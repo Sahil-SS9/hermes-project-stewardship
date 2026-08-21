@@ -300,7 +300,12 @@ def create_app(
     return app
 
 
+# Module-level app so `uvicorn hermes_project_stewardship.api.server:app`
+# works as documented in the README. Uses ./stewardship.db by default.
+app = create_app()
+
+
 if __name__ == "__main__":  # pragma: no cover
     import uvicorn
 
-    uvicorn.run(create_app(), host="127.0.0.1", port=9310)
+    uvicorn.run(app, host="127.0.0.1", port=9310)
