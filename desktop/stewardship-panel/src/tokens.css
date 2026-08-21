@@ -1,0 +1,50 @@
+/*
+ * Stewardship design tokens — single source for the desktop panel.
+ * Mirrors the CLI/Discord semantic palette (colourblind-safe).
+ */
+:root {
+  /* Type scale (1.25 ratio) */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.563rem;
+
+  /* Spacing (4px base) */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px;
+  --space-4: 16px; --space-6: 24px; --space-8: 32px;
+
+  /* Semantic health colours (colourblind-safe, WCAG AA on surface) */
+  --health-healthy: #2e7d32;
+  --health-watch: #b58900;
+  --health-degraded: #c05621;
+  --health-critical: #c0392b;
+  --health-unknown: #6b7280;
+
+  /* Risk */
+  --risk-low: #2e7d32; --risk-medium: #b58900;
+  --risk-high: #c05621; --risk-critical: #c0392b;
+
+  /* Surfaces + text */
+  --surface: #ffffff; --surface-alt: #f6f7f9; --border: #e2e5ea;
+  --text-primary: #1a202c; --text-secondary: #4a5568;
+
+  /* Accent */
+  --accent: #2b6cb0;
+
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(16, 24, 40, .08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #14161a; --surface-alt: #1d2127; --border: #2a2f37;
+    --text-primary: #e8eaed; --text-secondary: #aab2bd;
+    --accent: #63a4e8;
+    --shadow: 0 1px 3px rgba(0, 0, 0, .4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
