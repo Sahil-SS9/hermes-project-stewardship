@@ -48,8 +48,13 @@ class Store:
         self.cycle_retention_days = cycle_retention_days
         self.audit_retention_days = audit_retention_days
         # One connection per thread (FastAPI/gateway serve from worker
-        # threads); WAL + busy_timeout make cross-thread concurrency safe.
+        # threads); WAL + busy_timeout make cross-thread concurrency safe,
+        # and BEGIN IMMEDIATE serialises writers, so connections are opened
+        # with check_same_thread=False purely to allow deterministic
+        # cross-thread teardown in close().
         self._local = threading.local()
+        self._registry: Dict[int, sqlite3.Connection] = {}
+        self._reg_lock = threading.Lock()
         self.migrate()
 
     # ------------------------------------------------------------------ #
@@ -62,10 +67,14 @@ class Store:
         if conn is None:
             conn = self._connect()
             self._local.conn = conn
+            with self._reg_lock:
+                self._registry[id(threading.current_thread())] = conn
         return conn
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self.db_path), isolation_level=None)
+        conn = sqlite3.connect(
+            str(self.db_path), isolation_level=None, check_same_thread=False
+        )
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
@@ -73,14 +82,22 @@ class Store:
         return conn
 
     def close(self) -> None:
-        """Close THIS thread's connection; other threads' close lazily on GC."""
-        conn = getattr(self._local, "conn", None)
-        if conn is not None:
-            try:
-                conn.close()
-            except Exception:
-                pass
-            self._local.conn = None
+        """Close every thread's connection deterministically.
+
+        Connections are opened with ``check_same_thread=False`` (writes are
+        serialised by BEGIN IMMEDIATE under WAL), so any thread may close
+        them. Registered connections are closed first; the calling thread's
+        cached handle is then dropped so a subsequent operation reopens
+        cleanly.
+        """
+        with self._reg_lock:
+            for conn in self._registry.values():
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            self._registry.clear()
+        self._local.conn = None
 
     @contextmanager
     def tx(self) -> Iterator[sqlite3.Connection]:
@@ -122,12 +139,6 @@ class Store:
             "SELECT COALESCE(MAX(version),0) AS v FROM schema_migrations"
         ).fetchone()
         return int(row["v"])
-
-    def close(self) -> None:
-        try:
-            self._conn.close()
-        except Exception:
-            pass
 
     # ------------------------------------------------------------------ #
     # JSON helpers                                                       #
