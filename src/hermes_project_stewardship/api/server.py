@@ -3,7 +3,12 @@
 FastAPI is an OPTIONAL dependency (`pip install .[desktop-panel]`). The app
 factory takes an existing Store so embedding processes (e.g. `hermes serve`)
 can mount it on their own app; standalone `python -m
-hermes_project_stewardship.api.server` runs a dev server.
+hermes_project_stewardship.api.server` runs a dev server on 127.0.0.1:9310.
+
+Hardening (S5/S6/R2):
+- optional bearer auth (`auth_token`); /healthz always open;
+- per-client token-bucket rate limit on mutating methods;
+- uniform error envelope {error:{code,message}} on every non-2xx.
 
 Every endpoint returns JSON built from the same service layer the CLI uses —
 no separate state anywhere.
@@ -11,11 +16,12 @@ no separate state anywhere.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 try:
-    from fastapi import APIRouter, FastAPI, HTTPException
+    from fastapi import APIRouter, FastAPI, HTTPException, Request
     from pydantic import BaseModel
 except ImportError as e:  # pragma: no cover
     raise ImportError(
@@ -24,19 +30,28 @@ except ImportError as e:  # pragma: no cover
     ) from e
 
 from ..cycles.engine import CycleEngine, CycleRefused
+from ..events.bus import EventBus
 from ..gateway.handler import CommandRequest, GatewayCommandHandler
+from ..gateway.webhooks import WebhookRejected, WebhookReceiver
+from ..kanban import KanbanBridge, ReferenceKanbanAdapter
 from ..persistence.service import ServiceError, StewardshipService
 from ..persistence.store import Store
+from .middleware import (
+    BearerAuthMiddleware,
+    RateLimitMiddleware,
+    error_envelope_handler,
+)
 
 
 class EnableRequest(BaseModel):
-    project_id: str
+    project_id: str = ""
     mission: str = ""
     lead_profile: Optional[str] = None
     member_profiles: list[str] = []
     autonomy_level: int = 0
     verification_policy: Dict[str, Any] = {}
     release_policy: Dict[str, Any] = {}
+    notification_policy: Dict[str, Any] = {}
 
 
 class ObjectiveRequest(BaseModel):
@@ -75,22 +90,48 @@ class GatewayCommandBody(BaseModel):
     args: Dict[str, Any] = {}
 
 
-def create_app(store: Optional[Store] = None, db_path: Optional[Path] = None) -> FastAPI:
+class BindBoardRequest(BaseModel):
+    board_slug: Optional[str] = None
+
+
+class CompleteRequest(BaseModel):
+    outcome: Dict[str, Any]
+    regressed: bool = False
+
+
+def create_app(
+    store: Optional[Store] = None,
+    db_path: Optional[Path] = None,
+    *,
+    auth_token: Optional[str] = None,
+    rate_limit_rpm: int = 120,
+) -> FastAPI:
     if store is None:
         store = Store(db_path or Path("./stewardship.db"))
     svc = StewardshipService(store)
     engine = CycleEngine(svc)
+    bus = EventBus(store)
+    engine.attach_events(bus)
     gateway = GatewayCommandHandler(svc, cycle_engine=engine)
-    app = FastAPI(title="Hermes Project Stewardship RPC", version="0.1.0")
-    router = APIRouter(prefix="/stewardship/v1")
+    webhooks = WebhookReceiver(svc, engine)
+    bridge = KanbanBridge(svc, ReferenceKanbanAdapter(store))
 
-    def _err(fn):
-        def wrapper(*a, **kw):
-            try:
-                return fn(*a, **kw)
-            except ServiceError as e:
-                raise HTTPException(status_code=404 if "not" in str(e).lower() or "no such" in str(e).lower() else 409, detail=str(e))
-        return wrapper
+    app = FastAPI(
+        title="Hermes Project Stewardship RPC",
+        version="0.2.0",
+        description=(
+            "Durable project ownership for Hermes agent fleets. One canonical "
+            "backend serving CLI, TUI, Desktop and messaging gateways. "
+            "Mutating endpoints require a bearer token when auth_token is "
+            "configured; all errors use the {error:{code,message}} envelope."
+        ),
+    )
+    token = auth_token or os.environ.get("STEWARD_RPC_TOKEN")
+    if token:
+        app.add_middleware(BearerAuthMiddleware, token=token)
+    app.add_middleware(RateLimitMiddleware, requests_per_minute=rate_limit_rpm)
+
+    router = APIRouter(prefix="/stewardship/v1")
 
     @router.get("/projects")
     def list_projects():
@@ -106,6 +147,7 @@ def create_app(store: Optional[Store] = None, db_path: Optional[Path] = None) ->
             autonomy_level=body.autonomy_level,
             verification_policy=body.verification_policy,
             release_policy=body.release_policy,
+            notification_policy=body.notification_policy,
         )
 
     @router.post("/projects/{project_id}/disable")
@@ -175,6 +217,22 @@ def create_app(store: Optional[Store] = None, db_path: Optional[Path] = None) ->
     def reject(ref: str, body: ApprovalAction):
         return svc.reject_initiative(ref, actor=body.actor, interface=body.interface)
 
+    @router.post("/initiatives/{ref}/bind-board")
+    def bind_board(ref: str, body: BindBoardRequest):
+        try:
+            return bridge.bind(ref, board_slug=body.board_slug)
+        except ServiceError as e:
+            raise HTTPException(409, str(e))
+
+    @router.post("/initiatives/{ref}/complete")
+    def complete(ref: str, body: CompleteRequest):
+        try:
+            return bridge.complete_from_board(
+                ref, outcome=body.outcome, regressed=body.regressed
+            )
+        except ServiceError as e:
+            raise HTTPException(409, str(e))
+
     @router.post("/gateway/command")
     def gateway_command(body: GatewayCommandBody):
         req = CommandRequest(
@@ -192,7 +250,48 @@ def create_app(store: Optional[Store] = None, db_path: Optional[Path] = None) ->
             "already_done": resp.already_done,
         }
 
+    @router.post("/webhooks/{project_id}")
+    async def receive_webhook(project_id: str, request: Request):
+        body = await request.body()
+        signature = request.headers.get("x-hub-signature-256", "")
+        delivery = request.headers.get("x-github-delivery")
+        try:
+            res = webhooks.handle(
+                project_id=project_id, body=body,
+                signature=signature, delivery_id=delivery,
+            )
+        except WebhookRejected as e:
+            raise HTTPException(e.status, e.reason)
+        except CycleRefused as e:
+            raise HTTPException(409, str(e))
+        return {"accepted": True, "detail": res.detail, "trigger_key": res.trigger_key}
+
+    @router.get("/projects/{project_id}/events")
+    def events(project_id: str, limit: int = 50, event_type: Optional[str] = None):
+        return {"events": bus.recent(project_id=project_id, limit=limit,
+                                     event_type=event_type)}
+
+    @router.get("/projects/{project_id}/notifications")
+    def notifications(project_id: str):
+        from ..events.notifications import NotificationEngine
+
+        ne = NotificationEngine(store, svc)
+        return {"unacked": ne.unacked(project_id),
+                "queued": ne.pending_delivery(project_id)}
+
     app.include_router(router)
+
+    @app.exception_handler(HTTPException)
+    async def http_envelope(request: Request, exc: HTTPException):
+        return error_envelope_handler(request, exc)
+
+    @app.exception_handler(ServiceError)
+    async def service_envelope(request: Request, exc: ServiceError):
+        msg = str(exc).lower()
+        not_found = "not enabled" in msg or "no such" in msg or "disabled" in msg
+        return error_envelope_handler(
+            request, HTTPException(404 if not_found else 409, str(exc))
+        )
 
     @app.get("/healthz")
     def healthz():
@@ -200,8 +299,6 @@ def create_app(store: Optional[Store] = None, db_path: Optional[Path] = None) ->
 
     return app
 
-
-app = None  # populated by __main__; keeps import cheap when extra missing
 
 if __name__ == "__main__":  # pragma: no cover
     import uvicorn
