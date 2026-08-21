@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Dockyard - Mockups v2 (G0 iteration 2)</title>
+<style>
+/* ============================================================
+   Dockyard v2 tokens - extends desktop/stewardship-panel tokens.css.
+   Same semantic palette (colourblind-safe, WCAG AA), denser PM-grade
+   scale. Zero dependencies; drops into the Desktop plugin pane as-is.
+   ============================================================ */
+:root {
+  --text-xs: 0.6875rem; --text-sm: 0.8125rem; --text-md: 0.9375rem;
+  --text-lg: 1.125rem;  --text-xl: 1.375rem;
+
+  --space-1: 4px; --space-2: 8px; --space-3: 12px;
+  --space-4: 16px; --space-6: 24px; --space-8: 32px;
+
+  --health-healthy: #2e7d32; --health-watch: #b58900;
+  --health-degraded: #c05621; --health-critical: #c0392b;
+  --health-unknown: #6b7280;
+  --risk-low: #2e7d32; --risk-medium: #b58900;
+  --risk-high: #c05621; --risk-critical: #c0392b;
+
+  --surface: #ffffff; --surface-alt: #f4f5f7; --surface-sunken: #eceef1;
+  --border: #dfe1e6; --border-strong: #c1c7d0;
+  --text-primary: #172b4d; --text-secondary: #5e6c84;
+  --accent: #0052cc; --accent-soft: #deebff; --accent-strong: #0747a6;
+
+  --bot-lead: #6554c0; --bot-a: #008da6; --bot-b: #b38600; --human: #bf63f3;
+
+  --type-epic: #6554c0; --type-task: #0052cc; --type-bug: #c0392b;
+  --type-spike: #008da6; --type-initiative: #2e7d32;
+
+  --radius-sm: 3px; --radius: 6px; --radius-lg: 10px;
+  --shadow-sm: 0 1px 2px rgba(9,30,66,.12);
+  --shadow-md: 0 4px 12px rgba(9,30,66,.16);
+  --shadow-lg: 0 8px 28px rgba(9,30,66,.22);
+  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px #4c9aff;
+}
+[data-theme="dark"] {
+  --surface: #101214; --surface-alt: #161a1d; --surface-sunken: #1d2126;
+  --border: #2c3340; --border-strong: #44546f;
+  --text-primary: #e5e9f0; --text-secondary: #a3b1c6;
+  --accent: #4c9aff; --accent-soft: #172b4d; --accent-strong: #85b8ff;
+  --bot-lead: #9f8fef; --bot-a: #42b3d5; --bot-b: #d9a514; --human: #d98ef9;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.5);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.55);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,.6);
+}
+.rail-foot { color: var(--text-secondary); }
+* { margin:0; padding:0; box-sizing:border-box; }
+html { font-size: 16px; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  background: var(--surface-alt); color: var(--text-primary); font-size: var(--text-md);
+  line-height: 1.42; -webkit-font-smoothing: antialiased; }
+button { font: inherit; cursor: pointer; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-sm); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- app frame ---------- */
+.app { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+.rail { background: var(--surface); border-right: 1px solid var(--border);
+  display:flex; flex-direction:column; position: sticky; top:0; height:100vh; }
+.rail-brand { display:flex; align-items:center; gap: var(--space-2);
+  padding: var(--space-4) var(--space-4) var(--space-3); }
+.rail-brand .mark { width: 28px; height: 28px; border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--accent), var(--bot-lead));
+  display:grid; place-items:center; color:#fff; font-weight:800; font-size:13px; }
+.rail-brand b { font-size: var(--text-md); }
+.rail-section { padding: var(--space-3) var(--space-2) var(--space-1); }
+.rail-label { font-size: var(--text-xs); font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-secondary); padding: 0 var(--space-2) var(--space-1); }
+.rail-item { display:flex; align-items:center; gap: var(--space-2); width:100%;
+  padding: 7px var(--space-2); border:none; background:none; border-radius: var(--radius-sm);
+  color: var(--text-secondary); font-size: var(--text-sm); text-align:left; }
+.rail-item:hover { background: var(--surface-alt); color: var(--text-primary); }
+.rail-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.rail-item .badge { margin-left:auto; background: var(--accent); color:#fff; border-radius:999px;
+  font-size: var(--text-xs); font-weight:700; padding: 0 7px; line-height: 18px; }
+.rail-item .badge.quiet { background: var(--surface-sunken); color: var(--text-secondary); }
+.rail-foot { margin-top:auto; padding: var(--space-3); border-top: 1px solid var(--border);
+  font-size: var(--text-xs); color: var(--text-secondary); }
+
+.main { display:flex; flex-direction:column; min-width: 0; }
+.topbar { position: sticky; top:0; z-index: 40; background: var(--surface);
+  border-bottom: 1px solid var(--border); display:flex; align-items:center;
+  gap: var(--space-3); padding: var(--space-2) var(--space-6); }
+.crumbs { font-size: var(--text-sm); color: var(--text-secondary); }
+.crumbs b { color: var(--text-primary); }
+.palette-btn { margin-left:auto; display:flex; align-items:center; gap: var(--space-2);
+  border:1px solid var(--border); background: var(--surface-alt); color: var(--text-secondary);
+  border-radius: var(--radius); padding: 6px 12px; font-size: var(--text-sm); min-width: 240px; }
+.palette-btn kbd { margin-left:auto; font-family: inherit; font-size: var(--text-xs);
+  border:1px solid var(--border); border-radius:4px; padding:0 5px; background:var(--surface); }
+.iconbtn { position:relative; border:none; background:none; border-radius: var(--radius);
+  width: 34px; height: 34px; display:grid; place-items:center; color: var(--text-secondary); }
+.iconbtn:hover { background: var(--surface-alt); color: var(--text-primary); }
+.iconbtn .dot { position:absolute; top:6px; right:6px; min-width:15px; height:15px;
+  border-radius:999px; background: var(--risk-medium); color:#fff; font-size:9px; font-weight:800;
+  display:grid; place-items:center; padding:0 3px; }
+.content { padding: var(--space-6); max-width: 1280px; width:100%; margin: 0 auto; }
+
+/* ---------- primitives ---------- */
+.card { background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm); }
+.pad { padding: var(--space-4); }
+.grid { display:grid; gap: var(--space-4); }
+.row { display:flex; align-items:center; gap: var(--space-2); flex-wrap:wrap; }
+.spread { display:flex; justify-content:space-between; align-items:center; gap: var(--space-2); flex-wrap:wrap; }
+.sub { color: var(--text-secondary); font-size: var(--text-sm); }
+.xs { font-size: var(--text-xs); color: var(--text-secondary); }
+h1 { font-size: var(--text-xl); letter-spacing: -0.01em; }
+h2 { font-size: var(--text-lg); }
+h3 { font-size: var(--text-md); }
+
+.btn { border:none; border-radius: var(--radius); padding: 7px 14px; font-size: var(--text-sm);
+  font-weight: 500; transition: background .12s, transform .05s; }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--accent); color:#fff; }
+.btn-primary:hover { background: var(--accent-strong); }
+.btn-subtle { background: transparent; color: var(--text-secondary); }
+.btn-subtle:hover { background: var(--surface-alt); color: var(--text-primary); }
+.btn-danger-ghost { background:transparent; color: var(--risk-high); border:1px solid var(--border); }
+.btn-danger-ghost:hover { border-color: var(--risk-high); }
+
+.pill { display:inline-flex; align-items:center; gap:5px; padding: 1px 8px; border-radius:999px;
+  font-size: var(--text-xs); font-weight: 600; line-height: 18px; }
+.pill::before { content:""; width:7px; height:7px; border-radius:50%; background: currentColor; flex:none; }
+.p-healthy { color:var(--health-healthy); background: color-mix(in srgb, var(--health-healthy) 11%, transparent); }
+.p-watch { color:var(--health-watch); background: color-mix(in srgb, var(--health-watch) 13%, transparent); }
+.p-degraded { color:var(--health-degraded); background: color-mix(in srgb, var(--health-degraded) 12%, transparent); }
+.p-critical { color:var(--health-critical); background: color-mix(in srgb, var(--health-critical) 11%, transparent); }
+.p-unknown { color:var(--health-unknown); background: color-mix(in srgb, var(--health-unknown) 12%, transparent); }
+.p-neutral { color:var(--text-secondary); background: var(--surface-sunken); }
+
+.type-chip { font-size:10px; font-weight:800; letter-spacing:.05em; padding:1px 6px;
+  border-radius: var(--radius-sm); color:#fff; text-transform: uppercase; flex:none; }
+.t-epic{background:var(--type-epic);} .t-task{background:var(--type-task);}
+.t-bug{background:var(--type-bug);} .t-spike{background:var(--type-spike);}
+.t-init{background:var(--type-initiative);}
+
+.avatar { width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center;
+  justify-content:center; color:#fff; font-size:10px; font-weight:800; flex:none;
+  border: 2px solid var(--surface); }
+.av-lead{background:var(--bot-lead);} .av-bot{background:var(--bot-a);}
+.av-botb{background:var(--bot-b);} .av-human{background:var(--human);}
+.stack { display:flex; }
+.stack .avatar:not(:first-child){ margin-left:-7px; }
+
+.bar { height:4px; border-radius:2px; background: var(--surface-sunken); overflow:hidden; }
+.bar i { display:block; height:100%; border-radius:2px; }
+
+table.list { width:100%; border-collapse: collapse; font-size: var(--text-sm); }
+table.list th { text-align:left; color:var(--text-secondary); font-weight:600;
+  padding: var(--space-2) var(--space-3); border-bottom:1px solid var(--border);
+  font-size: var(--text-xs); text-transform: uppercase; letter-spacing:.05em; white-space:nowrap; }
+table.list td { padding: 10px var(--space-3); border-bottom:1px solid var(--border); }
+tr:last-child td { border-bottom:none; }
+tbody tr { transition: background .1s; }
+tbody tr:hover { background: var(--surface-alt); }
+tr[aria-selected="true"] { background: var(--accent-soft); }
+
+/* tabs */
+.tabs { display:flex; gap: var(--space-1); border-bottom:1px solid var(--border); }
+.tab { padding: 10px var(--space-3); color:var(--text-secondary); border:none; background:none;
+  font-size: var(--text-sm); font-weight:500; border-bottom:2px solid transparent; margin-bottom:-1px; }
+.tab[aria-selected="true"] { color:var(--accent); border-color: var(--accent); font-weight:600; }
+.tab:hover { color: var(--text-primary); }
+
+/* kanban */
+.board { display:grid; grid-template-columns: repeat(4, minmax(230px, 1fr)); gap: var(--space-3); align-items:start; }
+.col { background: var(--surface-sunken); border-radius: var(--radius-lg); padding: var(--space-2); }
+.col-head { display:flex; align-items:center; gap: var(--space-2); padding: var(--space-1) var(--space-2) var(--space-2); }
+.col-head h3 { font-size: var(--text-sm); font-weight: 700; }
+.col-head .count { color: var(--text-secondary); font-weight: 600; font-size: var(--text-xs); }
+.wi { background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3) var(--space-3); margin-bottom: var(--space-2);
+  cursor:pointer; box-shadow: var(--shadow-sm); transition: box-shadow .12s, transform .12s; }
+.wi:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.wi .title { font-weight: 500; font-size: var(--text-sm); margin: 6px 0 8px; line-height:1.35; }
+.wi .meta { display:flex; justify-content:space-between; align-items:center; }
+.wip { font-size: var(--text-xs); font-weight:700; }
+.wip.over { color: var(--risk-high); }
+
+/* drawer */
+.scrim { position:fixed; inset:0; background: rgba(9,30,66,.5); opacity:0; pointer-events:none;
+  transition: opacity .18s; z-index: 90; }
+.scrim.open { opacity:1; pointer-events:auto; }
+.drawer { position:fixed; top:0; right:0; bottom:0; width: 560px; max-width: 94vw;
+  background: var(--surface); border-left:1px solid var(--border); box-shadow: var(--shadow-lg);
+  transform: translateX(102%); transition: transform .2s cubic-bezier(.2,0,.4,1); z-index: 100;
+  display:flex; flex-direction:column; }
+.drawer.open { transform: none; }
+.drawer-head { padding: var(--space-4) var(--space-5); border-bottom:1px solid var(--border); }
+.drawer-body { padding: var(--space-4) var(--space-5); overflow:auto; flex:1; }
+.drawer-foot { padding: var(--space-3) var(--space-5); border-top:1px solid var(--border);
+  display:flex; gap: var(--space-2); align-items:center; background: var(--surface); }
+.field { margin-bottom: var(--space-4); }
+.field label { display:block; font-size: var(--text-xs); font-weight:700; color:var(--text-secondary);
+  text-transform: uppercase; letter-spacing:.05em; margin-bottom: var(--space-1); }
+.input { width:100%; border:1px solid var(--border-strong); border-radius: var(--radius);
+  padding: 8px 10px; font: inherit; font-size: var(--text-sm); background: var(--surface); color: var(--text-primary); }
+.evidence { background: var(--surface-alt); border:1px solid var(--border); border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3); font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: var(--text-xs); color: var(--text-secondary); white-space: pre-wrap; }
+
+/* timeline + chat */
+.timeline { position:relative; padding-left: 18px; }
+.timeline::before { content:""; position:absolute; left:5px; top:6px; bottom:6px; width:2px; background: var(--border); }
+.tl-item { position:relative; padding: 5px 0 5px var(--space-2); font-size: var(--text-sm); }
+.tl-item::before { content:""; position:absolute; left:-17px; top:10px; width:9px; height:9px;
+  border-radius:50%; background: var(--accent); box-shadow: 0 0 0 3px var(--surface); }
+.tl-item.ok::before{background:var(--health-healthy);} .tl-item.warn::before{background:var(--health-watch);}
+.tl-item.crit::before{background:var(--health-critical);} .tl-item.mute::before{background:var(--border-strong);}
+
+.chat { display:flex; flex-direction:column; gap: var(--space-2); }
+.msg { max-width: 82%; padding: var(--space-2) var(--space-3); border-radius: var(--radius-lg);
+  font-size: var(--text-sm); border:1px solid var(--border); }
+.msg .who { font-size: var(--text-xs); font-weight:700; margin-bottom:2px; }
+.msg.bot { background: var(--surface-alt); align-self:flex-start; border-bottom-left-radius: 3px; }
+.msg.sys { background: transparent; border:1px dashed var(--border-strong); align-self:center;
+  color:var(--text-secondary); font-size: var(--text-xs); border-radius: 999px; padding: 3px 12px; }
+
+/* palette */
+.palette-wrap { position:fixed; inset:0; z-index: 200; display:none; }
+.palette-wrap.open { display:block; }
+.palette { position:fixed; top:14vh; left:50%; transform: translateX(-50%); width: 560px; max-width:92vw;
+  background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  border:1px solid var(--border); overflow:hidden; }
+.palette input { width:100%; border:none; border-bottom:1px solid var(--border); padding: 14px 18px;
+  font: inherit; font-size: var(--text-md); background: var(--surface); color: var(--text-primary); }
+.palette input:focus { box-shadow:none; }
+.palette .results { max-height: 320px; overflow:auto; padding: var(--space-2); }
+.palette .group { font-size: var(--text-xs); font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--text-secondary); padding: var(--space-2) var(--space-2) var(--space-1); }
+.palette .res { display:flex; align-items:center; gap: var(--space-2); width:100%; text-align:left;
+  border:none; background:none; padding: 8px var(--space-2); border-radius: var(--radius); font-size: var(--text-sm); color: var(--text-primary); }
+.palette .res:hover, .palette .res.sel { background: var(--accent-soft); }
+.palette .res .sub { margin-left:auto; }
+
+/* state blocks */
+.state { display:grid; place-items:center; text-align:center; padding: var(--space-8) var(--space-4);
+  border:1px dashed var(--border-strong); border-radius: var(--radius-lg); background: var(--surface); }
+.state .art { width:56px; height:56px; border-radius: var(--radius-lg); display:grid; place-items:center;
+  font-size:24px; margin-bottom: var(--space-3); }
+.skeleton { border-radius: var(--radius); background: linear-gradient(90deg, var(--surface-sunken) 25%, var(--surface-alt) 50%, var(--surface-sunken) 75%);
+  background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+/* toasts */
+.toasts { position: fixed; bottom: var(--space-4); right: var(--space-4); z-index: 300;
+  display:flex; flex-direction:column; gap: var(--space-2); }
+.toast { background: var(--surface); border:1px solid var(--border); border-left:3px solid var(--accent);
+  box-shadow: var(--shadow-md); border-radius: var(--radius); padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm); min-width: 280px; }
+.toast.ok { border-left-color: var(--health-healthy); }
+.toast.warn { border-left-color: var(--health-watch); }
+
+/* screens */
+.screen { display:none; }
+.screen.active { display:block; }
+.note { border:1px solid var(--border); border-left:3px solid var(--accent); background: var(--surface);
+  border-radius: var(--radius); padding: var(--space-2) var(--space-3); margin-top: var(--space-4);
+  font-size: var(--text-xs); color: var(--text-secondary); }
+.note b { color: var(--text-primary); }
+
+@media (max-width: 980px) {
+  .app { grid-template-columns: 64px 1fr; }
+  .rail-brand b, .rail-label, .rail-item span.lbl, .rail-foot { display:none; }
+  .rail-item { justify-content:center; }
+  .board { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body data-theme="light">
+
+<div class="app">
+  <!-- ============ RAIL ============ -->
+  <aside class="rail">
+    <div class="rail-brand"><div class="mark">HD</div><b>Dockyard</b></div>
+    <div class="rail-section">
+      <div class="rail-label">Fleet</div>
+      <button class="rail-item active" data-s="s1"><span>⌂</span><span class="lbl">Home</span></button>
+      <button class="rail-item" data-s="s4"><span>✓</span><span class="lbl">Approval Inbox</span><span class="badge">3</span></button>
+      <button class="rail-item" data-s="s5"><span>◉</span><span class="lbl">Bot Teams</span></button>
+    </div>
+    <div class="rail-section">
+      <div class="rail-label">Projects</div>
+      <button class="rail-item" data-s="s2"><span class="pill p-watch" style="width:8px;height:8px;padding:0"></span><span class="lbl">checkout-service</span></button>
+      <button class="rail-item" data-s="s2"><span class="pill p-healthy" style="width:8px;height:8px;padding:0"></span><span class="lbl">walkie-talkie</span></button>
+      <button class="rail-item" data-s="s2"><span class="pill p-critical" style="width:8px;height:8px;padding:0"></span><span class="lbl">hydraskale-auth</span></button>
+      <button class="rail-item" data-s="s3"><span class="pill p-healthy" style="width:8px;height:8px;padding:0"></span><span class="lbl">sahilblog</span></button>
+      <button class="rail-item" data-s="s7"><span>＋</span><span class="lbl">New project</span></button>
+    </div>
+    <div class="rail-foot">Dockyard v0.3-draft · plugin build<br>upstream-compatible · no config changes</div>
+  </aside>
+
+  <div class="main">
+    <!-- ============ TOPBAR ============ -->
+    <header class="topbar">
+      <div class="crumbs" id="crumbs"><b>Fleet</b> / Home</div>
+      <button class="palette-btn" onclick="openPalette()" aria-label="Open command palette">
+        <span>Search or run a command</span><kbd>⌘K</kbd>
+      </button>
+      <button class="iconbtn" title="Notifications" aria-label="Notifications">
+        <span>🔔</span><span class="dot">3</span>
+      </button>
+      <button class="iconbtn" title="Toggle theme" aria-label="Toggle theme" onclick="toggleTheme()"><span id="themeIcon">☾</span></button>
+      <span class="avatar av-human" title="Sahil">S</span>
+    </header>
+
+    <div class="content">
+
+    <!-- ============ S1: HOME ============ -->
+    <section class="screen active" id="s1">
+      <div class="spread" style="margin-bottom:var(--space-4)">
+        <div><h1>Home</h1><p class="sub">Tuesday 25 Aug · everything the fleet owes you, nothing it doesn't.</p></div>
+        <button class="btn btn-primary" onclick="toast('Onboarding wizard opens here (UX-08)','ok')">+ New project</button>
+      </div>
+
+      <div class="grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:var(--space-4)">
+        <div class="card pad" onclick="go('s4')" style="cursor:pointer">
+          <div class="xs">Awaiting your decision</div>
+          <div style="font-size:1.75rem;font-weight:800;color:var(--accent)">3</div>
+          <div class="bar"><i style="width:55%;background:var(--accent)"></i></div></div>
+        <div class="card pad">
+          <div class="xs">Projects healthy</div>
+          <div style="font-size:1.75rem;font-weight:800">3<span class="sub" style="font-size:var(--text-sm)"> / 5</span></div>
+          <div class="row" style="gap:3px;margin-top:6px">
+            <span class="pill p-healthy" style="padding:0;width:22px;height:6px;border-radius:2px"></span>
+            <span class="pill p-healthy" style="padding:0;width:22px;height:6px;border-radius:2px"></span>
+            <span class="pill p-healthy" style="padding:0;width:22px;height:6px;border-radius:2px"></span>
+            <span class="pill p-watch" style="padding:0;width:22px;height:6px;border-radius:2px"></span>
+            <span class="pill p-critical" style="padding:0;width:22px;height:6px;border-radius:2px"></span>
+          </div></div>
+        <div class="card pad">
+          <div class="xs">Bots busy / idle</div>
+          <div style="font-size:1.75rem;font-weight:800">8<span class="sub" style="font-size:var(--text-sm)"> / 3</span></div>
+          <div class="bar"><i style="width:73%;background:var(--bot-a)"></i></div></div>
+        <div class="card pad">
+          <div class="xs">Shipped this week</div>
+          <div style="font-size:1.75rem;font-weight:800;color:var(--health-healthy)">6</div>
+          <div class="xs">1 flagged regressed · auto-follow-up open</div></div>
+      </div>
+
+      <div class="grid" style="grid-template-columns: 1.6fr 1fr;">
+        <div class="card">
+          <div class="pad spread"><h2>Projects</h2><button class="btn btn-subtle" onclick="go('s2')">View all →</button></div>
+          <table class="list">
+            <thead><tr><th>Project</th><th>Health</th><th>Work</th><th>Team</th><th>Last verified</th></tr></thead>
+            <tbody>
+              <tr onclick="go('s2')" style="cursor:pointer">
+                <td><b>checkout-service</b><div class="xs">Payments demo repo</div></td>
+                <td><span class="pill p-watch">Watch</span></td><td>14 items · 3 bots</td>
+                <td><span class="stack"><span class="avatar av-lead">RD</span><span class="avatar av-bot">CD</span><span class="avatar av-botb">QA</span></span></td>
+                <td class="xs">38 min ago · all collectors green</td></tr>
+              <tr onclick="go('s2')" style="cursor:pointer">
+                <td><b>walkie-talkie</b><div class="xs">Voice relay for Misa-Misa intake</div></td>
+                <td><span class="pill p-healthy">Healthy</span></td><td>9 items · 2 bots</td>
+                <td><span class="stack"><span class="avatar av-lead">OC</span><span class="avatar av-bot">CD</span></span></td>
+                <td class="xs">12 min ago · all collectors green</td></tr>
+              <tr>
+                <td><b>sahilblog</b><div class="xs">Content pipeline + publishing</div></td>
+                <td><span class="pill p-healthy">Healthy</span></td><td>11 items · 2 bots</td>
+                <td><span class="stack"><span class="avatar av-lead">CC</span><span class="avatar av-botb">IM</span></span></td>
+                <td class="xs" style="white-space:nowrap">1 h ago · 1 advisory note</td></tr>
+              <tr onclick="go('s2')" style="cursor:pointer">
+                <td><b>hydraskale-auth</b><div class="xs">SSO + credential vault</div></td>
+                <td><span class="pill p-critical">Critical · frozen</span></td><td>6 items · paused</td>
+                <td><span class="stack"><span class="avatar av-lead">WK</span></span></td>
+                <td class="xs"><a href="#" onclick="go('s6');return false" style="color:var(--risk-critical);font-weight:600">Recovery path required</a></td></tr>
+              <tr>
+                <td><b>rig-monitoring</b><div class="xs">GPU fleet telemetry</div></td>
+                <td><span class="pill p-unknown">Unknown</span></td><td style="white-space:nowrap">verification failing</td>
+                <td><span class="stack"><span class="avatar av-lead">WS</span></span></td>
+                <td class="xs">repo unreachable · fail-closed engaged</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+          <div class="card pad">
+            <div class="spread"><h3>Needs you</h3><button class="btn btn-subtle" onclick="go('s4')">Inbox →</button></div>
+            <div class="row" style="margin-top:var(--space-2);cursor:pointer" onclick="openDrawer()">
+              <span class="pill p-watch">medium</span><span style="font-size:var(--text-sm)">Restore failing objective 'tests-pass'</span></div>
+            <div class="row" style="margin-top:var(--space-2)">
+              <span class="pill p-degraded">high</span><span style="font-size:var(--text-sm)">Rotate exposed webhook key</span></div>
+            <div class="row" style="margin-top:var(--space-2)">
+              <span class="pill p-healthy">low</span><span style="font-size:var(--text-sm)">Bump httpx to 0.29</span></div>
+          </div>
+          <div class="card pad" style="flex:1">
+            <h3>Fleet activity</h3>
+            <div class="timeline" style="margin-top:var(--space-3)">
+              <div class="tl-item ok"><b>qa-bot</b> verified checkout tests green <span class="xs">· 4m</span></div>
+              <div class="tl-item"><b>coder-bot</b> started INIT-0001 on Kanban <span class="xs">· 22m</span></div>
+              <div class="tl-item warn"><b>research-bot</b> flagged dependency drift in blog <span class="xs">· 1h</span></div>
+              <div class="tl-item crit"><b>scanner</b> froze hydraskale-auth: injection pattern in issue body <span class="xs">· 2h</span></div>
+              <div class="tl-item mute"><b>blog</b> weekly cycle: NO_ACTION_REQUIRED <span class="xs">· 3h</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="note"><b>UX-01:</b> every flow on this screen is clickable. The engine (CLI, slash commands) is internal plumbing only. <b>Empty-state parity:</b> a new install renders this screen with the onboarding wizard instead of tables.</div>
+    </section>
+
+    <!-- ============ S2: PROJECT BOARD ============ -->
+    <section class="screen" id="s2">
+      <div class="spread" style="margin-bottom:var(--space-3)">
+        <div class="row">
+          <h1>checkout-service</h1>
+          <span class="pill p-watch">Watch</span>
+          <span class="pill p-neutral" title="Autonomy level 2: can propose, cannot touch code">L2 Planner</span>
+        </div>
+        <div class="row">
+          <button class="btn btn-subtle" onclick="toast('Cycle triggered · idempotency key minted','ok')">Run cycle</button>
+          <button class="btn btn-primary" onclick="openDrawer('new')">+ New item</button>
+        </div>
+      </div>
+      <div class="row xs" style="margin-bottom:var(--space-3)">
+        <span>Mission: <i>keep tests green and deps fresh</i></span>·<span>KPIs 1/2 met</span>·<span>Milestone <b>v0.2 hardening</b> 7/9 · due Fri</span>·<a onclick="toast('Goals editor opens as a full-screen sheet','ok')">edit goals</a>
+      </div>
+
+      <div class="tabs" style="margin-bottom:var(--space-3)">
+        <button class="tab" aria-selected="true">Board</button>
+        <button class="tab" onclick="go('s3')">Backlog</button>
+        <button class="tab">Timeline</button>
+        <button class="tab" onclick="go('s6')">Initiatives</button>
+        <button class="tab">Activity</button>
+        <button class="tab">Settings</button>
+      </div>
+
+      <div class="board">
+        <div class="col">
+          <div class="col-head"><h3>Backlog</h3><span class="count">5</span></div>
+          <div class="wi" onclick="openDrawer()"><div class="row"><span class="type-chip t-task">Task</span><span class="xs">HDY-31</span></div>
+            <div class="title">Split CI matrix by OS</div>
+            <div class="meta"><span class="xs">est 3d</span><span class="avatar av-bot" title="coder-bot">CD</span></div></div>
+          <div class="wi"><div class="row"><span class="type-chip t-spike">Spike</span><span class="xs">HDY-33</span></div>
+            <div class="title">Evaluate PG 17 partitioning</div>
+            <div class="meta"><span class="xs">created by Sahil</span><span class="avatar av-human">S</span></div></div>
+          <div class="wi" style="opacity:.6"><div class="row"><span class="type-chip t-epic">Epic</span><span class="xs">HDY-40</span></div>
+            <div class="title">Migrate UI to React 20 <span class="pill p-unknown" style="margin-left:4px">suppressed</span></div>
+            <div class="meta"><span class="xs">rejected 2× · no objective link</span></div></div>
+        </div>
+        <div class="col">
+          <div class="col-head"><h3>In progress</h3><span class="count">3</span><span class="wip">3/5</span></div>
+          <div class="wi" onclick="openDrawer()" aria-selected="true" style="outline:2px solid var(--accent)">
+            <div class="row"><span class="type-chip t-init">Initiative</span><span class="xs">INIT-0001</span></div>
+            <div class="title">Restore failing objective 'tests-pass'</div>
+            <div class="meta"><span class="pill p-watch">medium</span><span class="stack"><span class="avatar av-lead">RD</span><span class="avatar av-bot">CD</span></span></div></div>
+          <div class="wi"><div class="row"><span class="type-chip t-task">Task</span><span class="xs">HDY-28</span></div>
+            <div class="title">Add rate-limit smoke test</div>
+            <div class="meta"><span class="xs">est 1d</span><span class="avatar av-botb">QA</span></div></div>
+        </div>
+        <div class="col">
+          <div class="col-head"><h3>In review</h3><span class="count">2</span><span class="wip">2/3</span></div>
+          <div class="wi"><div class="row"><span class="type-chip t-bug">Bug</span><span class="xs">HDY-24</span></div>
+            <div class="title">Webhook retry duplicates events</div>
+            <div class="meta"><span class="pill p-degraded">high</span><span class="avatar av-bot">CD</span></div></div>
+        </div>
+        <div class="col">
+          <div class="col-head"><h3>Done</h3><span class="count">9</span></div>
+          <div class="wi" style="opacity:.72"><div class="row"><span class="type-chip t-task">Task</span><span class="xs">HDY-21</span></div>
+            <div class="title">Pin pytest-timeout</div><div class="meta"><span class="xs">outcome verified ✓</span><span class="avatar av-bot">CD</span></div></div>
+          <div class="wi" style="opacity:.72"><div class="row"><span class="type-chip t-task">Task</span><span class="xs">HDY-18</span></div>
+            <div class="title">Audit log retention job</div><div class="meta"><span class="xs">outcome verified ✓</span><span class="avatar av-botb">QA</span></div></div>
+        </div>
+      </div>
+      <div class="note"><b>D1 honoured:</b> these are native work-items; the "In execution" initiative card mirrors its Hermes Kanban board underneath (deep-link in the drawer). <b>D4:</b> human and bot cards share the board; WIP caps enforced per column; the suppressed epic shows its reasoning rather than vanishing (anti-busywork made visible).</div>
+    </section>
+
+    <!-- ============ S3: BACKLOG ============ -->
+    <section class="screen" id="s3">
+      <div class="spread" style="margin-bottom:var(--space-3)">
+        <div><h1>Backlog</h1><p class="sub">checkout-service · the PRIORITISE stage writes here; rank changes require a reason (PM-03)</p></div>
+        <div class="row"><button class="btn btn-subtle" onclick="toast('Auto-rank by objective severity: policy-gated, off by default')">Auto-rank</button>
+          <button class="btn btn-primary" onclick="toast('Drag to reorder · reason prompted on rank change','ok')">Reorder</button></div>
+      </div>
+      <div class="card">
+        <table class="list">
+          <thead><tr><th style="width:34px">#</th><th>Item</th><th>Evidence</th><th>Risk</th><th>Aged</th><th>Gate</th></tr></thead>
+          <tbody>
+            <tr onclick="openDrawer()" style="cursor:pointer"><td><b>1</b></td>
+              <td><b>Restore failing objective 'tests-pass'</b><div class="xs">INIT-0001 · objective breach, cycle 42</div></td>
+              <td class="xs">pytest exit=1 · snapshot #41</td>
+              <td><span class="pill p-watch">medium</span></td><td class="xs">2h</td><td><span class="pill p-watch">human approval</span></td></tr>
+            <tr><td><b>2</b></td>
+              <td><b>Rotate webhook signing key</b><div class="xs">INIT-BLOG-0007 · secret scan hit</div></td>
+              <td class="xs">scan ref · log line 882</td>
+              <td><span class="pill p-degraded">high</span></td><td class="xs">6h</td><td><span class="pill p-watch">human approval</span></td></tr>
+            <tr><td><b>3</b></td>
+              <td><b>Bump httpx 0.28 → 0.29</b><div class="xs">HDY-36 · weekly dependency sweep</div></td>
+              <td class="xs">dep scan report</td>
+              <td><span class="pill p-healthy">low</span></td><td class="xs">1d</td><td><span class="pill p-healthy">policy auto</span></td></tr>
+            <tr><td><b>4</b></td>
+              <td><b>Investigate flaky test_app_retry</b><div class="xs">HDY-38 · 3 flakes / 7 days</div></td>
+              <td class="xs">CI history query</td>
+              <td><span class="pill p-healthy">low</span></td><td class="xs">3d</td><td><span class="pill p-healthy">policy auto</span></td></tr>
+            <tr style="opacity:.55"><td class="xs">n/a</td>
+              <td><b>Migrate UI to React 20</b><div class="xs">HDY-40 · suppressed: rejected 2×, no objective link</div></td>
+              <td class="xs">none cited</td><td class="xs">n/a</td><td class="xs">since 3d</td><td><span class="pill p-unknown">suppressed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><b>Rank integrity:</b> reordering prompts for a reason and writes it to the audit log; bot-proposed ranks cite objective severity. Suppression is visible, not hidden.</div>
+    </section>
+
+    <!-- ============ S4: APPROVAL INBOX ============ -->
+    <section class="screen" id="s4">
+      <div class="spread" style="margin-bottom:var(--space-3)">
+        <div><h1>Approval Inbox</h1><p class="sub">every pending human decision across all projects · resolves without a terminal or Discord</p></div>
+        <span class="pill p-watch">3 pending</span>
+      </div>
+      <div class="grid" style="grid-template-columns: 1fr 340px; align-items:start;">
+        <div class="card" id="inbox-list">
+          <div class="pad" onclick="openDrawer()" style="cursor:pointer;border-bottom:1px solid var(--border)" aria-selected="true">
+            <div class="spread">
+              <div class="row"><span class="avatar av-lead">RD</span><b>Restore failing objective 'tests-pass'</b></div>
+              <span class="pill p-watch">medium</span></div>
+            <div class="xs" style="margin-top:4px">checkout-service · research-lead via cycle 42 · INIT-CHECKOUT-0001 · expires in 22h</div>
+            <div class="evidence" style="margin-top:var(--space-2)">objective 'tests-pass': target ≥1, measured 0.0 (pytest exit=1)
+last green: snapshot #41 · refs: git@8f3e21, ci-run#993
+plan: revert bad commit → rerun suite → outcome check vs objective</div>
+          </div>
+          <div class="pad" style="border-bottom:1px solid var(--border);cursor:pointer">
+            <div class="spread">
+              <div class="row"><span class="avatar av-botb">IM</span><b>Rotate exposed webhook signing key</b></div>
+              <span class="pill p-degraded">high</span></div>
+            <div class="xs" style="margin-top:4px">sahilblog · image-bot after secret scan · INIT-BLOG-0007 · expires in 16h</div>
+            <div class="evidence" style="margin-top:var(--space-2)">scan hit: signing key fragment in build log line 882
+policy: high-risk ops always require human approval (restriction-only)
+plan: revoke → rotate → verify signature checks pass</div>
+          </div>
+          <div class="pad" style="opacity:.78">
+            <div class="spread">
+              <div class="row"><span class="avatar av-botb">QA</span><b>Bump httpx to 0.29</b></div>
+              <span class="pill p-healthy">low</span></div>
+            <div class="xs" style="margin-top:4px">walkie-talkie · policy allows autonomous low-risk bumps · shown for visibility, no decision needed</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+          <div class="card pad">
+            <h3>Decide</h3>
+            <p class="xs" style="margin:var(--space-2) 0 var(--space-3)">Approving executes the plan on Hermes Kanban and schedules the outcome check. Rejecting feeds suppression with your reason.</p>
+            <div class="row">
+              <button class="btn btn-primary" onclick="toast('INIT-CHECKOUT-0001 approved · actor=sahil interface=approval-inbox · board checkout-ops starting','ok')">Approve &amp; execute</button>
+              <button class="btn btn-subtle" onclick="toast('Threaded question opens; bot answers in this drawer')">Ask</button>
+              <button class="btn btn-danger-ghost" onclick="toast('Rejected · reason recorded · suppression updated','warn')">Reject</button>
+            </div>
+          </div>
+          <div class="card pad">
+            <h3>Why this needs you</h3>
+            <p class="xs" style="margin-top:var(--space-2)">Project policy: L2 Planner may propose, never mutate source. Merge stays human-only regardless of level. This is the trust engine's restriction-only guarantee, surfaced as a decision rather than a command.</p>
+          </div>
+        </div>
+      </div>
+      <div class="note"><b>TE-02:</b> one screen aggregates every project's pending gates. Discord/gateway approvals keep working and post deep-links here; nothing requires them.</div>
+    </section>
+
+    <!-- ============ S5: BOT TEAMS ============ -->
+    <section class="screen" id="s5">
+      <div class="spread" style="margin-bottom:var(--space-3)">
+        <div><h1>Bot Teams</h1><p class="sub">registry, workload and A2A · coordination lands in Bot Mode groups/channels (D3)</p></div>
+        <button class="btn btn-primary" onclick="toast('Registration reads the live Hermes roster; no manual config','ok')">+ Register bot</button>
+      </div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr));margin-bottom:var(--space-4)">
+        <div class="card pad">
+          <div class="spread"><span class="row"><span class="avatar av-lead">RD</span><b>research-lead</b></span><span class="pill p-healthy">busy · 3</span></div>
+          <p class="xs" style="margin:var(--space-2) 0">Leads checkout team · proposes initiatives from verified gaps</p>
+          <div class="row xs"><span class="pill p-neutral">LEAD</span> 92% outcome success · 0 regressions / 30d</div>
+          <div class="row" style="margin-top:var(--space-2)"><button class="btn btn-subtle" onclick="toast('Opens the Bot Mode chat with research-lead (upstream message_agent transport)','ok')">Message</button>
+            <button class="btn btn-subtle">Assign</button></div>
+        </div>
+        <div class="card pad">
+          <div class="spread"><span class="row"><span class="avatar av-bot">CD</span><b>coder-bot</b></span><span class="pill p-healthy">busy · 4</span></div>
+          <p class="xs" style="margin:var(--space-2) 0">Implements approved work on Kanban across 3 projects</p>
+          <div class="row xs">python · typescript · ci · docker</div>
+          <div class="row" style="margin-top:var(--space-2)"><button class="btn btn-subtle" onclick="toast('Opens Bot Mode chat with coder-bot','ok')">Message</button>
+            <button class="btn btn-subtle">Assign</button></div>
+        </div>
+        <div class="card pad">
+          <div class="spread"><span class="row"><span class="avatar av-botb">QA</span><b>qa-bot</b></span><span class="pill p-watch">idle · 1</span></div>
+          <p class="xs" style="margin:var(--space-2) 0">Runs verification collectors + outcome checks</p>
+          <div class="row xs">last handoff: coder-bot → qa-bot · audit #4412</div>
+          <div class="row" style="margin-top:var(--space-2)"><button class="btn btn-subtle" onclick="toast('Opens Bot Mode chat with qa-bot','ok')">Message</button>
+            <button class="btn btn-subtle">Assign</button></div>
+        </div>
+        <div class="card pad">
+          <div class="spread"><span class="row"><span class="avatar av-human">S</span><b>Sahil</b></span><span class="pill p-neutral">human</span></div>
+          <p class="xs" style="margin:var(--space-2) 0">Owner · approves high-risk work · created HDY-33 directly</p>
+          <div class="row xs">3 decisions pending in inbox</div>
+        </div>
+      </div>
+
+      <div class="grid" style="grid-template-columns:1.5fr 1fr;align-items:start">
+        <div class="card">
+          <div class="pad spread"><h3>#checkout-ops</h3><span class="xs">Bot Mode group room · synced Desktop ⇄ gateway · audited A2A</span></div>
+          <div class="pad chat" style="padding-top:0">
+            <div class="msg sys">A2A handoff · structured event #4412 · context linked</div>
+            <div class="msg bot"><div class="who" style="color:var(--bot-a)">coder-bot</div>Handoff → qa-bot: INIT-0001 implementation pushed (branch fix/tests-pass). Validation contract attached: pytest -q, expect green. <a class="xs">view diff · audit trail</a></div>
+            <div class="msg bot"><div class="who" style="color:var(--bot-b)">qa-bot</div>Accepted. Outcome check scheduled post-merge; reporting against objective 'tests-pass', not task completion.</div>
+            <div class="msg sys">outcome: completed · objective green · health watch → healthy</div>
+          </div>
+          <div class="pad" style="border-top:1px solid var(--border)">
+            <div class="row"><span class="avatar av-human">S</span>
+              <input class="input" placeholder="Message the room (delivered via Bot Mode transport)" aria-label="Message the room">
+              <button class="btn btn-primary" onclick="toast('Sent · delivered as a Bot Mode turn','ok')">Send</button></div>
+          </div>
+        </div>
+        <div class="card pad">
+          <h3>Workload heat</h3>
+          <table class="list" style="margin-top:var(--space-2)">
+            <thead><tr><th>Bot</th><th style="width:45%">Load</th><th>Alerts</th></tr></thead>
+            <tbody>
+              <tr><td>coder-bot</td><td><div class="bar"><i style="width:80%;background:var(--bot-a)"></i></div></td><td class="xs">clear</td></tr>
+              <tr><td>research-lead</td><td><div class="bar"><i style="width:60%;background:var(--bot-lead)"></i></div></td><td class="xs">clear</td></tr>
+              <tr><td>qa-bot</td><td><div class="bar"><i style="width:25%;background:var(--bot-b)"></i></div></td><td class="xs">clear</td></tr>
+              <tr><td>image-bot</td><td><div class="bar"><i style="width:95%;background:var(--health-critical)"></i></div></td>
+                <td><span class="pill p-critical">stuck 48h</span></td></tr>
+            </tbody>
+          </table>
+          <p class="xs" style="margin-top:var(--space-2)">Reputation is advisory only (measured outcomes). It never auto-routes work; assignment stays with leads or you.</p>
+        </div>
+      </div>
+      <div class="note"><b>Upstream integration:</b> messaging uses Hermes Bot Mode's existing transports (message_agent tool, durable group rooms with gateway fan-out, verified at upstream 3bdc2165c3). Dockyard adds structure and audit on top; it does not build a parallel chat stack.</div>
+    </section>
+
+    <!-- ============ S6: INITIATIVE FLOW ============ -->
+    <section class="screen" id="s6">
+      <div class="spread" style="margin-bottom:var(--space-3)">
+        <div>
+          <div class="row"><h1>INIT-CHECKOUT-0001</h1><span class="pill p-watch">In execution</span><span class="pill p-unknown">medium risk</span></div>
+          <p class="sub" style="margin-top:2px">Restore failing objective 'tests-pass' · proposed by research-lead from cycle 42 evidence</p>
+        </div>
+        <button class="btn btn-danger-ghost" onclick="toast('Project frozen · all mutations blocked · recovery path required','warn')">Freeze project</button>
+      </div>
+      <div class="grid" style="grid-template-columns:1.5fr 1fr;align-items:start">
+        <div class="card pad">
+          <h3>The loop, live for this initiative</h3>
+          <div class="timeline" style="margin-top:var(--space-3)">
+            <div class="tl-item ok"><b>Verify project state</b> · git 8f3e21 dirty · pytest exit=1 · CI red <span class="xs">deterministic collectors</span></div>
+            <div class="tl-item ok"><b>Create initiative</b> · evidence cited · expected outcome declared</div>
+            <div class="tl-item ok"><b>Prioritise</b> · rank #1 in checkout backlog (objective breach)</div>
+            <div class="tl-item warn"><b>Human approval</b> · L2 cannot execute · <b>you approved 21 Aug 23:41</b></div>
+            <div class="tl-item ok"><b>Hermes Kanban</b> · board checkout-ops · 3 cards research → build → test/review</div>
+            <div class="tl-item mute"><b>Release gate</b> · merge remains human-only (policy)</div>
+            <div class="tl-item mute"><b>Observe results</b> · outcome check queued post-merge vs 'tests-pass'</div>
+            <div class="tl-item mute"><b>Did the project improve?</b> · pending · regression flags automatically</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+          <div class="card pad">
+            <h3>Evidence chain</h3>
+            <div class="evidence" style="margin-top:var(--space-2)">cycle #42 verification snapshot
+objective: tests-pass 0.0 / target ≥1
+approval: actor=sahil interface=approval-inbox
+kanban: checkout-ops · cards #1-#3
+audit: 14 events, all attributed</div>
+          </div>
+          <div class="card pad">
+            <h3>Execution</h3>
+            <div class="bar" style="margin-top:var(--space-3)"><i style="width:66%;background:var(--accent)"></i></div>
+            <p class="xs" style="margin-top:6px">2/3 cards complete · coder-bot on card 3 · <a onclick="toast('Opens the underlying Hermes Kanban board in a new pane','ok')">open board</a></p>
+          </div>
+          <div class="card pad">
+            <h3>Recovery (hydraskale-auth pattern)</h3>
+            <p class="xs" style="margin-top:var(--space-2)">Frozen projects surface their recovery path here: what failed, what unblocks, who decides. Freeze is reversible only by explicit human action.</p>
+          </div>
+        </div>
+      </div>
+      <div class="note"><b>G3 acceptance:</b> this screen is the canonical loop for one item, zero terminal steps, evidence chain unbroken. Freeze works mid-execution (fail-closed honoured).</div>
+    </section>
+
+    <!-- ============ S7: ONBOARDING / EMPTY STATE ============ -->
+    <section class="screen" id="s7">
+      <div class="grid" style="grid-template-columns:1fr 1fr;align-items:start">
+        <div class="card pad">
+          <h2 style="margin-bottom:var(--space-2)">Bring a project into Dockyard</h2>
+          <p class="sub" style="margin-bottom:var(--space-4)">Three questions. Everything else is inferred from the repo and your fleet.</p>
+          <div class="field"><label for="ob-path">Where does it live?</label>
+            <input id="ob-path" class="input" placeholder="/home/kensei/repos/next-big-thing"></div>
+          <div class="field"><label for="ob-mission">What should the bots protect?</label>
+            <input id="ob-mission" class="input" placeholder="Keep CI green, deps fresh, docs honest"></div>
+          <div class="field"><label for="ob-team">Who owns it?</label>
+            <input id="ob-team" class="input" placeholder="research-lead + coder-bot + qa-bot"></div>
+          <div class="row"><button class="btn btn-primary" onclick="toast('Stewardship enabled · first verification cycle queued','ok')">Create project</button>
+            <button class="btn btn-subtle">Advanced (autonomy, policies)</button></div>
+        </div>
+        <div class="state">
+          <div>
+            <div class="art" style="background:var(--accent-soft)">⌂</div>
+            <h3>No projects yet</h3>
+            <p class="sub" style="max-width:34ch;margin:var(--space-2) auto var(--space-4)">Your fleet is idle. Point Dockyard at one repo and the first verification cycle runs before you finish reading this.</p>
+            <button class="btn btn-primary" onclick="go('s1')">See a populated example</button>
+          </div>
+        </div>
+      </div>
+      <div class="note"><b>UX-08:</b> onboarding asks three questions, infers verification policy and team from the live Hermes roster, and never shows a config file.</div>
+    </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============ ITEM DRAWER ============ -->
+<div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Item details">
+  <div class="drawer-head">
+    <div class="spread">
+      <div class="row"><span class="type-chip t-init">Initiative</span><span class="xs">INIT-CHECKOUT-0001</span></div>
+      <button class="iconbtn" onclick="closeDrawer()" aria-label="Close">✕</button>
+    </div>
+    <h2 style="margin-top:6px">Restore failing objective 'tests-pass'</h2>
+    <div class="row" style="margin-top:6px">
+      <span class="pill p-watch">In execution</span><span class="pill p-unknown">medium risk</span>
+      <span class="xs">opened from Approval Inbox</span>
+    </div>
+  </div>
+  <div class="drawer-body">
+    <div class="field"><label>Status</label>
+      <div class="row"><span class="pill p-watch">In execution</span><span class="xs">2/3 Kanban cards complete · coder-bot on card 3</span></div>
+      <div class="bar" style="margin-top:var(--space-2)"><i style="width:66%;background:var(--accent)"></i></div></div>
+    <div class="field"><label>Evidence</label>
+      <div class="evidence">objective: tests-pass 0.0 / target ≥1 (pytest exit=1)
+last green: snapshot #41 · git@8f3e21 · ci-run#993
+approval: actor=sahil · interface=approval-inbox · 21 Aug 23:41</div></div>
+    <div class="field"><label>Plan</label>
+      <p class="sub">1. Revert the midnight commit breaking tests<br>2. Rerun full suite via qa-bot<br>3. Outcome check vs objective before close (regression auto-flags)</p></div>
+    <div class="field"><label>Team</label>
+      <div class="row"><span class="avatar av-lead">RD</span><span class="avatar av-bot">CD</span><span class="avatar av-botb">QA</span>
+        <span class="xs">research-lead proposed · coder-bot building · qa-bot verifying</span></div></div>
+    <div class="field"><label>Linked A2A</label>
+      <p class="sub">#checkout-ops handoff #4412 (coder-bot → qa-bot) · <a onclick="go('s5');closeDrawer()">open room</a></p></div>
+    <div class="field"><label>Audit trail (14)</label>
+      <div class="timeline">
+        <div class="tl-item ok"><span class="xs">approved · sahil · approval-inbox · 23:41</span></div>
+        <div class="tl-item"><span class="xs">kanban board bound · checkout-ops · system</span></div>
+        <div class="tl-item warn"><span class="xs">proposed · research-lead · cycle#42 · 21:24</span></div>
+        <div class="tl-item crit"><span class="xs">objective breach detected · cycle#42 · 21:23</span></div>
+      </div></div>
+  </div>
+  <div class="drawer-foot">
+    <button class="btn btn-primary" onclick="toast('Outcome recorded against objective · initiative closing','ok')">Mark outcome</button>
+    <button class="btn btn-subtle" onclick="toast('Paused · no new mutating steps after pause observed','warn')">Pause</button>
+    <span class="xs" style="margin-left:auto">Esc to close</span>
+  </div>
+</aside>
+
+<!-- ============ COMMAND PALETTE ============ -->
+<div class="palette-wrap" id="palette" onclick="if(event.target===this)closePalette()">
+  <div class="palette" role="dialog" aria-modal="true" aria-label="Command palette">
+    <input id="palette-input" placeholder="Search projects, items, bots… or type a command" aria-label="Search">
+    <div class="results" id="palette-results">
+      <div class="group">Actions</div>
+      <button class="res sel" onclick="toast('Cycle triggered on checkout-service','ok')"><span>▶</span> Run cycle · checkout-service <span class="sub">manual trigger</span></button>
+      <button class="res" onclick="go('s4');closePalette()"><span>✓</span> Open Approval Inbox <span class="sub">3 pending</span></button>
+      <button class="res" onclick="toast('Emergency global pause armed · confirm in next screen','warn')"><span>⏸</span> Pause all stewardship <span class="sub">emergency</span></button>
+      <div class="group">Projects</div>
+      <button class="res" onclick="go('s2');closePalette()"><span class="pill p-watch" style="padding:0;width:8px;height:8px"></span> checkout-service <span class="sub">watch</span></button>
+      <button class="res" onclick="go('s2');closePalette()"><span class="pill p-healthy" style="padding:0;width:8px;height:8px"></span> walkie-talkie <span class="sub">healthy</span></button>
+      <div class="group">Bots</div>
+      <button class="res" onclick="go('s5');closePalette()"><span class="avatar av-bot" style="width:18px;height:18px">CD</span> coder-bot <span class="sub">busy · 4</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+/* ---------- screens ---------- */
+const crumbs = {
+  s1:'<b>Fleet</b> / Home', s2:'<b>Fleet</b> / checkout-service',
+  s3:'<b>Fleet</b> / checkout-service / Backlog', s4:'<b>Fleet</b> / Approval Inbox',
+  s5:'<b>Fleet</b> / Bot Teams', s6:'<b>Fleet</b> / checkout-service / INIT-CHECKOUT-0001',
+  s7:'<b>Fleet</b> / New project' };
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));
+  document.querySelectorAll('.rail-item').forEach(b=>b.classList.toggle('active',b.dataset.s===id));
+  document.getElementById('crumbs').innerHTML = crumbs[id]||'';
+  window.scrollTo(0,0); closePalette();
+}
+document.querySelectorAll('.rail-item').forEach(b=>b.addEventListener('click',()=>go(b.dataset.s)));
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  t.parentElement.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected','false'));
+  t.setAttribute('aria-selected','true');
+}));
+
+/* ---------- drawer ---------- */
+function openDrawer(mode){
+  document.getElementById('scrim').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawer').querySelector('.drawer-body').scrollTop=0;
+}
+function closeDrawer(){
+  document.getElementById('scrim').classList.remove('open');
+  document.getElementById('drawer').classList.remove('open');
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closeDrawer();closePalette();}
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette();}
+});
+
+/* ---------- palette ---------- */
+function openPalette(){
+  document.getElementById('palette').classList.add('open');
+  const i=document.getElementById('palette-input'); i.value=''; i.focus();
+}
+function closePalette(){ document.getElementById('palette').classList.remove('open'); }
+document.getElementById('palette-input').addEventListener('input',e=>{
+  const q=e.target.value.toLowerCase();
+  document.querySelectorAll('#palette-results .res').forEach(r=>{
+    r.style.display = r.textContent.toLowerCase().includes(q)?'':'none';
+  });
+});
+
+/* ---------- theme ---------- */
+function toggleTheme(){
+  const b=document.body, dark=b.getAttribute('data-theme')==='dark';
+  b.setAttribute('data-theme', dark?'light':'dark');
+  document.getElementById('themeIcon').textContent = dark?'☾':'☀';
+  localStorage.setItem('dockyard-theme', dark?'light':'dark');
+}
+(function(){ const t=localStorage.getItem('dockyard-theme');
+  if(t){document.body.setAttribute('data-theme',t);
+    document.getElementById('themeIcon').textContent = t==='dark'?'☀':'☾';} })();
+
+/* ---------- toasts ---------- */
+function toast(msg,kind){
+  const t=document.createElement('div'); t.className='toast '+(kind||'');
+  t.textContent=msg; document.getElementById('toasts').appendChild(t);
+  setTimeout(()=>t.remove(), 4200);
+}
+</script>
+</body>
+</html>
