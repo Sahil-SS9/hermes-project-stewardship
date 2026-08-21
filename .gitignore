@@ -20,6 +20,10 @@ htmlcov/
 *.db-wal
 *.db-shm
 stewardship.db*
+demo/.demo-run/
+
+# Coverage artifacts
+.coverage.*
 
 # Desktop panel build (Node artifacts)
 desktop/stewardship-panel/node_modules/
