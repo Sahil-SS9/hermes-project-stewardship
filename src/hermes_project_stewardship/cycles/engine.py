@@ -23,6 +23,15 @@ from ..domain.constants import (
 )
 from ..domain.health import DEFAULT_HEALTH_MACHINE
 from ..domain.policy import AutonomyPolicy
+from ..events.bus import (
+    CYCLE_STARTED,
+    HEALTH_CHANGED,
+    INITIATIVE_PROPOSED,
+    MUTATIONS_BLOCKED,
+    PROJECT_CRITICAL,
+    VERIFICATION_FAILED,
+    EventBus,
+)
 from ..objectives.evaluators import DEFAULT_EVALUATOR, EvaluationContext
 from ..persistence.service import ServiceError, StewardshipService
 from ..security.untrusted import worst_severity
@@ -50,12 +59,18 @@ class CycleEngine:
         self._clock = clock or service.store._clock
         self.max_initiatives_per_cycle = max_initiatives_per_cycle
         self.max_cycles_per_day = max_cycles_per_day
+        # Optional event bus; when present, lifecycle transitions emit the
+        # PRD §13 vocabulary (durable + subscribed consumers).
+        self.events: Optional[EventBus] = None
         # proposal_fn(project_id, verdict, objective_results, cycle_id) ->
         # list[dict(title=..., rationale=..., risk=..., dedupe_key=...)]
         # In production this is the steward skill's LLM reasoning step; it is
         # ADVISORY input — every proposal is still subject to policy gates,
         # caps, dedupe and approval here.
         self.proposal_fn = proposal_fn
+
+    def attach_events(self, bus: EventBus) -> None:
+        self.events = bus
 
     # ------------------------------------------------------------------ #
     # Public entry                                                       #
@@ -102,6 +117,13 @@ class CycleEngine:
                 trigger_ref=trigger_ref,
                 idempotency_key=key,
             )
+            if self.events is not None:
+                self.events.emit(
+                    CYCLE_STARTED,
+                    project_id=project_id,
+                    subject=f"cycle:{cycle_id}",
+                    payload={"trigger_type": trigger_type, "trigger_ref": trigger_ref},
+                )
             result = self._execute(project_id, cycle_id, collector_specs)
             summary = f"health={result['health']['state']}; initiatives={len(result['initiatives'])}"
             self.svc.cycle_finish(cycle_id, state=CycleState.COMPLETED.value, summary=summary)
@@ -169,10 +191,20 @@ class CycleEngine:
                         failed_objectives.append(res_dict)
 
         # Critical contradictions force CRITICAL regardless of objectives.
+        # Distinguish two fail-closed modes:
+        # - injection/attack signals (high severity + untrusted origin) are an
+        #   ACTIVE threat → CRITICAL (freezable);
+        # - missing/unresolvable state without an attack signal stays UNKNOWN
+        #   (cannot judge).
         high_contras = [c for c in verdict.contradictions if c.severity == "high"]
+        attack_signal = any(
+            "injection" in (c.detail or "").lower()
+            or "prompt-injection" in " ".join(c.evidence_refs).lower()
+            for c in high_contras
+        )
         if not verdict.ok:
-            state = HealthState.UNKNOWN
-        elif high_contras:
+            state = HealthState.CRITICAL if attack_signal else HealthState.UNKNOWN
+        elif high_contras:  # defensive: should not happen when ok
             state = HealthState.CRITICAL
         else:
             state = DEFAULT_HEALTH_MACHINE.derive(
@@ -204,6 +236,38 @@ class CycleEngine:
             subject=f"{project_id}:{snapshot_id}",
             detail={"state": state.value, "notify": notify},
         )
+
+        # Domain events: verification failure, health change, critical.
+        if self.events is not None:
+            if not verdict.ok:
+                self.events.emit(
+                    VERIFICATION_FAILED,
+                    project_id=project_id,
+                    subject=f"cycle:{cycle_id}",
+                    payload={"contradictions": [c.__dict__ for c in verdict.contradictions]},
+                )
+            if previous_state != state and notify:
+                self.events.emit(
+                    HEALTH_CHANGED,
+                    project_id=project_id,
+                    subject=f"{previous_state.value if previous_state else 'none'}"
+                            f"->{state.value}",
+                    payload={"from": previous_state.value if previous_state else None,
+                             "to": state.value, "score": score,
+                             "snapshot_id": snapshot_id},
+                )
+            if state == HealthState.CRITICAL:
+                self.events.emit(
+                    PROJECT_CRITICAL,
+                    project_id=project_id,
+                    subject=f"snapshot:{snapshot_id}",
+                    payload={
+                        "contradictions": [c.__dict__ for c in verdict.contradictions],
+                        "auto_freeze": bool(policies.get("release", {}).get("auto_freeze_on_critical", False)),
+                    },
+                )
+                if policies.get("release", {}).get("auto_freeze_on_critical", False):
+                    self.svc.freeze(project_id)
 
         # 3. PROPOSE INITIATIVES (gated; never on unknown/critical).
         # Re-observe phase immediately before any mutating step: a pause/freeze
@@ -254,6 +318,14 @@ class CycleEngine:
                     )
                     created.append(ini)
                     remaining -= 1
+                    if self.events is not None:
+                        self.events.emit(
+                            INITIATIVE_PROPOSED,
+                            project_id=project_id,
+                            subject=ini["ref"],
+                            payload={"title": ini["title"], "risk": ini["risk"],
+                                     "source_cycle_id": cycle_id},
+                        )
                 except ServiceError as e:
                     # Dedupe/cap/suppression refusals are normal outcomes.
                     created.append({"refused": True, "reason": str(e)})
@@ -290,6 +362,16 @@ class CycleEngine:
         if repo:
             specs.append(CollectorSpec(kind="git_status", path=Path(repo)))
             specs.append(CollectorSpec(kind="git_log", path=Path(repo)))
+            # Auto-declare canonical repo-surface files: README/AGENTS are the
+            # classic injection vector into an agent's context, so they are
+            # always scanned when a repo is configured (unless the operator
+            # already declared them explicitly).
+            declared = {Path(f).name for f in (vp.get("declared_files") or [])}
+            for name in ("README.md", "AGENTS.md"):
+                if name not in declared:
+                    candidate = Path(repo) / name
+                    if candidate.exists():
+                        specs.append(CollectorSpec(kind="declared_file", path=candidate))
         for f in vp.get("declared_files", []) or []:
             specs.append(CollectorSpec(kind="declared_file", path=Path(f)))
         return specs

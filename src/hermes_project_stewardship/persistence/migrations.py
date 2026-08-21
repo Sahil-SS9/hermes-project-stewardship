@@ -187,4 +187,76 @@ MIGRATIONS: List[Migration] = [
         DROP TABLE IF EXISTS project_stewardship;
         """,
     ),
+    Migration(
+        version=2,
+        name="events, notifications, cost accounting, merge gates",
+        upgrade_sql="""
+        -- Domain event log (FR-13). Append-only; the in-process bus writes
+        -- here for durability so late subscribers can replay.
+        CREATE TABLE IF NOT EXISTS domain_events (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts          TEXT NOT NULL,
+            event_type  TEXT NOT NULL,
+            project_id  TEXT,
+            subject     TEXT,
+            payload_json TEXT NOT NULL DEFAULT '{}',
+            emitted_by  TEXT NOT NULL DEFAULT 'system'
+        );
+        CREATE INDEX IF NOT EXISTS idx_domain_events_project_time
+            ON domain_events(project_id, id DESC);
+        CREATE INDEX IF NOT EXISTS idx_domain_events_type_time
+            ON domain_events(event_type, id DESC);
+
+        -- Notification records w/ acknowledgement (alert-fatigue metrics).
+        CREATE TABLE IF NOT EXISTS notifications (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id   TEXT NOT NULL,
+            severity     TEXT NOT NULL CHECK (severity IN ('info','low','medium','high','critical')),
+            kind         TEXT NOT NULL,
+            title        TEXT NOT NULL,
+            body         TEXT NOT NULL DEFAULT '',
+            dedupe_key   TEXT,
+            channel      TEXT,
+            delivered_at TEXT,
+            acked_at     TEXT,
+            created_at   TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_notifications_project_time
+            ON notifications(project_id, created_at DESC);
+
+        ALTER TABLE project_cycles ADD COLUMN duration_ms INTEGER;
+        ALTER TABLE project_cycles ADD COLUMN token_estimate INTEGER;
+
+        -- Merge-gate records for autonomy levels 4-5 flow.
+        CREATE TABLE IF NOT EXISTS merge_gates (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            initiative_ref TEXT NOT NULL UNIQUE,
+            risk          TEXT NOT NULL,
+            decided_by    TEXT,
+            interface     TEXT,
+            decided_at    TEXT,
+            outcome       TEXT NOT NULL DEFAULT 'pending'
+                          CHECK (outcome IN ('pending','approved','rejected','superseded')),
+            evidence_json TEXT NOT NULL DEFAULT '{}'
+        );
+
+        CREATE TABLE IF NOT EXISTS cycle_phase_timings (
+            cycle_id  INTEGER NOT NULL REFERENCES project_cycles(id) ON DELETE CASCADE,
+            phase     TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            ended_at  TEXT,
+            PRIMARY KEY (cycle_id, phase)
+        );
+        """,
+        downgrade_sql="""
+        DROP TABLE IF EXISTS cycle_phase_timings;
+        DROP TABLE IF EXISTS merge_gates;
+        DROP TABLE IF EXISTS notifications;
+        DROP TABLE IF EXISTS domain_events;
+        -- SQLite pre-3.35 cannot DROP COLUMN; guarded by minimum-version note
+        -- in docs. Modern sqlite3 (3.35+) supports this.
+        ALTER TABLE project_cycles DROP COLUMN duration_ms;
+        ALTER TABLE project_cycles DROP COLUMN token_estimate;
+        """,
+    ),
 ]
