@@ -449,46 +449,12 @@ class StewardshipService:
 
         dk = dedupe_key or f"{title.strip().lower()[:80]}"
 
-        # Suppression check
-        suppressed = self.store._conn.execute(
-            "SELECT suppressed_until, reason FROM initiative_suppression"
-            " WHERE project_id=? AND dedupe_key=?",
-            (project_id, dk),
-        ).fetchone()
-        if suppressed and suppressed["suppressed_until"] > iso(self._clock()):
-            raise ServiceError(
-                f"initiative '{dk}' is suppressed until"
-                f" {suppressed['suppressed_until']} ({suppressed['reason']})"
-            )
-
-        # Dedupe against open initiatives
         open_states = (
             InitiativeStatus.PROPOSED.value,
             InitiativeStatus.PENDING_APPROVAL.value,
             InitiativeStatus.APPROVED.value,
             InitiativeStatus.EXECUTING.value,
         )
-        dup = self.store._conn.execute(
-            f"SELECT ref FROM project_initiatives WHERE project_id=? AND dedupe_key=?"
-            f" AND status IN ({','.join('?' * len(open_states))})",
-            (project_id, dk, *open_states),
-        ).fetchone()
-        if dup:
-            raise ServiceError(f"duplicate of open initiative {dup['ref']}")
-
-        # Concurrency cap
-        cap = int(settings["policies"].get("notification", {}).get("max_open_initiatives", 5))
-        cap = int(settings["policies"]["verification"].get("max_open_initiatives", cap))
-        open_count = self.store._conn.execute(
-            f"SELECT COUNT(*) AS n FROM project_initiatives WHERE project_id=?"
-            f" AND status IN ({','.join('?' * len(open_states))})",
-            (project_id, *open_states),
-        ).fetchone()["n"]
-        if open_count >= cap:
-            raise ServiceError(
-                f"open-initiative cap reached ({cap}); resolve existing work first"
-            )
-
         approval_state = (
             ApprovalState.PENDING.value if requires_approval else ApprovalState.NOT_REQUIRED.value
         )
@@ -497,33 +463,73 @@ class StewardshipService:
             if requires_approval
             else InitiativeStatus.APPROVED.value
         )
-        ref = self._next_ref(project_id)
 
+        # ALL anti-busywork checks + insert run inside ONE BEGIN IMMEDIATE tx:
+        # writers are serialised, so dedupe/cap decisions cannot race.
         with self.store.tx() as cx:
-            cx.execute(
-                """
-                INSERT INTO project_initiatives(
-                    ref, project_id, title, rationale, expected_outcome, risk,
-                    status, approval_state, priority, dedupe_key, source_cycle_id,
-                    validation_contract_json, created_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """,
-                (
-                    ref,
-                    project_id,
-                    title,
-                    rationale,
-                    expected_outcome,
-                    risk,
-                    status,
-                    approval_state,
-                    priority,
-                    dk,
-                    source_cycle_id,
-                    self.store._j(validation_contract or {}),
-                    iso(self._clock()),
-                ),
-            )
+            suppressed = cx.execute(
+                "SELECT suppressed_until, reason FROM initiative_suppression"
+                " WHERE project_id=? AND dedupe_key=?",
+                (project_id, dk),
+            ).fetchone()
+            if suppressed and suppressed["suppressed_until"] > iso(self._clock()):
+                raise ServiceError(
+                    f"initiative '{dk}' is suppressed until"
+                    f" {suppressed['suppressed_until']} ({suppressed['reason']})"
+                )
+            dup = cx.execute(
+                f"SELECT ref FROM project_initiatives WHERE project_id=? AND dedupe_key=?"
+                f" AND status IN ({','.join('?' * len(open_states))})",
+                (project_id, dk, *open_states),
+            ).fetchone()
+            if dup:
+                raise ServiceError(f"duplicate of open initiative {dup['ref']}")
+            cap = int(settings["policies"].get("notification", {}).get("max_open_initiatives", 5))
+            cap = int(settings["policies"]["verification"].get("max_open_initiatives", cap))
+            open_count = cx.execute(
+                f"SELECT COUNT(*) AS n FROM project_initiatives WHERE project_id=?"
+                f" AND status IN ({','.join('?' * len(open_states))})",
+                (project_id, *open_states),
+            ).fetchone()["n"]
+            if open_count >= cap:
+                raise ServiceError(
+                    f"open-initiative cap reached ({cap}); resolve existing work first"
+                )
+            slug = "".join(ch for ch in project_id.upper() if ch.isalnum())[:8] or "PROJ"
+            n = int(cx.execute(
+                "SELECT COUNT(*) AS n FROM project_initiatives WHERE project_id=?",
+                (project_id,),
+            ).fetchone()["n"]) + 1
+            while True:
+                ref = f"INIT-{slug}-{n:04d}"
+                try:
+                    cx.execute(
+                        """
+                        INSERT INTO project_initiatives(
+                            ref, project_id, title, rationale, expected_outcome, risk,
+                            status, approval_state, priority, dedupe_key, source_cycle_id,
+                            validation_contract_json, created_at)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        """,
+                        (
+                            ref,
+                            project_id,
+                            title,
+                            rationale,
+                            expected_outcome,
+                            risk,
+                            status,
+                            approval_state,
+                            priority,
+                            dk,
+                            source_cycle_id,
+                            self.store._j(validation_contract or {}),
+                            iso(self._clock()),
+                        ),
+                    )
+                    break
+                except sqlite3.IntegrityError:
+                    n += 1  # concurrent writer took this number; bump and retry
         self.store.audit(
             actor="system",
             interface="cycle",
