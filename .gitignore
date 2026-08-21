@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Stewardship runtime data (never commit project state)
+*.db
+*.db-wal
+*.db-shm
+stewardship.db*
+
+# Desktop panel build (Node artifacts)
+desktop/stewardship-panel/node_modules/
+desktop/stewardship-panel/dist/
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
