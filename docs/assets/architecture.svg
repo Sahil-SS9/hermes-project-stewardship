@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 560" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+  <defs>
+    <pattern id="grid2" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+    </pattern>
+    <marker id="a-slate" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+    </marker>
+    <marker id="a-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#fb923c"/>
+    </marker>
+  </defs>
+
+  <rect width="1160" height="560" fill="#020617"/>
+  <rect width="1160" height="560" fill="url(#grid2)"/>
+
+  <!-- ============ arrows first (render behind boxes) ============ -->
+  <!-- surfaces down into service -->
+  <g stroke="#94a3b8" stroke-width="1.5" fill="none">
+    <line x1="180" y1="118" x2="180" y2="156" marker-end="url(#a-slate)"/>
+    <line x1="580" y1="118" x2="580" y2="156" marker-end="url(#a-slate)"/>
+    <line x1="960" y1="118" x2="960" y2="156" marker-end="url(#a-slate)"/>
+  </g>
+  <!-- service -> cycle engine -->
+  <line x1="580" y1="216" x2="580" y2="246" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#a-slate)"/>
+  <!-- engine -> three subsystems -->
+  <g stroke="#94a3b8" stroke-width="1.5" fill="none">
+    <path d="M 400 296 V 330 H 250 V 346" marker-end="url(#a-slate)"/>
+    <line x1="580" y1="296" x2="580" y2="346" marker-end="url(#a-slate)"/>
+    <path d="M 760 296 V 330 H 910 V 346" marker-end="url(#a-slate)"/>
+  </g>
+  <!-- engine -> store ; kanban -> store -->
+  <g stroke="#fb923c" stroke-width="1.5" fill="none">
+    <path d="M 250 420 V 456" marker-end="url(#a-orange)"/>
+    <line x1="580" y1="420" x2="580" y2="456" marker-end="url(#a-orange)"/>
+    <path d="M 910 420 V 456" marker-end="url(#a-orange)"/>
+  </g>
+
+  <!-- ============ surfaces row ============ -->
+  <g>
+    <rect x="60" y="64" width="240" height="54" rx="6" fill="#0f172a"/>
+    <rect x="60" y="64" width="240" height="54" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+    <text x="180" y="87" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">CLI — stewardctl</text>
+    <text x="180" y="105" text-anchor="middle" font-size="9" fill="#94a3b8">human output / --json reads</text>
+
+    <rect x="460" y="64" width="240" height="54" rx="6" fill="#0f172a"/>
+    <rect x="460" y="64" width="240" height="54" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+    <text x="580" y="87" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">Desktop panel</text>
+    <text x="580" y="105" text-anchor="middle" font-size="9" fill="#94a3b8">React + Vite client of the RPC</text>
+
+    <rect x="840" y="64" width="260" height="54" rx="6" fill="#0f172a"/>
+    <rect x="840" y="64" width="260" height="54" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+    <text x="970" y="87" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">Gateway adapters</text>
+    <text x="970" y="105" text-anchor="middle" font-size="9" fill="#94a3b8">Discord commands - webhooks</text>
+  </g>
+
+  <!-- ============ API band ============ -->
+  <rect x="300" y="158" width="560" height="58" rx="6" fill="#0f172a"/>
+  <rect x="300" y="158" width="560" height="58" rx="6" fill="rgba(251,146,60,0.12)" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="580" y="182" text-anchor="middle" font-size="12" font-weight="bold" fill="#fdba74">RPC API — /stewardship/v1</text>
+  <text x="580" y="200" text-anchor="middle" font-size="9" fill="#fed7aa">bearer auth - rate limiting - error envelope — the contract every surface binds to</text>
+
+  <!-- ============ service + engine ============ -->
+  <rect x="330" y="218" width="500" height="78" rx="6" fill="#0f172a"/>
+  <rect x="330" y="218" width="500" height="78" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+  <text x="580" y="242" text-anchor="middle" font-size="13" font-weight="bold" fill="#f1f5f9">StewardshipService → CycleEngine</text>
+  <text x="580" y="261" text-anchor="middle" font-size="9" fill="#cbd5e1">mutex - idempotency keys - budget - pause/freeze gates</text>
+  <text x="580" y="277" text-anchor="middle" font-size="9" fill="#cbd5e1">restriction-only autonomy policy — never escalates permissions</text>
+
+  <!-- ============ subsystems row ============ -->
+  <g>
+    <rect x="110" y="348" width="280" height="72" rx="6" fill="#0f172a"/>
+    <rect x="110" y="348" width="280" height="72" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="250" y="371" text-anchor="middle" font-size="11" font-weight="bold" fill="#f1f5f9">VerificationEngine</text>
+    <text x="250" y="389" text-anchor="middle" font-size="9" fill="#cbd5e1">two-tier collectors: authority vs advisory</text>
+    <text x="250" y="404" text-anchor="middle" font-size="9" fill="#cbd5e1">contradiction detection - fail-closed on Unknown</text>
+
+    <rect x="450" y="348" width="260" height="72" rx="6" fill="#0f172a"/>
+    <rect x="450" y="348" width="260" height="72" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="580" y="371" text-anchor="middle" font-size="11" font-weight="bold" fill="#f1f5f9">Initiative lifecycle</text>
+    <text x="580" y="389" text-anchor="middle" font-size="9" fill="#cbd5e1">dedupe - concurrency caps - suppression</text>
+    <text x="580" y="404" text-anchor="middle" font-size="9" fill="#cbd5e1">approval state machine (human-only merge)</text>
+
+    <rect x="770" y="348" width="290" height="72" rx="6" fill="#0f172a"/>
+    <rect x="770" y="348" width="290" height="72" rx="6" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1.5"/>
+    <text x="915" y="371" text-anchor="middle" font-size="11" font-weight="bold" fill="#f1f5f9">Security module</text>
+    <text x="915" y="389" text-anchor="middle" font-size="9" fill="#fecdd3">untrusted-content labelling + injection scan</text>
+    <text x="915" y="404" text-anchor="middle" font-size="9" fill="#fecdd3">allowlisted command runner (L≥3 gate)</text>
+  </g>
+
+  <!-- ============ Kanban note ============ -->
+  <text x="1035" y="391" font-size="9" fill="#94a3b8">EXECUTE</text>
+  <text x="1035" y="404" font-size="9" fill="#94a3b8">via Kanban</text>
+
+  <!-- ============ store ============ -->
+  <rect x="380" y="458" width="400" height="62" rx="6" fill="#0f172a"/>
+  <rect x="380" y="458" width="400" height="62" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="580" y="482" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">SQLite (WAL) — canonical stewardship DB</text>
+  <text x="580" y="500" text-anchor="middle" font-size="9" fill="#ddd6fe">numbered migrations - audit log on every material action - retention pruning</text>
+
+  <!-- ============ rule banner ============ -->
+  <rect x="60" y="228" width="230" height="58" rx="6" fill="none" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="4,4"/>
+  <text x="175" y="252" text-anchor="middle" font-size="10" font-weight="bold" fill="#fb7185">ONE STATE STORE</text>
+  <text x="175" y="268" text-anchor="middle" font-size="8.5" fill="#fecdd3">surfaces hold no state; every write</text>
+  <text x="175" y="281" text-anchor="middle" font-size="8.5" fill="#fecdd3">goes through the service layer</text>
+
+  <!-- ============ legend ============ -->
+  <g font-size="9" fill="#94a3b8">
+    <rect x="60" y="532" width="12" height="12" rx="3" fill="rgba(8,51,68,0.4)" stroke="#22d3ee"/>
+    <text x="78" y="542">surface (thin client)</text>
+    <rect x="220" y="532" width="12" height="12" rx="3" fill="rgba(6,78,59,0.4)" stroke="#34d399"/>
+    <text x="238" y="542">domain engine</text>
+    <rect x="360" y="532" width="12" height="12" rx="3" fill="rgba(136,19,55,0.4)" stroke="#fb7185"/>
+    <text x="378" y="542">security boundary</text>
+    <rect x="520" y="532" width="12" height="12" rx="3" fill="rgba(76,29,149,0.4)" stroke="#a78bfa"/>
+    <text x="538" y="542">canonical state</text>
+    <line x1="650" y1="538" x2="682" y2="538" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="690" y="542">transport</text>
+    <line x1="790" y1="538" x2="822" y2="538" stroke="#fb923c" stroke-width="1.5"/>
+    <text x="830" y="542">persistence writes</text>
+  </g>
+</svg>

@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 520" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+    </pattern>
+    <marker id="arr-slate" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+    </marker>
+    <marker id="arr-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#fb923c"/>
+    </marker>
+    <marker id="arr-rose" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#fb7185"/>
+    </marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#fbbf24"/>
+    </marker>
+    <marker id="arr-emerald" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#34d399"/>
+    </marker>
+  </defs>
+
+  <rect width="1160" height="520" fill="#020617"/>
+  <rect width="1160" height="520" fill="url(#grid)"/>
+
+  <!-- ================= arrows (behind boxes) ================= -->
+  <!-- top-row flow -->
+  <g stroke="#94a3b8" stroke-width="1.5" fill="none">
+    <line x1="210" y1="97" x2="228" y2="97" marker-end="url(#arr-slate)"/>
+    <line x1="390" y1="97" x2="408" y2="97" marker-end="url(#arr-slate)"/>
+    <line x1="570" y1="97" x2="588" y2="97" marker-end="url(#arr-slate)"/>
+    <line x1="750" y1="97" x2="768" y2="97" marker-end="url(#arr-slate)"/>
+    <line x1="930" y1="97" x2="948" y2="97" marker-end="url(#arr-slate)"/>
+    <!-- GATE wrap down to EXECUTE (auto path) -->
+    <path d="M 1090 124 V 288" marker-end="url(#arr-emerald)" stroke="#34d399"/>
+    <!-- EXECUTE -> MEASURE -> LEARN (right to left) -->
+    <line x1="948" y1="317" x2="932" y2="317" marker-end="url(#arr-slate)"/>
+    <line x1="768" y1="317" x2="752" y2="317" marker-end="url(#arr-slate)"/>
+  </g>
+  <!-- next-cycle loop back -->
+  <path d="M 670 344 V 450 H 130 V 97 H 48" fill="none" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arr-orange)"/>
+  <!-- fail-closed branches -->
+  <g stroke="#fb7185" stroke-width="1.5" stroke-dasharray="4,4" fill="none">
+    <path d="M 310 124 V 166 H 400 V 180" marker-end="url(#arr-rose)"/>
+    <path d="M 670 124 V 166 H 560 V 180" marker-end="url(#arr-rose)"/>
+  </g>
+  <!-- human approval branch -->
+  <path d="M 970 124 V 180" fill="none" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="4,4" marker-end="url(#arr-amber)"/>
+  <path d="M 985 246 V 288" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arr-emerald)"/>
+
+  <!-- ================= stage boxes ================= -->
+  <!-- top row -->
+  <g>
+    <rect x="50" y="70" width="160" height="54" rx="6" fill="#0f172a"/>
+    <rect x="50" y="70" width="160" height="54" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="130" y="93" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">WAKE</text>
+    <text x="130" y="111" text-anchor="middle" font-size="9" fill="#94a3b8">cron - webhook - manual</text>
+
+    <rect x="230" y="70" width="160" height="54" rx="6" fill="#0f172a"/>
+    <rect x="230" y="70" width="160" height="54" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="310" y="93" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">VERIFY</text>
+    <text x="310" y="111" text-anchor="middle" font-size="9" fill="#94a3b8">canonical evidence first</text>
+
+    <rect x="410" y="70" width="160" height="54" rx="6" fill="#0f172a"/>
+    <rect x="410" y="70" width="160" height="54" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="490" y="93" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">SNAPSHOT</text>
+    <text x="490" y="111" text-anchor="middle" font-size="9" fill="#94a3b8">write canonical state</text>
+
+    <rect x="590" y="70" width="160" height="54" rx="6" fill="#0f172a"/>
+    <rect x="590" y="70" width="160" height="54" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="670" y="93" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">ASSESS</text>
+    <text x="670" y="111" text-anchor="middle" font-size="9" fill="#94a3b8">objectives vs reality</text>
+
+    <rect x="770" y="70" width="160" height="54" rx="6" fill="#0f172a"/>
+    <rect x="770" y="70" width="160" height="54" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="850" y="93" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">PROPOSE</text>
+    <text x="850" y="111" text-anchor="middle" font-size="9" fill="#94a3b8">evidence-backed initiatives</text>
+
+    <rect x="950" y="70" width="160" height="54" rx="6" fill="#0f172a"/>
+    <rect x="950" y="70" width="160" height="54" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="1030" y="93" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">GATE</text>
+    <text x="1030" y="111" text-anchor="middle" font-size="9" fill="#94a3b8">policy - caps - dedupe</text>
+  </g>
+
+  <!-- second row -->
+  <g>
+    <rect x="950" y="290" width="160" height="54" rx="6" fill="#0f172a"/>
+    <rect x="950" y="290" width="160" height="54" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="1030" y="313" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">EXECUTE</text>
+    <text x="1030" y="331" text-anchor="middle" font-size="9" fill="#94a3b8">via existing Kanban</text>
+
+    <rect x="770" y="290" width="160" height="54" rx="6" fill="#0f172a"/>
+    <rect x="770" y="290" width="160" height="54" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="850" y="313" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">MEASURE</text>
+    <text x="850" y="331" text-anchor="middle" font-size="9" fill="#94a3b8">outcome vs objective</text>
+
+    <rect x="590" y="290" width="160" height="54" rx="6" fill="#0f172a"/>
+    <rect x="590" y="290" width="160" height="54" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="670" y="313" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">LEARN</text>
+    <text x="670" y="331" text-anchor="middle" font-size="9" fill="#94a3b8">suppression - history</text>
+  </g>
+
+  <!-- fail-closed box -->
+  <rect x="330" y="182" width="300" height="64" rx="6" fill="#0f172a"/>
+  <rect x="330" y="182" width="300" height="64" rx="6" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1.5"/>
+  <text x="480" y="207" text-anchor="middle" font-size="11" font-weight="bold" fill="#fb7185">FAIL CLOSED</text>
+  <text x="480" y="223" text-anchor="middle" font-size="9" fill="#fecdd3">freeze project - block mutations - no proposals</text>
+  <text x="480" y="264" text-anchor="middle" font-size="9" font-style="italic" fill="#94a3b8">healthy day proposes nothing: NO_ACTION_REQUIRED is success</text>
+
+  <!-- human approval box -->
+  <rect x="860" y="182" width="250" height="64" rx="6" fill="#0f172a"/>
+  <rect x="860" y="182" width="250" height="64" rx="6" fill="rgba(30,41,59,0.5)" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="985" y="207" text-anchor="middle" font-size="11" font-weight="bold" fill="#e2e8f0">HUMAN APPROVAL</text>
+  <text x="985" y="223" text-anchor="middle" font-size="9" fill="#cbd5e1">Discord /project approve - RPC - CLI</text>
+
+  <!-- flow labels -->
+  <text x="1102" y="210" font-size="9" fill="#34d399">auto</text>
+  <text x="1102" y="222" font-size="9" fill="#34d399">(policy-</text>
+  <text x="1102" y="234" font-size="9" fill="#34d399">gated)</text>
+  <text x="978" y="158" text-anchor="end" font-size="9" fill="#fbbf24">beyond autonomy level</text>
+  <text x="993" y="272" font-size="9" fill="#34d399">approved</text>
+  <text x="400" y="442" font-size="9" fill="#fb923c">next cycle &#8635;</text>
+  <text x="130" y="88" font-size="9" fill="#fb923c">&#8635;</text>
+
+  <!-- legend -->
+  <g font-size="9" fill="#94a3b8">
+    <rect x="60" y="484" width="12" height="12" rx="3" fill="rgba(6,78,59,0.4)" stroke="#34d399"/>
+    <text x="78" y="494">engine stage</text>
+    <rect x="190" y="484" width="12" height="12" rx="3" fill="rgba(76,29,149,0.4)" stroke="#a78bfa"/>
+    <text x="208" y="494">canonical state</text>
+    <rect x="330" y="484" width="12" height="12" rx="3" fill="rgba(136,19,55,0.4)" stroke="#fb7185"/>
+    <text x="348" y="494">fail-closed path</text>
+    <rect x="470" y="484" width="12" height="12" rx="3" fill="rgba(30,41,59,0.5)" stroke="#fbbf24"/>
+    <text x="488" y="494">human gate</text>
+    <line x1="580" y1="490" x2="612" y2="490" stroke="#fb923c" stroke-width="1.5"/>
+    <text x="620" y="494">cycle repeats</text>
+    <line x1="730" y1="490" x2="762" y2="490" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="770" y="494">forward flow</text>
+  </g>
+</svg>

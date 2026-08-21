@@ -6,14 +6,18 @@ Hermes can complete tasks. Stewardship makes a team of Hermes profiles
 **responsible for a project over time**: it verifies reality before acting,
 turns gaps into evidence-backed initiatives, executes through existing Kanban,
 enforces explicit autonomy policy, and measures whether the project actually
-improved — from every surface (CLI, TUI, Desktop, Discord/gateway).
+improved — from every surface (CLI, RPC API, Desktop panel, Discord/gateway).
 
-> Status: **v0.1.0-alpha.** Core domain engine is implemented and tested.
-> Hermes runtime integration points are documented contracts (see
-> [docs/architecture.md](docs/architecture.md#hermes-integration-contracts)),
+> Status: **v0.1.0-alpha.** Core domain engine implemented and tested (174 tests, 90% coverage).
+> Hermes runtime integration points are documented contracts
+> ([docs/architecture.md](docs/architecture.md#hermes-integration-contracts)),
 > not yet wired to a live gateway.
 
+---
+
 ## The ownership loop
+
+Every stewardship cycle walks the same ring:
 
 ```
 WAKE → VERIFY → SNAPSHOT → ASSESS → PROPOSE → GATE → EXECUTE → MEASURE → LEARN ↺
@@ -26,8 +30,30 @@ WAKE → VERIFY → SNAPSHOT → ASSESS → PROPOSE → GATE → EXECUTE → MEA
 - **Autonomy is restriction-only.** Project policy may narrow what Hermes may
   do; it never escalates tool permissions or credentials.
 - **No busywork.** `NO_ACTION_REQUIRED` is a first-class cycle outcome.
-  Initiatives need evidence, pass dedupe/concurrency caps, and rejected
-  proposals feed suppression.
+
+## System workflow
+
+The full cycle as it runs in the engine — including where human approval and
+the fail-closed freeze sit:
+
+![Stewardship cycle workflow](docs/assets/cycle-workflow.svg)
+
+## Architecture
+
+One canonical backend, many thin surfaces. There is no second state store:
+CLI, RPC API, gateway adapters and the Desktop panel all bind to the same
+service, which is the only writer of the SQLite (WAL) database.
+
+![Architecture](docs/assets/architecture.svg)
+
+### Surfaces
+
+| Surface | Entry point | Notes |
+|---|---|---|
+| CLI | `stewardctl` | human output by default, `--json` on reads |
+| RPC API | `/stewardship/v1` | FastAPI optional extra; bearer auth + rate limiting |
+| Gateway commands | Discord et al. | permission binding + idempotent approvals |
+| Desktop panel | React + Vite | thin client of the same RPC |
 
 ## Autonomy levels
 
@@ -49,7 +75,7 @@ implementation (`docs/prd-v0.2.md` §Deferred).
 Requires Python 3.10+. No third-party runtime dependencies for the core engine.
 
 ```bash
-git clone https://github.com/YOUR_ORG/hermes-project-stewardship.git
+git clone https://github.com/Sahil-SS9/hermes-project-stewardship.git
 cd hermes-project-stewardship
 uv venv && uv pip install -e ".[dev]"
 pytest                      # run the test suite
@@ -86,20 +112,17 @@ stewardctl initiative list my-repo
 stewardctl initiative approve INIT-0001
 ```
 
-See [examples/example-project](examples/example-project) for a full walkthrough.
+See [examples/example-project](examples/example-project) for a full walkthrough,
+and [demo/](demo/) for a scripted 5-act terminal demo plus an interactive HTML
+dashboard of the same story.
 
-## Surfaces
+## Documentation
 
-One canonical backend, many clients:
-
-- **CLI** — `stewardctl` with human output by default and `--json` on reads.
-- **RPC API** — JSON HTTP service (FastAPI optional extra); the contract every
-  surface binds to.
-- **Gateway commands** — platform-neutral command contract for Discord et al.,
-  with sender-permission binding and idempotent approvals
-  ([docs/gateway-contract.md](docs/gateway-contract.md)).
-- **Desktop panel** — React scaffold consuming the same RPC
-  (desktop/stewardship-panel).
+- [PRD v0.2](docs/prd-v0.2.md) — product requirements this implementation satisfies
+- [Architecture](docs/architecture.md)
+- [Threat model](docs/threat-model.md)
+- [Gateway command contract](docs/gateway-contract.md)
+- [Roadmap to upstream Hermes core](docs/upstream-path.md)
 
 ## Security
 
@@ -107,14 +130,6 @@ Read [SECURITY.md](SECURITY.md) and [docs/threat-model.md](docs/threat-model.md)
 before enabling autonomy above level 2 on any repository that accepts content
 from untrusted people (issues, PRs, READMEs). Retrieved repository content is
 untrusted input; it is never treated as authority over project policy.
-
-## Docs
-
-- [PRD v0.2](docs/prd-v0.2.md) — product requirements this implementation satisfies
-- [Architecture](docs/architecture.md)
-- [Threat model](docs/threat-model.md)
-- [Gateway command contract](docs/gateway-contract.md)
-- [Roadmap to upstream Hermes core](docs/upstream-path.md)
 
 ## Licence
 
