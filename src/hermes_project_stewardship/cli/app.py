@@ -17,6 +17,17 @@ from ..cycles.engine import CycleEngine, CycleRefused
 from ..gateway.errors import CommandError
 from ..persistence.service import ServiceError, StewardshipService
 from ..persistence.store import Store
+from .ui import (
+    INITIATIVE_HEADERS,
+    __version__,
+    friendly_error,
+    health_line,
+    initiative_rows,
+    paint,
+    pick_initiative,
+    render_table,
+    state_glyph,
+)
 
 EXIT_OK = 0
 EXIT_REFUSED = 1
@@ -33,6 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Durable project ownership for Hermes agent fleets.",
     )
     p.add_argument("--db", type=Path, default=_default_db(), help="stewardship DB path")
+    p.add_argument("--version", action="version", version=f"stewardctl {__version__}")
     sub = p.add_subparsers(dest="group", required=True)
 
     proj = sub.add_parser("project", help="project lifecycle")
@@ -85,6 +97,9 @@ def build_parser() -> argparse.ArgumentParser:
     irej = isub.add_parser("reject")
     irej.add_argument("ref")
     irej.add_argument("--actor", default="cli-user")
+    ipick = isub.add_parser("pick", help="interactively approve a pending initiative")
+    ipick.add_argument("project_id")
+    ipick.add_argument("--actor", default="cli-user")
 
     run = sub.add_parser("run", help="run a stewardship cycle now")
     run.add_argument("project_id")
@@ -109,10 +124,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     try:
         return _dispatch(args, svc, engine, store)
     except CycleRefused as e:
-        print(f"refused: {e}", file=sys.stderr)
+        print(friendly_error(str(e)), file=sys.stderr)
         return EXIT_REFUSED
     except (ServiceError, CommandError) as e:
-        print(f"error: {e}", file=sys.stderr)
+        print(friendly_error(str(e)), file=sys.stderr)
         return EXIT_ERROR
     finally:
         store.close()
@@ -147,15 +162,11 @@ def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) 
         if args.action == "status":
             s = svc.settings(args.project_id)
             h = svc.latest_health(args.project_id)
-            state = h["status"] if h else "never-verified"
             if args.json:
                 print(json.dumps({"settings": s, "health": h}))
             else:
-                print(
-                    f"{s['project_id']}: {state} | phase={s['phase']} | "
-                    f"autonomy L{s['autonomy_level']} | lead={s['owner']['lead_profile']}"
-                )
-                print(f"mission: {s['mission'] or '(none)'}")
+                print(health_line(s["project_id"], h, s))
+                print(paint(f"mission: {s['mission'] or '(none)'}", "grey"))
             return EXIT_OK
 
     if g == "objective":
@@ -185,14 +196,18 @@ def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) 
     if g == "health":
         h = svc.latest_health(args.project_id)
         if h is None:
-            print("no snapshot yet", file=sys.stderr)
+            print(friendly_error("no snapshot yet — run: stewardctl run <project>"),
+                  file=sys.stderr)
             return EXIT_ERROR
         if args.json:
             print(json.dumps(h))
         else:
-            print(f"{h['project_id']}: {h['status']} score={h.get('score')} at {h['created_at']}")
+            print(f"{state_glyph(h['status'])} {h['project_id']}: "
+                  f"{h['status']} score={h.get('score')} at {h['created_at']}")
             for c in h.get("contradictions", []) or []:
-                print(f"  ! [{c.get('severity')}] {c.get('detail')}")
+                sev_colour = {"high": "red", "medium": "yellow"}.get(
+                    c.get("severity"), "grey")
+                print(paint(f"  ! [{c.get('severity')}] {c.get('detail')}", sev_colour))
         return EXIT_OK
 
     if g == "initiative":
@@ -201,16 +216,27 @@ def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) 
             if args.json:
                 print(json.dumps(inis))
             else:
-                for i in inis:
-                    print(f"- {i['ref']} [{i['status']}/{i['approval_state']}] {i['title']}")
+                if not inis:
+                    print("No initiatives.")
+                else:
+                    print(render_table(INITIATIVE_HEADERS, initiative_rows(inis)))
             return EXIT_OK
         if args.action == "approve":
             out = svc.approve_initiative(args.ref, actor=args.actor, interface="cli")
-            print(f"{out['ref']} approved")
+            print(f"{state_glyph('healthy')} {out['ref']} approved")
             return EXIT_OK
         if args.action == "reject":
             out = svc.reject_initiative(args.ref, actor=args.actor, interface="cli")
             print(f"{out['ref']} rejected (suppression applied)")
+            return EXIT_OK
+        if args.action == "pick":
+            pending = svc.initiatives(args.project_id, status="pending_approval")
+            chosen = pick_initiative(pending, f"Approve an initiative on {args.project_id}:")
+            if chosen is None:
+                return EXIT_REFUSED
+            out = svc.approve_initiative(chosen, actor=getattr(args, "actor", "cli-user"),
+                                         interface="cli-pick")
+            print(f"{out['ref']} approved")
             return EXIT_OK
 
     if g == "run":
@@ -219,14 +245,16 @@ def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) 
             print(json.dumps(result, default=str))
         else:
             h = result["health"]
-            print(f"cycle {result['cycle_id']}: health={h['state']} score={h['score']}")
+            print(f"cycle {result['cycle_id']}: {state_glyph(h['state'])} "
+                  f"health={h['state']} score={h['score']}")
             for i in result["initiatives"]:
                 if i.get("refused"):
-                    print(f"  - refused: {i['reason']}")
+                    print(paint(f"  ~ {i['reason']}", "grey"))
                 else:
-                    print(f"  + proposed {i['ref']}: {i['title']}")
+                    print(f"  + proposed {paint(i['ref'], 'bold')}: {i['title']}")
             if result.get("mutation_blocked_reason"):
-                print(f"  mutations blocked: {result['mutation_blocked_reason']}")
+                print(paint(f"  mutations blocked: {result['mutation_blocked_reason']}",
+                            "yellow"))
         return EXIT_OK
 
     if g == "audit":
