@@ -1,0 +1,15 @@
+{
+  "name": "hermes-project-stewardship",
+  "kind": "python-package",
+  "bootstrap": [
+    "uv venv .venv --allow-existing",
+    "uv pip install -e '.[dev,desktop-panel]' --python .venv/bin/python"
+  ],
+  "build": [],
+  "test": [
+    ".venv/bin/python -m pytest"
+  ],
+  "start": ".venv/bin/python -m hermes_project_stewardship.api.server",
+  "port": 9310,
+  "readinessPath": "/healthz"
+}

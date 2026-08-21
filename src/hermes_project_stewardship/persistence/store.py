@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -46,12 +47,22 @@ class Store:
         self.snapshot_retention_days = snapshot_retention_days
         self.cycle_retention_days = cycle_retention_days
         self.audit_retention_days = audit_retention_days
-        self._conn = self._connect()
+        # One connection per thread (FastAPI/gateway serve from worker
+        # threads); WAL + busy_timeout make cross-thread concurrency safe.
+        self._local = threading.local()
         self.migrate()
 
     # ------------------------------------------------------------------ #
     # Connection / migrations                                            #
     # ------------------------------------------------------------------ #
+
+    @property
+    def _conn(self) -> sqlite3.Connection:
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = self._connect()
+            self._local.conn = conn
+        return conn
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.db_path), isolation_level=None)
@@ -60,6 +71,16 @@ class Store:
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("PRAGMA busy_timeout=5000")
         return conn
+
+    def close(self) -> None:
+        """Close THIS thread's connection; other threads' close lazily on GC."""
+        conn = getattr(self._local, "conn", None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            self._local.conn = None
 
     @contextmanager
     def tx(self) -> Iterator[sqlite3.Connection]:
