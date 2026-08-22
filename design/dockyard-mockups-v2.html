@@ -352,7 +352,6 @@ tr[aria-selected="true"] { background: var(--accent-soft); }
       <button class="rail-item" data-s="s2"><span class="pill p-healthy" style="width:8px;height:8px;padding:0"></span><span class="lbl">walkie-talkie</span></button>
       <button class="rail-item" data-s="s2"><span class="pill p-critical" style="width:8px;height:8px;padding:0"></span><span class="lbl">hydraskale-auth</span></button>
       <button class="rail-item" data-s="s3"><span class="pill p-healthy" style="width:8px;height:8px;padding:0"></span><span class="lbl">sahilblog</span></button>
-      <button class="rail-item" data-s="s7"><span>⇄</span><span class="lbl">Workflows</span></button>
     </div>
     <div class="rail-foot">Dockyard v0.3-draft · plugin build<br>upstream-compatible · no config changes</div>
   </aside>
@@ -1063,6 +1062,7 @@ function wizGo(n){
   const next = document.getElementById('wiz-next');
   next.textContent = n===4 ? 'Create project' : 'Continue';
 }
+function wizNav(dir){ wizGo(Math.min(4, Math.max(1, wizState.step + dir))); }
 function wizNext(){
   if(wizState.step < 4){ wizGo(wizState.step+1); }
   else {
