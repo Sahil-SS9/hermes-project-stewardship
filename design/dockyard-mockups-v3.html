@@ -244,22 +244,43 @@ tr:last-child td { border-bottom:none; }
 </section>
 
 <section class="screen" id="s3">
-  <div class="card pad">
-    <table class="list"><tbody><tr>
-</td>
-          <tr>
-            <td style="opacity: 0.55">n/a</td>
-            <td><strong>Migrate UI to React 20</strong><br><span class="sub">suppressed: rejected twice, no objective link</span></td>
-            <td><span class="type-chip t-epic">Epic</span></td>
-            <td class="sub">none cited</td>
-            <td>n/a</td>
-            <td>n/a</td>
-            <td><span class="pill p-unknown">suppressed</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="note"><strong>Anti-busywork carried over:</strong> the suppressed row is visible deliberately: rejection history feeds suppression (v0.1 §20), and the product shows its reasoning instead of hiding it.</div>
+  <div class="spread" style="margin-bottom: var(--space-4);">
+    <div><h1>Prioritised Backlog</h1>
+      <p class="sub">checkout-service · the PRIORITISE stage writes here; rank changes require a reason</p></div>
+    <button class="btn btn-primary">Reorder</button>
+  </div>
+  <div class="card">
+    <table class="list">
+      <thead><tr><th style="width:34px;">#</th><th>Item</th><th>Evidence</th><th>Risk</th><th>Aged</th><th>Gate</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1</strong></td>
+          <td><strong>Restore failing objective 'tests-pass'</strong><br><span class="sub">INIT-0001 · objective breach, cycle 42</span></td>
+          <td class="sub">pytest exit=1 · snapshot #41</td>
+          <td><span class="pill p-watch">medium</span></td><td class="sub">2h</td>
+          <td><span class="pill p-watch">human approval</span></td></tr>
+        <tr><td><strong>2</strong></td>
+          <td><strong>Rotate webhook signing key</strong><br><span class="sub">INIT-BLOG-0007 · secret scan hit</span></td>
+          <td class="sub">scan ref · log line 882</td>
+          <td><span class="pill p-degraded">high</span></td><td class="sub">6h</td>
+          <td><span class="pill p-watch">human approval</span></td></tr>
+        <tr><td><strong>3</strong></td>
+          <td><strong>Bump httpx 0.28 to 0.29</strong><br><span class="sub">HDY-36 · weekly dependency sweep</span></td>
+          <td class="sub">dep scan report</td>
+          <td><span class="pill p-healthy">low</span></td><td class="sub">1d</td>
+          <td><span class="pill p-healthy">policy auto</span></td></tr>
+        <tr><td><strong>4</strong></td>
+          <td><strong>Investigate flaky test_app_retry</strong><br><span class="sub">HDY-38 · 3 flakes in 7 days</span></td>
+          <td class="sub">CI history query</td>
+          <td><span class="pill p-healthy">low</span></td><td class="sub">3d</td>
+          <td><span class="pill p-healthy">policy auto</span></td></tr>
+        <tr style="opacity:.55;"><td>n/a</td>
+          <td><strong>Migrate UI to React 20</strong><br><span class="sub">suppressed: rejected twice, no objective link</span></td>
+          <td class="sub">none cited</td><td>n/a</td><td>n/a</td>
+          <td><span class="pill p-unknown">suppressed</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note"><strong>Rank integrity:</strong> reordering prompts for a reason and writes it to the audit log. Suppression is visible, not hidden.</div>
 </section>
 
 <!-- ============ SCREEN 4 : APPROVAL INBOX (TE-02/UX-05) ============ -->
@@ -669,8 +690,8 @@ approval: actor=sahil · interface=approval-inbox · 21 Aug 23:41</div>
       <div class="timeline">
         <div class="tl-item ok"><span class="xs">approved · sahil · approval-inbox · 23:41</span></div>
         <div class="tl-item"><span class="xs">kanban board bound · checkout-ops · system</span></div>
-        <div class="tl-item warn><span class="xs">proposed · research-lead · cycle#42 · 21:24</span></div>
-        <div class="tl-item crit><span class="xs">objective breach detected · cycle#42 · 21:23</span></div>
+        <div class="tl-item warn"><span class="xs">proposed · research-lead · cycle#42 · 21:24</span></div>
+        <div class="tl-item crit"><span class="xs">objective breach detected · cycle#42 · 21:23</span></div>
       </div>
     </div>
   </div>
@@ -803,6 +824,13 @@ function wizNext(){
     toast('Project created · stewardship enabled · first verification cycle queued','ok');
   }
 }
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active', s.id===id));
+  document.querySelectorAll('.screen-btn').forEach(b=>b.classList.toggle('active', b.dataset.s===id));
+  window.scrollTo(0,0);
+}
+function go(id){ show(id); }
+document.querySelectorAll('.screen-btn').forEach(b=>b.addEventListener('click',()=>show(b.dataset.s)));
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape') closeWizard();
 });
