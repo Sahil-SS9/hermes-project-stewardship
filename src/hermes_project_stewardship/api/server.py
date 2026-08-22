@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 try:
     from fastapi import APIRouter, FastAPI, HTTPException, Request
@@ -34,6 +34,7 @@ from ..events.bus import EventBus
 from ..gateway.handler import CommandRequest, GatewayCommandHandler
 from ..gateway.webhooks import WebhookRejected, WebhookReceiver
 from ..kanban import KanbanBridge, ReferenceKanbanAdapter
+from ..persistence.dockyard_service import DockyardService
 from ..persistence.service import ServiceError, StewardshipService
 from ..persistence.store import Store
 from .middleware import (
@@ -99,6 +100,38 @@ class CompleteRequest(BaseModel):
     regressed: bool = False
 
 
+class WorkItemCreate(BaseModel):
+    type: str
+    title: str
+    actor_id: str
+    actor_kind: str = "bot"
+    parent_ref: Optional[str] = None
+    labels: List[str] = []
+    evidence_refs: List[str] = []
+    estimate_days: Optional[float] = None
+
+
+class WorkItemTransition(BaseModel):
+    status: str
+    actor_id: str
+    actor_kind: str = "bot"
+
+
+class BacklogAdd(BaseModel):
+    ref: str
+    rank: int
+    reason: str
+    actor_id: str
+    actor_kind: str = "bot"
+
+
+class BacklogRerank(BaseModel):
+    new_rank: int
+    reason: str
+    actor_id: str
+    actor_kind: str = "bot"
+
+
 def create_app(
     store: Optional[Store] = None,
     db_path: Optional[Path] = None,
@@ -115,6 +148,7 @@ def create_app(
     gateway = GatewayCommandHandler(svc, cycle_engine=engine)
     webhooks = WebhookReceiver(svc, engine)
     bridge = KanbanBridge(svc, ReferenceKanbanAdapter(store))
+    dy = DockyardService(store)
 
     app = FastAPI(
         title="Hermes Project Stewardship RPC",
@@ -278,6 +312,92 @@ def create_app(
         ne = NotificationEngine(store, svc)
         return {"unacked": ne.unacked(project_id),
                 "queued": ne.pending_delivery(project_id)}
+
+
+    # ------------------- Dockyard work management (G1) ----------------- #
+
+    def _actor(actor_id: str, actor_kind: str) -> Actor:
+        from ..dockyard import Actor as _Actor, ActorKind as _ActorKind
+
+        return _Actor(id=actor_id, display_name=actor_id,
+                      kind=_ActorKind(actor_kind))
+
+    @router.get("/projects/{project_id}/work-items")
+    def list_work_items(project_id: str, status: Optional[str] = None):
+        from ..dockyard import WorkItemStatus as _S
+
+        st = _S(status) if status else None
+        return {"work_items": [
+            w.__dict__ | {"type": w.type.value, "status": w.status.value,
+                          "assignee": w.assignee.id if w.assignee else None,
+                          "created_by": (w.created_by.id if w.created_by else None)}
+            for w in dy.list(project_id, status=st)
+        ]}
+
+    @router.post("/projects/{project_id}/work-items")
+    def create_work_item(project_id: str, body: WorkItemCreate):
+        import sqlite3 as _sq
+
+        try:
+            if store._conn.execute(
+                "SELECT 1 FROM project_stewardship WHERE project_id=?",
+                    (project_id,)).fetchone() is None:
+                raise HTTPException(404, f"project {project_id} not found")
+            item = dy.create_item(
+                project_id, body.type, body.title,
+                actor=_actor(body.actor_id, body.actor_kind),
+                parent_ref=body.parent_ref,
+                labels=body.labels,
+                evidence_refs=body.evidence_refs,
+                estimate_days=body.estimate_days,
+            )
+        except HTTPException:
+            raise
+        except ValueError as e:
+            raise HTTPException(422, str(e))
+        except _sq.IntegrityError as e:
+            raise HTTPException(409, f"constraint violation: {e}")
+        return {"ref": item.ref, "id": item.id, "title": item.title}
+
+    @router.post("/projects/{project_id}/work-items/{ref}/transition")
+    def transition_work_item(project_id: str, ref: str,
+                             body: WorkItemTransition):
+        try:
+            item = dy.transition(project_id, ref, body.status,
+                                 actor=_actor(body.actor_id, body.actor_kind))
+        except ValueError as e:
+            raise HTTPException(404 if "no such" in str(e) else 422, str(e))
+        return {"ref": ref, "status": item.status.value}
+
+    @router.get("/projects/{project_id}/backlog")
+    def list_backlog(project_id: str):
+        return {"backlog": [e.__dict__ | {
+            "aged_since": e.aged_since.isoformat()} for e in
+            dy.backlog_list(project_id)]}
+
+    @router.post("/projects/{project_id}/backlog")
+    def backlog_add(project_id: str, body: BacklogAdd):
+        try:
+            entry = dy.backlog_add(project_id, body.ref, body.rank,
+                                   reason=body.reason,
+                                   actor=_actor(body.actor_id, body.actor_kind))
+        except Exception as e:
+            msg = str(e)
+            raise HTTPException(400 if "reason" in msg else 404, msg)
+        return {"ref": entry.item_ref, "rank": entry.rank}
+
+    @router.post("/projects/{project_id}/backlog/{ref}/rerank")
+    def backlog_rerank(project_id: str, ref: str, body: BacklogRerank):
+        try:
+            audit = dy.backlog_rerank(project_id, ref, body.new_rank,
+                                      reason=body.reason,
+                                      actor=_actor(body.actor_id,
+                                                   body.actor_kind))
+        except Exception as e:
+            msg = str(e)
+            raise HTTPException(400 if "reason" in msg else 404, msg)
+        return {"ref": ref, "from_rank": audit["from_rank"],
+                "to_rank": audit["to_rank"]}
 
     app.include_router(router)
 

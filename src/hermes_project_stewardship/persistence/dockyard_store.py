@@ -124,7 +124,9 @@ class DockyardStore:
         return [_row_to_item(r) for r in rows]
 
     def update_status(self, project_id: str, item_id: int,
-                      new_status: WorkItemStatus) -> Optional[WorkItem]:
+                      new_status: WorkItemStatus | str) -> Optional[WorkItem]:
+        if isinstance(new_status, str):
+            new_status = WorkItemStatus(new_status)
         from .store import iso
 
         with self.store.tx() as cx:

@@ -90,7 +90,10 @@ class DockyardService:
         return self.dy.list_items(project_id, status=status)
 
     def transition(self, project_id: str, ref: str,
-                   new_status: WorkItemStatus, *, actor: Actor) -> WorkItem:
+                   new_status: WorkItemStatus | str, *, actor: Actor) -> WorkItem:
+        if isinstance(new_status, str):
+            from ..dockyard import WorkItemStatus as _S
+            new_status = _S(new_status)
         item = self._by_ref(project_id, ref)
         if item is None or item.id is None:
             raise ValueError(f"no such work item {ref}")
