@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 3
 
 
 @dataclass(frozen=True)
@@ -257,6 +257,56 @@ MIGRATIONS: List[Migration] = [
         -- in docs. Modern sqlite3 (3.35+) supports this.
         ALTER TABLE project_cycles DROP COLUMN duration_ms;
         ALTER TABLE project_cycles DROP COLUMN token_estimate;
+        """,
+    ),
+    Migration(
+        version=3,
+        name="dockyard work-items and backlog",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS dockyard_work_items (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id     TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            ref            TEXT NOT NULL UNIQUE,
+            type           TEXT NOT NULL CHECK (type IN
+                           ('epic','task','subtask','bug','spike','initiative')),
+            title          TEXT NOT NULL,
+            parent_id      INTEGER REFERENCES dockyard_work_items(id) ON DELETE SET NULL,
+            status         TEXT NOT NULL DEFAULT 'backlog' CHECK (status IN
+                           ('backlog','in_progress','in_review','done','blocked')),
+            assignee_id    TEXT,
+            assignee_kind  TEXT CHECK (assignee_kind IN ('human','bot')),
+            created_by_id  TEXT,
+            created_by_kind TEXT CHECK (created_by_kind IN ('human','bot')),
+            priority_rank  INTEGER,
+            labels_json    TEXT NOT NULL DEFAULT '[]',
+            blocked_by_json TEXT NOT NULL DEFAULT '[]',
+            estimate_days  REAL,
+            due            TEXT,
+            evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+            created_at     TEXT NOT NULL,
+            updated_at     TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_dwi_project_status
+            ON dockyard_work_items(project_id, status);
+        CREATE INDEX IF NOT EXISTS idx_dwi_parent
+            ON dockyard_work_items(parent_id);
+
+        CREATE TABLE IF NOT EXISTS dockyard_backlog (
+            item_ref        TEXT PRIMARY KEY,
+            project_id      TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            rank            INTEGER NOT NULL CHECK (rank >= 1),
+            priority_reason TEXT NOT NULL DEFAULT '',
+            aged_since      TEXT NOT NULL,
+            last_rerank_actor       TEXT,
+            last_rerank_kind        TEXT CHECK (last_rerank_kind IN ('human','bot')),
+            last_rerank_reason      TEXT
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_backlog_project_rank
+            ON dockyard_backlog(project_id, rank);
+        """,
+        downgrade_sql="""
+        DROP TABLE IF EXISTS dockyard_backlog;
+        DROP TABLE IF EXISTS dockyard_work_items;
         """,
     ),
 ]
