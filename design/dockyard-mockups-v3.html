@@ -1,17 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Dockyard - Mockups v3 (G0 iteration 3)</title>
+<style>
+/* Dockyard v3 tokens - v1 layout language, premium refinement.
+   Single accent, soft single-layer elevation, generous spacing. */
+:root {
+  --text-xs: 0.75rem; --text-sm: 0.875rem; --text-md: 1rem;
+  --text-lg: 1.25rem; --text-xl: 1.563rem;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px;
+  --space-4: 16px; --space-6: 24px; --space-8: 32px;
+  --health-healthy: #157347; --health-watch: #b45309;
+  --health-degraded: #c2410c; --health-critical: #b91c1c; --health-unknown: #52525b;
+  --risk-low: #157347; --risk-medium: #b45309; --risk-high: #c2410c; --risk-critical: #b91c1c;
+  --surface: #ffffff; --surface-alt: #f7f8fa; --border: #e4e7ee;
+  --text-primary: #101223; --text-secondary: #565b76;
+  --accent: #2563eb; --accent-soft: #eaf1fe;
+  --radius: 8px; --radius-lg: 12px; --shadow: 0 1px 3px rgba(16,24,40,.07);
+  --bot-lead: #6d28d9; --bot-a: #0e7490; --bot-b: #a16207; --human: #be185d;
+  --type-epic: #6d28d9; --type-task: #2563eb; --type-bug: #b91c1c;
+  --type-spike: #0e7490; --type-initiative: #157347;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #14161a; --surface-alt: #1b1e24; --border: #2a2f38;
+    --text-primary: #e8eaee; --text-secondary: #a5adba;
+    --accent: #6d9eff; --accent-soft: #1c2940;
+    --bot-lead: #a78bfa; --bot-a: #67e8f9; --bot-b: #fde047; --human: #f472b6;
+  }
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  background: var(--surface-alt); color: var(--text-primary);
+  font-size: var(--text-md); line-height: 1.5; }
+button { font: inherit; cursor: pointer; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation:none !important; transition:none !important; } }
+
+.chrome { background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: var(--space-3) var(--space-6); position: sticky; top: 0; z-index: 50;
+  display:flex; gap: var(--space-3); align-items:center; flex-wrap:wrap; box-shadow: var(--shadow); }
+.chrome .brand { font-weight: 700; font-size: var(--text-lg); margin-right: var(--space-4); }
+.chrome .brand span { color: var(--accent); }
+.screen-btn { border:1px solid var(--border); background:var(--surface); color:var(--text-secondary);
+  padding:6px 14px; border-radius:999px; cursor:pointer; font-size:var(--text-sm); transition:all .15s; }
+.screen-btn:hover { border-color: var(--accent); color: var(--accent); }
+.screen-btn.active { background: var(--accent); color:#fff; border-color: var(--accent); }
+.gate-note { margin-left:auto; font-size: var(--text-xs); color: var(--text-secondary); }
+.screen { display:none; max-width: 1280px; margin: 0 auto; padding: var(--space-6); }
+.screen.active { display:block; }
+
+.card { background: var(--surface); border:1px solid var(--border);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow); }
+.pad { padding: var(--space-4); }
+.grid { display:grid; gap: var(--space-4); }
+h1 { font-size: var(--text-xl); margin-bottom: var(--space-1); }
+h2 { font-size: var(--text-lg); } h3 { font-size: var(--text-md); }
+.sub { color: var(--text-secondary); font-size: var(--text-sm); }
+.row { display:flex; align-items:center; gap: var(--space-2); flex-wrap:wrap; }
+.spread { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap: var(--space-2); }
+.pill { display:inline-flex; align-items:center; gap:6px; padding:2px 10px; border-radius:999px;
+  font-size: var(--text-xs); font-weight:600; }
+.pill::before { content:""; width:8px; height:8px; border-radius:50%; background:currentColor; }
+.p-healthy{color:var(--health-healthy);background:color-mix(in srgb,var(--health-healthy) 11%,transparent);}
+.p-watch{color:var(--health-watch);background:color-mix(in srgb,var(--health-watch) 13%,transparent);}
+.p-degraded{color:var(--health-degraded);background:color-mix(in srgb,var(--health-degraded) 12%,transparent);}
+.p-critical{color:var(--health-critical);background:color-mix(in srgb,var(--health-critical) 11%,transparent);}
+.p-unknown{color:var(--health-unknown);background:color-mix(in srgb,var(--health-unknown) 12%,transparent);}
+.avatar { width:26px; height:26px; border-radius:50%; display:inline-flex; align-items:center;
+  justify-content:center; color:#fff; font-size:11px; font-weight:700; }
+.a-lead{background:var(--bot-lead);} .a-bot{background:var(--bot-a);}
+.a-botb{background:var(--bot-b);} .a-human{background:var(--human);}
+.btn { border:none; border-radius:8px; padding:8px 18px; font-size:var(--text-sm); font-weight:600; }
+.btn-primary { background: var(--accent); color:#fff; }
+.btn-ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+.btn-danger { background:transparent; color:var(--risk-high); border:1px solid var(--risk-high); }
+.btn-subtle { background:transparent; color:var(--text-secondary); border:1px solid var(--border); }
+.type-chip { font-size:10px; font-weight:800; letter-spacing:.05em; padding:2px 8px;
+  border-radius:4px; color:#fff; text-transform:uppercase; }
+.t-epic{background:var(--type-epic);} .t-task{background:var(--type-task);}
+.t-bug{background:var(--type-bug);} .t-spike{background:var(--type-spike);}
+.t-init{background:var(--type-initiative);}
+table.list { width:100%; border-collapse:collapse; font-size:var(--text-sm); }
+table.list th { text-align:left; color:var(--text-secondary); font-weight:600; padding:var(--space-2) var(--space-3);
+  border-bottom:1px solid var(--border); font-size:var(--text-xs); text-transform:uppercase; letter-spacing:.04em; }
+table.list td { padding:var(--space-3); border-bottom:1px solid var(--border); vertical-align:middle; }
+tr:last-child td { border-bottom:none; }
+.note { border:1px solid var(--border); border-left:4px solid var(--accent); background:var(--surface);
+  border-radius:6px; padding:var(--space-3) var(--space-4); margin-top:var(--space-6);
+  font-size:var(--text-sm); color:var(--text-secondary); }
+.evidence { background:var(--surface-alt); border:1px dashed var(--border); border-radius:6px;
+  padding:var(--space-2) var(--space-3); font-family:ui-monospace,monospace; font-size:var(--text-xs);
+  color:var(--text-secondary); margin-top:var(--space-2); }
+.inbox-item { display:flex; gap:var(--space-4); padding:var(--space-4); border-bottom:1px solid var(--border); align-items:flex-start; }
+.inbox-item:last-child { border-bottom:none; }
+.chat { display:flex; flex-direction:column; gap:var(--space-2); }
+.msg { max-width:78%; padding:var(--space-2) var(--space-3); border-radius:10px; font-size:var(--text-sm); }
+.msg.bot { background:var(--surface-alt); border:1px solid var(--border); align-self:flex-start; }
+.msg.sys { background:transparent; border:1px dashed var(--border); align-self:center; color:var(--text-secondary); font-size:var(--text-xs); }
+.msg .who { font-size:var(--text-xs); font-weight:700; margin-bottom:2px; }
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:var(--space-4); margin-bottom:var(--space-6); }
+.kpi { padding:var(--space-4); } .kpi .num { font-size:2rem; font-weight:800; }
+.bar { height:6px; border-radius:3px; background:var(--surface-alt); overflow:hidden; margin-top:var(--space-2); }
+.bar i { display:block; height:100%; border-radius:3px; background:var(--accent); }
+.board { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--space-4); }
+.col h3 { margin-bottom:var(--space-3); display:flex; justify-content:space-between; align-items:center; }
+.col .count { background:var(--surface-alt); border:1px solid var(--border); border-radius:999px; padding:0 8px;
+  font-size:var(--text-xs); color:var(--text-secondary); }
+.wi { background:var(--surface); border:1px solid var(--border); border-left-width:3px; border-radius:6px;
+  padding:var(--space-3); margin-bottom:var(--space-3); cursor:pointer; transition:box-shadow .15s; }
+.wi:hover { box-shadow: 0 3px 10px rgba(16,24,40,.14); }
+.wi .title { font-weight:600; font-size:var(--text-sm); margin:6px 0; }
+.wi .meta { display:flex; justify-content:space-between; align-items:center; }
+.wi.b-epic{border-left-color:var(--type-epic);} .wi.b-task{border-left-color:var(--type-task);}
+.wi.b-bug{border-left-color:var(--type-bug);} .wi.b-init{border-left-color:var(--type-initiative);}
+.timeline { position:relative; padding-left:20px; }
+.timeline::before { content:""; position:absolute; left:5px; top:4px; bottom:4px; width:2px; background:var(--border); }
+.tl-item { position:relative; padding:var(--space-2) 0 var(--space-2) var(--space-4); }
+.tl-item::before { content:""; position:absolute; left:-19px; top:12px; width:10px; height:10px; border-radius:50%; background:var(--accent); }
+.tl-item.ok::before{background:var(--health-healthy);} .tl-item.warn::before{background:var(--health-watch);}
+.tl-item.crit::before{background:var(--health-critical);} .tl-item.mute::before{background:var(--border);}
+</style>
+</head>
+<body>
+
+<nav class="chrome">
+  <div class="brand">Hermes <span>Dockyard</span></div>
+  <button class="screen-btn active" data-s="s1">Home</button>
+  <button class="screen-btn" data-s="s2">Project Board</button>
+  <button class="screen-btn" data-s="s3">Backlog</button>
+  <button class="screen-btn" data-s="s4">Approval Inbox</button>
+  <button class="screen-btn" data-s="s5">Bot Teams</button>
+  <button class="screen-btn" data-s="s6">Initiative Detail</button>
+  <button class="screen-btn" data-s="s7">Workflows</button>
+  <span class="gate-note">G0 mockup pack · v3 · click tabs and rows</span>
+</nav>
+
+<!-- ============ SCREEN 1 : HOME ============ -->
+<section class="screen active" id="s1">
+  <div class="spread" style="margin-bottom: var(--space-4);">
+    <div><h1>Good evening, Sahil</h1><p class="sub">Tuesday 25 Aug · everything the fleet owes you, nothing it doesn't.</p></div>
+    <button class="btn btn-primary" onclick="openWizard()">+ New project</button>
+  </div>
+  <div class="kpis">
+    <div class="card kpi"><div class="sub">Awaiting your decision</div><div class="num" style="color: var(--accent);">3</div><div class="bar"><i style="width:55%"></i></div></div>
+    <div class="card kpi"><div class="sub">Projects healthy</div><div class="num">3 / 5</div><div class="bar"><i style="width:60%"></i></div></div>
+    <div class="card kpi"><div class="sub">Bots busy / idle</div><div class="num">8 / 3</div><div class="bar"><i style="width:73%"></i></div></div>
+    <div class="card kpi"><div class="sub">Shipped this week</div><div class="num" style="color: var(--health-healthy);">6</div><div class="bar"><i style="width:85%; background:var(--health-healthy);"></i></div></div>
+  </div>
+  <div class="grid" style="grid-template-columns: 2fr 1fr;">
+    <div class="card">
+      <div class="pad spread"><h2>Projects</h2><button class="btn btn-subtle" onclick="show('s2')">Open a project</button></div>
+      <table class="list">
+        <thead><tr><th>Project</th><th>Health</th><th>Active work</th><th>Team</th><th>Last verified</th></tr></thead>
+        <tbody>
+          <tr onclick="show('s2')" style="cursor:pointer"><td><strong>checkout-service</strong><br><span class="sub">Payments demo repo</span></td>
+            <td><span class="pill p-watch">Watch</span></td><td>14 items · 3 bots</td>
+            <td><span class="avatar a-lead">RD</span> <span class="avatar a-bot">CD</span> <span class="avatar a-botb">QA</span></td>
+            <td class="sub">38 min ago · collectors green</td></tr>
+          <tr><td><strong>walkie-talkie</strong><br><span class="sub">Voice relay for Misa-Misa intake</span></td>
+            <td><span class="pill p-healthy">Healthy</span></td><td>9 items · 2 bots</td>
+            <td><span class="avatar a-lead">OC</span> <span class="avatar a-bot">CD</span></td>
+            <td class="sub">12 min ago · collectors green</td></tr>
+          <tr><td><strong>sahilblog</strong><br><span class="sub">Content pipeline and publishing</span></td>
+            <td><span class="pill p-healthy">Healthy</span></td><td>11 items · 2 bots</td>
+            <td><span class="avatar a-lead">CC</span> <span class="avatar a-botb">IM</span></td>
+            <td class="sub">1 h ago · 1 advisory note</td></tr>
+          <tr><td><strong>hydraskale-auth</strong><br><span class="sub">SSO and credential vault</span></td>
+            <td><span class="pill p-critical">Critical · frozen</span></td><td>6 items · paused</td>
+            <td><span class="avatar a-lead">WK</span></td><td class="sub">injection signal · awaiting recovery call</td></tr>
+          <tr><td><strong>rig-monitoring</strong><br><span class="sub">GPU fleet telemetry</span></td>
+            <td><span class="pill p-unknown">Unknown</span></td><td>verification failing</td>
+            <td><span class="avatar a-lead">WS</span></td><td class="sub">repo unreachable · fail-closed engaged</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <div class="card pad" style="margin-bottom: var(--space-4);">
+        <div class="spread"><h3>Needs your decision</h3><button class="btn btn-subtle" onclick="show('s4')">Inbox</button></div>
+        <div class="row" style="margin-top:var(--space-3); cursor:pointer" onclick="show('s4')">
+          <span class="pill p-watch">medium</span> Restore failing objective 'tests-pass'</div>
+        <div class="row" style="margin-top:var(--space-2)">
+          <span class="pill p-degraded">high</span> Rotate exposed webhook signing key</div>
+        <div class="row" style="margin-top:var(--space-2)">
+          <span class="pill p-healthy">low</span> Bump httpx to 0.29</div>
+      </div>
+      <div class="card pad">
+        <h3>Fleet activity</h3>
+        <div class="timeline" style="margin-top: var(--space-3);">
+          <div class="tl-item ok"><strong>qa-bot</strong> verified checkout tests green <span class="sub">· 4m</span></div>
+          <div class="tl-item"><strong>coder-bot</strong> started INIT-CHECKOUT-0001 on Kanban <span class="sub">· 22m</span></div>
+          <div class="tl-item warn"><strong>research-bot</strong> flagged dependency drift in blog <span class="sub">· 1h</span></div>
+          <div class="tl-item crit"><strong>scanner</strong> froze hydraskale-auth: injection pattern detected <span class="sub">· 2h</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><strong>UX-01:</strong> every flow is clickable. The engine stays invisible: no CLI, no slash commands anywhere in the product.</div>
+</section>
+
+<!-- ============ SCREEN 2 : PROJECT BOARD ============ -->
+<section class="screen" id="s2">
+  <div class="spread" style="margin-bottom: var(--space-4);">
+    <div><div class="row"><h1>checkout-service</h1> <span class="pill p-watch">Watch</span> <span class="pill p-unknown">L2 Planner</span></div>
+      <p class="sub">Payments demo repo · lead: research-lead · Kanban execution underneath</p></div>
+    <div class="row"><button class="btn btn-subtle">Run cycle</button><button class="btn btn-primary" onclick="openWizard()">+ New item</button></div>
+  </div>
+  <div class="kpis">
+    <div class="card kpi"><div class="sub">Mission</div><strong>"Keep tests green and deps fresh"</strong><div class="bar"><i style="width:64%"></i></div></div>
+    <div class="card kpi"><div class="sub">tests-pass ≥ 1</div><div class="num" style="color:var(--risk-medium)">0.0</div><span class="sub">initiative open</span></div>
+    <div class="card kpi"><div class="sub">deps-fresh ≤ 30d</div><div class="num" style="color:var(--health-healthy)">12d</div><span class="sub">on target</span></div>
+    <div class="card kpi"><div class="sub">Next milestone</div><strong>v0.2 hardening</strong><span class="sub"> due Fri · 7/9 done</span><div class="bar"><i style="width:78%"></i></div></div>
+  </div>
+  <div class="board">
+    <div class="col"><h3>Backlog <span class="count">5</span></h3>
+      <div class="wi b-task"><span class="type-chip t-task">Task</span><div class="title">Split CI matrix by OS</div>
+        <div class="meta"><span class="sub">HDY-31</span><span class="avatar a-bot">CD</span></div></div>
+      <div class="wi b-spike" style="border-left-color:var(--type-spike);"><span class="type-chip t-spike">Spike</span><div class="title">Evaluate PG 17 partitioning</div>
+        <div class="meta"><span class="sub">HDY-33 · by Sahil</span><span class="avatar a-human">S</span></div></div>
+    </div>
+    <div class="col"><h3>In progress <span class="count">3</span></h3>
+      <div class="wi b-init" onclick="show('s6')"><span class="type-chip t-init">Initiative</span><div class="title">Restore failing objective 'tests-pass'</div>
+        <div class="meta"><span class="sub">INIT-0001 · medium</span><span class="avatar a-lead">RD</span></div></div>
+      <div class="wi b-task"><span class="type-chip t-task">Task</span><div class="title">Add rate-limit smoke test</div>
+        <div class="meta"><span class="sub">HDY-28</span><span class="avatar a-botb">QA</span></div></div>
+    </div>
+    <div class="col"><h3>In review <span class="count">2</span></h3>
+      <div class="wi b-bug"><span class="type-chip t-bug">Bug</span><div class="title">Webhook retry duplicates events</div>
+        <div class="meta"><span class="sub">HDY-24 · high</span><span class="avatar a-bot">CD</span></div></div>
+    </div>
+    <div class="col"><h3>Done <span class="count">9</span></h3>
+      <div class="wi" style="opacity:.65;"><span class="type-chip t-task">Task</span><div class="title">Pin pytest-timeout</div>
+        <div class="meta"><span class="sub">outcome verified</span><span class="avatar a-bot">CD</span></div></div>
+      <div class="wi" style="opacity:.65;"><span class="type-chip t-task">Task</span><div class="title">Audit log retention job</div>
+        <div class="meta"><span class="sub">outcome verified</span><span class="avatar a-botb">QA</span></div></div>
+    </div>
+  </div>
+  <div class="note"><strong>D4:</strong> human and bot cards share one board (pink = Sahil). Initiative cards mirror their Hermes Kanban board underneath.</div>
+</section>
+
+<section class="screen" id="s3">
+  <div class="card pad">
+    <table class="list"><tbody><tr>
 </td>
           <tr>
-            <td style="opacity: 0.55">—</td>
+            <td style="opacity: 0.55">n/a</td>
             <td><strong>Migrate UI to React 20</strong><br><span class="sub">suppressed: rejected twice, no objective link</span></td>
             <td><span class="type-chip t-epic">Epic</span></td>
-            <td class="sub">—</td>
-            <td>—</td>
-            <td>—</td>
+            <td class="sub">none cited</td>
+            <td>n/a</td>
+            <td>n/a</td>
             <td><span class="pill p-unknown">suppressed</span></td>
           </tr>
         </tbody>
       </table>
     </div>
-    <div class="note"><strong>Anti-busywork carried over:</strong> the suppressed row is visible deliberately — rejection history feeds suppression (v0.1 §20), and the product shows its reasoning instead of hiding it.</div>
+    <div class="note"><strong>Anti-busywork carried over:</strong> the suppressed row is visible deliberately: rejection history feeds suppression (v0.1 §20), and the product shows its reasoning instead of hiding it.</div>
 </section>
 
 <!-- ============ SCREEN 4 : APPROVAL INBOX (TE-02/UX-05) ============ -->
@@ -19,7 +267,7 @@
   <div class="spread" style="margin-bottom: var(--space-6)">
     <div>
       <h1>Approval Inbox</h1>
-      <p class="sub">every pending human decision across all projects — one screen, full evidence, no hunting</p>
+      <p class="sub">every pending human decision across all projects: one screen, full evidence, no hunting</p>
     </div>
     <span class="pill p-watch">3 pending</span>
   </div>
@@ -55,14 +303,14 @@
       <span class="avatar a-botb">QA</span>
       <div style="flex: 1;">
         <div class="spread"><strong>Bump httpx to 0.29</strong><span class="pill p-healthy">low risk</span></div>
-        <p class="sub" style="margin-top: var(--space-2)">walkie-talkie · policy allows autonomous low-risk dependency bumps — shown for visibility only</p>
+        <p class="sub" style="margin-top: var(--space-2)">walkie-talkie · policy allows autonomous low-risk dependency bumps, shown for visibility only</p>
         <div class="row" style="margin-top: var(--space-2)"><button class="btn btn-ghost">View plan</button>
           <span class="sub" style="margin-left: auto;">executing · no decision required</span>
         </div>
       </div>
     </div>
   </div>
-  <div class="note"><strong>Trust engine surfaced:</strong> approvals here are the same permission-bound state machine as today's Discord flow — but you never need Discord or a terminal to decide.</div>
+  <div class="note"><strong>Trust engine surfaced:</strong> approvals here are the same permission-bound state machine as today's Discord flow, but you never need Discord or a terminal to decide.</div>
 </section>
 
 <!-- ============ SCREEN 5 : BOT TEAMS (BM-*) ============ -->
@@ -98,7 +346,7 @@
   </div>
   <div class="grid" style="grid-template-columns: 1.4fr 1fr; margin-top: var(--space-4); gap: var(--space-4);">
     <div class="card pad">
-      <div class="pad spread"><h3>#checkout-ops — bot group channel</h3><span class="sub">structured A2A + humans welcome (BM-04)</span></div>
+      <div class="pad spread"><h3>#checkout-ops · bot group channel</h3><span class="sub">structured A2A + humans welcome (BM-04)</span></div>
       <div class="pad chat" style="padding-top: 0;">
         <div class="msg sys">A2A handoff · audited event #4412 · full context linked</div>
         <div class="msg bot"><div class="who" style="color: var(--bot-a)">coder-bot</div>Handoff → qa-bot: INIT-0001 implementation pushed (branch fix/tests-pass). Validation contract attached: run pytest -q, expect green. <a href="#" class="sub">view diff · audit trail</a></div>
@@ -120,17 +368,17 @@
           <tr>
             <td>coder-bot</td>
             <td><div class="bar"><i style="width: 80%; background: var(--bot-a)"></i></div></td>
-            <td>—</td>
+            <td>n/a</td>
           </tr>
           <tr>
             <td>research-lead</td>
             <td><div class="bar"><i style="width: 60%; background: var(--bot-lead)"></i></div></td>
-            <td>—</td>
+            <td>n/a</td>
           </tr>
           <tr>
             <td>qa-bot</td>
             <td><div class="bar"><i style="width: 25%; background: var(--bot-b)"></i></div></td>
-            <td>—</td>
+            <td>n/a</td>
           </tr>
           <tr>
             <td>image-bot</td>
@@ -141,7 +389,7 @@
       </table>
     </div>
   </div>
-  <div class="note"><strong>D3 delivered:</strong> A2A messages are structured, audited events that render in the group channel — and the same summary posts to real Discord via gateway with deep-links back here.</div>
+  <div class="note"><strong>D3 delivered:</strong> A2A messages are structured, audited events that render in the group channel, and the same summary posts to real Discord via gateway with deep-links back here.</div>
 </section>
 
 <!-- ============ SCREEN 6 : INITIATIVE FLOW (TE/G3 walkthrough) ============ -->
@@ -168,7 +416,7 @@
         <div class="tl-item ok"><strong>Hermes Kanban</strong> · board checkout-ops created · 3 cards: research → build → test/review</div>
         <div class="tl-item"><strong>Release gate</strong> · merge remains human-only (policy)</div>
         <div class="tl-item"><strong>Observe results</strong> · outcome check queued post-merge against 'tests-pass'</div>
-        <div class="tl-item"><strong>Did the project improve?</strong> · pending — regression would flag automatically</div>
+        <div class="tl-item"><strong>Did the project improve?</strong> · pending: regression would flag automatically</div>
       </div>
     </div>
     <div style="display: flex; flex-direction: column; gap: var(--space-4);">
@@ -188,7 +436,7 @@
       </div>
     </div>
   </div>
-  <div class="note"><strong>G3 acceptance:</strong> this screen IS the §2.1 loop for one item — proposal to measurement, zero terminal steps, evidence chain unbroken. The freeze button works even mid-execution (fail-closed honoured).</div>
+  <div class="note"><strong>G3 acceptance:</strong> this screen is the §2.1 loop for one item: proposal to measurement, zero terminal steps, evidence chain unbroken. The freeze button works even mid-execution (fail-closed honoured).</div>
 </section>
 
 <!-- ============ SCREEN 7 : WORKFLOWS (creator + live node visualisation) ============ -->
@@ -547,7 +795,7 @@ function wizGo(n){
   const next = document.getElementById('wiz-next');
   next.textContent = n===4 ? 'Create project' : 'Continue';
 }
-function wizNav(dir){ wizGo(Math.min(4, Math.max(1, wizState.step + dir)); }
+function wizNav(dir){ wizGo(Math.min(4, Math.max(1, wizState.step + dir))); }
 function wizNext(){
   if(wizState.step < 4){ wizGo(wizState.step+1); }
   else {
