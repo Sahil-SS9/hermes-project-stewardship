@@ -11,39 +11,36 @@
    scale. Zero dependencies; drops into the Desktop plugin pane as-is.
    ============================================================ */
 :root {
-  --text-xs: 0.6875rem; --text-sm: 0.8125rem; --text-md: 0.9375rem;
-  --text-lg: 1.125rem;  --text-xl: 1.375rem;
-
-  --space-1: 4px; --space-2: 8px; --space-3: 12px;
-  --space-4: 16px; --space-6: 24px; --space-8: 32px;
-
-  --health-healthy: #2e7d32; --health-watch: #b58900;
-  --health-degraded: #c05621; --health-critical: #c0392b;
-  --health-unknown: #6b7280;
-  --risk-low: #2e7d32; --risk-medium: #b58900;
-  --risk-high: #c05621; --risk-critical: #c0392b;
-
-  --surface: #ffffff; --surface-alt: #f4f5f7; --surface-sunken: #eceef1;
-  --border: #dfe1e6; --border-strong: #c1c7d0;
-  --text-primary: #172b4d; --text-secondary: #5e6c84;
-  --accent: #0052cc; --accent-soft: #deebff; --accent-strong: #0747a6;
-
-  --bot-lead: #6554c0; --bot-a: #008da6; --bot-b: #b38600; --human: #bf63f3;
-
-  --type-epic: #6554c0; --type-task: #0052cc; --type-bug: #c0392b;
-  --type-spike: #008da6; --type-initiative: #2e7d32;
-
-  --radius-sm: 3px; --radius: 6px; --radius-lg: 10px;
-  --shadow-sm: 0 1px 2px rgba(9,30,66,.12);
-  --shadow-md: 0 4px 12px rgba(9,30,66,.16);
-  --shadow-lg: 0 8px 28px rgba(9,30,66,.22);
-  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px #4c9aff;
+  /* neutrals: cool indigo-tinted ramp (not generic grey) */
+  --surface: #ffffff; --surface-alt: #f7f8fc; --surface-sunken: #eef0f7;
+  --border: #e3e6f0; --border-strong: #c3c9dd;
+  --text-primary: #14162b; --text-secondary: #565b7c;
+  /* accent: deep indigo with violet secondary for gradient moments */
+  --accent: #4f46e5; --accent-strong: #4338ca; --accent-soft: #eef0fe;
+  --accent-grad: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  /* health + risk: saturated but AA-safe on light surfaces */
+  --health-healthy: #157347; --health-watch: #b45309;
+  --health-degraded: #c2410c; --health-critical: #b91c1c;
+  --health-unknown: #52525b;
+  --risk-low: #157347; --risk-medium: #b45309;
+  --risk-high: #c2410c; --risk-critical: #b91c1c;
+  /* bot identity hues */
+  --bot-lead: #7c3aed; --bot-a: #0e7490; --bot-b: #a16207; --human: #db2777;
+  /* work-type chips */
+  --type-epic: #7c3aed; --type-task: #4f46e5; --type-bug: #b91c1c;
+  --type-spike: #0e7490; --type-initiative: #157347;
+  /* elevation */
+  --radius-sm: 4px; --radius: 8px; --radius-lg: 12px;
+  --shadow-sm: 0 1px 2px rgba(20,22,43,.06), 0 0 0 1px rgba(20,22,43,.03);
+  --shadow-md: 0 4px 14px rgba(20,22,43,.10), 0 0 0 1px rgba(20,22,43,.04);
+  --shadow-lg: 0 12px 34px rgba(20,22,43,.18), 0 0 0 1px rgba(20,22,43,.05);
+  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px #818cf8;
 }
 [data-theme="dark"] {
   --surface: #101214; --surface-alt: #161a1d; --surface-sunken: #1d2126;
   --border: #2c3340; --border-strong: #44546f;
   --text-primary: #e5e9f0; --text-secondary: #a3b1c6;
-  --accent: #4c9aff; --accent-soft: #172b4d; --accent-strong: #85b8ff;
+  --accent: #818cf8; --accent-strong: #a5b4fc; --accent-soft: #232553;
   --bot-lead: #9f8fef; --bot-a: #42b3d5; --bot-b: #d9a514; --human: #d98ef9;
   --shadow-sm: 0 1px 2px rgba(0,0,0,.5);
   --shadow-md: 0 4px 12px rgba(0,0,0,.55);
@@ -68,7 +65,7 @@ a:hover { text-decoration: underline; }
 .rail-brand { display:flex; align-items:center; gap: var(--space-2);
   padding: var(--space-4) var(--space-4) var(--space-3); }
 .rail-brand .mark { width: 28px; height: 28px; border-radius: var(--radius);
-  background: linear-gradient(135deg, var(--accent), var(--bot-lead));
+  background: var(--accent-grad);
   display:grid; place-items:center; color:#fff; font-weight:800; font-size:13px; }
 .rail-brand b { font-size: var(--text-md); }
 .rail-section { padding: var(--space-3) var(--space-2) var(--space-1); }
@@ -120,7 +117,7 @@ h3 { font-size: var(--text-md); }
 .btn { border:none; border-radius: var(--radius); padding: 7px 14px; font-size: var(--text-sm);
   font-weight: 500; transition: background .12s, transform .05s; }
 .btn:active { transform: translateY(1px); }
-.btn-primary { background: var(--accent); color:#fff; }
+.btn-primary { background: var(--accent); color:#fff; box-shadow: var(--shadow-sm); }
 .btn-primary:hover { background: var(--accent-strong); }
 .btn-subtle { background: transparent; color: var(--text-secondary); }
 .btn-subtle:hover { background: var(--surface-alt); color: var(--text-primary); }
@@ -274,6 +271,64 @@ tr[aria-selected="true"] { background: var(--accent-soft); }
   .rail-item { justify-content:center; }
   .board { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ---------- wizard (multi-step pop-out) ---------- */
+.drawer.wizard { width: 640px; }
+.wiz-steps { display:flex; gap:6px; margin-top:var(--space-3); }
+.wiz-steps i { height:4px; flex:1; border-radius:2px; background: var(--surface-sunken); transition: background .2s; }
+.wiz-steps i.on { background: var(--accent); }
+.wstep { display:none; }
+.wstep.on { display:block; animation: fadein .18s ease; }
+@keyframes fadein { from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none} }
+.tpl-card { text-align:left; border:1px solid var(--border); background:var(--surface);
+  border-radius: var(--radius-lg); padding: var(--space-3) var(--space-4); cursor:pointer;
+  display:grid; gap:4px; transition: border-color .12s, box-shadow .12s; }
+.tpl-card b { font-size: var(--text-sm); }
+.tpl-card span { font-size: var(--text-xs); color: var(--text-secondary); }
+.tpl-card:hover { border-color: var(--accent); }
+.tpl-card.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow-sm);
+  background: var(--accent-soft); }
+.sel-chip { border:1px solid var(--border); border-radius:999px; padding:4px 12px 4px 5px;
+  cursor:pointer; font-size: var(--text-xs); font-weight:600; color:var(--text-secondary);
+  background: var(--surface); transition: all .12s; }
+.sel-chip.on { border-color: var(--accent); color: var(--text-primary); background: var(--accent-soft); }
+.seg { display:inline-flex; border:1px solid var(--border); border-radius: var(--radius-lg);
+  overflow:hidden; }
+.seg-btn { border:none; background:var(--surface); padding:10px 22px; font-size:var(--text-sm);
+  font-weight:600; color:var(--text-secondary); border-right:1px solid var(--border); line-height:1.25; }
+.seg-btn small { font-weight:500; color:var(--text-secondary); }
+.seg-btn:last-child { border-right:none; }
+.seg-btn:hover { background: var(--surface-alt); }
+.seg-btn.sel { background: var(--accent-soft); color: var(--accent-strong); }
+.dropzone { border:2px dashed var(--border-strong); border-radius: var(--radius-lg);
+  padding: var(--space-6); text-align:center; display:grid; gap:4px; cursor:pointer;
+  background: var(--surface-alt); transition: border-color .15s, background .15s; margin-bottom: var(--space-3); }
+.dropzone:hover, .dropzone:focus-visible { border-color: var(--accent); background: var(--accent-soft); }
+.upload-row { display:flex; align-items:center; gap: var(--space-3); padding: var(--space-2) 0;
+  border-bottom:1px solid var(--border); }
+.upload-row:last-of-type { border-bottom:none; }
+
+/* ---------- workflow node visualisation ---------- */
+.flow-wrap svg .node rect { fill: var(--surface-alt); stroke: var(--border-strong);
+  stroke-width: 1.5; filter: drop-shadow(0 1px 2px rgba(20,22,43,.08)); }
+.flow-wrap svg .node text { text-anchor: middle; fill: var(--text-primary);
+  font-size: 13px; font-weight: 700; }
+.flow-wrap svg .node .n2 { font-size: 10.5px; font-weight: 500; fill: var(--text-secondary); }
+.flow-wrap svg .node.ok rect { stroke: var(--health-healthy); fill: color-mix(in srgb, var(--health-healthy) 7%, var(--surface)); }
+.flow-wrap svg .node.live rect { stroke: var(--accent); fill: var(--accent-soft);
+  animation: nodepulse 1.8s ease-in-out infinite; }
+.flow-wrap svg .node.wait rect { stroke: var(--risk-medium); stroke-dasharray: 5 3;
+  fill: color-mix(in srgb, var(--risk-medium) 8%, var(--surface)); }
+.flow-wrap svg .node.mute rect { opacity:.62; }
+@keyframes nodepulse { 0%,100% { filter: drop-shadow(0 0 0 rgba(79,70,229,0)); }
+  50% { filter: drop-shadow(0 0 9px rgba(79,70,229,.45)); } }
+.flow-line { stroke-dasharray: 7 5; animation: dashmove 1.1s linear infinite; }
+@keyframes dashmove { to { stroke-dashoffset: -12; } }
+.legend-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-left:10px; }
+@media (prefers-reduced-motion: reduce) {
+  .flow-line { animation:none; stroke-dasharray:none; }
+  .flow-wrap svg .node.live rect { animation:none; }
+}
 </style>
 </head>
 <body data-theme="light">
@@ -289,12 +344,15 @@ tr[aria-selected="true"] { background: var(--accent-soft); }
       <button class="rail-item" data-s="s5"><span>◉</span><span class="lbl">Bot Teams</span></button>
     </div>
     <div class="rail-section">
-      <div class="rail-label">Projects</div>
+      <div class="rail-label">Automation</div>
+      <button class="rail-item" data-s="s7"><span>⇄</span><span class="lbl">Workflows</span></button>
+      <button class="rail-item" onclick="openWizard()"><span>＋</span><span class="lbl">New project</span></button>
+      <div class="rail-label" style="margin-top:var(--space-2)">Projects</div>
       <button class="rail-item" data-s="s2"><span class="pill p-watch" style="width:8px;height:8px;padding:0"></span><span class="lbl">checkout-service</span></button>
       <button class="rail-item" data-s="s2"><span class="pill p-healthy" style="width:8px;height:8px;padding:0"></span><span class="lbl">walkie-talkie</span></button>
       <button class="rail-item" data-s="s2"><span class="pill p-critical" style="width:8px;height:8px;padding:0"></span><span class="lbl">hydraskale-auth</span></button>
       <button class="rail-item" data-s="s3"><span class="pill p-healthy" style="width:8px;height:8px;padding:0"></span><span class="lbl">sahilblog</span></button>
-      <button class="rail-item" data-s="s7"><span>＋</span><span class="lbl">New project</span></button>
+      <button class="rail-item" data-s="s7"><span>⇄</span><span class="lbl">Workflows</span></button>
     </div>
     <div class="rail-foot">Dockyard v0.3-draft · plugin build<br>upstream-compatible · no config changes</div>
   </aside>
@@ -319,7 +377,7 @@ tr[aria-selected="true"] { background: var(--accent-soft); }
     <section class="screen active" id="s1">
       <div class="spread" style="margin-bottom:var(--space-4)">
         <div><h1>Home</h1><p class="sub">Tuesday 25 Aug · everything the fleet owes you, nothing it doesn't.</p></div>
-        <button class="btn btn-primary" onclick="toast('Onboarding wizard opens here (UX-08)','ok')">+ New project</button>
+        <button class="btn btn-primary" onclick="openWizard()">+ New project</button>
       </div>
 
       <div class="grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:var(--space-4)">
@@ -674,32 +732,171 @@ audit: 14 events, all attributed</div>
       <div class="note"><b>G3 acceptance:</b> this screen is the canonical loop for one item, zero terminal steps, evidence chain unbroken. Freeze works mid-execution (fail-closed honoured).</div>
     </section>
 
-    <!-- ============ S7: ONBOARDING / EMPTY STATE ============ -->
-    <section class="screen" id="s7">
-      <div class="grid" style="grid-template-columns:1fr 1fr;align-items:start">
-        <div class="card pad">
-          <h2 style="margin-bottom:var(--space-2)">Bring a project into Dockyard</h2>
-          <p class="sub" style="margin-bottom:var(--space-4)">Three questions. Everything else is inferred from the repo and your fleet.</p>
-          <div class="field"><label for="ob-path">Where does it live?</label>
-            <input id="ob-path" class="input" placeholder="/home/kensei/repos/next-big-thing"></div>
-          <div class="field"><label for="ob-mission">What should the bots protect?</label>
-            <input id="ob-mission" class="input" placeholder="Keep CI green, deps fresh, docs honest"></div>
-          <div class="field"><label for="ob-team">Who owns it?</label>
-            <input id="ob-team" class="input" placeholder="research-lead + coder-bot + qa-bot"></div>
-          <div class="row"><button class="btn btn-primary" onclick="toast('Stewardship enabled · first verification cycle queued','ok')">Create project</button>
-            <button class="btn btn-subtle">Advanced (autonomy, policies)</button></div>
+    <!-- ============ NEW-PROJECT WIZARD (multi-step pop-out, templates) ============ -->
+<div class="scrim" id="wiz-scrim" onclick="closeWizard()"></div>
+<aside class="drawer wizard" id="wizard" role="dialog" aria-modal="true" aria-label="New project wizard">
+  <div class="drawer-head">
+    <div class="spread">
+      <div class="row"><span class="type-chip t-task">New project</span><span class="xs" id="wiz-step-label">Step 1 of 4</span></div>
+      <button class="iconbtn" onclick="closeWizard()" aria-label="Close wizard">✕</button>
+    </div>
+    <h2 style="margin-top:6px" id="wiz-title">Start from a template</h2>
+    <div class="wiz-steps" role="progressbar" aria-valuemin="1" aria-valuemax="4" aria-valuenow="1" id="wiz-progress">
+      <i class="on"></i><i></i><i></i><i></i>
+    </div>
+  </div>
+  <div class="drawer-body">
+
+    <!-- STEP 1: template -->
+    <div class="wstep on" data-step="1">
+      <p class="sub" style="margin-bottom:var(--space-3)">Templates carry goals, KPIs, team shape and verification policy. Clone one or start blank.</p>
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <button class="tpl-card sel" onclick="pickTpl(this,'Blank')">
+          <b>Blank</b><span>Nothing preconfigured. Three questions and done.</span></button>
+        <button class="tpl-card" onclick="pickTpl(this,'Repo Guardian')">
+          <b>Repo Guardian</b><span>tests-pass · deps-fresh · daily cycle · L2 Planner</span></button>
+        <button class="tpl-card" onclick="pickTpl(this,'Content Engine')">
+          <b>Content Engine</b><span>publish-cadence · source-integrity · human review gate</span></button>
+        <button class="tpl-card" onclick="pickTpl(this,'Service Watch')">
+          <b>Service Watch</b><span>uptime ≥99.9 · error-budget alerts · webhook triggers</span></button>
+      </div>
+      <div class="row" style="margin-top:var(--space-3)">
+        <button class="btn btn-subtle" onclick="toast('Save current settings as a template','ok')">Save current as template</button>
+        <button class="btn btn-subtle" onclick="toast('Manage templates: rename, duplicate, archive','ok')">Manage…</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: basics -->
+    <div class="wstep" data-step="2">
+      <div class="field"><label for="wz-path">Repository or folder path</label>
+        <input id="wz-path" class="input" placeholder="/home/kensei/repos/next-big-thing">
+        <p class="xs" style="margin-top:4px">Verification collectors read git state here. Nothing is modified without approval.</p></div>
+      <div class="field"><label for="wz-name">Project name</label>
+        <input id="wz-name" class="input" placeholder="next-big-thing"></div>
+      <div class="field"><label for="wz-mission">What should the bots protect?</label>
+        <textarea id="wz-mission" class="input" rows="2" placeholder="Keep CI green, deps fresh, docs honest"></textarea></div>
+    </div>
+
+    <!-- STEP 3: documentation uploads -->
+    <div class="wstep" data-step="3">
+      <p class="sub" style="margin-bottom:var(--space-3)">PRDs, runbooks and specs become verified context: collectors cite them, initiatives must respect them.</p>
+      <div class="dropzone" onclick="toast('File picker opens (PDF, MD, DOCX ≤20MB)','ok')" role="button" tabindex="0"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toast('File picker opens','ok')}">
+        <b>Drop files here or click to upload</b>
+        <span class="xs">PRD · architecture notes · runbooks · ADRs · PDF, MD, DOCX up to 20 MB</span>
+      </div>
+      <div class="upload-row"><span class="type-chip t-init" style="background:var(--health-healthy)">✓</span>
+        <div style="flex:1"><b class="xs">PRD-v1.pdf</b><div class="bar" style="margin-top:4px"><i style="width:100%;background:var(--health-healthy)"></i></div></div>
+        <span class="xs">indexed · cited as evidence source</span></div>
+      <div class="upload-row"><span class="type-chip t-task">↻</span>
+        <div style="flex:1"><b class="xs">runbook-deploy.md</b><div class="bar" style="margin-top:4px"><i style="width:62%"></i></div></div>
+        <span class="xs">uploading…</span></div>
+      <p class="xs" style="margin-top:var(--space-2)">Optional. You can add documents any time from Project → Settings → Context.</p>
+    </div>
+
+    <!-- STEP 4: team + autonomy -->
+    <div class="wstep" data-step="4">
+      <div class="field"><label>Owner &amp; specialists</label>
+        <div class="row tpl-team">
+          <span class="row sel-chip on" onclick="this.classList.toggle('on')"><span class="avatar av-lead">RD</span> research-lead <span class="pill p-neutral">lead</span></span>
+          <span class="row sel-chip on" onclick="this.classList.toggle('on')"><span class="avatar av-bot">CD</span> coder-bot</span>
+          <span class="row sel-chip on" onclick="this.classList.toggle('on')"><span class="avatar av-botb">QA</span> qa-bot</span>
+          <span class="row sel-chip" onclick="this.classList.toggle('on')"><span class="avatar av-bot">IM</span> image-bot</span>
         </div>
-        <div class="state">
-          <div>
-            <div class="art" style="background:var(--accent-soft)">⌂</div>
-            <h3>No projects yet</h3>
-            <p class="sub" style="max-width:34ch;margin:var(--space-2) auto var(--space-4)">Your fleet is idle. Point Dockyard at one repo and the first verification cycle runs before you finish reading this.</p>
-            <button class="btn btn-primary" onclick="go('s1')">See a populated example</button>
-          </div>
+        <p class="xs" style="margin-top:6px">Roster read live from Hermes Bot Mode. Groups/channels are created automatically.</p></div>
+      <div class="field"><label>Autonomy at launch</label>
+        <div class="seg" role="radiogroup" aria-label="Autonomy level">
+          <button class="seg-btn" onclick="segPick(this)">L1<br><small>Investigate</small></button>
+          <button class="seg-btn sel" onclick="segPick(this)" aria-pressed="true">L2<br><small>Plan only</small></button>
+          <button class="seg-btn" onclick="segPick(this)">L3<br><small>Build + PR</small></button>
+        </div>
+        <p class="xs" style="margin-top:6px">Restriction-only: policy can narrow this later; merges stay human-only regardless.</p></div>
+    </div>
+  </div>
+  <div class="drawer-foot">
+    <button class="btn btn-subtle" id="wiz-back" onclick="wizNav(-1)" disabled>Back</button>
+    <span class="xs" style="margin-left:auto">Esc to close · nothing is created until the last step</span>
+    <button class="btn btn-primary" id="wiz-next" onclick="wizNext()">Continue</button>
+  </div>
+</aside>
+
+<!-- ============ S7: WORKFLOWS (creator + live node visualisation) ============ -->
+<section class="screen" id="s7">
+  <div class="spread" style="margin-bottom:var(--space-3)">
+    <div><h1>Workflows</h1>
+      <p class="sub">the canonical loop per project · live state, not a diagram you have to decode</p></div>
+    <div class="row">
+      <button class="btn btn-subtle" onclick="toast('Template gallery opens: Repo Guardian, Content Engine, Service Watch…')">Templates</button>
+      <button class="btn btn-primary" onclick="openWizard()">+ New workflow</button>
+    </div>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 300px; align-items:start;">
+    <div class="card pad flow-wrap">
+      <div class="spread" style="margin-bottom:var(--space-2)">
+        <h3>checkout-service · ownership loop</h3>
+        <div class="row xs">
+          <span class="legend-dot" style="background:var(--health-healthy)"></span>done
+          <span class="legend-dot pulse-dot" style="background:var(--accent)"></span>running
+          <span class="legend-dot" style="background:var(--border-strong)"></span>queued
+          <a href="#" onclick="toast('Workflow creator: drag nodes, bind triggers and policies');return false">edit in creator</a>
         </div>
       </div>
-      <div class="note"><b>UX-08:</b> onboarding asks three questions, infers verification policy and team from the live Hermes roster, and never shows a config file.</div>
-    </section>
+      <svg viewBox="0 0 720 250" width="100%" role="img" aria-label="Live workflow: verify running, prioritise queued">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--border-strong)"/></marker>
+          <marker id="arrow-live" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/></marker>
+        </defs>
+        <!-- connectors -->
+        <line x1="128" y1="60" x2="168" y2="60" stroke="var(--border-strong)" stroke-width="2" marker-end="url(#arrow)"/>
+        <line x1="288" y1="60" x2="328" y2="60" stroke="var(--border-strong)" stroke-width="2" marker-end="url(#arrow)"/>
+        <line x1="448" y1="60" x2="488" y2="60" stroke="var(--accent)" stroke-width="2.5" class="flow-line" marker-end="url(#arrow-live)"/>
+        <line x1="588" y1="88" x2="588" y2="140" stroke="var(--border-strong)" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#arrow)"/>
+        <line x1="488" y1="170" x2="448" y2="170" stroke="var(--border-strong)" stroke-width="2" marker-end="url(#arrow)"/>
+        <line x1="328" y1="170" x2="288" y2="170" stroke="var(--border-strong)" stroke-width="2" marker-end="url(#arrow)"/>
+        <line x1="168" y1="170" x2="128" y2="170" stroke="var(--border-strong)" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 68 142 V 200 H 360 V 174" stroke="var(--health-healthy)" stroke-width="2" fill="none" stroke-dasharray="4 4" marker-end="url(#arrow)"/>
+        <text x="380" y="216" font-size="11" fill="var(--text-secondary)" text-anchor="middle">learn ↺ feeds next cycle</text>
+
+        <!-- nodes -->
+        <g class="node ok"><rect x="40" y="34" width="88" height="52" rx="10"/><text x="84" y="56">Verify</text><text class="n2" x="84" y="72">cycle #43</text></g>
+        <g class="node ok"><rect x="170" y="34" width="118" height="52" rx="10"/><text x="229" y="56">Assess KPIs</text><text class="n2" x="229" y="72">1/2 targets met</text></g>
+        <g class="node ok"><rect x="330" y="34" width="118" height="52" rx="10"/><text x="389" y="56">Propose</text><text class="n2" x="389" y="72">INIT-0001 open</text></g>
+        <g class="node live"><rect x="490" y="34" width="98" height="52" rx="10"/><text x="539" y="56">Prioritise</text><text class="n2" x="539" y="72">rank #1 set</text></g>
+        <g class="node wait"><rect x="520" y="142" width="138" height="56" rx="10"/><text x="589" y="164">Human gate</text><text class="n2" x="589" y="181">awaiting Sahil</text></g>
+        <g class="node mute"><rect x="330" y="144" width="118" height="52" rx="10"/><text x="389" y="166">Execute</text><text class="n2" x="389" y="183">Kanban · paused</text></g>
+        <g class="node mute"><rect x="170" y="144" width="118" height="52" rx="10"/><text x="229" y="166">Measure</text><text class="n2" x="229" y="183">post-merge</text></g>
+        <g class="node mute"><rect x="40" y="144" width="88" height="52" rx="10"/><text x="84" y="166">Learn</text><text class="n2" x="84" y="183">suppression</text></g>
+      </svg>
+      <div class="xs" style="margin-top:var(--space-2)">The pulsing edge is where execution actually is right now. Nodes show real state, not stage names.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+      <div class="card pad">
+        <h3>Workflow creator</h3>
+        <p class="sub" style="margin-top:var(--space-2)">Drag-and-drop canvas to compose loops: pick stages, bind triggers (cron, webhook, bot event), attach policies per node.</p>
+        <ul class="xs" style="margin:var(--space-2) 0 0 var(--space-4);display:grid;gap:4px">
+          <li>Stage palette: verify, assess, propose, prioritise, approve, execute, measure, learn</li>
+          <li>Triggers: cron · GitHub push/PR/CI · initiative completed · manual</li>
+          <li>Policies attach per node (approval gates, budgets, quiet hours)</li>
+          <li>Publish runs a dry validation before activation</li>
+        </ul>
+      </div>
+      <div class="card pad">
+        <h3>Saved workflows</h3>
+        <table class="list" style="margin-top:var(--space-2)">
+          <tbody>
+            <tr><td><b>Ownership loop</b><div class="xs">checkout-service · live · edited 2d ago</div></td><td><span class="pill p-watch">running</span></td></tr>
+            <tr><td><b>Weekly dependency sweep</b><div class="xs">all projects · cron Mon 07:00</div></td><td><span class="pill p-healthy">healthy</span></td></tr>
+            <tr><td><b>Injection response</b><div class="xs">auto-freeze + recovery path · armed</div></td><td><span class="pill p-neutral">standby</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="note"><b>Navigation fix:</b> "New project" is now a four-step pop-out wizard with templates and document upload; this screen replaces the old dead-end onboarding page. Workflow state is visualised with live indicators (pulse = executing), and the creator is one click away.</div>
+</section>
+
 
     </div>
   </div>
@@ -775,7 +972,7 @@ const crumbs = {
   s1:'<b>Fleet</b> / Home', s2:'<b>Fleet</b> / checkout-service',
   s3:'<b>Fleet</b> / checkout-service / Backlog', s4:'<b>Fleet</b> / Approval Inbox',
   s5:'<b>Fleet</b> / Bot Teams', s6:'<b>Fleet</b> / checkout-service / INIT-CHECKOUT-0001',
-  s7:'<b>Fleet</b> / New project' };
+  s7:'<b>Fleet</b> / Workflows' };
 function go(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));
   document.querySelectorAll('.rail-item').forEach(b=>b.classList.toggle('active',b.dataset.s===id));
@@ -833,6 +1030,49 @@ function toast(msg,kind){
   t.textContent=msg; document.getElementById('toasts').appendChild(t);
   setTimeout(()=>t.remove(), 4200);
 }
+
+/* ---------- new-project wizard ---------- */
+const wizState = { step: 1, max: 4 };
+function openWizard(){
+  document.getElementById('wiz-scrim').classList.add('open');
+  document.getElementById('wizard').classList.add('open');
+  wizGo(1);
+}
+function closeWizard(){
+  document.getElementById('wiz-scrim').classList.remove('open');
+  document.getElementById('wizard').classList.remove('open');
+}
+function pickTpl(el,name){
+  el.parentElement.querySelectorAll('.tpl-card').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  toast(name==='Blank' ? 'Starting blank' : 'Template "'+name+'" loaded into following steps','ok');
+}
+function segPick(el){
+  el.parentElement.querySelectorAll('.seg-btn').forEach(b=>{b.classList.remove('sel');b.setAttribute('aria-pressed','false');});
+  el.classList.add('sel'); el.setAttribute('aria-pressed','true');
+}
+function wizGo(n){
+  wizState.step = n;
+  const titles = ['Start from a template','Project basics','Documentation & context','Team & autonomy'];
+  document.getElementById('wiz-title').textContent = titles[n-1];
+  document.getElementById('wiz-step-label').textContent = 'Step '+n+' of 4';
+  document.getElementById('wiz-progress').setAttribute('aria-valuenow', n);
+  document.querySelectorAll('#wiz-progress i').forEach((bar,i)=>bar.classList.toggle('on', i<n));
+  document.querySelectorAll('.wstep').forEach(s=>s.classList.toggle('on', +s.dataset.step===n));
+  document.getElementById('wiz-back').disabled = (n===1);
+  const next = document.getElementById('wiz-next');
+  next.textContent = n===4 ? 'Create project' : 'Continue';
+}
+function wizNext(){
+  if(wizState.step < 4){ wizGo(wizState.step+1); }
+  else {
+    closeWizard();
+    toast('Project created · stewardship enabled · first verification cycle queued','ok');
+  }
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') closeWizard();
+});
 </script>
 </body>
 </html>
