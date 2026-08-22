@@ -1,0 +1,563 @@
+</td>
+          <tr>
+            <td style="opacity: 0.55">—</td>
+            <td><strong>Migrate UI to React 20</strong><br><span class="sub">suppressed: rejected twice, no objective link</span></td>
+            <td><span class="type-chip t-epic">Epic</span></td>
+            <td class="sub">—</td>
+            <td>—</td>
+            <td>—</td>
+            <td><span class="pill p-unknown">suppressed</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note"><strong>Anti-busywork carried over:</strong> the suppressed row is visible deliberately — rejection history feeds suppression (v0.1 §20), and the product shows its reasoning instead of hiding it.</div>
+</section>
+
+<!-- ============ SCREEN 4 : APPROVAL INBOX (TE-02/UX-05) ============ -->
+<section class="screen" id="s4">
+  <div class="spread" style="margin-bottom: var(--space-6)">
+    <div>
+      <h1>Approval Inbox</h1>
+      <p class="sub">every pending human decision across all projects — one screen, full evidence, no hunting</p>
+    </div>
+    <span class="pill p-watch">3 pending</span>
+  </div>
+  <div class="card pad">
+    <div class="inbox-item">
+      <span class="avatar a-lead">RD</span>
+      <div style="flex: 1;">
+        <div class="spread"><strong>Restore failing objective 'tests-pass'</strong><span class="pill p-watch">medium risk</span></div>
+        <p class="sub" style="margin-top: var(--space-2)">checkout-service · proposed by research-lead via cycle 42 · <a href="#">INIT-CHECKOUT-0001</a></p>
+        <div class="evidence">objective 'tests-pass': target >=1, measured 0.0 (pytest exit=1)<br>last green: snapshot #41 · evidence refs: git@8f3e21, ci-run#993<br>expected outcome: 'tests-pass' passes again · plan: revert bad commit → rerun suite</div>
+        <div class="row" style="margin-top: var(--space-3)">
+          <button class="btn btn-primary">Approve & execute</button>
+          <button class="btn btn-ghost">Ask a question</button>
+          <button class="btn btn-danger">Reject</button>
+          <span class="sub" style="margin-left: auto;">auto-expires in 22h · reminder will post to #checkout-ops</span>
+        </div>
+      </div>
+    </div>
+    <div class="inbox-item">
+      <span class="avatar a-bot">IM</span>
+      <div style="flex: 1;">
+        <div class="spread"><strong>Rotate exposed webhook signing key</strong><span class="pill p-degraded">high risk</span></div>
+        <p class="sub" style="margin-top: var(--space-2)">sahilblog · proposed by image-bot after secret scan · <a href="#">INIT-BLOG-0007</a></p>
+        <div class="evidence">scan hit: signing key fragment in build log line 882<br>policy: high-risk ops always require human approval regardless of autonomy level<br>plan: revoke → rotate → verify signature checks pass</div>
+        <div class="row" style="margin-top: var(--space-3)">
+          <button class="btn btn-primary">Approve & execute</button>
+          <button class="btn btn-ghost">Ask a question</button>
+          <button class="btn btn-danger">Reject</button>
+        </div>
+      </div>
+    </div>
+    <div class="inbox-item" style="opacity: 0.75">
+      <span class="avatar a-botb">QA</span>
+      <div style="flex: 1;">
+        <div class="spread"><strong>Bump httpx to 0.29</strong><span class="pill p-healthy">low risk</span></div>
+        <p class="sub" style="margin-top: var(--space-2)">walkie-talkie · policy allows autonomous low-risk dependency bumps — shown for visibility only</p>
+        <div class="row" style="margin-top: var(--space-2)"><button class="btn btn-ghost">View plan</button>
+          <span class="sub" style="margin-left: auto;">executing · no decision required</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><strong>Trust engine surfaced:</strong> approvals here are the same permission-bound state machine as today's Discord flow — but you never need Discord or a terminal to decide.</div>
+</section>
+
+<!-- ============ SCREEN 5 : BOT TEAMS (BM-*) ============ -->
+<section class="screen" id="s5">
+  <div class="spread" style="margin-bottom: var(--space-6)">
+    <div>
+      <h1>Bot Teams</h1>
+      <p class="sub">the fleet at a glance · groups map to channels (A2A lands here)</p>
+    </div>
+    <button class="btn btn-primary">+ Register bot</button>
+  </div>
+  <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-4);">
+    <div class="card pad">
+      <div class="row"><span class="avatar a-lead">RD</span><strong>research-lead</strong> <span class="pill p-healthy" style="margin-left: auto;">busy · 3</span></div>
+      <p class="sub" style="margin: var(--space-2) 0">Leads checkout-service team · proposes initiatives from verified gaps</p>
+      <div class="row sub"><span class="type-chip t-init" style="background: var(--bot-lead)">LEAD</span> 92% outcome success · 0 regressions this month</div>
+    </div>
+    <div class="card pad">
+      <div class="row"><span class="avatar a-bot">CD</span><strong>coder-bot</strong> <span class="pill p-healthy" style="margin-left: auto;">busy · 4</span></div>
+      <p class="sub" style="margin: var(--space-2) 0">Implements approved work on Kanban boards across 3 projects</p>
+      <div class="row sub">capabilities: python · typescript · ci · docker</div>
+    </div>
+    <div class="card pad">
+      <div class="row"><span class="avatar a-botb">QA</span><strong>qa-bot</strong> <span class="pill p-watch" style="margin-left: auto;">idle · 1</span></div>
+      <p class="sub" style="margin: var(--space-2) 0">Runs verification collectors and post-delivery outcome checks</p>
+      <div class="row sub">last handoff received: coder-bot → qa-bot · audit #4412</div>
+    </div>
+    <div class="card pad">
+      <div class="row"><span class="avatar a-human">S</span><strong>Sahil</strong> <span class="pill p-unknown" style="margin-left: auto;">human</span></div>
+      <p class="sub" style="margin: var(--space-2) 0">Owner · approves high-risk work · created HDY-33 spike directly</p>
+      <div class="row sub">3 decisions pending in inbox</div>
+    </div>
+  </div>
+  <div class="grid" style="grid-template-columns: 1.4fr 1fr; margin-top: var(--space-4); gap: var(--space-4);">
+    <div class="card pad">
+      <div class="pad spread"><h3>#checkout-ops — bot group channel</h3><span class="sub">structured A2A + humans welcome (BM-04)</span></div>
+      <div class="pad chat" style="padding-top: 0;">
+        <div class="msg sys">A2A handoff · audited event #4412 · full context linked</div>
+        <div class="msg bot"><div class="who" style="color: var(--bot-a)">coder-bot</div>Handoff → qa-bot: INIT-0001 implementation pushed (branch fix/tests-pass). Validation contract attached: run pytest -q, expect green. <a href="#" class="sub">view diff · audit trail</a></div>
+        <div class="msg bot"><div class="who" style="color: var(--bot-b)">qa-bot</div>Accepted. Outcome check scheduled post-merge; will report against objective 'tests-pass', not just task completion.</div>
+        <div class="msg sys">outcome recorded: completed · objective green · health watch → healthy</div>
+      </div>
+    </div>
+    <div class="card pad">
+      <h3>Workload heat</h3>
+      <table class="list" style="margin-top: var(--space-2);">
+        <thead>
+          <tr>
+            <th>Bot</th>
+            <th>Load</th>
+            <th>Stuck?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>coder-bot</td>
+            <td><div class="bar"><i style="width: 80%; background: var(--bot-a)"></i></div></td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>research-lead</td>
+            <td><div class="bar"><i style="width: 60%; background: var(--bot-lead)"></i></div></td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>qa-bot</td>
+            <td><div class="bar"><i style="width: 25%; background: var(--bot-b)"></i></div></td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>image-bot</td>
+            <td><div class="bar"><i style="width: 95%; background: var(--health-critical)"></i></div></td>
+            <td><span class="pill p-critical">1 item >48h</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="note"><strong>D3 delivered:</strong> A2A messages are structured, audited events that render in the group channel — and the same summary posts to real Discord via gateway with deep-links back here.</div>
+</section>
+
+<!-- ============ SCREEN 6 : INITIATIVE FLOW (TE/G3 walkthrough) ============ -->
+<section class="screen" id="s6">
+  <div class="spread" style="margin-bottom: var(--space-6)">
+    <div>
+      <h1>INIT-CHECKOUT-0001</h1>
+      <div class="row" style="margin-top: var(--space-2)">
+        <span class="pill p-watch">In execution</span>
+        <span class="pill p-unknown">medium risk</span>
+        <span class="sub">created by research-lead from cycle 42 evidence</span>
+      </div>
+    </div>
+    <button class="btn btn-danger">Emergency freeze project</button>
+  </div>
+  <div class="grid" style="grid-template-columns: 1.5fr 1fr; gap: var(--space-6);">
+    <div class="card pad">
+      <h3>The loop, live for this initiative</h3>
+      <div class="timeline" style="margin-top: var(--space-4);">
+        <div class="tl-item ok"><strong>Verify project state</strong> · git 8f3e21 dirty, pytest exit=1, CI red <span class="sub">· deterministic collectors</span></div>
+        <div class="tl-item ok"><strong>Create initiative</strong> · evidence cited, expected outcome declared</div>
+        <div class="tl-item ok"><strong>Prioritise</strong> · ranked #1 in checkout backlog (objective breach severity)</div>
+        <div class="tl-item warn"><strong>Human approval</strong> · L2 cannot execute · <strong>Sahil approved via Approval Inbox 21 Aug 23:41</strong></div>
+        <div class="tl-item ok"><strong>Hermes Kanban</strong> · board checkout-ops created · 3 cards: research → build → test/review</div>
+        <div class="tl-item"><strong>Release gate</strong> · merge remains human-only (policy)</div>
+        <div class="tl-item"><strong>Observe results</strong> · outcome check queued post-merge against 'tests-pass'</div>
+        <div class="tl-item"><strong>Did the project improve?</strong> · pending — regression would flag automatically</div>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+      <div class="card pad" style="margin-bottom: var(--space-4);">
+        <h3>Evidence chain</h3>
+        <div class="evidence" style="margin-top: var(--space-2);">cycle #42 verification snapshot<br>objective result: tests-pass 0.0 / target ≥1<br>approval: actor=sahil interface=approval-inbox<br>kanban board: checkout-ops · cards #1–#3<br>audit events: 14 (all attributed)</div>
+      </div>
+      <div class="card pad">
+        <h3>Execution</h3>
+        <p class="sub" style="margin-top: var(--space-2);">Orchestrated on Hermes Kanban underneath (D1). Board progress mirrors here:</p>
+        <div class="bar" style="margin-top: var(--space-3);"><i style="width: 66%; background: var(--accent)"></i></div>
+        <p class="sub">2/3 cards complete · coder-bot building card 3</p>
+        <div class="row" style="margin-top: var(--space-3);">
+          <button class="btn btn-ghost">View board</button>
+          <button class="btn btn-ghost">Pause initiative</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><strong>G3 acceptance:</strong> this screen IS the §2.1 loop for one item — proposal to measurement, zero terminal steps, evidence chain unbroken. The freeze button works even mid-execution (fail-closed honoured).</div>
+</section>
+
+<!-- ============ SCREEN 7 : WORKFLOWS (creator + live node visualisation) ============ -->
+<section class="screen" id="s7">
+  <div class="spread" style="margin-bottom: var(--space-6)">
+    <div>
+      <h1>Workflows</h1>
+      <p class="sub">the canonical loop per project · live state, not a diagram you have to decode</p>
+    </div>
+    <div class="row">
+      <button class="btn btn-ghost" onclick="toast('Template gallery opens: Repo Guardian, Content Engine, Service Watch…')">Templates</button>
+      <button class="btn btn-primary" onclick="openWizard()">+ New workflow</button>
+    </div>
+  </div>
+  <div class="grid" style="grid-template-columns: 1fr 300px; gap: var(--space-6); align-items: start;">
+    <div class="card pad flow-wrap">
+      <div class="spread" style="margin-bottom: var(--space-2);">
+        <h3>checkout-service · ownership loop</h3>
+        <div class="row xs">
+          <span class="legend-dot" style="background: var(--success)"></span>done
+          <span class="legend-dot pulse-dot" style="background: var(--accent)"></span>running
+          <span class="legend-dot" style="background: var(--border-muted)"></span>queued
+          <a href="#" onclick="toast('Workflow creator: drag nodes, bind triggers and policies');return false">edit in creator</a>
+        </div>
+      </div>
+      <svg viewBox="0 0 720 250" width="100%" role="img" aria-label="Live workflow: verify running, prioritise queued">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--border-muted)"/>
+          </marker>
+          <marker id="arrow-live" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/>
+          </marker>
+        </defs>
+        <!-- connectors -->
+        <line x1="128" y1="60" x2="168" y2="60" stroke="var(--border-muted)" stroke-width="2" marker-end="url(#arrow)"/>
+        <line x1="288" y1="60" x2="328" y2="60" stroke="var(--border-muted)" stroke-width="2" marker-end="url(#arrow)"/>
+        <line x1="448" y1="60" x2="488" y2="60" stroke="var(--accent)" stroke-width="2.5" class="flow-line" marker-end="url(#arrow-live)"/>
+        <line x1="588" y1="88" x2="588" y2="140" stroke="var(--border-muted)" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#arrow)"/>
+        <line x1="488" y1="170" x2="448" y2="170" stroke="var(--border-muted)" stroke-width="2" marker-end="url(#arrow)"/>
+        <line x1="328" y1="170" x2="288" y2="170" stroke="var(--border-muted)" stroke-width="2" marker-end="url(#arrow)"/>
+        <line x1="168" y1="170" x2="128" y2="170" stroke="var(--border-muted)" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M 68 142 V 200 H 360 V 174" stroke="var(--success)" stroke-width="2" fill="none" stroke-dasharray="4 4" marker-end="url(#arrow)"/>
+        <text x="380" y="216" font-size="11" fill="var(--text-muted)" text-anchor="middle">learn: feeds next cycle</text>
+        <!-- nodes -->
+        <g class="node ok"><rect x="40" y="34" width="88" height="52" rx="10"/><text x="84" y="56">Verify</text><text class="n2" x="84" y="72">cycle #43</text></g>
+        <g class="node ok"><rect x="170" y="34" width="118" height="52" rx="10"/><text x="229" y="56">Assess KPIs</text><text class="n2" x="229" y="72">1/2 targets met</text></g>
+        <g class="node ok"><rect x="330" y="34" width="118" height="52" rx="10"/><text x="389" y="56">Propose</text><text class="n2" x="389" y="72">INIT-0001 open</text></g>
+        <g class="node live"><rect x="490" y="34" width="98" height="52" rx="10"/><text x="539" y="56">Prioritise</text><text class="n2" x="539" y="72">rank #1 set</text></g>
+        <g class="node wait"><rect x="520" y="142" width="138" height="56" rx="10"/><text x="589" y="164">Human gate</text><text class="n2" x="589" y="181">awaiting Sahil</text></g>
+        <g class="node mute"><rect x="330" y="144" width="118" height="52" rx="10"/><text x="389" y="166">Execute</text><text class="n2" x="389" y="183">Kanban · paused</text></g>
+        <g class="node mute"><rect x="170" y="144" width="118" height="52" rx="10"/><text x="229" y="166">Measure</text><text class="n2" x="229" y="183">post-merge</text></g>
+        <g class="node mute"><rect x="40" y="144" width="88" height="52" rx="10"/><text x="84" y="166">Learn</text><text class="n2" x="84" y="183">suppression</text></g>
+      </svg>
+      <div class="xs" style="margin-top: var(--space-2);">The pulsing edge is where execution actually is right now. Nodes show real state, not stage names.</div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+      <div class="card pad">
+        <h3>Workflow creator</h3>
+        <p class="sub" style="margin-top: var(--space-2);">Drag-and-drop canvas to compose loops: pick stages, bind triggers (cron, webhook, bot event), attach policies per node.</p>
+        <ul class="xs" style="margin: var(--space-2) 0 0 var(--space-4); display: grid; gap: 4px;">
+          <li>Stage palette: verify, assess, propose, prioritise, approve, execute, measure, learn</li>
+          <li>Triggers: cron · GitHub push/PR/CI · initiative completed · manual</li>
+          <li>Policies attach per node (approval gates, budgets, quiet hours)</li>
+          <li>Publish runs a dry validation before activation</li>
+        </ul>
+      </div>
+      <div class="card pad">
+        <h3>Saved workflows</h3>
+        <table class="list" style="margin-top: var(--space-2);">
+          <thead>
+            <tr>
+              <th>Workflow</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Ownership loop</b><div class="xs">checkout-service · live · edited 2d ago</div></td>
+              <td><span class="pill p-watch">running</span></td>
+            </tr>
+            <tr>
+              <td><b>Weekly dependency sweep</b><div class="xs">all projects · cron Mon 07:00</div></td>
+              <td><span class="pill p-healthy">healthy</span></td>
+            </tr>
+            <tr>
+              <td><b>Injection response</b><div class="xs">auto-freeze + recovery path · armed</div></td>
+              <td><span class="pill p-neutral">standby</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="note"><strong>Navigation fix:</strong> "New project" is now a four-step pop-out wizard with templates and document upload; this screen replaces the old dead-end onboarding page. Workflow state is visualised with live indicators (pulse = executing), and the creator is one click away.</div>
+</section>
+
+<!-- ============ NEW-PROJECT WIZARD (multi-step pop-out, templates) ============ -->
+<div class="scrim" id="wiz-scrim" onclick="closeWizard()"></div>
+<aside class="drawer wizard" id="wizard" role="dialog" aria-modal="true" aria-label="New project wizard">
+  <div class="drawer-head">
+    <div class="spread">
+      <div class="row"><span class="type-chip t-task">New project</span><span class="xs" id="wiz-step-label">Step 1 of 4</span></div>
+      <button class="iconbtn" onclick="closeWizard()" aria-label="Close wizard"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6l-6 6l6 6"/><path d="M6 18l6 -6"/></svg></button>
+    </div>
+    <h2 style="margin-top: 6px" id="wiz-title">Start from a template</h2>
+    <div class="wiz-steps" role="progressbar" aria-valuemin="1" aria-valuemax="4" aria-valuenow="1" id="wiz-progress">
+      <i class="on"></i><i></i><i></i><i></i>
+    </div>
+  </div>
+  <div class="drawer-body">
+    <!-- STEP 1: template -->
+    <div class="wstep on" data-step="1">
+      <p class="sub" style="margin-bottom: var(--space-3);">Templates carry goals, KPIs, team shape and verification policy. Clone one or start blank.</p>
+      <div class="grid" style="grid-template-columns: 1fr 1fr;">
+        <button class="tpl-card sel" onclick="pickTpl(this,'Blank')">
+          <b>Blank</b><span>Nothing preconfigured. Three questions and done.</span>
+        </button>
+        <button class="tpl-card" onclick="pickTpl(this,'Repo Guardian')">
+          <b>Repo Guardian</b><span>tests-pass · deps-fresh · daily cycle · L2 Planner</span>
+        </button>
+        <button class="tpl-card" onclick="pickTpl(this,'Content Engine')">
+          <b>Content Engine</b><span>publish-cadence · source-integrity · human review gate</span>
+        </button>
+        <button class="tpl-card" onclick="pickTpl(this,'Service Watch')">
+          <b>Service Watch</b><span>uptime ≥99.9 · error-budget alerts · webhook triggers</span>
+        </button>
+      </div>
+      <div class="row" style="margin-top: var(--space-3);">
+        <button class="btn btn-subtle" onclick="toast('Save current settings as a template','ok')">Save current as template</button>
+        <button class="btn btn-subtle" onclick="toast('Manage templates: rename, duplicate, archive','ok')">Manage…</button>
+      </div>
+    </div>
+    <!-- STEP 2: basics -->
+    <div class="wstep" data-step="2">
+      <div class="field"><label for="wz-path">Repository or folder path</label>
+        <input id="wz-path" class="input" placeholder="/home/kensei/repos/next-big-thing"/>
+        <p class="xs" style="margin-top: 4px;">Verification collectors read git state here. Nothing is modified without approval.</p>
+      </div>
+      <div class="field"><label for="wz-name">Project name</label>
+        <input id="wz-name" class="input" placeholder="next-big-thing"/>
+      </div>
+      <div class="field"><label for="wz-mission">What should the bots protect?</label>
+        <textarea id="wz-mission" class="input" rows="2" placeholder="Keep CI green, deps fresh, docs honest"></textarea>
+      </div>
+    </div>
+    <!-- STEP 3: documentation uploads -->
+    <div class="wstep" data-step="3">
+      <p class="sub" style="margin-bottom: var(--space-3);">PRDs, runbooks and specs become verified context: collectors cite them, initiatives must respect them.</p>
+      <div class="dropzone" onclick="toast('File picker opens (PDF, MD, DOCX ≤20MB)','ok')" role="button" tabindex="0"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toast('File picker opens','ok')}">
+        <b>Drop files here or click to upload</b>
+        <span class="xs">PRD · architecture notes · runbooks · ADRs · PDF, MD, DOCX up to 20 MB</span>
+      </div>
+      <div class="upload-row"><span class="type-chip t-init" style="background: var(--success)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5l10 -10"/></svg></span>
+        <div style="flex: 1;"><b class="xs">PRD-v1.pdf</b><div class="bar" style="margin-top: 4px;"><i style="width: 100%; background: var(--success)"></i></div></div>
+        <span class="xs">indexed · cited as evidence source</span>
+      </div>
+      <div class="upload-row"><span class="type-chip t-task"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0 -3.5 6.6"/><path d="M20 5v6h-6"/></svg></span>
+        <div style="flex: 1;"><b class="xs">runbook-deploy.md</b><div class="bar" style="margin-top: 4px;"><i style="width: 62%"></i></div></div>
+        <span class="xs">uploading…</span>
+      </div>
+      <p class="xs" style="margin-top: var(--space-2);">Optional. You can add documents any time from Project → Settings → Context.</p>
+    </div>
+    <!-- STEP 4: team + autonomy -->
+    <div class="wstep" data-step="4">
+      <div class="field"><label>Owner & specialists</label>
+        <div class="row tpl-team">
+          <span class="row sel-chip on" onclick="this.classList.toggle('on')"><span class="avatar av-lead">RD</span> research-lead <span class="pill p-neutral">lead</span></span>
+          <span class="row sel-chip on" onclick="this.classList.toggle('on')"><span class="avatar av-bot">CD</span> coder-bot</span>
+          <span class="row sel-chip on" onclick="this.classList.toggle('on')"><span class="avatar av-botb">QA</span> qa-bot</span>
+          <span class="row sel-chip" onclick="this.classList.toggle('on')"><span class="avatar av-bot">IM</span> image-bot</span>
+        </div>
+        <p class="xs" style="margin-top: 6px;">Roster read live from Hermes Bot Mode. Groups/channels are created automatically.</p>
+      </div>
+      <div class="field"><label>Autonomy at launch</label>
+        <div class="seg" role="radiogroup" aria-label="Autonomy level">
+          <button class="seg-btn" onclick="segPick(this)">L1<br><small>Investigate</small></button>
+          <button class="seg-btn sel" onclick="segPick(this)" aria-pressed="true">L2<br><small>Plan only</small></button>
+          <button class="seg-btn" onclick="segPick(this)">L3<br><small>Build + PR</small></button>
+        </div>
+        <p class="xs" style="margin-top: 6px;">Restriction-only: policy can narrow this later; merges stay human-only regardless.</p>
+      </div>
+    </div>
+  </div>
+  <div class="drawer-foot">
+    <button class="btn btn-subtle" id="wiz-back" onclick="wizNav(-1)" disabled>Back</button>
+    <span class="xs" style="margin-left: auto;">Esc to close · nothing is created until the last step</span>
+    <button class="btn btn-primary" id="wiz-next" onclick="wizNext()">Continue</button>
+  </div>
+</aside>
+
+<!-- ============ ITEM DRAWER ============ -->
+<div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Item details">
+  <div class="drawer-head">
+    <div class="spread">
+      <div class="row"><span class="type-chip t-init">Initiative</span><span class="xs">INIT-CHECKOUT-0001</span></div>
+      <button class="iconbtn" onclick="closeDrawer()" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6l-6 6l6 6"/><path d="M6 18l6 -6"/></svg></button>
+    </div>
+    <h2 style="margin-top: 6px">Restore failing objective 'tests-pass'</h2>
+    <div class="row" style="margin-top: 6px;">
+      <span class="pill p-watch">In execution</span>
+      <span class="pill p-unknown">medium risk</span>
+      <span class="xs">opened from Approval Inbox</span>
+    </div>
+  </div>
+  <div class="drawer-body">
+    <div class="field"><label>Status</label>
+      <div class="row"><span class="pill p-watch">In execution</span><span class="xs">2/3 Kanban cards complete · coder-bot on card 3</span></div>
+      <div class="bar" style="margin-top: var(--space-2);"><i style="width: 66%; background: var(--accent)"></i></div>
+    </div>
+    <div class="field"><label>Evidence</label>
+      <div class="evidence">objective: tests-pass 0.0 / target ≥1 (pytest exit=1)
+last green: snapshot #41 · git@8f3e21 · ci-run#993
+approval: actor=sahil · interface=approval-inbox · 21 Aug 23:41</div>
+    </div>
+    <div class="field"><label>Plan</label>
+      <p class="sub">1. Revert the midnight commit breaking tests<br>2. Rerun full suite via qa-bot<br>3. Outcome check vs objective before close (regression auto-flags)</p>
+    </div>
+    <div class="field"><label>Team</label>
+      <div class="row"><span class="avatar av-lead">RD</span><span class="avatar av-bot">CD</span><span class="avatar av-botb">QA</span>
+        <span class="xs">research-lead proposed · coder-bot building · qa-bot verifying</span>
+      </div>
+    </div>
+    <div class="field"><label>Linked A2A</label>
+      <p class="sub">#checkout-ops handoff #4412 (coder-bot → qa-bot) · <a onclick="go('s5');closeDrawer()">open room</a></p>
+    </div>
+    <div class="field"><label>Audit trail (14)</label>
+      <div class="timeline">
+        <div class="tl-item ok"><span class="xs">approved · sahil · approval-inbox · 23:41</span></div>
+        <div class="tl-item"><span class="xs">kanban board bound · checkout-ops · system</span></div>
+        <div class="tl-item warn><span class="xs">proposed · research-lead · cycle#42 · 21:24</span></div>
+        <div class="tl-item crit><span class="xs">objective breach detected · cycle#42 · 21:23</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="drawer-foot">
+    <button class="btn btn-primary" onclick="toast('Outcome recorded against objective · initiative closing','ok')">Mark outcome</button>
+    <button class="btn btn-subtle" onclick="toast('Paused · no new mutating steps after pause observed','warn')">Pause</button>
+    <span class="xs" style="margin-left: auto;">Esc to close</span>
+  </div>
+</aside>
+
+<!-- ============ COMMAND PALETTE ============ -->
+<div class="palette-wrap" id="palette" onclick="if(event.target===this)closePalette()">
+  <div class="palette" role="dialog" aria-modal="true" aria-label="Command palette">
+    <input id="palette-input" placeholder="Search projects, items, bots… or type a command" aria-label="Search"/>
+    <div class="results" id="palette-results">
+      <div class="group">Actions</div>
+      <button class="res sel" onclick="toast('Cycle triggered on checkout-service','ok')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l12 8l-12 8z"/></svg> Run cycle · checkout-service <span class="sub">manual trigger</span></button>
+      <button class="res" onclick="go('s4');closePalette()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5l10 -10"/></svg> Open Approval Inbox <span class="sub">3 pending</span></button>
+      <button class="res" onclick="toast('Emergency global pause armed · confirm in next screen','warn')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="9" y1="5" x2="9" y2="19"/><line x1="15" y1="5" x2="15" y2="19"/></svg> Pause all stewardship <span class="sub">emergency</span></button>
+      <div class="group">Projects</div>
+      <button class="res" onclick="go('s2');closePalette()"><span class="pill p-watch" style="padding:0;width:8px;height:8px;"></span> checkout-service <span class="sub">watch</span></button>
+      <button class="res" onclick="go('s2');closePalette()"><span class="pill p-healthy" style="padding:0;width:8px;height:8px;"></span> walkie-talkie <span class="sub">healthy</span></button>
+      <div class="group">Bots</div>
+      <button class="res" onclick="go('s5');closePalette()"><span class="avatar av-bot" style="width:18px;height:18px">CD</span> coder-bot <span class="sub">busy · 4</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+/* ---------- screens ---------- */
+const crumbs = {
+  s1:'<b>Fleet</b> / Home', s2:'<b>Fleet</b> / checkout-service',
+  s3:'<b>Fleet</b> / checkout-service / Backlog', s4:'<b>Fleet</b> / Approval Inbox',
+  s5:'<b>Fleet</b> / Bot Teams', s6:'<b>Fleet</b> / checkout-service / INIT-CHECKOUT-0001',
+  s7:'<b>Fleet</b> / Workflows'
+};
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));
+  document.querySelectorAll('.rail-item').forEach(b=>b.classList.toggle('active',b.dataset.s===id));
+  document.getElementById('crumbs').innerHTML = crumbs[id]||'';
+  window.scrollTo(0,0); closePalette();
+}
+document.querySelectorAll('.rail-item').forEach(b=>b.addEventListener('click',()=>go(b.dataset.s)));
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  t.parentElement.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected','false'));
+  t.setAttribute('aria-selected','true');
+}));
+/* ---------- drawer ---------- */
+function openDrawer(mode){
+  document.getElementById('scrim').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawer').querySelector('.drawer-body').scrollTop=0;
+}
+function closeDrawer(){
+  document.getElementById('scrim').classList.remove('open');
+  document.getElementById('drawer').classList.remove('open');
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closeDrawer();closePalette();}
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette();}
+});
+/* ---------- palette ---------- */
+function openPalette(){
+  document.getElementById('palette').classList.add('open');
+  const i=document.getElementById('palette-input'); i.value=''; i.focus();
+}
+function closePalette(){ document.getElementById('palette').classList.remove('open'); }
+document.getElementById('palette-input').addEventListener('input',e=>{
+  const q=e.target.value.toLowerCase();
+  document.querySelectorAll('#palette-results .res').forEach(r=>{
+    r.style.display = r.textContent.toLowerCase().includes(q)?'':'none';
+  });
+});
+/* ---------- theme ---------- */
+function toggleTheme(){
+  const b=document.body, dark=b.getAttribute('data-theme')==='dark';
+  b.setAttribute('data-theme', dark?'light':'dark');
+  document.getElementById('themeIcon').innerHTML = dark?'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4\"/></svg>':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z\"/></svg>';
+  localStorage.setItem('dockyard-theme', dark?'light':'dark');
+}
+(function(){ const t=localStorage.getItem('dockyard-theme');
+  if(t){document.body.setAttribute('data-theme',t);
+    document.getElementById('themeIcon').innerHTML = t==='dark'?'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4\"/></svg>':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z\"/></svg>';
+  } })();
+/* ---------- toasts ---------- */
+function toast(msg,kind){
+  const t=document.createElement('div'); t.className='toast '+(kind||'');
+  t.textContent=msg; document.getElementById('toasts').appendChild(t);
+  setTimeout(()=>t.remove(), 4200);
+}
+/* ---------- new-project wizard ---------- */
+const wizState = { step: 1, max: 4 };
+function openWizard(){
+  document.getElementById('wiz-scrim').classList.add('open');
+  document.getElementById('wizard').classList.add('open');
+  wizGo(1);
+}
+function closeWizard(){
+  document.getElementById('wiz-scrim').classList.remove('open');
+  document.getElementById('wizard').classList.remove('open');
+}
+function pickTpl(el,name){
+  el.parentElement.querySelectorAll('.tpl-card').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  toast(name==='Blank' ? 'Starting blank' : 'Template "'+name+'" loaded into following steps','ok');
+}
+function segPick(el){
+  el.parentElement.querySelectorAll('.seg-btn').forEach(b=>{b.classList.remove('sel');b.setAttribute('aria-pressed','false');});
+  el.classList.add('sel'); el.setAttribute('aria-pressed','true');
+}
+function wizGo(n){
+  wizState.step = n;
+  const titles = ['Start from a template','Project basics','Documentation & context','Team & autonomy'];
+  document.getElementById('wiz-title').textContent = titles[n-1];
+  document.getElementById('wiz-step-label').textContent = 'Step '+n+' of 4';
+  document.getElementById('wiz-progress').setAttribute('aria-valuenow', n);
+  document.querySelectorAll('#wiz-progress i').forEach((bar,i)=>bar.classList.toggle('on', i<n));
+  document.querySelectorAll('.wstep').forEach(s=>s.classList.toggle('on', +s.dataset.step===n));
+  document.getElementById('wiz-back').disabled = (n===1);
+  const next = document.getElementById('wiz-next');
+  next.textContent = n===4 ? 'Create project' : 'Continue';
+}
+function wizNav(dir){ wizGo(Math.min(4, Math.max(1, wizState.step + dir)); }
+function wizNext(){
+  if(wizState.step < 4){ wizGo(wizState.step+1); }
+  else {
+    closeWizard();
+    toast('Project created · stewardship enabled · first verification cycle queued','ok');
+  }
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') closeWizard();
+});
+</script>
+</body>
+</html>
