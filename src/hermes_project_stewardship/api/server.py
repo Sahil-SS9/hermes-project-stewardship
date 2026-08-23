@@ -132,6 +132,42 @@ class BacklogRerank(BaseModel):
     actor_kind: str = "bot"
 
 
+class BotRegister(BaseModel):
+    bot_id: str
+    display_name: str
+    capabilities: List[str] = []
+    profile: Optional[str] = None
+
+
+class BotStatusBody(BaseModel):
+    status: str
+    current_item: Optional[str] = None
+    actor_id: Optional[str] = None
+
+
+class GroupCreate(BaseModel):
+    name: str
+    purpose: str = ""
+    channel_ref: Optional[str] = None
+    member_ids: List[str] = []
+    lead_id: Optional[str] = None
+    actor_id: Optional[str] = None
+
+
+class GroupMemberAdd(BaseModel):
+    bot_id: str
+    as_lead: bool = False
+    actor_id: Optional[str] = None
+
+
+class A2ASend(BaseModel):
+    msg_type: str
+    from_actor: str
+    to_group: str
+    payload: Dict[str, Any] = {}
+    item_ref: Optional[str] = None
+
+
 class MilestoneCreate(BaseModel):
     name: str
     due: Optional[str] = None
@@ -471,6 +507,103 @@ def create_app(
     def views_list(project_id: str, actor_id: str, actor_kind: str = "human"):
         return {"views": dy.views_list(
             project_id, actor=_actor(actor_id, actor_kind))}
+
+
+    # ------------------- Dockyard bot layer (G2) ---------------------- #
+
+    @router.post("/projects/{project_id}/bots")
+    def register_bot(project_id: str, body: BotRegister):
+        try:
+            bot = dy.bot_register(body.bot_id, body.display_name,
+                                  capabilities=body.capabilities,
+                                  profile=body.profile)
+        except ValueError as e:
+            raise HTTPException(422, str(e))
+        return {"bot": body.bot_id, "capabilities": bot.capabilities}
+
+    @router.get("/bots")
+    def list_bots(status: Optional[str] = None):
+        return {"bots": [
+            {"id": b.id, "name": b.display_name, "status": b.status.value,
+             "current_item": b.current_item, "capabilities": b.capabilities}
+            for b in dy.bots_list(status=status)
+        ]}
+
+    @router.post("/bots/{bot_id}/status")
+    def set_bot_status(bot_id: str, body: BotStatusBody):
+        try:
+            actor = _actor(body.actor_id or bot_id,
+                           "bot" if not body.actor_id else "human")
+            bot = dy.bot_set_status(bot_id, body.status,
+                                    current_item=body.current_item,
+                                    actor=actor if body.actor_id else None)
+        except ValueError as e:
+            raise HTTPException(404 if "unknown" in str(e) else 422, str(e))
+        return {"bot": bot_id, "status": bot.status.value}
+
+    @router.get("/workload")
+    def workload_board():
+        return dy.workload_board()
+
+    @router.get("/bots/{bot_id}/reputation")
+    def bot_reputation(bot_id: str):
+        try:
+            return dy.bot_reputation(bot_id)
+        except ValueError as e:
+            raise HTTPException(404, str(e))
+
+    @router.post("/bot-groups")
+    def create_group(body: GroupCreate):
+        try:
+            g = dy.group_create(body.name, purpose=body.purpose,
+                                channel_ref=body.channel_ref,
+                                member_ids=body.member_ids,
+                                lead_id=body.lead_id)
+        except ValueError as e:
+            raise HTTPException(422, str(e))
+        except Exception as e:
+            raise HTTPException(409, str(e))
+        return {"group": body.name, "lead": g.lead_id(),
+                "members": list(g.members.keys())}
+
+    @router.get("/bot-groups")
+    def list_groups():
+        return {"groups": [
+            {"name": g.name, "purpose": g.purpose,
+             "channel_ref": g.channel_ref, "lead": g.lead_id(),
+             "members": list(g.members.keys())}
+            for g in dy.groups_list()
+        ]}
+
+    @router.post("/bot-groups/{name}/members")
+    def add_group_member(name: str, body: GroupMemberAdd):
+        try:
+            dy.group_add_member(name, body.bot_id, as_lead=body.as_lead)
+        except ValueError as e:
+            raise HTTPException(404 if "unknown" in str(e) else 422, str(e))
+        except Exception as e:
+            raise HTTPException(409, str(e))
+        return {"group": name, "added": body.bot_id}
+
+    @router.post("/a2a")
+    def a2a_send(body: A2ASend):
+        try:
+            sent = dy.a2a_send(body.msg_type, from_actor=body.from_actor,
+                               to_group=body.to_group,
+                               payload=body.payload, item_ref=body.item_ref)
+        except Exception as e:
+            msg = str(e)
+            code = 404 if "unknown group" in msg else 422
+            raise HTTPException(code, msg)
+        return sent
+
+    @router.get("/bot-groups/{name}/messages")
+    def a2a_feed(name: str, limit: int = 50):
+        try:
+            feed = dy.a2a_feed(name, limit=limit)
+        except Exception as e:
+            raise HTTPException(404, str(e))
+        return {"group": name, "messages": feed}
 
     app.include_router(router)
 
