@@ -27,13 +27,19 @@ from ..dockyard import (
 
 
 def _actor_from(row, id_col: str, kind_col: str) -> Optional[Actor]:
+    """Round-2 council fix: a NULL/unknown kind must NOT silently mask as
+    'bot'. Such rows carry no trustworthy attribution -> return None so
+    the field renders as unattributed rather than misattributed."""
     aid = row[id_col]
     if not aid:
         return None
     kind = row[kind_col]
-    # minor fix: NULL/unknown kinds surface loudly instead of masking as bot
-    return Actor(id=aid, display_name=aid,
-                 kind=ActorKind(kind or "bot"))
+    if not kind:
+        return None
+    try:
+        return Actor(id=aid, display_name=aid, kind=ActorKind(kind))
+    except ValueError:
+        return None
 
 
 def _row_to_item(row) -> WorkItem:

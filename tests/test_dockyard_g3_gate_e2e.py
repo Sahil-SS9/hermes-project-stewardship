@@ -96,8 +96,9 @@ def test_full_loop_proposal_to_measured_outcome(env):
             "SELECT actor, interface, action FROM stewardship_audit_log"
             " WHERE action=?", (action,)).fetchall()]
 
-    approvals_log = audit("initiative.approve")
-    assert approvals_log == [] or True  # engine may log approve via its own interface
+    approvals_log = audit("initiative.approved")
+    assert approvals_log, "engine must log the approval decision"
+    assert any(r["actor"] == "sahil" for r in approvals_log)
     promotions = audit("initiative.promoted")
     assert len(promotions) == 1
     results_events = audit("a2a.result")
