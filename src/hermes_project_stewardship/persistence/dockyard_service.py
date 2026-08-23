@@ -299,6 +299,11 @@ class DockyardService:
             item_ref=item_ref,
             id="a2a-" + _uuid.uuid4().hex[:12],
         )
+        # G5 hardening: bounded event size (structured events, not blobs)
+        import json as _json
+
+        if len(_json.dumps(m.payload)) > 32_768:
+            raise ValueError("a2a payload exceeds 32 KiB limit")
         self.dy.a2a_append(m)
         self._audit(actor=m.from_actor, action=f"a2a.{m.msg_type.value}",
                     subject=m.to_group,
