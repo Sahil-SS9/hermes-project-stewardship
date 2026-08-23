@@ -247,7 +247,7 @@ class DockyardService:
             g.add_member(b, role)
         gid = self.dy.group_create(g)
         if actor:
-            self._audit(actor=actor.id, action="group.created", subject=name,
+            self._audit(actor=actor, action="group.created", subject=name,
                         detail={"members": list(g.members.keys()),
                                 "lead": g.lead_id(),
                                 "channel": channel_ref})

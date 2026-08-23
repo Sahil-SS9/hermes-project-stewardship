@@ -555,10 +555,12 @@ def create_app(
     @router.post("/bot-groups")
     def create_group(body: GroupCreate):
         try:
-            g = dy.group_create(body.name, purpose=body.purpose,
-                                channel_ref=body.channel_ref,
-                                member_ids=body.member_ids,
-                                lead_id=body.lead_id)
+            g = dy.group_create(
+                body.name, purpose=body.purpose,
+                channel_ref=body.channel_ref,
+                member_ids=body.member_ids, lead_id=body.lead_id,
+                actor=_actor(body.actor_id, "human")
+                if body.actor_id else None)
         except ValueError as e:
             raise HTTPException(422, str(e))
         except Exception as e:
