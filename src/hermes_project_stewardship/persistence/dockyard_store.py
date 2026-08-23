@@ -215,3 +215,94 @@ class DockyardStore:
         entries = self.store._conn.execute(
             "SELECT COUNT(*) AS n FROM dockyard_backlog").fetchone()["n"]
         return {"work_items": items, "backlog_entries": entries}
+
+    # ------------------------------------------------------------------ #
+    # Milestones (PM-04)                                                 #
+    # ------------------------------------------------------------------ #
+
+    def milestone_create(self, project_id: str, name: str, *,
+                         due: Optional[str] = None,
+                         created_at: Optional[str] = None) -> int:
+        from .store import iso
+
+        with self.store.tx() as cx:
+            cur = cx.execute(
+                "INSERT INTO dockyard_milestones(project_id, name, due,"
+                " created_at) VALUES (?,?,?,?)",
+                (project_id, name, due, created_at or iso()),
+            )
+            return cur.lastrowid
+
+    def milestone_attach(self, project_id: str, name: str,
+                         item_ref: str) -> None:
+        with self.store.tx() as cx:
+            cx.execute(
+                """
+                INSERT INTO dockyard_milestone_items(milestone_id, item_ref)
+                SELECT id, ? FROM dockyard_milestones
+                WHERE project_id=? AND name=?
+                """,
+                (item_ref, project_id, name),
+            )
+
+    def milestone_progress(self, project_id: str, name: str) -> Dict:
+        row = self.store._conn.execute(
+            "SELECT id, due FROM dockyard_milestones"
+            " WHERE project_id=? AND name=?", (project_id, name),
+        ).fetchone()
+        if not row:
+            raise ValueError(f"milestone {name} not found")
+        total = self.store._conn.execute(
+            "SELECT COUNT(*) AS n FROM dockyard_milestone_items WHERE milestone_id=?",
+            (row["id"],),
+        ).fetchone()["n"]
+        done = self.store._conn.execute(
+            """
+            SELECT COUNT(*) AS n FROM dockyard_milestone_items mi
+            JOIN dockyard_work_items w ON w.ref = mi.item_ref
+            WHERE mi.milestone_id=? AND w.status='done'
+            """,
+            (row["id"],),
+        ).fetchone()["n"]
+        return {"name": name, "total": total, "done": done,
+                "due": row["due"]}
+
+    # ------------------------------------------------------------------ #
+    # Saved views (PM-05)                                                #
+    # ------------------------------------------------------------------ #
+
+    def view_save(self, project_id: str, name: str, layout: str, *,
+                  filters: Dict, owner_id: str,
+                  shared: bool = False) -> None:
+        from .store import iso
+
+        if layout not in ("board", "table", "timeline", "portfolio"):
+            raise ValueError(f"unknown layout {layout}")
+        with self.store.tx() as cx:
+            cx.execute(
+                """
+                INSERT INTO dockyard_saved_views(
+                    project_id, name, layout, filters_json, owner_id,
+                    shared, created_at)
+                VALUES (?,?,?,?,?,?,?)
+                ON CONFLICT(project_id, name) DO UPDATE SET
+                    layout=excluded.layout,
+                    filters_json=excluded.filters_json,
+                    shared=excluded.shared
+                """,
+                (project_id, name, layout, _j(filters), owner_id,
+                 1 if shared else 0, iso()),
+            )
+
+    def views_list(self, project_id: str, *, include_private_of=None) -> List[Dict]:
+        rows = self.store._conn.execute(
+            "SELECT * FROM dockyard_saved_views WHERE project_id=?"
+            " AND (shared=1 OR owner_id=?) ORDER BY name",
+            (project_id, include_private_of or "__none__"),
+        ).fetchall()
+        return [
+            {"name": r["name"], "layout": r["layout"],
+             "filters": json.loads(r["filters_json"]),
+             "owner": r["owner_id"], "shared": bool(r["shared"])}
+            for r in rows
+        ]

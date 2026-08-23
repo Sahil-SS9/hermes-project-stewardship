@@ -158,3 +158,38 @@ class DockyardService:
             subject=subject,
             detail=detail,
         )
+
+    # ------------------------------------------------------------------ #
+    # Milestones (PM-04)                                                 #
+    # ------------------------------------------------------------------ #
+
+    def milestone_create(self, project_id: str, name: str, *,
+                         due: Optional[str] = None,
+                         actor: Optional[Actor] = None) -> int:
+        mid = self.dy.milestone_create(project_id, name, due=due)
+        if actor:
+            self._audit(actor=actor, action="milestone.created",
+                        subject=name, detail={"due": due})
+        return mid
+
+    def milestone_attach(self, project_id: str, name: str, ref: str, *,
+                         actor: Actor) -> None:
+        self.dy.milestone_attach(project_id, name, ref)
+        self._audit(actor=actor, action="milestone.attached",
+                    subject=name, detail={"item": ref})
+
+    def milestone_progress(self, project_id: str, name: str) -> Dict:
+        return self.dy.milestone_progress(project_id, name)
+
+    # ------------------------------------------------------------------ #
+    # Saved views (PM-05)                                                #
+    # ------------------------------------------------------------------ #
+
+    def view_save(self, project_id: str, name: str, layout: str, *,
+                  filters: Dict, actor: Actor,
+                  shared: bool = False) -> None:
+        self.dy.view_save(project_id, name, layout, filters=filters,
+                          owner_id=actor.id, shared=shared)
+
+    def views_list(self, project_id: str, *, actor: Actor) -> List[Dict]:
+        return self.dy.views_list(project_id, include_private_of=actor.id)

@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Dockyard - Fleet workspace</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-soft: #f8f9fc;
+  --surface-accent: #eef2ff;
+  --text: #171a23;
+  --text-2: #525b6b;
+  --text-3: #667085;
+  --line: #dfe3eb;
+  --line-strong: #c9cfdb;
+  --accent: #4057c8;
+  --accent-hover: #3247b1;
+  --accent-ink: #26378f;
+  --success: #176b45;
+  --success-bg: #e9f7ef;
+  --warning: #8a5400;
+  --warning-bg: #fff4da;
+  --danger: #aa2d25;
+  --danger-bg: #fff0ee;
+  --neutral: #5d6676;
+  --neutral-bg: #edf0f4;
+  --human: #8b3f70;
+  --bot: #27657a;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --shadow: 0 10px 28px rgba(31, 42, 68, 0.08);
+  --max: 1480px;
+  --bar-height: 72px;
+  --ease: 160ms cubic-bezier(.2,.8,.2,1);
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #11141b;
+  --surface: #191d26;
+  --surface-raised: #202530;
+  --surface-soft: #151922;
+  --surface-accent: #20284a;
+  --text: #f1f3f7;
+  --text-2: #b7bfcc;
+  --text-3: #939cab;
+  --line: #303642;
+  --line-strong: #424958;
+  --accent: #8da0ff;
+  --accent-hover: #a7b5ff;
+  --accent-ink: #d5dcff;
+  --success: #63c697;
+  --success-bg: #18362a;
+  --warning: #f2bd66;
+  --warning-bg: #3b2d16;
+  --danger: #ff9188;
+  --danger-bg: #40201f;
+  --neutral: #b1bac8;
+  --neutral-bg: #292f3a;
+  --human: #e195c5;
+  --bot: #79c5dc;
+  --shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+}
+* { box-sizing: border-box; }
+html { min-height: 100%; background: var(--bg); }
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; }
+button { color: inherit; }
+button, [role="button"] { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  outline-offset: 2px;
+}
+a { color: var(--accent-ink); }
+svg { display: block; }
+.icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+.icon-sm { width: 15px; height: 15px; }
+.icon-lg { width: 22px; height: 22px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+[hidden] { display: none !important; }
+.project-row > .hide-sm { display: grid; gap: 2px; }
+.backlog-item > span:nth-child(2), .handoff > span:nth-child(2), .saved-workflow > span, .audit-row > span:nth-child(2) { min-width: 0; }
+.backlog-item > span:nth-child(2) > strong,
+.backlog-item > span:nth-child(2) > .small-text,
+.handoff > span:nth-child(2) > strong,
+.handoff > span:nth-child(2) > .small-text,
+.saved-workflow > span > strong,
+.saved-workflow > span > .small-text,
+.audit-row > span:nth-child(2) > strong,
+.audit-row > span:nth-child(2) > .small-text { display: block; }
+.backlog-item > span:nth-child(2) > .small-text,
+.handoff > span:nth-child(2) > .small-text,
+.saved-workflow > span > .small-text,
+.audit-row > span:nth-child(2) > .small-text { margin-top: 2px; }
+.appbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  min-height: var(--bar-height);
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(14px);
+}
+.appbar-inner {
+  max-width: var(--max);
+  min-height: var(--bar-height);
+  margin: 0 auto;
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: max-content;
+  font-weight: 760;
+  letter-spacing: -0.02em;
+  font-size: 17px;
+}
+.brand-mark {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: #ffffff;
+  background: var(--accent);
+}
+.nav-pills {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex: 1 1 auto;
+  padding: 3px;
+}
+.nav-pills::-webkit-scrollbar { display: none; }
+.nav-pill {
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  min-width: max-content;
+  min-height: 38px;
+  padding: 8px 11px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 650;
+  transition: background var(--ease), color var(--ease), transform var(--ease);
+}
+.nav-pill:hover { background: var(--surface-soft); color: var(--text); }
+.nav-pill:active { transform: translateY(1px); }
+.nav-pill.active { background: var(--surface-accent); color: var(--accent-ink); }
+.nav-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  background: var(--warning-bg);
+  color: var(--warning);
+  font-size: 11px;
+  font-weight: 780;
+}
+.app-actions { display: flex; align-items: center; gap: 8px; min-width: max-content; }
+.icon-button {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--text-2);
+  transition: border var(--ease), color var(--ease), background var(--ease), transform var(--ease);
+}
+.icon-button:hover { border-color: var(--line-strong); color: var(--text); background: var(--surface-soft); }
+.icon-button:active { transform: translateY(1px); }
+.button {
+  min-height: 40px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 680;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background var(--ease), border var(--ease), color var(--ease), transform var(--ease);
+}
+.button:hover { background: var(--surface-soft); border-color: var(--line-strong); }
+.button:active { transform: translateY(1px); }
+.button.primary { border-color: var(--accent); background: var(--accent); color: #ffffff; }
+.button.primary:hover { border-color: var(--accent-hover); background: var(--accent-hover); }
+.button.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); background: var(--surface); }
+.button.danger:hover { background: var(--danger-bg); }
+.button.quiet { border-color: transparent; background: transparent; color: var(--text-2); }
+.button.quiet:hover { background: var(--surface-soft); color: var(--text); }
+.button.small { min-height: 34px; padding: 7px 10px; font-size: 13px; border-radius: 8px; }
+.button:disabled { opacity: .48; cursor: not-allowed; transform: none; }
+.shell { max-width: var(--max); margin: 0 auto; padding: 34px 24px 64px; }
+.screen { display: none; animation: screen-in 220ms var(--ease); }
+.screen.active { display: block; }
+@keyframes screen-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 26px;
+}
+.page-head h1 { margin: 0; font-size: clamp(27px, 3vw, 34px); line-height: 1.15; letter-spacing: -0.035em; }
+.page-head p { margin: 8px 0 0; color: var(--text-2); max-width: 740px; }
+.page-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.owed {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: var(--warning);
+  background: var(--warning-bg);
+  font-weight: 720;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.owed.clear { color: var(--success); background: var(--success-bg); }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+.card.elevated { box-shadow: var(--shadow); border-color: transparent; }
+.card-pad { padding: 22px; }
+.section-title { margin: 0; font-size: 19px; line-height: 1.25; letter-spacing: -0.02em; }
+.section-sub { margin: 6px 0 0; color: var(--text-2); font-size: 14px; }
+.spread { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.stack { display: grid; gap: 16px; }
+.grid { display: grid; gap: 18px; }
+.grid-2 { grid-template-columns: minmax(0, 1.55fr) minmax(300px, .8fr); }
+.grid-even { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.muted { color: var(--text-2); }
+.small-text { font-size: 13px; color: var(--text-2); }
+.mini-label { color: var(--text-3); font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 25px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 720;
+  white-space: nowrap;
+}
+.badge.success { color: var(--success); background: var(--success-bg); }
+.badge.warning { color: var(--warning); background: var(--warning-bg); }
+.badge.danger { color: var(--danger); background: var(--danger-bg); }
+.badge.neutral { color: var(--neutral); background: var(--neutral-bg); }
+.badge.accent { color: var(--accent-ink); background: var(--surface-accent); }
+.avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: inline-grid;
+  place-items: center;
+  color: #ffffff;
+  background: var(--bot);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+.avatar.human { background: var(--human); }
+.avatar-stack { display: flex; align-items: center; }
+.avatar-stack .avatar { margin-left: -7px; border: 2px solid var(--surface); }
+.avatar-stack .avatar:first-child { margin-left: 0; }
+.metric-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 1px;
+  margin-bottom: 18px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--line);
+}
+.metric { padding: 18px 20px; background: var(--surface); min-height: 112px; }
+.metric strong { display: block; margin-top: 8px; font-size: 27px; line-height: 1; letter-spacing: -0.03em; }
+.metric .delta { display: block; margin-top: 10px; font-size: 12px; color: var(--text-2); }
+.attention-card {
+  padding: 24px;
+  background: linear-gradient(145deg, var(--surface-accent), var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line));
+  border-radius: var(--radius-lg);
+  display: grid;
+  grid-template-columns: minmax(210px,.7fr) minmax(0,1.3fr);
+  gap: 26px;
+  margin-bottom: 18px;
+}
+.attention-number { font-size: 50px; line-height: .95; letter-spacing: -0.05em; font-weight: 780; color: var(--accent-ink); }
+.attention-copy h2 { margin: 8px 0 8px; font-size: 22px; letter-spacing: -0.02em; }
+.attention-list { display: grid; gap: 8px; }
+.decision-row {
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  padding: 13px 14px;
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.decision-row strong { display: block; font-size: 14px; }
+.project-list { overflow: hidden; }
+.project-row {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  display: grid;
+  grid-template-columns: minmax(230px,1.4fr) minmax(110px,.65fr) minmax(120px,.7fr) minmax(120px,.7fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 16px 20px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--ease);
+}
+.project-row:last-child { border-bottom: 0; }
+.project-row:hover { background: var(--surface-soft); }
+.project-name { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.project-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--surface-accent); color: var(--accent-ink); display: grid; place-items: center; }
+.project-name strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.project-name span { display: block; margin-top: 2px; color: var(--text-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.activity-list { padding: 6px 22px 14px; }
+.activity-item { position: relative; display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 12px; padding: 14px 0; }
+.activity-item:not(:last-child)::after { content: ""; position: absolute; left: 16px; top: 48px; bottom: -5px; width: 1px; background: var(--line); }
+.activity-icon { width: 34px; height: 34px; border-radius: 10px; background: var(--surface-soft); color: var(--text-2); display: grid; place-items: center; z-index: 1; }
+.activity-item p { margin: 0; font-size: 14px; }
+.activity-item time { display: block; margin-top: 3px; color: var(--text-3); font-size: 12px; }
+.goal-card {
+  display: grid;
+  grid-template-columns: minmax(260px,1.15fr) minmax(0,1.85fr);
+  gap: 28px;
+  padding: 25px;
+  margin-bottom: 18px;
+}
+.goal-copy h2 { margin: 8px 0 10px; font-size: 25px; line-height: 1.2; letter-spacing: -0.03em; }
+.goal-copy p { margin: 0; color: var(--text-2); }
+.kpi-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.kpi { padding: 15px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-soft); }
+.kpi strong { display: block; margin: 8px 0 5px; font-size: 20px; }
+.progress { height: 7px; border-radius: 999px; background: var(--neutral-bg); overflow: hidden; }
+.progress > span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.tabs { display: flex; align-items: center; gap: 2px; padding: 4px; width: max-content; max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); margin-bottom: 18px; }
+.tab { border: 0; background: transparent; min-width: max-content; padding: 8px 13px; border-radius: 8px; color: var(--text-2); font-weight: 680; font-size: 13px; cursor: pointer; }
+.tab.active { color: var(--accent-ink); background: var(--surface-accent); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+.board-wrap { overflow-x: auto; padding-bottom: 6px; }
+.board { display: grid; grid-template-columns: repeat(4,minmax(270px,1fr)); gap: 14px; min-width: 1130px; }
+.board-column { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-soft); min-height: 430px; }
+.column-head { padding: 15px 15px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.column-head h3 { margin: 0; font-size: 14px; }
+.column-meta { display: inline-flex; align-items: center; gap: 7px; color: var(--text-2); font-size: 12px; }
+.wip-over { color: var(--danger); font-weight: 750; }
+.card-stack { padding: 0 10px 12px; min-height: 340px; }
+.card-stack.drag-over { background: color-mix(in srgb, var(--accent) 6%, transparent); border-radius: 12px; }
+.work-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 13px;
+  margin-bottom: 10px;
+  cursor: grab;
+  box-shadow: 0 3px 10px rgba(31,42,68,.05);
+}
+.work-card:active { cursor: grabbing; }
+.work-card.dragging { opacity: .45; }
+.work-type { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.type { font-size: 11px; font-weight: 780; text-transform: uppercase; letter-spacing: .05em; color: var(--accent-ink); }
+.work-card h4 { margin: 10px 0 12px; font-size: 14px; line-height: 1.35; }
+.work-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--text-3); font-size: 12px; }
+.drag-handle { color: var(--text-3); }
+.timeline-list { display: grid; gap: 12px; }
+.timeline-row { display: grid; grid-template-columns: 120px minmax(0,1fr) auto; gap: 16px; align-items: center; padding: 15px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.backlog-list { display: grid; gap: 10px; }
+.backlog-item {
+  display: grid;
+  grid-template-columns: 42px minmax(240px,1.4fr) minmax(140px,.65fr) minmax(170px,.75fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 15px 17px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.rank { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: var(--surface-soft); font-weight: 780; }
+.rank-controls { display: flex; gap: 5px; justify-content: flex-end; }
+.suppressed {
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+}
+.suppressed h3 { margin: 0 0 6px; font-size: 15px; }
+.approval-list { display: grid; gap: 14px; }
+.approval-card { padding: 22px; }
+.approval-card.resolved { opacity: .68; }
+.approval-top { display: grid; grid-template-columns: 42px minmax(0,1fr) auto; gap: 14px; align-items: start; }
+.approval-title h2 { margin: 0; font-size: 18px; }
+.approval-title p { margin: 5px 0 0; color: var(--text-2); font-size: 13px; }
+.evidence-box { margin: 17px 0; padding: 16px; border-radius: var(--radius-md); background: var(--surface-soft); border: 1px solid var(--line); }
+.evidence-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.evidence-cell { padding-right: 12px; border-right: 1px solid var(--line); }
+.evidence-cell:last-child { border: 0; }
+.evidence-cell strong { display: block; margin-top: 5px; font-size: 14px; }
+.approval-actions { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
+.team-layout { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(320px,.8fr); gap: 18px; }
+.registry { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.bot-card { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 16px; background: var(--surface); cursor: pointer; text-align: left; }
+.bot-card:hover { border-color: var(--line-strong); background: var(--surface-soft); }
+.bot-head { display: flex; align-items: center; gap: 11px; }
+.bot-head strong { display: block; }
+.bot-head span { display: block; color: var(--text-2); font-size: 12px; }
+.capabilities { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 13px; }
+.capability { padding: 4px 7px; border-radius: 7px; background: var(--surface-soft); color: var(--text-2); font-size: 11px; font-weight: 680; }
+.load-list { display: grid; gap: 13px; margin-top: 16px; }
+.load-row { display: grid; grid-template-columns: 90px minmax(0,1fr) auto; gap: 10px; align-items: center; font-size: 13px; }
+.load-bar { height: 7px; border-radius: 999px; background: var(--neutral-bg); overflow: hidden; }
+.load-bar span { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
+.group-card { padding: 20px; margin-top: 18px; }
+.handoff-list { display: grid; gap: 9px; margin-top: 14px; }
+.handoff { width: 100%; text-align: left; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-soft); padding: 13px; cursor: pointer; display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 12px; align-items: center; }
+.handoff:hover { border-color: var(--line-strong); }
+.loop-layout { display: grid; grid-template-columns: minmax(0,1.45fr) minmax(320px,.75fr); gap: 18px; }
+.loop { padding: 20px; }
+.stage-list { display: grid; gap: 7px; margin-top: 17px; }
+.stage {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  padding: 12px 13px;
+  display: grid;
+  grid-template-columns: 30px minmax(0,1fr) auto;
+  gap: 11px;
+  align-items: center;
+  text-align: left;
+  cursor: pointer;
+}
+.stage:hover, .stage.active { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--surface-accent); }
+.stage-state { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; color: var(--neutral); background: var(--neutral-bg); }
+.stage.done .stage-state { color: var(--success); background: var(--success-bg); }
+.stage.running .stage-state { color: var(--accent-ink); background: var(--surface-accent); }
+.stage.waiting .stage-state { color: var(--warning); background: var(--warning-bg); }
+.stage-copy strong { display: block; font-size: 13px; }
+.stage-copy span { display: block; margin-top: 2px; color: var(--text-2); font-size: 12px; }
+.detail-panel { padding: 20px; position: sticky; top: 94px; align-self: start; }
+.detail-panel h2 { margin: 8px 0 10px; font-size: 20px; }
+.audit-list { display: grid; gap: 11px; margin-top: 16px; }
+.audit-row { display: grid; grid-template-columns: 28px minmax(0,1fr); gap: 10px; font-size: 13px; }
+.audit-row .activity-icon { width: 28px; height: 28px; border-radius: 8px; }
+.workflow-layout { display: grid; grid-template-columns: minmax(0,1.45fr) minmax(330px,.7fr); gap: 18px; }
+.workflow-card { padding: 20px; }
+.workflow-graph { width: 100%; min-height: 220px; margin-top: 16px; border-radius: 13px; background: var(--surface-soft); border: 1px solid var(--line); }
+.workflow-graph text { fill: var(--text); font: 650 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.workflow-graph .node { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1.5; }
+.workflow-graph .node-done { fill: var(--success-bg); stroke: var(--success); }
+.workflow-graph .node-running { fill: var(--surface-accent); stroke: var(--accent); }
+.workflow-graph .node-waiting { fill: var(--warning-bg); stroke: var(--warning); stroke-dasharray: 4 3; }
+.workflow-graph .node-queued { fill: var(--neutral-bg); stroke: var(--neutral); }
+.workflow-graph .edge { fill: none; stroke: var(--line-strong); stroke-width: 2; }
+.workflow-graph .edge-live { stroke: var(--accent); stroke-dasharray: 8 7; animation: flow 1.1s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -30; } }
+.legend { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 12px; color: var(--text-2); font-size: 12px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 9px; height: 9px; border-radius: 3px; background: var(--neutral); }
+.saved-list { display: grid; gap: 9px; margin-top: 15px; }
+.saved-workflow { border: 1px solid var(--line); border-radius: 11px; padding: 13px; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface); }
+.notification-wrap { position: relative; }
+.popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  z-index: 80;
+  width: min(390px, calc(100vw - 24px));
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+  display: none;
+}
+.popover.open { display: block; }
+.popover-head { padding: 7px 8px 12px; }
+.popover-head h2 { margin: 0; font-size: 16px; }
+.notification {
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  padding: 11px;
+  background: transparent;
+  display: grid;
+  grid-template-columns: 30px minmax(0,1fr);
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+.notification:hover { background: var(--surface-soft); }
+.notification strong { display: block; font-size: 13px; }
+.notification span { display: block; margin-top: 2px; color: var(--text-2); font-size: 12px; }
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: none;
+  background: rgba(12, 17, 28, .42);
+  backdrop-filter: blur(3px);
+}
+.overlay.open { display: flex; }
+.modal-shell { width: 100%; min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.modal {
+  width: min(560px, 100%);
+  max-height: min(820px, calc(100vh - 48px));
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+}
+.modal.wide { width: min(760px, 100%); }
+.modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 22px 16px; border-bottom: 1px solid var(--line); }
+.modal-head h2 { margin: 0; font-size: 21px; letter-spacing: -0.02em; }
+.modal-head p { margin: 5px 0 0; color: var(--text-2); font-size: 13px; }
+.modal-body { padding: 20px 22px; }
+.modal-foot { display: flex; justify-content: flex-end; gap: 9px; padding: 16px 22px 20px; border-top: 1px solid var(--line); }
+.drawer-shell { margin-left: auto; width: min(560px, 100%); min-height: 100%; background: var(--surface-raised); box-shadow: var(--shadow); overflow: auto; }
+.drawer-head { position: sticky; top: 0; z-index: 2; background: var(--surface-raised); display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 22px; border-bottom: 1px solid var(--line); }
+.drawer-head h2 { margin: 0; font-size: 22px; }
+.drawer-body { padding: 22px; }
+.form-grid { display: grid; gap: 15px; }
+.field { display: grid; gap: 7px; }
+.field label, .field-label { font-size: 13px; font-weight: 720; }
+.field input, .field select, .field textarea {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 9px 11px;
+}
+.field textarea { min-height: 104px; resize: vertical; }
+.helper { color: var(--text-3); font-size: 12px; }
+.wizard-shell { margin-left: auto; width: min(720px, 100%); min-height: 100%; background: var(--surface-raised); box-shadow: var(--shadow); display: grid; grid-template-rows: auto auto minmax(0,1fr) auto; }
+.wizard-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 23px 24px 16px; }
+.wizard-head h2 { margin: 0; font-size: 24px; letter-spacing: -0.03em; }
+.wizard-head p { margin: 6px 0 0; color: var(--text-2); font-size: 13px; }
+.stepper { display: grid; grid-template-columns: repeat(4,1fr); padding: 0 24px 17px; gap: 7px; }
+.step-track { height: 5px; border-radius: 999px; background: var(--neutral-bg); }
+.step-track.active { background: var(--accent); }
+.wizard-body { overflow: auto; padding: 22px 24px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.wizard-step { display: none; }
+.wizard-step.active { display: block; animation: screen-in 180ms var(--ease); }
+.wizard-step h3 { margin: 0; font-size: 21px; }
+.wizard-step > p { margin: 7px 0 18px; color: var(--text-2); }
+.template-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 11px; }
+.template-card { border: 1px solid var(--line); border-radius: 13px; background: var(--surface); padding: 15px; text-align: left; cursor: pointer; }
+.template-card:hover { border-color: var(--line-strong); }
+.template-card.selected { border-color: var(--accent); background: var(--surface-accent); }
+.template-card strong { display: block; margin: 10px 0 4px; }
+.template-card span { color: var(--text-2); font-size: 12px; }
+.template-tools { display: flex; gap: 8px; margin-top: 13px; flex-wrap: wrap; }
+.dropzone { min-height: 160px; border: 1px dashed var(--line-strong); border-radius: 13px; background: var(--surface-soft); display: grid; place-items: center; text-align: center; padding: 24px; cursor: pointer; }
+.dropzone:hover { border-color: var(--accent); background: var(--surface-accent); }
+.upload-list { display: grid; gap: 8px; margin-top: 13px; }
+.upload-row { border: 1px solid var(--line); border-radius: 10px; padding: 11px; display: flex; align-items: center; gap: 10px; }
+.upload-row strong { display: block; font-size: 13px; }
+.upload-row span { display: block; color: var(--text-2); font-size: 11px; }
+.choice-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 9px; }
+.choice { border: 1px solid var(--line); border-radius: 11px; background: var(--surface); padding: 12px; cursor: pointer; text-align: left; }
+.choice.selected { border-color: var(--accent); background: var(--surface-accent); }
+.wizard-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 17px 24px 21px; }
+.toast-region { position: fixed; right: 22px; bottom: 22px; z-index: 150; display: grid; gap: 8px; pointer-events: none; }
+.toast { min-width: 260px; max-width: 390px; padding: 12px 14px; border-radius: 11px; background: var(--text); color: var(--surface); box-shadow: var(--shadow); font-size: 13px; animation: toast-in 180ms var(--ease); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+.theme-sun { display: none; }
+html[data-theme="dark"] .theme-sun { display: block; }
+html[data-theme="dark"] .theme-moon { display: none; }
+@media (max-width: 1100px) {
+  .nav-pill span.label { display: none; }
+  .project-row { grid-template-columns: minmax(220px,1.3fr) 110px 120px auto; }
+  .project-row .hide-md { display: none; }
+  .grid-2, .team-layout, .loop-layout, .workflow-layout { grid-template-columns: 1fr; }
+  .detail-panel { position: static; }
+  .metric-strip { grid-template-columns: repeat(2,1fr); }
+}
+@media (max-width: 760px) {
+  .appbar-inner { padding-inline: 14px; gap: 10px; }
+  .brand span { display: none; }
+  .shell { padding: 24px 14px 50px; }
+  .page-head { flex-direction: column; }
+  .page-actions { justify-content: flex-start; }
+  .attention-card, .goal-card { grid-template-columns: 1fr; }
+  .grid-even, .registry, .kpi-grid, .evidence-grid, .template-grid, .choice-grid { grid-template-columns: 1fr; }
+  .metric-strip { grid-template-columns: 1fr; }
+  .project-row { grid-template-columns: minmax(0,1fr) auto; gap: 10px; }
+  .project-row .hide-sm { display: none; }
+  .backlog-item { grid-template-columns: 36px minmax(0,1fr) auto; }
+  .backlog-item .hide-sm { display: none; }
+  .approval-top { grid-template-columns: 38px minmax(0,1fr); }
+  .approval-top > .badge { grid-column: 2; width: max-content; }
+  .modal-shell { padding: 10px; }
+  .modal { max-height: calc(100vh - 20px); }
+  .wizard-shell { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body>
+<svg class="sr-only" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-dock" viewBox="0 0 24 24"><path d="M4 18h16M6 18l2-9h8l2 9M9 9V6h6v3M8 14h8"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5M5.5 10v9h13v-9M9.5 19v-5h5v5"/></symbol>
+  <symbol id="i-project" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5"/></symbol>
+  <symbol id="i-backlog" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></symbol>
+  <symbol id="i-approval" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.6 2.6L16.5 9"/></symbol>
+  <symbol id="i-bots" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M9 12h.01M15 12h.01M9 16h6M12 7V4M10 4h4"/></symbol>
+  <symbol id="i-initiative" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v2M22 12h-2M12 22v-2M2 12h2"/></symbol>
+  <symbol id="i-workflow" viewBox="0 0 24 24"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M9 6h4a5 5 0 0 1 5 5v4M15 18h-4a5 5 0 0 1-5-5V9"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7M10 20h4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20.8 5.8a5.2 5.2 0 0 0-7.4 0L12 7.2l-1.4-1.4a5.2 5.2 0 1 0-7.4 7.4L12 22l8.8-8.8a5.2 5.2 0 0 0 0-7.4Z"/></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24"><path d="M3 12h4l2-6 4 12 2-6h6"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+  <symbol id="i-milestone" viewBox="0 0 24 24"><path d="M5 21V4M5 5h12l-2 4 2 4H5"/></symbol>
+  <symbol id="i-drag" viewBox="0 0 24 24"><circle cx="9" cy="7" r="1"/><circle cx="15" cy="7" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="17" r="1"/><circle cx="15" cy="17" r="1"/></symbol>
+  <symbol id="i-evidence" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h6M9 16h6"/></symbol>
+  <symbol id="i-freeze" viewBox="0 0 24 24"><path d="M12 2v20M4.2 6.5l15.6 9M4.2 17.5l15.6-9M8 4l4 3 4-3M8 20l4-3 4 3M3.8 10l4.5 2-4.5 2M20.2 10l-4.5 2 4.5 2"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 15v5h16v-5"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v11H3z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m8 9-3 3 3 3M16 9l3 3-3 3M14 5l-4 14"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 5 3 8 7 10 4-2 7-5 7-10V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+</svg>
+<header class="appbar">
+  <div class="appbar-inner">
+    <div class="brand"><span class="brand-mark"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-dock"></use></svg></span><span>Hermes Dockyard</span></div>
+    <nav class="nav-pills" aria-label="Dockyard screens">
+      <button type="button" class="nav-pill active" data-s="s1" aria-current="page"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-home"></use></svg><span class="label">Home</span></button>
+      <button type="button" class="nav-pill" data-s="s2"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-project"></use></svg><span class="label">Project</span></button>
+      <button type="button" class="nav-pill" data-s="s3"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-backlog"></use></svg><span class="label">Backlog</span></button>
+      <button type="button" class="nav-pill" data-s="s4"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-approval"></use></svg><span class="label">Approvals</span><span class="nav-badge approval-count">2</span></button>
+      <button type="button" class="nav-pill" data-s="s5"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-bots"></use></svg><span class="label">Bot teams</span></button>
+      <button type="button" class="nav-pill" data-s="s6"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-initiative"></use></svg><span class="label">Initiative</span></button>
+      <button type="button" class="nav-pill" data-s="s7"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-workflow"></use></svg><span class="label">Workflows</span></button>
+    </nav>
+    <div class="app-actions">
+      <div class="notification-wrap">
+        <button type="button" class="icon-button" id="notification-toggle" aria-label="Open notifications" aria-expanded="false" aria-controls="notification-popover"><svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg></button>
+        <div class="popover" id="notification-popover">
+          <div class="popover-head"><h2>Notifications</h2><div class="small-text">Open the work, not a transcript</div></div>
+          <button type="button" class="notification" data-goto="s4"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-approval"></use></svg></span><span><strong>Release risk needs a decision</strong><span>View approval evidence in Approval Inbox</span></span></button>
+          <button type="button" class="notification" data-goto="s6"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-initiative"></use></svg></span><span><strong>Checkout recovery reached review</strong><span>Open initiative stage and audit trail</span></span></button>
+          <button type="button" class="notification" data-goto="s5"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-bots"></use></svg></span><span><strong>One handoff is stuck</strong><span>Open Bot Teams to inspect ownership</span></span></button>
+        </div>
+      </div>
+      <button type="button" class="icon-button" id="theme-toggle" aria-label="Switch colour theme"><svg class="icon theme-moon" aria-hidden="true"><use href="#i-moon"></use></svg><svg class="icon theme-sun" aria-hidden="true"><use href="#i-sun"></use></svg></button>
+      <button type="button" class="button primary" id="new-project-button"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-plus"></use></svg>New project</button>
+    </div>
+  </div>
+</header>
+<main class="shell">
+<section class="screen active" id="s1" aria-labelledby="home-title">
+  <div class="page-head">
+    <div><h1 id="home-title">Your fleet, without the noise</h1><p>Five projects are being watched. The system has isolated the two calls only you can make.</p></div>
+    <div class="page-actions"><span class="owed"><span class="status-dot"></span>2 decisions owed</span></div>
+  </div>
+  <div class="attention-card elevated">
+    <div><div class="mini-label">NEEDS YOUR DECISION</div><div class="attention-number">2</div><div class="small-text" style="margin-top:10px">Both decisions carry evidence and a safe rollback.</div><button type="button" class="button primary small" data-goto="s4" style="margin-top:16px">Review decisions<svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron"></use></svg></button></div>
+    <div class="attention-copy"><h2>Everything else can keep moving</h2><div class="attention-list">
+      <div class="decision-row"><span class="badge danger">High risk</span><span><strong>Rotate a published signing key</strong><span class="small-text">SahilBlog, evidence verified 18 minutes ago</span></span><button type="button" class="icon-button" data-goto="s4" aria-label="Open signing key decision"><svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg></button></div>
+      <div class="decision-row"><span class="badge warning">Medium risk</span><span><strong>Release checkout recovery</strong><span class="small-text">Tests are green, final release remains owner-only</span></span><button type="button" class="icon-button" data-goto="s6" aria-label="Open checkout recovery initiative"><svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg></button></div>
+    </div></div>
+  </div>
+  <div class="metric-strip" aria-label="Fleet summary">
+    <div class="metric"><span class="mini-label">PROJECT HEALTH</span><strong>3 healthy</strong><span class="delta">1 watch, 1 frozen</span></div>
+    <div class="metric"><span class="mini-label">ACTIVE WORK</span><strong>18 items</strong><span class="delta">6 bots and 2 humans</span></div>
+    <div class="metric"><span class="mini-label">MILESTONES</span><strong>4 on track</strong><span class="delta">1 forecast at risk</span></div>
+    <div class="metric"><span class="mini-label">HEALTHY-DAY RESULT</span><strong style="color:var(--success)">No action needed</strong><span class="delta">Three projects proposed nothing</span></div>
+  </div>
+  <div class="grid grid-2">
+    <div class="card project-list">
+      <div class="card-pad spread"><div><h2 class="section-title">Projects</h2><p class="section-sub">Health, active work and who owns the next move.</p></div><button type="button" class="button small" data-goto="s2">Open workspace</button></div>
+      <button type="button" class="project-row" data-goto="s2"><span class="project-name"><span class="project-icon"><svg class="icon" aria-hidden="true"><use href="#i-project"></use></svg></span><span><strong>checkout-service</strong><span>Payments reliability and release safety</span></span></span><span class="badge warning"><span class="status-dot"></span>Watch</span><span class="hide-sm"><strong>7 active</strong><span class="small-text">2 in review</span></span><span class="avatar-stack hide-md"><span class="avatar">OC</span><span class="avatar">QA</span><span class="avatar human">SS</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg></button>
+      <button type="button" class="project-row" data-goto="s2"><span class="project-name"><span class="project-icon"><svg class="icon" aria-hidden="true"><use href="#i-heart"></use></svg></span><span><strong>walkie-talkie</strong><span>Voice relay and intake capture</span></span></span><span class="badge success"><span class="status-dot"></span>Healthy</span><span class="hide-sm"><strong>4 active</strong><span class="small-text">Nothing blocked</span></span><span class="avatar-stack hide-md"><span class="avatar">OC</span><span class="avatar">QA</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg></button>
+      <button type="button" class="project-row" data-goto="s3"><span class="project-name"><span class="project-icon"><svg class="icon" aria-hidden="true"><use href="#i-evidence"></use></svg></span><span><strong>SahilBlog</strong><span>Research, drafting and publishing</span></span></span><span class="badge success"><span class="status-dot"></span>Healthy</span><span class="hide-sm"><strong>5 active</strong><span class="small-text">1 approval</span></span><span class="avatar-stack hide-md"><span class="avatar">CC</span><span class="avatar human">SS</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg></button>
+      <button type="button" class="project-row" data-goto="s6"><span class="project-name"><span class="project-icon"><svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg></span><span><strong>hydraskale-auth</strong><span>Identity and credential safety</span></span></span><span class="badge danger"><span class="status-dot"></span>Frozen</span><span class="hide-sm"><strong>2 paused</strong><span class="small-text">Owner recovery call</span></span><span class="avatar-stack hide-md"><span class="avatar">WK</span><span class="avatar human">SS</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg></button>
+      <button type="button" class="project-row" data-goto="s5"><span class="project-name"><span class="project-icon"><svg class="icon" aria-hidden="true"><use href="#i-activity"></use></svg></span><span><strong>rig-monitoring</strong><span>Local compute health and capacity</span></span></span><span class="badge neutral"><span class="status-dot"></span>Unknown</span><span class="hide-sm"><strong>Verification held</strong><span class="small-text">Fail-closed</span></span><span class="avatar-stack hide-md"><span class="avatar">WS</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg></button>
+    </div>
+    <div class="card">
+      <div class="card-pad"><h2 class="section-title">Fleet activity</h2><p class="section-sub">Only attributed state changes and handoffs.</p></div>
+      <div class="activity-list">
+        <div class="activity-item"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-approval"></use></svg></span><span><p><strong>Quan</strong> verified the checkout recovery against 202 tests.</p><time>6 minutes ago</time></span></div>
+        <div class="activity-item"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-workflow"></use></svg></span><span><p><strong>Octacon</strong> handed release evidence to Quan with 4 linked records.</p><time>21 minutes ago</time></span></div>
+        <div class="activity-item"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-alert"></use></svg></span><span><p><strong>Wesker</strong> froze identity work after an unknown state appeared.</p><time>48 minutes ago</time></span></div>
+        <div class="activity-item"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"></use></svg></span><span><p><strong>CeeCee</strong> reported no useful content gap. No work was created.</p><time>1 hour ago</time></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="screen" id="s2" aria-labelledby="project-title">
+  <div class="page-head"><div><div class="small-text">Projects / checkout-service</div><h1 id="project-title">Keep checkout releases safe</h1><p>Goals and measurable outcomes lead the workspace. Work exists only when it supports them.</p></div><div class="page-actions"><span class="owed"><span class="status-dot"></span>1 blocked item</span><button type="button" class="button" id="new-item-button"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-plus"></use></svg>New work item</button></div></div>
+  <div class="card goal-card elevated"><div class="goal-copy"><span class="badge warning">Project on watch</span><h2>Make every release reversible and prove payment paths stay green.</h2><p>Owner: Sahil. Lead: Octacon. Next milestone is release hardening on Friday.</p><div style="margin-top:17px"><div class="spread small-text"><strong>Milestone progress</strong><span>7 of 9 items complete</span></div><div class="progress" style="margin-top:7px"><span style="width:78%"></span></div></div></div><div class="kpi-grid"><div class="kpi"><span class="mini-label">PAYMENT TESTS</span><strong style="color:var(--success)">100%</strong><span class="small-text">Target 100%</span></div><div class="kpi"><span class="mini-label">ROLLBACK TIME</span><strong>4 min</strong><span class="small-text">Target under 10 min</span></div><div class="kpi"><span class="mini-label">OPEN SEVERE BUGS</span><strong style="color:var(--warning)">1</strong><span class="small-text">Target 0</span></div></div></div>
+  <div class="tabs" role="tablist" aria-label="Project views"><button type="button" class="tab active" role="tab" aria-selected="true" data-project-tab="p-board">Board</button><button type="button" class="tab" role="tab" aria-selected="false" data-project-tab="p-timeline">Timeline</button><button type="button" class="tab" role="tab" aria-selected="false" data-project-tab="p-objectives">Objectives</button><button type="button" class="tab" role="tab" aria-selected="false" data-project-tab="p-activity">Activity</button><button type="button" class="tab" role="tab" aria-selected="false" data-project-tab="p-settings">Settings</button></div>
+  <div class="tab-panel active" id="p-board" role="tabpanel"><div class="board-wrap"><div class="board">
+    <div class="board-column" data-column="Backlog"><div class="column-head"><h3>Backlog</h3><span class="column-meta"><span class="column-count">3</span> items / WIP 6</span></div><div class="card-stack">
+      <article class="work-card" draggable="true" data-item="HDY-41"><div class="work-type"><span class="type">Epic</span><svg class="icon icon-sm drag-handle" aria-hidden="true"><use href="#i-drag"></use></svg></div><h4>Complete resilient payment release programme</h4><div class="work-meta"><span>HDY-41</span><span class="avatar human">SS</span></div></article>
+      <article class="work-card" draggable="true" data-item="HDY-52"><div class="work-type"><span class="type">Spike</span><svg class="icon icon-sm drag-handle" aria-hidden="true"><use href="#i-drag"></use></svg></div><h4>Measure recovery under partial provider failure</h4><div class="work-meta"><span>HDY-52</span><span class="avatar">RM</span></div></article>
+      <article class="work-card" draggable="true" data-item="HDY-53"><div class="work-type"><span class="type">Subtask</span><svg class="icon icon-sm drag-handle" aria-hidden="true"><use href="#i-drag"></use></svg></div><h4>Document owner release checklist</h4><div class="work-meta"><span>HDY-53</span><span class="avatar human">SS</span></div></article>
+    </div></div>
+    <div class="board-column" data-column="In progress"><div class="column-head"><h3>In progress</h3><span class="column-meta"><span class="column-count">2</span> items / WIP 3</span></div><div class="card-stack">
+      <article class="work-card" draggable="true" data-item="INIT-18"><div class="work-type"><span class="type">Initiative</span><svg class="icon icon-sm drag-handle" aria-hidden="true"><use href="#i-drag"></use></svg></div><h4>Restore payment path confidence after retry regression</h4><div class="work-meta"><span>INIT-18</span><span class="avatar">OC</span></div></article>
+      <article class="work-card" draggable="true" data-item="HDY-48"><div class="work-type"><span class="type">Task</span><svg class="icon icon-sm drag-handle" aria-hidden="true"><use href="#i-drag"></use></svg></div><h4>Add reversible release rehearsal</h4><div class="work-meta"><span>HDY-48</span><span class="avatar">OC</span></div></article>
+    </div></div>
+    <div class="board-column" data-column="Review"><div class="column-head"><h3>Review</h3><span class="column-meta wip-over"><span class="column-count">3</span> items / WIP 2</span></div><div class="card-stack">
+      <article class="work-card" draggable="true" data-item="HDY-44"><div class="work-type"><span class="type">Bug</span><svg class="icon icon-sm drag-handle" aria-hidden="true"><use href="#i-drag"></use></svg></div><h4>Prevent duplicate webhook delivery during retry</h4><div class="work-meta"><span>HDY-44</span><span class="avatar">OC</span></div></article>
+      <article class="work-card" draggable="true" data-item="HDY-49"><div class="work-type"><span class="type">Task</span><svg class="icon icon-sm drag-handle" aria-hidden="true"><use href="#i-drag"></use></svg></div><h4>Verify rollback evidence is complete</h4><div class="work-meta"><span>HDY-49</span><span class="avatar">QA</span></div></article>
+      <article class="work-card" draggable="true" data-item="HDY-50"><div class="work-type"><span class="type">Task</span><svg class="icon icon-sm drag-handle" aria-hidden="true"><use href="#i-drag"></use></svg></div><h4>Owner release decision packet</h4><div class="work-meta"><span>HDY-50</span><span class="avatar human">SS</span></div></article>
+    </div></div>
+    <div class="board-column" data-column="Done"><div class="column-head"><h3>Done</h3><span class="column-meta"><span class="column-count">2</span> items</span></div><div class="card-stack">
+      <article class="work-card" draggable="true" data-item="HDY-38"><div class="work-type"><span class="type">Task</span><svg class="icon icon-sm drag-handle" aria-hidden="true"><use href="#i-drag"></use></svg></div><h4>Pin retry timing to measured evidence</h4><div class="work-meta"><span>HDY-38</span><span class="avatar">OC</span></div></article>
+      <article class="work-card" draggable="true" data-item="HDY-39"><div class="work-type"><span class="type">Bug</span><svg class="icon icon-sm drag-handle" aria-hidden="true"><use href="#i-drag"></use></svg></div><h4>Remove duplicate audit event</h4><div class="work-meta"><span>HDY-39</span><span class="avatar">QA</span></div></article>
+    </div></div>
+  </div></div></div>
+  <div class="tab-panel" id="p-timeline" role="tabpanel"><div class="timeline-list"><div class="timeline-row"><strong>Today</strong><span>Recovery evidence review and owner decision packet</span><span class="badge warning">At risk</span></div><div class="timeline-row"><strong>Thursday</strong><span>Reversible release rehearsal</span><span class="badge accent">Planned</span></div><div class="timeline-row"><strong>Friday</strong><span>Release hardening milestone</span><span class="badge neutral">Forecast</span></div></div></div>
+  <div class="tab-panel" id="p-objectives" role="tabpanel"><div class="grid grid-even"><div class="card card-pad"><span class="mini-label">MISSION KPI</span><h2 class="section-title" style="margin-top:8px">Payment tests remain green</h2><p class="section-sub">Measured on each release candidate. Current result is 100%.</p></div><div class="card card-pad"><span class="mini-label">MISSION KPI</span><h2 class="section-title" style="margin-top:8px">Rollback completes within 10 minutes</h2><p class="section-sub">Latest rehearsal completed in 4 minutes.</p></div></div></div>
+  <div class="tab-panel" id="p-activity" role="tabpanel"><div class="card activity-list"><div class="activity-item"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-evidence"></use></svg></span><span><p>Quan attached fresh release evidence to HDY-50.</p><time>6 minutes ago</time></span></div><div class="activity-item"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-drag"></use></svg></span><span><p>Sahil moved the owner decision packet to Review and recorded a reason.</p><time>32 minutes ago</time></span></div></div></div>
+  <div class="tab-panel" id="p-settings" role="tabpanel"><div class="card card-pad"><h2 class="section-title">Project rules</h2><p class="section-sub">Automation can only narrow these boundaries. Risky releases, credential changes and unknown state always return to the owner.</p><div class="form-grid" style="margin-top:18px"><div class="field"><label for="project-owner">Owner</label><select id="project-owner"><option>Sahil</option></select></div><div class="field"><label for="project-autonomy">Autonomy</label><select id="project-autonomy"><option>Plan and propose</option><option>Execute low-risk work</option></select></div></div></div></div>
+</section>
+<section class="screen" id="s3" aria-labelledby="backlog-title">
+  <div class="page-head"><div><h1 id="backlog-title">Prioritised backlog</h1><p>Ranked by project impact, evidence strength and urgency. Every manual reorder leaves a reason.</p></div><div class="page-actions"><span class="owed"><span class="status-dot"></span>2 ranks need review</span><button type="button" class="button" data-demo-action="Backlog filters opened"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-search"></use></svg>Filter</button></div></div>
+  <div class="card card-pad" style="margin-bottom:16px"><div class="spread"><div><h2 class="section-title">What should move next</h2><p class="section-sub">The first two items affect a failing goal or a high-risk decision.</p></div><span class="badge accent">Ranked 8 minutes ago</span></div></div>
+  <div class="backlog-list" id="backlog-list">
+    <div class="backlog-item" data-rank-item="INIT-18"><span class="rank">1</span><span><strong>Restore payment path confidence</strong><span class="small-text">Goal breach with verified regression evidence</span></span><span class="hide-sm"><span class="badge warning">Initiative</span></span><span class="hide-sm small-text">Impact: release safety<br>Age: 2 hours</span><span class="rank-controls"><button type="button" class="icon-button" data-rank-dir="down" aria-label="Move restore payment path confidence down"><svg class="icon" style="transform:rotate(90deg)" aria-hidden="true"><use href="#i-chevron"></use></svg></button></span></div>
+    <div class="backlog-item" data-rank-item="SEC-9"><span class="rank">2</span><span><strong>Rotate published signing key</strong><span class="small-text">High-risk exposure with owner approval required</span></span><span class="hide-sm"><span class="badge danger">Security</span></span><span class="hide-sm small-text">Impact: trust<br>Age: 5 hours</span><span class="rank-controls"><button type="button" class="icon-button" data-rank-dir="up" aria-label="Move signing key rotation up"><svg class="icon" style="transform:rotate(-90deg)" aria-hidden="true"><use href="#i-chevron"></use></svg></button><button type="button" class="icon-button" data-rank-dir="down" aria-label="Move signing key rotation down"><svg class="icon" style="transform:rotate(90deg)" aria-hidden="true"><use href="#i-chevron"></use></svg></button></span></div>
+    <div class="backlog-item" data-rank-item="HDY-52"><span class="rank">3</span><span><strong>Measure partial provider recovery</strong><span class="small-text">Spike linked to rollback-time KPI</span></span><span class="hide-sm"><span class="badge accent">Spike</span></span><span class="hide-sm small-text">Impact: resilience<br>Age: 1 day</span><span class="rank-controls"><button type="button" class="icon-button" data-rank-dir="up" aria-label="Move provider recovery spike up"><svg class="icon" style="transform:rotate(-90deg)" aria-hidden="true"><use href="#i-chevron"></use></svg></button><button type="button" class="icon-button" data-rank-dir="down" aria-label="Move provider recovery spike down"><svg class="icon" style="transform:rotate(90deg)" aria-hidden="true"><use href="#i-chevron"></use></svg></button></span></div>
+    <div class="backlog-item" data-rank-item="BLOG-31"><span class="rank">4</span><span><strong>Improve draft citation coverage</strong><span class="small-text">Measured content-quality gap</span></span><span class="hide-sm"><span class="badge neutral">Task</span></span><span class="hide-sm small-text">Impact: quality<br>Age: 2 days</span><span class="rank-controls"><button type="button" class="icon-button" data-rank-dir="up" aria-label="Move citation coverage up"><svg class="icon" style="transform:rotate(-90deg)" aria-hidden="true"><use href="#i-chevron"></use></svg></button></span></div>
+  </div>
+  <div class="suppressed"><div class="spread"><div><h3>Suppressed: Rewrite the entire project UI</h3><p class="section-sub">Reason: rejected twice, no linked goal, and no evidence that a rewrite would improve outcomes. Visible so the same busywork is not proposed again.</p></div><span class="badge neutral">Suppressed 3 days ago</span></div></div>
+</section>
+<section class="screen" id="s4" aria-labelledby="approval-title">
+  <div class="page-head"><div><h1 id="approval-title">Approval Inbox</h1><p>Every pending human decision across every project, with enough evidence to decide here.</p></div><div class="page-actions"><span class="owed"><span class="status-dot"></span><span class="approval-count">2</span> decisions owed</span></div></div>
+  <div class="approval-list">
+    <article class="card approval-card" data-approval="SEC-9"><div class="approval-top"><span class="activity-icon" style="color:var(--danger);background:var(--danger-bg)"><svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg></span><div class="approval-title"><h2>Rotate the published signing key</h2><p>SahilBlog / proposed by Wesker / verified 18 minutes ago</p></div><span class="badge danger">High risk</span></div><div class="evidence-box"><div class="evidence-grid"><div class="evidence-cell"><span class="mini-label">OBSERVED</span><strong>Key fragment found in a public build record</strong></div><div class="evidence-cell"><span class="mini-label">PROPOSED CHANGE</span><strong>Revoke, rotate, then verify signed delivery</strong></div><div class="evidence-cell"><span class="mini-label">ROLLBACK</span><strong>Restore previous key from sealed recovery copy</strong></div></div></div><div class="approval-actions"><button type="button" class="button primary" data-decision="approve">Approve rotation</button><button type="button" class="button danger" data-decision="reject">Reject</button><button type="button" class="button quiet" data-evidence-toggle>Show evidence chain</button><span class="badge neutral decision-state">Awaiting you</span></div><div class="evidence-box" hidden data-evidence-detail><strong>Evidence chain</strong><p class="section-sub">Detection record, public exposure check, owner policy, proposed steps and post-change verification are linked and attributed. Unknown steps remain blocked.</p></div></article>
+    <article class="card approval-card" data-approval="REL-18"><div class="approval-top"><span class="activity-icon" style="color:var(--warning);background:var(--warning-bg)"><svg class="icon" aria-hidden="true"><use href="#i-milestone"></use></svg></span><div class="approval-title"><h2>Release checkout recovery</h2><p>checkout-service / proposed by Octacon / verified 6 minutes ago</p></div><span class="badge warning">Medium risk</span></div><div class="evidence-box"><div class="evidence-grid"><div class="evidence-cell"><span class="mini-label">OBSERVED</span><strong>202 tests pass on the exact candidate</strong></div><div class="evidence-cell"><span class="mini-label">EXPECTED OUTCOME</span><strong>Payment retries stop duplicating events</strong></div><div class="evidence-cell"><span class="mini-label">ROLLBACK</span><strong>Rehearsed in 4 minutes</strong></div></div></div><div class="approval-actions"><button type="button" class="button primary" data-decision="approve">Approve release</button><button type="button" class="button danger" data-decision="reject">Reject</button><button type="button" class="button quiet" data-evidence-toggle>Show evidence chain</button><span class="badge neutral decision-state">Awaiting you</span></div><div class="evidence-box" hidden data-evidence-detail><strong>Evidence chain</strong><p class="section-sub">Regression reproduction, focused fix, wider proof, independent review and rollback rehearsal all refer to the same candidate.</p></div></article>
+    <article class="card approval-card resolved"><div class="approval-top"><span class="activity-icon" style="color:var(--success);background:var(--success-bg)"><svg class="icon" aria-hidden="true"><use href="#i-approval"></use></svg></span><div class="approval-title"><h2>Refresh a low-risk dependency</h2><p>walkie-talkie / completed within policy / shown for visibility</p></div><span class="badge success">No decision needed</span></div></article>
+  </div>
+</section>
+<section class="screen" id="s5" aria-labelledby="teams-title">
+  <div class="page-head"><div><h1 id="teams-title">Bot teams</h1><p>Capabilities, workload, group ownership and structured handoffs in one place.</p></div><div class="page-actions"><span class="owed"><span class="status-dot"></span>1 handoff stuck</span><button type="button" class="button" data-demo-action="New bot group form opened"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-plus"></use></svg>Create group</button></div></div>
+  <div class="team-layout"><div>
+    <div class="card card-pad"><div class="spread"><div><h2 class="section-title">Registry</h2><p class="section-sub">Measured capabilities and current work. Reputation is guidance only.</p></div><span class="badge neutral">8 available</span></div><div class="registry" style="margin-top:17px">
+      <button type="button" class="bot-card" data-bot="Octacon"><span class="bot-head"><span class="avatar">OC</span><span><strong>Octacon</strong><span>Build lead / 3 active items</span></span></span><span class="capabilities"><span class="capability">Architecture</span><span class="capability">Python</span><span class="capability">Frontend</span></span></button>
+      <button type="button" class="bot-card" data-bot="Quan"><span class="bot-head"><span class="avatar">QA</span><span><strong>Quan</strong><span>QA lead / 2 active items</span></span></span><span class="capabilities"><span class="capability">Verification</span><span class="capability">Release</span><span class="capability">UX QA</span></span></button>
+      <button type="button" class="bot-card" data-bot="Remii"><span class="bot-head"><span class="avatar">RM</span><span><strong>Remii</strong><span>Research lead / 2 active items</span></span></span><span class="capabilities"><span class="capability">Research</span><span class="capability">Evidence</span><span class="capability">Landscape</span></span></button>
+      <button type="button" class="bot-card" data-bot="Wesker"><span class="bot-head"><span class="avatar">WK</span><span><strong>Wesker</strong><span>Operations lead / 4 active items</span></span></span><span class="capabilities"><span class="capability">Security</span><span class="capability">Recovery</span><span class="capability">Fleet health</span></span></button>
+    </div></div>
+    <div class="card group-card"><div class="spread"><div><h2 class="section-title">Checkout reliability group</h2><p class="section-sub">Lead Octacon with Quan, Remii and Sahil. Group channel mirrors these audited events.</p></div><span class="badge warning">1 stuck</span></div><div class="handoff-list">
+      <button type="button" class="handoff" data-handoff="H-4412"><span class="avatar">OC</span><span><strong>Octacon handed release evidence to Quan</strong><span class="small-text">Accepted, validation contract attached, 4 records linked</span></span><span class="badge success">Complete</span></button>
+      <button type="button" class="handoff" data-handoff="H-4418"><span class="avatar">RM</span><span><strong>Remii requested recovery proof from Wesker</strong><span class="small-text">Waiting 2 hours, owner remains Remii</span></span><span class="badge warning">Stuck</span></button>
+      <button type="button" class="handoff" data-handoff="H-4420"><span class="avatar">QA</span><span><strong>Quan returned a release recommendation to Sahil</strong><span class="small-text">Decision is now in Approval Inbox</span></span><span class="badge accent">Delivered</span></button>
+    </div></div>
+  </div><aside class="card card-pad"><h2 class="section-title">Workload heat</h2><p class="section-sub">Who is busy, idle or blocked right now.</p><div class="load-list"><div class="load-row"><strong>Wesker</strong><span class="load-bar"><span style="width:92%;background:var(--danger)"></span></span><span class="badge danger">High</span></div><div class="load-row"><strong>Octacon</strong><span class="load-bar"><span style="width:72%"></span></span><span>72%</span></div><div class="load-row"><strong>Quan</strong><span class="load-bar"><span style="width:54%"></span></span><span>54%</span></div><div class="load-row"><strong>Remii</strong><span class="load-bar"><span style="width:38%"></span></span><span>38%</span></div><div class="load-row"><strong>CeeCee</strong><span class="load-bar"><span style="width:10%;background:var(--success)"></span></span><span class="badge success">Idle</span></div></div><div class="evidence-box" style="margin-bottom:0"><strong>Reputation is advisory only</strong><p class="section-sub">Measured outcomes help a lead decide. They never assign work or expand permissions automatically.</p></div></aside></div>
+</section>
+<section class="screen" id="s6" aria-labelledby="initiative-title">
+  <div class="page-head"><div><div class="small-text">Initiative INIT-18 / checkout-service</div><h1 id="initiative-title">Restore payment path confidence</h1><p>One live loop from verified gap to measured outcome, with every gate and actor visible.</p></div><div class="page-actions"><span class="owed"><span class="status-dot"></span>Waiting for release review</span><button type="button" class="button danger" id="freeze-button"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-freeze"></use></svg>Freeze initiative</button></div></div>
+  <div class="loop-layout"><div class="card loop"><div class="spread"><div><h2 class="section-title">Live initiative loop</h2><p class="section-sub">Select a stage to inspect its evidence and audit trail.</p></div><span class="badge warning" id="initiative-state">In review</span></div><div class="stage-list">
+    <button type="button" class="stage done" data-stage="Verify project state" data-stage-copy="Collectors confirmed duplicate retry events on the exact release candidate. The result is deterministic and linked to the payment reliability goal."><span class="stage-state"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-approval"></use></svg></span><span class="stage-copy"><strong>Verify project state</strong><span>Evidence captured and attributed</span></span><span class="badge success">Done</span></button>
+    <button type="button" class="stage done" data-stage="Research and detect gaps" data-stage-copy="Remii compared retry paths and isolated one reproducible gap. No unrelated improvements were proposed."><span class="stage-state"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-approval"></use></svg></span><span class="stage-copy"><strong>Research and detect gaps</strong><span>One actionable gap found</span></span><span class="badge success">Done</span></button>
+    <button type="button" class="stage done" data-stage="Create initiative" data-stage-copy="The initiative declares the expected outcome, linked goal, evidence, owner and suppression fingerprint."><span class="stage-state"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-approval"></use></svg></span><span class="stage-copy"><strong>Create initiative</strong><span>Expected outcome declared</span></span><span class="badge success">Done</span></button>
+    <button type="button" class="stage done" data-stage="Prioritise" data-stage-copy="Ranked first because a verified goal breach affects release safety. Every reorder since creation includes a reason."><span class="stage-state"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-approval"></use></svg></span><span class="stage-copy"><strong>Prioritise</strong><span>Ranked first with reason</span></span><span class="badge success">Done</span></button>
+    <button type="button" class="stage done" data-stage="Human approval" data-stage-copy="Sahil approved the bounded repair. The release itself remains a separate human decision."><span class="stage-state"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-approval"></use></svg></span><span class="stage-copy"><strong>Human approval</strong><span>Repair approved, release still gated</span></span><span class="badge success">Done</span></button>
+    <button type="button" class="stage done" data-stage="Research build test review" data-stage-copy="Octacon built the repair and Quan verified it against 202 tests plus the original failure case."><span class="stage-state"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-approval"></use></svg></span><span class="stage-copy"><strong>Research, build, test and review</strong><span>Candidate verified independently</span></span><span class="badge success">Done</span></button>
+    <button type="button" class="stage running active" data-stage="Release" data-stage-copy="The candidate is ready, rollback completed in 4 minutes, and the final owner decision is waiting in Approval Inbox."><span class="stage-state"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-play"></use></svg></span><span class="stage-copy"><strong>Release</strong><span>Waiting on owner decision</span></span><span class="badge warning">Gate</span></button>
+    <button type="button" class="stage" data-stage="Observe results" data-stage-copy="After release, the system will measure duplicate events and rollback time against the declared project goals."><span class="stage-state"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-clock"></use></svg></span><span class="stage-copy"><strong>Observe results</strong><span>Starts after release</span></span><span class="badge neutral">Queued</span></button>
+    <button type="button" class="stage" data-stage="Did the project improve" data-stage-copy="A green outcome becomes learning. A failed outcome creates a bounded follow-up with the same evidence chain."><span class="stage-state"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-target"></use></svg></span><span class="stage-copy"><strong>Did the project improve?</strong><span>Learn or create a follow-up</span></span><span class="badge neutral">Queued</span></button>
+  </div></div>
+  <aside class="card detail-panel"><span class="mini-label">SELECTED STAGE</span><h2 id="stage-detail-title">Release</h2><p class="section-sub" id="stage-detail-copy">The candidate is ready, rollback completed in 4 minutes, and the final owner decision is waiting in Approval Inbox.</p><div class="evidence-box"><span class="mini-label">EVIDENCE CHAIN</span><strong style="display:block;margin-top:7px">14 linked records, 5 actors, one candidate</strong><button type="button" class="button quiet small" style="margin-top:8px" data-goto="s4">Open decision evidence</button></div><h3 class="section-title" style="font-size:16px">Audit trail</h3><div class="audit-list"><div class="audit-row"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-evidence"></use></svg></span><span><strong>Quan verified candidate</strong><span class="small-text">6 minutes ago</span></span></div><div class="audit-row"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-workflow"></use></svg></span><span><strong>Octacon completed handoff</strong><span class="small-text">21 minutes ago</span></span></div><div class="audit-row"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-approval"></use></svg></span><span><strong>Sahil approved repair scope</strong><span class="small-text">2 hours ago</span></span></div></div></aside></div>
+</section>
+<section class="screen" id="s7" aria-labelledby="workflow-title">
+  <div class="page-head"><div><h1 id="workflow-title">Workflows</h1><p>Live loops show what is done, moving, waiting on you or queued. Saved workflows remain bounded by project rules.</p></div><div class="page-actions"><span class="owed"><span class="status-dot"></span>1 gate waiting</span><button type="button" class="button primary" id="new-workflow-button"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-plus"></use></svg>New workflow</button></div></div>
+  <div class="workflow-layout"><div class="stack">
+    <article class="card workflow-card"><div class="spread"><div><h2 class="section-title">Checkout recovery</h2><p class="section-sub">Cycle 42 / Release gate waiting</p></div><span class="badge warning">Waiting on you</span></div><svg class="workflow-graph" viewBox="0 0 760 220" role="img" aria-label="Checkout recovery workflow with done, running, waiting and queued states"><path class="edge" d="M130 80H215M325 80H410M520 80H605"/><path class="edge edge-live" d="M520 80H605"/><rect class="node node-done" x="30" y="50" width="100" height="60" rx="12"/><text x="80" y="84" text-anchor="middle">Verified</text><rect class="node node-done" x="215" y="50" width="110" height="60" rx="12"/><text x="270" y="84" text-anchor="middle">Built + tested</text><rect class="node node-waiting" x="410" y="50" width="110" height="60" rx="12"/><text x="465" y="78" text-anchor="middle">Release gate</text><text x="465" y="94" text-anchor="middle">Waiting</text><rect class="node node-queued" x="605" y="50" width="120" height="60" rx="12"/><text x="665" y="78" text-anchor="middle">Observe</text><text x="665" y="94" text-anchor="middle">Queued</text><path class="edge" d="M665 110V160H80V110"/></svg><div class="legend"><span><i style="background:var(--success)"></i>Done</span><span><i style="background:var(--accent)"></i>Running</span><span><i style="background:var(--warning)"></i>Waiting gate</span><span><i></i>Queued</span></div></article>
+    <article class="card workflow-card"><div class="spread"><div><h2 class="section-title">Content quality watch</h2><p class="section-sub">Cycle 18 / Research running</p></div><span class="badge accent">Running</span></div><svg class="workflow-graph" viewBox="0 0 760 190" role="img" aria-label="Content quality workflow with verification done and research running"><path class="edge edge-live" d="M160 80H290M430 80H570"/><rect class="node node-done" x="30" y="50" width="130" height="60" rx="12"/><text x="95" y="84" text-anchor="middle">Verify quality</text><rect class="node node-running" x="290" y="50" width="140" height="60" rx="12"/><text x="360" y="78" text-anchor="middle">Research gap</text><text x="360" y="94" text-anchor="middle">Running</text><rect class="node node-queued" x="570" y="50" width="140" height="60" rx="12"/><text x="640" y="84" text-anchor="middle">Propose work</text></svg></article>
+  </div><aside class="card card-pad"><div class="spread"><div><h2 class="section-title">Saved workflows</h2><p class="section-sub">Reusable starting points, never permission shortcuts.</p></div><span class="badge neutral">3 saved</span></div><div class="saved-list" id="saved-workflow-list"><div class="saved-workflow"><span><strong>Verified fix</strong><span class="small-text">Verify, build, test, review, observe</span></span><button type="button" class="icon-button" data-open-saved-workflow aria-label="Open verified fix workflow"><svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg></button></div><div class="saved-workflow"><span><strong>Dependency refresh</strong><span class="small-text">Research, risk gate, test, observe</span></span><button type="button" class="icon-button" data-open-saved-workflow aria-label="Open dependency refresh workflow"><svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg></button></div><div class="saved-workflow"><span><strong>Project health review</strong><span class="small-text">Verify, prioritise, report or finish clear</span></span><button type="button" class="icon-button" data-open-saved-workflow aria-label="Open project health review workflow"><svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg></button></div></div><div class="evidence-box" style="margin-bottom:0"><strong>Workflow creator</strong><p class="section-sub">Choose stages, set human gates, name the evidence each stage must produce, then save the bounded workflow.</p><button type="button" class="button small" id="open-workflow-creator" style="margin-top:11px">Open creator</button></div></aside></div>
+</section>
+</main>
+<div class="overlay" id="item-drawer" aria-hidden="true"><aside class="drawer-shell" role="dialog" aria-modal="true" aria-labelledby="item-drawer-title"><div class="drawer-head"><div><div class="small-text">Work item detail</div><h2 id="item-drawer-title">Work item</h2></div><button type="button" class="icon-button" data-close-overlay aria-label="Close work item detail"><svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg></button></div><div class="drawer-body"><span class="badge accent" id="item-type">Task</span><p class="section-sub" id="item-summary">Select a work item to inspect its goal, owner, blockers and evidence.</p><div class="evidence-box"><span class="mini-label">WHY THIS EXISTS</span><strong style="display:block;margin-top:6px">Linked to checkout release safety</strong></div><div class="grid grid-even"><div><span class="mini-label">OWNER</span><p>Human or bot, fully attributed</p></div><div><span class="mini-label">STATUS</span><p id="item-status">Active</p></div></div><h3 class="section-title" style="font-size:16px;margin-top:20px">Evidence</h3><div class="audit-list"><div class="audit-row"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-evidence"></use></svg></span><span><strong>Goal and source record linked</strong><span class="small-text">Verified</span></span></div><div class="audit-row"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-bots"></use></svg></span><span><strong>Every edit has an actor</strong><span class="small-text">Audit ready</span></span></div></div></div></aside></div>
+<div class="overlay" id="bot-drawer" aria-hidden="true"><aside class="drawer-shell" role="dialog" aria-modal="true" aria-labelledby="bot-drawer-title"><div class="drawer-head"><div><div class="small-text">Fleet profile</div><h2 id="bot-drawer-title">Bot</h2></div><button type="button" class="icon-button" data-close-overlay aria-label="Close bot detail"><svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg></button></div><div class="drawer-body"><div class="evidence-box"><span class="mini-label">CURRENT WORKLOAD</span><strong style="display:block;margin-top:7px">Measured from active owned work</strong></div><h3 class="section-title" style="font-size:16px">Capabilities</h3><p class="section-sub">Capabilities are declared and confirmed by completed outcomes. They do not grant permission.</p><h3 class="section-title" style="font-size:16px;margin-top:22px">Advisory outcome record</h3><p class="section-sub">Useful for a human lead deciding who fits the work. Never used for automatic routing.</p></div></aside></div>
+<div class="overlay" id="handoff-drawer" aria-hidden="true"><aside class="drawer-shell" role="dialog" aria-modal="true" aria-labelledby="handoff-drawer-title"><div class="drawer-head"><div><div class="small-text">Audited handoff event</div><h2 id="handoff-drawer-title">Handoff</h2></div><button type="button" class="icon-button" data-close-overlay aria-label="Close handoff detail"><svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg></button></div><div class="drawer-body"><div class="evidence-box"><span class="mini-label">CONTEXT PACKAGE</span><strong style="display:block;margin-top:7px">Goal, work item, acceptance proof and owner</strong></div><div class="audit-list"><div class="audit-row"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-bots"></use></svg></span><span><strong>Sender attributed</strong><span class="small-text">Recorded when sent</span></span></div><div class="audit-row"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-approval"></use></svg></span><span><strong>Receiver state recorded</strong><span class="small-text">Accepted, declined or waiting</span></span></div><div class="audit-row"><span class="activity-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-project"></use></svg></span><span><strong>Group channel linked</strong><span class="small-text">Shared context, no parallel conversation</span></span></div></div></div></aside></div>
+<div class="overlay" id="reason-modal" aria-hidden="true"><div class="modal-shell"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="reason-title"><div class="modal-head"><div><h2 id="reason-title">Record the reason</h2><p>Rank and status changes must explain why the new position is better for the project.</p></div><button type="button" class="icon-button" data-close-overlay aria-label="Close reason dialog"><svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg></button></div><div class="modal-body"><div class="field"><label for="reason-text">Reason for this change</label><textarea id="reason-text" placeholder="Example: This verified goal breach now blocks Friday's milestone."></textarea><span class="helper">This becomes part of the work item's audit trail.</span></div></div><div class="modal-foot"><button type="button" class="button" data-close-overlay>Cancel</button><button type="button" class="button primary" id="reason-confirm">Save reason and move</button></div></section></div></div>
+<div class="overlay" id="freeze-modal" aria-hidden="true"><div class="modal-shell"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="freeze-title"><div class="modal-head"><div><h2 id="freeze-title">Freeze this initiative?</h2><p>All queued and active work pauses. Evidence and ownership remain intact.</p></div><button type="button" class="icon-button" data-close-overlay aria-label="Close freeze dialog"><svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg></button></div><div class="modal-body"><div class="evidence-box"><strong>Use when the project state is unknown or the risk changed.</strong><p class="section-sub">A human must review current evidence before work can resume.</p></div></div><div class="modal-foot"><button type="button" class="button" data-close-overlay>Keep running</button><button type="button" class="button danger" id="freeze-confirm">Freeze initiative</button></div></section></div></div>
+<div class="overlay" id="workflow-modal" aria-hidden="true"><div class="modal-shell"><section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="workflow-create-title"><div class="modal-head"><div><h2 id="workflow-create-title">Create a workflow</h2><p>Choose the stages and human gates. Project rules still decide what can run.</p></div><button type="button" class="icon-button" data-close-overlay aria-label="Close workflow creator"><svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg></button></div><div class="modal-body"><div class="form-grid"><div class="field"><label for="workflow-name">Workflow name</label><input id="workflow-name" value="Verified improvement loop"></div><div class="field"><span class="field-label">Stages</span><div class="choice-grid"><button type="button" class="choice selected">Verify</button><button type="button" class="choice selected">Research</button><button type="button" class="choice selected">Build and test</button><button type="button" class="choice selected">Human gate</button><button type="button" class="choice selected">Release</button><button type="button" class="choice selected">Observe</button></div></div><div class="field"><label for="workflow-evidence">Required evidence before release</label><textarea id="workflow-evidence">Original failure reproduced, exact candidate verified, rollback rehearsed.</textarea></div></div></div><div class="modal-foot"><button type="button" class="button" data-close-overlay>Cancel</button><button type="button" class="button primary" id="workflow-save">Save workflow</button></div></section></div></div>
+<div class="overlay" id="wizard" aria-hidden="true"><aside class="wizard-shell" role="dialog" aria-modal="true" aria-labelledby="wizard-title"><div class="wizard-head"><div><div class="small-text" id="wizard-step-label">Step 1 of 4</div><h2 id="wizard-title">Start a project</h2><p>Point to a repository, answer three questions and choose the team.</p></div><button type="button" class="icon-button" data-close-overlay aria-label="Close new project wizard"><svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg></button></div><div class="stepper" role="progressbar" aria-valuemin="1" aria-valuemax="4" aria-valuenow="1" aria-label="Project setup progress"><span class="step-track active"></span><span class="step-track"></span><span class="step-track"></span><span class="step-track"></span></div><div class="wizard-body">
+  <section class="wizard-step active" data-wizard-step="1"><h3>Choose from reusable templates</h3><p>Start blank, clone a template, or save the current setup for next time.</p><div class="template-grid"><button type="button" class="template-card selected" data-template="Blank project"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-plus"></use></svg><strong>Blank project</strong><span>Goals, team and rules from scratch</span></button><button type="button" class="template-card" data-template="Repository guardian"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-shield"></use></svg><strong>Repository guardian</strong><span>Health checks, safe fixes and release gates</span></button><button type="button" class="template-card" data-template="Content engine"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-evidence"></use></svg><strong>Content quality</strong><span>Research, drafts, evidence and approval</span></button><button type="button" class="template-card" data-template="Service watch"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-activity"></use></svg><strong>Service watch</strong><span>Availability goals and recovery workflows</span></button></div><div class="template-tools"><button type="button" class="button small" id="template-save">Save as template</button><button type="button" class="button small" id="template-clone">Clone selected template</button></div></section>
+  <section class="wizard-step" data-wizard-step="2"><h3>Repository and three questions</h3><p>These answers define why the project exists and when the owner must step in.</p><div class="form-grid"><div class="field"><label for="wizard-repo">Repository or folder</label><div style="display:flex;gap:8px"><input id="wizard-repo" value="/home/sahil/projects/checkout-service"><button type="button" class="button" data-demo-action="Repository browser opened"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-folder"></use></svg>Browse</button></div></div><div class="field"><label for="wizard-name">Project name</label><input id="wizard-name" value="checkout-service"></div><div class="field"><label for="wizard-mission">1. What outcome must this project protect?</label><input id="wizard-mission" value="Safe, reversible checkout releases"></div><div class="field"><label for="wizard-success">2. How will we know it improved?</label><input id="wizard-success" value="Payment tests stay green and rollback remains under 10 minutes"></div><div class="field"><label for="wizard-risk">3. Which changes always need your approval?</label><input id="wizard-risk" value="Release, credentials and any unknown project state"></div></div></section>
+  <section class="wizard-step" data-wizard-step="3"><h3>Documentation uploads</h3><p>PRDs, runbooks and policies are indexed as evidence sources, not treated as instructions on their own.</p><label class="dropzone" for="wizard-files" tabindex="0"><span><svg class="icon icon-lg" aria-hidden="true" style="margin:0 auto 10px"><use href="#i-upload"></use></svg><strong>Choose PRDs, runbooks or policies</strong><span class="small-text" style="display:block;margin-top:5px">Files remain attached to this project and are cited in evidence.</span></span></label><input class="sr-only" type="file" id="wizard-files" multiple accept=".md,.txt,.pdf,.docx"><div class="upload-list" id="upload-list"><div class="upload-row"><svg class="icon" aria-hidden="true"><use href="#i-evidence"></use></svg><span><strong>dockyard-prd-v0.3.md</strong><span>Ready to index as an evidence source</span></span><span class="badge success" style="margin-left:auto">Ready</span></div></div></section>
+  <section class="wizard-step" data-wizard-step="4"><h3>Team and autonomy</h3><p>Choose a lead, specialists and the narrowest useful autonomy. Policies can only reduce it.</p><div class="form-grid"><div class="field"><label for="wizard-lead">Lead</label><select id="wizard-lead"><option>Octacon - build lead</option><option>Remii - research lead</option><option>Wesker - operations lead</option></select></div><div class="field"><span class="field-label">Specialists</span><div class="choice-grid"><button type="button" class="choice selected">Quan</button><button type="button" class="choice selected">Remii</button><button type="button" class="choice">Wesker</button></div></div><div class="field"><span class="field-label">Autonomy</span><div class="choice-grid"><button type="button" class="choice">Observe only</button><button type="button" class="choice selected">Plan and propose</button><button type="button" class="choice">Execute low-risk work</button></div><span class="helper">Risky transitions and unknown state still return to you.</span></div></div></section>
+</div><div class="wizard-foot"><span class="small-text">Nothing is created until the final step.</span><span style="display:flex;gap:8px"><button type="button" class="button" id="wizard-back" disabled>Back</button><button type="button" class="button primary" id="wizard-next">Next</button><button type="button" class="button primary" id="wizard-create" hidden>Create project</button></span></div></aside></div>
+<div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+<script>
+(() => {
+  'use strict';
+  const all = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+  const one = (selector, root = document) => root.querySelector(selector);
+  const focusMemory = new Map();
+  let draggedCard = null;
+  let pendingReasonAction = null;
+  let wizardStep = 1;
+
+  function iconUse(id) {
+    return `<svg class="icon icon-sm" aria-hidden="true"><use href="#${id}"></use></svg>`;
+  }
+
+  function toast(message) {
+    const region = one('#toast-region');
+    const item = document.createElement('div');
+    item.className = 'toast';
+    item.textContent = message;
+    region.appendChild(item);
+    window.setTimeout(() => item.remove(), 2800);
+  }
+
+  function showScreen(id) {
+    const target = document.getElementById(id);
+    if (!target || !target.classList.contains('screen')) return;
+    all('.screen').forEach(screen => screen.classList.toggle('active', screen.id === id));
+    all('.nav-pill[data-s]').forEach(button => {
+      const active = button.dataset.s === id;
+      button.classList.toggle('active', active);
+      if (active) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current');
+    });
+    closePopover();
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  function openOverlay(id, trigger) {
+    const overlay = document.getElementById(id);
+    if (!overlay) return;
+    focusMemory.set(id, trigger || document.activeElement);
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    window.setTimeout(() => {
+      const focusable = one('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]', overlay);
+      if (focusable) focusable.focus();
+    }, 0);
+  }
+
+  function closeOverlay(overlay) {
+    if (!overlay) return;
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+    if (!one('.overlay.open')) document.body.style.overflow = '';
+    const previous = focusMemory.get(overlay.id);
+    if (previous && typeof previous.focus === 'function') previous.focus();
+  }
+
+  function closePopover() {
+    const popover = one('#notification-popover');
+    const toggle = one('#notification-toggle');
+    popover.classList.remove('open');
+    toggle.setAttribute('aria-expanded', 'false');
+  }
+
+  function updateColumnCounts() {
+    all('.board-column').forEach(column => {
+      const count = all('.work-card', column).length;
+      const counter = one('.column-count', column);
+      if (counter) counter.textContent = String(count);
+    });
+  }
+
+  function updateRanks() {
+    all('.backlog-item', one('#backlog-list')).forEach((item, index) => {
+      one('.rank', item).textContent = String(index + 1);
+    });
+  }
+
+  function requestReason(action, trigger, title = 'Record the reason') {
+    pendingReasonAction = action;
+    one('#reason-title').textContent = title;
+    one('#reason-text').value = '';
+    openOverlay('reason-modal', trigger);
+  }
+
+  function updateApprovalCount() {
+    const count = all('.approval-card[data-approval]:not(.resolved)').length;
+    all('.approval-count').forEach(node => node.textContent = String(count));
+  }
+
+  function showWizardStep(step) {
+    wizardStep = Math.max(1, Math.min(4, step));
+    all('[data-wizard-step]').forEach(panel => panel.classList.toggle('active', Number(panel.dataset.wizardStep) === wizardStep));
+    all('.step-track').forEach((track, index) => track.classList.toggle('active', index < wizardStep));
+    const progress = one('.stepper');
+    progress.setAttribute('aria-valuenow', String(wizardStep));
+    one('#wizard-step-label').textContent = `Step ${wizardStep} of 4`;
+    one('#wizard-back').disabled = wizardStep === 1;
+    one('#wizard-next').hidden = wizardStep === 4;
+    one('#wizard-create').hidden = wizardStep !== 4;
+  }
+
+  all('[data-s]').forEach(button => button.addEventListener('click', () => showScreen(button.dataset.s)));
+  all('[data-goto]').forEach(button => button.addEventListener('click', () => showScreen(button.dataset.goto)));
+  all('[data-demo-action]').forEach(button => button.addEventListener('click', () => toast(button.dataset.demoAction)));
+  one('#saved-workflow-list').addEventListener('click', event => {
+    const button = event.target.closest('[data-open-saved-workflow]');
+    if (!button) return;
+    const row = button.closest('.saved-workflow');
+    one('#workflow-name').value = one('strong', row).textContent.trim();
+    openOverlay('workflow-modal', button);
+  });
+
+  one('#notification-toggle').addEventListener('click', event => {
+    event.stopPropagation();
+    const popover = one('#notification-popover');
+    const open = popover.classList.toggle('open');
+    event.currentTarget.setAttribute('aria-expanded', String(open));
+  });
+  document.addEventListener('click', event => {
+    if (!event.target.closest('.notification-wrap')) closePopover();
+  });
+
+  one('#theme-toggle').addEventListener('click', () => {
+    const root = document.documentElement;
+    const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    root.dataset.theme = next;
+    toast(`${next === 'dark' ? 'Dark' : 'Light'} theme active`);
+  });
+
+  all('[data-project-tab]').forEach(tab => tab.addEventListener('click', () => {
+    all('[data-project-tab]').forEach(item => {
+      const active = item === tab;
+      item.classList.toggle('active', active);
+      item.setAttribute('aria-selected', String(active));
+    });
+    all('.tab-panel').forEach(panel => panel.classList.toggle('active', panel.id === tab.dataset.projectTab));
+  }));
+
+  all('.work-card').forEach(card => {
+    card.addEventListener('click', event => {
+      if (card.classList.contains('dragging')) return;
+      one('#item-drawer-title').textContent = `${card.dataset.item} - ${one('h4', card).textContent}`;
+      one('#item-type').textContent = one('.type', card).textContent;
+      one('#item-summary').textContent = 'This item is linked to checkout release safety, has a named owner and preserves every status change with its reason.';
+      openOverlay('item-drawer', event.currentTarget);
+    });
+    card.addEventListener('dragstart', event => {
+      draggedCard = card;
+      card.classList.add('dragging');
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', card.dataset.item);
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      all('.card-stack').forEach(stack => stack.classList.remove('drag-over'));
+    });
+  });
+
+  all('.card-stack').forEach(stack => {
+    stack.addEventListener('dragover', event => { event.preventDefault(); stack.classList.add('drag-over'); });
+    stack.addEventListener('dragleave', event => { if (!stack.contains(event.relatedTarget)) stack.classList.remove('drag-over'); });
+    stack.addEventListener('drop', event => {
+      event.preventDefault();
+      stack.classList.remove('drag-over');
+      if (!draggedCard || draggedCard.parentElement === stack) return;
+      const targetColumn = stack.closest('.board-column').dataset.column;
+      const item = draggedCard;
+      requestReason(() => {
+        stack.appendChild(item);
+        updateColumnCounts();
+        toast(`${item.dataset.item} moved to ${targetColumn}`);
+      }, stack, `Why move ${item.dataset.item} to ${targetColumn}?`);
+    });
+  });
+
+  all('[data-rank-dir]').forEach(button => button.addEventListener('click', () => {
+    const item = button.closest('.backlog-item');
+    const direction = button.dataset.rankDir;
+    requestReason(() => {
+      if (direction === 'up' && item.previousElementSibling) item.parentElement.insertBefore(item, item.previousElementSibling);
+      if (direction === 'down' && item.nextElementSibling) item.parentElement.insertBefore(item.nextElementSibling, item);
+      updateRanks();
+      toast(`${item.dataset.rankItem} reranked with reason recorded`);
+    }, button, `Why move ${item.dataset.rankItem} ${direction}?`);
+  }));
+
+  one('#reason-confirm').addEventListener('click', () => {
+    const reason = one('#reason-text').value.trim();
+    if (reason.length < 8) { toast('Add a clear reason before moving the work'); one('#reason-text').focus(); return; }
+    if (pendingReasonAction) pendingReasonAction(reason);
+    pendingReasonAction = null;
+    closeOverlay(one('#reason-modal'));
+  });
+
+  all('[data-decision]').forEach(button => button.addEventListener('click', () => {
+    const card = button.closest('.approval-card');
+    const decision = button.dataset.decision;
+    card.classList.add('resolved');
+    all('[data-decision]', card).forEach(action => action.disabled = true);
+    const state = one('.decision-state', card);
+    state.className = `badge ${decision === 'approve' ? 'success' : 'danger'} decision-state`;
+    state.textContent = decision === 'approve' ? 'Approved by you' : 'Rejected by you';
+    updateApprovalCount();
+    toast(`${one('h2', card).textContent} ${decision === 'approve' ? 'approved' : 'rejected'}`);
+  }));
+
+  all('[data-evidence-toggle]').forEach(button => button.addEventListener('click', () => {
+    const detail = one('[data-evidence-detail]', button.closest('.approval-card'));
+    detail.hidden = !detail.hidden;
+    button.textContent = detail.hidden ? 'Show evidence chain' : 'Hide evidence chain';
+  }));
+
+  all('[data-bot]').forEach(button => button.addEventListener('click', () => {
+    one('#bot-drawer-title').textContent = button.dataset.bot;
+    openOverlay('bot-drawer', button);
+  }));
+  all('[data-handoff]').forEach(button => button.addEventListener('click', () => {
+    one('#handoff-drawer-title').textContent = `${button.dataset.handoff} - ${one('strong', button).textContent}`;
+    openOverlay('handoff-drawer', button);
+  }));
+
+  all('[data-stage]').forEach(button => button.addEventListener('click', () => {
+    all('[data-stage]').forEach(stage => stage.classList.remove('active'));
+    button.classList.add('active');
+    one('#stage-detail-title').textContent = button.dataset.stage;
+    one('#stage-detail-copy').textContent = button.dataset.stageCopy;
+  }));
+
+  one('#freeze-button').addEventListener('click', event => openOverlay('freeze-modal', event.currentTarget));
+  one('#freeze-confirm').addEventListener('click', () => {
+    one('#initiative-state').className = 'badge danger';
+    one('#initiative-state').textContent = 'Frozen by Sahil';
+    closeOverlay(one('#freeze-modal'));
+    toast('Initiative frozen. All work is paused.');
+  });
+
+  function openWorkflow(event) { openOverlay('workflow-modal', event.currentTarget); }
+  one('#new-workflow-button').addEventListener('click', openWorkflow);
+  one('#open-workflow-creator').addEventListener('click', openWorkflow);
+  all('#workflow-modal .choice').forEach(choice => choice.addEventListener('click', () => choice.classList.toggle('selected')));
+  one('#workflow-save').addEventListener('click', () => {
+    const name = one('#workflow-name').value.trim() || 'Untitled workflow';
+    const row = document.createElement('div');
+    row.className = 'saved-workflow';
+    row.innerHTML = `<span><strong></strong><span class="small-text">New bounded workflow</span></span><button type="button" class="icon-button" data-open-saved-workflow aria-label="Open workflow">${iconUse('i-chevron')}</button>`;
+    one('strong', row).textContent = name;
+    one('#saved-workflow-list').prepend(row);
+    closeOverlay(one('#workflow-modal'));
+    toast(`${name} saved`);
+  });
+
+  function openWizard(trigger) {
+    showWizardStep(1);
+    openOverlay('wizard', trigger);
+  }
+  one('#new-project-button').addEventListener('click', event => openWizard(event.currentTarget));
+  all('.template-card').forEach(card => card.addEventListener('click', () => {
+    all('.template-card').forEach(item => item.classList.remove('selected'));
+    card.classList.add('selected');
+    toast(`${card.dataset.template} selected`);
+  }));
+  one('#template-save').addEventListener('click', () => toast('Current setup saved as a reusable template'));
+  one('#template-clone').addEventListener('click', () => toast('Selected template cloned for this project'));
+  all('#wizard .choice').forEach(choice => choice.addEventListener('click', () => choice.classList.toggle('selected')));
+  one('#wizard-back').addEventListener('click', () => showWizardStep(wizardStep - 1));
+  one('#wizard-next').addEventListener('click', () => showWizardStep(wizardStep + 1));
+  one('#wizard-create').addEventListener('click', () => {
+    const name = one('#wizard-name').value.trim();
+    const repo = one('#wizard-repo').value.trim();
+    if (!name || !repo) { toast('Add a project name and repository'); showWizardStep(2); return; }
+    closeOverlay(one('#wizard'));
+    toast(`${name} created with evidence indexing queued`);
+  });
+  one('#wizard-files').addEventListener('change', event => {
+    const list = one('#upload-list');
+    Array.from(event.target.files).forEach(file => {
+      const row = document.createElement('div');
+      row.className = 'upload-row';
+      row.innerHTML = `${iconUse('i-evidence')}<span><strong></strong><span>Ready to index as an evidence source</span></span><span class="badge success" style="margin-left:auto">Ready</span>`;
+      one('strong', row).textContent = file.name;
+      list.appendChild(row);
+    });
+  });
+  one('.dropzone').addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); one('#wizard-files').click(); }
+  });
+
+  all('[data-close-overlay]').forEach(button => button.addEventListener('click', () => closeOverlay(button.closest('.overlay'))));
+  all('.overlay').forEach(overlay => overlay.addEventListener('mousedown', event => {
+    if (event.target === overlay || event.target.classList.contains('modal-shell')) closeOverlay(overlay);
+  }));
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    const open = all('.overlay.open').pop();
+    if (open) closeOverlay(open); else closePopover();
+  });
+
+  one('#new-item-button').addEventListener('click', () => toast('New work item form would open here'));
+  updateApprovalCount();
+  updateColumnCounts();
+})();
+</script>
+</body>
+</html>

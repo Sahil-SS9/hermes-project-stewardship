@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 @dataclass(frozen=True)
@@ -307,6 +307,41 @@ MIGRATIONS: List[Migration] = [
         downgrade_sql="""
         DROP TABLE IF EXISTS dockyard_backlog;
         DROP TABLE IF EXISTS dockyard_work_items;
+        """,
+    ),
+    Migration(
+        version=4,
+        name="dockyard milestones and saved views",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS dockyard_milestones (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id  TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            name        TEXT NOT NULL,
+            due         TEXT,
+            created_at  TEXT NOT NULL,
+            UNIQUE (project_id, name)
+        );
+        CREATE TABLE IF NOT EXISTS dockyard_milestone_items (
+            milestone_id INTEGER NOT NULL REFERENCES dockyard_milestones(id) ON DELETE CASCADE,
+            item_ref     TEXT NOT NULL,
+            PRIMARY KEY (milestone_id, item_ref)
+        );
+        CREATE TABLE IF NOT EXISTS dockyard_saved_views (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id  TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            name        TEXT NOT NULL,
+            layout      TEXT NOT NULL CHECK (layout IN ('board','table','timeline','portfolio')),
+            filters_json TEXT NOT NULL DEFAULT '{}',
+            owner_id    TEXT NOT NULL,
+            shared      INTEGER NOT NULL DEFAULT 0 CHECK (shared IN (0,1)),
+            created_at  TEXT NOT NULL,
+            UNIQUE (project_id, name)
+        );
+        """,
+        downgrade_sql="""
+        DROP TABLE IF EXISTS dockyard_saved_views;
+        DROP TABLE IF EXISTS dockyard_milestone_items;
+        DROP TABLE IF EXISTS dockyard_milestones;
         """,
     ),
 ]

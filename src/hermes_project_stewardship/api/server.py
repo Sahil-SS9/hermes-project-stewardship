@@ -132,6 +132,28 @@ class BacklogRerank(BaseModel):
     actor_kind: str = "bot"
 
 
+class MilestoneCreate(BaseModel):
+    name: str
+    due: Optional[str] = None
+    actor_id: str
+    actor_kind: str = "human"
+
+
+class MilestoneAttach(BaseModel):
+    ref: str
+    actor_id: str
+    actor_kind: str = "bot"
+
+
+class ViewSave(BaseModel):
+    name: str
+    layout: str
+    filters: Dict[str, Any] = {}
+    actor_id: str
+    actor_kind: str = "human"
+    shared: bool = False
+
+
 def create_app(
     store: Optional[Store] = None,
     db_path: Optional[Path] = None,
@@ -398,6 +420,57 @@ def create_app(
             raise HTTPException(400 if "reason" in msg else 404, msg)
         return {"ref": ref, "from_rank": audit["from_rank"],
                 "to_rank": audit["to_rank"]}
+
+
+    @router.post("/projects/{project_id}/milestones")
+    def milestone_create(project_id: str, body: MilestoneCreate):
+        try:
+            if store._conn.execute(
+                "SELECT 1 FROM project_stewardship WHERE project_id=?",
+                    (project_id,)).fetchone() is None:
+                raise HTTPException(404, f"project {project_id} not found")
+            mid = dy.milestone_create(project_id, body.name, due=body.due,
+                                      actor=_actor(body.actor_id,
+                                                   body.actor_kind))
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(409, str(e))
+        return {"id": mid, "name": body.name}
+
+    @router.post("/projects/{project_id}/milestones/{name}/attach")
+    def milestone_attach(project_id: str, name: str, body: MilestoneAttach):
+        try:
+            dy.milestone_attach(project_id, name, body.ref,
+                                actor=_actor(body.actor_id, body.actor_kind))
+        except Exception as e:
+            raise HTTPException(409, str(e))
+        return {"name": name, "attached": body.ref}
+
+    @router.get("/projects/{project_id}/milestones/{name}")
+    def milestone_progress(project_id: str, name: str):
+        try:
+            return dy.milestone_progress(project_id, name)
+        except ValueError as e:
+            raise HTTPException(404, str(e))
+
+    @router.put("/projects/{project_id}/views")
+    def view_save(project_id: str, body: ViewSave):
+        try:
+            dy.view_save(project_id, body.name, body.layout,
+                         filters=body.filters,
+                         actor=_actor(body.actor_id, body.actor_kind),
+                         shared=body.shared)
+        except ValueError as e:
+            raise HTTPException(422, str(e))
+        except Exception as e:
+            raise HTTPException(409, str(e))
+        return {"name": body.name, "layout": body.layout}
+
+    @router.get("/projects/{project_id}/views")
+    def views_list(project_id: str, actor_id: str, actor_kind: str = "human"):
+        return {"views": dy.views_list(
+            project_id, actor=_actor(actor_id, actor_kind))}
 
     app.include_router(router)
 
