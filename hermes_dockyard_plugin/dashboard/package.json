@@ -1,0 +1,14 @@
+{
+  "name": "hermes-dockyard-plugin",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --experimental-vm-modules --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "jsdom": "^30.0.1",
+    "typescript": "^5.6.0"
+  }
+}

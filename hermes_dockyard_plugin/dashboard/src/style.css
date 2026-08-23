@@ -1,0 +1,63 @@
+/* Hermes Dockyard plugin — palette aligned with the approved v4 baseline. */
+.dy-root { --dy-bg: #0d1117; --dy-panel: #161b22; --dy-line: #2a3140;
+  --dy-text: #e6edf3; --dy-dim: #9aa7b8; --dy-accent: #4c8dff;
+  --dy-warn: #d29922; --dy-bad: #f85149;
+  display: flex; flex-direction: column; height: 100%;
+  color: var(--dy-text); background: var(--dy-bg);
+  font: 14px/1.5 system-ui, sans-serif; }
+.dy-host, :root { height: 100%; }
+
+.dy-header { display: flex; align-items: center; gap: 24px;
+  padding: 10px 20px; border-bottom: 1px solid var(--dy-line);
+  background: var(--dy-panel); }
+.dy-brand { display: flex; align-items: center; gap: 10px; }
+.dy-brand h1 { font-size: 15px; margin: 0; letter-spacing: .02em; }
+.dy-mark { width: 18px; height: 18px; border-radius: 4px;
+  background: linear-gradient(135deg, var(--dy-accent), #7c5cff); }
+.dy-tabs { display: flex; gap: 4px; margin-left: auto; }
+.dy-tabs button { background: none; border: none; color: var(--dy-dim);
+  padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.dy-tabs button:hover { color: var(--dy-text); }
+.dy-tabs button.active { background: var(--dy-bg); color: var(--dy-text);
+  border: 1px solid var(--dy-line); }
+
+.dy-main { padding: 20px; overflow-y: auto; flex: 1; }
+.dy-card { background: var(--dy-panel); border: 1px solid var(--dy-line);
+  border-radius: 10px; padding: 16px 20px; max-width: 960px; }
+.dy-card h2 { margin: 0 0 12px; font-size: 14px; color: var(--dy-dim);
+  text-transform: uppercase; letter-spacing: .08em; }
+
+.dy-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dy-table th { text-align: left; color: var(--dy-dim); font-weight: 500;
+  padding: 6px 10px; border-bottom: 1px solid var(--dy-line); }
+.dy-table td { padding: 8px 10px; border-bottom: 1px solid var(--dy-line); }
+.dy-table tr:last-child td { border-bottom: none; }
+.dy-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+td.warn, .warn { color: var(--dy-warn); }
+td.bad, .bad { color: var(--dy-bad); }
+
+.dy-inbox-item, .dy-note { display: flex; align-items: center; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--dy-line); }
+.dy-inbox-item:last-child, .dy-note:last-child { border-bottom: none; }
+.dy-inbox-main { display: flex; align-items: center; gap: 10px; flex: 1; }
+.dy-pill { font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--dy-accent); color: var(--dy-accent); }
+.dy-dim { color: var(--dy-dim); font-size: 12px; }
+.dy-note.acked { opacity: .45; text-decoration: line-through; }
+
+.dy-btn { background: var(--dy-bg); color: var(--dy-text);
+  border: 1px solid var(--dy-line); padding: 6px 14px; border-radius: 6px;
+  cursor: pointer; font-size: 13px; }
+.dy-btn.primary { background: var(--dy-accent); border-color: var(--dy-accent);
+  color: #fff; }
+.dy-btn:disabled { opacity: .5; cursor: default; }
+
+.dy-empty, .dy-loading, .dy-error { padding: 40px; text-align: center;
+  color: var(--dy-dim); }
+.dy-error { color: var(--dy-bad); }
+
+.dy-form label { display: block; margin: 10px 0; }
+.dy-form input, .dy-form select { width: 100%; box-sizing: border-box;
+  margin-top: 4px; padding: 8px 10px; border-radius: 6px;
+  border: 1px solid var(--dy-line); background: var(--dy-bg);
+  color: var(--dy-text); }
