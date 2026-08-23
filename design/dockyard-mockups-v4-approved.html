@@ -690,7 +690,7 @@ html[data-theme="dark"] .theme-moon { display: none; }
       <button type="button" class="nav-pill active" data-s="s1" aria-current="page"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-home"></use></svg><span class="label">Home</span></button>
       <button type="button" class="nav-pill" data-s="s2"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-project"></use></svg><span class="label">Project</span></button>
       <button type="button" class="nav-pill" data-s="s3"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-backlog"></use></svg><span class="label">Backlog</span></button>
-      <button type="button" class="nav-pill" data-s="s4"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-approval"></use></svg><span class="label">Approvals</span><span class="nav-badge approval-count">2</span></button>
+      <button type="button" class="nav-pill" data-s="s4"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-approval"></use></svg><span class="label">Approvals</span><span class="nav-badge approval-count" data-live="owed-count">2</span></button>
       <button type="button" class="nav-pill" data-s="s5"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-bots"></use></svg><span class="label">Bot teams</span></button>
       <button type="button" class="nav-pill" data-s="s6"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-initiative"></use></svg><span class="label">Initiative</span></button>
       <button type="button" class="nav-pill" data-s="s7"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-workflow"></use></svg><span class="label">Workflows</span></button>
@@ -790,7 +790,7 @@ html[data-theme="dark"] .theme-moon { display: none; }
   <div class="suppressed"><div class="spread"><div><h3>Suppressed: Rewrite the entire project UI</h3><p class="section-sub">Reason: rejected twice, no linked goal, and no evidence that a rewrite would improve outcomes. Visible so the same busywork is not proposed again.</p></div><span class="badge neutral">Suppressed 3 days ago</span></div></div>
 </section>
 <section class="screen" id="s4" aria-labelledby="approval-title">
-  <div class="page-head"><div><h1 id="approval-title">Approval Inbox</h1><p>Every pending human decision across every project, with enough evidence to decide here.</p></div><div class="page-actions"><span class="owed"><span class="status-dot"></span><span class="approval-count">2</span> decisions owed</span></div></div>
+  <div class="page-head"><div><h1 id="approval-title">Approval Inbox</h1><p>Every pending human decision across every project, with enough evidence to decide here.</p></div><div class="page-actions"><span class="owed"><span class="status-dot"></span><span class="approval-count" data-live="owed-count">2</span> decisions owed</span></div></div>
   <div class="approval-list">
     <article class="card approval-card" data-approval="SEC-9"><div class="approval-top"><span class="activity-icon" style="color:var(--danger);background:var(--danger-bg)"><svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg></span><div class="approval-title"><h2>Rotate the published signing key</h2><p>SahilBlog / proposed by Wesker / verified 18 minutes ago</p></div><span class="badge danger">High risk</span></div><div class="evidence-box"><div class="evidence-grid"><div class="evidence-cell"><span class="mini-label">OBSERVED</span><strong>Key fragment found in a public build record</strong></div><div class="evidence-cell"><span class="mini-label">PROPOSED CHANGE</span><strong>Revoke, rotate, then verify signed delivery</strong></div><div class="evidence-cell"><span class="mini-label">ROLLBACK</span><strong>Restore previous key from sealed recovery copy</strong></div></div></div><div class="approval-actions"><button type="button" class="button primary" data-decision="approve">Approve rotation</button><button type="button" class="button danger" data-decision="reject">Reject</button><button type="button" class="button quiet" data-evidence-toggle>Show evidence chain</button><span class="badge neutral decision-state">Awaiting you</span></div><div class="evidence-box" hidden data-evidence-detail><strong>Evidence chain</strong><p class="section-sub">Detection record, public exposure check, owner policy, proposed steps and post-change verification are linked and attributed. Unknown steps remain blocked.</p></div></article>
     <article class="card approval-card" data-approval="REL-18"><div class="approval-top"><span class="activity-icon" style="color:var(--warning);background:var(--warning-bg)"><svg class="icon" aria-hidden="true"><use href="#i-milestone"></use></svg></span><div class="approval-title"><h2>Release checkout recovery</h2><p>checkout-service / proposed by Octacon / verified 6 minutes ago</p></div><span class="badge warning">Medium risk</span></div><div class="evidence-box"><div class="evidence-grid"><div class="evidence-cell"><span class="mini-label">OBSERVED</span><strong>202 tests pass on the exact candidate</strong></div><div class="evidence-cell"><span class="mini-label">EXPECTED OUTCOME</span><strong>Payment retries stop duplicating events</strong></div><div class="evidence-cell"><span class="mini-label">ROLLBACK</span><strong>Rehearsed in 4 minutes</strong></div></div></div><div class="approval-actions"><button type="button" class="button primary" data-decision="approve">Approve release</button><button type="button" class="button danger" data-decision="reject">Reject</button><button type="button" class="button quiet" data-evidence-toggle>Show evidence chain</button><span class="badge neutral decision-state">Awaiting you</span></div><div class="evidence-box" hidden data-evidence-detail><strong>Evidence chain</strong><p class="section-sub">Regression reproduction, focused fix, wider proof, independent review and rollback rehearsal all refer to the same candidate.</p></div></article>
@@ -945,6 +945,87 @@ html[data-theme="dark"] .theme-moon { display: none; }
     } catch (err) {
       toast('Rank sync failed: ' + err.message.slice(0, 80));
     }
+  };
+
+  /* ---- G4 live wiring: inbox / dashboard / notifications / onboard --
+     Activates only when the API is reachable (same probe as above).
+     Fills EXISTING approved elements; creates nothing structural. ----- */
+  function dyBadge(el, text) {
+    if (!el) return;
+    el.textContent = text;
+    el.classList.add('live');
+  }
+  async function dyRefreshInbox() {
+    if (!DY_API.enabled) return;
+    try {
+      const r = await fetch(`${DY_API.base.replace(/\/v1$/, '')}/inbox`,
+                            {signal: AbortSignal.timeout(2000)});
+      if (!r.ok) return;
+      const data = await r.json();
+      const badge = one('[data-live="owed-count"]');
+      if (badge) badge.textContent = String(data.count);
+      const list = one('[data-live="inbox-list"]');
+      if (list && data.items.length) {
+        list.innerHTML = data.items.map(i =>
+          `<div class="approval-card"><div class="work-type"><span class="type">${i.kind === 'initiative_approval' ? 'Approval' : 'Attention'}</span></div><h4>${i.title}</h4><div class="work-meta"><span>${i.project}</span><span class="badge ${i.risk === 'high' ? 'danger' : 'warning'}">${i.risk} risk</span></div></div>`
+        ).join('');
+      }
+    } catch { /* demo mode stays */ }
+  }
+  async function dyRefreshDashboard() {
+    if (!DY_API.enabled) return;
+    try {
+      const r = await fetch(`${DY_API.base.replace(/\/v1$/, '')}/dashboard`,
+                            {signal: AbortSignal.timeout(2000)});
+      if (!r.ok) return;
+      const d = await r.json();
+      dyBadge(one('[data-live="active-work"]'), String(d.totals.active_work));
+      dyBadge(one('[data-live="blocked-work"]'), String(d.totals.blocked));
+      dyBadge(one('[data-live="stuck-bots"]'), String(d.totals.stuck_bots));
+      const projWrap = one('[data-live="projects"]');
+      if (projWrap && d.projects.length) {
+        projWrap.innerHTML = d.projects.map(p => `
+          <div class="project-row"><strong>${p.id}</strong>
+          <span class="badge ${p.health === 'healthy' ? 'success' : p.health === 'critical' || p.health === 'degraded' ? 'danger' : 'warning'}">${p.health}</span>
+          <span class="small-text">${p.work.active} active · ${p.work.backlog} backlog · ${p.unacked_notifications} alerts</span></div>`).join('');
+      }
+    } catch { /* demo mode stays */ }
+  }
+  async function dyRefreshNotifications() {
+    if (!DY_API.enabled) return;
+    try {
+      const r = await fetch(`${DY_API.base.replace(/\/v1$/, '')}/notifications`,
+                            {signal: AbortSignal.timeout(2000)});
+      if (!r.ok) return;
+      const data = await r.json();
+      const unacked = data.notifications.filter(n => !n.acked);
+      dyBadge(one('[data-live="alert-count"]'), String(unacked.length));
+      const list = one('[data-live="notification-list"]');
+      if (list && unacked.length) {
+        list.innerHTML = unacked.slice(0, 8).map(n =>
+          `<div class="audit-row" data-notif-id="${n.id}"><span class="badge ${n.severity === 'critical' || n.severity === 'high' ? 'danger' : 'warning'}">${n.severity}</span><span><strong>${n.title}</strong><span class="small-text">${n.body}</span></span><button type="button" class="icon-button" data-ack="${n.id}" aria-label="Acknowledge ${n.title}">OK</button></div>`).join('');
+        all('[data-ack]', list).forEach(btn => btn.addEventListener('click', async () => {
+          await fetch(`${DY_API.base.replace(/\/v1$/, '')}/notifications/${btn.dataset.ack}/ack`, {method: 'POST'});
+          btn.closest('.audit-row').remove();
+          toast('Notification acknowledged');
+        }));
+      }
+    } catch { /* demo mode stays */ }
+  }
+  async function dyOnboard(payload) {
+    const base = DY_API.base.replace(/\/v1$/, '');
+    const r = await fetch(`${base}/onboard`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)});
+    if (!r.ok) throw new Error((await r.json()).detail || 'onboarding failed');
+    return r.json();
+  }
+  // run once when API probe succeeds
+  const _dyProbeOrig = dyProbe;
+  dyProbe = async function() {
+    const ok = await _dyProbeOrig();
+    if (ok) { dyRefreshInbox(); dyRefreshDashboard(); dyRefreshNotifications(); }
+    return ok;
   };
 
   function showScreen(id) {
