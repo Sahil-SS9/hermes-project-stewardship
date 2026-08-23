@@ -190,6 +190,15 @@ class ViewSave(BaseModel):
     shared: bool = False
 
 
+class OnboardingRequest(BaseModel):
+    project_id: str
+    repo_path: str
+    mission: str
+    lead_profile: str
+    autonomy_level: int = 2
+    actor_id: str = "sahil"
+
+
 def create_app(
     store: Optional[Store] = None,
     db_path: Optional[Path] = None,
@@ -606,6 +615,67 @@ def create_app(
         except Exception as e:
             raise HTTPException(404, str(e))
         return {"group": name, "messages": feed}
+
+
+    # ------------------- Dockyard product polish (G4) ------------------ #
+
+    @router.get("/inbox")
+    def approval_inbox():
+        return dy.approval_inbox()
+
+    @router.get("/dashboard")
+    def dashboard():
+        return dy.dashboard()
+
+    @router.get("/notifications")
+    def fleet_notifications():
+        return dy.fleet_notifications()
+
+    @router.post("/notifications/{notification_id}/ack")
+    def ack_notification(notification_id: int):
+        dy.ack_notification(notification_id)
+        return {"acked": notification_id}
+
+    @router.post("/onboard")
+    def onboard(body: OnboardingRequest):
+        """Zero-setup onboarding (UX-08): point at a repo, answer 3
+        questions. Creates the project, seeds the ops group + default
+        saved view, returns the starting screen."""
+        import sqlite3 as _sq
+
+        if store._conn.execute(
+            "SELECT 1 FROM project_stewardship WHERE project_id=?",
+                (body.project_id,)).fetchone() is not None:
+            raise HTTPException(409, f"project {body.project_id} already"
+                                     " onboarded")
+        try:
+            svc.enable(project_id=body.project_id,
+                       mission=body.mission,
+                       lead_profile=body.lead_profile,
+                       autonomy_level=min(max(body.autonomy_level, 0), 3))
+        except ServiceError as e:
+            raise HTTPException(409, str(e))
+        except _sq.IntegrityError as e:
+            raise HTTPException(409, f"constraint violation: {e}")
+        except Exception as e:
+            raise HTTPException(400, str(e))
+        try:
+            dy.group_create(f"{body.project_id}-ops",
+                            purpose="auto-created by onboarding")
+        except ValueError:
+            pass  # already exists
+        try:
+            dy.view_save(body.project_id, "Default board", "board",
+                         filters={}, actor=_actor(body.actor_id, "human"))
+        except Exception:
+            pass  # view already saved
+        self_audit = store.audit(actor=body.actor_id, interface="dockyard:human",
+                                 action="project.onboarded",
+                                 subject=body.project_id,
+                                 detail={"repo": body.repo_path})
+        return {"project": body.project_id, "screen": "s2",
+                "group": f"{body.project_id}-ops",
+                "view": "Default board"}
 
     app.include_router(router)
 

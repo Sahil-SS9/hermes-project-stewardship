@@ -243,6 +243,8 @@ class DockyardService:
                      actor: Optional[Actor] = None):
         from ..dockyard.bots import BotGroup, GroupRole
 
+        if self.dy.group_get(name) is not None:
+            raise ValueError(f"group {name} already exists")
         g = BotGroup(name=name, purpose=purpose, channel_ref=channel_ref)
         for b in (member_ids or []):
             role = GroupRole.LEAD if b == lead_id else GroupRole.MEMBER
@@ -375,3 +377,132 @@ class DockyardService:
         if not row:
             return None
         return self.dy.get_item(project_id, row["id"])
+
+    # ------------------------------------------------------------------ #
+    # Approval Inbox (TE-02) — G4 P1                                     #
+    # ------------------------------------------------------------------ #
+
+    def approval_inbox(self) -> Dict:
+        """ALL pending human decisions across ALL projects, one call."""
+        initiatives = self.store._conn.execute(
+            """
+            SELECT project_id, ref, title, risk, priority, created_at
+            FROM project_initiatives
+            WHERE approval_state='pending' AND status='pending_approval'
+            ORDER BY created_at
+            """
+        ).fetchall()
+        items = []
+        for r in initiatives:
+            items.append({
+                "kind": "initiative_approval",
+                "project": r["project_id"],
+                "ref": r["ref"],
+                "title": r["title"],
+                "risk": r["risk"],
+                "deep_link": f"s6:initiative/{r['ref']}",
+            })
+        frozen = self.store._conn.execute(
+            "SELECT project_id, phase FROM project_stewardship"
+            " WHERE phase='frozen' OR enabled=0"
+        ).fetchall()
+        for r in frozen:
+            items.append({
+                "kind": "project_attention",
+                "project": r["project_id"],
+                "ref": r["phase"],
+                "title": f"Project needs attention (phase={r['phase']})",
+                "risk": "high",
+                "deep_link": f"s1:project/{r['project_id']}",
+            })
+        return {"count": len(items), "items": items}
+
+    # ------------------------------------------------------------------ #
+    # Dashboard roll-up (UX-02) — G4 P2                                  #
+    # ------------------------------------------------------------------ #
+
+    def dashboard(self) -> Dict:
+        """All projects x health x active work x owed decisions, one call.
+        Answers 'what does my fleet owe me right now?' (PRD §8.5)."""
+        projects = self.store._conn.execute(
+            "SELECT project_id, enabled, phase, autonomy_level"
+            " FROM project_stewardship ORDER BY project_id").fetchall()
+        out = {"projects": [], "owed_decisions": 0, "totals":
+               {"active_work": 0, "blocked": 0, "stuck_bots": 0,
+                "unacked_notifications": 0}}
+        inbox = self.approval_inbox()
+        out["owed_decisions"] = inbox["count"]
+        for p in projects:
+            pid = p["project_id"]
+            counts = self.store._conn.execute(
+                "SELECT status, COUNT(*) AS n FROM dockyard_work_items"
+                " WHERE project_id=? GROUP BY status", (pid,),
+            ).fetchall()
+            by = {r["status"]: r["n"] for r in counts}
+            active = by.get("in_progress", 0) + by.get("in_review", 0)
+            health_row = self.store._conn.execute(
+                "SELECT status FROM project_health_snapshots"
+                " WHERE project_id=? ORDER BY id DESC LIMIT 1",
+                (pid,)).fetchone()
+            unacked = self.store._conn.execute(
+                "SELECT COUNT(*) AS n FROM notifications WHERE project_id=?"
+                " AND acked_at IS NULL", (pid,)).fetchone()["n"]
+            stuck = self.store._conn.execute(
+                "SELECT COUNT(*) AS n FROM dockyard_bots WHERE status='stuck'"
+            ).fetchone()["n"]
+            out["projects"].append({
+                "id": pid, "enabled": bool(p["enabled"]), "phase": p["phase"],
+                "health": health_row["status"] if health_row
+                else "unknown",
+                "work": {"backlog": by.get("backlog", 0),
+                         "active": active, "done": by.get("done", 0),
+                         "blocked": by.get("blocked", 0)},
+                "unacked_notifications": unacked,
+            })
+            out["totals"]["active_work"] += active
+            out["totals"]["blocked"] += by.get("blocked", 0)
+            out["totals"]["stuck_bots"] = max(
+                out["totals"]["stuck_bots"], stuck)
+            out["totals"]["unacked_notifications"] += unacked
+        return out
+
+    # ------------------------------------------------------------------ #
+    # Notification deep-links (UX-07) — G4 P3                            #
+    # ------------------------------------------------------------------ #
+
+    def fleet_notifications(self) -> Dict:
+        """Cross-project notification feed with screen deep-links."""
+        rows = self.store._conn.execute(
+            "SELECT n.id, n.project_id, n.severity, n.kind, n.title,"
+            " n.body, n.created_at, n.acked_at"
+            " FROM notifications n ORDER BY n.created_at DESC LIMIT 100"
+        ).fetchall()
+        items = []
+        for r in rows:
+            link = self._deep_link(r["kind"])
+            items.append({
+                "id": r["id"], "project": r["project_id"],
+                "severity": r["severity"], "kind": r["kind"],
+                "title": r["title"], "body": r["body"],
+                "created_at": r["created_at"],
+                "acked": r["acked_at"] is not None,
+                "deep_link": link,
+            })
+        return {"notifications": items}
+
+    @staticmethod
+    def _deep_link(kind: str) -> str:
+        if kind.startswith("approval"):
+            return "s4:approval-inbox"
+        if "health" in kind or "regression" in kind:
+            return "s1:dashboard"
+        if "handoff" in kind or "a2a" in kind:
+            return "s5:bot-teams"
+        return "s2:project-board"
+
+    def ack_notification(self, notification_id: int) -> None:
+        from .store import iso
+
+        with self.store.tx() as cx:
+            cx.execute("UPDATE notifications SET acked_at=? WHERE id=?",
+                       (iso(), notification_id))
