@@ -157,19 +157,29 @@ class DockyardStore:
     # Backlog                                                            #
     # ------------------------------------------------------------------ #
 
-    def upsert_backlog(self, project_id: str, entry: BacklogEntry) -> None:
+    def upsert_backlog(self, project_id: str, entry: BacklogEntry, *,
+                       actor=None) -> None:
+        from .store import iso
+
         with self.store.tx() as cx:
             cx.execute(
                 """
                 INSERT INTO dockyard_backlog(
-                    item_ref, project_id, rank, priority_reason, aged_since)
-                VALUES (?,?,?,?,?)
+                    item_ref, project_id, rank, priority_reason, aged_since,
+                    last_rerank_actor, last_rerank_kind, last_rerank_reason)
+                VALUES (?,?,?,?,?,?,?,?)
                 ON CONFLICT(item_ref) DO UPDATE SET
                     rank=excluded.rank,
-                    priority_reason=excluded.priority_reason
+                    priority_reason=excluded.priority_reason,
+                    last_rerank_actor=excluded.last_rerank_actor,
+                    last_rerank_kind=excluded.last_rerank_kind,
+                    last_rerank_reason=excluded.last_rerank_reason
                 """,
                 (entry.item_ref, project_id, entry.rank,
-                 entry.priority_reason, entry.aged_since.isoformat()),
+                 entry.priority_reason, entry.aged_since.isoformat(),
+                 actor.id if actor else None,
+                 actor.kind.value if actor else None,
+                 entry.priority_reason or None),
             )
 
     def list_backlog(self, project_id: str) -> List[BacklogEntry]:

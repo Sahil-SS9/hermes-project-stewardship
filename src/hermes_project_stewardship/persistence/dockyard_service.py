@@ -131,7 +131,7 @@ class DockyardService:
             raise RankChangeError(
                 "backlog additions require a priority reason (min 4 chars)")
         entry = BacklogEntry(item_ref=ref, rank=rank, priority_reason=reason)
-        self.dy.upsert_backlog(project_id, entry)
+        self.dy.upsert_backlog(project_id, entry, actor=actor)
         self._audit(actor=actor, action="backlog.added",
                     subject=ref, detail={"rank": rank, "reason": reason})
         return entry
