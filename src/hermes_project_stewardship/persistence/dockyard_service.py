@@ -304,3 +304,9 @@ class DockyardService:
 
     def a2a_item_trail(self, item_ref: str) -> List[Dict]:
         return self.dy.a2a_for_item(item_ref)
+
+    def workload_board(self) -> Dict:
+        return self.dy.workload_board()
+
+    def bot_reputation(self, bot_id: str) -> Dict:
+        return self.dy.bot_reputation(bot_id)

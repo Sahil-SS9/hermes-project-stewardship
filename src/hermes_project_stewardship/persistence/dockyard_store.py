@@ -483,3 +483,55 @@ class DockyardStore:
                 "payload": json.loads(row["payload_json"]),
                 "channel_post": row["channel_post"],
                 "created_at": row["created_at"]}
+
+    # ------------------------------------------------------------------ #
+    # Workload + reputation (BM-05/06) — G2 P4                           #
+    # ------------------------------------------------------------------ #
+
+    def workload_board(self) -> Dict:
+        """Who is busy, idle, stuck, offline (BM-05)."""
+        rows = self.store._conn.execute(
+            "SELECT id, status, current_item FROM dockyard_bots ORDER BY id"
+        ).fetchall()
+        board = {"busy": [], "idle": [], "stuck": [], "offline": []}
+        for r in rows:
+            entry = {"bot": r["id"], "item": r["current_item"]}
+            board[r["status"]].append(entry)
+        return board
+
+    def bot_reputation(self, bot_id: str) -> Dict:
+        """Advisory-only summary from measured outcomes (BM-06).
+
+        Sources: dockyard audit events for this bot (workitem transitions,
+        a2a results). Never auto-routes; consumers decide.
+        """
+        row = self.store._conn.execute(
+            "SELECT COUNT(*) AS n FROM dockyard_bots WHERE id=?",
+            (bot_id,),
+        ).fetchone()
+        if not row["n"]:
+            raise ValueError(f"unknown bot {bot_id}")
+        results = self.store._conn.execute(
+            "SELECT payload_json FROM dockyard_a2a_messages"
+            " WHERE msg_type='result' AND from_actor=?", (bot_id,),
+        ).fetchall()
+        completed = sum(
+            1 for r in results
+            if json.loads(r["payload_json"]).get("outcome")
+            in ("verified", "done", "completed"))
+        regressed = sum(
+            1 for r in results
+            if json.loads(r["payload_json"]).get("outcome") == "regressed")
+        transitions = self.store._conn.execute(
+            "SELECT COUNT(*) AS n FROM stewardship_audit_log"
+            " WHERE action='workitem.transition' AND actor=?",
+            (bot_id,),
+        ).fetchone()["n"]
+        return {
+            "bot": bot_id,
+            "results_posted": len(results),
+            "completed": completed,
+            "regressed": regressed,
+            "transitions": transitions,
+            "advisory": True,
+        }
