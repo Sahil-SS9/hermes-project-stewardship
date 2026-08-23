@@ -306,3 +306,133 @@ class DockyardStore:
              "owner": r["owner_id"], "shared": bool(r["shared"])}
             for r in rows
         ]
+
+    # ------------------------------------------------------------------ #
+    # Bot registry (BM-01) — G2 P2                                       #
+    # ------------------------------------------------------------------ #
+
+    def bot_register(self, bot) -> None:
+        from .store import iso
+
+        with self.store.tx() as cx:
+            cx.execute(
+                """
+                INSERT INTO dockyard_bots(
+                    id, display_name, profile, capabilities_json,
+                    status, registered_at, last_seen_at)
+                VALUES (?,?,?,?,?,?,?)
+                ON CONFLICT(id) DO UPDATE SET
+                    display_name=excluded.display_name,
+                    profile=excluded.profile,
+                    capabilities_json=excluded.capabilities_json
+                """,
+                (bot.id, bot.display_name, bot.profile, _j(bot.capabilities),
+                 bot.status.value, iso(), iso()),
+            )
+
+    def bot_get(self, bot_id: str):
+        row = self.store._conn.execute(
+            "SELECT * FROM dockyard_bots WHERE id=?", (bot_id,),
+        ).fetchone()
+        return self._bot_from_row(row)
+
+    def _bot_from_row(self, row):
+        if not row:
+            return None
+        from ..dockyard.bots import Bot, BotStatus
+
+        bot = Bot(id=row["id"], display_name=row["display_name"],
+                  profile=row["profile"],
+                  capabilities=json.loads(row["capabilities_json"]))
+        bot.status = BotStatus(row["status"])
+        bot.current_item = row["current_item"]
+        return bot
+
+    def bots_list(self, *, status: Optional[str] = None) -> List:
+        if status:
+            rows = self.store._conn.execute(
+                "SELECT * FROM dockyard_bots WHERE status=? ORDER BY id",
+                (status,),
+            ).fetchall()
+        else:
+            rows = self.store._conn.execute(
+                "SELECT * FROM dockyard_bots ORDER BY id").fetchall()
+        return [self._bot_from_row(r) for r in rows]
+
+    def bot_set_status(self, bot_id: str, status_value: str,
+                       current_item: Optional[str] = None):
+        from ..dockyard.bots import BotStatus
+
+        bot = self.bot_get(bot_id)
+        if bot is None:
+            raise ValueError(f"unknown bot {bot_id}")
+        bot.set_status(BotStatus(status_value), current_item=current_item)
+        from .store import iso
+
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE dockyard_bots SET status=?, current_item=?,"
+                " last_seen_at=? WHERE id=?",
+                (bot.status.value, bot.current_item, iso(), bot_id),
+            )
+        return bot
+
+    # ------------------------------------------------------------------ #
+    # Groups (BM-02)                                                     #
+    # ------------------------------------------------------------------ #
+
+    def group_create(self, group) -> int:
+        from .store import iso
+
+        with self.store.tx() as cx:
+            cur = cx.execute(
+                "INSERT INTO dockyard_bot_groups(name, purpose, channel_ref,"
+                " created_at) VALUES (?,?,?,?)",
+                (group.name, group.purpose, group.channel_ref, iso()),
+            )
+            gid = cur.lastrowid
+            for bot_id, role in group.members.items():
+                cx.execute(
+                    "INSERT INTO dockyard_group_members(group_id, bot_id,"
+                    " role) VALUES (?,?,?)",
+                    (gid, bot_id, role.value),
+                )
+        return gid
+
+    def group_get(self, name: str):
+        from ..dockyard.bots import BotGroup, GroupRole
+
+        row = self.store._conn.execute(
+            "SELECT * FROM dockyard_bot_groups WHERE name=?", (name,),
+        ).fetchone()
+        if not row:
+            return None
+        g = BotGroup(name=row["name"], purpose=row["purpose"],
+                     channel_ref=row["channel_ref"], id=row["id"])
+        members = self.store._conn.execute(
+            "SELECT bot_id, role FROM dockyard_group_members WHERE group_id=?",
+            (row["id"],),
+        ).fetchall()
+        for m in members:
+            g.add_member(m["bot_id"], GroupRole(m["role"]))
+        return g
+
+    def groups_list(self) -> List:
+        rows = self.store._conn.execute(
+            "SELECT name FROM dockyard_bot_groups ORDER BY name").fetchall()
+        return [self.group_get(r["name"]) for r in rows]
+
+    def group_add_member(self, name: str, bot_id: str, role_value: str) -> None:
+        from ..dockyard.bots import GroupRole
+
+        g = self.group_get(name)
+        if g is None:
+            raise ValueError(f"unknown group {name}")
+        g.add_member(bot_id, GroupRole(role_value))
+        with self.store.tx() as cx:
+            cx.execute(
+                "INSERT OR REPLACE INTO dockyard_group_members("
+                "group_id, bot_id, role) VALUES ("
+                "(SELECT id FROM dockyard_bot_groups WHERE name=?),?,?)",
+                (name, bot_id, role_value),
+            )

@@ -149,11 +149,18 @@ class DockyardService:
     # Audit — into the SAME stewardship audit log (one trail, TE-01)      #
     # ------------------------------------------------------------------ #
 
-    def _audit(self, *, actor: Actor, action: str, subject: str,
+    def _audit(self, *, actor, action: str, subject: str,
                detail: Optional[dict] = None) -> None:
+        from ..dockyard import Actor as _Actor
+
+        if isinstance(actor, str):
+            actor_id, kind = actor, "bot"
+        else:
+            actor_id = actor.id
+            kind = actor.kind.value
         self.store.audit(
-            actor=actor.id,
-            interface=f"dockyard:{actor.kind.value}",
+            actor=actor_id,
+            interface=f"dockyard:{kind}",
             action=action,
             subject=subject,
             detail=detail,
@@ -193,3 +200,74 @@ class DockyardService:
 
     def views_list(self, project_id: str, *, actor: Actor) -> List[Dict]:
         return self.dy.views_list(project_id, include_private_of=actor.id)
+
+    # ------------------------------------------------------------------ #
+    # Bot registry + groups (BM-01/02) — G2 P2                           #
+    # ------------------------------------------------------------------ #
+
+    def bot_register(self, bot_id: str, display_name: str, *,
+                     capabilities: Optional[List[str]] = None,
+                     profile: Optional[str] = None) -> "Bot":
+        from ..dockyard.bots import Bot
+
+        bot = Bot(id=bot_id, display_name=display_name,
+                  capabilities=capabilities or [], profile=profile)
+        self.dy.bot_register(bot)
+        self._audit(actor=bot_id, action="bot.registered", subject=bot_id,
+                    detail={"capabilities": bot.capabilities})
+        return bot
+
+    def bot_get(self, bot_id: str):
+        return self.dy.bot_get(bot_id)
+
+    def bots_list(self, *, status: Optional[str] = None):
+        return self.dy.bots_list(status=status)
+
+    def bot_set_status(self, bot_id: str, status_value: str, *,
+                       current_item: Optional[str] = None,
+                       actor: Optional[Actor] = None):
+        bot = self.dy.bot_set_status(bot_id, status_value,
+                                     current_item=current_item)
+        self._audit(actor=(actor.id if actor else bot_id),
+                    action="bot.status", subject=bot_id,
+                    detail={"status": status_value,
+                            "item": current_item})
+        return bot
+
+    def group_create(self, name: str, *, purpose: str = "",
+                     channel_ref: Optional[str] = None,
+                     member_ids: Optional[List[str]] = None,
+                     lead_id: Optional[str] = None,
+                     actor: Optional[Actor] = None):
+        from ..dockyard.bots import BotGroup, GroupRole
+
+        g = BotGroup(name=name, purpose=purpose, channel_ref=channel_ref)
+        for b in (member_ids or []):
+            role = GroupRole.LEAD if b == lead_id else GroupRole.MEMBER
+            g.add_member(b, role)
+        gid = self.dy.group_create(g)
+        if actor:
+            self._audit(actor=actor.id, action="group.created", subject=name,
+                        detail={"members": list(g.members.keys()),
+                                "lead": g.lead_id(),
+                                "channel": channel_ref})
+        g.id = gid
+        return g
+
+    def group_get(self, name: str):
+        return self.dy.group_get(name)
+
+    def groups_list(self):
+        return self.dy.groups_list()
+
+    def group_add_member(self, name: str, bot_id: str, *, as_lead=False,
+                         actor: Optional[Actor] = None):
+        from ..dockyard.bots import GroupRole
+
+        if self.dy.bot_get(bot_id) is None:
+            raise ValueError(f"unknown bot {bot_id}")
+        role = GroupRole.LEAD.value if as_lead else GroupRole.MEMBER.value
+        self.dy.group_add_member(name, bot_id, role)
+        if actor:
+            self._audit(actor=actor.id, action="group.member_added",
+                        subject=name, detail={"bot": bot_id, "role": role})
