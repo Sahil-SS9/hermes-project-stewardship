@@ -71,6 +71,7 @@ class InitiativeProposal(BaseModel):
     expected_outcome: str = ""
     risk: str = "low"
     dedupe_key: Optional[str] = None
+    validation_contract: Optional[Dict[str, Any]] = None
 
 
 class ApprovalAction(BaseModel):
@@ -312,7 +313,19 @@ def create_app(
 
     @router.post("/initiatives/{ref}/approve")
     def approve(ref: str, body: ApprovalAction):
-        return svc.approve_initiative(ref, actor=body.actor, interface=body.interface)
+        result = svc.approve_initiative(ref, actor=body.actor,
+                                        interface=body.interface)
+        # zero-CLI flow (G4): approval auto-binds the board when a
+        # validation contract defines the work; failure surfaces as 409.
+        ini = svc.initiative_by_ref(ref)
+        if ini.get("validation_contract"):
+            try:
+                bound = bridge.bind(ref, start_execution=True)
+                result["board_slug"] = bound.get("board_slug")
+                result["cards"] = len(bound.get("card_ids") or [])
+            except ServiceError as e:
+                raise HTTPException(409, str(e))
+        return result
 
     @router.post("/initiatives/{ref}/reject")
     def reject(ref: str, body: ApprovalAction):
