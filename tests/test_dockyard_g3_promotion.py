@@ -32,7 +32,7 @@ def test_promote_approved_initiative_creates_twin(both, enabled, human):
         enabled, title="Split CI matrix by OS",
         rationale="objective breach: flaky pipeline blocks releases [audit:991]",
         expected_outcome="green matrix across runners",
-        validation_contract={"steps": [{"name": "verify", "command": ["true"]}]})
+        validation_contract={"steps": ["verify split"], "tests": "ci"})
     svc.approve_initiative(ini["ref"], actor="sahil", interface="rpc")
 
     item = dy.promote_initiative(
@@ -43,8 +43,9 @@ def test_promote_approved_initiative_creates_twin(both, enabled, human):
     # PM-07: rationale (evidence-bearing) preserved verbatim in the twin
     assert item.title == "Split CI matrix by OS"
     assert any(e.startswith("contract:") for e in item.evidence_refs)
-    assert '"verify"' in next(e for e in item.evidence_refs
-                              if e.startswith("contract:"))
+    contract_e = next(e for e in item.evidence_refs
+                      if e.startswith("contract:"))
+    assert "verify split" in contract_e
 
 
 def test_promotion_is_idempotent(both, enabled, human):
