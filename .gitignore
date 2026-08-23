@@ -34,3 +34,10 @@ desktop/stewardship-panel/dist/
 Thumbs.db
 .idea/
 .vscode/
+
+# Dockyard plugin build artefacts
+hermes_dockyard_plugin/dashboard/node_modules/
+hermes_dockyard_plugin/dashboard/.tmp-dockyard-plugin/
+tests/.tmp-dockyard-plugin/
+__pycache__/
+*.pyc
