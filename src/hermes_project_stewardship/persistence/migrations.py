@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 @dataclass(frozen=True)
@@ -342,6 +342,43 @@ MIGRATIONS: List[Migration] = [
         DROP TABLE IF EXISTS dockyard_saved_views;
         DROP TABLE IF EXISTS dockyard_milestone_items;
         DROP TABLE IF EXISTS dockyard_milestones;
+        """,
+    ),
+    Migration(
+        version=5,
+        name="dockyard bot registry and groups",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS dockyard_bots (
+            id           TEXT PRIMARY KEY,
+            display_name TEXT NOT NULL,
+            profile      TEXT,
+            capabilities_json TEXT NOT NULL DEFAULT '[]',
+            status       TEXT NOT NULL DEFAULT 'idle' CHECK (status IN
+                         ('idle','busy','stuck','offline')),
+            current_item TEXT,
+            registered_at TEXT NOT NULL,
+            last_seen_at  TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS dockyard_bot_groups (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT NOT NULL UNIQUE,
+            purpose     TEXT NOT NULL DEFAULT '',
+            channel_ref TEXT,
+            created_at  TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS dockyard_group_members (
+            group_id  INTEGER NOT NULL REFERENCES dockyard_bot_groups(id) ON DELETE CASCADE,
+            bot_id    TEXT NOT NULL REFERENCES dockyard_bots(id) ON DELETE CASCADE,
+            role      TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('lead','member')),
+            PRIMARY KEY (group_id, bot_id)
+        );
+        """,
+        downgrade_sql="""
+        DROP TABLE IF EXISTS dockyard_group_members;
+        DROP TABLE IF EXISTS dockyard_bot_groups;
+        DROP TABLE IF EXISTS dockyard_bots;
         """,
     ),
 ]
