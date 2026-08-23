@@ -66,15 +66,11 @@ class DockyardStore:
     # ------------------------------------------------------------------ #
 
     def create_item(self, item: WorkItem) -> WorkItem:
-        if not item.ref:
-            row = self.store._conn.execute(
-                "SELECT COUNT(*) AS n FROM dockyard_work_items WHERE project_id=?",
-                (item.project_id,),
-            ).fetchone()
-            item.ref = make_ref("HDY", row["n"] + 1)
+        """Insert; when ref unset, derive HDY-n from the assigned rowid
+        inside the same transaction (race-safe, G5)."""
         with self.store.tx() as cx:
             cur = cx.execute(
-                """
+                f"""
                 INSERT INTO dockyard_work_items(
                     project_id, ref, type, title, status,
                     assignee_id, assignee_kind, created_by_id, created_by_kind,
@@ -83,8 +79,11 @@ class DockyardStore:
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
-                    item.project_id, item.ref, item.type.value, item.title,
-                    item.status.value,
+                    item.project_id,
+                    item.ref or ("tmp-" + cx.execute(
+                        "SELECT hex(randomblob(12))").fetchone()[0]),
+                    item.type.value,
+                    item.title, item.status.value,
                     item.assignee.id if item.assignee else None,
                     item.assignee.kind.value if item.assignee else None,
                     item.created_by.id if item.created_by else None,
@@ -97,7 +96,16 @@ class DockyardStore:
                     item.created_at.isoformat(), item.updated_at.isoformat(),
                 ),
             )
-            item.id = cur.lastrowid
+            row_id = cur.lastrowid
+            if not item.ref:
+                seq = cx.execute(
+                    "SELECT COUNT(*) AS n FROM dockyard_work_items WHERE id <= ?",
+                    (row_id,),
+                ).fetchone()["n"]
+                item.ref = make_ref("HDY", seq)
+                cx.execute("UPDATE dockyard_work_items SET ref=? WHERE id=?",
+                           (item.ref, row_id))
+            item.id = row_id
         return item
 
     def get_item(self, project_id: str, item_id: int) -> Optional[WorkItem]:

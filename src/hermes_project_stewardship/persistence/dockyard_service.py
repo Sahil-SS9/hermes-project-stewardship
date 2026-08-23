@@ -23,6 +23,7 @@ from ..dockyard import (
     make_ref,
 )
 from .dockyard_store import DockyardStore
+
 from .store import Store
 
 
@@ -67,8 +68,9 @@ class DockyardService:
             evidence_refs=evidence_refs or [],
             estimate_days=estimate_days,
         )
-        item.ref = self.next_ref(project_id)
-
+        # G5 race-safety: leave ref unset; DockyardStore.create_item
+        # derives HDY-n from the assigned rowid inside its own
+        # transaction, so concurrent creators can never collide.
         if parent_ref is not None:
             parent = self._by_ref(project_id, parent_ref)
             if parent is None:
