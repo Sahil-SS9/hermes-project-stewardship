@@ -75,22 +75,31 @@ def test_parentage_via_store_enforces_rules(dy, proj):
     assert dy.get_item(proj, task.id).parent_id == epic.id
 
 
+def _mk_item(dy, proj, title):
+    it = dy.create_item(WorkItem(project_id=proj, type=WorkItemType.TASK,
+                                 title=title))
+    return it.ref
+
+
 def test_backlog_upsert_and_order(dy, proj):
-    dy.upsert_backlog(proj, BacklogEntry(item_ref="HDY-31", rank=2))
-    dy.upsert_backlog(proj, BacklogEntry(item_ref="HDY-24", rank=1))
+    r31 = _mk_item(dy, proj, "b31")
+    r24 = _mk_item(dy, proj, "b24")
+    dy.upsert_backlog(proj, BacklogEntry(item_ref=r31, rank=2))
+    dy.upsert_backlog(proj, BacklogEntry(item_ref=r24, rank=1))
     entries = dy.list_backlog(proj)
-    assert [e.item_ref for e in entries] == ["HDY-24", "HDY-31"]
+    assert [e.item_ref for e in entries] == [r24, r31]
 
 
 def test_rerank_requires_reason_and_persists_audit(dy, proj, bot):
-    dy.upsert_backlog(proj, BacklogEntry(item_ref="HDY-31", rank=2))
+    ref = _mk_item(dy, proj, "rerank target")
+    dy.upsert_backlog(proj, BacklogEntry(item_ref=ref, rank=2))
     with pytest.raises(Exception):
-        dy.rerank(proj, "HDY-31", 1, "", actor=bot)
-    audit = dy.rerank(proj, "HDY-31", 1,
+        dy.rerank(proj, ref, 1, "", actor=bot)
+    audit = dy.rerank(proj, ref, 1,
                       "objective breach outranks chores", actor=bot)
     assert audit["to_rank"] == 1
     rows = dy.store._conn.execute(
-        "SELECT * FROM dockyard_backlog WHERE item_ref='HDY-31'").fetchall()
+        "SELECT * FROM dockyard_backlog WHERE item_ref=?", (ref,)).fetchall()
     assert rows[0]["last_rerank_reason"] == "objective breach outranks chores"
     assert rows[0]["last_rerank_kind"] == "bot"
 
@@ -107,7 +116,7 @@ def test_cascade_delete_with_project(dy, svc, store, enabled):
 
 
 def test_stats(dy, proj):
-    dy.create_item(_item(proj, "one"))
-    dy.upsert_backlog(proj, BacklogEntry(item_ref="HDY-50", rank=1))
+    it = dy.create_item(_item(proj, "one"))
+    dy.upsert_backlog(proj, BacklogEntry(item_ref=it.ref, rank=1))
     s = dy.stats()
     assert s["work_items"] >= 1 and s["backlog_entries"] >= 1

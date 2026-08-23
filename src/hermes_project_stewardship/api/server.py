@@ -406,7 +406,10 @@ def create_app(
     def list_work_items(project_id: str, status: Optional[str] = None):
         from ..dockyard import WorkItemStatus as _S
 
-        st = _S(status) if status else None
+        try:
+            st = _S(status) if status else None
+        except ValueError:
+            raise HTTPException(422, f"invalid status {status!r}")
         return {"work_items": [
             w.__dict__ | {"type": w.type.value, "status": w.status.value,
                           "assignee": w.assignee.id if w.assignee else None,
@@ -527,8 +530,11 @@ def create_app(
 
     @router.get("/projects/{project_id}/views")
     def views_list(project_id: str, actor_id: str, actor_kind: str = "human"):
-        return {"views": dy.views_list(
-            project_id, actor=_actor(actor_id, actor_kind))}
+        try:
+            actor = _actor(actor_id, actor_kind)
+        except ValueError:
+            raise HTTPException(422, f"invalid actor_kind {actor_kind!r}")
+        return {"views": dy.views_list(project_id, actor=actor)}
 
 
     # ------------------- Dockyard bot layer (G2) ---------------------- #
@@ -545,6 +551,13 @@ def create_app(
 
     @router.get("/bots")
     def list_bots(status: Optional[str] = None):
+        from ..dockyard.bots import BotStatus as _BS
+
+        if status:
+            try:
+                _BS(status)
+            except ValueError:
+                raise HTTPException(422, f"invalid status {status!r}")
         return {"bots": [
             {"id": b.id, "name": b.display_name, "status": b.status.value,
              "current_item": b.current_item, "capabilities": b.capabilities}
@@ -646,7 +659,10 @@ def create_app(
 
     @router.post("/notifications/{notification_id}/ack")
     def ack_notification(notification_id: int):
-        dy.ack_notification(notification_id)
+        try:
+            dy.ack_notification(notification_id)
+        except ValueError as e:
+            raise HTTPException(404, str(e))
         return {"acked": notification_id}
 
     @router.post("/onboard")

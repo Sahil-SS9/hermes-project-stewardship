@@ -75,6 +75,9 @@ class Bot:
 
     def set_status(self, status: BotStatus,
                    current_item: Optional[str] = None) -> None:
+        if (status is BotStatus.STUCK
+                and self.status is BotStatus.OFFLINE):
+            raise ValueError("offline bots cannot be marked stuck")  # M1
         self.status = status
         if status is not BotStatus.BUSY and current_item is not None:
             raise ValueError("current_item only valid while busy")

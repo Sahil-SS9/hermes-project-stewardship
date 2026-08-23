@@ -27,6 +27,11 @@ from .dockyard_store import DockyardStore
 from .store import Store
 
 
+import threading as _threading
+
+_PROMOTION_LOCK = _threading.Lock()
+
+
 class DockyardService:
     def __init__(self, store: Store) -> None:
         self.store = store
@@ -132,6 +137,9 @@ class DockyardService:
         if len(reason.strip()) < 4:
             raise RankChangeError(
                 "backlog additions require a priority reason (min 4 chars)")
+        # C4: refuse phantom refs; item must exist IN THIS project
+        if self._by_ref(project_id, ref) is None:
+            raise ValueError(f"no such work item {ref} in {project_id}")
         entry = BacklogEntry(item_ref=ref, rank=rank, priority_reason=reason)
         self.dy.upsert_backlog(project_id, entry, actor=actor)
         self._audit(actor=actor, action="backlog.added",
@@ -185,6 +193,10 @@ class DockyardService:
 
     def milestone_attach(self, project_id: str, name: str, ref: str, *,
                          actor: Actor) -> None:
+        # C6: refuse attaching to non-existent milestones / phantom items
+        self.dy.milestone_progress(project_id, name)  # raises if missing
+        if self._by_ref(project_id, ref) is None:
+            raise ValueError(f"no such work item {ref} in {project_id}")
         self.dy.milestone_attach(project_id, name, ref)
         self._audit(actor=actor, action="milestone.attached",
                     subject=name, detail={"item": ref})
@@ -360,8 +372,15 @@ class DockyardService:
             labels=[f"engine:{ref}"],
             evidence_refs=evidence,
         )
-        item.ref = self.next_ref(initiative["project_id"])
-        created = self.dy.create_item(item)
+        # C2: leave ref unset -> store derives HDY-n from rowid inside
+        # its own transaction (no TOCTOU cache under concurrency).
+        # Idempotency under concurrency: serialise twin-creation per
+        # process, then re-check inside the lock.
+        with _PROMOTION_LOCK:
+            existing = self.find_promoted(initiative["project_id"], ref)
+            if existing is not None:
+                return existing  # idempotent promotion
+            created = self.dy.create_item(item)
         self._audit(actor=actor, action="initiative.promoted",
                     subject=ref,
                     detail={"work_item": created.ref,
@@ -511,5 +530,8 @@ class DockyardService:
         from .store import iso
 
         with self.store.tx() as cx:
-            cx.execute("UPDATE notifications SET acked_at=? WHERE id=?",
-                       (iso(), notification_id))
+            cur = cx.execute(
+                "UPDATE notifications SET acked_at=? WHERE id=?",
+                (iso(), notification_id))
+        if cur.rowcount == 0:  # C5: fail closed on unknown ids
+            raise ValueError(f"notification {notification_id} not found")

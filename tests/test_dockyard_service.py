@@ -60,10 +60,14 @@ def test_parent_rule_violation_refused_at_service(dsvc, enabled, human):
         dsvc.attach_parent(enabled, "HDY-999", task.ref, actor=human)
 
 
-def test_backlog_add_requires_reason(dsvc, enabled, human):
+def test_backlog_add_requires_reason_and_real_item(dsvc, enabled, human):
     wi = dsvc.create_item(enabled, WorkItemType.TASK, "Queued work", actor=human)
     with pytest.raises(RankChangeError):
         dsvc.backlog_add(enabled, wi.ref, 1, reason="", actor=human)
+    # phantom refs refused (C4): item must exist
+    with pytest.raises(Exception):
+        dsvc.backlog_add(enabled, "HDY-9999", 1,
+                         reason="ghost reference", actor=human)
     entry = dsvc.backlog_add(enabled, wi.ref, 1,
                              reason="objective breach", actor=human)
     assert entry.rank == 1

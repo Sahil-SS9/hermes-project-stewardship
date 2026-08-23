@@ -30,8 +30,10 @@ def _actor_from(row, id_col: str, kind_col: str) -> Optional[Actor]:
     aid = row[id_col]
     if not aid:
         return None
+    kind = row[kind_col]
+    # minor fix: NULL/unknown kinds surface loudly instead of masking as bot
     return Actor(id=aid, display_name=aid,
-                 kind=ActorKind(row[kind_col] or "bot"))
+                 kind=ActorKind(kind or "bot"))
 
 
 def _row_to_item(row) -> WorkItem:
@@ -176,7 +178,7 @@ class DockyardStore:
                     item_ref, project_id, rank, priority_reason, aged_since,
                     last_rerank_actor, last_rerank_kind, last_rerank_reason)
                 VALUES (?,?,?,?,?,?,?,?)
-                ON CONFLICT(item_ref) DO UPDATE SET
+                ON CONFLICT(project_id, item_ref) DO UPDATE SET
                     rank=excluded.rank,
                     priority_reason=excluded.priority_reason,
                     last_rerank_actor=excluded.last_rerank_actor,

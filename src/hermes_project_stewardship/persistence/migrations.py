@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 @dataclass(frozen=True)
@@ -403,6 +403,50 @@ MIGRATIONS: List[Migration] = [
         """,
         downgrade_sql="""
         DROP TABLE IF EXISTS dockyard_a2a_messages;
+        """,
+    ),
+    Migration(
+        version=7,
+        name="backlog project scoping hardening (G5 council)",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS dockyard_backlog_v2 (
+            item_ref        TEXT NOT NULL REFERENCES dockyard_work_items(ref)
+                            ON UPDATE CASCADE ON DELETE CASCADE,
+            project_id      TEXT NOT NULL REFERENCES project_stewardship(project_id)
+                            ON DELETE CASCADE,
+            rank            INTEGER NOT NULL CHECK (rank >= 1),
+            priority_reason TEXT NOT NULL DEFAULT '',
+            aged_since      TEXT NOT NULL,
+            last_rerank_actor TEXT,
+            last_rerank_kind  TEXT CHECK (last_rerank_kind IN ('human','bot')),
+            last_rerank_reason TEXT,
+            PRIMARY KEY (project_id, item_ref)
+        );
+        INSERT INTO dockyard_backlog_v2
+            SELECT item_ref, project_id, rank, priority_reason, aged_since,
+                   last_rerank_actor, last_rerank_kind, last_rerank_reason
+            FROM dockyard_backlog;
+        DROP TABLE dockyard_backlog;
+        ALTER TABLE dockyard_backlog_v2 RENAME TO dockyard_backlog;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_backlog_project_rank
+            ON dockyard_backlog(project_id, rank);
+        """,
+        downgrade_sql="""
+        CREATE TABLE IF NOT EXISTS dockyard_backlog_legacy (
+            item_ref        TEXT PRIMARY KEY,
+            project_id      TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            rank            INTEGER NOT NULL CHECK (rank >= 1),
+            priority_reason TEXT NOT NULL DEFAULT '',
+            aged_since      TEXT NOT NULL,
+            last_rerank_actor       TEXT,
+            last_rerank_kind        TEXT CHECK (last_rerank_kind IN ('human','bot')),
+            last_rerank_reason      TEXT
+        );
+        INSERT INTO dockyard_backlog_legacy SELECT * FROM dockyard_backlog;
+        DROP TABLE dockyard_backlog;
+        ALTER TABLE dockyard_backlog_legacy RENAME TO dockyard_backlog;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_backlog_project_rank
+            ON dockyard_backlog(project_id, rank);
         """,
     ),
 ]
