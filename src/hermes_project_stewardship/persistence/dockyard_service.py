@@ -9,6 +9,8 @@ Enforces PRD rules that span domain + persistence:
 """
 from __future__ import annotations
 
+import json
+
 from typing import Dict, List, Optional
 
 from ..dockyard import (
@@ -310,3 +312,66 @@ class DockyardService:
 
     def bot_reputation(self, bot_id: str) -> Dict:
         return self.dy.bot_reputation(bot_id)
+
+    # ------------------------------------------------------------------ #
+    # Initiative promotion (PM-07) — G3 P1                               #
+    # ------------------------------------------------------------------ #
+
+    def promote_initiative(self, initiative: Dict, *,
+                           actor: Actor) -> WorkItem:
+        """Mirror an approved stewardship initiative as a first-class
+        WorkItem so it appears on boards/timelines with its evidence
+        chain intact (PM-07).
+
+        - type='initiative' (PRD §3.2)
+        - evidence_refs carry the engine's evidence + validation contract
+        - labels mark the engine ref for traceability both ways
+        """
+        if initiative.get("status") not in ("approved", "executing",
+                                            "completed", "regressed"):
+            raise ValueError(
+                "only initiatives past approval can be promoted "
+                f"(status={initiative.get('status')})")
+        ref = initiative["ref"]
+        existing = self.find_promoted(initiative["project_id"], ref)
+        if existing is not None:
+            return existing  # idempotent promotion
+
+        evidence = list(initiative.get("evidence_refs") or [])
+        contract = initiative.get("validation_contract") or {}
+        if contract:
+            evidence.append("contract:" + json.dumps(
+                contract, sort_keys=True, separators=(",", ":")))
+        item = WorkItem(
+            project_id=initiative["project_id"],
+            type=WorkItemType.INITIATIVE,
+            title=initiative.get("title") or ref,
+            assignee=actor,
+            created_by=actor,
+            labels=[f"engine:{ref}"],
+            evidence_refs=evidence,
+        )
+        item.ref = self.next_ref(initiative["project_id"])
+        created = self.dy.create_item(item)
+        self._audit(actor=actor, action="initiative.promoted",
+                    subject=ref,
+                    detail={"work_item": created.ref,
+                            "evidence_count": len(evidence)})
+        return created
+
+    @staticmethod
+    def _promotion_ref(engine_ref: str) -> str:
+        """Deterministic label key used to find a promoted twin."""
+        return f"engine:{engine_ref}"
+
+    def find_promoted(self, project_id: str, engine_ref: str):
+        """Return the promoted WorkItem twin for an engine ref, if any."""
+        label = self._promotion_ref(engine_ref)
+        row = self.store._conn.execute(
+            "SELECT id FROM dockyard_work_items WHERE project_id=? AND"
+            " labels_json LIKE ? ORDER BY id LIMIT 1",
+            (project_id, f'%"{label}"%'),
+        ).fetchone()
+        if not row:
+            return None
+        return self.dy.get_item(project_id, row["id"])
