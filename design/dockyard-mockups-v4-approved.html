@@ -872,6 +872,81 @@ html[data-theme="dark"] .theme-moon { display: none; }
     window.setTimeout(() => item.remove(), 2800);
   }
 
+  
+  /* ---- Dockyard live-data adapter (G1) ------------------------------
+     Activates only when /stewardship/v1 is reachable. Static demo data
+     (approved baseline) is used verbatim otherwise, so the file still
+     renders perfectly cold from disk. Palette/structure untouched. --- */
+  const DY_API = {
+    base: localStorage.getItem('dockyard-api') || 'http://127.0.0.1:9310/stewardship/v1',
+    project: 'checkout-service',
+    actor: JSON.parse(localStorage.getItem('dockyard-actor') ||
+      '{"id":"sahil","kind":"human"}'),
+    enabled: null
+  };
+  async function dyProbe() {
+    try {
+      const r = await fetch(DY_API.base.replace(/\/v1$/, '') + '/healthz', {signal: AbortSignal.timeout(1500)});
+      DY_API.enabled = r.ok;
+    } catch { DY_API.enabled = false; }
+    return DY_API.enabled;
+  }
+  function dyItemPayload(card, columnTitle) {
+    const statusMap = {'Backlog':'backlog','In Progress':'in_progress',
+      'Review':'in_review','Done':'done'};
+    return {
+      type: card.querySelector('.type').textContent.trim().toLowerCase(),
+      title: card.querySelector('h4').textContent.trim(),
+      actor_id: DY_API.actor.id, actor_kind: DY_API.actor.kind,
+      status: statusMap[columnTitle] || undefined,
+      ref: card.dataset.item || undefined
+    };
+  }
+  window.dockyardSyncMove = async function(card, columnTitle) {
+    if (!DY_API.enabled) return;               // demo mode: no network
+    try {
+      const exists = card.dataset.synced === '1';
+      let ref = card.dataset.item;
+      if (!exists) {
+        const p = dyItemPayload(card, columnTitle);
+        delete p.ref;
+        const r = await fetch(`${DY_API.base}/projects/${DY_API.project}/work-items`, {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(p)});
+        if (!r.ok) throw new Error(await r.text());
+        const made = await r.json();
+        card.dataset.item = made.ref; ref = made.ref;
+        card.dataset.synced = '1';
+        const metaRef = card.querySelector('.work-meta span');
+        if (metaRef && /^\s*$/.test(metaRef.textContent) ) metaRef.textContent = ref;
+      } else {
+        const p = dyItemPayload(card, columnTitle); p.ref = ref;
+        const r = await fetch(`${DY_API.base}/projects/${DY_API.project}/work-items`, {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(p)});
+        if (!r.ok) throw new Error(await r.text());
+      }
+      toast(ref + ' synced to ' + columnTitle);
+    } catch (err) {
+      toast('Sync failed: ' + err.message.slice(0, 80));
+    }
+  };
+  window.dockyardSyncRank = async function(itemEl, reasonText) {
+    if (!DY_API.enabled) return;
+    try {
+      const list = all('#backlog-list .backlog-item');
+      const rank = list.indexOf(itemEl) + 1;
+      const ref = itemEl.dataset.rankItem;
+      const r = await fetch(`${DY_API.base}/projects/${DY_API.project}/backlog/${ref}/rerank`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({new_rank: rank, reason: reasonText,
+          actor_id: DY_API.actor.id, actor_kind: DY_API.actor.kind})});
+      if (!r.ok) throw new Error(await r.text());
+    } catch (err) {
+      toast('Rank sync failed: ' + err.message.slice(0, 80));
+    }
+  };
+
   function showScreen(id) {
     const target = document.getElementById(id);
     if (!target || !target.classList.contains('screen')) return;
@@ -1018,10 +1093,12 @@ html[data-theme="dark"] .theme-moon { display: none; }
       if (!draggedCard || draggedCard.parentElement === stack) return;
       const targetColumn = stack.closest('.board-column').dataset.column;
       const item = draggedCard;
-      requestReason(() => {
+      requestReason((reason) => {
         stack.appendChild(item);
         updateColumnCounts();
         toast(`${item.dataset.item} moved to ${targetColumn}`);
+        dockyardSyncMove(item, targetColumn);
+        item.dataset.lastReason = reason;
       }, stack, `Why move ${item.dataset.item} to ${targetColumn}?`);
     });
   });
@@ -1029,11 +1106,12 @@ html[data-theme="dark"] .theme-moon { display: none; }
   all('[data-rank-dir]').forEach(button => button.addEventListener('click', () => {
     const item = button.closest('.backlog-item');
     const direction = button.dataset.rankDir;
-    requestReason(() => {
+    requestReason((reason) => {
       if (direction === 'up' && item.previousElementSibling) item.parentElement.insertBefore(item, item.previousElementSibling);
       if (direction === 'down' && item.nextElementSibling) item.parentElement.insertBefore(item.nextElementSibling, item);
       updateRanks();
       toast(`${item.dataset.rankItem} reranked with reason recorded`);
+      dockyardSyncRank(item, reason);
     }, button, `Why move ${item.dataset.rankItem} ${direction}?`);
   }));
 
