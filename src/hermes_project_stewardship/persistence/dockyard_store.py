@@ -436,3 +436,50 @@ class DockyardStore:
                 "(SELECT id FROM dockyard_bot_groups WHERE name=?),?,?)",
                 (name, bot_id, role_value),
             )
+
+    # ------------------------------------------------------------------ #
+    # A2A message bus (BM-03/04) — G2 P3                                 #
+    # ------------------------------------------------------------------ #
+
+    def a2a_append(self, msg) -> None:
+        """Persist one structured A2A event. Refuses unknown groups."""
+        from .store import iso
+
+        if self.group_get(msg.to_group) is None:
+            raise ValueError(f"unknown group {msg.to_group}")
+        msg.validate_payload()
+        with self.store.tx() as cx:
+            cx.execute(
+                """
+                INSERT INTO dockyard_a2a_messages(
+                    id, msg_type, from_actor, to_group, item_ref,
+                    payload_json, channel_post, created_at)
+                VALUES (?,?,?,?,?,?,?,?)
+                """,
+                (msg.id, msg.msg_type.value, msg.from_actor, msg.to_group,
+                 msg.item_ref, _j(msg.payload), msg.summary_line(), iso()),
+            )
+
+    def a2a_for_group(self, group_name: str, *,
+                      limit: int = 50) -> List[Dict]:
+        rows = self.store._conn.execute(
+            "SELECT * FROM dockyard_a2a_messages WHERE to_group=?"
+            " ORDER BY created_at DESC, id DESC LIMIT ?",
+            (group_name, limit),
+        ).fetchall()
+        return [self._a2a_row(r) for r in rows]
+
+    def a2a_for_item(self, item_ref: str) -> List[Dict]:
+        rows = self.store._conn.execute(
+            "SELECT * FROM dockyard_a2a_messages WHERE item_ref=?"
+            " ORDER BY created_at, id", (item_ref,),
+        ).fetchall()
+        return [self._a2a_row(r) for r in rows]
+
+    def _a2a_row(self, row) -> Dict:
+        return {"id": row["id"], "type": row["msg_type"],
+                "from": row["from_actor"], "group": row["to_group"],
+                "item_ref": row["item_ref"],
+                "payload": json.loads(row["payload_json"]),
+                "channel_post": row["channel_post"],
+                "created_at": row["created_at"]}

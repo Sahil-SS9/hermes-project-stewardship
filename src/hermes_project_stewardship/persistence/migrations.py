@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 @dataclass(frozen=True)
@@ -379,6 +379,30 @@ MIGRATIONS: List[Migration] = [
         DROP TABLE IF EXISTS dockyard_group_members;
         DROP TABLE IF EXISTS dockyard_bot_groups;
         DROP TABLE IF EXISTS dockyard_bots;
+        """,
+    ),
+    Migration(
+        version=6,
+        name="dockyard A2A message bus",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS dockyard_a2a_messages (
+            id          TEXT PRIMARY KEY,
+            msg_type    TEXT NOT NULL CHECK (msg_type IN
+                        ('handoff','status_query','capability_request','result')),
+            from_actor  TEXT NOT NULL,
+            to_group    TEXT NOT NULL REFERENCES dockyard_bot_groups(name),
+            item_ref    TEXT,
+            payload_json TEXT NOT NULL DEFAULT '{}',
+            channel_post TEXT,
+            created_at  TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_a2a_group_time
+            ON dockyard_a2a_messages(to_group, created_at);
+        CREATE INDEX IF NOT EXISTS idx_a2a_item
+            ON dockyard_a2a_messages(item_ref);
+        """,
+        downgrade_sql="""
+        DROP TABLE IF EXISTS dockyard_a2a_messages;
         """,
     ),
 ]

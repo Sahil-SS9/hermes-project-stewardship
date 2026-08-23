@@ -271,3 +271,36 @@ class DockyardService:
         if actor:
             self._audit(actor=actor.id, action="group.member_added",
                         subject=name, detail={"bot": bot_id, "role": role})
+
+    # ------------------------------------------------------------------ #
+    # A2A bus service (BM-03/04)                                         #
+    # ------------------------------------------------------------------ #
+
+    def a2a_send(self, msg_type: str, *, from_actor: str, to_group: str,
+                 payload: Optional[Dict] = None,
+                 item_ref: Optional[str] = None) -> Dict:
+        """Validate, persist, audit. Channel post text is generated
+        (BM-04); actual gateway delivery stays an integration concern."""
+        import uuid as _uuid
+
+        from ..dockyard.bots import A2AMessage, A2AMessageType
+
+        m = A2AMessage(
+            msg_type=A2AMessageType(msg_type),
+            from_actor=from_actor,
+            to_group=to_group,
+            payload=payload or {},
+            item_ref=item_ref,
+            id="a2a-" + _uuid.uuid4().hex[:12],
+        )
+        self.dy.a2a_append(m)
+        self._audit(actor=m.from_actor, action=f"a2a.{m.msg_type.value}",
+                    subject=m.to_group,
+                    detail={"item": m.item_ref, "message_id": m.id})
+        return {"id": m.id, "channel_post": m.summary_line()}
+
+    def a2a_feed(self, group_name: str, *, limit: int = 50) -> List[Dict]:
+        return self.dy.a2a_for_group(group_name, limit=limit)
+
+    def a2a_item_trail(self, item_ref: str) -> List[Dict]:
+        return self.dy.a2a_for_item(item_ref)
