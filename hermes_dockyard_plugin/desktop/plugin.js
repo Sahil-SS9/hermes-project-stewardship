@@ -174,7 +174,6 @@ function renderDashboard(view, goInbox) {
         ]}),
         projects.map((p) => jsxs('button', {
           type: 'button', className: 'project-row',
-          key: p.id ?? p.project_id ?? 'row',
           onClick: () => host.navigate('/dockyard'),
           children: [
             jsxs('span', { className: 'project-name', children: [
@@ -193,7 +192,7 @@ function renderDashboard(view, goInbox) {
             ]}),
             jsx('svg', { className: 'icon', 'aria-hidden': true, children: jsx('use', { href: '#i-chevron' }) }),
           ],
-        }, p.id)),
+        }, p.id ?? p.project_id ?? 'row')),
       ]}),
     }),
   ]})
@@ -384,7 +383,7 @@ function DashboardPage() {
       error
         ? jsx(ErrorBox, { error, onRetry: refresh })
         : !data
-          ? jsx(Loading)
+          ? jsx(Loading, {})
           : tab === 'dashboard'
             ? renderDashboard(data, () => setTab('inbox'))
             : tab === 'inbox'
