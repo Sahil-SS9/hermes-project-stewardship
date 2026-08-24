@@ -32,15 +32,37 @@ _store = Store(_DB)
 _app = create_app(_store)
 
 
-async def _proxy(method: str, path: str, json_body: dict | None = None):
-    """Forward a request to the Dockyard API app and normalise the reply."""
-    from starlette.testclient import TestClient  # local import: heavy
+# One process-lifetime client over ASGI: no per-request TestClient churn
+# (cor-001/002) and genuinely non-blocking for the host's event loop.
+import httpx
 
-    with TestClient(_app) as client:
-        response = client.request(method, path, json=json_body)
+_client: httpx.AsyncClient | None = None
+
+
+def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None:
+        _client = httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=_app),
+            base_url="http://dockyard.local",
+        )
+    return _client
+
+
+async def _proxy(method: str, path: str, json_body: dict | None = None,
+                 params: dict | None = None):
+    """Forward a request to the Dockyard API app and normalise the reply."""
+    response = await _get_client().request(
+        method, path, json=json_body, params=params)
     if response.status_code >= 400:
-        raise HTTPException(status_code=response.status_code,
-                            detail=response.json())
+        try:
+            detail = response.json()
+        except ValueError:
+            # cor-003: upstream non-JSON failures (plain-text 500s) must not
+            # become an opaque JSONDecodeError here.
+            detail = {"error": {"code": "upstream_error",
+                                "message": response.text[:500]}}
+        raise HTTPException(status_code=response.status_code, detail=detail)
     return response.json()
 
 
@@ -72,9 +94,14 @@ async def projects() -> dict:
 
 @plugin_api.get("/projects/{project_id}/work-items")
 async def work_items(project_id: str, status: str | None = None) -> dict:
-    suffix = f"?status={status}" if status else ""
+    from urllib.parse import quote
+
+    # cor-004: quote path segments; pass query values structurally so a
+    # crafted value can never inject extra upstream parameters.
+    pid = quote(project_id, safe="")
+    params = {"status": status} if status else None
     return await _proxy(
-        "GET", f"/stewardship/v1/projects/{project_id}/work-items{suffix}")
+        "GET", f"/stewardship/v1/projects/{pid}/work-items", params=params)
 
 
 # --------------------------------------------------------------- writes --
@@ -95,8 +122,11 @@ async def onboard(body: OnboardBody) -> dict:
 @plugin_api.post("/initiatives/{ref}/approve")
 async def approve(ref: str) -> dict:
     # Actor attribution is fixed server-side: this dashboard always acts as sahil.
+    from urllib.parse import quote
+
+    r = quote(ref, safe="")
     return await _proxy(
-        "POST", f"/stewardship/v1/initiatives/{ref}/approve",
+        "POST", f"/stewardship/v1/initiatives/{r}/approve",
         {"actor_id": "sahil"})
 
 

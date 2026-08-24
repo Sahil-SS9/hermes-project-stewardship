@@ -8,8 +8,36 @@ interface AppState {
   tab: 'dashboard' | 'inbox' | 'notifications' | 'onboard';
 }
 
-export function initApp(sdk: HermesPluginSDK, root: HTMLElement): void {
+export function initApp(
+  sdk: HermesPluginSDK,
+  root: HTMLElement,
+): () => void {
   const state: AppState = { api: createApi(sdk), tab: 'dashboard' };
+  // cor-005/007: generation token — a newer render invalidates in-flight ones;
+  // disposed flag lets the host unmount abort everything cleanly.
+  let renderSeq = 0;
+  let disposed = false;
+
+  const render = async (
+    main: HTMLElement,
+    s: AppState,
+  ): Promise<void> => {
+    const gen = ++renderSeq;
+    main.innerHTML = `<div class="dy-loading">Loading…</div>`;
+    try {
+      if (disposed || gen !== renderSeq) return;
+      const stale = (): boolean =>
+        disposed || gen !== renderSeq || !main.isConnected;
+      if (s.tab === 'dashboard') await renderDashboard(main, s, stale);
+      else if (s.tab === 'inbox') await renderInbox(main, s, stale);
+      else if (s.tab === 'notifications')
+        await renderNotifications(main, s, stale);
+      else renderOnboard(main, s);
+    } catch (err) {
+      if (disposed || gen !== renderSeq || !main.isConnected) return;
+      main.innerHTML = `<div class="dy-error">Dockyard backend unreachable: ${esc(String(err))}</div>`;
+    }
+  };
 
   root.innerHTML = '';
   root.className = 'dy-root';
@@ -45,21 +73,19 @@ export function initApp(sdk: HermesPluginSDK, root: HTMLElement): void {
   );
 
   void render(main, state);
+
+  // cor-007: host-facing teardown — aborts in-flight renders and blocks new ones
+  return () => {
+    disposed = true;
+    root.innerHTML = '';
+  };
 }
 
-async function render(main: HTMLElement, s: AppState): Promise<void> {
-  main.innerHTML = `<div class="dy-loading">Loading…</div>`;
-  try {
-    if (s.tab === 'dashboard') await renderDashboard(main, s);
-    else if (s.tab === 'inbox') await renderInbox(main, s);
-    else if (s.tab === 'notifications') await renderNotifications(main, s);
-    else renderOnboard(main, s);
-  } catch (err) {
-    main.innerHTML = `<div class="dy-error">Dockyard backend unreachable: ${esc(String(err))}</div>`;
-  }
-}
-
-async function renderDashboard(main: HTMLElement, s: AppState): Promise<void> {
+async function renderDashboard(
+  main: HTMLElement,
+  s: AppState,
+  isStale: () => boolean,
+): Promise<void> {
   const view = await s.api.dashboard();
   const projects = view.projects ?? [];
   if (projects.length === 0) {
@@ -84,6 +110,7 @@ async function renderDashboard(main: HTMLElement, s: AppState): Promise<void> {
       </tr>`;
     })
     .join('');
+  if (isStale()) return;
   main.innerHTML = `
     <section class="dy-card">
       <h2>Fleet overview</h2>
@@ -95,13 +122,18 @@ async function renderDashboard(main: HTMLElement, s: AppState): Promise<void> {
     </section>`;
 }
 
-async function renderInbox(main: HTMLElement, s: AppState): Promise<void> {
+async function renderInbox(
+  main: HTMLElement,
+  s: AppState,
+  isStale: () => boolean,
+): Promise<void> {
   const view = await s.api.inbox();
   const items = view.items ?? [];
   if (items.length === 0) {
     main.innerHTML = `<div class="dy-empty"><p>Inbox zero. Nothing is waiting on you.</p></div>`;
     return;
   }
+  if (isStale()) return;
   const list = document.createElement('section');
   list.className = 'dy-card';
   list.innerHTML = '<h2>Waiting on you</h2>';
@@ -137,13 +169,18 @@ async function renderInbox(main: HTMLElement, s: AppState): Promise<void> {
   main.appendChild(list);
 }
 
-async function renderNotifications(main: HTMLElement, s: AppState): Promise<void> {
+async function renderNotifications(
+  main: HTMLElement,
+  s: AppState,
+  isStale: () => boolean,
+): Promise<void> {
   const view = await s.api.notifications();
   const notes = view.notifications ?? [];
   if (notes.length === 0) {
     main.innerHTML = `<div class="dy-empty"><p>No notifications.</p></div>`;
     return;
   }
+  if (isStale()) return;
   const list = document.createElement('section');
   list.className = 'dy-card';
   list.innerHTML = '<h2>Notifications</h2>';
@@ -155,7 +192,13 @@ async function renderNotifications(main: HTMLElement, s: AppState): Promise<void
       btn.textContent = 'Acknowledge';
       btn.addEventListener('click', async () => {
         btn.disabled = true;
-        try { await s.api.ack(Number(n.id)); row.classList.add('acked'); } catch { btn.disabled = false; }
+        try {
+          await s.api.ack(Number(n.id));
+          row.classList.add('acked');
+        } catch (e) {
+          btn.disabled = false;
+          btn.textContent = `Failed: ${String(e).slice(0, 60)}`;
+        }
       });
       row.appendChild(btn);
     }

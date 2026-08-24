@@ -23,10 +23,10 @@ function registerPlugin(sdk: HermesPluginSDK): void {
   const DockyardTab = () => {
     const ref = useRef(null);
     useEffect(() => {
-      if (ref.current) {
-        ref.current.innerHTML = '';
-        initApp(sdk, ref.current);
-      }
+      if (!ref.current) return undefined;
+      ref.current.innerHTML = '';
+      const dispose = initApp(sdk, ref.current as HTMLElement);
+      return dispose; // cor-007: teardown on unmount/StrictMode double-invoke
     }, []);
     return React.createElement('div', { ref, className: 'dy-host' });
   };
