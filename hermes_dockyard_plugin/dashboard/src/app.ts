@@ -129,11 +129,11 @@ async function renderInbox(
 ): Promise<void> {
   const view = await s.api.inbox();
   const items = view.items ?? [];
+  if (isStale()) return;  // guard BEFORE any DOM write, including empty states
   if (items.length === 0) {
     main.innerHTML = `<div class="dy-empty"><p>Inbox zero. Nothing is waiting on you.</p></div>`;
     return;
   }
-  if (isStale()) return;
   const list = document.createElement('section');
   list.className = 'dy-card';
   list.innerHTML = '<h2>Waiting on you</h2>';
@@ -176,11 +176,11 @@ async function renderNotifications(
 ): Promise<void> {
   const view = await s.api.notifications();
   const notes = view.notifications ?? [];
+  if (isStale()) return;  // guard BEFORE any DOM write, including empty states
   if (notes.length === 0) {
     main.innerHTML = `<div class="dy-empty"><p>No notifications.</p></div>`;
     return;
   }
-  if (isStale()) return;
   const list = document.createElement('section');
   list.className = 'dy-card';
   list.innerHTML = '<h2>Notifications</h2>';

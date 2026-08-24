@@ -11,6 +11,7 @@ import os
 import tempfile
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -28,14 +29,15 @@ _DB = Path(
 )
 _DB.parent.mkdir(parents=True, exist_ok=True)
 
+# NOTE (lifecycle): _store/_client are closed when the host process exits; the
+# desktop-plugin contract exposes no router-level teardown hook, so an explicit
+# close would require a custom seam. Acceptable for single-user local tooling.
 _store = Store(_DB)
 _app = create_app(_store)
 
 
 # One process-lifetime client over ASGI: no per-request TestClient churn
 # (cor-001/002) and genuinely non-blocking for the host's event loop.
-import httpx
-
 _client: httpx.AsyncClient | None = None
 
 
@@ -63,12 +65,17 @@ async def _proxy(method: str, path: str, json_body: dict | None = None,
             detail = {"error": {"code": "upstream_error",
                                 "message": response.text[:500]}}
         raise HTTPException(status_code=response.status_code, detail=detail)
-    return response.json()
+    try:
+        return response.json()
+    except ValueError:
+        return {"error": {"code": "bad_upstream_body",
+                          "message": "2xx response was not valid JSON"}}
 
 
 @plugin_api.get("/health")
 async def health() -> dict:
-    return {"ok": True, "service": "hermes-dockyard", "db": str(_DB)}
+    # No filesystem paths in responses: dashboard viewers need liveness only.
+    return {"ok": True, "service": "hermes-dockyard"}
 
 
 # ---------------------------------------------------------------- reads --
