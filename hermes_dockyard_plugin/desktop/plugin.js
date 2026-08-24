@@ -174,6 +174,7 @@ function renderDashboard(view, goInbox) {
         ]}),
         projects.map((p) => jsxs('button', {
           type: 'button', className: 'project-row',
+          key: p.id ?? p.project_id ?? 'row',
           onClick: () => host.navigate('/dockyard'),
           children: [
             jsxs('span', { className: 'project-name', children: [
