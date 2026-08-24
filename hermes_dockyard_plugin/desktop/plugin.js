@@ -4,19 +4,18 @@
  * (unified agent-plugin half; plain ESM + jsx() calls, specifiers rewritten to SDK shims).
  */
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime'
-import { useEffect, useState } from 'react'
 import { host } from '@hermes/plugin-sdk'
+import { useEffect, useState } from 'react'
 
-const BASE = '/api/plugins/hermes-dockyard'
+let _rest = null
+function bindRest(ctx) { _rest = ctx.rest }
 
 async function api(path, init) {
-  const res = await host.request(`${BASE}${path}`, {
-    method: init?.method ?? 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    body: init?.body != null ? JSON.stringify(init.body) : undefined,
-  })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  try {
+    return await _rest(path, { method: init?.method ?? 'GET', body: init?.body })
+  } catch (e) {
+    throw new Error(String(e?.message ?? e).slice(0, 120))
+  }
 }
 
 function DashboardPage() {
@@ -165,6 +164,7 @@ export default {
   id: 'hermes-dockyard',
   name: 'Hermes Dockyard',
   register(ctx) {
+    bindRest(ctx)
     ctx.registerMany([
       {
         id: 'page',
