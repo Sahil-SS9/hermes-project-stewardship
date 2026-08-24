@@ -4,5 +4,6 @@
   "version": "0.1.0",
   "description": "Dockyard: PM core + bot fleet oversight for Hermes (work items, inbox, dashboard, notifications, onboarding).",
   "entry": "dist/index.js",
-  "css": "dist/style.css"
+  "css": "dist/style.css",
+  "api": "plugin_api.py"
 }

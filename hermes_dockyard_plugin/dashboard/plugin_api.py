@@ -24,6 +24,11 @@ from hermes_project_stewardship.persistence.store import Store
 
 plugin_api = APIRouter()
 
+# The KenseiAgent host contract mounts the module-level `router` attribute
+# (web_server.py `_mount_plugin_api_routes`); `plugin_api` is the same object
+# under the name our own docs/tests use.
+router = plugin_api
+
 # Single shared store for the plugin's lifetime; swap via env var.
 _DB = Path(
     os.environ.get(
