@@ -39,6 +39,13 @@ export interface InboxView {
   items: InboxItem[];
 }
 
+export interface NotificationItem {
+  id?: number | string;
+  summary?: string;
+  title?: string;
+  acked_at?: string | null;
+}
+
 export function createApi(sdk: HermesPluginSDK) {
   const get = <T,>(path: string): Promise<T> => sdk.fetchJSON(`${BASE}${path}`);
   const post = <T,>(path: string, body: unknown): Promise<T> =>
@@ -52,7 +59,7 @@ export function createApi(sdk: HermesPluginSDK) {
     health: () => get<{ ok: boolean }>('/health'),
     dashboard: () => get<DashboardView>('/dashboard'),
     inbox: () => get<InboxView>('/inbox'),
-    notifications: () => get<{ notifications: unknown[] }>('/notifications'),
+    notifications: () => get<{ notifications: NotificationItem[] }>('/notifications'),
     onboard: (b: { project_id: string; repo_path: string; mission: string; lead_profile: string }) =>
       post('/onboard', b),
     approve: (ref: string) => post(`/initiatives/${encodeURIComponent(ref)}/approve`, {}),

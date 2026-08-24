@@ -4,13 +4,12 @@ import type { Api, HermesPluginSDK } from './api';
 import { createApi } from './api';
 
 interface AppState {
-  sdk: HermesPluginSDK;
   api: Api;
   tab: 'dashboard' | 'inbox' | 'notifications' | 'onboard';
 }
 
 export function initApp(sdk: HermesPluginSDK, root: HTMLElement): void {
-  const state: AppState = { sdk, api: createApi(sdk), tab: 'dashboard' };
+  const state: AppState = { api: createApi(sdk), tab: 'dashboard' };
 
   root.innerHTML = '';
   root.className = 'dy-root';
@@ -56,7 +55,7 @@ async function render(main: HTMLElement, s: AppState): Promise<void> {
     else if (s.tab === 'notifications') await renderNotifications(main, s);
     else renderOnboard(main, s);
   } catch (err) {
-    main.innerHTML = `<div class="dy-error">Dockyard backend unreachable: ${escapeHtml(String(err))}</div>`;
+    main.innerHTML = `<div class="dy-error">Dockyard backend unreachable: ${esc(String(err))}</div>`;
   }
 }
 
@@ -70,9 +69,9 @@ async function renderDashboard(main: HTMLElement, s: AppState): Promise<void> {
     });
     return;
   }
-  const totals = (view as any).totals ?? {};
+  const totals = view.totals ?? {};
   const rows = projects
-    .map((p: any) => {
+    .map((p) => {
       const w = p.work ?? {};
       return `<tr>
         <td><strong>${esc(String(p.id))}</strong></td>
@@ -107,14 +106,12 @@ async function renderInbox(main: HTMLElement, s: AppState): Promise<void> {
   list.className = 'dy-card';
   list.innerHTML = '<h2>Waiting on you</h2>';
   items.forEach((it) => {
-    const row = document.createElement('div');
-    row.className = 'dy-inbox-item';
-    row.innerHTML = `
+    const row = buildRow('dy-inbox-item', `
       <div class="dy-inbox-main">
         <span class="dy-pill">${esc(it.kind)}</span>
         <strong>${esc(it.title)}</strong>
         <span class="dy-dim">${esc(it.project_id)} · ${esc(it.ref)}</span>
-      </div>`;
+      </div>`);
     if (it.kind === 'approval') {
       const btn = document.createElement('button');
       btn.className = 'dy-btn primary';
@@ -142,7 +139,7 @@ async function renderInbox(main: HTMLElement, s: AppState): Promise<void> {
 
 async function renderNotifications(main: HTMLElement, s: AppState): Promise<void> {
   const view = await s.api.notifications();
-  const notes = (view as any).notifications ?? [];
+  const notes = view.notifications ?? [];
   if (notes.length === 0) {
     main.innerHTML = `<div class="dy-empty"><p>No notifications.</p></div>`;
     return;
@@ -150,10 +147,8 @@ async function renderNotifications(main: HTMLElement, s: AppState): Promise<void
   const list = document.createElement('section');
   list.className = 'dy-card';
   list.innerHTML = '<h2>Notifications</h2>';
-  (notes as any[]).forEach((n: any) => {
-    const row = document.createElement('div');
-    row.className = 'dy-note';
-    row.innerHTML = `<span>${esc(String(n.summary ?? n.title ?? ''))}</span>`;
+  notes.forEach((n) => {
+    const row = buildRow('dy-note', `<span>${esc(String(n.summary ?? n.title ?? ''))}</span>`);
     if (!n.acked_at && n.id != null) {
       const btn = document.createElement('button');
       btn.className = 'dy-btn';
@@ -207,9 +202,15 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
 }
 
 // ---- helpers ----
+function buildRow(className: string, html: string): HTMLDivElement {
+  const row = document.createElement('div');
+  row.className = className;
+  row.innerHTML = html;
+  return row;
+}
 function esc(v: string): string {
   return v.replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string,
   );
 }
-const escapeHtml = esc;
+

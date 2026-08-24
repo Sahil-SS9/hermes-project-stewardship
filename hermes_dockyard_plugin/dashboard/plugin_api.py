@@ -92,12 +92,9 @@ async def onboard(body: OnboardBody) -> dict:
     return await _proxy("POST", "/stewardship/v1/onboard", payload)
 
 
-class DecisionBody(BaseModel):
-    actor_id: str = "sahil"
-
-
 @plugin_api.post("/initiatives/{ref}/approve")
-async def approve(ref: str, body: DecisionBody | None = None) -> dict:
+async def approve(ref: str) -> dict:
+    # Actor attribution is fixed server-side: this dashboard always acts as sahil.
     return await _proxy(
         "POST", f"/stewardship/v1/initiatives/{ref}/approve",
         {"actor_id": "sahil"})

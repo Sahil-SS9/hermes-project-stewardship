@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, copyFileSync, statSync } from 'node:fs';
 
 mkdirSync('dist', { recursive: true });
 
@@ -15,7 +15,6 @@ await build({
 });
 
 // style.css is plain CSS — copy verbatim (no imports to resolve yet)
-import { copyFileSync, readFileSync, statSync } from 'node:fs';
 copyFileSync('src/style.css', 'dist/style.css');
 
 const meta = {

@@ -1,5 +1,6 @@
 // Entry: register the Dockyard tab with the host plugin registry.
 import { initApp } from './app';
+import { getSDK } from './api';
 import type { HermesPluginSDK } from './api';
 
 function whenReady(): Promise<void> {
@@ -33,8 +34,8 @@ function registerPlugin(sdk: HermesPluginSDK): void {
 }
 
 void whenReady().then(() => {
-  const sdk = (window as any).__HERMES_PLUGIN_SDK__ as HermesPluginSDK | undefined;
-  if (!sdk || typeof sdk.fetchJSON !== 'function') {
+  const sdk: HermesPluginSDK | null = getSDK();
+  if (!sdk) {
     console.error('[hermes-dockyard] Hermes plugin SDK not present');
     return;
   }
