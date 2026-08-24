@@ -7,6 +7,54 @@ import { jsx, jsxs, Fragment } from 'react/jsx-runtime'
 import { host } from '@hermes/plugin-sdk'
 import { useEffect, useState } from 'react'
 
+function EmptyState({ icon, title, description, action }) {
+  return jsxs('div', {
+    style: {
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      gap: 12, padding: '64px 24px', textAlign: 'center', minHeight: '50vh',
+    },
+    children: [
+      jsx('div', {
+        style: {
+          width: 56, height: 56, borderRadius: '50%',
+          background: 'var(--ui-bg-active, #2a2f3a)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        },
+        children: icon,
+      }),
+      jsx('div', { style: { fontSize: 16, fontWeight: 600 }, children: title }),
+      description && jsx('div', {
+        style: { fontSize: 13, opacity: 0.65, maxWidth: 360, lineHeight: 1.5 },
+        children: description,
+      }),
+      action,
+    ],
+  })
+}
+
+const icons = {
+  grid: jsx('svg', { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+    strokeWidth: 1.5, style: { opacity: 0.5 },
+    children: [
+      jsx('rect', { x: 3, y: 3, width: 7, height: 7, rx: 1 }),
+      jsx('rect', { x: 14, y: 3, width: 7, height: 7, rx: 1 }),
+      jsx('rect', { x: 3, y: 14, width: 7, height: 7, rx: 1 }),
+      jsx('rect', { x: 14, y: 14, width: 7, height: 7, rx: 1 }),
+    ]}),
+  inbox: jsx('svg', { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+    strokeWidth: 1.5, style: { opacity: 0.5 },
+    children: [
+      jsx('path', { d: 'M22 12h-6l-2 3h-4l-2-3H2' }),
+      jsx('path', { d: 'M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z' }),
+    ]}),
+  bell: jsx('svg', { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+    strokeWidth: 1.5, style: { opacity: 0.5 },
+    children: [
+      jsx('path', { d: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9' }),
+      jsx('path', { d: 'M10.3 21a1.94 1.94 0 0 0 3.4 0' }),
+    ]}),
+}
+
 let _rest = null
 function bindRest(ctx) { _rest = ctx.rest }
 
@@ -70,7 +118,19 @@ function DashboardPage() {
 
 function renderDashboard(view) {
   const projects = view.projects ?? []
-  if (projects.length === 0) return jsx('div', { children: 'No projects yet. Use the CLI onboarding or add the Onboard panel.' })
+  if (projects.length === 0) return jsx(EmptyState, {
+    icon: icons.grid,
+    title: 'No projects yet',
+    description: 'Create your first project to start tracking work items, bot teams and approvals. Onboarding walks you through setup in under a minute.',
+    action: jsx('code', {
+      style: {
+        padding: '8px 14px', borderRadius: 6,
+        background: 'var(--ui-bg-active, #2a2f3a)',
+        fontFamily: 'ui-monospace, monospace', fontSize: 12.5,
+      },
+      children: 'hermes dockyard onboard',
+    }),
+  })
   const totals = view.totals ?? {}
   return jsxs('table', {
     style: { borderCollapse: 'collapse', width: '100%', fontSize: 13 },
@@ -123,7 +183,11 @@ function InboxRow({ item, refresh }) {
 
 function renderInbox(view) {
   const items = view.items ?? []
-  if (items.length === 0) return jsx('div', { children: 'Inbox zero. Nothing is waiting on you.' })
+  if (items.length === 0) return jsx(EmptyState, {
+    icon: icons.inbox,
+    title: 'Inbox zero',
+    description: 'Nothing is waiting on your approval. New requests will appear here as they arrive.',
+  })
   return jsx('div', { children: items.map((it) => jsx(InboxRowWithRefresh, { item: it }, it.ref)) })
 }
 
@@ -134,7 +198,11 @@ function InboxRowWithRefresh({ item }) {
 
 function renderNotifications(view) {
   const notes = view.notifications ?? []
-  if (notes.length === 0) return jsx('div', { children: 'No notifications.' })
+  if (notes.length === 0) return jsx(EmptyState, {
+    icon: icons.bell,
+    title: 'All caught up',
+    description: 'Fleet notifications will appear here when bots need attention or tasks complete.',
+  })
   return jsx('div', { children: notes.map((n) => jsx(NotificationRow, { n }, String(n.id)) ) })
 }
 
