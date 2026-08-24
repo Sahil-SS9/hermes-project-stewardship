@@ -11,9 +11,13 @@ import os
 import tempfile
 from pathlib import Path
 
+import logging
+
 import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 from hermes_project_stewardship.api.server import create_app
 from hermes_project_stewardship.persistence.store import Store
@@ -38,24 +42,23 @@ _app = create_app(_store)
 
 # One process-lifetime client over ASGI: no per-request TestClient churn
 # (cor-001/002) and genuinely non-blocking for the host's event loop.
-_client: httpx.AsyncClient | None = None
-
-
-def _get_client() -> httpx.AsyncClient:
-    global _client
-    if _client is None:
-        _client = httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=_app),
-            base_url="http://dockyard.local",
-        )
-    return _client
+# Hermaguard fixes: EAGER initialisation (no lazy-init race, HG-CRITICAL),
+# explicit timeouts (HG-HIGH), env-configurable base URL (HG-MEDIUM).
+_BASE_URL = os.environ.get("DOCKYARD_PLUGIN_URL", "http://dockyard.local")
+_client = httpx.AsyncClient(
+    transport=httpx.ASGITransport(app=_app),
+    base_url=_BASE_URL,
+    timeout=httpx.Timeout(10.0, read=30.0),
+)
+logger.info("Dockyard plugin HTTP client initialised (base_url=%s)", _BASE_URL)
 
 
 async def _proxy(method: str, path: str, json_body: dict | None = None,
                  params: dict | None = None):
     """Forward a request to the Dockyard API app and normalise the reply."""
-    response = await _get_client().request(
-        method, path, json=json_body, params=params)
+    logger.debug("Proxying %s %s", method, path)
+    response = await _client.request(method, path, json=json_body, params=params)
+    logger.debug("Upstream %s %s -> %s", method, path, response.status_code)
     if response.status_code >= 400:
         try:
             detail = response.json()
@@ -64,6 +67,8 @@ async def _proxy(method: str, path: str, json_body: dict | None = None,
             # become an opaque JSONDecodeError here.
             detail = {"error": {"code": "upstream_error",
                                 "message": response.text[:500]}}
+        logger.error("Upstream error %s on %s %s",
+                     response.status_code, method, path)
         raise HTTPException(status_code=response.status_code, detail=detail)
     try:
         return response.json()
