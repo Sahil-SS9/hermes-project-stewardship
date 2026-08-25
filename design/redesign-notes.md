@@ -191,15 +191,44 @@ The harness recomputes 54 declared foreground/background pairs and fails if any 
 
 ## Verification log
 
+Final verification run: 25 August 2026.
+
 | Gate | Result | Evidence |
 |---|---|---|
-| CSS parse and render harness | PASS | Live-copy harness `10/10`; no CSS or browser warnings |
-| Loading, error, empty, populated | PASS | All three tabs and retry path exercised in jsdom |
-| Approve and reject flows | PASS | Frontend interaction tests plus `tests/test_dockyard_plugin_backend.py` real proxy/upstream tests |
-| Acknowledge flow | PASS | Unread item POSTs, moves to Cleared and remains readable |
-| 700px, 1200px and 1600px responsiveness | PASS | Zero document overflow and zero clipped project rows |
-| Light and dark screenshots | PASS | `/tmp/dockyard-dashboard-700-light.png`, `/tmp/dockyard-dashboard-1600-light.png`, `/tmp/dockyard-dashboard-1200-dark.png`, `/tmp/dockyard-inbox-1200-light.png`, `/tmp/dockyard-notifications-1200-dark.png` |
-| Contrast calculation | PASS | 54 pairs; 4.74:1 minimum text, 3.01:1 minimum control boundary |
-| Python regression suite | PASS | `309 passed in 95.40s` |
-| Live desktop smoke | Pending | |
-| Live/repo byte identity | PASS | Plugin SHA-256 `ad371a28...de1b` before final documentation-only update; exact `cmp` passed. Harness SHA-256 `6902656b...b303`; exact `cmp` passed. Rechecked at deployment gate. |
+| CSS parse and interaction harness | PASS | `node --test hermes_dockyard_plugin/desktop/repro-live.test.mjs`; `PASS_SUMMARY=16/16` |
+| Loading, error, empty and populated states | PASS | Dashboard, Project, Backlog, Bot teams, Initiative, Workflows, Approvals, Notifications and onboarding states exercised in the render harness |
+| Approve and reject flows | PASS | Frontend interaction tests; backend contract tests; live authenticated rejection of `INI-DEMO-1` returned 200 and read back `status=rejected`, `approval_state=rejected` |
+| Settings save | PASS | Live authenticated PATCH for `payments-relaunch` returned 200; mission, team, autonomy level and all four policy groups matched on readback |
+| Reports | PASS | Live executive, delivery, risk and full reports generated, fetched by ID and found in durable history. Section and activity inclusion rules matched each report type |
+| Bot session evidence | PASS | Live Octacon, Quan and Wesker session discovery returned 200. Twenty-message transcript samples excluded system, reasoning, thinking, internal, hidden and internal-notification rows |
+| Workflow save | PASS | Live `Release control` board view saved and read back with its status filter and private ownership boundary intact |
+| 700px to 1600px responsiveness | PASS | Zero document overflow, clipped rows, clipped controls, misaligned project icons or primary-tab overflow across supported widths. The 480px onboarding dialog also remained usable |
+| Live host-shell render | PASS | Restarted Hermes Desktop mounted the unified plugin and displayed all primary tabs plus the icon-only project action without the earlier right-edge clipping. Screenshot: `/home/kensei/.hermes/cache/images/computer_use_abc06e3094d74638b44dd818d3ba46fc.png` |
+| Light and dark screenshots | PASS | Dashboard, settings, reports, transcripts, backlog, initiative, workflows, approvals, notifications and onboarding renders were produced under `/tmp/dockyard-*.png` |
+| Contrast calculation | PASS | 54 declared pairs; 4.74:1 minimum normal text and 3.01:1 minimum control boundary |
+| Python regression suite | PASS | 317 tests collected; `.venv/bin/pytest -q` exited 0 after the final privacy-filter change |
+| Static security scan | PASS | 727 added lines scanned; no hardcoded-secret, shell-injection, eval/exec, pickle, SQL-formatting, XSS, direct-network, browser-storage or debug-output matches |
+| Architecture and performance | PASS | Desktop code stays on `ctx.rest` and the OS capability surface; profile paths are contained and opened read-only; transcript queries are bounded, parameterised and backed by existing session/message indexes; blocking SQLite routes run in the FastAPI thread pool |
+| Code simplification | PASS | Inline reuse, clarity, efficiency and altitude review found no actionable dead helper or duplicate abstraction. `add_to_backlog` is a decorator-referenced route, not dead code |
+| Live/repo byte identity | PASS | Canonical and active unified desktop plugin SHA-256: `aa6bffecc30c9604f7038b422d42dd4e56bbee6e022557cc32e7d02858ea443b` |
+| Runtime logs | CONDITIONAL | Dashboard emitted readiness only and remained running. Electron emitted no Dockyard-specific exception, but repeated host-level `hermes:readFileText` ENOENT plus D-Bus/accessibility warnings remain unclassified outside this plugin |
+| Direct live GUI mutation controls | CONDITIONAL | Background Computer Use click approval timed out. Live backend writes and readbacks passed, and the render harness covers the same controls plus clipboard behaviour, but clipboard copy and a separate sidebar-toggle sequence were not re-exercised inside the restarted Desktop window |
+
+## Quality-gate verdict
+
+Verdict: CONDITIONAL
+
+- Code review: PASS.
+- Simplification: PASS, performed inline because this redesign was explicitly no-delegation work.
+- Architecture: PASS.
+- Security: PASS. `hermaguard-prescan`, Semgrep, Bandit, Ruff and ESLint were not installed; the documented added-line scan and manual review were used instead.
+- Performance: PASS.
+- Release condition: Sahil must approve one final Computer Use interaction sequence if direct in-window clipboard and sidebar-toggle evidence is required. The remaining Electron ENOENT noise belongs to the host file-preview path and is not causally linked to Dockyard.
+
+## Deployment state
+
+- Code commits: `6b66b14` and `2414572`.
+- Active door: unified plugin symlink at `/home/kensei/.hermes/plugins/hermes-dockyard`.
+- The stale duplicate standalone door was moved, not deleted, to `/home/kensei/.hermes/backups/desktop-plugin-doors/hermes-dockyard-standalone-20260825-094528`.
+- Dashboard and Hermes Desktop were restarted and remain running.
+- The branch is ahead of `origin/master`; nothing has been pushed.
