@@ -416,3 +416,117 @@ def test_built_dist_present():
         p = PLUGIN_DIR / "dist" / f
         assert p.exists(), f"missing built asset {p}"
         assert p.stat().st_size > 0
+
+
+# ---------------------------------------------------------------------------
+# Slice 3 - atomic create+queue proxy + enable/disable/pause proxy routes
+# + disabled readback through the plugin contract.
+# ---------------------------------------------------------------------------
+
+
+def test_plugin_create_queued_item_proxy(client):
+    project_id = "queued-ui"
+    client.post("/api/plugins/hermes-dockyard/onboard", json={
+        "project_id": project_id, "repo_path": "/srv/queued",
+        "mission": "exercise the queued item proxy",
+        "lead_profile": "octacon",
+    })
+    r = client.post(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/backlog/items",
+        json={
+            "type": "task", "title": "Investigate customer checkout",
+            "assignee_id": "octacon-bot", "assignee_kind": "bot",
+            "rank": 1, "reason": "customer-reported checkout regression",
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ref"].startswith("HDY-") and body["rank"] == 1
+
+    work = client.get(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items"
+    ).json()["work_items"]
+    assert any(w["ref"] == body["ref"] and w["assignee"] == "octacon-bot"
+               and w["created_by"] == "sahil" for w in work)
+    entries = client.get(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/backlog"
+    ).json()["backlog"]
+    assert entries[0]["item_ref"] == body["ref"]
+
+
+def test_plugin_create_queued_item_rejects_same_creator_assignee(client):
+    project_id = "queued-self"
+    client.post("/api/plugins/hermes-dockyard/onboard", json={
+        "project_id": project_id, "repo_path": "/srv/queued-self",
+        "mission": "exercise the queued item proxy self-assign",
+        "lead_profile": "octacon",
+    })
+    r = client.post(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/backlog/items",
+        json={
+            "type": "task", "title": "Self assigned",
+            "assignee_id": "sahil", "assignee_kind": "human",
+            "rank": 1, "reason": "reasonable reason supplied",
+        },
+    )
+    assert r.status_code == 422, r.text
+
+
+def test_plugin_create_queued_item_rejects_cross_project_initiative(client):
+    client.post("/api/plugins/hermes-dockyard/onboard", json={
+        "project_id": "a-proj", "repo_path": "/srv/a",
+        "mission": "exercise cross-project initiative guard",
+        "lead_profile": "octacon",
+    })
+    b = client.post("/api/plugins/hermes-dockyard/onboard", json={
+        "project_id": "b-proj", "repo_path": "/srv/b",
+        "mission": "exercise cross-project initiative guard too",
+        "lead_profile": "octacon",
+    })
+    assert b.status_code == 200, b.text
+    with TestClient(plugin_api._app) as upstream:
+        ini = upstream.post(
+            "/stewardship/v1/projects/a-proj/initiatives",
+            json={"title": "Only in a", "rationale": "r"},
+        ).json()
+    r = client.post(
+        "/api/plugins/hermes-dockyard/projects/b-proj/backlog/items",
+        json={
+            "type": "task", "title": "Cross project",
+            "assignee_id": "octacon-bot", "assignee_kind": "bot",
+            "initiative_ref": ini["ref"],
+            "rank": 1, "reason": "reasonable reason supplied",
+        },
+    )
+    assert r.status_code == 422, r.text
+
+
+def test_plugin_project_lifecycle_proxy_routes(client):
+    project_id = "lifecycle-ui"
+    client.post("/api/plugins/hermes-dockyard/onboard", json={
+        "project_id": project_id, "repo_path": "/srv/lifecycle",
+        "mission": "exercise enable/disable/pause/resume/freeze",
+        "lead_profile": "octacon",
+    })
+
+    disable = client.post(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/disable")
+    assert disable.status_code == 200, disable.text
+    settings = client.get(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/settings").json()
+    assert settings["enabled"] is False
+
+    re_enable = client.post(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/re-enable")
+    assert re_enable.status_code == 200, re_enable.text
+    assert re_enable.json()["enabled"] is True
+
+    pause = client.post(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/pause")
+    assert pause.status_code == 200, pause.text
+    freeze = client.post(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/freeze")
+    assert freeze.status_code == 200, freeze.text
+    resume = client.post(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/resume")
+    assert resume.status_code == 200, resume.text

@@ -139,6 +139,18 @@ class BacklogAdd(BaseModel):
     actor_kind: str = "bot"
 
 
+class QueuedWorkItemCreate(BaseModel):
+    type: str
+    title: str
+    creator_id: str
+    creator_kind: str = "human"
+    assignee_id: str
+    assignee_kind: str = "bot"
+    rank: int
+    reason: str
+    initiative_ref: Optional[str] = None
+
+
 class BacklogRerank(BaseModel):
     new_rank: int
     reason: str
@@ -276,9 +288,13 @@ def create_app(
     def disable(project_id: str):
         return svc.disable(project_id)
 
+    @router.post("/projects/{project_id}/re-enable")
+    def re_enable(project_id: str):
+        return svc.re_enable(project_id)
+
     @router.get("/projects/{project_id}/settings")
     def settings(project_id: str):
-        return svc.settings(project_id)
+        return svc.settings(project_id, include_disabled=True)
 
     @router.patch("/projects/{project_id}/settings")
     def patch_settings(project_id: str, body: SettingsPatch):
@@ -486,6 +502,43 @@ def create_app(
         return {"backlog": [e.__dict__ | {
             "aged_since": e.aged_since.isoformat()} for e in
             dy.backlog_list(project_id)]}
+
+    @router.post("/projects/{project_id}/backlog/items")
+    def create_queued_work_item(project_id: str,
+                                body: QueuedWorkItemCreate):
+        import sqlite3 as _sq
+
+        try:
+            from ..dockyard import WorkItemType as _T
+
+            item, entry = dy.create_queued_item(
+                project_id,
+                title=body.title,
+                item_type=_T(body.type),
+                creator=_actor(body.creator_id, body.creator_kind),
+                assignee=_actor(body.assignee_id, body.assignee_kind),
+                rank=body.rank,
+                reason=body.reason,
+                initiative_ref=body.initiative_ref,
+            )
+        except ValueError as exc:
+            raise HTTPException(422, str(exc))
+        except _sq.IntegrityError:
+            raise HTTPException(
+                409,
+                "queued item conflicts with current project state",
+            )
+        return {
+            "ref": item.ref,
+            "id": item.id,
+            "type": item.type.value,
+            "title": item.title,
+            "assignee": item.assignee.id if item.assignee else None,
+            "created_by": item.created_by.id if item.created_by else None,
+            "initiative_ref": item.initiative_ref,
+            "rank": entry.rank,
+            "priority_reason": entry.priority_reason,
+        }
 
     @router.post("/projects/{project_id}/backlog")
     def backlog_add(project_id: str, body: BacklogAdd):

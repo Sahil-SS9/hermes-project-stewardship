@@ -1,4 +1,6 @@
-# Mockup vs Implementation — Feature Discrepancy Report
+# Mockup vs Implementation - Historical Feature Discrepancy Report
+
+> Historical snapshot from the initial three-tab implementation. The current Desktop plugin has since implemented or intentionally superseded most entries. Use [`../roadmap.md`](../roadmap.md) for remaining work and do not treat the counts below as current.
 
 Reference mockup: `/home/sahil/Desktop/carad/Hermes-Dockyard-v4.html` (106,801 chars, 7 screens, 101 buttons, 14 overlays, drag-drop + wizard + toasts).
 Current implementation: `~/.hermes/desktop-plugins/hermes-dockyard/plugin.js` (3 tabs).

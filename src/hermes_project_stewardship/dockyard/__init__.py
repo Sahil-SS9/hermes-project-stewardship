@@ -68,12 +68,13 @@ class WorkItem:
     status: WorkItemStatus = WorkItemStatus.BACKLOG
     assignee: Optional[Actor] = None
     created_by: Optional[Actor] = None  # source attribution (PM-02)
-    priority_rank: Optional[int] = None # backlog position (PM-03)
+    priority_rank: Optional[int] = None # backlog position (PM-03, mirror of dockyard_backlog.rank)
     labels: list[str] = field(default_factory=list)
     blocked_by: list[int] = field(default_factory=list)  # relation graph (PM-08)
     estimate_days: Optional[float] = None
     due: Optional[datetime] = None
     evidence_refs: list[str] = field(default_factory=list)
+    initiative_ref: Optional[str] = None  # first-class validated relation
     created_at: datetime = field(default_factory=utcnow)
     updated_at: datetime = field(default_factory=utcnow)
 

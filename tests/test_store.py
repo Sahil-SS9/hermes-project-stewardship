@@ -29,6 +29,51 @@ def test_migration_runs_and_is_idempotent(tmp_path):
     s2.close()
 
 
+def test_schema_version_constant_matches_migrations(tmp_path):
+    """SCHEMA_VERSION must equal max(migration.version) and a fresh store
+    must report exactly that constant."""
+    from hermes_project_stewardship.persistence.migrations import (
+        MIGRATIONS, SCHEMA_VERSION,
+    )
+    latest = max(m.version for m in MIGRATIONS)
+    assert SCHEMA_VERSION == latest, (
+        f"SCHEMA_VERSION={SCHEMA_VERSION} but MIGRATIONS reaches {latest}"
+    )
+    fresh = Store(tmp_path / "fresh.db")
+    try:
+        assert fresh.schema_version == latest
+    finally:
+        fresh.close()
+
+
+def test_initiative_relation_migration_roundtrips(tmp_path):
+    """Migration 9 must support downgrade followed by a clean re-upgrade."""
+    from hermes_project_stewardship.persistence.migrations import MIGRATIONS
+
+    store = Store(tmp_path / "roundtrip.db")
+    migration = next(item for item in MIGRATIONS if item.version == 9)
+    try:
+        store._conn.executescript(migration.downgrade_sql)
+        columns = {
+            row["name"]
+            for row in store._conn.execute(
+                "PRAGMA table_info(dockyard_work_items)"
+            ).fetchall()
+        }
+        assert "initiative_ref" not in columns
+
+        store._conn.executescript(migration.upgrade_sql)
+        columns = {
+            row["name"]
+            for row in store._conn.execute(
+                "PRAGMA table_info(dockyard_work_items)"
+            ).fetchall()
+        }
+        assert "initiative_ref" in columns
+    finally:
+        store.close()
+
+
 def test_mutex_exclusive_and_ttl(store, clock):
     assert store.mutex_acquire("p", "a", ttl_seconds=100)
     assert not store.mutex_acquire("p", "b", ttl_seconds=100)

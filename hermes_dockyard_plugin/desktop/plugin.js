@@ -279,7 +279,7 @@ const DOCKYARD_CSS = `
   position: relative;
   min-width: max-content;
   min-height: 38px;
-  padding: 8px 11px;
+  padding: 8px 10px;
   border: 0;
   border-radius: 7px;
   background: transparent;
@@ -1168,58 +1168,24 @@ const DOCKYARD_CSS = `
 .dockyard-root .dockyard-stage-list small { margin-top: 2px; color: var(--dy-text-3); font-size: 9px; }
 .dockyard-root .dockyard-stage-detail { align-self: start; }
 .dockyard-root .dockyard-stage-detail .dockyard-evidence-details { margin-top: 17px; }
-.dockyard-root .dockyard-workflows-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(330px, .85fr); gap: 18px; margin-top: 18px; }
-.dockyard-root .dockyard-workflows-layout > .dockyard-feature-card { align-self: start; }
-.dockyard-root .dockyard-workflow-dynamic { overflow: hidden; }
-.dockyard-root .dockyard-workflow-graph {
-  display: grid;
-  grid-template-columns: minmax(118px, 1fr) minmax(28px, .3fr) minmax(118px, 1fr) minmax(28px, .3fr) minmax(118px, 1fr) minmax(28px, .3fr) minmax(118px, 1fr);
-  align-items: center;
-  gap: 8px;
-  margin-top: 20px;
-  overflow-x: auto;
-}
-.dockyard-root .dockyard-workflow-node {
-  position: relative;
-  display: grid;
-  gap: 4px;
-  min-width: 118px;
-  min-height: 64px;
-  padding: 11px 12px;
-  border: 1px solid var(--dy-control-border);
-  border-radius: 11px;
+.dockyard-root .dockyard-saved-views-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(330px, .85fr); gap: 18px; margin-top: 18px; }
+.dockyard-root .dockyard-saved-views-layout > .dockyard-feature-card { align-self: start; }
+.dockyard-root .dockyard-saved-views-notice,
+.dockyard-root .dockyard-lifecycle-panel,
+.dockyard-root .dockyard-creator-summary {
+  margin-top: 16px;
+  padding: 13px 14px;
+  border: 1px solid var(--dy-border);
+  border-radius: 10px;
   background: var(--dy-surface-subtle);
-  color: var(--dy-text);
-  font: 700 11px/1.25 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  text-align: left;
-  cursor: pointer;
-  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+  color: var(--dy-text-2);
+  font-size: 11px;
+  line-height: 1.5;
 }
-.dockyard-root .dockyard-workflow-node:hover { transform: translateY(-2px); border-color: var(--dy-accent-border); }
-.dockyard-root .dockyard-workflow-node.selected { border-color: var(--dy-accent-border); box-shadow: 0 0 0 3px var(--dy-accent-soft); }
-.dockyard-root .dockyard-workflow-node.done { border-left: 4px solid var(--dy-success); }
-.dockyard-root .dockyard-workflow-node.current { border-left: 4px solid var(--dy-info); background: var(--dy-info-bg); }
-.dockyard-root .dockyard-workflow-node.waiting { border-left: 4px solid var(--dy-warning); }
-.dockyard-root .dockyard-workflow-node.queued { border-left: 4px solid var(--dy-neutral); }
-.dockyard-root .dockyard-workflow-node small { color: var(--dy-text-3); font-size: 9px; font-weight: 600; text-transform: uppercase; }
-.dockyard-root .dockyard-workflow-edge { display: block; height: 3px; min-width: 28px; border-radius: 999px; background: var(--dy-border); }
-.dockyard-root .dockyard-workflow-edge.done { background: var(--dy-success); }
-.dockyard-root .dockyard-workflow-edge.active {
-  background: linear-gradient(90deg, var(--dy-success), var(--dy-info), var(--dy-success));
-  background-size: 200% 100%;
-  animation: dockyard-flow-pulse 1.8s linear infinite;
-}
-.dockyard-root .dockyard-workflow-edge.waiting { height: 0; border-top: 3px dashed var(--dy-warning); background: transparent; }
-@keyframes dockyard-flow-pulse {
-  from { background-position: 200% 0; }
-  to { background-position: 0 0; }
-}
-.dockyard-root .dockyard-workflow-detail { display: grid; gap: 7px; margin-top: 16px; padding: 13px 14px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface-subtle); }
-.dockyard-root .dockyard-workflow-detail > div { display: flex; align-items: center; gap: 9px; }
-.dockyard-root .dockyard-workflow-detail strong { font-size: 12px; }
-.dockyard-root .dockyard-workflow-detail p { margin: 0; color: var(--dy-text-2); font-size: 11px; }
-.dockyard-root .dockyard-saved-workflows { display: grid; gap: 7px; margin-top: 14px; }
-.dockyard-root .dockyard-saved-workflows button {
+.dockyard-root .dockyard-saved-views-notice strong,
+.dockyard-root .dockyard-creator-summary strong { display: block; margin-bottom: 3px; color: var(--dy-text); font-size: 12px; }
+.dockyard-root .dockyard-saved-views { display: grid; gap: 7px; margin-top: 14px; }
+.dockyard-root .dockyard-saved-views button {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
@@ -1233,17 +1199,26 @@ const DOCKYARD_CSS = `
   text-align: left;
   cursor: pointer;
 }
-.dockyard-root .dockyard-saved-workflows button:hover,
-.dockyard-root .dockyard-saved-workflows button.active { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
-.dockyard-root .dockyard-saved-workflows strong,
-.dockyard-root .dockyard-saved-workflows small { display: block; min-width: 0; overflow-wrap: anywhere; }
-.dockyard-root .dockyard-saved-workflows strong { font-size: 11px; }
-.dockyard-root .dockyard-saved-workflows small { margin-top: 3px; color: var(--dy-text-3); font-size: 9px; }
-.dockyard-root .dockyard-saved-workflows svg { width: 14px; height: 14px; }
-.dockyard-root .dockyard-workflow-creator { display: grid; gap: 7px; }
-.dockyard-root .dockyard-workflow-creator label { margin-top: 5px; font-size: 10px; font-weight: 700; }
-.dockyard-root .dockyard-workflow-creator input,
-.dockyard-root .dockyard-workflow-creator select { min-height: 36px; padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; }
+.dockyard-root .dockyard-saved-views button:hover,
+.dockyard-root .dockyard-saved-views button.active { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
+.dockyard-root .dockyard-saved-views strong,
+.dockyard-root .dockyard-saved-views small { display: block; min-width: 0; overflow-wrap: anywhere; }
+.dockyard-root .dockyard-saved-views strong { font-size: 11px; }
+.dockyard-root .dockyard-saved-views small { margin-top: 3px; color: var(--dy-text-3); font-size: 9px; }
+.dockyard-root .dockyard-saved-views svg { width: 14px; height: 14px; }
+.dockyard-root .dockyard-saved-view-editor { display: grid; gap: 7px; }
+.dockyard-root .dockyard-saved-view-editor label { margin-top: 5px; font-size: 10px; font-weight: 700; }
+.dockyard-root .dockyard-saved-view-editor input,
+.dockyard-root .dockyard-saved-view-editor select { min-height: 36px; padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; }
+.dockyard-root .dockyard-project-state-summary,
+.dockyard-root .dockyard-lifecycle-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dockyard-root .dockyard-lifecycle-panel { display: grid; gap: 10px; }
+.dockyard-root .dockyard-lifecycle-panel header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.dockyard-root .dockyard-lifecycle-panel h3,
+.dockyard-root .dockyard-lifecycle-panel p { margin: 0; }
+.dockyard-root .dockyard-lifecycle-panel h3 { color: var(--dy-text); font-size: 13px; }
+.dockyard-root .dockyard-lifecycle-panel p { margin-top: 3px; }
+.dockyard-root .dockyard-settings-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .dockyard-root .dockyard-form-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 7px; }
 .dockyard-root .dockyard-main-grid {
   display: grid;
@@ -1382,7 +1357,7 @@ const DOCKYARD_CSS = `
   }
   .dockyard-root .dockyard-brand { grid-column: 1; grid-row: 1; }
   .dockyard-root .dockyard-tabs { grid-column: 1 / -1; grid-row: 2; width: 100%; }
-  .dockyard-root .dockyard-tab { padding-right: 9px; padding-left: 9px; }
+  .dockyard-root .dockyard-tab { padding-right: 8px; padding-left: 8px; }
   .dockyard-root .dockyard-console-action { grid-column: 3; grid-row: 1; width: 38px; padding: 6px; justify-content: center; }
   .dockyard-root .dockyard-brand-copy { display: none; }
   .dockyard-root .dockyard-console-action-label { display: none; }
@@ -1396,7 +1371,7 @@ const DOCKYARD_CSS = `
   .dockyard-root .dockyard-workload-card,
   .dockyard-root .dockyard-teams-layout,
   .dockyard-root .dockyard-loop-layout,
-  .dockyard-root .dockyard-workflows-layout { grid-template-columns: 1fr; }
+  .dockyard-root .dockyard-saved-views-layout { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-backlog-item { grid-template-columns: 42px minmax(0, 1fr); }
   .dockyard-root .dockyard-backlog-item > .dockyard-status-tag,
   .dockyard-root .dockyard-rank-actions { grid-column: 2; justify-self: start; }
@@ -1748,7 +1723,7 @@ function ConsoleBar({ tab, counts, onTab, onNewProject }) {
     ['backlog', 'Backlog', null],
     ['teams', 'Bot teams', null],
     ['initiative', 'Initiative', null],
-    ['workflows', 'Workflows', null],
+    ['workflows', 'Saved views', null],
     ['inbox', 'Approvals', counts.approvals],
     ['notifications', 'Notifications', counts.notifications],
   ]
@@ -1882,6 +1857,11 @@ function initials(value) {
   return words.slice(0, 2).map((word) => word.charAt(0).toUpperCase()).join('') || '?'
 }
 
+function readableLabel(value, fallback = 'All') {
+  const text = String(value || fallback).replace(/[_-]+/g, ' ').trim()
+  return text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : fallback
+}
+
 function validationSummary(contract) {
   if (!contract || typeof contract !== 'object') return 'No validation contract supplied'
   const steps = Array.isArray(contract.steps) ? contract.steps.filter(Boolean) : []
@@ -1943,21 +1923,25 @@ async function loadBacklogData(projectId) {
   const dashboard = await api('/dashboard')
   const projects = sortProjects(dashboard.projects ?? [])
   const project = projects.find((item) => item.id === projectId) ?? projects[0]
-  if (!project) return { project: null, projects, backlog: [], workItems: [] }
+  if (!project) return { project: null, projects, backlog: [], workItems: [], initiatives: [], bots: [] }
   const encoded = encodeURIComponent(project.id)
-  const [backlog, workItems] = await Promise.all([
+  const [backlog, workItems, initiatives, bots] = await Promise.all([
     api(`/projects/${encoded}/backlog`),
     api(`/projects/${encoded}/work-items`),
+    api(`/projects/${encoded}/initiatives`),
+    api('/bots'),
   ])
   return {
     project,
     projects,
     backlog: backlog.backlog ?? [],
     workItems: workItems.work_items ?? [],
+    initiatives: initiatives.initiatives ?? [],
+    bots: bots.bots ?? [],
   }
 }
 
-async function loadWorkflowsData(projectId) {
+async function loadSavedViewsData(projectId) {
   const dashboard = await api('/dashboard')
   const projects = sortProjects(dashboard.projects ?? [])
   const project = projects.find((item) => item.id === projectId) ?? projects[0]
@@ -2247,8 +2231,38 @@ function ProjectSettingsPanel({ project, settings, onRefresh }) {
   const [form, setForm] = useState(buildForm)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
+  const [pendingLifecycle, setPendingLifecycle] = useState(null)
+  const [lifecycleBusy, setLifecycleBusy] = useState(false)
+  const [lifecycleState, setLifecycleState] = useState(settings)
+  useEffect(() => {
+    if (!pendingLifecycle) return undefined
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape' && !lifecycleBusy) setPendingLifecycle(null)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [pendingLifecycle, lifecycleBusy])
+  const enabled = lifecycleState?.enabled !== false
+  const phase = lifecycleState?.phase || project.phase || 'unknown'
+  const lifecycleCopy = {
+    enable: { endpoint: 're-enable', label: 'Enable', past: 'enabled' },
+    disable: { endpoint: 'disable', label: 'Disable', past: 'disabled' },
+    pause: { endpoint: 'pause', label: 'Pause', past: 'paused' },
+    resume: { endpoint: 'resume', label: 'Resume', past: 'resumed' },
+    freeze: { endpoint: 'freeze', label: 'Freeze', past: 'frozen' },
+  }
+  const lifecycleActions = !enabled
+    ? ['enable']
+    : phase === 'active'
+      ? ['pause', 'freeze', 'disable']
+      : phase === 'paused'
+        ? ['resume', 'freeze', 'disable']
+        : phase === 'frozen'
+          ? ['resume', 'disable']
+          : ['disable']
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }))
   const save = async () => {
+    if (!enabled) return
     setSaving(true)
     setMessage(null)
     try {
@@ -2284,12 +2298,44 @@ function ProjectSettingsPanel({ project, settings, onRefresh }) {
     }
     setSaving(false)
   }
+  const confirmLifecycle = async () => {
+    const config = lifecycleCopy[pendingLifecycle]
+    if (!config) return
+    setLifecycleBusy(true)
+    setMessage(null)
+    try {
+      await api(`/projects/${encodeURIComponent(project.id)}/${config.endpoint}`, { method: 'POST', body: {} })
+      const readback = await api(`/projects/${encodeURIComponent(project.id)}/settings`)
+      setLifecycleState(readback)
+      setPendingLifecycle(null)
+      emitToast('success', `Project ${config.past}.`)
+    } catch (failure) {
+      setMessage({ tone: 'danger', text: String(failure?.message ?? failure) })
+    }
+    setLifecycleBusy(false)
+  }
   return jsxs('section', { className: 'dockyard-feature-card dockyard-settings-card', 'data-project-settings-form': true, children: [
     jsxs('header', { className: 'dockyard-section-head', children: [
       jsxs('div', { children: [jsx('h2', { children: 'Project configuration' }), jsx('p', { children: 'Ownership, autonomy, verification, release and notification boundaries.' })] }),
-      jsx(StatusTag, { tone: settings?.phase === 'active' ? 'success' : 'warning', label: settings?.phase || project.phase || 'unknown' }),
+      jsxs('div', { className: 'dockyard-project-state-summary', children: [
+        jsx('span', { 'data-project-enabled-state': true, children: jsx(StatusTag, { tone: enabled ? 'success' : 'neutral', label: enabled ? 'Enabled' : 'Disabled' }) }),
+        jsx('span', { 'data-project-phase-state': true, children: jsx(StatusTag, { tone: phase === 'active' ? 'success' : 'warning', label: phase.charAt(0).toUpperCase() + phase.slice(1) }) }),
+      ]}),
     ]}),
-    jsxs('div', { className: 'dockyard-settings-grid', children: [
+    jsxs('section', { className: 'dockyard-lifecycle-panel', 'data-project-lifecycle': true, children: [
+      jsxs('header', { children: [
+        jsxs('div', { children: [jsx('h3', { children: 'Project lifecycle' }), jsx('p', { children: enabled ? 'Only actions valid for the current phase are available.' : 'Configuration remains readable while the project is disabled.' })] }),
+        jsx('div', { className: 'dockyard-lifecycle-actions', children: lifecycleActions.map((action) => jsx('button', {
+          type: 'button',
+          className: `dockyard-button small${['disable', 'freeze'].includes(action) ? ' danger' : action === 'enable' ? ' primary' : ''}`,
+          'data-lifecycle-action': action,
+          disabled: lifecycleBusy,
+          onClick: () => setPendingLifecycle(action),
+          children: lifecycleCopy[action].label,
+        }, action)) }),
+      ]}),
+    ]}),
+    jsxs('fieldset', { className: 'dockyard-settings-grid dockyard-settings-fieldset', disabled: !enabled, children: [
       jsxs('label', { className: 'dockyard-field dockyard-field-wide', children: [
         jsx('span', { children: 'Mission' }),
         jsx('textarea', { 'data-setting-field': 'mission', rows: 3, value: form.mission, onInput: (event) => update('mission', event.target.value), onChange: (event) => update('mission', event.target.value) }),
@@ -2348,7 +2394,17 @@ function ProjectSettingsPanel({ project, settings, onRefresh }) {
       ]}),
     ]}),
     message ? jsx('p', { className: message.tone === 'danger' ? 'dockyard-inline-error' : 'dockyard-inline-success', role: 'status', children: message.text }) : null,
-    jsx(Button, { action: 'save-project-settings', variant: 'primary', disabled: saving || !form.mission.trim(), onClick: save, children: saving ? 'Saving...' : 'Save configuration' }),
+    jsx(Button, { action: 'save-project-settings', variant: 'primary', disabled: !enabled || saving || !form.mission.trim(), onClick: save, children: saving ? 'Saving...' : 'Save configuration' }),
+    jsxs('section', { className: 'dockyard-modal-layer', 'data-lifecycle-confirm': true, hidden: !pendingLifecycle, children: [
+      jsxs('div', { className: 'dockyard-modal', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'dockyard-lifecycle-title', children: [
+        jsx('h2', { id: 'dockyard-lifecycle-title', children: `${lifecycleCopy[pendingLifecycle]?.label || 'Change'} project?` }),
+        jsx('p', { children: `This changes ${project.id} from its current ${enabled ? 'enabled' : 'disabled'} and ${phase} state.` }),
+        jsxs('div', { className: 'dockyard-modal-actions', children: [
+          jsx(Button, { disabled: lifecycleBusy, onClick: () => setPendingLifecycle(null), children: 'Cancel' }),
+          jsx(Button, { action: 'confirm-lifecycle-action', variant: ['disable', 'freeze'].includes(pendingLifecycle) ? 'danger' : 'primary', disabled: lifecycleBusy, onClick: confirmLifecycle, children: lifecycleBusy ? 'Applying...' : `Confirm ${lifecycleCopy[pendingLifecycle]?.label || 'change'}` }),
+        ]}),
+      ]}),
+    ]}),
   ]})
 }
 
@@ -2586,8 +2642,23 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createSaving, setCreateSaving] = useState(false)
+  const [createError, setCreateError] = useState(null)
+  const [createForm, setCreateForm] = useState({
+    type: 'task', title: '', assignee: '', initiative: '', rank: '1', reason: '',
+  })
+  useEffect(() => {
+    if (!createOpen) return undefined
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape' && !createSaving) setCreateOpen(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [createOpen, createSaving])
   const project = view.project
   if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Select a project before prioritising its backlog.', icon: 'project' })
+  const canCreate = project.enabled !== false && project.phase === 'active'
   const workByRef = Object.fromEntries((view.workItems ?? []).map((item) => [item.ref, item]))
   const entries = [...(view.backlog ?? [])].sort((left, right) => Number(left.rank) - Number(right.rank))
   const requestMove = (entry, newRank) => {
@@ -2612,6 +2683,44 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
     }
     setSaving(false)
   }
+  const updateCreate = (key, value) => setCreateForm((current) => ({ ...current, [key]: value }))
+  const maxInitialRank = entries.length + 1
+  const initialRank = Number(createForm.rank)
+  const createValid = createForm.title.trim().length >= 3
+    && Boolean(createForm.assignee)
+    && Number.isInteger(initialRank)
+    && initialRank >= 1
+    && initialRank <= maxInitialRank
+    && createForm.reason.trim().length >= 4
+  const openCreate = () => {
+    if (!canCreate) return
+    setCreateForm({ type: 'task', title: '', assignee: '', initiative: '', rank: String(maxInitialRank), reason: '' })
+    setCreateError(null)
+    setCreateOpen(true)
+  }
+  const saveCreate = async () => {
+    if (!createValid) return
+    setCreateSaving(true)
+    setCreateError(null)
+    try {
+      const body = {
+        type: createForm.type,
+        title: createForm.title.trim(),
+        assignee_id: createForm.assignee,
+        assignee_kind: 'bot',
+        ...(createForm.initiative ? { initiative_ref: createForm.initiative } : {}),
+        rank: initialRank,
+        reason: createForm.reason.trim(),
+      }
+      const created = await api(`/projects/${encodeURIComponent(project.id)}/backlog/items`, { method: 'POST', body })
+      setCreateOpen(false)
+      emitToast('success', `${created.ref || 'Work item'} created and added to the backlog.`)
+      onRefresh()
+    } catch (failure) {
+      setCreateError(String(failure?.message ?? failure))
+    }
+    setCreateSaving(false)
+  }
   return jsxs('div', { 'data-backlog-board': project.id, children: [
     jsx(PageHead, {
       title: 'Prioritised backlog',
@@ -2625,6 +2734,7 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
         (view.projects ?? []).map((option) => jsx('option', { value: option.id, children: option.id }, option.id)),
       }),
       jsx('span', { className: 'dockyard-meta', children: 'Drag a row or use the move controls. Saving always requires a reason.' }),
+      jsx(Button, { action: 'open-create-backlog-item', variant: 'primary', small: true, disabled: !canCreate, onClick: openCreate, children: 'Create item' }),
     ]}),
     entries.length > 0 ? jsx('section', { className: 'dockyard-backlog-list', children:
       entries.map((entry) => {
@@ -2646,6 +2756,7 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
             jsxs('span', { className: 'dockyard-backlog-copy', children: [
               jsx('strong', { children: item.title }),
               jsx('span', { children: entry.priority_reason || 'No ranking reason supplied' }),
+              jsx('span', { children: `${item.assignee || 'Unassigned'}${item.initiative_ref ? ` / ${item.initiative_ref}` : ''}` }),
             ]}),
             jsx(StatusTag, { tone: item.status === 'in_progress' ? 'info' : 'neutral', label: item.type || 'Item' }),
             jsxs('span', { className: 'dockyard-rank-actions', children: [
@@ -2678,6 +2789,37 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
         jsxs('div', { className: 'dockyard-modal-actions', children: [
           jsx(Button, { onClick: () => setPendingMove(null), children: 'Cancel' }),
           jsx(Button, { variant: 'primary', disabled: saving || !reason.trim(), onClick: saveMove, children: saving ? 'Saving...' : 'Save reason and move' }),
+        ]}),
+      ]}),
+    ]}),
+    jsxs('section', { className: 'dockyard-modal-layer', hidden: !createOpen, children: [
+      jsxs('form', { className: 'dockyard-modal', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'dockyard-create-title', 'data-create-backlog-item': true, onSubmit: (event) => { event.preventDefault(); saveCreate() }, children: [
+        jsx('h2', { id: 'dockyard-create-title', children: 'Create backlog item' }),
+        jsx('p', { children: `Create and rank one item in ${project.id}. Nothing is saved until submission succeeds.` }),
+        jsxs('div', { className: 'dockyard-creator-summary', children: [jsx('strong', { children: 'Sahil is recorded as creator' }), jsx('span', { children: 'Choose a separate bot assignee for delivery ownership.' })] }),
+        jsxs('div', { className: 'dockyard-settings-grid', children: [
+          jsxs('label', { className: 'dockyard-field dockyard-field-wide', children: [jsx('span', { children: 'Title' }), jsx('input', { 'data-create-field': 'title', value: createForm.title, onInput: (event) => updateCreate('title', event.target.value), onChange: (event) => updateCreate('title', event.target.value), placeholder: 'Describe the delivery outcome' })] }),
+          jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Type' }), jsx('select', { 'data-create-field': 'type', value: createForm.type, onChange: (event) => updateCreate('type', event.target.value), children: [
+            jsx('option', { value: 'task', children: 'Task' }, 'task'),
+            jsx('option', { value: 'bug', children: 'Bug' }, 'bug'),
+            jsx('option', { value: 'spike', children: 'Spike' }, 'spike'),
+            jsx('option', { value: 'epic', children: 'Epic' }, 'epic'),
+          ]})] }),
+          jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Assignee' }), jsx('select', { 'data-create-field': 'assignee', value: createForm.assignee, onChange: (event) => updateCreate('assignee', event.target.value), children: [
+            jsx('option', { value: '', children: 'Select a bot' }, 'none'),
+            ...(view.bots ?? []).map((bot) => jsx('option', { value: bot.id, children: bot.name || bot.id }, bot.id)),
+          ]})] }),
+          jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Initiative (optional)' }), jsx('select', { 'data-create-field': 'initiative', value: createForm.initiative, onChange: (event) => updateCreate('initiative', event.target.value), children: [
+            jsx('option', { value: '', children: 'No initiative' }, 'none'),
+            ...(view.initiatives ?? []).map((initiative) => jsx('option', { value: initiative.ref, children: `${initiative.ref} / ${initiative.title}` }, initiative.ref)),
+          ]})] }),
+          jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Initial rank' }), jsx('input', { type: 'number', min: 1, max: maxInitialRank, 'data-create-field': 'rank', value: createForm.rank, onInput: (event) => updateCreate('rank', event.target.value), onChange: (event) => updateCreate('rank', event.target.value) })] }),
+          jsxs('label', { className: 'dockyard-field dockyard-field-wide', children: [jsx('span', { children: 'Priority reason' }), jsx('textarea', { rows: 3, 'data-create-field': 'reason', value: createForm.reason, onInput: (event) => updateCreate('reason', event.target.value), onChange: (event) => updateCreate('reason', event.target.value), placeholder: 'Why should this item hold this rank?' })] }),
+        ]}),
+        createError ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: createError }) : null,
+        jsxs('div', { className: 'dockyard-modal-actions', children: [
+          jsx(Button, { disabled: createSaving, onClick: () => setCreateOpen(false), children: 'Cancel' }),
+          jsx(Button, { action: 'submit-create-backlog-item', variant: 'primary', disabled: createSaving || !createValid, onClick: saveCreate, children: createSaving ? 'Creating...' : 'Create and add' }),
         ]}),
       ]}),
     ]}),
@@ -2922,22 +3064,14 @@ function InitiativeView({ view, onRefresh }) {
   ]})
 }
 
-function WorkflowsView({ view, onSelectProject, onRefresh }) {
+function SavedViewsView({ view, onSelectProject, onRefresh }) {
   const [name, setName] = useState('Owner focus')
   const [layout, setLayout] = useState('board')
   const [statusFilter, setStatusFilter] = useState('in_progress')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
-  const [selectedNode, setSelectedNode] = useState('build')
   const [selectedView, setSelectedView] = useState(null)
   const project = view.project
-  const nodes = [
-    { id: 'verify', label: 'Verify', state: 'done', detail: 'Project state verified', description: 'Canonical project settings, work and recent evidence are available.' },
-    { id: 'build', label: 'Build + test', state: 'current', detail: 'Delivery in progress', description: 'The assigned team is building and testing inside the declared project boundary.' },
-    { id: 'gate', label: 'Human gate', state: 'waiting', detail: 'Owner decision', description: 'Risk or policy-bound changes pause here until an owner decides.' },
-    { id: 'observe', label: 'Observe', state: 'queued', detail: 'Outcome observation', description: 'Measure the released outcome against the declared success signal.' },
-  ]
-  const selected = nodes.find((node) => node.id === selectedNode) ?? nodes[1]
   const applySavedView = (saved) => {
     setSelectedView(saved.name)
     setName(saved.name ?? '')
@@ -2954,70 +3088,52 @@ function WorkflowsView({ view, onSelectProject, onRefresh }) {
         body: { name: name.trim(), layout, filters: { status: statusFilter }, shared: false },
       })
       setSelectedView(name.trim())
+      emitToast('success', `Saved view ${name.trim()}.`)
       onRefresh()
     } catch (failure) {
       setError(String(failure?.message ?? failure))
     }
     setSaving(false)
   }
-  if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Select a project before creating a workflow view.', icon: 'project' })
-  return jsxs('div', { 'data-workflows-screen': project.id, children: [
-    jsx(PageHead, { title: 'Workflows', description: 'Inspect a bounded delivery path and save reusable project views.', status: `${number(view.views?.length ?? 0)} saved`, onRefresh }),
+  if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Select a project before saving a display layout.', icon: 'project' })
+  return jsxs('div', { 'data-saved-views-screen': project.id, children: [
+    jsx(PageHead, { title: 'Saved views', description: 'Reusable display layouts and filters over canonical project work.', status: `${number(view.views?.length ?? 0)} saved`, onRefresh }),
     jsxs('div', { className: 'dockyard-project-toolbar', children: [
       jsx('label', { children: 'Project' }),
       jsx('select', { value: project.id, onChange: (event) => onSelectProject(event.target.value), children:
         (view.projects ?? []).map((option) => jsx('option', { value: option.id, children: option.id }, option.id)),
       }),
-      jsx('span', { className: 'dockyard-meta', children: 'Saved definitions shape a view. They never expand project permissions.' }),
+      jsx('span', { className: 'dockyard-meta', children: 'Saved definitions affect presentation only. They never expand project permissions.' }),
     ]}),
-    jsxs('section', { className: 'dockyard-feature-card dockyard-workflow-dynamic', children: [
-      jsxs('header', { className: 'dockyard-section-head', children: [
-        jsxs('div', { children: [jsx('span', { className: 'dockyard-card-label', children: 'LIVE DELIVERY PATH' }), jsx('h2', { children: 'Verified improvement loop' }), jsx('p', { children: 'Select a node to inspect its current state and operating boundary.' })] }),
-        jsx(Button, { small: true, onClick: () => onSelectProject(project.id), children: 'Open project' }),
-      ]}),
-      jsx('div', { className: 'dockyard-workflow-graph', role: 'group', 'aria-label': 'Interactive project workflow', 'data-workflow-visual': true, children:
-        nodes.map((node, index) => jsxs(Fragment, { children: [
-          index > 0 ? jsx('span', { className: `dockyard-workflow-edge ${node.state === 'current' ? 'active' : index <= 2 ? 'done' : 'waiting'}`, 'aria-hidden': true }) : null,
-          jsxs('button', {
-            type: 'button',
-            className: `dockyard-workflow-node ${node.state}${selectedNode === node.id ? ' selected' : ''}`,
-            'data-workflow-node': node.id,
-            'aria-pressed': selectedNode === node.id,
-            onClick: () => setSelectedNode(node.id),
-            children: [jsx('span', { children: node.label }), jsx('small', { children: node.state })],
-          }),
-        ]}, node.id)),
-      }),
-      jsxs('div', { className: `dockyard-workflow-detail ${selected.state}`, 'data-workflow-detail': selected.id, children: [
-        jsxs('div', { children: [jsx(StatusTag, { tone: selected.state === 'done' ? 'success' : selected.state === 'current' ? 'info' : 'warning', label: selected.state }), jsx('strong', { children: selected.detail })] }),
-        jsx('p', { children: selected.description }),
-      ]}),
+    jsxs('section', { className: 'dockyard-saved-views-notice', children: [
+      jsx('strong', { children: 'Display preferences only' }),
+      jsx('span', { children: 'Saved views change how canonical work is displayed. They do not run automations or assign work.' }),
     ]}),
-    jsxs('div', { className: 'dockyard-workflows-layout', children: [
+    jsxs('div', { className: 'dockyard-saved-views-layout', children: [
       jsxs('section', { className: 'dockyard-feature-card', children: [
-        jsxs('div', { className: 'dockyard-section-head', children: [jsxs('div', { children: [jsx('h2', { children: 'Saved workflows' }), jsx('p', { children: 'Select a saved view to load it into the editor.' })] }), jsx(StatusTag, { tone: 'neutral', label: `${number(view.views?.length ?? 0)} total` })] }),
-        jsx('div', { className: 'dockyard-saved-workflows', children:
+        jsxs('div', { className: 'dockyard-section-head', children: [jsxs('div', { children: [jsx('h2', { children: 'Saved views' }), jsx('p', { children: 'Select a saved view to load it into the editor.' })] }), jsx(StatusTag, { tone: 'neutral', label: `${number(view.views?.length ?? 0)} total` })] }),
+        jsx('div', { className: 'dockyard-saved-views', children:
           (view.views ?? []).length > 0
-            ? view.views.map((saved) => jsxs('button', { type: 'button', className: selectedView === saved.name ? 'active' : '', 'data-saved-workflow': saved.name, onClick: () => applySavedView(saved), children: [
-                jsxs('span', { children: [jsx('strong', { children: saved.name }), jsx('small', { children: `${saved.layout} / ${JSON.stringify(saved.filters ?? {})}` })] }),
+            ? view.views.map((saved) => jsxs('button', { type: 'button', className: selectedView === saved.name ? 'active' : '', 'data-saved-view': saved.name, onClick: () => applySavedView(saved), children: [
+                jsxs('span', { children: [jsx('strong', { children: saved.name }), jsx('small', { children: `${readableLabel(saved.layout, 'Board')} / ${readableLabel(saved.filters?.status)}` })] }),
                 jsx(Icon, { name: 'chevron' }),
               ]}, saved.name))
-            : jsx('p', { className: 'dockyard-meta', children: 'No saved workflows yet.' }),
+            : jsx('p', { className: 'dockyard-meta', children: 'No saved views yet.' }),
         }),
       ]}),
       jsxs('aside', { className: 'dockyard-feature-card', children: [
-        jsxs('div', { className: 'dockyard-workflow-creator', 'data-workflow-creator': true, children: [
-          jsxs('div', { className: 'dockyard-section-head', children: [jsxs('div', { children: [jsx('h2', { children: selectedView ? 'Edit workflow view' : 'Create workflow view' }), jsx('p', { children: 'Persist a bounded lens over canonical project work.' })] }), selectedView ? jsx(StatusTag, { tone: 'info', label: 'loaded' }) : null] }),
-          jsx('label', { htmlFor: 'dockyard-workflow-name', children: 'Name' }),
-          jsx('input', { id: 'dockyard-workflow-name', value: name, onChange: (event) => setName(event.target.value) }),
-          jsx('label', { htmlFor: 'dockyard-workflow-layout', children: 'Layout' }),
-          jsx('select', { id: 'dockyard-workflow-layout', value: layout, onChange: (event) => setLayout(event.target.value), children: [
+        jsxs('div', { className: 'dockyard-saved-view-editor', 'data-saved-view-editor': true, children: [
+          jsxs('div', { className: 'dockyard-section-head', children: [jsxs('div', { children: [jsx('h2', { children: selectedView ? 'Edit saved view' : 'Create saved view' }), jsx('p', { children: 'Persist a bounded lens over canonical project work.' })] }), selectedView ? jsx(StatusTag, { tone: 'info', label: 'loaded' }) : null] }),
+          jsx('label', { htmlFor: 'dockyard-view-name', children: 'Name' }),
+          jsx('input', { id: 'dockyard-view-name', value: name, onChange: (event) => setName(event.target.value) }),
+          jsx('label', { htmlFor: 'dockyard-view-layout', children: 'Layout' }),
+          jsx('select', { id: 'dockyard-view-layout', value: layout, onChange: (event) => setLayout(event.target.value), children: [
             jsx('option', { value: 'board', children: 'Board' }, 'board'),
             jsx('option', { value: 'table', children: 'Table' }, 'table'),
             jsx('option', { value: 'timeline', children: 'Timeline' }, 'timeline'),
           ]}),
-          jsx('label', { htmlFor: 'dockyard-workflow-status', children: 'Status filter' }),
-          jsx('select', { id: 'dockyard-workflow-status', value: statusFilter, onChange: (event) => setStatusFilter(event.target.value), children: [
+          jsx('label', { htmlFor: 'dockyard-view-status', children: 'Status filter' }),
+          jsx('select', { id: 'dockyard-view-status', value: statusFilter, onChange: (event) => setStatusFilter(event.target.value), children: [
             jsx('option', { value: 'in_progress', children: 'In progress' }, 'in_progress'),
             jsx('option', { value: 'in_review', children: 'In review' }, 'in_review'),
             jsx('option', { value: 'backlog', children: 'Backlog' }, 'backlog'),
@@ -3280,7 +3396,7 @@ function DashboardPage() {
       : tab === 'initiative'
         ? () => loadProjectData(selectedProject)
       : tab === 'workflows'
-        ? () => loadWorkflowsData(selectedProject)
+        ? () => loadSavedViewsData(selectedProject)
       : tab === 'inbox'
         ? loadInboxData
         : () => api('/notifications')
@@ -3343,7 +3459,7 @@ function DashboardPage() {
   } else if (tab === 'initiative') {
     content = jsx(InitiativeView, { view: payload, onRefresh: refresh })
   } else if (tab === 'workflows') {
-    content = jsx(WorkflowsView, { view: payload, onSelectProject: setSelectedProject, onRefresh: refresh })
+    content = jsx(SavedViewsView, { view: payload, onSelectProject: setSelectedProject, onRefresh: refresh })
   } else if (tab === 'inbox') {
     content = jsx(InboxView, { view: payload, onRefresh: refresh })
   } else {

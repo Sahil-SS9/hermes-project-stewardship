@@ -77,6 +77,33 @@ def test_pause_resume_freeze(svc, enabled):
     assert svc.settings(enabled)["phase"] == "frozen"
 
 
+def test_settings_readable_when_disabled_for_re_enable(svc, enabled):
+    """Disabled project state must remain readable so the user can re-enable."""
+    svc.disable(enabled)
+    # default settings() raises when disabled; include_disabled=True must read
+    with pytest.raises(ServiceError):
+        svc.settings(enabled)
+    read = svc.settings(enabled, include_disabled=True)
+    assert read["enabled"] is False
+    assert read["phase"] == "active"  # disable keeps phase=active
+    # re-enable flips back without requiring mission/lead via the dedicated path
+    re_enabled = svc.re_enable(enabled)
+    assert re_enabled["enabled"] is True and re_enabled["phase"] == "active"
+
+
+def test_re_enable_preserves_mission_and_owners(svc, enabled):
+    svc.update_settings(enabled, mission="original mission text",
+                        lead_profile="lead", member_profiles=["coder", "qa"])
+    svc.disable(enabled)
+    read = svc.settings(enabled, include_disabled=True)
+    assert read["mission"] == "original mission text"
+    out = svc.re_enable(enabled)
+    assert out["enabled"] is True
+    assert out["mission"] == "original mission text"
+    assert out["owner"]["lead_profile"] == "lead"
+    assert out["owner"]["member_profiles"] == ["coder", "qa"]
+
+
 def test_initiative_requires_rationale(svc, enabled):
     with pytest.raises(ServiceError):
         svc.propose_initiative(enabled, title="t", rationale="   ")

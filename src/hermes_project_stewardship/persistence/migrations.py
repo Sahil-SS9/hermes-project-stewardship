@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 9
 
 
 @dataclass(frozen=True)
@@ -470,6 +470,26 @@ MIGRATIONS: List[Migration] = [
         """,
         downgrade_sql="""
         DROP TABLE IF EXISTS dockyard_reports;
+        """,
+    ),
+    Migration(
+        version=9,
+        name="dockyard work item ↔ initiative first-class relation",
+        upgrade_sql="""
+        -- Slice 3: backlog work items can be linked to an existing project
+        -- initiative as a first-class validated relation. Cross-project
+        -- references and unknown refs are rejected at the service layer and
+        -- by the FK on `initiative_ref`.
+        ALTER TABLE dockyard_work_items
+            ADD COLUMN initiative_ref TEXT
+            REFERENCES project_initiatives(ref)
+            ON DELETE SET NULL;
+        CREATE INDEX IF NOT EXISTS idx_dwi_initiative
+            ON dockyard_work_items(initiative_ref);
+        """,
+        downgrade_sql="""
+        DROP INDEX IF EXISTS idx_dwi_initiative;
+        ALTER TABLE dockyard_work_items DROP COLUMN initiative_ref;
         """,
     ),
 ]

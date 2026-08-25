@@ -40,12 +40,12 @@ const POPULATED = {
   },
   settings: {
     'demo-project': {
-      project_id: 'demo-project', mission: 'Seeded demo for desktop review', autonomy_level: 1, phase: 'active',
+      project_id: 'demo-project', enabled: true, mission: 'Seeded demo for desktop review', autonomy_level: 1, phase: 'active',
       owner: { lead_profile: 'octacon', member_profiles: ['quan'] },
       policies: { autonomy: {}, verification: { require_tests: true, max_open_initiatives: 3 }, release: { require_rollback: true, soak_hours: 24 }, notification: { severity_threshold: 'medium', digest: 'daily' } },
     },
     'payments-relaunch': {
-      project_id: 'payments-relaunch', mission: 'Checkout reliability rebuild', autonomy_level: 1, phase: 'active',
+      project_id: 'payments-relaunch', enabled: true, mission: 'Checkout reliability rebuild', autonomy_level: 1, phase: 'active',
       owner: { lead_profile: 'octacon', member_profiles: ['quan', 'wesker'] },
       policies: { autonomy: {}, verification: { require_tests: true, max_open_initiatives: 2 }, release: { require_rollback: true, soak_hours: 12 }, notification: { severity_threshold: 'high', digest: 'immediate' } },
     },
@@ -249,6 +249,51 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       if (item) item.acked = true;
       data.dashboard.totals.unacked_notifications = data.notifications.notifications.filter((note) => !note.acked).length;
       return { ok: true, id, acked: true };
+    }
+    const createQueued = path.match(/^\/projects\/([^/]+)\/backlog\/items$/);
+    if (method === 'POST' && createQueued) {
+      const projectId = decodeURIComponent(createQueued[1]);
+      const rank = Number(init.body?.rank ?? 1);
+      data.workItems[projectId] ??= { work_items: [] };
+      data.backlog[projectId] ??= { backlog: [] };
+      const ref = `HDY-${16 + data.workItems[projectId].work_items.length}`;
+      for (const entry of data.backlog[projectId].backlog) {
+        if (Number(entry.rank) >= rank) entry.rank = Number(entry.rank) + 1;
+      }
+      const item = {
+        ref,
+        type: init.body?.type ?? 'task',
+        title: init.body?.title,
+        status: 'backlog',
+        assignee: init.body?.assignee_id,
+        created_by: 'sahil',
+        initiative_ref: init.body?.initiative_ref || null,
+        priority_rank: rank,
+        evidence_refs: [],
+      };
+      data.workItems[projectId].work_items.push(item);
+      data.backlog[projectId].backlog.push({
+        item_ref: ref,
+        rank,
+        priority_reason: init.body?.reason,
+        aged_since: '2026-08-25T12:00:00+00:00',
+      });
+      data.backlog[projectId].backlog.sort((left, right) => left.rank - right.rank);
+      return { ...item, rank, priority_reason: init.body?.reason };
+    }
+    const lifecycle = path.match(/^\/projects\/([^/]+)\/(disable|re-enable|pause|resume|freeze)$/);
+    if (method === 'POST' && lifecycle) {
+      const projectId = decodeURIComponent(lifecycle[1]);
+      const action = lifecycle[2];
+      const settings = data.settings[projectId];
+      const project = data.dashboard.projects.find((candidate) => candidate.id === projectId);
+      if (action === 'disable') settings.enabled = false;
+      if (action === 're-enable') { settings.enabled = true; settings.phase = 'active'; }
+      if (action === 'pause') settings.phase = 'paused';
+      if (action === 'resume') settings.phase = 'active';
+      if (action === 'freeze') settings.phase = 'frozen';
+      if (project) { project.enabled = settings.enabled; project.phase = settings.phase; }
+      return clone(settings);
     }
     const rerank = path.match(/^\/projects\/([^/]+)\/backlog\/([^/]+)\/rerank$/);
     if (method === 'POST' && rerank) {
@@ -578,6 +623,68 @@ async function testProjectDashboardScreen() {
   await runtime.dispose();
 }
 
+async function testProjectLifecycleStateAndConfirmedActions() {
+  const runtime = await createRuntime();
+  await runtime.mount();
+  await runtime.click('[data-tab="project"]', 80);
+  await runtime.click('[data-project-view="settings"]');
+  const doc = runtime.dom.window.document;
+  const assertAction = (action, present = true) => {
+    assert.equal(Boolean(doc.querySelector(`[data-lifecycle-action="${action}"]`)), present, `${action} action visibility is wrong`);
+  };
+  const runAction = async (action, path) => {
+    await runtime.click(`[data-lifecycle-action="${action}"]`);
+    const confirmation = doc.querySelector('[data-lifecycle-confirm]');
+    assert(confirmation && !confirmation.hidden, `${action} did not ask for confirmation`);
+    assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === path), `${action} mutated state before confirmation`);
+    await runtime.click('[data-action="confirm-lifecycle-action"]', 100);
+    await runtime.flush(120);
+    assert(runtime.calls.some((call) => call.method === 'POST' && call.path === path), `${action} POST was not sent`);
+  };
+
+  assert.equal(doc.querySelector('[data-project-enabled-state]')?.textContent.trim(), 'Enabled');
+  assert.equal(doc.querySelector('[data-project-phase-state]')?.textContent.trim(), 'Active');
+  assertAction('disable');
+  assertAction('pause');
+  assertAction('freeze');
+  assertAction('enable', false);
+  assertAction('resume', false);
+
+  await runtime.click('[data-lifecycle-action="disable"]');
+  await act(async () => {
+    runtime.dom.window.dispatchEvent(new runtime.dom.window.KeyboardEvent('keydown', { key: 'Escape' }));
+    await wait(30);
+  });
+  assert(doc.querySelector('[data-lifecycle-confirm]')?.hidden, 'Escape did not close lifecycle confirmation');
+  assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/disable'), 'Escape triggered a lifecycle mutation');
+
+  await runAction('disable', '/projects/payments-relaunch/disable');
+  assert.equal(doc.querySelector('[data-project-enabled-state]')?.textContent.trim(), 'Disabled');
+  assert(doc.querySelector('[data-setting-field="mission"]')?.matches(':disabled'), 'disabled project settings remain editable');
+  assertAction('enable');
+  assertAction('disable', false);
+  assertAction('pause', false);
+  await runAction('enable', '/projects/payments-relaunch/re-enable');
+
+  await runAction('pause', '/projects/payments-relaunch/pause');
+  assert.equal(doc.querySelector('[data-project-phase-state]')?.textContent.trim(), 'Paused');
+  assertAction('resume');
+  assertAction('freeze');
+  assertAction('pause', false);
+
+  await runtime.click('[data-tab="backlog"]', 80);
+  assert(doc.querySelector('[data-action="open-create-backlog-item"]')?.disabled, 'paused project still allows the create-item modal to open');
+  await runtime.click('[data-tab="project"]', 80);
+  await runtime.click('[data-project-view="settings"]');
+  await runAction('resume', '/projects/payments-relaunch/resume');
+
+  await runAction('freeze', '/projects/payments-relaunch/freeze');
+  assert.equal(doc.querySelector('[data-project-phase-state]')?.textContent.trim(), 'Frozen');
+  assertAction('resume');
+  assertAction('freeze', false);
+  await runtime.dispose();
+}
+
 async function testBacklogBoardAndReasonGate() {
   const runtime = await createRuntime();
   await runtime.mount();
@@ -591,6 +698,57 @@ async function testBacklogBoardAndReasonGate() {
   assert(modal && !modal.hidden, 'rank change did not open the mandatory reason-capture modal');
   assert(modal.querySelector('textarea'), 'reason modal is missing its reason field');
   assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/backlog'), 'backlog screen did not use the backend route');
+  await runtime.dispose();
+}
+
+async function testBacklogCreateFormValidationAndReadback() {
+  const runtime = await createRuntime();
+  await runtime.mount();
+  await runtime.click('[data-tab="backlog"]', 80);
+  const doc = runtime.dom.window.document;
+  await runtime.click('[data-action="open-create-backlog-item"]');
+  const form = doc.querySelector('[data-create-backlog-item]');
+  assert(form, 'create backlog item form is missing');
+  assert.match(form.textContent, /Sahil.*creator/i, 'creator attribution is not shown separately');
+  assert(form.querySelector('[data-create-field="assignee"]'), 'assignee selector is missing');
+  assert(form.querySelector('[data-create-field="initiative"]'), 'initiative selector is missing');
+  assert(form.querySelector('[data-create-field="rank"]'), 'initial rank field is missing');
+  assert(form.querySelector('[data-action="submit-create-backlog-item"]')?.disabled, 'invalid empty form can be submitted');
+  await act(async () => {
+    runtime.dom.window.dispatchEvent(new runtime.dom.window.KeyboardEvent('keydown', { key: 'Escape' }));
+    await wait(30);
+  });
+  assert(form.parentElement?.hidden, 'Escape did not close the create-item modal');
+  await runtime.click('[data-action="open-create-backlog-item"]');
+
+  await runtime.setValue('[data-create-field="title"]', 'Verify retry idempotency');
+  await runtime.setValue('[data-create-field="assignee"]', 'quan-bot');
+  await runtime.setValue('[data-create-field="initiative"]', 'INI-DEMO-2');
+  await runtime.setValue('[data-create-field="rank"]', '1');
+  await runtime.setValue('[data-create-field="reason"]', 'x');
+  assert(doc.querySelector('[data-action="submit-create-backlog-item"]')?.disabled, 'priority reason shorter than four characters is accepted');
+  await runtime.setValue('[data-create-field="reason"]', 'Protects customers from duplicate charges');
+  const currentSubmit = doc.querySelector('[data-action="submit-create-backlog-item"]');
+  const currentValues = Object.fromEntries(['title', 'assignee', 'initiative', 'rank', 'reason'].map((field) => [field, doc.querySelector(`[data-create-field="${field}"]`)?.value]));
+  assert(!currentSubmit?.disabled, `valid create form remains disabled: ${JSON.stringify(currentValues)}`);
+  await runtime.click('[data-action="submit-create-backlog-item"]', 100);
+
+  const create = runtime.calls.find((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/backlog/items');
+  assert(create, 'atomic create-and-queue POST was not sent');
+  assert.deepEqual(create.body, {
+    type: 'task',
+    title: 'Verify retry idempotency',
+    assignee_id: 'quan-bot',
+    assignee_kind: 'bot',
+    initiative_ref: 'INI-DEMO-2',
+    rank: 1,
+    reason: 'Protects customers from duplicate charges',
+  });
+  const created = [...doc.querySelectorAll('[data-backlog-item]')]
+    .find((entry) => entry.textContent.includes('Verify retry idempotency'));
+  assert(created, 'created backlog item was not read back after refresh');
+  assert.match(created.textContent, /quan-bot/);
+  assert.match(created.textContent, /INI-DEMO-2/);
   await runtime.dispose();
 }
 
@@ -636,26 +794,25 @@ async function testInitiativeLoopScreen() {
   await runtime.dispose();
 }
 
-async function testWorkflowsScreenAndCreator() {
+async function testSavedViewsScreenAndCreator() {
   const runtime = await createRuntime();
   await runtime.mount();
   await runtime.click('[data-tab="workflows"]', 80);
   const doc = runtime.dom.window.document;
-  assert(doc.querySelector('[data-workflows-screen]'), 'workflows screen is missing');
-  assert(doc.querySelector('[data-workflow-visual]'), 'workflow visualisation is missing');
-  assert.equal(doc.querySelectorAll('[data-workflow-node]').length, 4, 'workflow must expose four interactive nodes');
-  assert.equal(doc.querySelector('[data-workflow-node][aria-pressed="true"]')?.getAttribute('data-workflow-node'), 'build', 'current workflow node is not selected');
-  await runtime.click('[data-workflow-node="gate"]');
-  assert.equal(doc.querySelector('[data-workflow-node="gate"]')?.getAttribute('aria-pressed'), 'true', 'workflow node selection did not update');
-  assert.match(doc.querySelector('[data-workflow-detail]').textContent, /Owner decision/);
-  assert.equal(doc.querySelectorAll('[data-saved-workflow]').length, 1, 'saved workflow/view did not render');
-  await runtime.click('[data-saved-workflow="Release focus"]');
-  assert.equal(doc.querySelector('#dockyard-workflow-name')?.value, 'Release focus', 'saved workflow did not populate the editor');
-  assert(doc.querySelector('[data-workflow-creator]'), 'workflow creator is missing');
-  const style = doc.querySelector('style[data-dockyard-style]')?.textContent || '';
-  assert(style.includes('@keyframes dockyard-flow-pulse'), 'workflow motion keyframes are missing');
-  assert(style.includes('prefers-reduced-motion: reduce'), 'workflow motion lacks a reduced-motion fallback');
-  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/views'), 'workflows screen did not load saved backend views');
+  assert.equal(doc.querySelector('[data-tab="workflows"]')?.textContent.trim(), 'Saved views');
+  assert(doc.querySelector('[data-saved-views-screen]'), 'saved views screen is missing');
+  assert.match(doc.body.textContent, /do not run automations/i);
+  assert.match(doc.body.textContent, /displayed/i);
+  assert(!doc.querySelector('[data-workflow-visual]'), 'a fabricated executable workflow is still rendered');
+  assert.equal(doc.querySelectorAll('[data-saved-view]').length, 1, 'saved view did not render');
+  const savedViewRow = doc.querySelector('[data-saved-view="Release focus"]');
+  assert.match(savedViewRow?.textContent || '', /Board\s*\/\s*In progress/, 'saved view exposes raw filter data instead of readable labels');
+  assert(!savedViewRow?.textContent.includes('{'), 'saved view exposes raw JSON');
+  await runtime.click('[data-saved-view="Release focus"]');
+  assert.equal(doc.querySelector('#dockyard-view-name')?.value, 'Release focus', 'saved view did not populate the editor');
+  assert(doc.querySelector('[data-saved-view-editor]'), 'saved view editor is missing');
+  assert(!/Saved workflows|Create workflow|LIVE DELIVERY PATH/.test(doc.body.textContent), 'misleading workflow copy remains visible');
+  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/views'), 'saved views screen did not load backend views');
   await runtime.dispose();
 }
 
@@ -814,6 +971,7 @@ async function testChromiumLayouts() {
     projectSettings: '/tmp/dockyard-project-settings.html',
     projectReports: '/tmp/dockyard-project-reports.html',
     backlog: '/tmp/dockyard-backlog.html',
+    backlogCreate: '/tmp/dockyard-backlog-create.html',
     teams: '/tmp/dockyard-teams.html',
     teamsTranscript: '/tmp/dockyard-teams-transcript.html',
     initiative: '/tmp/dockyard-initiative.html',
@@ -830,6 +988,7 @@ async function testChromiumLayouts() {
     await runtime.click('[data-action="generate-report"]', 60);
   } });
   await writeSnapshot('backlog', snapshots.backlog);
+  await writeSnapshot('backlog', snapshots.backlogCreate, { prepare: (runtime) => runtime.click('[data-action="open-create-backlog-item"]') });
   await writeSnapshot('teams', snapshots.teams);
   await writeSnapshot('teams', snapshots.teamsTranscript, { prepare: async (runtime) => {
     await runtime.click('[data-action="open-bot-sessions"][data-bot-id="octacon-bot"]', 50);
@@ -852,6 +1011,7 @@ async function testChromiumLayouts() {
     { name: 'project-reports-700-dark', file: snapshots.projectReports, width: 700, height: 1000, scheme: 'dark' },
     { name: 'project-reports-1400-light', file: snapshots.projectReports, width: 1400, height: 1000, scheme: 'light' },
     { name: 'backlog-1400-dark', file: snapshots.backlog, width: 1400, height: 1000, scheme: 'dark' },
+    { name: 'backlog-create-700-light', file: snapshots.backlogCreate, width: 700, height: 1000, scheme: 'light' },
     { name: 'teams-1400-light', file: snapshots.teams, width: 1400, height: 1000, scheme: 'light' },
     { name: 'teams-transcript-700-light', file: snapshots.teamsTranscript, width: 700, height: 1000, scheme: 'light' },
     { name: 'teams-transcript-1400-dark', file: snapshots.teamsTranscript, width: 1400, height: 1000, scheme: 'dark' },
@@ -911,7 +1071,8 @@ async function testChromiumLayouts() {
       assert(!measure.rootFont.includes('Times New Roman'), `${spec.name} inherited Times New Roman`);
       const expectedTab = spec.name.startsWith('onboarding-') ? 'dashboard' : spec.name.split('-')[0];
       assert.equal(measure.activeScreen, `dockyard-tab-${expectedTab}`, `${spec.name} captured the wrong active screen`);
-      assert.equal(measure.dialogCount, spec.name.startsWith('onboarding-') ? 1 : 0, `${spec.name} has the wrong modal-dialog state`);
+      const expectedDialogs = spec.name.startsWith('onboarding-') || spec.name.startsWith('backlog-create-') ? 1 : 0;
+      assert.equal(measure.dialogCount, expectedDialogs, `${spec.name} has the wrong modal-dialog state`);
       if (spec.width >= 1200) assert.equal(measure.clippedLoopVisuals, 0, `${spec.name} requires horizontal scrolling for a primary workflow visual`);
       const screenshot = `/tmp/dockyard-${spec.name}.png`;
       await page.screenshot({ path: screenshot, fullPage: true });
@@ -932,10 +1093,12 @@ const tests = [
   ['reference benchmark dashboard composition', testReferenceBenchmarkDashboardComposition],
   ['reference benchmark approval cards and reject', testReferenceBenchmarkApprovalCardsAndReject],
   ['project dashboard screen', testProjectDashboardScreen],
+  ['project lifecycle state and confirmed actions', testProjectLifecycleStateAndConfirmedActions],
   ['backlog board and reason gate', testBacklogBoardAndReasonGate],
+  ['backlog create form validation and readback', testBacklogCreateFormValidationAndReadback],
   ['bot teams screen', testBotTeamsScreen],
   ['initiative loop screen', testInitiativeLoopScreen],
-  ['workflows screen and creator', testWorkflowsScreenAndCreator],
+  ['saved views screen and creator', testSavedViewsScreenAndCreator],
   ['onboarding wizard and toast surface', testOnboardingWizardAndToastSurface],
   ['approval flow', testApprovalFlow],
   ['notification flow', testNotificationFlow],

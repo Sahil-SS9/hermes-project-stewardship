@@ -1,7 +1,8 @@
-# Implementation Checklist — Master Verification Register
+# Implementation Checklist - Historical Verification Register
 
-Single source of truth for the final push. Everything from the concept PRD,
-the 2026-08-21 critical review, and subsequent directives is tracked here.
+> Historical snapshot from 21/08/2026. It is no longer the active backlog. Several open markers below were delivered later. Re-test each claim against current code and use [`../roadmap.md`](../roadmap.md) as the single forward-looking roadmap.
+
+This register preserves the evidence and decisions used for the earlier release gate.
 Nothing ships until every open item is `[x]` with its verification evidence.
 
 Status key: `[x]` done+verified · `[~]` partial (contract/scaffold exists) · `[ ]` open

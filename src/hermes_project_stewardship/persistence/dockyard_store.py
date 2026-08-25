@@ -58,6 +58,7 @@ def _row_to_item(row) -> WorkItem:
         blocked_by=json.loads(row["blocked_by_json"]),
         estimate_days=row["estimate_days"],
         evidence_refs=json.loads(row["evidence_refs_json"]),
+        initiative_ref=row["initiative_ref"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
@@ -77,44 +78,55 @@ class DockyardStore:
         """Insert; when ref unset, derive HDY-n from the assigned rowid
         inside the same transaction (race-safe, G5)."""
         with self.store.tx() as cx:
-            cur = cx.execute(
-                f"""
-                INSERT INTO dockyard_work_items(
-                    project_id, ref, type, title, status,
-                    assignee_id, assignee_kind, created_by_id, created_by_kind,
-                    priority_rank, labels_json, blocked_by_json,
-                    estimate_days, due, evidence_refs_json, created_at, updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """,
-                (
-                    item.project_id,
-                    item.ref or ("tmp-" + cx.execute(
-                        "SELECT hex(randomblob(12))").fetchone()[0]),
-                    item.type.value,
-                    item.title, item.status.value,
-                    item.assignee.id if item.assignee else None,
-                    item.assignee.kind.value if item.assignee else None,
-                    item.created_by.id if item.created_by else None,
-                    item.created_by.kind.value if item.created_by else None,
-                    item.priority_rank,
-                    _j(item.labels), _j(item.blocked_by),
-                    item.estimate_days,
-                    item.due.isoformat() if item.due else None,
-                    _j(item.evidence_refs),
-                    item.created_at.isoformat(), item.updated_at.isoformat(),
-                ),
-            )
-            row_id = cur.lastrowid
-            if not item.ref:
-                seq = cx.execute(
-                    "SELECT COUNT(*) AS n FROM dockyard_work_items WHERE id <= ?",
-                    (row_id,),
-                ).fetchone()["n"]
-                item.ref = make_ref("HDY", seq)
-                cx.execute("UPDATE dockyard_work_items SET ref=? WHERE id=?",
-                           (item.ref, row_id))
-            item.id = row_id
+            self._insert_item(cx, item)
         return item
+
+    def _insert_item(self, cx, item: WorkItem) -> None:
+        """Insert a work item row inside an existing transaction.
+
+        When ``item.ref`` is empty the HDY-n key is derived from the
+        assigned rowid, so concurrent creators never collide. The same row
+        is updated in place to the canonical ref.
+        """
+        cur = cx.execute(
+            """
+            INSERT INTO dockyard_work_items(
+                project_id, ref, type, title, status,
+                assignee_id, assignee_kind, created_by_id, created_by_kind,
+                priority_rank, labels_json, blocked_by_json,
+                estimate_days, due, evidence_refs_json, initiative_ref,
+                created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                item.project_id,
+                item.ref or ("tmp-" + cx.execute(
+                    "SELECT hex(randomblob(12))").fetchone()[0]),
+                item.type.value,
+                item.title, item.status.value,
+                item.assignee.id if item.assignee else None,
+                item.assignee.kind.value if item.assignee else None,
+                item.created_by.id if item.created_by else None,
+                item.created_by.kind.value if item.created_by else None,
+                item.priority_rank,
+                _j(item.labels), _j(item.blocked_by),
+                item.estimate_days,
+                item.due.isoformat() if item.due else None,
+                _j(item.evidence_refs),
+                item.initiative_ref,
+                item.created_at.isoformat(), item.updated_at.isoformat(),
+            ),
+        )
+        row_id = cur.lastrowid
+        if not item.ref:
+            seq = cx.execute(
+                "SELECT COUNT(*) AS n FROM dockyard_work_items WHERE id <= ?",
+                (row_id,),
+            ).fetchone()["n"]
+            item.ref = make_ref("HDY", seq)
+            cx.execute("UPDATE dockyard_work_items SET ref=? WHERE id=?",
+                       (item.ref, row_id))
+        item.id = row_id
 
     def get_item(self, project_id: str, item_id: int) -> Optional[WorkItem]:
         row = self.store._conn.execute(
@@ -175,28 +187,199 @@ class DockyardStore:
 
     def upsert_backlog(self, project_id: str, entry: BacklogEntry, *,
                        actor=None) -> None:
-        from .store import iso
-
         with self.store.tx() as cx:
-            cx.execute(
-                """
-                INSERT INTO dockyard_backlog(
-                    item_ref, project_id, rank, priority_reason, aged_since,
-                    last_rerank_actor, last_rerank_kind, last_rerank_reason)
-                VALUES (?,?,?,?,?,?,?,?)
-                ON CONFLICT(project_id, item_ref) DO UPDATE SET
-                    rank=excluded.rank,
-                    priority_reason=excluded.priority_reason,
-                    last_rerank_actor=excluded.last_rerank_actor,
-                    last_rerank_kind=excluded.last_rerank_kind,
-                    last_rerank_reason=excluded.last_rerank_reason
-                """,
-                (entry.item_ref, project_id, entry.rank,
-                 entry.priority_reason, entry.aged_since.isoformat(),
-                 actor.id if actor else None,
-                 actor.kind.value if actor else None,
-                 entry.priority_reason or None),
+            existing = cx.execute(
+                "SELECT 1 FROM dockyard_backlog"
+                " WHERE project_id=? AND item_ref=?",
+                (project_id, entry.item_ref),
+            ).fetchone()
+            if existing is None:
+                # Shift existing rows out of the way so the requested rank
+                # remains unique within the project.
+                self._shift_increase_from(cx, project_id, entry.rank)
+            self._insert_backlog_row(cx, project_id, entry, actor=actor)
+            self._sync_priority_rank(cx, project_id)
+
+    @staticmethod
+    def _temporary_offset(cx, project_id: str) -> int:
+        """Return an offset above every live rank in one project."""
+        row = cx.execute(
+            "SELECT COALESCE(MAX(rank), 0) AS max_rank"
+            " FROM dockyard_backlog WHERE project_id=?",
+            (project_id,),
+        ).fetchone()
+        return int(row["max_rank"]) + 1
+
+    @classmethod
+    def _shift_increase_from(cls, cx, project_id: str,
+                             from_rank: int) -> None:
+        """Bump every backlog row with ``rank >= from_rank`` up by one
+        (lower priority, larger rank).
+
+        SQLite enforces the unique rank index per updated row. The first pass
+        therefore moves affected rows above the project's highest live rank;
+        the second maps them back to ``rank + 1`` without colliding with a
+        valid sparse rank.
+        """
+        offset = cls._temporary_offset(cx, project_id)
+        cx.execute(
+            "UPDATE dockyard_backlog SET rank = rank + ?"
+            " WHERE project_id=? AND rank >= ?",
+            (offset, project_id, from_rank),
+        )
+        cx.execute(
+            "UPDATE dockyard_backlog SET rank = rank - ? + 1"
+            " WHERE project_id=? AND rank >= ?",
+            (offset, project_id, from_rank + offset),
+        )
+
+    @classmethod
+    def _shift_increase_range(cls, cx, project_id: str,
+                              lo_inclusive: int,
+                              hi_exclusive: int) -> None:
+        """Bump every backlog row with ``lo <= rank < hi`` up by one
+        (lower priority, larger rank). Used to make room above when an
+        item reranks upward in priority.
+        """
+        offset = cls._temporary_offset(cx, project_id)
+        cx.execute(
+            "UPDATE dockyard_backlog SET rank = rank + ?"
+            " WHERE project_id=? AND rank >= ? AND rank < ?",
+            (offset, project_id, lo_inclusive, hi_exclusive),
+        )
+        cx.execute(
+            "UPDATE dockyard_backlog SET rank = rank - ? + 1"
+            " WHERE project_id=? AND rank >= ? AND rank < ?",
+            (offset, project_id,
+             lo_inclusive + offset, hi_exclusive + offset),
+        )
+
+    @classmethod
+    def _shift_decrease_range(cls, cx, project_id: str,
+                              lo_inclusive: int,
+                              hi_inclusive: int) -> None:
+        """Drop every backlog row with ``lo <= rank <= hi`` by one
+        (higher priority, smaller rank). Used to make room below when an
+        item reranks downward in priority.
+        """
+        offset = cls._temporary_offset(cx, project_id)
+        cx.execute(
+            "UPDATE dockyard_backlog SET rank = rank + ?"
+            " WHERE project_id=? AND rank >= ? AND rank <= ?",
+            (offset, project_id, lo_inclusive, hi_inclusive),
+        )
+        cx.execute(
+            "UPDATE dockyard_backlog SET rank = rank - ? - 1"
+            " WHERE project_id=? AND rank >= ? AND rank <= ?",
+            (offset, project_id,
+             lo_inclusive + offset, hi_inclusive + offset),
+        )
+
+    def _insert_backlog_row(self, cx, project_id: str, entry: BacklogEntry,
+                            *, actor) -> None:
+        """Insert one backlog row inside an existing transaction. The caller
+        is responsible for any required rank shifting and synchronisation.
+        """
+        cx.execute(
+            """
+            INSERT INTO dockyard_backlog(
+                item_ref, project_id, rank, priority_reason, aged_since,
+                last_rerank_actor, last_rerank_kind, last_rerank_reason)
+            VALUES (?,?,?,?,?,?,?,?)
+            ON CONFLICT(project_id, item_ref) DO UPDATE SET
+                rank=excluded.rank,
+                priority_reason=excluded.priority_reason,
+                last_rerank_actor=excluded.last_rerank_actor,
+                last_rerank_kind=excluded.last_rerank_kind,
+                last_rerank_reason=excluded.last_rerank_reason
+            """,
+            (entry.item_ref, project_id, entry.rank,
+             entry.priority_reason, entry.aged_since.isoformat(),
+             actor.id if actor else None,
+             actor.kind.value if actor else None,
+             entry.priority_reason or None),
+        )
+
+    def _sync_priority_rank(self, cx, project_id: str) -> None:
+        """Make ``dockyard_work_items.priority_rank`` mirror the canonical
+        ``dockyard_backlog.rank`` for every backlog entry in this project
+        and NULL it for unranked items. Run inside the same transaction as
+        any rank change so the two sources cannot drift.
+        """
+        cx.execute(
+            """
+            UPDATE dockyard_work_items
+            SET priority_rank = (
+                SELECT b.rank FROM dockyard_backlog b
+                WHERE b.item_ref = dockyard_work_items.ref
+                  AND b.project_id = dockyard_work_items.project_id
             )
+            WHERE project_id = ?
+            """,
+            (project_id,),
+        )
+
+    @staticmethod
+    def _validate_queue_context(cx, item: WorkItem) -> None:
+        """Recheck queue invariants inside the write transaction."""
+        project = cx.execute(
+            "SELECT enabled, phase FROM project_stewardship WHERE project_id=?",
+            (item.project_id,),
+        ).fetchone()
+        if project is None:
+            raise ValueError(f"no such project {item.project_id}")
+        if not project["enabled"]:
+            raise ValueError(f"project {item.project_id} is disabled")
+        if project["phase"] != "active":
+            raise ValueError(
+                f"project {item.project_id} is {project['phase']};"
+                " resume it before adding work"
+            )
+        if not item.initiative_ref:
+            return
+        initiative = cx.execute(
+            "SELECT project_id FROM project_initiatives WHERE ref=?",
+            (item.initiative_ref,),
+        ).fetchone()
+        if initiative is None:
+            raise ValueError(f"no such initiative {item.initiative_ref}")
+        if initiative["project_id"] != item.project_id:
+            raise ValueError(
+                f"initiative {item.initiative_ref} belongs to project "
+                f"{initiative['project_id']}, not {item.project_id}"
+            )
+
+    def create_queued_item(self, item: WorkItem, entry: BacklogEntry, *,
+                           actor) -> tuple:
+        """Atomic work-item create + backlog insert.
+
+        Inside a single ``BEGIN IMMEDIATE`` transaction:
+
+        1. Validate the requested rank, shifting any existing backlog rows
+           at or above it up by one so the unique ``(project_id, rank)``
+           index cannot collide.
+        2. Insert the work item and derive its ref.
+        3. Insert the backlog entry pointing at the new ref.
+        4. Re-synchronise ``priority_rank`` on every work item in the
+           project so the denormalised copy agrees with the canonical
+           backlog rank.
+
+        Any failure during these steps rolls back the whole transaction, so
+        no orphan work item can be left behind.
+        """
+        if entry.rank < 1:
+            raise ValueError(f"backlog rank must be >= 1, got {entry.rank}")
+        entry.item_ref = entry.item_ref or item.ref
+        if not item.ref:
+            item.priority_rank = entry.rank  # reflected back via sync
+        with self.store.tx() as cx:
+            self._validate_queue_context(cx, item)
+            self._shift_increase_from(cx, item.project_id, entry.rank)
+            self._insert_item(cx, item)
+            entry.item_ref = item.ref
+            self._insert_backlog_row(cx, item.project_id, entry, actor=actor)
+            self._sync_priority_rank(cx, item.project_id)
+        return item, entry
 
     def list_backlog(self, project_id: str) -> List[BacklogEntry]:
         rows = self.store._conn.execute(
@@ -211,19 +394,46 @@ class DockyardStore:
 
     def rerank(self, project_id: str, item_ref: str, new_rank: int,
                reason: str, *, actor: Actor) -> dict:
-        """PM-03: reason-mandatory rerank that persists the audit fields."""
-        rows = self.store._conn.execute(
-            "SELECT rank FROM dockyard_backlog WHERE project_id=? AND item_ref=?",
-            (project_id, item_ref),
-        ).fetchall()
-        if not rows:
-            raise ValueError(f"no backlog entry {item_ref} in {project_id}")
-        old = rows[0]["rank"]
-        entry = BacklogEntry(item_ref=item_ref, rank=old)
-        audit = entry.rerank(new_rank, reason, actor=actor)
-        from .store import iso
+        """PM-03: reason-mandatory rerank that persists the audit fields and
+        keeps ``(project_id, rank)`` unique by shifting the affected rows
+        inside the same transaction.
+        """
+        if new_rank < 1:
+            raise ValueError(f"rerank target must be >= 1, got {new_rank}")
 
+        # Read the source rank while holding the same write transaction used
+        # for the move. Concurrent reranks then produce a serial audit chain
+        # rather than reporting a stale from_rank.
         with self.store.tx() as cx:
+            row = cx.execute(
+                "SELECT rank FROM dockyard_backlog"
+                " WHERE project_id=? AND item_ref=?",
+                (project_id, item_ref),
+            ).fetchone()
+            if row is None:
+                raise ValueError(
+                    f"no backlog entry {item_ref} in {project_id}"
+                )
+            old = row["rank"]
+            entry = BacklogEntry(item_ref=item_ref, rank=old)
+            audit = entry.rerank(new_rank, reason, actor=actor)
+
+            # The moving item sits inside the rank range that other rows will
+            # occupy. Park it above the project's highest live rank, shift the
+            # affected rows, then move it to the destination.
+            if new_rank != old:
+                sentinel = self._temporary_offset(cx, project_id)
+                cx.execute(
+                    "UPDATE dockyard_backlog SET rank=? WHERE project_id=?"
+                    " AND item_ref=?",
+                    (sentinel, project_id, item_ref),
+                )
+                if new_rank > old:
+                    self._shift_decrease_range(cx, project_id,
+                                               old + 1, new_rank)
+                else:
+                    self._shift_increase_range(cx, project_id,
+                                                new_rank, old)
             cx.execute(
                 """
                 UPDATE dockyard_backlog SET rank=?, last_rerank_actor=?,
@@ -233,6 +443,7 @@ class DockyardStore:
                 (new_rank, actor.id, actor.kind.value, reason,
                  project_id, item_ref),
             )
+            self._sync_priority_rank(cx, project_id)
         return audit
 
     def stats(self) -> Dict[str, int]:

@@ -23,6 +23,7 @@ from ..dockyard import (
     make_ref,
 )
 from .dockyard_store import DockyardStore
+from .service import ServiceError, StewardshipService
 
 from .store import Store
 
@@ -145,6 +146,75 @@ class DockyardService:
         self._audit(actor=actor, action="backlog.added",
                     subject=ref, detail={"rank": rank, "reason": reason})
         return entry
+
+    def create_queued_item(
+        self,
+        project_id: str,
+        *,
+        title: str,
+        item_type: WorkItemType,
+        creator: Actor,
+        assignee: Actor,
+        rank: int,
+        reason: str,
+        initiative_ref: Optional[str] = None,
+    ) -> tuple[WorkItem, BacklogEntry]:
+        """Create a work item and insert it into the backlog atomically."""
+        if not title or len(title.strip()) < 3:
+            raise ValueError("title must be at least 3 characters")
+        if not reason or len(reason.strip()) < 4:
+            raise RankChangeError(
+                "backlog additions require a priority reason (min 4 chars)")
+        if creator.id == assignee.id:
+            raise ValueError("assignee must be distinct from the creator")
+
+        stewardship = StewardshipService(self.store)
+        try:
+            settings = stewardship.settings(project_id)
+        except ServiceError as exc:
+            raise ValueError(str(exc)) from exc
+        if settings["phase"] != "active":
+            raise ValueError(
+                f"project {project_id} is {settings['phase']}; resume it before adding work")
+
+        relation = initiative_ref.strip() if initiative_ref else None
+        if relation:
+            try:
+                initiative = stewardship.initiative_by_ref(relation)
+            except ServiceError as exc:
+                raise ValueError(str(exc)) from exc
+            if initiative["project_id"] != project_id:
+                raise ValueError(
+                    f"initiative {relation} belongs to project "
+                    f"{initiative['project_id']}, not {project_id}")
+
+        item = WorkItem(
+            project_id=project_id,
+            type=item_type,
+            title=title.strip(),
+            assignee=assignee,
+            created_by=creator,
+            priority_rank=rank,
+            initiative_ref=relation,
+        )
+        entry = BacklogEntry(
+            item_ref="",
+            rank=rank,
+            priority_reason=reason.strip(),
+        )
+        item, entry = self.dy.create_queued_item(item, entry, actor=creator)
+        self._audit(
+            actor=creator,
+            action="backlog.item_created",
+            subject=item.ref,
+            detail={
+                "assignee": assignee.id,
+                "initiative_ref": relation,
+                "rank": rank,
+                "reason": reason.strip(),
+            },
+        )
+        return item, entry
 
     def backlog_rerank(self, project_id: str, ref: str, new_rank: int, *,
                        reason: str, actor: Actor) -> dict:

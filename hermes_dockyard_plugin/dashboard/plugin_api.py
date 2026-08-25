@@ -449,6 +449,16 @@ class BacklogAddBody(BaseModel):
     reason: str
 
 
+class QueuedItemBody(BaseModel):
+    type: str
+    title: str
+    assignee_id: str
+    assignee_kind: str = "bot"
+    rank: int
+    reason: str
+    initiative_ref: str | None = None
+
+
 class BacklogRerankBody(BaseModel):
     new_rank: int
     reason: str
@@ -479,6 +489,20 @@ async def project_backlog(project_id: str) -> dict:
 
     pid = quote(project_id, safe="")
     return await _proxy("GET", f"/stewardship/v1/projects/{pid}/backlog")
+
+
+@plugin_api.post("/projects/{project_id}/backlog/items")
+async def create_queued_item(project_id: str, body: QueuedItemBody) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    payload = {
+        **body.model_dump(),
+        "creator_id": "sahil",
+        "creator_kind": "human",
+    }
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{pid}/backlog/items", payload)
 
 
 @plugin_api.post("/projects/{project_id}/backlog")
@@ -531,12 +555,36 @@ async def freeze_project(project_id: str) -> dict:
     return await _proxy("POST", f"/stewardship/v1/projects/{pid}/freeze")
 
 
+@plugin_api.post("/projects/{project_id}/pause")
+async def pause_project(project_id: str) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    return await _proxy("POST", f"/stewardship/v1/projects/{pid}/pause")
+
+
 @plugin_api.post("/projects/{project_id}/resume")
 async def resume_project(project_id: str) -> dict:
     from urllib.parse import quote
 
     pid = quote(project_id, safe="")
     return await _proxy("POST", f"/stewardship/v1/projects/{pid}/resume")
+
+
+@plugin_api.post("/projects/{project_id}/disable")
+async def disable_project(project_id: str) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    return await _proxy("POST", f"/stewardship/v1/projects/{pid}/disable")
+
+
+@plugin_api.post("/projects/{project_id}/re-enable")
+async def re_enable_project(project_id: str) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    return await _proxy("POST", f"/stewardship/v1/projects/{pid}/re-enable")
 
 
 @plugin_api.post("/onboard")

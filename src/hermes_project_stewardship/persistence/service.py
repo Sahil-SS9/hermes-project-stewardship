@@ -118,6 +118,29 @@ class StewardshipService:
         ).fetchone()
         return self._row_settings(r)
 
+    def re_enable(self, project_id: str) -> Dict[str, Any]:
+        """Re-enable an existing project without replacing its configuration."""
+        row = self.store._conn.execute(
+            "SELECT * FROM project_stewardship WHERE project_id=?", (project_id,)
+        ).fetchone()
+        if row is None:
+            raise ServiceError(f"stewardship not enabled for project '{project_id}'")
+        if row["enabled"]:
+            return self._row_settings(row)
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE project_stewardship SET enabled=1, phase='active',"
+                " paused_at=NULL, updated_at=? WHERE project_id=?",
+                (iso(self._clock()), project_id),
+            )
+        self.store.audit(
+            actor="system",
+            interface="service",
+            action="stewardship.re_enabled",
+            subject=project_id,
+        )
+        return self.settings(project_id)
+
     def pause(self, project_id: str) -> Dict[str, Any]:
         return self._set_phase(project_id, ProjectPhase.PAUSED)
 
@@ -178,29 +201,16 @@ class StewardshipService:
             "paused_at": r["paused_at"],
         }
 
-    def settings(self, project_id: str) -> Dict[str, Any]:
-        r = self._require(project_id)
-        return {
-            "project_id": r["project_id"],
-            "enabled": bool(r["enabled"]),
-            "mission": r["mission"],
-            "owner": {
-                "lead_profile": r["owner_lead_profile"],
-                "member_profiles": self.store._uj(r["member_profiles_json"], []),
-                "owner_team_id": r["owner_team_id"],
-            },
-            "autonomy_level": r["autonomy_level"],
-            "policies": {
-                "autonomy": self.store._uj(r["autonomy_policy_json"], {}),
-                "verification": self.store._uj(r["verification_policy_json"], {}),
-                "release": self.store._uj(r["release_policy_json"], {}),
-                "notification": self.store._uj(r["notification_policy_json"], {}),
-            },
-            "phase": r["phase"],
-            "created_at": r["created_at"],
-            "updated_at": r["updated_at"],
-            "paused_at": r["paused_at"],
-        }
+    def settings(self, project_id: str, *,
+                 include_disabled: bool = False) -> Dict[str, Any]:
+        r = self.store._conn.execute(
+            "SELECT * FROM project_stewardship WHERE project_id=?", (project_id,)
+        ).fetchone()
+        if r is None:
+            raise ServiceError(f"stewardship not enabled for project '{project_id}'")
+        if not r["enabled"] and not include_disabled:
+            raise ServiceError(f"stewardship is disabled for project '{project_id}'")
+        return self._row_settings(r)
 
     def update_settings(
         self,
