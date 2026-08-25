@@ -334,6 +334,66 @@ class DockyardStore:
         ]
 
     # ------------------------------------------------------------------ #
+    # Generated reports                                                  #
+    # ------------------------------------------------------------------ #
+
+    def report_save(self, report: Dict) -> Dict:
+        with self.store.tx() as cx:
+            cx.execute(
+                """
+                INSERT INTO dockyard_reports(
+                    report_id, project_id, report_type, title, content_md,
+                    options_json, generated_by, generated_at)
+                VALUES(?,?,?,?,?,?,?,?)
+                """,
+                (
+                    report["report_id"], report["project_id"],
+                    report["report_type"], report["title"], report["content"],
+                    _j(report.get("options", {})), report["generated_by"],
+                    report["generated_at"],
+                ),
+            )
+        return dict(report)
+
+    def reports_list(self, project_id: str, *, limit: int = 20) -> List[Dict]:
+        rows = self.store._conn.execute(
+            "SELECT report_id, project_id, report_type, title, options_json,"
+            " generated_by, generated_at FROM dockyard_reports"
+            " WHERE project_id=? ORDER BY generated_at DESC, report_id DESC LIMIT ?",
+            (project_id, max(1, min(int(limit), 100))),
+        ).fetchall()
+        return [
+            {
+                "report_id": row["report_id"],
+                "project_id": row["project_id"],
+                "report_type": row["report_type"],
+                "title": row["title"],
+                "options": json.loads(row["options_json"]),
+                "generated_by": row["generated_by"],
+                "generated_at": row["generated_at"],
+            }
+            for row in rows
+        ]
+
+    def report_get(self, project_id: str, report_id: str) -> Optional[Dict]:
+        row = self.store._conn.execute(
+            "SELECT * FROM dockyard_reports WHERE project_id=? AND report_id=?",
+            (project_id, report_id),
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "report_id": row["report_id"],
+            "project_id": row["project_id"],
+            "report_type": row["report_type"],
+            "title": row["title"],
+            "content": row["content_md"],
+            "options": json.loads(row["options_json"]),
+            "generated_by": row["generated_by"],
+            "generated_at": row["generated_at"],
+        }
+
+    # ------------------------------------------------------------------ #
     # Bot registry (BM-01) — G2 P2                                       #
     # ------------------------------------------------------------------ #
 

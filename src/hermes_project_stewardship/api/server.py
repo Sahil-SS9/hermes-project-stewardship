@@ -55,6 +55,19 @@ class EnableRequest(BaseModel):
     notification_policy: Dict[str, Any] = {}
 
 
+class SettingsPatch(BaseModel):
+    mission: Optional[str] = None
+    lead_profile: Optional[str] = None
+    member_profiles: Optional[list[str]] = None
+    autonomy_level: Optional[int] = None
+    autonomy_policy: Optional[Dict[str, Any]] = None
+    verification_policy: Optional[Dict[str, Any]] = None
+    release_policy: Optional[Dict[str, Any]] = None
+    notification_policy: Optional[Dict[str, Any]] = None
+    actor: str = "sahil"
+    interface: str = "dockyard:human"
+
+
 class ObjectiveRequest(BaseModel):
     name: str
     evaluator_type: str = "manual"
@@ -191,6 +204,13 @@ class ViewSave(BaseModel):
     shared: bool = False
 
 
+class ReportRequest(BaseModel):
+    report_type: str = "executive"
+    include_activity: bool = True
+    actor_id: str = "sahil"
+    actor_kind: str = "human"
+
+
 class OnboardingRequest(BaseModel):
     project_id: str
     repo_path: str
@@ -259,6 +279,15 @@ def create_app(
     @router.get("/projects/{project_id}/settings")
     def settings(project_id: str):
         return svc.settings(project_id)
+
+    @router.patch("/projects/{project_id}/settings")
+    def patch_settings(project_id: str, body: SettingsPatch):
+        changes = body.model_dump(exclude_unset=True)
+        actor = changes.pop("actor", body.actor)
+        interface = changes.pop("interface", body.interface)
+        return svc.update_settings(
+            project_id, actor=actor, interface=interface, **changes
+        )
 
     @router.post("/projects/{project_id}/pause")
     def pause(project_id: str):
@@ -535,6 +564,30 @@ def create_app(
         except ValueError:
             raise HTTPException(422, f"invalid actor_kind {actor_kind!r}")
         return {"views": dy.views_list(project_id, actor=actor)}
+
+    @router.post("/projects/{project_id}/reports")
+    def report_generate(project_id: str, body: ReportRequest):
+        try:
+            actor = _actor(body.actor_id, body.actor_kind)
+            return dy.report_generate(
+                project_id,
+                report_type=body.report_type,
+                include_activity=body.include_activity,
+                actor=actor,
+            )
+        except ValueError as exc:
+            raise HTTPException(422, str(exc))
+
+    @router.get("/projects/{project_id}/reports")
+    def reports_list(project_id: str, limit: int = 20):
+        return {"reports": dy.reports_list(project_id, limit=limit)}
+
+    @router.get("/projects/{project_id}/reports/{report_id}")
+    def report_get(project_id: str, report_id: str):
+        try:
+            return dy.report_get(project_id, report_id)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc))
 
 
     # ------------------- Dockyard bot layer (G2) ---------------------- #

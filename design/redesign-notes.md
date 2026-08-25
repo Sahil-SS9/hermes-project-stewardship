@@ -50,6 +50,31 @@ Dockyard is an embedded operational oversight console for one human owner. It is
 - Parsed stylesheet rules: `48`; `.page-head`, metrics, project rows and every later rule are missing from the CSSOM.
 - 1200px body width: 1184px, with no horizontal overflow. The problem is hierarchy and missing CSS, not viewport overflow.
 
+## Exact local benchmark review
+
+The owner supplied `/home/sahil/Desktop/carad/Hermes-Dockyard-v4.html` as the minimum quality benchmark. SHA-256: `e9ae7288a73c2d2597fbc14419b9ad660010db9d55d6bcb9f2b4e58b55906e44`.
+
+The first rebuild remained too flat against this file. It had a count-only attention panel, one compressed status surface, one wide project table and a lightweight approval list. The reference was stronger because it used:
+
+- one tinted, elevated decision card with the actual pending decisions inside it;
+- a separate four-part metric strip;
+- a projects card paired with a clearly separated activity card;
+- individual approval cards with a three-cell evidence/context strip;
+- selective semantic colour on risk, health and action states;
+- stronger boundaries between overview, action and history components.
+
+The final rebuild ports those compositional principles without copying unsupported or fabricated data. It also improves the reference by ordering projects, approvals and unread notifications by attention severity and by preserving complete keyboard tab behaviour, loading/error/empty states and numeric WCAG verification.
+
+### Backend capability verification
+
+The richer patterns were checked against the real stewardship API and demo database before implementation.
+
+- Supported reads: project settings, work items, initiatives, events, bots and workload.
+- Supported writes: approve, reject and notification acknowledge.
+- The desktop plugin proxy was extended to expose those existing backend routes.
+- The previous approve proxy was genuinely broken: it sent `actor_id`, while the upstream contract requires `actor` plus `interface`. The proxy now sends `{"actor":"sahil","interface":"dockyard:human"}` and focused integration tests prove both approve and reject.
+- Approval evidence cards use actual initiative `rationale`, `expected_outcome` and `validation_contract` fields. Missing fields are labelled as missing rather than invented.
+
 ## Reference research
 
 The references below informed patterns, not a visual copy.
@@ -80,21 +105,24 @@ Use one embedded console header with three peer tabs: Fleet, Approvals and Notif
 
 ### 2. Fleet page
 
-Use an action-first two-column summary followed by a full-width project roster.
+Use an action-first dashboard composed as four distinct bands.
 
-- Left: decisions waiting, or a clear no-decisions state.
-- Right: one compact fleet-status surface with projects, active work, blocked work and unread alerts.
-- Below: project rows with name/phase, labelled health, backlog-active-done breakdown and notification count.
+- Decision card: count and CTA on the left; actual risk-ordered decisions on the right.
+- Metric strip: project health, active work, bot workload and owner attention.
+- Main grid: severity-ordered project roster with actual missions/owners, plus recent fleet signals from notifications.
+- At 700px the cards stack while the decision rows, 2x2 metrics and project rows retain their hierarchy.
 - Informed by Grafana's actionable-alert discipline, Vercel's project metadata and PatternFly's compact table.
-- Rejected: four independent metric cards, charts without temporal data, a card gallery and clickable rows that navigate nowhere.
+- Rejected: charts without temporal data, a generic card gallery and clickable rows that navigate nowhere.
 
 ### 3. Approval queue
 
-Use one structured row per approval. Surface risk, project, initiative reference, title and the only available action. The row moves through idle, approving, approved and failed states.
+Use one separated decision card per approval. Surface risk, project, initiative reference and actual backend context before the actions.
 
 - Informed by Linear triage, Sentry issue triage and Atlassian semantic lozenges.
-- The approved state is shown before an authoritative refresh removes the item.
-- Rejected: fake evidence, a reject action that has no endpoint, modals and card-within-card composition.
+- Three context cells show why the initiative was proposed, its expected outcome and its validation contract.
+- Approve and Reject are both real backend operations. Approved/rejected state is shown before an authoritative refresh removes the item.
+- Evidence details progressively disclose status, priority, approval state and context reference.
+- Rejected: fake evidence and decorative fields unsupported by the backend.
 
 ### 4. Notifications
 
@@ -137,7 +165,7 @@ All ratios use WCAG 2.1 relative luminance. Normal text must be at least 4.5:1; 
 | Light | `#15171c` | `#f6f7f9` | Primary text on page | 16.73:1 |
 | Light | `#15171c` | `#ffffff` | Primary text on surface | 17.93:1 |
 | Light | `#515968` | `#ffffff` | Secondary text | 7.05:1 |
-| Light | `#687181` | `#ffffff` | Tertiary metadata | 4.92:1 |
+| Light | `#626c7b` | `#ffffff` | Tertiary metadata | 5.32:1 |
 | Light | `#ffffff` | `#3654c7` | Primary action | 6.46:1 |
 | Light | `#293f9e` | `#eef1ff` | Accent tag/selection | 8.12:1 |
 | Light | `#136c4a` | `#e7f6ef` | Success | 5.75:1 |
@@ -159,21 +187,19 @@ All ratios use WCAG 2.1 relative luminance. Normal text must be at least 4.5:1; 
 | Dark | `#bac2ce` | `#2a303a` | Unknown/neutral | 7.39:1 |
 | Dark | `#8fa2ff` | `#0f1217` | Focus indicator against page | 7.84:1 |
 
-The final harness will recompute these pairs and fail if any ratio is below the relevant threshold.
+The harness recomputes 54 declared foreground/background pairs and fails if any ratio is below the relevant threshold. Lowest normal-text result: 4.74:1. Lowest non-text control-boundary result: 3.01:1.
 
 ## Verification log
 
-To be filled from executed evidence after implementation.
-
 | Gate | Result | Evidence |
 |---|---|---|
-| CSS parse and render harness | Pending | |
-| Loading, error, empty, populated | Pending | |
-| Approve flow | Pending | |
-| Acknowledge flow | Pending | |
-| 700px and 1600px responsiveness | Pending | |
-| Light and dark screenshots | Pending | |
-| Contrast calculation | Pending | |
-| Python regression suite | Pending | |
+| CSS parse and render harness | PASS | Live-copy harness `10/10`; no CSS or browser warnings |
+| Loading, error, empty, populated | PASS | All three tabs and retry path exercised in jsdom |
+| Approve and reject flows | PASS | Frontend interaction tests plus `tests/test_dockyard_plugin_backend.py` real proxy/upstream tests |
+| Acknowledge flow | PASS | Unread item POSTs, moves to Cleared and remains readable |
+| 700px, 1200px and 1600px responsiveness | PASS | Zero document overflow and zero clipped project rows |
+| Light and dark screenshots | PASS | `/tmp/dockyard-dashboard-700-light.png`, `/tmp/dockyard-dashboard-1600-light.png`, `/tmp/dockyard-dashboard-1200-dark.png`, `/tmp/dockyard-inbox-1200-light.png`, `/tmp/dockyard-notifications-1200-dark.png` |
+| Contrast calculation | PASS | 54 pairs; 4.74:1 minimum text, 3.01:1 minimum control boundary |
+| Python regression suite | PASS | `309 passed in 95.40s` |
 | Live desktop smoke | Pending | |
-| Live/repo byte identity | Pending | |
+| Live/repo byte identity | PASS | Plugin SHA-256 `ad371a28...de1b` before final documentation-only update; exact `cmp` passed. Harness SHA-256 `6902656b...b303`; exact `cmp` passed. Rechecked at deployment gate. |

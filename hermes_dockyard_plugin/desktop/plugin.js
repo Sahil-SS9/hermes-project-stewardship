@@ -20,6 +20,8 @@ const LIGHT_TOKENS = Object.freeze({
   actionHover: '#2945b4',
   accentText: '#293f9e',
   accentSoft: '#eef1ff',
+  accentBorder: '#b8c4f0',
+  shadow: '0 10px 28px rgba(31, 42, 68, 0.08)',
   success: '#136c4a',
   successBg: '#e7f6ef',
   warning: '#805200',
@@ -49,6 +51,8 @@ const DARK_TOKENS = Object.freeze({
   actionHover: '#4662d4',
   accentText: '#c2cbff',
   accentSoft: '#232c4f',
+  accentBorder: '#46558f',
+  shadow: '0 12px 30px rgba(0, 0, 0, 0.24)',
   success: '#72cda2',
   successBg: '#16372a',
   warning: '#f0bd64',
@@ -142,6 +146,8 @@ const DOCKYARD_CSS = `
   --dy-action-hover: ${LIGHT_TOKENS.actionHover};
   --dy-accent-text: ${LIGHT_TOKENS.accentText};
   --dy-accent-soft: ${LIGHT_TOKENS.accentSoft};
+  --dy-accent-border: ${LIGHT_TOKENS.accentBorder};
+  --dy-shadow: ${LIGHT_TOKENS.shadow};
   --dy-success: ${LIGHT_TOKENS.success};
   --dy-success-bg: ${LIGHT_TOKENS.successBg};
   --dy-warning: ${LIGHT_TOKENS.warning};
@@ -181,6 +187,8 @@ const DOCKYARD_CSS = `
     --dy-action-hover: ${DARK_TOKENS.actionHover};
     --dy-accent-text: ${DARK_TOKENS.accentText};
     --dy-accent-soft: ${DARK_TOKENS.accentSoft};
+    --dy-accent-border: ${DARK_TOKENS.accentBorder};
+    --dy-shadow: ${DARK_TOKENS.shadow};
     --dy-success: ${DARK_TOKENS.success};
     --dy-success-bg: ${DARK_TOKENS.successBg};
     --dy-warning: ${DARK_TOKENS.warning};
@@ -255,8 +263,10 @@ const DOCKYARD_CSS = `
 .dockyard-root .dockyard-brand-copy span { color: var(--dy-text-3); font-size: 11px; }
 .dockyard-root .dockyard-tabs {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 2px;
+  min-width: 0;
   max-width: 100%;
   padding: 3px;
   overflow-x: auto;
@@ -357,6 +367,7 @@ const DOCKYARD_CSS = `
 .dockyard-root .dockyard-button.primary { color: #ffffff; background: var(--dy-action); border-color: var(--dy-action); }
 .dockyard-root .dockyard-button.primary:hover { color: #ffffff; background: var(--dy-action-hover); border-color: var(--dy-action-hover); }
 .dockyard-root .dockyard-button.small { min-height: 34px; padding: 6px 10px; font-size: 12px; }
+.dockyard-root .dockyard-console-action { flex: 0 0 auto; white-space: nowrap; }
 .dockyard-root .dockyard-button:disabled {
   color: var(--dy-disabled-text);
   background: var(--dy-disabled-bg);
@@ -369,19 +380,10 @@ const DOCKYARD_CSS = `
   grid-template-columns: minmax(0, 1.12fr) minmax(340px, .88fr);
   gap: 18px;
 }
-.dockyard-root .dockyard-panel,
 .dockyard-root .dockyard-section {
   border: 1px solid var(--dy-border);
   border-radius: 14px;
   background: var(--dy-surface);
-}
-.dockyard-root .dockyard-panel { padding: 22px; }
-.dockyard-root .dockyard-attention {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 24px;
-  min-height: 210px;
 }
 .dockyard-root .dockyard-attention-icon,
 .dockyard-root .dockyard-empty-icon,
@@ -398,8 +400,6 @@ const DOCKYARD_CSS = `
 .dockyard-root .dockyard-attention-icon svg,
 .dockyard-root .dockyard-empty-icon svg,
 .dockyard-root .dockyard-error-icon svg { width: 19px; height: 19px; }
-.dockyard-root .dockyard-attention h2,
-.dockyard-root .dockyard-status-panel h2,
 .dockyard-root .dockyard-section-head h2,
 .dockyard-root .dockyard-feed-head h2 {
   margin: 0;
@@ -408,7 +408,6 @@ const DOCKYARD_CSS = `
   line-height: 1.3;
   letter-spacing: -0.015em;
 }
-.dockyard-root .dockyard-attention p,
 .dockyard-root .dockyard-section-head p,
 .dockyard-root .dockyard-feed-head p {
   margin: 5px 0 0;
@@ -425,35 +424,7 @@ const DOCKYARD_CSS = `
   letter-spacing: -0.05em;
   font-variant-numeric: tabular-nums;
 }
-.dockyard-root .dockyard-attention.is-clear .dockyard-attention-icon { color: var(--dy-success); background: var(--dy-success-bg); }
-.dockyard-root .dockyard-attention.is-clear .dockyard-decision-count { color: var(--dy-success); font-size: 30px; }
-.dockyard-root .dockyard-status-panel { min-height: 210px; }
-.dockyard-root .dockyard-status-panel h2 { margin-bottom: 15px; }
-.dockyard-root .dockyard-status-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid var(--dy-border);
-  border-radius: 10px;
-  background: var(--dy-border);
-}
-.dockyard-root .dockyard-status-cell {
-  min-height: 68px;
-  padding: 12px 13px;
-  background: var(--dy-surface-subtle);
-}
-.dockyard-root .dockyard-status-cell span { display: block; color: var(--dy-text-3); font-size: 11px; }
-.dockyard-root .dockyard-status-cell strong {
-  display: block;
-  margin-top: 5px;
-  color: var(--dy-text);
-  font-size: 19px;
-  font-weight: 720;
-  font-variant-numeric: tabular-nums;
-}
-.dockyard-root .dockyard-status-cell strong.is-danger { color: var(--dy-danger); }
-.dockyard-root .dockyard-status-cell strong.is-info { color: var(--dy-info); }
+
 .dockyard-root .dockyard-section { margin-top: 18px; overflow: hidden; }
 .dockyard-root .dockyard-section-head,
 .dockyard-root .dockyard-feed-head {
@@ -490,19 +461,48 @@ const DOCKYARD_CSS = `
 }
 .dockyard-root .dockyard-project-row:hover { background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-project-cell { min-width: 0; }
-.dockyard-root .dockyard-project-name { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.dockyard-root .dockyard-project-cell.project {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+.dockyard-root .dockyard-project-name {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+.dockyard-root .dockyard-project-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+}
 .dockyard-root .dockyard-project-icon {
   width: 34px;
   height: 34px;
+  margin: 0;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
+  align-self: center;
   border-radius: 9px;
   background: var(--dy-accent-soft);
   color: var(--dy-accent-text);
 }
 .dockyard-root .dockyard-project-icon svg { width: 17px; height: 17px; }
-.dockyard-root .dockyard-project-name strong,
+.dockyard-root .dockyard-project-name strong {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  color: var(--dy-text);
+  font-size: 14px;
+  font-weight: 690;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
 .dockyard-root .dockyard-approval-main h2,
 .dockyard-root .dockyard-notification-main h3 {
   display: block;
@@ -514,13 +514,16 @@ const DOCKYARD_CSS = `
   line-height: 1.35;
   text-overflow: ellipsis;
 }
-.dockyard-root .dockyard-project-name span,
+.dockyard-root .dockyard-project-mission,
 .dockyard-root .dockyard-meta {
   display: block;
   margin-top: 3px;
   color: var(--dy-text-3);
   font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
+.dockyard-root .dockyard-project-mission { margin-top: 0; text-wrap: pretty; }
 .dockyard-root .dockyard-status-tag {
   min-height: 25px;
   padding: 4px 8px;
@@ -548,39 +551,9 @@ const DOCKYARD_CSS = `
 .dockyard-root .dockyard-work-stats strong { color: var(--dy-text); font-size: 13px; font-weight: 720; font-variant-numeric: tabular-nums; }
 .dockyard-root .dockyard-alert-count { color: var(--dy-text-2); font-size: 12px; }
 .dockyard-root .dockyard-alert-count.has-alert { color: var(--dy-warning); font-weight: 680; }
-.dockyard-root .dockyard-queue-intro {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 16px;
-  padding: 13px 15px;
-  border: 1px solid var(--dy-border);
-  border-radius: 10px;
-  background: var(--dy-surface-subtle);
-  color: var(--dy-text-2);
-  font-size: 13px;
-}
-.dockyard-root .dockyard-queue-intro strong { color: var(--dy-text); font-variant-numeric: tabular-nums; }
-.dockyard-root .dockyard-approval-list,
 .dockyard-root .dockyard-feed-group { overflow: hidden; border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); }
-.dockyard-root .dockyard-approval-row {
-  display: grid;
-  grid-template-columns: 108px minmax(0, 1fr) auto;
-  grid-template-areas: "risk main actions" "risk error actions";
-  gap: 6px 18px;
-  align-items: center;
-  min-height: 92px;
-  padding: 17px 19px;
-  border-top: 1px solid var(--dy-border);
-}
-.dockyard-root .dockyard-approval-row:first-child { border-top: 0; }
-.dockyard-root .dockyard-approval-row[data-state="approved"] { background: var(--dy-success-bg); }
-.dockyard-root .dockyard-approval-risk { grid-area: risk; }
-.dockyard-root .dockyard-approval-main { grid-area: main; min-width: 0; }
-.dockyard-root .dockyard-approval-main h2 { font-size: 15px; }
-.dockyard-root .dockyard-approval-actions { grid-area: actions; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-.dockyard-root .dockyard-inline-error { grid-area: error; margin: 0; color: var(--dy-danger); font-size: 12px; }
+.dockyard-root .dockyard-approval-main { min-width: 0; }
+.dockyard-root .dockyard-inline-error { margin: 10px 0 0; color: var(--dy-danger); font-size: 12px; }
 .dockyard-root .dockyard-feed-group { margin-top: 14px; }
 .dockyard-root .dockyard-feed-head { padding: 14px 17px; background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-feed-head h2 { font-size: 14px; }
@@ -655,8 +628,6 @@ const DOCKYARD_CSS = `
 }
 @media (max-width: 980px) {
   .dockyard-root .dockyard-overview-grid { grid-template-columns: 1fr; }
-  .dockyard-root .dockyard-attention,
-  .dockyard-root .dockyard-status-panel { min-height: 0; }
 }
 @media (max-width: 820px) {
   .dockyard-root .dockyard-shell { padding: 14px 16px 34px; }
@@ -674,13 +645,6 @@ const DOCKYARD_CSS = `
   .dockyard-root .dockyard-project-cell.health { grid-area: health; justify-self: end; }
   .dockyard-root .dockyard-project-cell.work { grid-area: work; }
   .dockyard-root .dockyard-project-cell.alerts { grid-area: alerts; justify-self: end; }
-  .dockyard-root .dockyard-approval-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "main risk" "actions actions" "error error";
-    align-items: start;
-  }
-  .dockyard-root .dockyard-approval-risk { justify-self: end; }
-  .dockyard-root .dockyard-approval-actions { justify-content: flex-start; }
   .dockyard-root .dockyard-notification-row {
     grid-template-columns: 36px minmax(0, 1fr);
     grid-template-areas: "marker main" ". action" ". error";
@@ -692,9 +656,557 @@ const DOCKYARD_CSS = `
   .dockyard-root .dockyard-consolebar { flex-direction: column; }
   .dockyard-root .dockyard-tabs { width: 100%; }
   .dockyard-root .dockyard-page-head { flex-direction: column; }
-  .dockyard-root .dockyard-attention { grid-template-columns: 1fr; align-items: start; }
-  .dockyard-root .dockyard-status-grid { grid-template-columns: 1fr; }
-  .dockyard-root .dockyard-queue-intro { align-items: flex-start; flex-direction: column; }
+}
+/* Reference-benchmark composition: action card, metric strip, split content and evidence cards. */
+.dockyard-root .dockyard-consolebar {
+  min-height: 72px;
+  margin: -18px -20px 32px;
+  padding: 12px 20px;
+  border: 0;
+  border-bottom: 1px solid var(--dy-border);
+  border-radius: 0;
+  background: var(--dy-surface);
+}
+.dockyard-root .dockyard-page-head { margin-bottom: 26px; }
+.dockyard-root .dockyard-page-actions { align-items: center; justify-content: flex-end; }
+.dockyard-root .dockyard-owed-pill {
+  min-height: 34px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  color: var(--dy-warning);
+  background: var(--dy-warning-bg);
+  font-size: 12px;
+  font-weight: 720;
+  white-space: nowrap;
+}
+.dockyard-root .dockyard-owed-pill .dockyard-status-mark { background: currentColor; }
+.dockyard-root .dockyard-button.danger {
+  color: var(--dy-danger);
+  border-color: var(--dy-danger);
+  background: var(--dy-surface);
+}
+.dockyard-root .dockyard-button.danger:hover { background: var(--dy-danger-bg); }
+.dockyard-root .dockyard-button.quiet { color: var(--dy-text-2); border-color: transparent; background: transparent; }
+.dockyard-root .dockyard-button.quiet:hover { color: var(--dy-text); background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-attention-card {
+  display: grid;
+  grid-template-columns: minmax(210px, .7fr) minmax(0, 1.3fr);
+  gap: 26px;
+  margin-bottom: 18px;
+  padding: 24px;
+  border: 1px solid var(--dy-accent-border);
+  border-radius: 16px;
+  background: linear-gradient(145deg, var(--dy-accent-soft), var(--dy-surface));
+  box-shadow: var(--dy-shadow);
+}
+.dockyard-root .dockyard-attention-card.is-clear { grid-template-columns: 1fr; }
+.dockyard-root .dockyard-attention-summary { align-self: center; }
+.dockyard-root .dockyard-attention-summary h2,
+.dockyard-root .dockyard-attention-copy h2 { margin: 0; color: var(--dy-text); font-size: 20px; letter-spacing: -0.02em; }
+.dockyard-root .dockyard-attention-summary p { margin: 9px 0 0; color: var(--dy-text-2); font-size: 13px; }
+.dockyard-root .dockyard-attention-summary .dockyard-button { margin-top: 16px; }
+.dockyard-root .dockyard-attention-list { display: grid; gap: 8px; margin-top: 12px; }
+.dockyard-root .dockyard-attention-decision {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 13px 14px;
+  border: 1px solid var(--dy-border);
+  border-radius: 11px;
+  background: var(--dy-surface);
+}
+.dockyard-root .dockyard-attention-decision strong { display: block; color: var(--dy-text); font-size: 14px; }
+.dockyard-root .dockyard-attention-decision span.dockyard-meta { margin-top: 3px; }
+.dockyard-root .dockyard-metric-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin-bottom: 18px;
+  overflow: hidden;
+  border: 1px solid var(--dy-border);
+  border-radius: 14px;
+  background: var(--dy-border);
+}
+.dockyard-root .dockyard-metric {
+  min-height: 112px;
+  padding: 18px 20px;
+  background: var(--dy-surface);
+}
+.dockyard-root .dockyard-metric span { display: block; color: var(--dy-text-3); font-size: 11px; font-weight: 700; }
+.dockyard-root .dockyard-metric strong { display: block; margin-top: 8px; color: var(--dy-text); font-size: 25px; line-height: 1.05; letter-spacing: -0.03em; }
+.dockyard-root .dockyard-metric strong.success { color: var(--dy-success); }
+.dockyard-root .dockyard-metric strong.warning { color: var(--dy-warning); }
+.dockyard-root .dockyard-metric small { display: block; margin-top: 10px; color: var(--dy-text-2); font-size: 12px; }
+.dockyard-root .dockyard-portfolio-visual {
+  display: grid;
+  grid-template-columns: minmax(220px, .65fr) minmax(0, 1.35fr);
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  border: 1px solid var(--dy-border);
+  border-radius: 14px;
+  background: var(--dy-surface);
+}
+.dockyard-root .dockyard-portfolio-copy h2 { margin: 0; color: var(--dy-text); font-size: 17px; }
+.dockyard-root .dockyard-portfolio-copy p { margin: 5px 0 0; color: var(--dy-text-2); font-size: 12px; }
+.dockyard-root .dockyard-portfolio-chart { min-width: 0; }
+.dockyard-root .dockyard-work-visual {
+  width: 100%;
+  height: 11px;
+  display: flex;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--dy-surface-strong);
+}
+.dockyard-root .dockyard-work-visual.compact { max-width: 230px; height: 5px; margin-top: 8px; }
+.dockyard-root .dockyard-work-visual > span { display: block; height: 100%; }
+.dockyard-root .dockyard-work-visual > .backlog { background: var(--dy-neutral); }
+.dockyard-root .dockyard-work-visual > .active { background: var(--dy-action); }
+.dockyard-root .dockyard-work-visual > .done { background: var(--dy-success); }
+.dockyard-root .dockyard-work-visual > .danger { background: var(--dy-danger); }
+.dockyard-root .dockyard-work-legend { display: flex; align-items: center; gap: 16px; margin-top: 10px; color: var(--dy-text-2); font-size: 11px; }
+.dockyard-root .dockyard-work-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.dockyard-root .dockyard-work-legend i { width: 8px; height: 8px; border-radius: 2px; background: var(--dy-neutral); }
+.dockyard-root .dockyard-work-legend .active i { background: var(--dy-action); }
+.dockyard-root .dockyard-work-legend .done i { background: var(--dy-success); }
+.dockyard-root .dockyard-project-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 4px;
+  overflow-x: auto;
+  border: 1px solid var(--dy-border);
+  border-radius: 11px;
+  background: var(--dy-surface);
+}
+.dockyard-root .dockyard-project-toolbar > label { padding-left: 8px; color: var(--dy-text-3); font-size: 11px; font-weight: 700; }
+.dockyard-root .dockyard-project-toolbar select {
+  min-height: 36px;
+  padding: 6px 9px;
+  border: 1px solid var(--dy-control-border);
+  border-radius: 7px;
+  background: var(--dy-surface);
+  color: var(--dy-text);
+  font: inherit;
+}
+.dockyard-root .dockyard-project-tabs { display: flex; gap: 2px; margin-left: auto; }
+.dockyard-root .dockyard-project-tabs button {
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--dy-text-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 680;
+}
+.dockyard-root .dockyard-project-tabs button.active { color: var(--dy-accent-text); background: var(--dy-accent-soft); }
+.dockyard-root .dockyard-project-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(280px, .75fr); gap: 18px; }
+.dockyard-root .dockyard-feature-card {
+  padding: 20px;
+  border: 1px solid var(--dy-border);
+  border-radius: 14px;
+  background: var(--dy-surface);
+}
+.dockyard-root .dockyard-feature-card h2 { margin: 9px 0 0; color: var(--dy-text); font-size: 20px; letter-spacing: -0.02em; }
+.dockyard-root .dockyard-feature-card p { margin: 8px 0 0; color: var(--dy-text-2); font-size: 13px; }
+.dockyard-root .dockyard-project-hero { background: linear-gradient(145deg, var(--dy-accent-soft), var(--dy-surface)); border-color: var(--dy-accent-border); }
+.dockyard-root .dockyard-project-hero .dockyard-work-visual { margin-top: 20px; }
+.dockyard-root .dockyard-project-overview-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(260px, .8fr); gap: 14px; margin-top: 14px; }
+.dockyard-root .dockyard-overview-card { min-width: 0; padding: 17px; }
+.dockyard-root .dockyard-overview-card > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.dockyard-root .dockyard-overview-card > header h2 { margin: 0; font-size: 16px; }
+.dockyard-root .dockyard-overview-card > header > span { min-width: 24px; height: 24px; display: grid; place-items: center; border-radius: 7px; background: var(--dy-neutral-bg); color: var(--dy-neutral); font-size: 10px; font-weight: 760; }
+.dockyard-root .dockyard-overview-card > p { margin-top: 4px; font-size: 11px; }
+.dockyard-root .dockyard-overview-list { display: grid; gap: 0; margin-top: 13px; border-top: 1px solid var(--dy-border); }
+.dockyard-root .dockyard-overview-list article { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; min-width: 0; padding: 10px 0; border-bottom: 1px solid var(--dy-border); }
+.dockyard-root .dockyard-overview-list article:last-child { border-bottom: 0; padding-bottom: 0; }
+.dockyard-root .dockyard-overview-list article > span:first-child { min-width: 0; }
+.dockyard-root .dockyard-overview-list strong,
+.dockyard-root .dockyard-overview-list small { display: block; min-width: 0; }
+.dockyard-root .dockyard-overview-list strong { overflow: hidden; color: var(--dy-text); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.dockyard-root .dockyard-overview-list small { margin-top: 3px; overflow: hidden; color: var(--dy-text-3); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.dockyard-root .dockyard-overview-list .dockyard-status-tag { max-width: 118px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dockyard-root .dockyard-overview-list.activity article { grid-template-columns: 1fr; }
+.dockyard-root .dockyard-card-label { color: var(--dy-text-3); font-size: 10px; font-weight: 760; }
+.dockyard-root .dockyard-board-wrap { overflow-x: auto; padding-bottom: 6px; }
+.dockyard-root .dockyard-board { display: grid; grid-template-columns: repeat(4, minmax(240px, 1fr)); gap: 12px; min-width: 1040px; }
+.dockyard-root .dockyard-board-column { min-height: 360px; border: 1px solid var(--dy-border); border-radius: 13px; background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-board-column > header { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 11px; }
+.dockyard-root .dockyard-board-column h3 { margin: 0; font-size: 13px; }
+.dockyard-root .dockyard-board-column header span { color: var(--dy-text-3); font-size: 11px; }
+.dockyard-root .dockyard-board-cards { padding: 0 9px 10px; }
+.dockyard-root .dockyard-work-card { margin-bottom: 9px; padding: 12px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); }
+.dockyard-root .dockyard-work-card h4 { margin: 8px 0 12px; font-size: 13px; line-height: 1.35; }
+.dockyard-root .dockyard-work-card footer { display: flex; justify-content: space-between; gap: 8px; color: var(--dy-text-3); font-size: 10px; }
+.dockyard-root .dockyard-work-type { color: var(--dy-accent-text); font-size: 9px; font-weight: 780; text-transform: uppercase; }
+.dockyard-root .dockyard-policy-summary { margin: 15px 0 0; padding: 13px; overflow: auto; border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font: 11px/1.5 ui-monospace, monospace; }
+.dockyard-root .dockyard-backlog-list { display: grid; gap: 10px; }
+.dockyard-root .dockyard-backlog-item {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid var(--dy-border);
+  border-radius: 12px;
+  background: var(--dy-surface);
+  cursor: grab;
+}
+.dockyard-root .dockyard-backlog-item:active { cursor: grabbing; }
+.dockyard-root .dockyard-rank { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; color: var(--dy-accent-text); background: var(--dy-accent-soft); font-weight: 760; }
+.dockyard-root .dockyard-backlog-copy { min-width: 0; }
+.dockyard-root .dockyard-backlog-copy strong { display: block; color: var(--dy-text); font-size: 14px; }
+.dockyard-root .dockyard-backlog-copy span { display: block; margin-top: 3px; color: var(--dy-text-2); font-size: 11px; }
+.dockyard-root .dockyard-rank-actions { display: flex; gap: 6px; }
+.dockyard-root .dockyard-modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(12, 17, 28, .48);
+  backdrop-filter: blur(3px);
+}
+.dockyard-root .dockyard-modal-layer[hidden] { display: none; }
+.dockyard-root .dockyard-modal { width: min(540px, 100%); padding: 22px; border: 1px solid var(--dy-border); border-radius: 16px; background: var(--dy-surface); box-shadow: var(--dy-shadow); }
+.dockyard-root .dockyard-modal h2 { margin: 0; font-size: 20px; }
+.dockyard-root .dockyard-modal p { margin: 7px 0 16px; color: var(--dy-text-2); font-size: 13px; }
+.dockyard-root .dockyard-modal label { display: block; margin-bottom: 7px; font-size: 12px; font-weight: 700; }
+.dockyard-root .dockyard-modal textarea { width: 100%; min-height: 110px; padding: 10px 11px; border: 1px solid var(--dy-control-border); border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text); font: inherit; resize: vertical; }
+.dockyard-root .dockyard-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.dockyard-root .dockyard-toast-region {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 140;
+  width: min(390px, calc(100vw - 32px));
+  display: grid;
+  gap: 9px;
+  pointer-events: none;
+}
+.dockyard-root .dockyard-toast {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
+  gap: 10px;
+  align-items: center;
+  min-height: 52px;
+  padding: 10px 11px;
+  border: 1px solid var(--dy-border);
+  border-left: 4px solid var(--dy-success);
+  border-radius: 10px;
+  background: var(--dy-surface);
+  color: var(--dy-text);
+  box-shadow: var(--dy-shadow);
+  pointer-events: auto;
+  font-size: 12px;
+  font-weight: 650;
+}
+.dockyard-root .dockyard-toast.danger { border-left-color: var(--dy-danger); }
+.dockyard-root .dockyard-toast-icon { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: var(--dy-success-bg); color: var(--dy-success); }
+.dockyard-root .dockyard-toast.danger .dockyard-toast-icon { background: var(--dy-danger-bg); color: var(--dy-danger); }
+.dockyard-root .dockyard-toast-icon svg { width: 16px; height: 16px; }
+.dockyard-root .dockyard-toast button,
+.dockyard-root .dockyard-modal-close { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--dy-text-2); cursor: pointer; font-size: 20px; line-height: 1; }
+.dockyard-root .dockyard-toast button:hover,
+.dockyard-root .dockyard-modal-close:hover { background: var(--dy-surface-strong); color: var(--dy-text); }
+.dockyard-root .dockyard-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(12, 17, 28, .58);
+  backdrop-filter: blur(4px);
+}
+.dockyard-root .dockyard-onboarding {
+  width: min(780px, 100%);
+  max-height: min(820px, calc(100vh - 40px));
+  overflow-y: auto;
+  border: 1px solid var(--dy-border);
+  border-radius: 18px;
+  background: var(--dy-surface);
+  color: var(--dy-text);
+  box-shadow: 0 24px 80px rgba(5, 9, 18, .34);
+}
+.dockyard-root .dockyard-onboarding-head { display: flex; justify-content: space-between; gap: 20px; padding: 23px 24px 18px; border-bottom: 1px solid var(--dy-border); }
+.dockyard-root .dockyard-onboarding-head h2 { margin: 5px 0 0; font-size: 23px; letter-spacing: -.025em; }
+.dockyard-root .dockyard-onboarding-head p { margin: 5px 0 0; color: var(--dy-text-2); font-size: 12px; }
+.dockyard-root .dockyard-wizard-progress { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; padding: 14px 24px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-wizard-progress > div { display: grid; grid-template-columns: 27px minmax(0, 1fr); gap: 8px; align-items: center; min-width: 0; color: var(--dy-text-3); }
+.dockyard-root .dockyard-wizard-progress > div > span:first-child { width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid var(--dy-border); border-radius: 999px; background: var(--dy-surface); font-size: 10px; font-weight: 750; }
+.dockyard-root .dockyard-wizard-progress > div.complete { color: var(--dy-accent-text); }
+.dockyard-root .dockyard-wizard-progress > div.complete > span:first-child { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
+.dockyard-root .dockyard-wizard-progress strong,
+.dockyard-root .dockyard-wizard-progress small { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dockyard-root .dockyard-wizard-progress strong { font-size: 10px; }
+.dockyard-root .dockyard-wizard-progress small { margin-top: 1px; font-size: 8px; }
+.dockyard-root .dockyard-wizard-body { min-height: 330px; padding: 24px; }
+.dockyard-root .dockyard-wizard-step[hidden] { display: none; }
+.dockyard-root .dockyard-wizard-step h3 { margin: 0; font-size: 18px; }
+.dockyard-root .dockyard-wizard-step > p { max-width: 620px; margin: 6px 0 20px; color: var(--dy-text-2); font-size: 12px; }
+.dockyard-root .dockyard-wizard-step label { display: block; margin: 15px 0 6px; font-size: 11px; font-weight: 720; }
+.dockyard-root .dockyard-wizard-step input,
+.dockyard-root .dockyard-wizard-step textarea { width: 100%; padding: 10px 11px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface-subtle); color: var(--dy-text); font: inherit; }
+.dockyard-root .dockyard-wizard-step textarea { resize: vertical; }
+.dockyard-root .dockyard-wizard-step > small { display: block; margin-top: 5px; color: var(--dy-text-3); font-size: 9px; }
+.dockyard-root .dockyard-onboarding-review { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 0; margin: 20px 0 0; border: 1px solid var(--dy-border); border-radius: 11px; overflow: hidden; }
+.dockyard-root .dockyard-onboarding-review dt,
+.dockyard-root .dockyard-onboarding-review dd { margin: 0; padding: 11px 12px; border-top: 1px solid var(--dy-border); }
+.dockyard-root .dockyard-onboarding-review dt:nth-of-type(1),
+.dockyard-root .dockyard-onboarding-review dd:nth-of-type(1) { border-top: 0; }
+.dockyard-root .dockyard-onboarding-review dt { background: var(--dy-surface-subtle); color: var(--dy-text-3); font-size: 10px; font-weight: 750; }
+.dockyard-root .dockyard-onboarding-review dd { min-width: 0; overflow-wrap: anywhere; color: var(--dy-text); font-size: 12px; }
+.dockyard-root .dockyard-review-note { padding: 11px 12px; border-radius: 9px; background: var(--dy-info-bg); color: var(--dy-info) !important; }
+.dockyard-root .dockyard-wizard-actions { display: flex; justify-content: space-between; gap: 10px; padding: 16px 24px 20px; border-top: 1px solid var(--dy-border); }
+.dockyard-root .dockyard-onboarding > .dockyard-inline-error { margin: 0 24px 12px; }
+.dockyard-root .dockyard-workload-card {
+  display: grid;
+  grid-template-columns: minmax(220px, .6fr) minmax(0, 1.4fr);
+  gap: 22px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  border: 1px solid var(--dy-border);
+  border-radius: 14px;
+  background: var(--dy-surface);
+}
+.dockyard-root .dockyard-workload-card h2 { margin: 0; font-size: 17px; }
+.dockyard-root .dockyard-workload-card p { margin: 5px 0 0; color: var(--dy-text-2); font-size: 12px; }
+.dockyard-root .dockyard-teams-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, .8fr); gap: 18px; }
+.dockyard-root .dockyard-bot-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.dockyard-root .dockyard-bot-card { padding: 14px; border: 1px solid var(--dy-border); border-radius: 11px; background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-bot-card header { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.dockyard-root .dockyard-bot-card .dockyard-avatar { margin: 0; }
+.dockyard-root .dockyard-bot-card strong { display: block; font-size: 13px; }
+.dockyard-root .dockyard-bot-card small { display: block; margin-top: 2px; color: var(--dy-text-3); font-size: 10px; }
+.dockyard-root .dockyard-capabilities { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 11px; }
+.dockyard-root .dockyard-capabilities span { padding: 3px 6px; border-radius: 6px; background: var(--dy-neutral-bg); color: var(--dy-neutral); font-size: 9px; }
+.dockyard-root .dockyard-group-list { display: grid; gap: 10px; margin-top: 16px; }
+.dockyard-root .dockyard-group-card { padding: 13px; border: 1px solid var(--dy-border); border-radius: 11px; background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-group-card > header { display: flex; justify-content: space-between; gap: 10px; }
+.dockyard-root .dockyard-group-card header span { color: var(--dy-text-3); font-size: 10px; }
+.dockyard-root .dockyard-group-card p { font-size: 11px; }
+.dockyard-root .dockyard-group-members { display: flex; margin-top: 10px; }
+.dockyard-root .dockyard-group-members .dockyard-avatar { margin-left: -5px; }
+.dockyard-root .dockyard-group-members .dockyard-avatar:first-child { margin-left: 0; }
+.dockyard-root .dockyard-handoff-list { display: grid; gap: 7px; margin-top: 12px; }
+.dockyard-root .dockyard-handoff-list > div { padding: 9px 10px; border-radius: 8px; background: var(--dy-surface); }
+.dockyard-root .dockyard-handoff-list strong { display: block; font-size: 11px; }
+.dockyard-root .dockyard-handoff-list span { display: block; margin-top: 2px; color: var(--dy-text-3); font-size: 9px; }
+.dockyard-root .dockyard-loop-layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, .7fr); gap: 18px; }
+.dockyard-root .dockyard-loop-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+.dockyard-root .dockyard-loop-head h2 { margin-top: 0; }
+.dockyard-root .dockyard-loop-visual-wrap { margin-top: 16px; overflow-x: auto; border: 1px solid var(--dy-border); border-radius: 11px; background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-loop-visual-wrap svg { width: 100%; min-width: 760px; height: auto; }
+.dockyard-root .dockyard-loop-node { fill: var(--dy-neutral-bg); stroke: var(--dy-neutral); stroke-width: 1.5; }
+.dockyard-root .dockyard-loop-node.done { fill: var(--dy-success-bg); stroke: var(--dy-success); }
+.dockyard-root .dockyard-loop-node.current { fill: var(--dy-warning-bg); stroke: var(--dy-warning); stroke-dasharray: 5 3; }
+.dockyard-root .dockyard-loop-edge { fill: none; stroke: var(--dy-border-strong, var(--dy-border)); stroke-width: 2; }
+.dockyard-root .dockyard-loop-edge.done { stroke: var(--dy-success); }
+.dockyard-root .dockyard-loop-edge.current { stroke: var(--dy-warning); stroke-dasharray: 5 4; }
+.dockyard-root .dockyard-loop-visual-wrap text { fill: var(--dy-text); font: 600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.dockyard-root .dockyard-stage-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 14px; }
+.dockyard-root .dockyard-stage-list button { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 9px; align-items: center; padding: 9px 10px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface); color: var(--dy-text); text-align: left; cursor: pointer; }
+.dockyard-root .dockyard-stage-list button.active { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
+.dockyard-root .dockyard-stage-list button > span:first-child { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 7px; background: var(--dy-neutral-bg); color: var(--dy-neutral); font-size: 10px; }
+.dockyard-root .dockyard-stage-list strong,
+.dockyard-root .dockyard-stage-list small { display: block; }
+.dockyard-root .dockyard-stage-list strong { font-size: 11px; }
+.dockyard-root .dockyard-stage-list small { margin-top: 2px; color: var(--dy-text-3); font-size: 9px; }
+.dockyard-root .dockyard-stage-detail { align-self: start; }
+.dockyard-root .dockyard-stage-detail .dockyard-evidence-details { margin-top: 17px; }
+.dockyard-root .dockyard-workflows-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(330px, .75fr); gap: 18px; }
+.dockyard-root .dockyard-workflows-layout > .dockyard-feature-card { align-self: start; }
+.dockyard-root .dockyard-workflow-visual { margin-top: 16px; overflow-x: auto; border: 1px solid var(--dy-border); border-radius: 11px; background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-workflow-visual svg { width: 100%; min-width: 700px; height: auto; }
+.dockyard-root .dockyard-workflow-visual text { fill: var(--dy-text); font: 600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.dockyard-root .dockyard-saved-workflows { display: grid; gap: 7px; margin-top: 14px; }
+.dockyard-root .dockyard-saved-workflows article { padding: 10px 11px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-saved-workflows strong,
+.dockyard-root .dockyard-saved-workflows span { display: block; }
+.dockyard-root .dockyard-saved-workflows strong { font-size: 11px; }
+.dockyard-root .dockyard-saved-workflows span { margin-top: 3px; color: var(--dy-text-3); font-size: 9px; }
+.dockyard-root .dockyard-workflow-creator { display: grid; gap: 7px; margin-top: 17px; padding-top: 16px; border-top: 1px solid var(--dy-border); }
+.dockyard-root .dockyard-workflow-creator h3 { margin: 0 0 4px; font-size: 14px; }
+.dockyard-root .dockyard-workflow-creator label { font-size: 10px; font-weight: 700; }
+.dockyard-root .dockyard-workflow-creator input,
+.dockyard-root .dockyard-workflow-creator select { min-height: 36px; padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; }
+.dockyard-root .dockyard-workflow-creator .dockyard-button { margin-top: 6px; }
+.dockyard-root .dockyard-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(320px, .8fr);
+  gap: 18px;
+  align-items: start;
+}
+.dockyard-root .dockyard-main-grid .dockyard-section { margin-top: 0; }
+.dockyard-root .dockyard-project-mission { max-width: 430px; }
+.dockyard-root .dockyard-avatar-stack { display: flex; align-items: center; margin: 7px 0 0 45px; }
+.dockyard-root .dockyard-avatar {
+  width: 27px;
+  height: 27px;
+  margin-left: -6px;
+  display: inline-grid;
+  place-items: center;
+  border: 2px solid var(--dy-surface);
+  border-radius: 8px;
+  color: #ffffff;
+  background: var(--dy-info);
+  font-size: 9px;
+  font-weight: 800;
+}
+.dockyard-root .dockyard-avatar:first-child { margin-left: 0; }
+.dockyard-root .dockyard-activity-card {
+  overflow: hidden;
+  border: 1px solid var(--dy-border);
+  border-radius: 14px;
+  background: var(--dy-surface);
+}
+.dockyard-root .dockyard-activity-list { padding: 5px 20px 14px; }
+.dockyard-root .dockyard-activity-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px 0;
+}
+.dockyard-root .dockyard-activity-item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 48px;
+  bottom: -5px;
+  width: 1px;
+  background: var(--dy-border);
+}
+.dockyard-root .dockyard-activity-item p { margin: 0; color: var(--dy-text); font-size: 13px; }
+.dockyard-root .dockyard-activity-item time { display: block; margin-top: 4px; color: var(--dy-text-3); font-size: 11px; }
+.dockyard-root .dockyard-activity-item .dockyard-notification-marker { grid-area: auto; }
+.dockyard-root .dockyard-approval-list {
+  display: grid;
+  gap: 14px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.dockyard-root .dockyard-approval-row {
+  display: block;
+  min-height: 0;
+  padding: 22px;
+  border: 1px solid var(--dy-border);
+  border-radius: 14px;
+  background: var(--dy-surface);
+}
+.dockyard-root .dockyard-approval-row[data-state="approved"] { background: var(--dy-success-bg); }
+.dockyard-root .dockyard-approval-row[data-state="rejected"] { background: var(--dy-danger-bg); }
+.dockyard-root .dockyard-approval-top {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+.dockyard-root .dockyard-approval-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--dy-warning);
+  background: var(--dy-warning-bg);
+}
+.dockyard-root .dockyard-approval-icon.danger { color: var(--dy-danger); background: var(--dy-danger-bg); }
+.dockyard-root .dockyard-approval-icon.success { color: var(--dy-success); background: var(--dy-success-bg); }
+.dockyard-root .dockyard-approval-icon svg { width: 17px; height: 17px; }
+.dockyard-root .dockyard-approval-top .dockyard-approval-main { grid-area: auto; }
+.dockyard-root .dockyard-approval-main h2 { font-size: 17px; }
+.dockyard-root .dockyard-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin: 17px 0;
+  padding: 16px;
+  border: 1px solid var(--dy-border);
+  border-radius: 12px;
+  background: var(--dy-surface-subtle);
+}
+.dockyard-root .dockyard-evidence-cell { min-width: 0; padding: 0 13px; border-left: 1px solid var(--dy-border); }
+.dockyard-root .dockyard-evidence-cell:first-child { padding-left: 0; border-left: 0; }
+.dockyard-root .dockyard-evidence-cell:last-child { padding-right: 0; }
+.dockyard-root .dockyard-evidence-cell span { display: block; color: var(--dy-text-3); font-size: 10px; font-weight: 750; }
+.dockyard-root .dockyard-evidence-cell strong { display: block; margin-top: 7px; color: var(--dy-text); font-size: 13px; line-height: 1.4; }
+.dockyard-root .dockyard-approval-actions { display: flex; align-items: center; justify-content: flex-start; gap: 9px; flex-wrap: wrap; }
+.dockyard-root .dockyard-evidence-details {
+  margin-top: 14px;
+  padding: 14px 15px;
+  border: 1px solid var(--dy-border);
+  border-radius: 10px;
+  background: var(--dy-surface-subtle);
+  color: var(--dy-text-2);
+  font-size: 12px;
+}
+.dockyard-root .dockyard-evidence-details[hidden] { display: none; }
+.dockyard-root .dockyard-feed-group { box-shadow: 0 4px 18px rgba(31, 42, 68, 0.04); }
+@media (min-width: 821px) and (max-width: 1350px) {
+  .dockyard-root .dockyard-main-grid .dockyard-project-head,
+  .dockyard-root .dockyard-main-grid .dockyard-project-row {
+    grid-template-columns: minmax(180px, 1.35fr) 100px minmax(160px, 1fr) 80px;
+    gap: 12px;
+  }
+}
+@media (max-width: 980px) {
+  .dockyard-root .dockyard-main-grid { grid-template-columns: 1fr; }
+  .dockyard-root .dockyard-attention-card { grid-template-columns: 1fr; }
+  .dockyard-root .dockyard-project-overview-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 820px) {
+  .dockyard-root .dockyard-consolebar { gap: 8px; margin: -14px -16px 26px; padding: 10px 16px; }
+  .dockyard-root .dockyard-brand-copy { display: none; }
+  .dockyard-root .dockyard-console-action { width: 38px; padding: 6px; overflow: hidden; white-space: nowrap; font-size: 0; }
+  .dockyard-root .dockyard-console-action svg { flex: 0 0 auto; margin: 0; }
+  .dockyard-root .dockyard-wizard-progress { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 4px; }
+  .dockyard-root .dockyard-metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dockyard-root .dockyard-portfolio-visual { grid-template-columns: 1fr; gap: 14px; }
+  .dockyard-root .dockyard-project-grid { grid-template-columns: 1fr; }
+  .dockyard-root .dockyard-workload-card,
+  .dockyard-root .dockyard-teams-layout,
+  .dockyard-root .dockyard-loop-layout,
+  .dockyard-root .dockyard-workflows-layout { grid-template-columns: 1fr; }
+  .dockyard-root .dockyard-backlog-item { grid-template-columns: 42px minmax(0, 1fr); }
+  .dockyard-root .dockyard-backlog-item > .dockyard-status-tag,
+  .dockyard-root .dockyard-rank-actions { grid-column: 2; justify-self: start; }
+  .dockyard-root .dockyard-evidence-grid { grid-template-columns: 1fr; gap: 13px; }
+  .dockyard-root .dockyard-evidence-cell { padding: 13px 0 0; border-top: 1px solid var(--dy-border); border-left: 0; }
+  .dockyard-root .dockyard-evidence-cell:first-child { padding-top: 0; border-top: 0; }
+  .dockyard-root .dockyard-approval-top { grid-template-columns: 38px minmax(0, 1fr); }
+  .dockyard-root .dockyard-approval-top > .dockyard-status-tag { grid-column: 2; }
+}
+@media (max-width: 640px) {
+  .dockyard-root .dockyard-metric-strip { grid-template-columns: 1fr; }
+  .dockyard-root .dockyard-bot-grid,
+  .dockyard-root .dockyard-stage-list { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .dockyard-root .dockyard-modal-backdrop { padding: 8px; }
+  .dockyard-root .dockyard-onboarding { max-height: calc(100vh - 16px); border-radius: 13px; }
+  .dockyard-root .dockyard-onboarding-head,
+  .dockyard-root .dockyard-wizard-body { padding: 18px; }
+  .dockyard-root .dockyard-wizard-progress { padding: 12px 18px; }
+  .dockyard-root .dockyard-wizard-actions { padding: 14px 18px 17px; }
+  .dockyard-root .dockyard-onboarding-review { grid-template-columns: 84px minmax(0, 1fr); }
+  .dockyard-root .dockyard-toast-region { right: 16px; bottom: 16px; }
+  .dockyard-root .dockyard-attention-decision { grid-template-columns: auto minmax(0, 1fr); }
+  .dockyard-root .dockyard-attention-decision .dockyard-button { grid-column: 2; justify-self: start; }
 }
 @media (prefers-reduced-motion: reduce) {
   .dockyard-root *,
@@ -704,13 +1216,46 @@ const DOCKYARD_CSS = `
 `
 
 let _rest = null
+let _toastId = 0
+const TOAST_EVENT = 'dockyard:toast'
+
 function bindRest(ctx) { _rest = ctx.rest }
 
+function mutationMessage(path, result) {
+  if (path === '/onboard') return `Project ${result?.project_id || 'created'} onboarded`
+  if (path.endsWith('/approve')) return 'Initiative approved'
+  if (path.endsWith('/reject')) return 'Initiative rejected'
+  if (path.endsWith('/ack')) return 'Notification cleared'
+  if (path.endsWith('/rerank')) return 'Backlog priority updated'
+  if (path.endsWith('/views')) return 'Workflow view saved'
+  if (path.endsWith('/freeze')) return 'Project frozen'
+  if (path.endsWith('/resume')) return 'Project resumed'
+  if (path.endsWith('/transition')) return 'Work item updated'
+  return 'Change saved'
+}
+
+function emitToast(tone, message) {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return
+  window.dispatchEvent(new window.CustomEvent(TOAST_EVENT, {
+    detail: { id: ++_toastId, tone, message },
+  }))
+}
+
 async function api(path, init) {
+  const method = init?.method ?? 'GET'
   try {
-    return await _rest(path, { method: init?.method ?? 'GET', body: init?.body })
+    const result = await _rest(path, { method, body: init?.body })
+    if (method !== 'GET') emitToast('success', mutationMessage(path, result))
+    return result
   } catch (error) {
-    throw new Error(String(error?.message ?? error).slice(0, 140))
+    const raw = String(error?.message ?? error).slice(0, 240)
+    const message = /(?:error\s*)?500|internal service error/i.test(raw)
+      ? 'Dockyard could not confirm the request.'
+      : raw
+    if (method !== 'GET' && !init?.suppressErrorToast) emitToast('danger', message)
+    const failure = new Error(message)
+    failure.cause = error
+    throw failure
   }
 }
 
@@ -826,9 +1371,154 @@ function Button({ children, onClick, variant = '', small = false, disabled = fal
   })
 }
 
-function ConsoleBar({ tab, counts, onTab }) {
+function ToastRegion({ toasts, onDismiss }) {
+  return jsx('div', {
+    className: 'dockyard-toast-region',
+    'data-toast-region': true,
+    'aria-label': 'Status messages',
+    children: toasts.map((toast) => jsxs('div', {
+      className: `dockyard-toast ${toast.tone}`,
+      role: toast.tone === 'danger' ? 'alert' : 'status',
+      children: [
+        jsx('span', { className: 'dockyard-toast-icon', 'aria-hidden': true, children: jsx(Icon, { name: toast.tone === 'danger' ? 'alert' : 'check' }) }),
+        jsx('span', { children: toast.message }),
+        jsx('button', { type: 'button', 'aria-label': 'Dismiss message', onClick: () => onDismiss(toast.id), children: '×' }),
+      ],
+    }, toast.id)),
+  })
+}
+
+function OnboardingWizard({ onClose, onComplete }) {
+  const [step, setStep] = useState(1)
+  const [projectId, setProjectId] = useState('')
+  const [repoPath, setRepoPath] = useState('')
+  const [mission, setMission] = useState('')
+  const [leadProfile, setLeadProfile] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    const handleKey = (event) => { if (event.key === 'Escape' && !submitting) onClose() }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [onClose, submitting])
+
+  const valid = step === 1
+    ? /^[a-z0-9][a-z0-9-]*$/.test(projectId.trim()) && repoPath.trim().startsWith('/')
+    : step === 2
+      ? mission.trim().length >= 12
+      : step === 3
+        ? leadProfile.trim().length > 0
+        : true
+  const submit = async () => {
+    setSubmitting(true)
+    setError(null)
+    try {
+      const result = await api('/onboard', {
+        method: 'POST',
+        body: {
+          project_id: projectId.trim(),
+          repo_path: repoPath.trim(),
+          mission: mission.trim(),
+          lead_profile: leadProfile.trim(),
+        },
+      })
+      onComplete(result)
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+      setSubmitting(false)
+    }
+  }
+  const steps = [
+    ['Project', 'Name and repository'],
+    ['Mission', 'Define the outcome'],
+    ['Lead', 'Assign ownership'],
+    ['Review', 'Confirm the contract'],
+  ]
+  return jsx('div', { className: 'dockyard-modal-backdrop', children:
+    jsxs('section', {
+      className: 'dockyard-onboarding',
+      role: 'dialog',
+      'aria-modal': true,
+      'aria-labelledby': 'dockyard-onboarding-title',
+      'data-onboarding-wizard': true,
+      children: [
+        jsxs('header', { className: 'dockyard-onboarding-head', children: [
+          jsxs('div', { children: [
+            jsx('span', { className: 'dockyard-card-label', children: 'NEW PROJECT' }),
+            jsx('h2', { id: 'dockyard-onboarding-title', children: 'Bring a project into Dockyard' }),
+            jsx('p', { children: 'Four bounded steps. Nothing runs until the final review.' }),
+          ]}),
+          jsx('button', { type: 'button', className: 'dockyard-modal-close', 'aria-label': 'Close onboarding', disabled: submitting, onClick: onClose, children: '×' }),
+        ]}),
+        jsx('div', { className: 'dockyard-wizard-progress', role: 'progressbar', 'aria-label': 'Onboarding progress', 'aria-valuemin': 1, 'aria-valuemax': 4, 'aria-valuenow': step, children:
+          steps.map(([label, detail], index) => jsxs('div', { className: index + 1 <= step ? 'complete' : '', children: [
+            jsx('span', { children: number(index + 1) }),
+            jsxs('span', { children: [jsx('strong', { children: label }), jsx('small', { children: detail })] }),
+          ]}, label)),
+        }),
+        jsxs('div', { className: 'dockyard-wizard-body', children: [
+          jsxs('div', { className: step === 1 ? 'dockyard-wizard-step active' : 'dockyard-wizard-step', hidden: step !== 1, 'data-wizard-step': '1', children: [
+            jsx('h3', { children: 'Project identity' }),
+            jsx('p', { children: 'Use the stable project identifier and its absolute repository path.' }),
+            jsx('label', { htmlFor: 'dockyard-project-id', children: 'Project ID' }),
+            jsx('input', { id: 'dockyard-project-id', 'data-field': 'project-id', value: projectId, placeholder: 'payments-relaunch', autoComplete: 'off', onInput: (event) => setProjectId(event.target.value) }),
+            jsx('small', { children: 'Lowercase letters, numbers and hyphens.' }),
+            jsx('label', { htmlFor: 'dockyard-repo-path', children: 'Repository path' }),
+            jsx('input', { id: 'dockyard-repo-path', 'data-field': 'repo-path', value: repoPath, placeholder: '/home/sahil/repos/project', autoComplete: 'off', onInput: (event) => setRepoPath(event.target.value) }),
+          ]}),
+          jsxs('div', { className: step === 2 ? 'dockyard-wizard-step active' : 'dockyard-wizard-step', hidden: step !== 2, 'data-wizard-step': '2', children: [
+            jsx('h3', { children: 'Mission and outcome' }),
+            jsx('p', { children: 'State what the project must improve. This anchors later initiative decisions.' }),
+            jsx('label', { htmlFor: 'dockyard-mission', children: 'Mission' }),
+            jsx('textarea', { id: 'dockyard-mission', 'data-field': 'mission', value: mission, rows: 5, placeholder: 'Reduce payment failures without weakening release gates.', onInput: (event) => setMission(event.target.value) }),
+            jsx('small', { children: `${number(mission.trim().length)} characters / minimum 12` }),
+          ]}),
+          jsxs('div', { className: step === 3 ? 'dockyard-wizard-step active' : 'dockyard-wizard-step', hidden: step !== 3, 'data-wizard-step': '3', children: [
+            jsx('h3', { children: 'Lead ownership' }),
+            jsx('p', { children: 'Assign the specialist profile accountable for the project.' }),
+            jsx('label', { htmlFor: 'dockyard-lead-profile', children: 'Lead profile' }),
+            jsx('input', { id: 'dockyard-lead-profile', 'data-field': 'lead-profile', value: leadProfile, list: 'dockyard-lead-options', placeholder: 'octacon', autoComplete: 'off', onInput: (event) => setLeadProfile(event.target.value) }),
+            jsxs('datalist', { id: 'dockyard-lead-options', children: [
+              jsx('option', { value: 'octacon' }, 'octacon'),
+              jsx('option', { value: 'remii' }, 'remii'),
+              jsx('option', { value: 'wesker' }, 'wesker'),
+              jsx('option', { value: 'gojo' }, 'gojo'),
+              jsx('option', { value: 'ceecee' }, 'ceecee'),
+            ]}),
+            jsx('small', { children: 'This records ownership; it does not expand permissions.' }),
+          ]}),
+          jsxs('div', { className: step === 4 ? 'dockyard-wizard-step active' : 'dockyard-wizard-step', hidden: step !== 4, 'data-wizard-step': '4', children: [
+            jsx('h3', { children: 'Review onboarding contract' }),
+            jsxs('dl', { className: 'dockyard-onboarding-review', children: [
+              jsx('dt', { children: 'Project' }), jsx('dd', { children: projectId }),
+              jsx('dt', { children: 'Repository' }), jsx('dd', { children: repoPath }),
+              jsx('dt', { children: 'Mission' }), jsx('dd', { children: mission }),
+              jsx('dt', { children: 'Lead' }), jsx('dd', { children: leadProfile }),
+            ]}),
+            jsx('p', { className: 'dockyard-review-note', children: 'Onboarding creates the project record and its initial oversight surfaces. It does not approve future initiatives.' }),
+          ]}),
+        ]}),
+        error ? jsx('p', { className: 'dockyard-inline-error', children: error }) : null,
+        jsxs('footer', { className: 'dockyard-wizard-actions', children: [
+          jsx(Button, { action: step === 1 ? 'cancel-onboarding' : 'wizard-back', disabled: submitting, onClick: step === 1 ? onClose : () => setStep((value) => value - 1), children: step === 1 ? 'Cancel' : 'Back' }),
+          step < 4
+            ? jsx(Button, { action: 'wizard-next', variant: 'primary', disabled: !valid, onClick: () => setStep((value) => value + 1), children: 'Continue' })
+            : jsx(Button, { action: 'submit-onboarding', variant: 'primary', disabled: submitting, onClick: submit, children: submitting ? 'Onboarding…' : 'Onboard project' }),
+        ]}),
+      ],
+    }),
+  })
+}
+
+function ConsoleBar({ tab, counts, onTab, onNewProject }) {
   const tabs = [
     ['dashboard', 'Fleet', null],
+    ['project', 'Project', null],
+    ['backlog', 'Backlog', null],
+    ['teams', 'Bot teams', null],
+    ['initiative', 'Initiative', null],
+    ['workflows', 'Workflows', null],
     ['inbox', 'Approvals', counts.approvals],
     ['notifications', 'Notifications', counts.notifications],
   ]
@@ -870,22 +1560,33 @@ function ConsoleBar({ tab, counts, onTab }) {
         ],
       }, key)),
     }),
+    jsx(Button, {
+      action: 'open-onboarding',
+      variant: 'primary dockyard-console-action',
+      small: true,
+      onClick: onNewProject,
+      children: jsxs(Fragment, { children: [jsx(Icon, { name: 'project' }), 'New project'] }),
+    }),
   ]})
 }
 
-function PageHead({ title, description, onRefresh }) {
+function PageHead({ title, description, onRefresh, status }) {
   return jsxs('div', { className: 'dockyard-page-head', children: [
     jsxs('div', { children: [
       jsx('h1', { children: title }),
       jsx('p', { children: description }),
     ]}),
-    onRefresh ? jsx('div', { className: 'dockyard-page-actions', children:
-      jsx(Button, {
+    status || onRefresh ? jsxs('div', { className: 'dockyard-page-actions', children: [
+      status ? jsxs('span', { className: 'dockyard-owed-pill', children: [
+        jsx('span', { className: 'dockyard-status-mark', 'aria-hidden': true }),
+        status,
+      ]}) : null,
+      onRefresh ? jsx(Button, {
         action: 'refresh',
         onClick: onRefresh,
         children: jsxs(Fragment, { children: [jsx(Icon, { name: 'refresh' }), 'Refresh'] }),
-      }),
-    }) : null,
+      }) : null,
+    ]}) : null,
   ]})
 }
 
@@ -920,10 +1621,151 @@ function LoadingState() {
   ]})
 }
 
-function AttentionPanel({ owed, onReview }) {
+const HEALTH_PRIORITY = Object.freeze({ critical: 0, frozen: 0, attention: 0, degraded: 1, watch: 1, unknown: 2, healthy: 3 })
+const RISK_PRIORITY = Object.freeze({ critical: 0, high: 0, medium: 1, low: 2 })
+const SEVERITY_PRIORITY = Object.freeze({ critical: 0, high: 0, error: 0, medium: 1, warning: 1, low: 2, info: 3 })
+
+function sortProjects(projects) {
+  return [...projects].sort((left, right) => {
+    const health = (HEALTH_PRIORITY[left.health] ?? 2) - (HEALTH_PRIORITY[right.health] ?? 2)
+    if (health !== 0) return health
+    const blocked = Number(right.work?.blocked ?? 0) - Number(left.work?.blocked ?? 0)
+    if (blocked !== 0) return blocked
+    const alerts = Number(right.unacked_notifications ?? 0) - Number(left.unacked_notifications ?? 0)
+    if (alerts !== 0) return alerts
+    return String(left.id).localeCompare(String(right.id))
+  })
+}
+
+function sortApprovals(items) {
+  return [...items].sort((left, right) => {
+    const risk = (RISK_PRIORITY[String(left.risk || 'medium').toLowerCase()] ?? 1)
+      - (RISK_PRIORITY[String(right.risk || 'medium').toLowerCase()] ?? 1)
+    if (risk !== 0) return risk
+    return Number(right.detail?.priority ?? 0) - Number(left.detail?.priority ?? 0)
+  })
+}
+
+function initials(value) {
+  const words = String(value || '?').replace(/-bot$/i, '').split(/[-_\s]+/).filter(Boolean)
+  return words.slice(0, 2).map((word) => word.charAt(0).toUpperCase()).join('') || '?'
+}
+
+function validationSummary(contract) {
+  if (!contract || typeof contract !== 'object') return 'No validation contract supplied'
+  const steps = Array.isArray(contract.steps) ? contract.steps.filter(Boolean) : []
+  const tests = typeof contract.tests === 'string' ? contract.tests.trim() : ''
+  if (steps.length > 0 && tests) return `${steps.length} checks plus ${tests}`
+  if (steps.length > 0) return steps.join('; ')
+  if (tests) return tests
+  return 'No validation contract supplied'
+}
+
+async function loadDashboardData() {
+  const [dashboard, inbox, notifications, bots, workload] = await Promise.all([
+    api('/dashboard'), api('/inbox'), api('/notifications'), api('/bots'), api('/workload'),
+  ])
+  const entries = await Promise.all((dashboard.projects ?? []).map(async (project) => {
+    const projectId = encodeURIComponent(project.id)
+    const [settings, workItems] = await Promise.all([
+      api(`/projects/${projectId}/settings`),
+      api(`/projects/${projectId}/work-items`),
+    ])
+    return [project.id, { settings, workItems: workItems.work_items ?? [] }]
+  }))
+  return {
+    ...dashboard,
+    inbox,
+    notifications,
+    bots,
+    workload,
+    projectContext: Object.fromEntries(entries),
+  }
+}
+
+async function loadProjectData(projectId) {
+  const dashboard = await api('/dashboard')
+  const projects = sortProjects(dashboard.projects ?? [])
+  const project = projects.find((item) => item.id === projectId) ?? projects[0]
+  if (!project) return { ...dashboard, project: null, projects }
+  const encoded = encodeURIComponent(project.id)
+  const [settings, workItems, initiatives, events] = await Promise.all([
+    api(`/projects/${encoded}/settings`),
+    api(`/projects/${encoded}/work-items`),
+    api(`/projects/${encoded}/initiatives`),
+    api(`/projects/${encoded}/events`),
+  ])
+  return {
+    ...dashboard,
+    projects,
+    project,
+    settings,
+    workItems: workItems.work_items ?? [],
+    initiatives: initiatives.initiatives ?? [],
+    events: events.events ?? [],
+  }
+}
+
+async function loadBacklogData(projectId) {
+  const dashboard = await api('/dashboard')
+  const projects = sortProjects(dashboard.projects ?? [])
+  const project = projects.find((item) => item.id === projectId) ?? projects[0]
+  if (!project) return { project: null, projects, backlog: [], workItems: [] }
+  const encoded = encodeURIComponent(project.id)
+  const [backlog, workItems] = await Promise.all([
+    api(`/projects/${encoded}/backlog`),
+    api(`/projects/${encoded}/work-items`),
+  ])
+  return {
+    project,
+    projects,
+    backlog: backlog.backlog ?? [],
+    workItems: workItems.work_items ?? [],
+  }
+}
+
+async function loadWorkflowsData(projectId) {
+  const dashboard = await api('/dashboard')
+  const projects = sortProjects(dashboard.projects ?? [])
+  const project = projects.find((item) => item.id === projectId) ?? projects[0]
+  if (!project) return { project: null, projects, views: [] }
+  const views = await api(`/projects/${encodeURIComponent(project.id)}/views`)
+  return { project, projects, views: views.views ?? [] }
+}
+
+async function loadTeamsData() {
+  const [bots, workload, groups] = await Promise.all([
+    api('/bots'), api('/workload'), api('/bot-groups'),
+  ])
+  const messages = {}
+  await Promise.all((groups.groups ?? []).map(async (group) => {
+    const result = await api(`/bot-groups/${encodeURIComponent(group.name)}/messages`)
+    messages[group.name] = result.messages ?? []
+  }))
+  return { bots: bots.bots ?? [], workload, groups: groups.groups ?? [], messages }
+}
+
+async function loadInboxData() {
+  const inbox = await api('/inbox')
+  const projectIds = [...new Set((inbox.items ?? []).map((item) => item.project).filter(Boolean))]
+  const projectInitiatives = await Promise.all(projectIds.map(async (projectId) => {
+    const result = await api(`/projects/${encodeURIComponent(projectId)}/initiatives`)
+    return result.initiatives ?? []
+  }))
+  const detailByRef = {}
+  projectInitiatives.flat().forEach((initiative) => { detailByRef[initiative.ref] = initiative })
+  return {
+    ...inbox,
+    items: (inbox.items ?? []).map((item) => ({ ...item, detail: detailByRef[item.ref] ?? null })),
+  }
+}
+
+function AttentionPanel({ items, onReview }) {
+  const decisions = sortApprovals(items ?? [])
+  const owed = decisions.length
   if (owed === 0) {
-    return jsxs('section', { className: 'dockyard-panel dockyard-attention is-clear', children: [
-      jsxs('div', { children: [
+    return jsxs('section', { className: 'dockyard-attention-card is-clear', 'data-dashboard-card': 'attention', children: [
+      jsxs('div', { className: 'dockyard-attention-summary', children: [
         jsx('span', { className: 'dockyard-attention-icon', children: jsx(Icon, { name: 'check' }) }),
         jsx('h2', { children: 'No decisions waiting' }),
         jsx('strong', { className: 'dockyard-decision-count', children: 'All clear' }),
@@ -931,70 +1773,186 @@ function AttentionPanel({ owed, onReview }) {
       ]}),
     ]})
   }
-  return jsxs('section', { className: 'dockyard-panel dockyard-attention', children: [
-    jsxs('div', { children: [
-      jsx('span', { className: 'dockyard-attention-icon', children: jsx(Icon, { name: 'alert' }) }),
+  return jsxs('section', { className: 'dockyard-attention-card', 'data-dashboard-card': 'attention', children: [
+    jsxs('div', { className: 'dockyard-attention-summary', children: [
       jsx('h2', { children: 'Needs your decision' }),
       jsx('strong', { className: 'dockyard-decision-count', children: number(owed) }),
-      jsx('p', { children: `${number(owed)} ${plural(owed, 'approval')} waiting across the fleet.` }),
+      jsx('p', { children: `${number(owed)} ${plural(owed, 'decision')} carry project context and a declared risk.` }),
+      jsx(Button, { variant: 'primary', onClick: onReview, children: 'Review decisions' }),
     ]}),
-    jsx(Button, { variant: 'primary', onClick: onReview, children: 'Review approvals' }),
+    jsxs('div', { className: 'dockyard-attention-copy', children: [
+      jsx('h2', { children: 'Everything else can keep moving' }),
+      jsx('div', { className: 'dockyard-attention-list', children:
+        decisions.map((item) => {
+          const [tone, label] = riskDetails(item.risk)
+          return jsxs('div', { className: 'dockyard-attention-decision', 'data-attention-decision': item.ref, children: [
+            jsx(StatusTag, { tone, label }),
+            jsxs('span', { children: [
+              jsx('strong', { children: item.title }),
+              jsx('span', { className: 'dockyard-meta', children: `${item.project || 'Unknown project'} / ${item.ref}` }),
+            ]}),
+            jsx(Button, { small: true, onClick: onReview, children: 'Open' }),
+          ]}, item.ref)
+        }),
+      }),
+    ]}),
   ]})
 }
 
-function FleetStatus({ projects, totals }) {
+function FleetMetrics({ view }) {
+  const projects = view.projects ?? []
+  const totals = view.totals ?? {}
+  const workload = view.workload ?? { busy: [], idle: [], stuck: [] }
+  const healthy = projects.filter((project) => project.health === 'healthy').length
+  const watch = projects.filter((project) => ['watch', 'degraded', 'attention', 'critical', 'frozen'].includes(project.health)).length
+  const unknown = projects.filter((project) => !project.health || project.health === 'unknown').length
   const blocked = Number(totals.blocked ?? 0)
-  const unread = Number(totals.unacked_notifications ?? projects.reduce((sum, project) => sum + Number(project.unacked_notifications ?? 0), 0))
-  return jsxs('section', { className: 'dockyard-panel dockyard-status-panel', children: [
-    jsx('h2', { children: 'Fleet status' }),
-    jsxs('div', { className: 'dockyard-status-grid', children: [
-      jsxs('div', { className: 'dockyard-status-cell', children: [jsx('span', { children: 'Projects' }), jsx('strong', { children: number(projects.length) })] }),
-      jsxs('div', { className: 'dockyard-status-cell', children: [jsx('span', { children: 'Active work' }), jsx('strong', { children: number(totals.active_work ?? 0) })] }),
-      jsxs('div', { className: 'dockyard-status-cell', children: [jsx('span', { children: 'Blocked work' }), jsx('strong', { className: blocked > 0 ? 'is-danger' : '', children: number(blocked) })] }),
-      jsxs('div', { className: 'dockyard-status-cell', children: [jsx('span', { children: 'Unread alerts' }), jsx('strong', { className: unread > 0 ? 'is-info' : '', children: number(unread) })] }),
+  const owed = Number(view.inbox?.count ?? view.owed_decisions ?? 0)
+  const unread = Number((view.notifications?.notifications ?? []).filter((note) => !note.acked).length)
+  const ownerAttention = owed + unread
+  const healthValue = healthy > 0 ? `${number(healthy)} healthy` : `${number(unknown)} unverified`
+  const healthDelta = [watch > 0 ? `${number(watch)} need review` : null, unknown > 0 ? `${number(unknown)} unverified` : null].filter(Boolean).join(', ') || 'No health warnings'
+  const botDelta = `${number(workload.idle?.length ?? 0)} idle, ${number(workload.stuck?.length ?? 0)} stuck`
+  return jsxs('section', { className: 'dockyard-metric-strip', 'aria-label': 'Fleet summary', children: [
+    jsxs('div', { className: 'dockyard-metric', 'data-metric': 'health', children: [
+      jsx('span', { children: 'PROJECT HEALTH' }),
+      jsx('strong', { children: healthValue }),
+      jsx('small', { children: healthDelta }),
+    ]}),
+    jsxs('div', { className: 'dockyard-metric', 'data-metric': 'work', children: [
+      jsx('span', { children: 'ACTIVE WORK' }),
+      jsx('strong', { children: `${number(totals.active_work ?? 0)} items` }),
+      jsx('small', { children: `${number(blocked)} blocked` }),
+    ]}),
+    jsxs('div', { className: 'dockyard-metric', 'data-metric': 'bots', children: [
+      jsx('span', { children: 'BOT WORKLOAD' }),
+      jsx('strong', { children: `${number(workload.busy?.length ?? 0)} busy` }),
+      jsx('small', { children: botDelta }),
+    ]}),
+    jsxs('div', { className: 'dockyard-metric', 'data-metric': 'attention', children: [
+      jsx('span', { children: 'OWNER ATTENTION' }),
+      jsx('strong', { className: ownerAttention === 0 ? 'success' : 'warning', children: ownerAttention === 0 ? 'No action needed' : `${number(ownerAttention)} open` }),
+      jsx('small', { children: ownerAttention === 0 ? 'Fleet can keep moving' : `${number(owed)} decisions, ${number(unread)} alerts` }),
     ]}),
   ]})
 }
 
-function ProjectRow({ project }) {
+function WorkBar({ work, project = false, label = 'Work distribution' }) {
+  const backlog = Number(work?.backlog ?? 0)
+  const active = Number(work?.active ?? 0)
+  const done = Number(work?.done ?? 0)
+  const total = Math.max(1, backlog + active + done)
+  return jsxs('div', {
+    className: `dockyard-work-visual${project ? ' compact' : ''}`,
+    role: 'img',
+    'aria-label': `${label}: ${backlog} backlog, ${active} active, ${done} done`,
+    'data-work-visual': project ? true : undefined,
+    children: [
+      backlog > 0 ? jsx('span', { className: 'backlog', style: { width: `${(backlog / total) * 100}%` } }) : null,
+      active > 0 ? jsx('span', { className: 'active', style: { width: `${(active / total) * 100}%` } }) : null,
+      done > 0 ? jsx('span', { className: 'done', style: { width: `${(done / total) * 100}%` } }) : null,
+    ],
+  })
+}
+
+function PortfolioVisual({ projects }) {
+  const totals = projects.reduce((acc, project) => ({
+    backlog: acc.backlog + Number(project.work?.backlog ?? 0),
+    active: acc.active + Number(project.work?.active ?? 0),
+    done: acc.done + Number(project.work?.done ?? 0),
+  }), { backlog: 0, active: 0, done: 0 })
+  return jsxs('section', { className: 'dockyard-portfolio-visual', 'data-portfolio-visual': true, children: [
+    jsxs('div', { className: 'dockyard-portfolio-copy', children: [
+      jsx('h2', { children: 'Delivery mix' }),
+      jsx('p', { children: 'Current work distribution across the watched projects.' }),
+    ]}),
+    jsxs('div', { className: 'dockyard-portfolio-chart', children: [
+      jsx(WorkBar, { work: totals, label: 'Portfolio work distribution' }),
+      jsxs('div', { className: 'dockyard-work-legend', children: [
+        jsxs('span', { className: 'backlog', children: [jsx('i', {}), `${number(totals.backlog)} backlog`] }),
+        jsxs('span', { className: 'active', children: [jsx('i', {}), `${number(totals.active)} active`] }),
+        jsxs('span', { className: 'done', children: [jsx('i', {}), `${number(totals.done)} done`] }),
+      ]}),
+    ]}),
+  ]})
+}
+
+function ProjectRow({ project, context, botNames }) {
   const [tone, label] = healthDetails(project.health)
   const work = project.work ?? {}
   const alerts = Number(project.unacked_notifications ?? 0)
+  const mission = context?.settings?.mission || (project.phase ? `Phase: ${project.phase}` : 'No mission supplied')
+  const activeAssignees = [...new Set((context?.workItems ?? [])
+    .filter((item) => !['done', 'backlog', 'cancelled'].includes(item.status))
+    .map((item) => item.assignee)
+    .filter(Boolean))].slice(0, 3)
   return jsxs('div', { className: 'dockyard-project-row', role: 'row', 'data-project-row': project.id, children: [
-    jsx('div', { className: 'dockyard-project-cell project', role: 'cell', children:
+    jsxs('div', { className: 'dockyard-project-cell project', role: 'cell', children: [
       jsxs('div', { className: 'dockyard-project-name', children: [
         jsx('span', { className: 'dockyard-project-icon', children: jsx(Icon, { name: 'project' }) }),
-        jsxs('span', { children: [
+        jsxs('span', { className: 'dockyard-project-copy', children: [
           jsx('strong', { children: project.id }),
-          jsx('span', { children: project.phase ? `Phase: ${project.phase}` : 'No phase set' }),
+          jsx('span', { className: 'dockyard-project-mission', children: mission }),
         ]}),
       ]}),
-    }),
+      activeAssignees.length > 0 ? jsx('div', { className: 'dockyard-avatar-stack', 'aria-label': 'Active owners', children:
+        activeAssignees.map((assignee) => {
+          const label = botNames?.[assignee] || assignee
+          return jsx('span', { className: 'dockyard-avatar', title: label, children: initials(label) }, assignee)
+        }),
+      }) : null,
+    ]}),
     jsx('div', { className: 'dockyard-project-cell health', role: 'cell', children: jsx(StatusTag, { tone, label }) }),
-    jsx('div', { className: 'dockyard-project-cell work', role: 'cell', children:
+    jsxs('div', { className: 'dockyard-project-cell work', role: 'cell', children: [
       jsxs('div', { className: 'dockyard-work-stats', 'aria-label': `Work: ${work.active ?? 0} active, ${work.backlog ?? 0} backlog, ${work.done ?? 0} done`, children: [
         jsxs('span', { children: [jsx('strong', { children: number(work.active) }), ' active'] }),
         jsxs('span', { children: [jsx('strong', { children: number(work.backlog) }), ' backlog'] }),
         jsxs('span', { children: [jsx('strong', { children: number(work.done) }), ' done'] }),
       ]}),
-    }),
+      jsx(WorkBar, { work, project: true, label: `${project.id} work distribution` }),
+    ]}),
     jsx('div', { className: 'dockyard-project-cell alerts', role: 'cell', children:
       jsx('span', { className: `dockyard-alert-count${alerts > 0 ? ' has-alert' : ''}`, children: alerts > 0 ? `${number(alerts)} unread` : 'None unread' }),
     }),
   ]})
 }
 
+function FleetActivity({ notifications }) {
+  const items = [...(notifications ?? [])].sort((left, right) => String(right.created_at || '').localeCompare(String(left.created_at || ''))).slice(0, 4)
+  return jsxs('aside', { className: 'dockyard-activity-card', 'data-dashboard-card': 'activity', 'data-fleet-activity': true, children: [
+    jsxs('div', { className: 'dockyard-section-head', children: [
+      jsxs('div', { children: [
+        jsx('h2', { children: 'Fleet activity' }),
+        jsx('p', { children: 'Recent attributed project signals.' }),
+      ]}),
+      jsx('span', { className: 'dockyard-section-count', children: `${number(items.length)} recent` }),
+    ]}),
+    items.length > 0 ? jsx('div', { className: 'dockyard-activity-list', children:
+      items.map((note) => {
+        const tone = severityTone(note.severity)
+        return jsxs('div', { className: 'dockyard-activity-item', children: [
+          jsx('span', { className: `dockyard-notification-marker ${tone}`, children: jsx(Icon, { name: tone === 'warning' || tone === 'danger' ? 'alert' : 'bell' }) }),
+          jsxs('span', { children: [
+            jsx('p', { children: note.title || 'Fleet event' }),
+            jsx('span', { className: 'dockyard-meta', children: `${note.project || 'Fleet'}${note.body ? ` / ${note.body}` : ''}` }),
+            jsx('time', { children: formatWhen(note.created_at) }),
+          ]}),
+        ]}, String(note.id))
+      }),
+    }) : jsx('div', { className: 'dockyard-activity-list', children: jsx('p', { className: 'dockyard-meta', children: 'No recent fleet signals.' }) }),
+  ]})
+}
+
 function DashboardView({ view, onInbox, onRefresh }) {
-  const projects = view.projects ?? []
-  const totals = view.totals ?? {}
+  const projects = sortProjects(view.projects ?? [])
   if (projects.length === 0) {
     return jsxs(Fragment, { children: [
       jsx(PageHead, { title: 'Fleet overview', description: 'Project health, work and owner decisions in one view.', onRefresh }),
       jsx(EmptyState, { title: 'No projects under watch', description: 'Projects will appear here after they are connected to Dockyard.', icon: 'project' }),
     ]})
   }
-  const owed = Number(view.owed_decisions ?? 0)
-  const unread = Number(totals.unacked_notifications ?? 0)
+  const owed = Number(view.inbox?.count ?? view.owed_decisions ?? 0)
+  const unread = Number((view.notifications?.notifications ?? []).filter((note) => !note.acked).length)
   const attention = []
   if (owed > 0) attention.push(`${number(owed)} ${plural(owed, 'approval')}`)
   if (unread > 0) attention.push(`${number(unread)} unread ${plural(unread, 'alert')}`)
@@ -1002,29 +1960,530 @@ function DashboardView({ view, onInbox, onRefresh }) {
   const summary = attention.length > 0
     ? `${attention.join(' and ')} ${attentionCount === 1 ? 'needs' : 'need'} review.`
     : 'No owner action is waiting.'
+  const botNames = Object.fromEntries((view.bots?.bots ?? []).map((bot) => [bot.id, bot.name || bot.id]))
   return jsxs(Fragment, { children: [
     jsx(PageHead, {
-      title: 'Fleet overview',
+      title: 'Your fleet, without the noise',
       description: `${number(projects.length)} ${plural(projects.length, 'project')} under watch. ${summary}`,
+      status: owed > 0 ? `${number(owed)} ${plural(owed, 'decision')} owed` : null,
       onRefresh,
     }),
-    jsxs('div', { className: 'dockyard-overview-grid', children: [
-      jsx(AttentionPanel, { owed: Number(view.owed_decisions ?? 0), onReview: onInbox }),
-      jsx(FleetStatus, { projects, totals }),
-    ]}),
-    jsxs('section', { className: 'dockyard-section', children: [
-      jsxs('div', { className: 'dockyard-section-head', children: [
-        jsxs('div', { children: [jsx('h2', { children: 'Projects' }), jsx('p', { children: 'Current phase, health signal and work distribution.' })] }),
-        jsx('span', { className: 'dockyard-section-count', children: `${number(projects.length)} total` }),
-      ]}),
-      jsxs('div', { role: 'table', 'aria-label': 'Project fleet', children: [
-        jsxs('div', { className: 'dockyard-project-head', role: 'row', children: [
-          jsx('span', { role: 'columnheader', children: 'Project' }),
-          jsx('span', { role: 'columnheader', children: 'Health' }),
-          jsx('span', { role: 'columnheader', children: 'Work' }),
-          jsx('span', { role: 'columnheader', children: 'Alerts' }),
+    jsx(AttentionPanel, { items: view.inbox?.items ?? [], onReview: onInbox }),
+    jsx(FleetMetrics, { view }),
+    jsx(PortfolioVisual, { projects }),
+    jsxs('div', { className: 'dockyard-main-grid', children: [
+      jsxs('section', { className: 'dockyard-section', 'data-dashboard-card': 'projects', children: [
+        jsxs('div', { className: 'dockyard-section-head', children: [
+          jsxs('div', { children: [jsx('h2', { children: 'Projects' }), jsx('p', { children: 'Health, active work and the owners carrying it.' })] }),
+          jsx('span', { className: 'dockyard-section-count', children: `${number(projects.length)} total` }),
         ]}),
-        projects.map((project) => jsx(ProjectRow, { project }, project.id)),
+        jsxs('div', { role: 'table', 'aria-label': 'Project fleet', children: [
+          jsxs('div', { className: 'dockyard-project-head', role: 'row', children: [
+            jsx('span', { role: 'columnheader', children: 'Project' }),
+            jsx('span', { role: 'columnheader', children: 'Health' }),
+            jsx('span', { role: 'columnheader', children: 'Work' }),
+            jsx('span', { role: 'columnheader', children: 'Alerts' }),
+          ]}),
+          projects.map((project) => jsx(ProjectRow, {
+            project,
+            context: view.projectContext?.[project.id],
+            botNames,
+          }, project.id)),
+        ]}),
+      ]}),
+      jsx(FleetActivity, { notifications: view.notifications?.notifications ?? [] }),
+    ]}),
+  ]})
+}
+
+function ProjectDashboard({ view, onSelectProject, onRefresh }) {
+  const [projectView, setProjectView] = useState('overview')
+  const project = view.project
+  if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Connect a project before opening the project dashboard.', icon: 'project' })
+  const [healthTone, healthLabel] = healthDetails(project.health)
+  const views = [
+    ['overview', 'Overview'], ['board', 'Board'], ['objectives', 'Objectives'], ['activity', 'Activity'], ['settings', 'Settings'],
+  ]
+  const columns = [
+    ['backlog', 'Backlog', ['backlog']],
+    ['active', 'In progress', ['in_progress', 'executing', 'active']],
+    ['review', 'Review', ['in_review', 'review']],
+    ['done', 'Done', ['done', 'complete', 'completed']],
+  ]
+  const projectOptions = view.projects ?? []
+  let panel
+  if (projectView === 'board') {
+    panel = jsx('div', { className: 'dockyard-board-wrap', children:
+      jsx('div', { className: 'dockyard-board', children:
+        columns.map(([key, label, statuses]) => {
+          const items = (view.workItems ?? []).filter((item) => statuses.includes(item.status))
+          return jsxs('section', { className: 'dockyard-board-column', 'data-board-column': key, children: [
+            jsxs('header', { children: [jsx('h3', { children: label }), jsx('span', { children: number(items.length) })] }),
+            jsx('div', { className: 'dockyard-board-cards', children:
+              items.length > 0
+                ? items.map((item) => jsxs('article', { className: 'dockyard-work-card', 'data-work-card': item.ref, children: [
+                    jsx('span', { className: 'dockyard-work-type', children: item.type || 'task' }),
+                    jsx('h4', { children: item.title }),
+                    jsxs('footer', { children: [jsx('span', { children: item.ref }), jsx('span', { children: item.assignee || 'Unassigned' })] }),
+                  ]}, item.ref))
+                : jsx('p', { className: 'dockyard-meta', children: 'No work in this stage.' }),
+            }),
+          ]}, key)
+        }),
+      }),
+    })
+  } else if (projectView === 'objectives') {
+    panel = jsxs('div', { className: 'dockyard-project-grid', children: [
+      jsxs('section', { className: 'dockyard-feature-card', children: [
+        jsx('span', { className: 'dockyard-card-label', children: 'MISSION' }),
+        jsx('h2', { children: view.settings?.mission || 'No mission supplied' }),
+        jsx('p', { children: `Autonomy level ${number(view.settings?.autonomy_level ?? 0)}. Policies can only narrow this boundary.` }),
+      ]}),
+      jsxs('section', { className: 'dockyard-feature-card', children: [
+        jsx('span', { className: 'dockyard-card-label', children: 'INITIATIVES' }),
+        jsx('h2', { children: `${number(view.initiatives?.length ?? 0)} tracked` }),
+        jsx('p', { children: view.initiatives?.[0]?.expected_outcome || view.initiatives?.[0]?.rationale || 'No active initiative outcome supplied.' }),
+      ]}),
+    ]})
+  } else if (projectView === 'activity') {
+    panel = jsxs('section', { className: 'dockyard-feature-card', children: [
+      jsx('h2', { children: 'Project activity' }),
+      (view.events ?? []).length > 0
+        ? jsx('div', { className: 'dockyard-activity-list', children: view.events.map((event, index) => jsx('p', { children: JSON.stringify(event) }, String(event.id ?? index))) })
+        : jsx('p', { className: 'dockyard-meta', children: 'No attributed project events have been recorded yet.' }),
+    ]})
+  } else if (projectView === 'settings') {
+    panel = jsxs('section', { className: 'dockyard-feature-card', children: [
+      jsx('h2', { children: 'Project rules' }),
+      jsx('p', { children: `Phase: ${view.settings?.phase || project.phase || 'unknown'}. Autonomy level: ${number(view.settings?.autonomy_level ?? 0)}.` }),
+      jsx('pre', { className: 'dockyard-policy-summary', children: JSON.stringify(view.settings?.policies ?? {}, null, 2) }),
+    ]})
+  } else {
+    const visibleWork = [...(view.workItems ?? [])]
+      .sort((left, right) => String(left.status || '').localeCompare(String(right.status || '')))
+      .slice(0, 5)
+    const visibleInitiatives = [...(view.initiatives ?? [])]
+      .sort((left, right) => Number(right.priority ?? 0) - Number(left.priority ?? 0))
+      .slice(0, 3)
+    const visibleEvents = [...(view.events ?? [])]
+      .sort((left, right) => String(right.created_at || '').localeCompare(String(left.created_at || '')))
+      .slice(0, 4)
+    panel = jsxs(Fragment, { children: [
+      jsxs('div', { className: 'dockyard-project-grid', 'data-project-visual': true, children: [
+        jsxs('section', { className: 'dockyard-feature-card dockyard-project-hero', children: [
+          jsx(StatusTag, { tone: healthTone, label: healthLabel }),
+          jsx('h2', { children: view.settings?.mission || project.id }),
+          jsx('p', { children: 'Work distribution and current delivery state from the canonical Dockyard backend.' }),
+          jsx(WorkBar, { work: project.work ?? {}, label: `${project.id} delivery state` }),
+          jsxs('div', { className: 'dockyard-work-legend', children: [
+            jsxs('span', { className: 'backlog', children: [jsx('i', {}), `${number(project.work?.backlog ?? 0)} backlog`] }),
+            jsxs('span', { className: 'active', children: [jsx('i', {}), `${number(project.work?.active ?? 0)} active`] }),
+            jsxs('span', { className: 'done', children: [jsx('i', {}), `${number(project.work?.done ?? 0)} done`] }),
+          ]}),
+        ]}),
+        jsxs('section', { className: 'dockyard-feature-card', children: [
+          jsx('span', { className: 'dockyard-card-label', children: 'CURRENT SIGNALS' }),
+          jsx('h2', { children: `${number(project.work?.blocked ?? 0)} blocked` }),
+          jsx('p', { children: `${number(view.workItems?.length ?? 0)} work items and ${number(view.initiatives?.length ?? 0)} initiatives are attached to this project.` }),
+        ]}),
+      ]}),
+      jsxs('div', { className: 'dockyard-project-overview-grid', children: [
+        jsxs('section', { className: 'dockyard-feature-card dockyard-overview-card', 'data-overview-work': true, children: [
+          jsxs('header', { children: [jsx('h2', { children: 'Current work' }), jsx('span', { children: number(view.workItems?.length ?? 0) })] }),
+          jsx('p', { children: 'Live work, ownership and stage.' }),
+          visibleWork.length > 0 ? jsx('div', { className: 'dockyard-overview-list', children:
+            visibleWork.map((item) => jsxs('article', { children: [
+              jsxs('span', { children: [jsx('strong', { children: item.title || item.ref }), jsx('small', { children: `${item.ref} / ${item.assignee || 'Unassigned'}` })] }),
+              jsx(StatusTag, { tone: ['done', 'completed'].includes(item.status) ? 'success' : item.status === 'in_progress' ? 'info' : 'neutral', label: String(item.status || 'unknown').replaceAll('_', ' ') }),
+            ]}, item.ref)),
+          })
+            : jsx('p', { className: 'dockyard-meta', children: 'No work items are attached.' }),
+        ]}),
+        jsxs('section', { className: 'dockyard-feature-card dockyard-overview-card', 'data-overview-initiatives': true, children: [
+          jsxs('header', { children: [jsx('h2', { children: 'Initiatives' }), jsx('span', { children: number(view.initiatives?.length ?? 0) })] }),
+          jsx('p', { children: 'Current improvement bets and their decision state.' }),
+          visibleInitiatives.length > 0 ? jsx('div', { className: 'dockyard-overview-list', children:
+            visibleInitiatives.map((initiative) => jsxs('article', { children: [
+              jsxs('span', { children: [jsx('strong', { children: initiative.title }), jsx('small', { children: initiative.expected_outcome || initiative.rationale || initiative.ref })] }),
+              jsx(StatusTag, { tone: initiative.status === 'pending_approval' ? 'warning' : 'info', label: String(initiative.status || 'unknown').replaceAll('_', ' ') }),
+            ]}, initiative.ref)),
+          })
+            : jsx('p', { className: 'dockyard-meta', children: 'No initiatives are attached.' }),
+        ]}),
+        jsxs('section', { className: 'dockyard-feature-card dockyard-overview-card', 'data-overview-activity': true, children: [
+          jsxs('header', { children: [jsx('h2', { children: 'Recent activity' }), jsx('span', { children: number(view.events?.length ?? 0) })] }),
+          jsx('p', { children: 'Attributed events from this project.' }),
+          visibleEvents.length > 0 ? jsx('div', { className: 'dockyard-overview-list activity', children:
+            visibleEvents.map((event, index) => jsxs('article', { children: [
+              jsxs('span', { children: [jsx('strong', { children: event.title || event.event_type || event.type || 'Project event' }), jsx('small', { children: event.actor_id || event.actor || formatWhen(event.created_at) || 'Attributed event' })] }),
+            ]}, String(event.id ?? index))),
+          })
+            : jsx('p', { className: 'dockyard-meta', children: 'No attributed project events recorded yet.' }),
+        ]}),
+      ]}),
+    ]})
+  }
+  return jsxs('div', { 'data-project-dashboard': project.id, children: [
+    jsx(PageHead, {
+      title: view.settings?.mission || project.id,
+      description: `Project dashboard / ${project.id}`,
+      status: project.health && project.health !== 'healthy' ? healthLabel : null,
+      onRefresh,
+    }),
+    jsxs('div', { className: 'dockyard-project-toolbar', children: [
+      jsx('label', { children: 'Project' }),
+      jsx('select', { value: project.id, onChange: (event) => onSelectProject(event.target.value), children:
+        projectOptions.map((option) => jsx('option', { value: option.id, children: option.id }, option.id)),
+      }),
+      jsx('nav', { className: 'dockyard-project-tabs', 'aria-label': 'Project views', children:
+        views.map(([key, label]) => jsx('button', {
+          type: 'button',
+          className: projectView === key ? 'active' : '',
+          'data-project-view': key,
+          'aria-pressed': projectView === key,
+          onClick: () => setProjectView(key),
+          children: label,
+        }, key)),
+      }),
+    ]}),
+    panel,
+  ]})
+}
+
+function BacklogView({ view, onSelectProject, onRefresh }) {
+  const [draggedRef, setDraggedRef] = useState(null)
+  const [pendingMove, setPendingMove] = useState(null)
+  const [reason, setReason] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const project = view.project
+  if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Select a project before prioritising its backlog.', icon: 'project' })
+  const workByRef = Object.fromEntries((view.workItems ?? []).map((item) => [item.ref, item]))
+  const entries = [...(view.backlog ?? [])].sort((left, right) => Number(left.rank) - Number(right.rank))
+  const requestMove = (entry, newRank) => {
+    if (!entry || newRank < 1 || newRank > entries.length || newRank === Number(entry.rank)) return
+    setPendingMove({ ref: entry.item_ref, newRank, title: workByRef[entry.item_ref]?.title || entry.item_ref })
+    setReason('')
+    setError(null)
+  }
+  const saveMove = async () => {
+    if (!pendingMove || !reason.trim()) return
+    setSaving(true)
+    setError(null)
+    try {
+      await api(`/projects/${encodeURIComponent(project.id)}/backlog/${encodeURIComponent(pendingMove.ref)}/rerank`, {
+        method: 'POST', body: { new_rank: pendingMove.newRank, reason: reason.trim() },
+      })
+      setPendingMove(null)
+      setReason('')
+      onRefresh()
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+    setSaving(false)
+  }
+  return jsxs('div', { 'data-backlog-board': project.id, children: [
+    jsx(PageHead, {
+      title: 'Prioritised backlog',
+      description: 'Ranked work with a mandatory reason for every change.',
+      status: `${number(entries.length)} ranked`,
+      onRefresh,
+    }),
+    jsxs('div', { className: 'dockyard-project-toolbar', children: [
+      jsx('label', { children: 'Project' }),
+      jsx('select', { value: project.id, onChange: (event) => onSelectProject(event.target.value), children:
+        (view.projects ?? []).map((option) => jsx('option', { value: option.id, children: option.id }, option.id)),
+      }),
+      jsx('span', { className: 'dockyard-meta', children: 'Drag a row or use the move controls. Saving always requires a reason.' }),
+    ]}),
+    entries.length > 0 ? jsx('section', { className: 'dockyard-backlog-list', children:
+      entries.map((entry) => {
+        const item = workByRef[entry.item_ref] ?? { ref: entry.item_ref, title: entry.item_ref, status: 'backlog', type: 'item' }
+        return jsxs('article', {
+          className: 'dockyard-backlog-item',
+          draggable: true,
+          'data-backlog-item': entry.item_ref,
+          onDragStart: () => setDraggedRef(entry.item_ref),
+          onDragOver: (event) => event.preventDefault(),
+          onDrop: (event) => {
+            event.preventDefault()
+            const source = entries.find((candidate) => candidate.item_ref === draggedRef)
+            requestMove(source, Number(entry.rank))
+            setDraggedRef(null)
+          },
+          children: [
+            jsx('span', { className: 'dockyard-rank', children: number(entry.rank) }),
+            jsxs('span', { className: 'dockyard-backlog-copy', children: [
+              jsx('strong', { children: item.title }),
+              jsx('span', { children: entry.priority_reason || 'No ranking reason supplied' }),
+            ]}),
+            jsx(StatusTag, { tone: item.status === 'in_progress' ? 'info' : 'neutral', label: item.type || 'Item' }),
+            jsxs('span', { className: 'dockyard-rank-actions', children: [
+              jsx('button', {
+                type: 'button', className: 'dockyard-button small',
+                'data-rerank-ref': entry.item_ref, 'data-direction': 'up',
+                disabled: Number(entry.rank) <= 1,
+                onClick: () => requestMove(entry, Number(entry.rank) - 1),
+                children: 'Move up',
+              }),
+              jsx('button', {
+                type: 'button', className: 'dockyard-button small',
+                'data-rerank-ref': entry.item_ref, 'data-direction': 'down',
+                disabled: Number(entry.rank) >= entries.length,
+                onClick: () => requestMove(entry, Number(entry.rank) + 1),
+                children: 'Move down',
+              }),
+            ]}),
+          ],
+        }, entry.item_ref)
+      }),
+    }) : jsx(EmptyState, { title: 'No ranked backlog items', description: 'Work items appear here after they are added to the project backlog.', icon: 'project' }),
+    jsxs('section', { className: 'dockyard-modal-layer', 'data-reason-modal': true, hidden: !pendingMove, children: [
+      jsxs('div', { className: 'dockyard-modal', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'dockyard-reason-title', children: [
+        jsx('h2', { id: 'dockyard-reason-title', children: 'Record the reason' }),
+        jsx('p', { children: pendingMove ? `Move ${pendingMove.title} to rank ${pendingMove.newRank}.` : '' }),
+        jsx('label', { htmlFor: 'dockyard-rank-reason', children: 'Reason for this priority change' }),
+        jsx('textarea', { id: 'dockyard-rank-reason', value: reason, onChange: (event) => setReason(event.target.value), placeholder: 'Explain why this position is better for the project.' }),
+        error ? jsx('p', { className: 'dockyard-inline-error', children: error }) : null,
+        jsxs('div', { className: 'dockyard-modal-actions', children: [
+          jsx(Button, { onClick: () => setPendingMove(null), children: 'Cancel' }),
+          jsx(Button, { variant: 'primary', disabled: saving || !reason.trim(), onClick: saveMove, children: saving ? 'Saving...' : 'Save reason and move' }),
+        ]}),
+      ]}),
+    ]}),
+  ]})
+}
+
+function TeamsView({ view, onRefresh }) {
+  const bots = view.bots ?? []
+  const workload = view.workload ?? { busy: [], idle: [], stuck: [], offline: [] }
+  const total = Math.max(1, bots.length)
+  return jsxs('div', { 'data-bot-teams': true, children: [
+    jsx(PageHead, {
+      title: 'Bot teams',
+      description: 'Capabilities, availability, group ownership and structured handoffs.',
+      status: workload.stuck?.length > 0 ? `${number(workload.stuck.length)} stuck` : null,
+      onRefresh,
+    }),
+    jsxs('section', { className: 'dockyard-workload-card', 'data-workload-visual': true, children: [
+      jsxs('div', { children: [jsx('h2', { children: 'Workload heat' }), jsx('p', { children: 'Current fleet availability from owned work.' })] }),
+      jsxs('div', { className: 'dockyard-workload-chart', children: [
+        jsxs('div', { className: 'dockyard-work-visual', role: 'img', 'aria-label': `${workload.busy?.length ?? 0} busy, ${workload.idle?.length ?? 0} idle, ${workload.stuck?.length ?? 0} stuck, ${workload.offline?.length ?? 0} offline`, children: [
+          workload.busy?.length > 0 ? jsx('span', { className: 'active', style: { width: `${(workload.busy.length / total) * 100}%` } }) : null,
+          workload.idle?.length > 0 ? jsx('span', { className: 'done', style: { width: `${(workload.idle.length / total) * 100}%` } }) : null,
+          workload.stuck?.length > 0 ? jsx('span', { className: 'danger', style: { width: `${(workload.stuck.length / total) * 100}%` } }) : null,
+        ]}),
+        jsx('p', { children: `${number(workload.busy?.length ?? 0)} busy / ${number(workload.idle?.length ?? 0)} idle / ${number(workload.stuck?.length ?? 0)} stuck / ${number(workload.offline?.length ?? 0)} offline` }),
+      ]}),
+    ]}),
+    jsxs('div', { className: 'dockyard-teams-layout', children: [
+      jsxs('section', { className: 'dockyard-feature-card', children: [
+        jsx('h2', { children: 'Registry' }),
+        jsx('p', { children: 'Declared capabilities and current state. Capability never expands permission.' }),
+        jsx('div', { className: 'dockyard-bot-grid', children:
+          bots.map((bot) => jsxs('article', { className: 'dockyard-bot-card', 'data-bot-card': bot.id, children: [
+            jsxs('header', { children: [
+              jsx('span', { className: 'dockyard-avatar', children: initials(bot.name || bot.id) }),
+              jsxs('span', { children: [jsx('strong', { children: bot.name || bot.id }), jsx('small', { children: bot.current_item || 'No active item' })] }),
+              jsx(StatusTag, { tone: bot.status === 'busy' ? 'warning' : bot.status === 'idle' ? 'success' : 'neutral', label: bot.status || 'unknown' }),
+            ]}),
+            jsx('div', { className: 'dockyard-capabilities', children:
+              (bot.capabilities ?? []).length > 0
+                ? bot.capabilities.map((capability) => jsx('span', { children: capability }, capability))
+                : jsx('span', { children: 'No capabilities declared' }),
+            }),
+          ]}, bot.id)),
+        }),
+      ]}),
+      jsxs('section', { className: 'dockyard-feature-card', children: [
+        jsx('h2', { children: 'Groups and handoffs' }),
+        jsx('p', { children: 'Group membership and audited A2A messages from the canonical feed.' }),
+        jsx('div', { className: 'dockyard-group-list', children:
+          (view.groups ?? []).length > 0
+            ? view.groups.map((group) => jsxs('article', { className: 'dockyard-group-card', 'data-bot-group': group.name, children: [
+                jsxs('header', { children: [jsx('strong', { children: group.name }), jsx('span', { children: `${number(group.members?.length ?? 0)} members` })] }),
+                jsx('p', { children: group.purpose || 'No purpose supplied' }),
+                jsx('div', { className: 'dockyard-group-members', children: (group.members ?? []).map((member) => jsx('span', { className: 'dockyard-avatar', title: member, children: initials(member) }, member)) }),
+                jsx('div', { className: 'dockyard-handoff-list', children:
+                  (view.messages?.[group.name] ?? []).length > 0
+                    ? view.messages[group.name].map((message, index) => jsxs('div', { children: [
+                        jsx('strong', { children: message.payload?.summary || message.msg_type || 'A2A event' }),
+                        jsx('span', { children: `${message.from_actor || 'Unknown actor'} / ${formatWhen(message.created_at)}` }),
+                      ]}, String(message.id ?? index)))
+                    : jsx('span', { className: 'dockyard-meta', children: 'No handoff messages recorded.' }),
+                }),
+              ]}, group.name))
+            : jsx('p', { className: 'dockyard-meta', children: 'No bot groups configured.' }),
+        }),
+      ]}),
+    ]}),
+  ]})
+}
+
+function InitiativeView({ view, onRefresh }) {
+  const initiative = [...(view.initiatives ?? [])].sort((left, right) => (RISK_PRIORITY[left.risk] ?? 1) - (RISK_PRIORITY[right.risk] ?? 1))[0]
+  const project = view.project
+  const stages = [
+    ['verify', 'Verify state', 'Confirm the project state and evidence source.'],
+    ['detect', 'Detect gap', initiative?.rationale || 'Research the highest-value project gap.'],
+    ['propose', 'Create initiative', initiative?.expected_outcome || 'Declare the expected outcome.'],
+    ['prioritise', 'Prioritise', `Priority ${number(initiative?.priority ?? 0)} with a recorded rationale.`],
+    ['approval', 'Human approval', 'Owner reviews the risk, evidence and validation contract.'],
+    ['execute', 'Build and verify', validationSummary(initiative?.validation_contract)],
+    ['release', 'Release', 'Release remains bounded by project policy.'],
+    ['observe', 'Observe outcome', 'Measure whether the project improved.'],
+  ]
+  const currentIndex = initiative?.status === 'pending_approval' ? 4
+    : ['approved', 'executing'].includes(initiative?.status) ? 5
+      : ['completed', 'measured'].includes(initiative?.status) ? 7 : 2
+  const [selectedStage, setSelectedStage] = useState(currentIndex)
+  const [freezeState, setFreezeState] = useState(null)
+  const freeze = async () => {
+    if (!project) return
+    setFreezeState('freezing')
+    try {
+      await api(`/projects/${encodeURIComponent(project.id)}/freeze`, { method: 'POST', body: {} })
+      setFreezeState('frozen')
+      onRefresh()
+    } catch (failure) {
+      setFreezeState(String(failure?.message ?? failure))
+    }
+  }
+  if (!project || !initiative) return jsx(EmptyState, { title: 'No initiative available', description: 'A project initiative will appear here after it is proposed.', icon: 'project' })
+  return jsxs('div', { 'data-initiative-loop': initiative.ref, children: [
+    jsx(PageHead, {
+      title: initiative.title,
+      description: `${project.id} / ${initiative.ref} / one canonical improvement loop`,
+      status: initiative.status || 'unknown',
+      onRefresh,
+    }),
+    jsxs('div', { className: 'dockyard-loop-layout', children: [
+      jsxs('section', { className: 'dockyard-feature-card dockyard-loop-card', children: [
+        jsxs('div', { className: 'dockyard-loop-head', children: [
+          jsxs('div', { children: [jsx('h2', { children: 'Initiative loop' }), jsx('p', { children: 'Select a stage to inspect its current evidence and state.' })] }),
+          jsx(Button, { action: 'freeze-project', variant: 'danger', disabled: freezeState === 'freezing' || freezeState === 'frozen', onClick: freeze, children: freezeState === 'freezing' ? 'Freezing...' : freezeState === 'frozen' ? 'Project frozen' : 'Freeze project' }),
+        ]}),
+        jsx('div', { className: 'dockyard-loop-visual-wrap', children:
+          jsx('svg', { viewBox: '0 0 1010 140', role: 'img', 'aria-label': 'Initiative stages from verification to observed outcome', 'data-loop-visual': true, children:
+            stages.map(([key, label], index) => {
+              const x = 20 + index * 123
+              const state = index < currentIndex ? 'done' : index === currentIndex ? 'current' : 'queued'
+              return jsxs(Fragment, { children: [
+                index < stages.length - 1 ? jsx('path', { className: `dockyard-loop-edge ${state}`, d: `M${x + 105} 55H${x + 123}` }) : null,
+                jsx('rect', { className: `dockyard-loop-node ${state}`, x, y: 30, width: 105, height: 52, rx: 10 }),
+                jsx('text', { x: x + 52.5, y: 60, textAnchor: 'middle', children: label }),
+              ]}, key)
+            }),
+          }),
+        }),
+        jsx('div', { className: 'dockyard-stage-list', children:
+          stages.map(([key, label], index) => jsx('button', {
+            type: 'button',
+            className: selectedStage === index ? 'active' : '',
+            'data-initiative-stage': key,
+            onClick: () => setSelectedStage(index),
+            children: jsxs(Fragment, { children: [
+              jsx('span', { children: number(index + 1) }),
+              jsxs('span', { children: [jsx('strong', { children: label }), jsx('small', { children: index < currentIndex ? 'Done' : index === currentIndex ? 'Current gate' : 'Queued' })] }),
+            ]}),
+          }, key)),
+        }),
+      ]}),
+      jsxs('aside', { className: 'dockyard-feature-card dockyard-stage-detail', children: [
+        jsx('span', { className: 'dockyard-card-label', children: 'SELECTED STAGE' }),
+        jsx('h2', { children: stages[selectedStage][1] }),
+        jsx('p', { children: stages[selectedStage][2] }),
+        jsxs('div', { className: 'dockyard-evidence-details', children: [
+          jsx('strong', { children: 'Initiative evidence' }),
+          jsx('p', { children: initiative.rationale || 'No rationale supplied.' }),
+          jsx('p', { children: `Validation: ${validationSummary(initiative.validation_contract)}` }),
+        ]}),
+        freezeState && !['freezing', 'frozen'].includes(freezeState) ? jsx('p', { className: 'dockyard-inline-error', children: freezeState }) : null,
+      ]}),
+    ]}),
+  ]})
+}
+
+function WorkflowsView({ view, onSelectProject, onRefresh }) {
+  const [name, setName] = useState('Owner focus')
+  const [layout, setLayout] = useState('board')
+  const [statusFilter, setStatusFilter] = useState('in_progress')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const project = view.project
+  const save = async () => {
+    if (!project || !name.trim()) return
+    setSaving(true)
+    setError(null)
+    try {
+      await api(`/projects/${encodeURIComponent(project.id)}/views`, {
+        method: 'PUT',
+        body: { name: name.trim(), layout, filters: { status: statusFilter }, shared: false },
+      })
+      onRefresh()
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+    setSaving(false)
+  }
+  if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Select a project before creating a workflow view.', icon: 'project' })
+  return jsxs('div', { 'data-workflows-screen': project.id, children: [
+    jsx(PageHead, { title: 'Workflows', description: 'Visualise a bounded work loop and save reusable project views.', status: `${number(view.views?.length ?? 0)} saved`, onRefresh }),
+    jsxs('div', { className: 'dockyard-project-toolbar', children: [
+      jsx('label', { children: 'Project' }),
+      jsx('select', { value: project.id, onChange: (event) => onSelectProject(event.target.value), children:
+        (view.projects ?? []).map((option) => jsx('option', { value: option.id, children: option.id }, option.id)),
+      }),
+      jsx('span', { className: 'dockyard-meta', children: 'Saved definitions shape a view. They never expand project permissions.' }),
+    ]}),
+    jsxs('div', { className: 'dockyard-workflows-layout', children: [
+      jsxs('section', { className: 'dockyard-feature-card', children: [
+        jsx('h2', { children: 'Verified improvement loop' }),
+        jsx('p', { children: 'A compact project-dashboard view of the standard verify, build, gate and observe path.' }),
+        jsx('div', { className: 'dockyard-workflow-visual', 'data-workflow-visual': true, children:
+          jsxs('svg', { viewBox: '0 0 760 180', role: 'img', 'aria-label': 'Workflow from verification through outcome observation', children: [
+            jsx('path', { className: 'dockyard-loop-edge done', d: 'M150 75H240M350 75H440M550 75H640' }, 'edge'),
+            jsx('rect', { className: 'dockyard-loop-node done', x: 30, y: 48, width: 120, height: 54, rx: 10 }, 'verify-node'),
+            jsx('text', { x: 90, y: 80, textAnchor: 'middle', children: 'Verify' }, 'verify-text'),
+            jsx('rect', { className: 'dockyard-loop-node current', x: 240, y: 48, width: 110, height: 54, rx: 10 }, 'build-node'),
+            jsx('text', { x: 295, y: 80, textAnchor: 'middle', children: 'Build + test' }, 'build-text'),
+            jsx('rect', { className: 'dockyard-loop-node queued', x: 440, y: 48, width: 110, height: 54, rx: 10 }, 'gate-node'),
+            jsx('text', { x: 495, y: 80, textAnchor: 'middle', children: 'Human gate' }, 'gate-text'),
+            jsx('rect', { className: 'dockyard-loop-node queued', x: 640, y: 48, width: 90, height: 54, rx: 10 }, 'observe-node'),
+            jsx('text', { x: 685, y: 80, textAnchor: 'middle', children: 'Observe' }, 'observe-text'),
+          ] }),
+        }),
+      ]}),
+      jsxs('aside', { className: 'dockyard-feature-card', children: [
+        jsx('h2', { children: 'Saved workflows' }),
+        jsx('p', { children: 'Backend-saved project views rendered as reusable starting points.' }),
+        jsx('div', { className: 'dockyard-saved-workflows', children:
+          (view.views ?? []).length > 0
+            ? view.views.map((saved) => jsxs('article', { 'data-saved-workflow': saved.name, children: [
+                jsx('strong', { children: saved.name }),
+                jsx('span', { children: `${saved.layout} / ${JSON.stringify(saved.filters ?? {})}` }),
+              ]}, saved.name))
+            : jsx('p', { className: 'dockyard-meta', children: 'No saved workflows yet.' }),
+        }),
+        jsxs('div', { className: 'dockyard-workflow-creator', 'data-workflow-creator': true, children: [
+          jsx('h3', { children: 'Create a workflow view' }),
+          jsx('label', { htmlFor: 'dockyard-workflow-name', children: 'Name' }),
+          jsx('input', { id: 'dockyard-workflow-name', value: name, onChange: (event) => setName(event.target.value) }),
+          jsx('label', { htmlFor: 'dockyard-workflow-layout', children: 'Layout' }),
+          jsx('select', { id: 'dockyard-workflow-layout', value: layout, onChange: (event) => setLayout(event.target.value), children: [
+            jsx('option', { value: 'board', children: 'Board' }, 'board'),
+            jsx('option', { value: 'table', children: 'Table' }, 'table'),
+            jsx('option', { value: 'timeline', children: 'Timeline' }, 'timeline'),
+          ]}),
+          jsx('label', { htmlFor: 'dockyard-workflow-status', children: 'Status filter' }),
+          jsx('select', { id: 'dockyard-workflow-status', value: statusFilter, onChange: (event) => setStatusFilter(event.target.value), children: [
+            jsx('option', { value: 'in_progress', children: 'In progress' }, 'in_progress'),
+            jsx('option', { value: 'in_review', children: 'In review' }, 'in_review'),
+            jsx('option', { value: 'backlog', children: 'Backlog' }, 'backlog'),
+          ]}),
+          error ? jsx('p', { className: 'dockyard-inline-error', children: error }) : null,
+          jsx(Button, { variant: 'primary', disabled: saving || !name.trim(), onClick: save, children: saving ? 'Saving...' : 'Save workflow view' }),
+        ]}),
       ]}),
     ]}),
   ]})
@@ -1033,54 +2492,130 @@ function DashboardView({ view, onInbox, onRefresh }) {
 function ApprovalRow({ item, onResolved }) {
   const [state, setState] = useState('idle')
   const [error, setError] = useState(null)
+  const [expanded, setExpanded] = useState(false)
   const [tone, label] = riskDetails(item.risk)
-  const approve = async () => {
-    setState('approving')
+  const detail = item.detail ?? {}
+  const decide = async (action) => {
+    const resolvedState = action === 'approve' ? 'approved' : 'rejected'
+    const actionLabel = action === 'approve' ? 'Approve' : 'Reject'
+    setState(action === 'approve' ? 'approving' : 'rejecting')
     setError(null)
     try {
-      await api(`/initiatives/${encodeURIComponent(item.ref)}/approve`, { method: 'POST', body: {} })
-      setState('approved')
+      await api(`/initiatives/${encodeURIComponent(item.ref)}/${action}`, {
+        method: 'POST', body: {}, suppressErrorToast: true,
+      })
+      setState(resolvedState)
       setTimeout(onResolved, 850)
     } catch (failure) {
+      let stillPending = null
+      try {
+        const inbox = await api('/inbox')
+        stillPending = (inbox?.items ?? []).some((pending) => pending.ref === item.ref)
+      } catch {
+        stillPending = null
+      }
+      if (stillPending === false) {
+        setState(resolvedState)
+        emitToast('success', `Initiative ${resolvedState}; status confirmed after a response error`)
+        setTimeout(onResolved, 850)
+        return
+      }
       setState('failed')
-      setError(String(failure?.message ?? failure))
+      const detailMessage = String(failure?.message ?? failure)
+      const message = stillPending === true
+        ? `${actionLabel} was not recorded. The approval is still pending. ${detailMessage}`
+        : `${actionLabel} could not be confirmed. Refresh before trying again. ${detailMessage}`
+      setError(message)
+      emitToast('danger', message)
     }
   }
-  return jsxs('article', { className: 'dockyard-approval-row', 'data-approval-ref': item.ref, 'data-state': state, children: [
-    jsx('div', { className: 'dockyard-approval-risk', children: jsx(StatusTag, { tone: state === 'approved' ? 'success' : tone, label: state === 'approved' ? 'Approved' : label }) }),
-    jsxs('div', { className: 'dockyard-approval-main', children: [
-      jsx('h2', { children: item.title }),
-      jsx('span', { className: 'dockyard-meta', children: `${item.project || 'Unknown project'} / ${item.ref}` }),
-    ]}),
-    jsx('div', { className: 'dockyard-approval-actions', children:
-      state === 'approved'
-        ? jsx(StatusTag, { tone: 'success', label: 'Approved' })
-        : jsx(Button, {
-            action: 'approve',
-            variant: 'primary',
-            disabled: state === 'approving',
-            onClick: approve,
-            children: state === 'approving' ? 'Approving...' : state === 'failed' ? 'Try again' : 'Approve',
-          }),
-    }),
-    error ? jsx('p', { className: 'dockyard-inline-error', children: `Approval failed: ${error}` }) : null,
-  ]})
+  const resolved = state === 'approved' || state === 'rejected'
+  const stateTone = state === 'approved' ? 'success' : state === 'rejected' || state === 'failed' ? 'danger' : tone
+  const stateLabel = state === 'approved'
+    ? 'Approved'
+    : state === 'rejected'
+      ? 'Rejected'
+      : state === 'failed'
+        ? 'Decision unconfirmed'
+        : label
+  const created = formatWhen(detail.created_at)
+  return jsxs('article', {
+    className: 'dockyard-approval-row',
+    'data-approval-card': true,
+    'data-approval-ref': item.ref,
+    'data-state': state,
+    children: [
+      jsxs('div', { className: 'dockyard-approval-top', children: [
+        jsx('span', { className: `dockyard-approval-icon ${tone}`, children: jsx(Icon, { name: tone === 'danger' ? 'alert' : 'check' }) }),
+        jsxs('div', { className: 'dockyard-approval-main', children: [
+          jsx('h2', { children: item.title }),
+          jsx('span', { className: 'dockyard-meta', children: `${item.project || 'Unknown project'} / ${item.ref}${created ? ` / proposed ${created}` : ''}` }),
+        ]}),
+        jsx(StatusTag, { tone: stateTone, label: stateLabel }),
+      ]}),
+      jsxs('div', { className: 'dockyard-evidence-grid', 'data-evidence-grid': true, children: [
+        jsxs('div', { className: 'dockyard-evidence-cell', 'data-evidence-cell': 'rationale', children: [
+          jsx('span', { children: 'WHY PROPOSED' }),
+          jsx('strong', { children: detail.rationale || 'No rationale supplied' }),
+        ]}),
+        jsxs('div', { className: 'dockyard-evidence-cell', 'data-evidence-cell': 'outcome', children: [
+          jsx('span', { children: 'EXPECTED OUTCOME' }),
+          jsx('strong', { children: detail.expected_outcome || 'No expected outcome supplied' }),
+        ]}),
+        jsxs('div', { className: 'dockyard-evidence-cell', 'data-evidence-cell': 'validation', children: [
+          jsx('span', { children: 'VALIDATION' }),
+          jsx('strong', { children: validationSummary(detail.validation_contract) }),
+        ]}),
+      ]}),
+      jsxs('div', { className: 'dockyard-approval-actions', children: [
+        resolved ? jsx(StatusTag, { tone: stateTone, label: stateLabel }) : jsx(Button, {
+          action: 'approve',
+          variant: 'primary',
+          disabled: state === 'approving' || state === 'rejecting',
+          onClick: () => decide('approve'),
+          children: state === 'approving' ? 'Approving...' : 'Approve',
+        }),
+        resolved ? null : jsx(Button, {
+          action: 'reject',
+          variant: 'danger',
+          disabled: state === 'approving' || state === 'rejecting',
+          onClick: () => decide('reject'),
+          children: state === 'rejecting' ? 'Rejecting...' : 'Reject',
+        }),
+        jsx(Button, {
+          action: 'toggle-evidence',
+          variant: 'quiet',
+          onClick: () => setExpanded((open) => !open),
+          children: expanded ? 'Hide evidence details' : 'Show evidence details',
+        }),
+        !resolved ? jsx(StatusTag, { tone: 'neutral', label: 'Awaiting you' }) : null,
+      ]}),
+      jsx('div', {
+        className: 'dockyard-evidence-details',
+        'data-evidence-details': true,
+        hidden: !expanded,
+        children: `Status: ${detail.status || 'pending approval'}. Priority: ${number(detail.priority ?? 0)}. Approval state: ${detail.approval_state || 'pending'}. Context reference: ${item.deep_link || item.ref}.`,
+      }),
+      error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
+    ],
+  })
 }
 
 function InboxView({ view, onRefresh }) {
-  const items = view.items ?? []
+  const items = sortApprovals(view.items ?? [])
   if (items.length === 0) {
     return jsxs(Fragment, { children: [
-      jsx(PageHead, { title: 'Approval queue', description: 'Owner-only decisions from every project.', onRefresh }),
-      jsx(EmptyState, { title: 'No approvals waiting', description: 'New owner decisions will appear here with their project, reference and risk.', icon: 'check' }),
+      jsx(PageHead, { title: 'Approval Inbox', description: 'Every pending human decision across every project, with enough context to decide here.', onRefresh }),
+      jsx(EmptyState, { title: 'No approvals waiting', description: 'New owner decisions will appear here with their project, evidence context and risk.', icon: 'check' }),
     ]})
   }
   return jsxs(Fragment, { children: [
-    jsx(PageHead, { title: 'Approval queue', description: 'Owner-only decisions from every project.', onRefresh }),
-    jsxs('div', { className: 'dockyard-queue-intro', children: [
-      jsxs('span', { children: [jsx('strong', { children: number(items.length) }), ` ${plural(items.length, 'decision')} waiting`] }),
-      jsx('span', { children: 'Approve only after the project and risk match your intent.' }),
-    ]}),
+    jsx(PageHead, {
+      title: 'Approval Inbox',
+      description: 'Every pending human decision across every project, with enough context to decide here.',
+      status: `${number(items.length)} ${plural(items.length, 'decision')} owed`,
+      onRefresh,
+    }),
     jsx('section', { className: 'dockyard-approval-list', 'aria-label': 'Pending approvals', children:
       items.map((item) => jsx(ApprovalRow, { item, onResolved: onRefresh }, item.ref)),
     }),
@@ -1139,10 +2674,19 @@ function NotificationsView({ view, onRefresh, onAcknowledged }) {
       jsx(EmptyState, { title: 'No notifications yet', description: 'Fleet events will appear here when work changes state or needs attention.', icon: 'bell' }),
     ]})
   }
-  const unread = notes.filter((note) => !note.acked)
-  const cleared = notes.filter((note) => note.acked)
+  const unread = notes.filter((note) => !note.acked).sort((left, right) => {
+    const severity = (SEVERITY_PRIORITY[String(left.severity || 'info').toLowerCase()] ?? 3)
+      - (SEVERITY_PRIORITY[String(right.severity || 'info').toLowerCase()] ?? 3)
+    return severity !== 0 ? severity : String(right.created_at || '').localeCompare(String(left.created_at || ''))
+  })
+  const cleared = notes.filter((note) => note.acked).sort((left, right) => String(right.created_at || '').localeCompare(String(left.created_at || '')))
   return jsxs(Fragment, { children: [
-    jsx(PageHead, { title: 'Notifications', description: 'Attributed fleet events and their cleared history.', onRefresh }),
+    jsx(PageHead, {
+      title: 'Notifications',
+      description: 'Attributed fleet events and their cleared history.',
+      status: unread.length > 0 ? `${number(unread.length)} unread` : null,
+      onRefresh,
+    }),
     unread.length > 0 ? jsx(NotificationGroup, { title: 'Needs attention', description: 'Unread fleet events.', items: unread, onAcknowledged }) : null,
     cleared.length > 0 ? jsx(NotificationGroup, { title: 'Cleared', description: 'Acknowledged events remain available for context.', items: cleared, onAcknowledged }) : null,
   ]})
@@ -1151,24 +2695,59 @@ function NotificationsView({ view, onRefresh, onAcknowledged }) {
 function DashboardPage() {
   useDockyardStyles()
   const [tab, setTab] = useState('dashboard')
+  const [selectedProject, setSelectedProject] = useState(null)
+  const [onboardingOpen, setOnboardingOpen] = useState(false)
+  const [toasts, setToasts] = useState([])
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [requestVersion, setRequestVersion] = useState(0)
   const [counts, setCounts] = useState({ approvals: null, notifications: null })
 
   useEffect(() => {
+    const timers = new Map()
+    const handleToast = (event) => {
+      const toast = event.detail
+      if (!toast?.id || !toast?.message) return
+      setToasts((current) => [...current.slice(-3), toast])
+      timers.set(toast.id, window.setTimeout(() => {
+        setToasts((current) => current.filter((item) => item.id !== toast.id))
+        timers.delete(toast.id)
+      }, 5000))
+    }
+    window.addEventListener(TOAST_EVENT, handleToast)
+    return () => {
+      window.removeEventListener(TOAST_EVENT, handleToast)
+      for (const timer of timers.values()) window.clearTimeout(timer)
+    }
+  }, [])
+
+  useEffect(() => {
     let current = true
     setData(null)
     setError(null)
-    const path = tab === 'dashboard' ? '/dashboard' : tab === 'inbox' ? '/inbox' : '/notifications'
-    api(path).then(
+    const loader = tab === 'dashboard'
+      ? loadDashboardData
+      : tab === 'project'
+        ? () => loadProjectData(selectedProject)
+      : tab === 'backlog'
+        ? () => loadBacklogData(selectedProject)
+      : tab === 'teams'
+        ? loadTeamsData
+      : tab === 'initiative'
+        ? () => loadProjectData(selectedProject)
+      : tab === 'workflows'
+        ? () => loadWorkflowsData(selectedProject)
+      : tab === 'inbox'
+        ? loadInboxData
+        : () => api('/notifications')
+    loader().then(
       (result) => {
         if (!current) return
-        setData(result)
+        setData({ tab, payload: result })
         if (tab === 'dashboard') {
           setCounts({
-            approvals: Number(result.owed_decisions ?? 0),
-            notifications: Number(result.totals?.unacked_notifications ?? 0),
+            approvals: Number(result.inbox?.count ?? result.owed_decisions ?? 0),
+            notifications: Number((result.notifications?.notifications ?? []).filter((note) => !note.acked).length),
           })
         } else if (tab === 'inbox') {
           setCounts((previous) => ({ ...previous, approvals: Number(result.count ?? result.items?.length ?? 0) }))
@@ -1176,36 +2755,60 @@ function DashboardPage() {
           setCounts((previous) => ({ ...previous, notifications: Number((result.notifications ?? []).filter((note) => !note.acked).length) }))
         }
       },
-      (failure) => { if (current) setError(failure) },
+      (failure) => { if (current) setError({ tab, error: failure }) },
     )
     return () => { current = false }
-  }, [tab, requestVersion])
+  }, [tab, selectedProject, requestVersion])
 
   const refresh = () => setRequestVersion((version) => version + 1)
+  const dismissToast = (id) => setToasts((current) => current.filter((toast) => toast.id !== id))
+  const completeOnboarding = (result) => {
+    setOnboardingOpen(false)
+    setSelectedProject(result?.project_id ?? null)
+    setTab('project')
+  }
   const acknowledge = (id) => {
     setData((previous) => {
-      if (!previous?.notifications) return previous
-      return { ...previous, notifications: previous.notifications.map((note) => note.id === id ? { ...note, acked: true } : note) }
+      if (previous?.tab !== 'notifications' || !previous.payload?.notifications) return previous
+      return {
+        ...previous,
+        payload: {
+          ...previous.payload,
+          notifications: previous.payload.notifications.map((note) => note.id === id ? { ...note, acked: true } : note),
+        },
+      }
     })
     setCounts((previous) => ({ ...previous, notifications: Math.max(0, Number(previous.notifications ?? 1) - 1) }))
   }
 
+  const payload = data?.tab === tab ? data.payload : null
+  const activeError = error?.tab === tab ? error.error : null
   let content
-  if (error) {
-    content = jsx(ErrorState, { error, onRetry: refresh })
-  } else if (!data) {
+  if (activeError) {
+    content = jsx(ErrorState, { error: activeError, onRetry: refresh })
+  } else if (!payload) {
     content = jsx(LoadingState, {})
   } else if (tab === 'dashboard') {
-    content = jsx(DashboardView, { view: data, onInbox: () => setTab('inbox'), onRefresh: refresh })
+    content = jsx(DashboardView, { view: payload, onInbox: () => setTab('inbox'), onRefresh: refresh })
+  } else if (tab === 'project') {
+    content = jsx(ProjectDashboard, { view: payload, onSelectProject: setSelectedProject, onRefresh: refresh })
+  } else if (tab === 'backlog') {
+    content = jsx(BacklogView, { view: payload, onSelectProject: setSelectedProject, onRefresh: refresh })
+  } else if (tab === 'teams') {
+    content = jsx(TeamsView, { view: payload, onRefresh: refresh })
+  } else if (tab === 'initiative') {
+    content = jsx(InitiativeView, { view: payload, onRefresh: refresh })
+  } else if (tab === 'workflows') {
+    content = jsx(WorkflowsView, { view: payload, onSelectProject: setSelectedProject, onRefresh: refresh })
   } else if (tab === 'inbox') {
-    content = jsx(InboxView, { view: data, onRefresh: refresh })
+    content = jsx(InboxView, { view: payload, onRefresh: refresh })
   } else {
-    content = jsx(NotificationsView, { view: data, onRefresh: refresh, onAcknowledged: acknowledge })
+    content = jsx(NotificationsView, { view: payload, onRefresh: refresh, onAcknowledged: acknowledge })
   }
 
-  return jsx('div', { className: 'dockyard-root', children:
+  return jsxs('div', { className: 'dockyard-root', children: [
     jsxs('div', { className: 'dockyard-shell', children: [
-      jsx(ConsoleBar, { tab, counts, onTab: setTab }),
+      jsx(ConsoleBar, { tab, counts, onTab: setTab, onNewProject: () => setOnboardingOpen(true) }),
       jsx('main', {
         id: 'dockyard-panel',
         role: 'tabpanel',
@@ -1213,7 +2816,9 @@ function DashboardPage() {
         children: content,
       }),
     ]}),
-  })
+    jsx(ToastRegion, { toasts, onDismiss: dismissToast }),
+    onboardingOpen ? jsx(OnboardingWizard, { onClose: () => setOnboardingOpen(false), onComplete: completeOnboarding }) : null,
+  ]})
 }
 
 const __plugin = {

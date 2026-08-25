@@ -449,4 +449,27 @@ MIGRATIONS: List[Migration] = [
             ON dockyard_backlog(project_id, rank);
         """,
     ),
+    Migration(
+        version=8,
+        name="dockyard generated project reports",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS dockyard_reports (
+            report_id       TEXT PRIMARY KEY,
+            project_id      TEXT NOT NULL REFERENCES project_stewardship(project_id)
+                            ON DELETE CASCADE,
+            report_type     TEXT NOT NULL CHECK (
+                            report_type IN ('executive','delivery','risk','full')),
+            title           TEXT NOT NULL,
+            content_md      TEXT NOT NULL,
+            options_json    TEXT NOT NULL DEFAULT '{}',
+            generated_by    TEXT NOT NULL,
+            generated_at    TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_dockyard_reports_project_time
+            ON dockyard_reports(project_id, generated_at DESC);
+        """,
+        downgrade_sql="""
+        DROP TABLE IF EXISTS dockyard_reports;
+        """,
+    ),
 ]

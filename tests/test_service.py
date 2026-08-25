@@ -15,6 +15,48 @@ def test_enable_and_settings(svc, enabled):
     assert s["owner"]["owner_team_id"] is None  # forward-compatible schema only
 
 
+def test_update_settings_merges_policies_and_records_audit(svc, enabled):
+    svc.update_settings(
+        enabled,
+        mission="Keep releases reversible",
+        lead_profile="octacon",
+        member_profiles=["quan", "wesker"],
+        autonomy_level=2,
+        verification_policy={"require_tests": True, "max_open_initiatives": 3},
+        release_policy={"require_rollback": True, "soak_hours": 24},
+        notification_policy={"severity_threshold": "medium", "digest": "daily"},
+        actor="sahil",
+        interface="dockyard:human",
+    )
+    svc.update_settings(
+        enabled,
+        verification_policy={"max_open_initiatives": 4},
+        actor="sahil",
+        interface="dockyard:human",
+    )
+
+    settings = svc.settings(enabled)
+    assert settings["mission"] == "Keep releases reversible"
+    assert settings["owner"]["lead_profile"] == "octacon"
+    assert settings["owner"]["member_profiles"] == ["quan", "wesker"]
+    assert settings["autonomy_level"] == 2
+    assert settings["policies"]["verification"] == {
+        "require_tests": True,
+        "max_open_initiatives": 4,
+    }
+    assert settings["policies"]["release"]["soak_hours"] == 24
+    assert settings["policies"]["notification"]["digest"] == "daily"
+    assert any(
+        row["action"] == "project.settings_updated" and row["actor"] == "sahil"
+        for row in svc.store.audit_tail(5)
+    )
+
+
+def test_update_settings_rejects_invalid_autonomy(svc, enabled):
+    with pytest.raises(ServiceError, match="autonomy_level"):
+        svc.update_settings(enabled, autonomy_level=6)
+
+
 def test_unknown_project_raises(svc):
     with pytest.raises(ServiceError):
         svc.settings("ghost")
@@ -68,6 +110,30 @@ def test_rejection_suppression_window(svc, enabled, clock):
     b = svc.propose_initiative(enabled, title="Refactor all", rationale="post-window",
                                dedupe_key="big-refactor")
     assert b["ref"]
+
+
+def test_reject_legacy_initiative_without_dedupe_key(svc, enabled):
+    """Legacy/demo rows with NULL dedupe keys still reject and stay suppressed."""
+    title = "Legacy demo initiative"
+    a = svc.propose_initiative(enabled, title=title, rationale="seeded before dedupe")
+    svc.store._conn.execute(
+        "UPDATE project_initiatives SET dedupe_key=NULL WHERE ref=?", (a["ref"],)
+    )
+
+    out = svc.reject_initiative(
+        a["ref"], actor="sahil", interface="dockyard:human", suppress_days=14
+    )
+
+    assert out["status"] == "rejected"
+    fallback_key = title.lower()
+    suppressed = svc.store._conn.execute(
+        "SELECT reason FROM initiative_suppression"
+        " WHERE project_id=? AND dedupe_key=?",
+        (enabled, fallback_key),
+    ).fetchone()
+    assert suppressed is not None and suppressed["reason"] == "rejected"
+    with pytest.raises(ServiceError, match="suppressed"):
+        svc.propose_initiative(enabled, title=title, rationale="same legacy work")
 
 
 def test_concurrency_cap(svc, enabled):

@@ -202,6 +202,109 @@ class StewardshipService:
             "paused_at": r["paused_at"],
         }
 
+    def update_settings(
+        self,
+        project_id: str,
+        *,
+        mission: Optional[str] = None,
+        lead_profile: Optional[str] = None,
+        member_profiles: Optional[Sequence[str]] = None,
+        autonomy_level: Optional[int] = None,
+        autonomy_policy: Optional[Dict[str, Any]] = None,
+        verification_policy: Optional[Dict[str, Any]] = None,
+        release_policy: Optional[Dict[str, Any]] = None,
+        notification_policy: Optional[Dict[str, Any]] = None,
+        actor: str = "system",
+        interface: str = "service",
+    ) -> Dict[str, Any]:
+        """Patch project configuration without discarding unknown policy keys."""
+        current = self.settings(project_id)
+        changed: List[str] = []
+
+        if mission is not None:
+            if not isinstance(mission, str) or len(mission.strip()) > 2000:
+                raise ServiceError("mission must be text of at most 2000 characters")
+            current["mission"] = mission.strip()
+            changed.append("mission")
+        if lead_profile is not None:
+            if not isinstance(lead_profile, str) or len(lead_profile.strip()) > 100:
+                raise ServiceError("lead_profile must be text of at most 100 characters")
+            current["owner"]["lead_profile"] = lead_profile.strip() or None
+            changed.append("lead_profile")
+        if member_profiles is not None:
+            members = list(member_profiles)
+            if len(members) > 32 or any(
+                not isinstance(profile, str) or not profile.strip() or len(profile.strip()) > 100
+                for profile in members
+            ):
+                raise ServiceError("member_profiles must contain at most 32 valid profile names")
+            current["owner"]["member_profiles"] = [profile.strip() for profile in members]
+            changed.append("member_profiles")
+        if autonomy_level is not None:
+            if isinstance(autonomy_level, bool) or not isinstance(autonomy_level, int) or not 0 <= autonomy_level <= 5:
+                raise ServiceError("autonomy_level must be an integer from 0 to 5")
+            current["autonomy_level"] = autonomy_level
+            changed.append("autonomy_level")
+
+        def merge_policy(name: str, patch: Optional[Dict[str, Any]]) -> None:
+            if patch is None:
+                return
+            if not isinstance(patch, dict):
+                raise ServiceError(f"{name}_policy must be an object")
+
+            def deep_merge(base: Dict[str, Any], incoming: Dict[str, Any]) -> Dict[str, Any]:
+                merged = dict(base)
+                for key, value in incoming.items():
+                    if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                        merged[key] = deep_merge(merged[key], value)
+                    else:
+                        merged[key] = value
+                return merged
+
+            current["policies"][name] = deep_merge(current["policies"][name], patch)
+            changed.append(f"{name}_policy")
+
+        merge_policy("autonomy", autonomy_policy)
+        merge_policy("verification", verification_policy)
+        merge_policy("release", release_policy)
+        merge_policy("notification", notification_policy)
+
+        if not changed:
+            return current
+
+        now = iso(self._clock())
+        with self.store.tx() as cx:
+            cx.execute(
+                """
+                UPDATE project_stewardship SET
+                    mission=?, owner_lead_profile=?, member_profiles_json=?,
+                    autonomy_level=?, autonomy_policy_json=?,
+                    verification_policy_json=?, release_policy_json=?,
+                    notification_policy_json=?, updated_at=?
+                WHERE project_id=?
+                """,
+                (
+                    current["mission"],
+                    current["owner"]["lead_profile"],
+                    self.store._j(current["owner"]["member_profiles"]),
+                    current["autonomy_level"],
+                    self.store._j(current["policies"]["autonomy"]),
+                    self.store._j(current["policies"]["verification"]),
+                    self.store._j(current["policies"]["release"]),
+                    self.store._j(current["policies"]["notification"]),
+                    now,
+                    project_id,
+                ),
+            )
+        self.store.audit(
+            actor=actor,
+            interface=interface,
+            action="project.settings_updated",
+            subject=project_id,
+            detail={"fields": changed},
+        )
+        return self.settings(project_id)
+
     def is_active(self, project_id: str) -> bool:
         try:
             s = self.settings(project_id)
@@ -629,11 +732,15 @@ class StewardshipService:
         if ini["status"] not in (InitiativeStatus.PENDING_APPROVAL.value, InitiativeStatus.PROPOSED.value):
             raise ServiceError(f"initiative {ref} cannot be rejected from status={ini['status']}")
         days = suppress_days if suppress_days is not None else self.default_suppression_days
+        # Legacy/demo imports created before dedupe enforcement may have NULL
+        # keys. Reconstruct the same fallback propose_initiative uses so a
+        # rejection remains atomic and still suppresses the repeated proposal.
+        dedupe_key = ini["dedupe_key"] or ini["title"].strip().lower()[:80] or ref.lower()
         with self.store.tx() as cx:
             cx.execute(
                 "UPDATE project_initiatives SET status='rejected',"
-                " approval_state='rejected' WHERE ref=?",
-                (ref,),
+                " approval_state='rejected', dedupe_key=? WHERE ref=?",
+                (dedupe_key, ref),
             )
             cx.execute(
                 """
@@ -646,7 +753,7 @@ class StewardshipService:
                 """,
                 (
                     ini["project_id"],
-                    ini["dedupe_key"],
+                    dedupe_key,
                     iso(self._clock() + timedelta(days=days)),
                     "rejected",
                 ),

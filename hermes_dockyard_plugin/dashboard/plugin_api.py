@@ -121,12 +121,167 @@ async def work_items(project_id: str, status: str | None = None) -> dict:
         "GET", f"/stewardship/v1/projects/{pid}/work-items", params=params)
 
 
+@plugin_api.get("/projects/{project_id}/settings")
+async def project_settings(project_id: str) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    return await _proxy("GET", f"/stewardship/v1/projects/{pid}/settings")
+
+
+@plugin_api.get("/projects/{project_id}/initiatives")
+async def project_initiatives(project_id: str,
+                              status: str | None = None) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    params = {"status": status} if status else None
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{pid}/initiatives", params=params)
+
+
+@plugin_api.get("/projects/{project_id}/events")
+async def project_events(project_id: str, limit: int = 50) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{pid}/events",
+        params={"limit": limit})
+
+
+@plugin_api.get("/bots")
+async def bots(status: str | None = None) -> dict:
+    params = {"status": status} if status else None
+    return await _proxy("GET", "/stewardship/v1/bots", params=params)
+
+
+@plugin_api.get("/workload")
+async def workload() -> dict:
+    return await _proxy("GET", "/stewardship/v1/workload")
+
+
+@plugin_api.get("/bot-groups")
+async def bot_groups() -> dict:
+    return await _proxy("GET", "/stewardship/v1/bot-groups")
+
+
+@plugin_api.get("/bot-groups/{name}/messages")
+async def bot_group_messages(name: str, limit: int = 50) -> dict:
+    from urllib.parse import quote
+
+    group = quote(name, safe="")
+    return await _proxy(
+        "GET", f"/stewardship/v1/bot-groups/{group}/messages",
+        params={"limit": limit})
+
+
 # --------------------------------------------------------------- writes --
 class OnboardBody(BaseModel):
     project_id: str
     repo_path: str
     mission: str
     lead_profile: str
+
+
+class TransitionBody(BaseModel):
+    status: str
+
+
+class BacklogAddBody(BaseModel):
+    ref: str
+    rank: int
+    reason: str
+
+
+class BacklogRerankBody(BaseModel):
+    new_rank: int
+    reason: str
+
+
+class ViewSaveBody(BaseModel):
+    name: str
+    layout: str
+    filters: dict = {}
+    shared: bool = False
+
+
+@plugin_api.post("/projects/{project_id}/work-items/{ref}/transition")
+async def transition_work_item(project_id: str, ref: str,
+                               body: TransitionBody) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    item = quote(ref, safe="")
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{pid}/work-items/{item}/transition",
+        {"status": body.status, "actor_id": "sahil", "actor_kind": "human"})
+
+
+@plugin_api.get("/projects/{project_id}/backlog")
+async def project_backlog(project_id: str) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    return await _proxy("GET", f"/stewardship/v1/projects/{pid}/backlog")
+
+
+@plugin_api.post("/projects/{project_id}/backlog")
+async def add_to_backlog(project_id: str, body: BacklogAddBody) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{pid}/backlog",
+        {**body.model_dump(), "actor_id": "sahil", "actor_kind": "human"})
+
+
+@plugin_api.post("/projects/{project_id}/backlog/{ref}/rerank")
+async def rerank_backlog(project_id: str, ref: str,
+                         body: BacklogRerankBody) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    item = quote(ref, safe="")
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{pid}/backlog/{item}/rerank",
+        {**body.model_dump(), "actor_id": "sahil", "actor_kind": "human"})
+
+
+@plugin_api.get("/projects/{project_id}/views")
+async def project_views(project_id: str) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{pid}/views",
+        params={"actor_id": "sahil", "actor_kind": "human"})
+
+
+@plugin_api.put("/projects/{project_id}/views")
+async def save_project_view(project_id: str, body: ViewSaveBody) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    return await _proxy(
+        "PUT", f"/stewardship/v1/projects/{pid}/views",
+        {**body.model_dump(), "actor_id": "sahil", "actor_kind": "human"})
+
+
+@plugin_api.post("/projects/{project_id}/freeze")
+async def freeze_project(project_id: str) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    return await _proxy("POST", f"/stewardship/v1/projects/{pid}/freeze")
+
+
+@plugin_api.post("/projects/{project_id}/resume")
+async def resume_project(project_id: str) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    return await _proxy("POST", f"/stewardship/v1/projects/{pid}/resume")
 
 
 @plugin_api.post("/onboard")
@@ -144,7 +299,17 @@ async def approve(ref: str) -> dict:
     r = quote(ref, safe="")
     return await _proxy(
         "POST", f"/stewardship/v1/initiatives/{r}/approve",
-        {"actor_id": "sahil"})
+        {"actor": "sahil", "interface": "dockyard:human"})
+
+
+@plugin_api.post("/initiatives/{ref}/reject")
+async def reject(ref: str) -> dict:
+    from urllib.parse import quote
+
+    r = quote(ref, safe="")
+    return await _proxy(
+        "POST", f"/stewardship/v1/initiatives/{r}/reject",
+        {"actor": "sahil", "interface": "dockyard:human"})
 
 
 @plugin_api.post("/notifications/{notification_id}/ack")
