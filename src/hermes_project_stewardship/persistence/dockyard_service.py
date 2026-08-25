@@ -456,13 +456,13 @@ class DockyardService:
     def reports_list(self, project_id: str, *, limit: int = 20) -> List[Dict]:
         from .service import StewardshipService
 
-        StewardshipService(self.store).settings(project_id)
+        StewardshipService(self.store).settings(project_id, include_disabled=True)
         return self.dy.reports_list(project_id, limit=limit)
 
     def report_get(self, project_id: str, report_id: str) -> Dict:
         from .service import StewardshipService
 
-        StewardshipService(self.store).settings(project_id)
+        StewardshipService(self.store).settings(project_id, include_disabled=True)
         report = self.dy.report_get(project_id, report_id)
         if report is None:
             raise ValueError(f"report {report_id} not found for {project_id}")

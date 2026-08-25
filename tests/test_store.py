@@ -74,6 +74,35 @@ def test_initiative_relation_migration_roundtrips(tmp_path):
         store.close()
 
 
+def test_project_management_migration_roundtrips(tmp_path):
+    """Migration 10 must drop and recreate both project-management tables."""
+    from hermes_project_stewardship.persistence.migrations import MIGRATIONS
+
+    store = Store(tmp_path / "project-management-roundtrip.db")
+    migration = next(item for item in MIGRATIONS if item.version == 10)
+    try:
+        store._conn.executescript(migration.downgrade_sql)
+        tables = {
+            row["name"]
+            for row in store._conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        assert "project_mission_archive" not in tables
+        assert "project_content" not in tables
+
+        store._conn.executescript(migration.upgrade_sql)
+        tables = {
+            row["name"]
+            for row in store._conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        assert {"project_mission_archive", "project_content"} <= tables
+    finally:
+        store.close()
+
+
 def test_mutex_exclusive_and_ttl(store, clock):
     assert store.mutex_acquire("p", "a", ttl_seconds=100)
     assert not store.mutex_acquire("p", "b", ttl_seconds=100)

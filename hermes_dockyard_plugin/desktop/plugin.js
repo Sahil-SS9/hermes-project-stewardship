@@ -161,7 +161,7 @@ const DOCKYARD_CSS = `
   --dy-focus: ${LIGHT_TOKENS.focus};
   --dy-disabled-text: ${LIGHT_TOKENS.disabledText};
   --dy-disabled-bg: ${LIGHT_TOKENS.disabledBg};
-  min-height: 100%;
+  min-height: 100vh;
   background: ${LIGHT_TOKENS.bg};
   color: ${LIGHT_TOKENS.text};
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -844,7 +844,21 @@ const DOCKYARD_CSS = `
 .dockyard-root .dockyard-board-column h3 { margin: 0; font-size: 13px; }
 .dockyard-root .dockyard-board-column header span { color: var(--dy-text-3); font-size: 11px; }
 .dockyard-root .dockyard-board-cards { padding: 0 9px 10px; }
-.dockyard-root .dockyard-work-card { margin-bottom: 9px; padding: 12px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); }
+.dockyard-root .dockyard-work-card {
+  display: block;
+  width: 100%;
+  margin-bottom: 9px;
+  padding: 12px;
+  border: 1px solid var(--dy-border);
+  border-radius: 10px;
+  background: var(--dy-surface);
+  color: var(--dy-text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: border-color .16s ease, background .16s ease, transform .16s ease;
+}
+.dockyard-root .dockyard-work-card:hover { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); transform: translateY(-1px); }
 .dockyard-root .dockyard-work-card h4 { margin: 8px 0 12px; font-size: 13px; line-height: 1.35; }
 .dockyard-root .dockyard-work-card footer { display: flex; justify-content: space-between; gap: 8px; color: var(--dy-text-3); font-size: 10px; }
 .dockyard-root .dockyard-work-type { color: var(--dy-accent-text); font-size: 9px; font-weight: 780; text-transform: uppercase; }
@@ -962,7 +976,14 @@ const DOCKYARD_CSS = `
   backdrop-filter: blur(3px);
 }
 .dockyard-root .dockyard-modal-layer[hidden] { display: none; }
-.dockyard-root .dockyard-modal { width: min(540px, 100%); padding: 22px; border: 1px solid var(--dy-border); border-radius: 16px; background: var(--dy-surface); box-shadow: var(--dy-shadow); }
+.dockyard-root .dockyard-modal { width: min(540px, 100%); max-height: calc(100vh - 40px); padding: 22px; overflow-y: auto; border: 1px solid var(--dy-border); border-radius: 16px; background: var(--dy-surface); box-shadow: var(--dy-shadow); }
+.dockyard-root .dockyard-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.dockyard-root .dockyard-modal-head > div { min-width: 0; }
+.dockyard-root .dockyard-detail-modal { width: min(680px, 100%); }
+.dockyard-root .dockyard-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 18px 0 0; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-border); }
+.dockyard-root .dockyard-detail-grid > div { min-width: 0; padding: 12px; background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-detail-grid dt { color: var(--dy-text-3); font-size: 9px; font-weight: 760; letter-spacing: .05em; text-transform: uppercase; }
+.dockyard-root .dockyard-detail-grid dd { margin: 4px 0 0; overflow-wrap: anywhere; color: var(--dy-text); font-size: 12px; font-weight: 650; }
 .dockyard-root .dockyard-modal h2 { margin: 0; font-size: 20px; }
 .dockyard-root .dockyard-modal p { margin: 7px 0 16px; color: var(--dy-text-2); font-size: 13px; }
 .dockyard-root .dockyard-modal label { display: block; margin-bottom: 7px; font-size: 12px; font-weight: 700; }
@@ -1220,6 +1241,60 @@ const DOCKYARD_CSS = `
 .dockyard-root .dockyard-lifecycle-panel p { margin-top: 3px; }
 .dockyard-root .dockyard-settings-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .dockyard-root .dockyard-form-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 7px; }
+.dockyard-root .dockyard-view-only-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--dy-info);
+  border-radius: 9px;
+  background: var(--dy-info-bg);
+  color: var(--dy-info);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+.dockyard-root .dockyard-view-only-note svg { width: 17px; height: 17px; flex: 0 0 auto; }
+.dockyard-root .dockyard-objectives-layout { display: grid; gap: 16px; }
+.dockyard-root .dockyard-inline-editor { display: grid; gap: 9px; margin-top: 16px; padding: 14px; border: 1px solid var(--dy-accent-border); border-radius: 10px; background: var(--dy-accent-soft); }
+.dockyard-root .dockyard-inline-editor > label { display: grid; gap: 6px; color: var(--dy-text-2); font-size: 10px; font-weight: 730; }
+.dockyard-root .dockyard-inline-editor input,
+.dockyard-root .dockyard-inline-editor textarea,
+.dockyard-root .dockyard-inline-editor select { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; }
+.dockyard-root .dockyard-inline-editor textarea { resize: vertical; }
+.dockyard-root .dockyard-mission-history { display: grid; gap: 7px; margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--dy-border); }
+.dockyard-root .dockyard-mission-history h3 { margin: 0 0 2px; color: var(--dy-text); font-size: 12px; }
+.dockyard-root .dockyard-mission-history article { display: grid; gap: 3px; padding: 10px 11px; border-radius: 8px; background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-mission-history strong { color: var(--dy-text); font-size: 11px; }
+.dockyard-root .dockyard-mission-history span { color: var(--dy-text-3); font-size: 9px; }
+.dockyard-root .dockyard-objective-list { display: grid; gap: 9px; margin-top: 16px; }
+.dockyard-root .dockyard-objective-list > article { padding: 13px 14px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-objective-list > article.archived { border-style: dashed; }
+.dockyard-root .dockyard-objective-copy { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.dockyard-root .dockyard-objective-copy > span:first-child { min-width: 0; }
+.dockyard-root .dockyard-objective-copy strong,
+.dockyard-root .dockyard-objective-copy small { display: block; overflow-wrap: anywhere; }
+.dockyard-root .dockyard-objective-copy strong { color: var(--dy-text); font-size: 13px; }
+.dockyard-root .dockyard-objective-copy small { margin-top: 4px; color: var(--dy-text-2); font-size: 10px; line-height: 1.4; }
+.dockyard-root .dockyard-objective-list > article > p { margin: 9px 0 0; color: var(--dy-text-3); font-size: 10px; }
+.dockyard-root .dockyard-content-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr); gap: 16px; align-items: start; }
+.dockyard-root .dockyard-content-list { display: grid; gap: 7px; margin-top: 16px; }
+.dockyard-root .dockyard-content-list button { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; padding: 11px 12px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text); text-align: left; cursor: pointer; }
+.dockyard-root .dockyard-content-list button:hover { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
+.dockyard-root .dockyard-content-list strong,
+.dockyard-root .dockyard-content-list small { display: block; min-width: 0; overflow-wrap: anywhere; }
+.dockyard-root .dockyard-content-list strong { font-size: 12px; }
+.dockyard-root .dockyard-content-list small { margin-top: 4px; color: var(--dy-text-3); font-size: 9px; }
+.dockyard-root .dockyard-content-list svg { width: 15px; height: 15px; }
+.dockyard-root .dockyard-upload-panel { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--dy-border); }
+.dockyard-root .dockyard-upload-dropzone { position: relative; display: grid; gap: 3px; min-width: 0; padding: 12px; overflow: hidden; border: 1px dashed var(--dy-control-border); border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text); cursor: pointer; }
+.dockyard-root .dockyard-upload-dropzone:hover { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
+.dockyard-root .dockyard-upload-dropzone span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 720; }
+.dockyard-root .dockyard-upload-dropzone small { color: var(--dy-text-3); font-size: 9px; }
+.dockyard-root .dockyard-upload-dropzone input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.dockyard-root .dockyard-content-preview-card { min-height: 360px; }
+.dockyard-root .dockyard-content-preview { max-height: 580px; margin: 17px 0 0; padding: 15px; overflow: auto; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text-2); white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; }
 .dockyard-root .dockyard-main-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(320px, .8fr);
@@ -1341,10 +1416,14 @@ const DOCKYARD_CSS = `
     gap: 12px;
   }
 }
+@media (max-width: 1200px) {
+  .dockyard-root .dockyard-loop-layout { grid-template-columns: 1fr; }
+}
 @media (max-width: 980px) {
   .dockyard-root .dockyard-main-grid { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-attention-card { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-project-overview-grid { grid-template-columns: 1fr; }
+  .dockyard-root .dockyard-content-layout { grid-template-columns: 1fr; }
 }
 @media (max-width: 820px) {
   .dockyard-root .dockyard-consolebar {
@@ -1362,6 +1441,9 @@ const DOCKYARD_CSS = `
   .dockyard-root .dockyard-brand-copy { display: none; }
   .dockyard-root .dockyard-console-action-label { display: none; }
   .dockyard-root .dockyard-console-action svg { flex: 0 0 auto; margin: 0; }
+  .dockyard-root .dockyard-project-toolbar { flex-wrap: wrap; overflow-x: visible; }
+  .dockyard-root .dockyard-project-tabs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); flex: 1 1 100%; width: 100%; margin-left: 0; }
+  .dockyard-root .dockyard-project-tabs button { min-width: 0; padding-right: 5px; padding-left: 5px; font-size: 11px; }
   .dockyard-root .dockyard-wizard-progress { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 4px; }
   .dockyard-root .dockyard-metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dockyard-root .dockyard-portfolio-visual { grid-template-columns: 1fr; gap: 14px; }
@@ -1387,6 +1469,8 @@ const DOCKYARD_CSS = `
   .dockyard-root .dockyard-field-wide { grid-column: auto; }
   .dockyard-root .dockyard-bot-grid,
   .dockyard-root .dockyard-stage-list { grid-template-columns: 1fr; }
+  .dockyard-root .dockyard-upload-panel,
+  .dockyard-root .dockyard-detail-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 520px) {
   .dockyard-root .dockyard-modal-backdrop { padding: 8px; }
@@ -1506,6 +1590,12 @@ function Icon({ name }) {
   if (name === 'activity') {
     return jsx('svg', { ...common, children: jsx('path', { d: 'M3 12h4l2.2-5 4.1 10 2.1-5H21' }) })
   }
+  if (name === 'eye') {
+    return jsxs('svg', { ...common, children: [
+      jsx('path', { d: 'M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z' }),
+      jsx('circle', { cx: 12, cy: 12, r: 2.5 }),
+    ]})
+  }
   if (name === 'chevron') {
     return jsx('svg', { ...common, children: jsx('path', { d: 'm9 6 6 6-6 6' }) })
   }
@@ -1557,6 +1647,42 @@ function formatWhen(value) {
   return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(parsed)
 }
 
+function formatBytes(value) {
+  const bytes = Number(value ?? 0)
+  if (!Number.isFinite(bytes) || bytes < 0) return 'Unknown size'
+  if (bytes < 1024) return `${number(bytes)} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function mediaTypeLabel(value) {
+  return {
+    'text/plain': 'Text',
+    'text/markdown': 'Markdown',
+    'application/pdf': 'PDF',
+    'image/png': 'PNG image',
+    'image/jpeg': 'JPEG image',
+    'image/webp': 'WebP image',
+  }[value] || readableLabel(value, 'File')
+}
+
+function fileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('The selected file could not be read.'))
+    reader.onload = () => {
+      const result = String(reader.result ?? '')
+      const comma = result.indexOf(',')
+      if (comma < 0) {
+        reject(new Error('The selected file could not be encoded.'))
+        return
+      }
+      resolve(result.slice(comma + 1))
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
 function StatusTag({ tone = 'neutral', label }) {
   return jsxs('span', { className: `dockyard-status-tag ${tone}`, children: [
     jsx('span', { className: 'dockyard-status-mark', 'aria-hidden': true }),
@@ -1573,6 +1699,35 @@ function Button({ children, onClick, variant = '', small = false, disabled = fal
     'data-action': action,
     'aria-label': ariaLabel,
     children,
+  })
+}
+
+function ConfirmDialog({ confirmKey, title, description, confirmLabel, busy = false, onConfirm, onCancel }) {
+  useEffect(() => {
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape' && !busy) onCancel()
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [busy, onCancel])
+  return jsx('section', {
+    className: 'dockyard-modal-layer',
+    'data-destructive-confirm': confirmKey,
+    onClick: (event) => { if (event.target === event.currentTarget && !busy) onCancel() },
+    children: jsxs('div', {
+      className: 'dockyard-modal',
+      role: 'dialog',
+      'aria-modal': true,
+      'aria-labelledby': `dockyard-confirm-${confirmKey}`,
+      children: [
+        jsx('h2', { id: `dockyard-confirm-${confirmKey}`, children: title }),
+        jsx('p', { children: description }),
+        jsxs('div', { className: 'dockyard-modal-actions', children: [
+          jsx(Button, { action: 'cancel-destructive-action', disabled: busy, onClick: onCancel, children: 'Cancel' }),
+          jsx(Button, { action: 'confirm-destructive-action', variant: 'danger', disabled: busy, onClick: onConfirm, children: busy ? 'Applying...' : confirmLabel }),
+        ]}),
+      ],
+    }),
   })
 }
 
@@ -1900,10 +2055,13 @@ async function loadProjectData(projectId) {
   const project = projects.find((item) => item.id === projectId) ?? projects[0]
   if (!project) return { ...dashboard, project: null, projects }
   const encoded = encodeURIComponent(project.id)
-  const [settings, workItems, initiatives, events, reports] = await Promise.all([
+  const [settings, workItems, initiatives, objectives, missionArchive, content, events, reports] = await Promise.all([
     api(`/projects/${encoded}/settings`),
     api(`/projects/${encoded}/work-items`),
     api(`/projects/${encoded}/initiatives`),
+    api(`/projects/${encoded}/objectives`),
+    api(`/projects/${encoded}/missions/archive`),
+    api(`/projects/${encoded}/content`),
     api(`/projects/${encoded}/events`),
     api(`/projects/${encoded}/reports`),
   ])
@@ -1914,6 +2072,9 @@ async function loadProjectData(projectId) {
     settings,
     workItems: workItems.work_items ?? [],
     initiatives: initiatives.initiatives ?? [],
+    objectives: objectives.objectives ?? [],
+    missionArchive: missionArchive.missions ?? [],
+    content: content.content ?? [],
     events: events.events ?? [],
     reports: reports.reports ?? [],
   }
@@ -2229,6 +2390,7 @@ function ProjectSettingsPanel({ project, settings, onRefresh }) {
     digest: settings?.policies?.notification?.digest ?? 'daily',
   })
   const [form, setForm] = useState(buildForm)
+  const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
   const [pendingLifecycle, setPendingLifecycle] = useState(null)
@@ -2262,7 +2424,7 @@ function ProjectSettingsPanel({ project, settings, onRefresh }) {
           : ['disable']
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }))
   const save = async () => {
-    if (!enabled) return
+    if (!enabled || !editing) return
     setSaving(true)
     setMessage(null)
     try {
@@ -2292,7 +2454,8 @@ function ProjectSettingsPanel({ project, settings, onRefresh }) {
         },
       })
       setMessage({ tone: 'success', text: 'Project configuration saved.' })
-      onRefresh()
+      setEditing(false)
+      onRefresh?.()
     } catch (failure) {
       setMessage({ tone: 'danger', text: String(failure?.message ?? failure) })
     }
@@ -2307,8 +2470,10 @@ function ProjectSettingsPanel({ project, settings, onRefresh }) {
       await api(`/projects/${encodeURIComponent(project.id)}/${config.endpoint}`, { method: 'POST', body: {} })
       const readback = await api(`/projects/${encodeURIComponent(project.id)}/settings`)
       setLifecycleState(readback)
+      if (readback.enabled === false) setEditing(false)
       setPendingLifecycle(null)
       emitToast('success', `Project ${config.past}.`)
+      onRefresh?.()
     } catch (failure) {
       setMessage({ tone: 'danger', text: String(failure?.message ?? failure) })
     }
@@ -2335,7 +2500,7 @@ function ProjectSettingsPanel({ project, settings, onRefresh }) {
         }, action)) }),
       ]}),
     ]}),
-    jsxs('fieldset', { className: 'dockyard-settings-grid dockyard-settings-fieldset', disabled: !enabled, children: [
+    jsxs('fieldset', { className: 'dockyard-settings-grid dockyard-settings-fieldset', disabled: !enabled || !editing, children: [
       jsxs('label', { className: 'dockyard-field dockyard-field-wide', children: [
         jsx('span', { children: 'Mission' }),
         jsx('textarea', { 'data-setting-field': 'mission', rows: 3, value: form.mission, onInput: (event) => update('mission', event.target.value), onChange: (event) => update('mission', event.target.value) }),
@@ -2394,7 +2559,13 @@ function ProjectSettingsPanel({ project, settings, onRefresh }) {
       ]}),
     ]}),
     message ? jsx('p', { className: message.tone === 'danger' ? 'dockyard-inline-error' : 'dockyard-inline-success', role: 'status', children: message.text }) : null,
-    jsx(Button, { action: 'save-project-settings', variant: 'primary', disabled: !enabled || saving || !form.mission.trim(), onClick: save, children: saving ? 'Saving...' : 'Save configuration' }),
+    enabled ? jsx('div', { className: 'dockyard-form-actions', children: editing
+      ? jsxs(Fragment, { children: [
+          jsx(Button, { action: 'cancel-project-settings', disabled: saving, onClick: () => { setForm(buildForm()); setEditing(false); setMessage(null) }, children: 'Cancel' }),
+          jsx(Button, { action: 'save-project-settings', variant: 'primary', disabled: saving || !form.mission.trim(), onClick: save, children: saving ? 'Saving...' : 'Save configuration' }),
+        ]})
+      : jsx(Button, { action: 'edit-project-settings', variant: 'primary', onClick: () => { setForm(buildForm()); setEditing(true); setMessage(null) }, children: 'Edit configuration' }),
+    }) : jsx('p', { className: 'dockyard-meta', children: 'Enable this project before editing its configuration.' }),
     jsxs('section', { className: 'dockyard-modal-layer', 'data-lifecycle-confirm': true, hidden: !pendingLifecycle, children: [
       jsxs('div', { className: 'dockyard-modal', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'dockyard-lifecycle-title', children: [
         jsx('h2', { id: 'dockyard-lifecycle-title', children: `${lifecycleCopy[pendingLifecycle]?.label || 'Change'} project?` }),
@@ -2408,7 +2579,7 @@ function ProjectSettingsPanel({ project, settings, onRefresh }) {
   ]})
 }
 
-function ProjectReportsPanel({ project, reports }) {
+function ProjectReportsPanel({ project, reports, onRefresh }) {
   const [reportType, setReportType] = useState('executive')
   const [includeActivity, setIncludeActivity] = useState(true)
   const [history, setHistory] = useState(reports)
@@ -2432,6 +2603,7 @@ function ProjectReportsPanel({ project, reports }) {
       })
       setSelected(report)
       setHistory((current) => [report, ...current.filter((item) => item.report_id !== report.report_id)])
+      onRefresh?.()
     } catch (failure) {
       setError(String(failure?.message ?? failure))
     }
@@ -2484,13 +2656,311 @@ function ProjectReportsPanel({ project, reports }) {
   ]})
 }
 
+function WorkItemDetail({ item, onClose }) {
+  useEffect(() => {
+    if (!item) return undefined
+    const closeOnEscape = (event) => { if (event.key === 'Escape') onClose() }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [item, onClose])
+  return jsx('section', {
+    className: 'dockyard-modal-layer',
+    'data-work-item-detail-layer': true,
+    hidden: !item,
+    onClick: (event) => { if (event.target === event.currentTarget) onClose() },
+    children: item ? jsxs('div', {
+      className: 'dockyard-modal dockyard-detail-modal',
+      role: 'dialog',
+      'aria-modal': true,
+      'aria-labelledby': 'dockyard-work-item-title',
+      'data-work-item-detail': item.ref,
+      children: [
+        jsxs('header', { className: 'dockyard-modal-head', children: [
+          jsxs('div', { children: [
+            jsx('span', { className: 'dockyard-card-label', children: 'VIEW ONLY' }),
+            jsx('h2', { id: 'dockyard-work-item-title', children: item.title || item.ref }),
+          ]}),
+          jsx(Button, { action: 'close-work-item-detail', ariaLabel: 'Close work item details', onClick: onClose, children: 'Close' }),
+        ]}),
+        jsx('p', { children: 'This board is a read-only view of canonical project work.' }),
+        jsxs('dl', { className: 'dockyard-detail-grid', children: [
+          jsxs('div', { children: [jsx('dt', { children: 'Reference' }), jsx('dd', { children: item.ref })] }),
+          jsxs('div', { children: [jsx('dt', { children: 'Status' }), jsx('dd', { children: readableLabel(item.status) })] }),
+          jsxs('div', { children: [jsx('dt', { children: 'Type' }), jsx('dd', { children: readableLabel(item.type, 'Task') })] }),
+          jsxs('div', { children: [jsx('dt', { children: 'Assignee' }), jsx('dd', { children: item.assignee || 'Unassigned' })] }),
+          jsxs('div', { children: [jsx('dt', { children: 'Initiative' }), jsx('dd', { children: item.initiative_ref || 'Not linked' })] }),
+          jsxs('div', { children: [jsx('dt', { children: 'Evidence' }), jsx('dd', { children: `${number(item.evidence_refs?.length ?? 0)} attached` })] }),
+        ]}),
+      ],
+    }) : null,
+  })
+}
+
+function ObjectivesPanel({ project, settings, objectives, missionArchive, onRefresh }) {
+  const [mission, setMission] = useState(settings?.mission ?? '')
+  const [missionDraft, setMissionDraft] = useState(settings?.mission ?? '')
+  const [missionEditing, setMissionEditing] = useState(false)
+  const [history, setHistory] = useState(missionArchive ?? [])
+  const [items, setItems] = useState(objectives ?? [])
+  const [objectiveEditor, setObjectiveEditor] = useState(null)
+  const [objectiveForm, setObjectiveForm] = useState({ name: '', description: '', target: '>=1', severity: 'medium' })
+  const [pending, setPending] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const encoded = encodeURIComponent(project.id)
+  const startObjective = (objective = null) => {
+    setObjectiveEditor(objective?.id ?? 'new')
+    setObjectiveForm({
+      name: objective?.name ?? '',
+      description: objective?.description ?? '',
+      target: objective?.target ?? '>=1',
+      severity: objective?.severity ?? 'medium',
+    })
+    setError(null)
+  }
+  const saveMission = async () => {
+    const clean = missionDraft.trim()
+    if (!clean) return
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await api(`/projects/${encoded}/settings`, { method: 'PATCH', body: { mission: clean } })
+      setMission(result?.mission ?? clean)
+      setMissionDraft(result?.mission ?? clean)
+      setMissionEditing(false)
+      onRefresh?.()
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+    setBusy(false)
+  }
+  const saveObjective = async () => {
+    if (!objectiveForm.name.trim() || !objectiveForm.target.trim()) return
+    setBusy(true)
+    setError(null)
+    try {
+      const body = {
+        name: objectiveForm.name.trim(),
+        description: objectiveForm.description.trim(),
+        target: objectiveForm.target.trim(),
+        severity: objectiveForm.severity,
+      }
+      if (objectiveEditor === 'new') {
+        const created = await api(`/projects/${encoded}/objectives`, { method: 'POST', body: { ...body, evaluator_type: 'manual', window: '30d' } })
+        setItems((current) => [...current, created])
+      } else {
+        const updated = await api(`/projects/${encoded}/objectives/${objectiveEditor}`, { method: 'PATCH', body })
+        setItems((current) => current.map((item) => Number(item.id) === Number(objectiveEditor) ? updated : item))
+      }
+      setObjectiveEditor(null)
+      onRefresh?.()
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+    setBusy(false)
+  }
+  const applyDestructive = async () => {
+    if (!pending) return
+    setBusy(true)
+    setError(null)
+    try {
+      if (pending.type === 'archive-mission') {
+        const archived = await api(`/projects/${encoded}/mission/archive`, { method: 'POST', body: {} })
+        setHistory((current) => [archived, ...current])
+        setMission('')
+        setMissionDraft('')
+        setMissionEditing(false)
+      } else if (pending.type === 'remove-mission') {
+        await api(`/projects/${encoded}/mission`, { method: 'DELETE', body: {} })
+        setMission('')
+        setMissionDraft('')
+        setMissionEditing(false)
+      } else if (pending.type === 'archive-objective') {
+        const archived = await api(`/projects/${encoded}/objectives/${pending.id}/archive`, { method: 'POST', body: {} })
+        setItems((current) => current.map((item) => Number(item.id) === Number(pending.id) ? archived : item))
+      } else if (pending.type === 'remove-objective') {
+        await api(`/projects/${encoded}/objectives/${pending.id}`, { method: 'DELETE', body: {} })
+        setItems((current) => current.filter((item) => Number(item.id) !== Number(pending.id)))
+      }
+      setPending(null)
+      onRefresh?.()
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+    setBusy(false)
+  }
+  const confirmation = pending ? {
+    'archive-mission': {
+      key: 'archive-mission',
+      title: 'Archive this mission?',
+      description: 'The mission moves to history and is removed from the active project.',
+      label: 'Archive mission',
+    },
+    'remove-mission': {
+      key: 'remove-mission',
+      title: 'Remove this mission?',
+      description: 'The active mission is cleared without adding it to mission history.',
+      label: 'Remove mission',
+    },
+    'archive-objective': {
+      key: `archive-objective-${pending.id}`,
+      title: 'Archive this objective?',
+      description: 'The objective remains visible in history but stops participating in active evaluation.',
+      label: 'Archive objective',
+    },
+    'remove-objective': {
+      key: `remove-objective-${pending.id}`,
+      title: 'Remove this objective?',
+      description: 'This permanently removes the objective from the project.',
+      label: 'Remove objective',
+    },
+  }[pending.type] : null
+  return jsxs('div', { className: 'dockyard-objectives-layout', children: [
+    jsxs('section', { className: 'dockyard-feature-card', 'data-mission-manager': true, children: [
+      jsxs('div', { className: 'dockyard-section-head', children: [
+        jsxs('div', { children: [jsx('span', { className: 'dockyard-card-label', children: 'MISSION' }), jsx('h2', { children: mission || 'No active mission' })] }),
+        mission ? jsx(StatusTag, { tone: 'success', label: 'Active' }) : jsx(StatusTag, { tone: 'neutral', label: 'Not set' }),
+      ]}),
+      missionEditing ? jsxs('div', { className: 'dockyard-inline-editor', children: [
+        jsx('label', { htmlFor: 'dockyard-mission-editor', children: 'Mission statement' }),
+        jsx('textarea', { id: 'dockyard-mission-editor', 'data-mission-field': true, rows: 4, value: missionDraft, onInput: (event) => setMissionDraft(event.target.value), onChange: (event) => setMissionDraft(event.target.value) }),
+        jsxs('div', { className: 'dockyard-form-actions', children: [
+          jsx(Button, { disabled: busy, onClick: () => { setMissionDraft(mission); setMissionEditing(false) }, children: 'Cancel' }),
+          jsx(Button, { action: 'save-mission', variant: 'primary', disabled: busy || !missionDraft.trim(), onClick: saveMission, children: busy ? 'Saving...' : 'Save mission' }),
+        ]}),
+      ]}) : jsxs('div', { className: 'dockyard-form-actions', children: [
+        jsx(Button, { action: 'edit-mission', onClick: () => { setMissionDraft(mission); setMissionEditing(true) }, children: mission ? 'Edit mission' : 'Set mission' }),
+        mission ? jsx(Button, { action: 'archive-mission', variant: 'danger', onClick: () => setPending({ type: 'archive-mission' }), children: 'Archive' }) : null,
+        mission ? jsx(Button, { action: 'remove-mission', variant: 'danger', onClick: () => setPending({ type: 'remove-mission' }), children: 'Remove' }) : null,
+      ]}),
+      history.length > 0 ? jsxs('div', { className: 'dockyard-mission-history', children: [
+        jsx('h3', { children: 'Mission history' }),
+        history.map((entry) => jsxs('article', { children: [
+          jsx('strong', { children: entry.mission }),
+          jsx('span', { children: `Archived ${formatWhen(entry.archived_at) || 'previously'} by ${entry.archived_by || 'unknown'}` }),
+        ]}, entry.archive_id)),
+      ]}) : null,
+    ]}),
+    jsxs('section', { className: 'dockyard-feature-card', children: [
+      jsxs('div', { className: 'dockyard-section-head', children: [
+        jsxs('div', { children: [jsx('span', { className: 'dockyard-card-label', children: 'OBJECTIVES' }), jsx('h2', { children: `${number(items.filter((item) => item.enabled !== false).length)} active` })] }),
+        jsx(Button, { action: 'add-objective', variant: 'primary', small: true, onClick: () => startObjective(), children: 'Add objective' }),
+      ]}),
+      objectiveEditor !== null ? jsxs('div', { className: 'dockyard-inline-editor', 'data-objective-editor': String(objectiveEditor), children: [
+        jsxs('label', { children: [jsx('span', { children: 'Name' }), jsx('input', { 'data-objective-field': 'name', value: objectiveForm.name, onChange: (event) => setObjectiveForm((current) => ({ ...current, name: event.target.value })) })] }),
+        jsxs('label', { children: [jsx('span', { children: 'Description' }), jsx('textarea', { 'data-objective-field': 'description', rows: 3, value: objectiveForm.description, onInput: (event) => setObjectiveForm((current) => ({ ...current, description: event.target.value })), onChange: (event) => setObjectiveForm((current) => ({ ...current, description: event.target.value })) })] }),
+        jsxs('div', { className: 'dockyard-settings-grid', children: [
+          jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Target' }), jsx('input', { 'data-objective-field': 'target', value: objectiveForm.target, onChange: (event) => setObjectiveForm((current) => ({ ...current, target: event.target.value })) })] }),
+          jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Severity' }), jsx('select', { 'data-objective-field': 'severity', value: objectiveForm.severity, onChange: (event) => setObjectiveForm((current) => ({ ...current, severity: event.target.value })), children: ['info', 'low', 'medium', 'high'].map((value) => jsx('option', { value, children: readableLabel(value) }, value)) })] }),
+        ]}),
+        jsxs('div', { className: 'dockyard-form-actions', children: [
+          jsx(Button, { disabled: busy, onClick: () => setObjectiveEditor(null), children: 'Cancel' }),
+          jsx(Button, { action: 'save-objective', variant: 'primary', disabled: busy || !objectiveForm.name.trim() || !objectiveForm.target.trim(), onClick: saveObjective, children: busy ? 'Saving...' : objectiveEditor === 'new' ? 'Create objective' : 'Save objective' }),
+        ]}),
+      ]}) : null,
+      items.length > 0 ? jsx('div', { className: 'dockyard-objective-list', children: items.map((objective) => jsxs('article', { 'data-objective-row': objective.id, className: objective.enabled === false ? 'archived' : '', children: [
+        jsxs('div', { className: 'dockyard-objective-copy', children: [
+          jsxs('span', { children: [jsx('strong', { children: objective.name }), jsx('small', { children: objective.description || 'No description supplied.' })] }),
+          jsx(StatusTag, { tone: objective.enabled === false ? 'neutral' : severityTone(objective.severity), label: objective.enabled === false ? 'Archived' : readableLabel(objective.severity) }),
+        ]}),
+        jsx('p', { children: `Target ${objective.target} / ${readableLabel(objective.evaluator_type, 'Manual')} / ${objective.window || '30d'}` }),
+        jsxs('div', { className: 'dockyard-form-actions', children: [
+          objective.enabled !== false ? jsx('button', { type: 'button', className: 'dockyard-button small', 'data-action': 'edit-objective', 'data-objective-id': objective.id, onClick: () => startObjective(objective), children: 'Edit' }) : null,
+          objective.enabled !== false ? jsx('button', { type: 'button', className: 'dockyard-button danger small', 'data-action': 'archive-objective', 'data-objective-id': objective.id, onClick: () => setPending({ type: 'archive-objective', id: objective.id }), children: 'Archive' }) : null,
+          jsx('button', { type: 'button', className: 'dockyard-button danger small', 'data-action': 'remove-objective', 'data-objective-id': objective.id, onClick: () => setPending({ type: 'remove-objective', id: objective.id }), children: 'Remove' }),
+        ]}),
+      ]}, String(objective.id))) }) : jsx('p', { className: 'dockyard-meta', children: 'No objectives are configured.' }),
+    ]}),
+    error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
+    confirmation ? jsx(ConfirmDialog, { confirmKey: confirmation.key, title: confirmation.title, description: confirmation.description, confirmLabel: confirmation.label, busy, onConfirm: applyDestructive, onCancel: () => setPending(null) }) : null,
+  ]})
+}
+
+function ProjectContentPanel({ project, content, onRefresh }) {
+  const [items, setItems] = useState(content ?? [])
+  const [selected, setSelected] = useState(null)
+  const [previewState, setPreviewState] = useState('idle')
+  const [file, setFile] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState(null)
+  const encoded = encodeURIComponent(project.id)
+  const openPreview = async (item) => {
+    setSelected(item)
+    setPreviewState('loading')
+    setError(null)
+    try {
+      const result = await api(`/projects/${encoded}/content/${encodeURIComponent(item.content_id)}/preview`)
+      setSelected(result)
+      setPreviewState('ready')
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+  }
+  const upload = async () => {
+    if (!file || file.size <= 0 || file.size > 5 * 1024 * 1024) return
+    setUploading(true)
+    setError(null)
+    try {
+      const extension = file.name.toLowerCase().split('.').pop()
+      const mediaType = file.type || ({ txt: 'text/plain', md: 'text/markdown', pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' }[extension])
+      if (!mediaType) throw new Error('Choose a text, Markdown, PDF, PNG, JPEG or WebP file.')
+      const contentBase64 = await fileAsBase64(file)
+      const created = await api(`/projects/${encoded}/content`, {
+        method: 'POST',
+        body: { filename: file.name, media_type: mediaType, content_base64: contentBase64 },
+      })
+      setItems((current) => [created, ...current.filter((item) => item.content_id !== created.content_id)])
+      setFile(null)
+      onRefresh?.()
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+    setUploading(false)
+  }
+  return jsxs('div', { className: 'dockyard-content-layout', 'data-project-content': project.id, children: [
+    jsxs('section', { className: 'dockyard-feature-card', children: [
+      jsxs('div', { className: 'dockyard-section-head', children: [
+        jsxs('div', { children: [jsx('h2', { children: 'Project documentation' }), jsx('p', { children: 'Supporting files linked to this project.' })] }),
+        jsx(StatusTag, { tone: 'neutral', label: `${number(items.length)} ${plural(items.length, 'file')}` }),
+      ]}),
+      items.length > 0 ? jsx('div', { className: 'dockyard-content-list', children: items.map((item) => jsxs('button', { type: 'button', 'data-project-content-item': item.content_id, onClick: () => openPreview(item), children: [
+        jsxs('span', { children: [jsx('strong', { children: item.filename }), jsx('small', { children: `${mediaTypeLabel(item.media_type)} / ${formatBytes(item.size_bytes)} / ${formatWhen(item.uploaded_at) || 'Uploaded'}` })] }),
+        jsx(Icon, { name: 'chevron' }),
+      ]}, item.content_id)) }) : jsx('p', { className: 'dockyard-meta', children: 'No supporting content uploaded yet.' }),
+      jsxs('div', { className: 'dockyard-upload-panel', children: [
+        jsxs('label', { className: 'dockyard-upload-dropzone', children: [
+          jsx('span', { children: file ? file.name : 'Choose supporting content' }),
+          jsx('small', { children: file ? `${formatBytes(file.size)} selected` : 'Text, Markdown, PDF or image. Maximum 5 MB.' }),
+          jsx('input', { type: 'file', 'data-content-file': true, accept: '.txt,.md,.pdf,.png,.jpg,.jpeg,.webp,text/plain,text/markdown,application/pdf,image/png,image/jpeg,image/webp', onChange: (event) => { setFile(event.target.files?.[0] ?? null); setError(null) } }),
+        ]}),
+        jsx(Button, { action: 'upload-project-content', variant: 'primary', disabled: uploading || !file || file.size <= 0 || file.size > 5 * 1024 * 1024, onClick: upload, children: uploading ? 'Uploading...' : 'Upload content' }),
+      ]}),
+      file && file.size > 5 * 1024 * 1024 ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: 'This file exceeds the 5 MB limit.' }) : null,
+      error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
+    ]}),
+    jsxs('aside', { className: 'dockyard-feature-card dockyard-content-preview-card', children: [
+      jsx('span', { className: 'dockyard-card-label', children: 'PREVIEW' }),
+      selected ? jsx('h2', { children: selected.filename }) : jsx('h2', { children: 'Select a document' }),
+      previewState === 'loading' ? jsx('p', { children: 'Loading preview...' }) : null,
+      previewState === 'ready' && selected?.preview_kind === 'text'
+        ? jsx('pre', { 'data-content-preview': true, className: 'dockyard-content-preview', children: selected.text || 'This text file is empty.' })
+        : previewState === 'ready'
+          ? jsx('div', { 'data-content-preview': true, className: 'dockyard-report-placeholder', children: `Preview is not available for ${mediaTypeLabel(selected?.media_type)}. File metadata remains visible.` })
+          : previewState === 'idle'
+            ? jsx('p', { className: 'dockyard-meta', children: 'Text and Markdown files can be read here. Other formats show verified metadata.' })
+            : null,
+    ]}),
+  ]})
+}
+
 function ProjectDashboard({ view, onSelectProject, onRefresh }) {
   const [projectView, setProjectView] = useState('overview')
+  const [selectedWorkItem, setSelectedWorkItem] = useState(null)
   const project = view.project
   if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Connect a project before opening the project dashboard.', icon: 'project' })
   const [healthTone, healthLabel] = healthDetails(project.health)
   const views = [
-    ['overview', 'Overview'], ['board', 'Board'], ['objectives', 'Objectives'], ['activity', 'Activity'], ['settings', 'Settings'], ['reports', 'Reports'],
+    ['overview', 'Overview'], ['board', 'Board'], ['objectives', 'Objectives'], ['content', 'Content'], ['activity', 'Activity'], ['settings', 'Settings'], ['reports', 'Reports'],
   ]
   const columns = [
     ['backlog', 'Backlog', ['backlog']],
@@ -2501,7 +2971,11 @@ function ProjectDashboard({ view, onSelectProject, onRefresh }) {
   const projectOptions = view.projects ?? []
   let panel
   if (projectView === 'board') {
-    panel = jsx('div', { className: 'dockyard-board-wrap', children:
+    panel = jsxs('div', { className: 'dockyard-board-wrap', children: [
+      jsxs('div', { className: 'dockyard-view-only-note', 'data-view-only': 'board', children: [
+        jsx(Icon, { name: 'eye' }),
+        jsx('span', { children: 'View only. Open an item to inspect its details; changes are made in the canonical work system.' }),
+      ]}),
       jsx('div', { className: 'dockyard-board', children:
         columns.map(([key, label, statuses]) => {
           const items = (view.workItems ?? []).filter((item) => statuses.includes(item.status))
@@ -2509,7 +2983,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh }) {
             jsxs('header', { children: [jsx('h3', { children: label }), jsx('span', { children: number(items.length) })] }),
             jsx('div', { className: 'dockyard-board-cards', children:
               items.length > 0
-                ? items.map((item) => jsxs('article', { className: 'dockyard-work-card', 'data-work-card': item.ref, children: [
+                ? items.map((item) => jsxs('button', { type: 'button', className: 'dockyard-work-card', 'data-work-card': item.ref, onClick: () => setSelectedWorkItem(item), children: [
                     jsx('span', { className: 'dockyard-work-type', children: item.type || 'task' }),
                     jsx('h4', { children: item.title }),
                     jsxs('footer', { children: [jsx('span', { children: item.ref }), jsx('span', { children: item.assignee || 'Unassigned' })] }),
@@ -2519,20 +2993,11 @@ function ProjectDashboard({ view, onSelectProject, onRefresh }) {
           ]}, key)
         }),
       }),
-    })
-  } else if (projectView === 'objectives') {
-    panel = jsxs('div', { className: 'dockyard-project-grid', children: [
-      jsxs('section', { className: 'dockyard-feature-card', children: [
-        jsx('span', { className: 'dockyard-card-label', children: 'MISSION' }),
-        jsx('h2', { children: view.settings?.mission || 'No mission supplied' }),
-        jsx('p', { children: `Autonomy level ${number(view.settings?.autonomy_level ?? 0)}. Policies can only narrow this boundary.` }),
-      ]}),
-      jsxs('section', { className: 'dockyard-feature-card', children: [
-        jsx('span', { className: 'dockyard-card-label', children: 'INITIATIVES' }),
-        jsx('h2', { children: `${number(view.initiatives?.length ?? 0)} tracked` }),
-        jsx('p', { children: view.initiatives?.[0]?.expected_outcome || view.initiatives?.[0]?.rationale || 'No active initiative outcome supplied.' }),
-      ]}),
     ]})
+  } else if (projectView === 'objectives') {
+    panel = jsx(ObjectivesPanel, { project, settings: view.settings ?? {}, objectives: view.objectives ?? [], missionArchive: view.missionArchive ?? [], onRefresh }, project.id)
+  } else if (projectView === 'content') {
+    panel = jsx(ProjectContentPanel, { project, content: view.content ?? [], onRefresh }, project.id)
   } else if (projectView === 'activity') {
     panel = jsxs('section', { className: 'dockyard-feature-card', children: [
       jsx('h2', { children: 'Project activity' }),
@@ -2543,7 +3008,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh }) {
   } else if (projectView === 'settings') {
     panel = jsx(ProjectSettingsPanel, { project, settings: view.settings ?? {}, onRefresh }, `${project.id}:${view.settings?.updated_at || 'initial'}`)
   } else if (projectView === 'reports') {
-    panel = jsx(ProjectReportsPanel, { project, reports: view.reports ?? [] })
+    panel = jsx(ProjectReportsPanel, { project, reports: view.reports ?? [], onRefresh })
   } else {
     const visibleWork = [...(view.workItems ?? [])]
       .sort((left, right) => String(left.status || '').localeCompare(String(right.status || '')))
@@ -2633,6 +3098,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh }) {
       }),
     ]}),
     panel,
+    jsx(WorkItemDetail, { item: selectedWorkItem, onClose: () => setSelectedWorkItem(null) }),
   ]})
 }
 
@@ -2792,9 +3258,17 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
         ]}),
       ]}),
     ]}),
-    jsxs('section', { className: 'dockyard-modal-layer', hidden: !createOpen, children: [
+    jsxs('section', {
+      className: 'dockyard-modal-layer',
+      'data-create-backlog-layer': true,
+      hidden: !createOpen,
+      onClick: (event) => { if (event.target === event.currentTarget && !createSaving) setCreateOpen(false) },
+      children: [
       jsxs('form', { className: 'dockyard-modal', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'dockyard-create-title', 'data-create-backlog-item': true, onSubmit: (event) => { event.preventDefault(); saveCreate() }, children: [
-        jsx('h2', { id: 'dockyard-create-title', children: 'Create backlog item' }),
+        jsxs('header', { className: 'dockyard-modal-head', children: [
+          jsx('h2', { id: 'dockyard-create-title', children: 'Create backlog item' }),
+          jsx(Button, { action: 'close-create-backlog-item', ariaLabel: 'Close create item dialog', disabled: createSaving, onClick: () => setCreateOpen(false), children: 'Close' }),
+        ]}),
         jsx('p', { children: `Create and rank one item in ${project.id}. Nothing is saved until submission succeeds.` }),
         jsxs('div', { className: 'dockyard-creator-summary', children: [jsx('strong', { children: 'Sahil is recorded as creator' }), jsx('span', { children: 'Choose a separate bot assignee for delivery ownership.' })] }),
         jsxs('div', { className: 'dockyard-settings-grid', children: [
@@ -2868,6 +3342,10 @@ function TeamsView({ view, onRefresh }) {
       status: workload.stuck?.length > 0 ? `${number(workload.stuck.length)} stuck` : null,
       onRefresh,
     }),
+    jsxs('div', { className: 'dockyard-view-only-note', 'data-view-only': 'bot-team', children: [
+      jsx(Icon, { name: 'eye' }),
+      jsx('span', { children: 'View only. Project membership, task assignment and reassignment are managed in the canonical work system.' }),
+    ]}),
     jsxs('section', { className: 'dockyard-workload-card', 'data-workload-visual': true, children: [
       jsxs('div', { children: [jsx('h2', { children: 'Workload heat' }), jsx('p', { children: 'Current fleet availability from owned work.' })] }),
       jsxs('div', { className: 'dockyard-workload-chart', children: [
@@ -2998,6 +3476,7 @@ function InitiativeView({ view, onRefresh }) {
       : ['completed', 'measured'].includes(initiative?.status) ? 7 : 2
   const [selectedStage, setSelectedStage] = useState(currentIndex)
   const [freezeState, setFreezeState] = useState(null)
+  const [freezeConfirm, setFreezeConfirm] = useState(false)
   const freeze = async () => {
     if (!project) return
     setFreezeState('freezing')
@@ -3021,7 +3500,7 @@ function InitiativeView({ view, onRefresh }) {
       jsxs('section', { className: 'dockyard-feature-card dockyard-loop-card', children: [
         jsxs('div', { className: 'dockyard-loop-head', children: [
           jsxs('div', { children: [jsx('h2', { children: 'Initiative loop' }), jsx('p', { children: 'Select a stage to inspect its current evidence and state.' })] }),
-          jsx(Button, { action: 'freeze-project', variant: 'danger', disabled: freezeState === 'freezing' || freezeState === 'frozen', onClick: freeze, children: freezeState === 'freezing' ? 'Freezing...' : freezeState === 'frozen' ? 'Project frozen' : 'Freeze project' }),
+          jsx(Button, { action: 'freeze-project', variant: 'danger', disabled: freezeState === 'freezing' || freezeState === 'frozen', onClick: () => setFreezeConfirm(true), children: freezeState === 'freezing' ? 'Freezing...' : freezeState === 'frozen' ? 'Project frozen' : 'Freeze project' }),
         ]}),
         jsx('div', { className: 'dockyard-loop-visual-wrap', children:
           jsx('svg', { viewBox: '0 0 1010 140', role: 'img', 'aria-label': 'Initiative stages from verification to observed outcome', 'data-loop-visual': true, children:
@@ -3061,6 +3540,15 @@ function InitiativeView({ view, onRefresh }) {
         freezeState && !['freezing', 'frozen'].includes(freezeState) ? jsx('p', { className: 'dockyard-inline-error', children: freezeState }) : null,
       ]}),
     ]}),
+    freezeConfirm ? jsx(ConfirmDialog, {
+      confirmKey: 'freeze-project',
+      title: 'Freeze this project?',
+      description: 'Freezing stops new execution until the project is explicitly resumed.',
+      confirmLabel: 'Freeze project',
+      busy: freezeState === 'freezing',
+      onCancel: () => setFreezeConfirm(false),
+      onConfirm: async () => { setFreezeConfirm(false); await freeze() },
+    }) : null,
   ]})
 }
 
@@ -3106,8 +3594,8 @@ function SavedViewsView({ view, onSelectProject, onRefresh }) {
       jsx('span', { className: 'dockyard-meta', children: 'Saved definitions affect presentation only. They never expand project permissions.' }),
     ]}),
     jsxs('section', { className: 'dockyard-saved-views-notice', children: [
-      jsx('strong', { children: 'Display preferences only' }),
-      jsx('span', { children: 'Saved views change how canonical work is displayed. They do not run automations or assign work.' }),
+      jsx('strong', { children: 'Renamed from Workflows' }),
+      jsx('span', { children: 'These are display preferences, not executable workflows. Saved views change how canonical work is displayed; they do not run automations, assign work or expand permissions.' }),
     ]}),
     jsxs('div', { className: 'dockyard-saved-views-layout', children: [
       jsxs('section', { className: 'dockyard-feature-card', children: [
@@ -3153,6 +3641,7 @@ function ApprovalRow({ item, onResolved }) {
   const [state, setState] = useState('idle')
   const [error, setError] = useState(null)
   const [expanded, setExpanded] = useState(false)
+  const [rejectConfirm, setRejectConfirm] = useState(false)
   const [tone, label] = riskDetails(item.risk)
   const detail = item.detail ?? {}
   const decide = async (action) => {
@@ -3239,7 +3728,7 @@ function ApprovalRow({ item, onResolved }) {
           action: 'reject',
           variant: 'danger',
           disabled: state === 'approving' || state === 'rejecting',
-          onClick: () => decide('reject'),
+          onClick: () => setRejectConfirm(true),
           children: state === 'rejecting' ? 'Rejecting...' : 'Reject',
         }),
         jsx(Button, {
@@ -3257,6 +3746,15 @@ function ApprovalRow({ item, onResolved }) {
         children: `Status: ${detail.status || 'pending approval'}. Priority: ${number(detail.priority ?? 0)}. Approval state: ${detail.approval_state || 'pending'}. Context reference: ${item.deep_link || item.ref}.`,
       }),
       error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
+      rejectConfirm ? jsx(ConfirmDialog, {
+        confirmKey: `reject-${item.ref}`,
+        title: 'Reject this initiative?',
+        description: `${item.title} will leave the approval queue and be recorded as rejected.`,
+        confirmLabel: 'Reject initiative',
+        busy: state === 'rejecting',
+        onCancel: () => setRejectConfirm(false),
+        onConfirm: async () => { setRejectConfirm(false); await decide('reject') },
+      }) : null,
     ],
   })
 }
@@ -3362,6 +3860,7 @@ function DashboardPage() {
   const [error, setError] = useState(null)
   const [requestVersion, setRequestVersion] = useState(0)
   const [counts, setCounts] = useState({ approvals: null, notifications: null })
+  const [loadScope, setLoadScope] = useState(null)
 
   useEffect(() => {
     const timers = new Map()
@@ -3383,7 +3882,11 @@ function DashboardPage() {
 
   useEffect(() => {
     let current = true
-    setData(null)
+    const nextLoadScope = `${tab}:${selectedProject ?? ''}`
+    if (loadScope !== nextLoadScope) {
+      setData(null)
+      setLoadScope(nextLoadScope)
+    }
     setError(null)
     const loader = tab === 'dashboard'
       ? loadDashboardData

@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 
 @dataclass(frozen=True)
@@ -490,6 +490,44 @@ MIGRATIONS: List[Migration] = [
         downgrade_sql="""
         DROP INDEX IF EXISTS idx_dwi_initiative;
         ALTER TABLE dockyard_work_items DROP COLUMN initiative_ref;
+        """,
+    ),
+    Migration(
+        version=10,
+        name="mission archive and project supporting content",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS project_mission_archive (
+            archive_id      TEXT PRIMARY KEY,
+            project_id      TEXT NOT NULL REFERENCES project_stewardship(project_id)
+                            ON DELETE CASCADE,
+            mission         TEXT NOT NULL CHECK (length(trim(mission)) > 0),
+            archived_by     TEXT NOT NULL,
+            archived_at     TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_mission_archive_project_time
+            ON project_mission_archive(project_id, archived_at DESC);
+
+        CREATE TABLE IF NOT EXISTS project_content (
+            content_id      TEXT PRIMARY KEY,
+            project_id      TEXT NOT NULL REFERENCES project_stewardship(project_id)
+                            ON DELETE CASCADE,
+            filename        TEXT NOT NULL,
+            stored_path     TEXT NOT NULL,
+            media_type      TEXT NOT NULL CHECK (media_type IN (
+                            'text/plain','text/markdown','application/pdf',
+                            'image/png','image/jpeg','image/webp')),
+            size_bytes      INTEGER NOT NULL CHECK (size_bytes BETWEEN 1 AND 5242880),
+            sha256          TEXT NOT NULL CHECK (length(sha256) = 64),
+            uploaded_by     TEXT NOT NULL,
+            uploaded_at     TEXT NOT NULL,
+            UNIQUE(project_id, stored_path)
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_content_project_time
+            ON project_content(project_id, uploaded_at DESC);
+        """,
+        downgrade_sql="""
+        DROP TABLE IF EXISTS project_content;
+        DROP TABLE IF EXISTS project_mission_archive;
         """,
     ),
 ]

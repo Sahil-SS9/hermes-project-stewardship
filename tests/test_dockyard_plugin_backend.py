@@ -5,9 +5,14 @@ and end-to-end behaviour through the plugin's own endpoints.
 """
 from __future__ import annotations
 
+import atexit
+import base64
 import os
+import shutil
 import sqlite3
+import stat
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -18,11 +23,10 @@ fastapi = pytest.importorskip("fastapi")
 PLUGIN_DIR = Path(__file__).resolve().parents[1] / "hermes_dockyard_plugin" / "dashboard"
 sys.path.insert(0, str(PLUGIN_DIR))
 
-# Fresh tmp DB per test session (env must be set BEFORE importing plugin_api)
-_tmp_db = Path(__file__).resolve().parents[1] / ".tmp-dockyard-plugin" / "dockyard.db"
-_tmp_db.parent.mkdir(parents=True, exist_ok=True)
-if _tmp_db.exists():
-    _tmp_db.unlink()
+# Fresh OS-temporary DB per test process (env must be set BEFORE importing plugin_api).
+_tmp_root = Path(tempfile.mkdtemp(prefix="dockyard-plugin-tests-"))
+atexit.register(shutil.rmtree, _tmp_root, ignore_errors=True)
+_tmp_db = _tmp_root / "dockyard.db"
 os.environ["DOCKYARD_PLUGIN_DB"] = str(_tmp_db)
 
 from fastapi import FastAPI  # noqa: E402
@@ -44,6 +48,20 @@ def test_host_contract_router_and_health(client):
     assert r.status_code == 200
     assert r.json()["ok"] is True
     assert r.json()["service"] == "hermes-dockyard"
+
+
+def test_default_plugin_database_is_durable_and_private(tmp_path, monkeypatch):
+    hermes_home = tmp_path / "hermes-home"
+    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.delenv("DOCKYARD_PLUGIN_DB", raising=False)
+
+    default_path = plugin_api._default_db_path()
+
+    assert default_path == (
+        hermes_home / "plugin-data" / "hermes-dockyard" / "dockyard.db"
+    )
+    assert stat.S_IMODE(default_path.parent.stat().st_mode) == 0o700
+    assert stat.S_IMODE(plugin_api._DB.stat().st_mode) == 0o600
 
 
 def test_proxy_rejects_invalid_success_payload(client, monkeypatch):
@@ -530,3 +548,57 @@ def test_plugin_project_lifecycle_proxy_routes(client):
     resume = client.post(
         f"/api/plugins/hermes-dockyard/projects/{project_id}/resume")
     assert resume.status_code == 200, resume.text
+
+
+def test_plugin_mission_objective_and_content_management_routes(client):
+    project_id = "management-ui"
+    created = client.post("/api/plugins/hermes-dockyard/onboard", json={
+        "project_id": project_id,
+        "repo_path": "/srv/management-ui",
+        "mission": "Manage project outcomes and supporting evidence",
+        "lead_profile": "octacon",
+    })
+    assert created.status_code == 200, created.text
+    base = f"/api/plugins/hermes-dockyard/projects/{project_id}"
+
+    objective = client.post(f"{base}/objectives", json={
+        "name": "Release confidence",
+        "description": "Protect the release gate",
+        "target": ">=1",
+        "severity": "high",
+    })
+    assert objective.status_code == 200, objective.text
+    objective_id = objective.json()["id"]
+    listed = client.get(f"{base}/objectives")
+    assert listed.status_code == 200
+    assert listed.json()["objectives"][0]["name"] == "Release confidence"
+
+    edited = client.patch(f"{base}/objectives/{objective_id}", json={
+        "description": "Protect every release gate",
+    })
+    assert edited.status_code == 200, edited.text
+    archived = client.post(f"{base}/objectives/{objective_id}/archive")
+    assert archived.status_code == 200, archived.text
+    removed = client.delete(f"{base}/objectives/{objective_id}")
+    assert removed.status_code == 200, removed.text
+
+    mission = client.post(f"{base}/mission/archive")
+    assert mission.status_code == 200, mission.text
+    history = client.get(f"{base}/missions/archive")
+    assert history.status_code == 200
+    assert history.json()["missions"][0]["mission"].startswith("Manage project")
+
+    raw = b"# Support\n\nProject context.\n"
+    uploaded = client.post(f"{base}/content", json={
+        "filename": "support.md",
+        "media_type": "text/markdown",
+        "content_base64": base64.b64encode(raw).decode("ascii"),
+    })
+    assert uploaded.status_code == 200, uploaded.text
+    content_id = uploaded.json()["content_id"]
+    content = client.get(f"{base}/content")
+    assert content.status_code == 200
+    assert content.json()["content"][0]["filename"] == "support.md"
+    preview = client.get(f"{base}/content/{content_id}/preview")
+    assert preview.status_code == 200
+    assert preview.json()["text"] == raw.decode("utf-8")

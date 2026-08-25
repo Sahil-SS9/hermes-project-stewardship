@@ -11,9 +11,14 @@ Fail-closed rules enforced here:
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import sqlite3
+import tempfile
+import uuid
 from datetime import timedelta
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
 from ..domain.constants import (
@@ -29,6 +34,18 @@ from .store import Store, iso
 
 class ServiceError(RuntimeError):
     """Refusal surfaced to users (bad state, bad policy, not found)."""
+
+
+_CONTENT_TYPES = {
+    "text/plain": ".txt",
+    "text/markdown": ".md",
+    "application/pdf": ".pdf",
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+}
+_MAX_CONTENT_BYTES = 5 * 1024 * 1024
+_TEXT_PREVIEW_BYTES = 100_000
 
 
 class StewardshipService:
@@ -177,6 +194,15 @@ class StewardshipService:
             raise ServiceError(f"stewardship is disabled for project '{project_id}'")
         return row
 
+    def _require_known(self, project_id: str) -> sqlite3.Row:
+        """Require a configured project without requiring it to be enabled."""
+        row = self.store._conn.execute(
+            "SELECT * FROM project_stewardship WHERE project_id=?", (project_id,)
+        ).fetchone()
+        if row is None:
+            raise ServiceError(f"stewardship not enabled for project '{project_id}'")
+        return row
+
     def _row_settings(self, r: sqlite3.Row) -> Dict[str, Any]:
         """Serialise a raw stewardship row regardless of enabled flag."""
         return {
@@ -315,6 +341,81 @@ class StewardshipService:
         )
         return self.settings(project_id)
 
+    def archive_mission(
+        self,
+        project_id: str,
+        *,
+        actor: str = "system",
+        interface: str = "service",
+    ) -> Dict[str, Any]:
+        """Preserve the active mission in history, then clear it atomically."""
+        current = self.settings(project_id)
+        mission = str(current.get("mission") or "").strip()
+        if not mission:
+            raise ServiceError("project has no active mission to archive")
+        archived_at = iso(self._clock())
+        archive_id = f"MISSION-{uuid.uuid4().hex[:12].upper()}"
+        with self.store.tx() as cx:
+            cx.execute(
+                "INSERT INTO project_mission_archive(archive_id, project_id, mission,"
+                " archived_by, archived_at) VALUES(?,?,?,?,?)",
+                (archive_id, project_id, mission, actor, archived_at),
+            )
+            cx.execute(
+                "UPDATE project_stewardship SET mission='', updated_at=?"
+                " WHERE project_id=?",
+                (archived_at, project_id),
+            )
+        self.store.audit(
+            actor=actor,
+            interface=interface,
+            action="mission.archived",
+            subject=project_id,
+            detail={"archive_id": archive_id},
+        )
+        return {
+            "archive_id": archive_id,
+            "project_id": project_id,
+            "mission": mission,
+            "archived_by": actor,
+            "archived_at": archived_at,
+        }
+
+    def archived_missions(self, project_id: str) -> List[Dict[str, Any]]:
+        self._require_known(project_id)
+        rows = self.store._conn.execute(
+            "SELECT archive_id, project_id, mission, archived_by, archived_at"
+            " FROM project_mission_archive WHERE project_id=?"
+            " ORDER BY archived_at DESC, archive_id DESC",
+            (project_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def remove_mission(
+        self,
+        project_id: str,
+        *,
+        actor: str = "system",
+        interface: str = "service",
+    ) -> Dict[str, Any]:
+        """Clear the active mission without retaining its text in mission history."""
+        current = self.settings(project_id)
+        if not str(current.get("mission") or "").strip():
+            raise ServiceError("project has no active mission to remove")
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE project_stewardship SET mission='', updated_at=?"
+                " WHERE project_id=?",
+                (iso(self._clock()), project_id),
+            )
+        self.store.audit(
+            actor=actor,
+            interface=interface,
+            action="mission.removed",
+            subject=project_id,
+        )
+        return {"project_id": project_id, "removed": True}
+
     def is_active(self, project_id: str) -> bool:
         try:
             s = self.settings(project_id)
@@ -333,6 +434,71 @@ class StewardshipService:
     # Objectives                                                         #
     # ------------------------------------------------------------------ #
 
+    def _objective_dict(self, row: sqlite3.Row) -> Dict[str, Any]:
+        return {
+            "id": row["id"],
+            "project_id": row["project_id"],
+            "name": row["name"],
+            "description": row["description"],
+            "evaluator_type": row["evaluator_type"],
+            "target": row["target"],
+            "severity": row["severity"],
+            "enabled": bool(row["enabled"]),
+            "command": self.store._uj(row["command_json"], None),
+            "integration": row["integration"],
+            "window": row["window"],
+        }
+
+    def _validate_objective(
+        self,
+        *,
+        name: str,
+        evaluator_type: str,
+        target: str,
+        severity: str,
+        description: str,
+        command: Optional[Sequence[str]],
+        integration: Optional[str],
+        window: str,
+    ) -> Dict[str, Any]:
+        clean_name = name.strip() if isinstance(name, str) else ""
+        clean_target = target.strip() if isinstance(target, str) else ""
+        clean_description = description.strip() if isinstance(description, str) else ""
+        clean_window = window.strip() if isinstance(window, str) else ""
+        if not clean_name or len(clean_name) > 200:
+            raise ServiceError("objective name must be 1 to 200 characters")
+        if not clean_target or len(clean_target) > 500:
+            raise ServiceError("objective target must be 1 to 500 characters")
+        if len(clean_description) > 2000:
+            raise ServiceError("objective description must be at most 2000 characters")
+        if not clean_window or len(clean_window) > 50:
+            raise ServiceError("objective window must be 1 to 50 characters")
+        if evaluator_type not in ("manual", "command", "integration"):
+            raise ServiceError(f"unsupported evaluator_type '{evaluator_type}'")
+        if severity not in ("info", "low", "medium", "high"):
+            raise ServiceError(f"unsupported objective severity '{severity}'")
+        clean_command = list(command) if command is not None else None
+        if evaluator_type == "command":
+            if not clean_command:
+                raise ServiceError("command objective requires a command argv list")
+            if isinstance(command, str) or any(
+                not isinstance(part, str) or not part for part in clean_command
+            ):
+                raise ServiceError("command must be an argv list (no shell strings)")
+        clean_integration = integration.strip() if isinstance(integration, str) else None
+        if evaluator_type == "integration" and not clean_integration:
+            raise ServiceError("integration objective requires an integration name")
+        return {
+            "name": clean_name,
+            "evaluator_type": evaluator_type,
+            "target": clean_target,
+            "severity": severity,
+            "description": clean_description,
+            "command": clean_command,
+            "integration": clean_integration,
+            "window": clean_window,
+        }
+
     def add_objective(
         self,
         project_id: str,
@@ -345,73 +511,367 @@ class StewardshipService:
         command: Optional[Sequence[str]] = None,
         integration: Optional[str] = None,
         window: str = "30d",
+        actor: str = "system",
+        interface: str = "service",
     ) -> Dict[str, Any]:
         self._require(project_id)
-        if evaluator_type not in ("manual", "command", "integration"):
-            raise ServiceError(f"unsupported evaluator_type '{evaluator_type}'")
-        if evaluator_type == "command":
-            if not command:
-                raise ServiceError("command objective requires a command argv list")
-            if isinstance(command, str):
-                raise ServiceError("command must be an argv list (no shell strings)")
+        values = self._validate_objective(
+            name=name,
+            evaluator_type=evaluator_type,
+            target=target,
+            severity=severity,
+            description=description,
+            command=command,
+            integration=integration,
+            window=window,
+        )
+        try:
+            with self.store.tx() as cx:
+                cx.execute(
+                    """
+                    INSERT INTO project_objectives(
+                        project_id, name, description, evaluator_type, target,
+                        severity, enabled, command_json, integration, window)
+                    VALUES(?,?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        project_id,
+                        values["name"],
+                        values["description"],
+                        values["evaluator_type"],
+                        values["target"],
+                        values["severity"],
+                        1,
+                        self.store._j(values["command"]) if values["command"] else None,
+                        values["integration"],
+                        values["window"],
+                    ),
+                )
+        except sqlite3.IntegrityError as error:
+            message = str(error)
+            if (
+                "UNIQUE constraint failed" in message
+                and "project_objectives.project_id" in message
+                and "project_objectives.name" in message
+            ):
+                raise ServiceError(
+                    "an objective with that name already exists"
+                ) from None
+            raise
+        row = self.store._conn.execute(
+            "SELECT * FROM project_objectives WHERE project_id=? AND name=?",
+            (project_id, values["name"]),
+        ).fetchone()
+        self.store.audit(
+            actor=actor,
+            interface=interface,
+            action="objective.added",
+            subject=f"{project_id}:{values['name']}",
+        )
+        return self._objective_dict(row)
+
+    def _objective_row(self, project_id: str, objective_id: int) -> sqlite3.Row:
+        self._require(project_id)
+        row = self.store._conn.execute(
+            "SELECT * FROM project_objectives WHERE project_id=? AND id=?",
+            (project_id, objective_id),
+        ).fetchone()
+        if row is None:
+            raise ServiceError(f"unknown objective {objective_id} for project '{project_id}'")
+        return row
+
+    def update_objective(
+        self,
+        project_id: str,
+        objective_id: int,
+        *,
+        name: Optional[str] = None,
+        evaluator_type: Optional[str] = None,
+        target: Optional[str] = None,
+        severity: Optional[str] = None,
+        description: Optional[str] = None,
+        command: Optional[Sequence[str]] = None,
+        integration: Optional[str] = None,
+        window: Optional[str] = None,
+        actor: str = "system",
+        interface: str = "service",
+    ) -> Dict[str, Any]:
+        row = self._objective_row(project_id, objective_id)
+        existing = self._objective_dict(row)
+        selected_type = evaluator_type or existing["evaluator_type"]
+        selected_command = command
+        if command is None and selected_type == existing["evaluator_type"]:
+            selected_command = existing["command"]
+        selected_integration = integration
+        if integration is None and selected_type == existing["evaluator_type"]:
+            selected_integration = existing["integration"]
+        values = self._validate_objective(
+            name=existing["name"] if name is None else name,
+            evaluator_type=selected_type,
+            target=existing["target"] if target is None else target,
+            severity=existing["severity"] if severity is None else severity,
+            description=existing["description"] if description is None else description,
+            command=selected_command,
+            integration=selected_integration,
+            window=existing["window"] if window is None else window,
+        )
+        try:
+            with self.store.tx() as cx:
+                cx.execute(
+                    """UPDATE project_objectives SET name=?, description=?,
+                    evaluator_type=?, target=?, severity=?, command_json=?,
+                    integration=?, window=? WHERE project_id=? AND id=?""",
+                    (
+                        values["name"],
+                        values["description"],
+                        values["evaluator_type"],
+                        values["target"],
+                        values["severity"],
+                        self.store._j(values["command"]) if values["command"] else None,
+                        values["integration"],
+                        values["window"],
+                        project_id,
+                        objective_id,
+                    ),
+                )
+        except sqlite3.IntegrityError as error:
+            raise ServiceError("an objective with that name already exists") from error
+        updated = self._objective_row(project_id, objective_id)
+        self.store.audit(
+            actor=actor,
+            interface=interface,
+            action="objective.updated",
+            subject=f"{project_id}:{objective_id}",
+        )
+        return self._objective_dict(updated)
+
+    def archive_objective(
+        self,
+        project_id: str,
+        objective_id: int,
+        *,
+        actor: str = "system",
+        interface: str = "service",
+    ) -> Dict[str, Any]:
+        self._objective_row(project_id, objective_id)
         with self.store.tx() as cx:
             cx.execute(
-                """
-                INSERT INTO project_objectives(
-                    project_id, name, description, evaluator_type, target,
-                    severity, enabled, command_json, integration, window)
-                VALUES(?,?,?,?,?,?,?,?,?,?)
-                ON CONFLICT(project_id, name) DO UPDATE SET
-                    description=excluded.description,
-                    evaluator_type=excluded.evaluator_type,
-                    target=excluded.target,
-                    severity=excluded.severity,
-                    enabled=excluded.enabled,
-                    command_json=excluded.command_json,
-                    integration=excluded.integration,
-                    window=excluded.window
-                """,
-                (
-                    project_id,
-                    name,
-                    description,
-                    evaluator_type,
-                    target,
-                    severity,
-                    1,
-                    self.store._j(list(command)) if command else None,
-                    integration,
-                    window,
-                ),
+                "UPDATE project_objectives SET enabled=0 WHERE project_id=? AND id=?",
+                (project_id, objective_id),
             )
-        self.store.audit(actor="system", interface="service", action="objective.added", subject=f"{project_id}:{name}")
-        return {"project_id": project_id, "name": name}
+        archived = self._objective_row(project_id, objective_id)
+        self.store.audit(
+            actor=actor,
+            interface=interface,
+            action="objective.archived",
+            subject=f"{project_id}:{objective_id}",
+        )
+        return self._objective_dict(archived)
+
+    def remove_objective(
+        self,
+        project_id: str,
+        objective_id: int,
+        *,
+        actor: str = "system",
+        interface: str = "service",
+    ) -> Dict[str, Any]:
+        self._objective_row(project_id, objective_id)
+        with self.store.tx() as cx:
+            cx.execute(
+                "DELETE FROM project_objectives WHERE project_id=? AND id=?",
+                (project_id, objective_id),
+            )
+        self.store.audit(
+            actor=actor,
+            interface=interface,
+            action="objective.removed",
+            subject=f"{project_id}:{objective_id}",
+        )
+        return {"id": objective_id, "removed": True}
 
     def objectives(self, project_id: str, *, include_disabled: bool = False) -> List[Objective]:
-        self._require(project_id)
+        self._require_known(project_id)
         sql = "SELECT * FROM project_objectives WHERE project_id=?"
         if not include_disabled:
             sql += " AND enabled=1"
         sql += " ORDER BY id"
         rows = self.store._conn.execute(sql, (project_id,)).fetchall()
-        out: List[Objective] = []
-        for r in rows:
-            out.append(
-                Objective(
-                    id=r["id"],
-                    project_id=r["project_id"],
-                    name=r["name"],
-                    description=r["description"],
-                    evaluator_type=r["evaluator_type"],
-                    target=r["target"],
-                    severity=r["severity"],
-                    enabled=bool(r["enabled"]),
-                    command=self.store._uj(r["command_json"], None),
-                    integration=r["integration"],
-                    window=r["window"],
-                )
-            )
-        return out
+        return [Objective(**self._objective_dict(row)) for row in rows]
+
+    # ------------------------------------------------------------------ #
+    # Project supporting content                                         #
+    # ------------------------------------------------------------------ #
+
+    def _content_root(self) -> Path:
+        root = (self.store.db_path.parent / "project-content").resolve()
+        root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        return root
+
+    def _content_metadata(self, row: sqlite3.Row) -> Dict[str, Any]:
+        return {
+            "content_id": row["content_id"],
+            "project_id": row["project_id"],
+            "filename": row["filename"],
+            "media_type": row["media_type"],
+            "size_bytes": row["size_bytes"],
+            "sha256": row["sha256"],
+            "uploaded_by": row["uploaded_by"],
+            "uploaded_at": row["uploaded_at"],
+        }
+
+    def _validate_content_bytes(self, media_type: str, content: bytes) -> None:
+        if media_type in ("text/plain", "text/markdown"):
+            try:
+                content.decode("utf-8")
+            except UnicodeDecodeError as error:
+                raise ServiceError("text project content must be valid UTF-8") from error
+            if b"\x00" in content:
+                raise ServiceError("text project content cannot contain null bytes")
+            return
+        signatures = {
+            "application/pdf": content.startswith(b"%PDF-"),
+            "image/png": content.startswith(b"\x89PNG\r\n\x1a\n"),
+            "image/jpeg": content.startswith(b"\xff\xd8\xff"),
+            "image/webp": len(content) >= 12
+            and content.startswith(b"RIFF")
+            and content[8:12] == b"WEBP",
+        }
+        if not signatures.get(media_type, False):
+            raise ServiceError("project content does not match its declared media type")
+
+    def upload_project_content(
+        self,
+        project_id: str,
+        *,
+        filename: str,
+        media_type: str,
+        content: bytes,
+        actor: str = "system",
+        interface: str = "service",
+    ) -> Dict[str, Any]:
+        self._require(project_id)
+        clean_filename = filename.strip() if isinstance(filename, str) else ""
+        if (
+            not clean_filename
+            or len(clean_filename) > 180
+            or Path(clean_filename).name != clean_filename
+            or "/" in clean_filename
+            or "\\" in clean_filename
+            or clean_filename in (".", "..")
+        ):
+            raise ServiceError("filename must be a safe single filename")
+        clean_media_type = media_type.split(";", 1)[0].strip().lower()
+        extension = _CONTENT_TYPES.get(clean_media_type)
+        if extension is None:
+            raise ServiceError("supported project content types are text, Markdown, PDF and images")
+        if not isinstance(content, bytes):
+            raise ServiceError("project content must be bytes")
+        if not content:
+            raise ServiceError("project content cannot be empty")
+        if len(content) > _MAX_CONTENT_BYTES:
+            raise ServiceError("project content cannot exceed 5 MB")
+        self._validate_content_bytes(clean_media_type, content)
+
+        content_id = f"CONTENT-{uuid.uuid4().hex[:16].upper()}"
+        project_dir_name = hashlib.sha256(project_id.encode("utf-8")).hexdigest()[:20]
+        root = self._content_root()
+        project_dir = root / project_dir_name
+        project_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        final_path = (project_dir / f"{content_id}{extension}").resolve()
+        if root not in final_path.parents:
+            raise ServiceError("project content path escaped its storage root")
+        fd, temporary_name = tempfile.mkstemp(prefix=".upload-", dir=project_dir)
+        temporary_path = Path(temporary_name)
+        try:
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary_path, final_path)
+            stored_path = str(final_path.relative_to(root))
+            uploaded_at = iso(self._clock())
+            digest = hashlib.sha256(content).hexdigest()
+            try:
+                with self.store.tx() as cx:
+                    cx.execute(
+                        """INSERT INTO project_content(
+                        content_id, project_id, filename, stored_path, media_type,
+                        size_bytes, sha256, uploaded_by, uploaded_at)
+                        VALUES(?,?,?,?,?,?,?,?,?)""",
+                        (
+                            content_id,
+                            project_id,
+                            clean_filename,
+                            stored_path,
+                            clean_media_type,
+                            len(content),
+                            digest,
+                            actor,
+                            uploaded_at,
+                        ),
+                    )
+            except BaseException:
+                final_path.unlink(missing_ok=True)
+                raise
+        finally:
+            temporary_path.unlink(missing_ok=True)
+        row = self.store._conn.execute(
+            "SELECT * FROM project_content WHERE project_id=? AND content_id=?",
+            (project_id, content_id),
+        ).fetchone()
+        self.store.audit(
+            actor=actor,
+            interface=interface,
+            action="project.content_uploaded",
+            subject=f"{project_id}:{content_id}",
+            detail={"filename": clean_filename, "size_bytes": len(content)},
+        )
+        return self._content_metadata(row)
+
+    def project_content(self, project_id: str) -> List[Dict[str, Any]]:
+        self._require_known(project_id)
+        rows = self.store._conn.execute(
+            "SELECT * FROM project_content WHERE project_id=?"
+            " ORDER BY uploaded_at DESC, content_id DESC",
+            (project_id,),
+        ).fetchall()
+        return [self._content_metadata(row) for row in rows]
+
+    def project_content_preview(
+        self, project_id: str, content_id: str
+    ) -> Dict[str, Any]:
+        self._require_known(project_id)
+        row = self.store._conn.execute(
+            "SELECT * FROM project_content WHERE project_id=? AND content_id=?",
+            (project_id, content_id),
+        ).fetchone()
+        if row is None:
+            raise ServiceError(f"unknown project content '{content_id}'")
+        root = self._content_root()
+        try:
+            path = (root / row["stored_path"]).resolve(strict=True)
+            if root not in path.parents or not path.is_file():
+                raise FileNotFoundError("content path is outside its storage root")
+            raw = path.read_bytes()
+        except (OSError, RuntimeError) as error:
+            raise ServiceError("project content file is unavailable") from error
+        if (
+            len(raw) != row["size_bytes"]
+            or hashlib.sha256(raw).hexdigest() != row["sha256"]
+        ):
+            raise ServiceError("project content failed its integrity check")
+        metadata = self._content_metadata(row)
+        if row["media_type"] in ("text/plain", "text/markdown"):
+            preview = raw[:_TEXT_PREVIEW_BYTES].decode("utf-8", errors="ignore")
+            return {
+                **metadata,
+                "preview_kind": "text",
+                "text": preview,
+                "truncated": len(raw) > _TEXT_PREVIEW_BYTES,
+            }
+        return {**metadata, "preview_kind": "metadata", "text": None, "truncated": False}
 
     # ------------------------------------------------------------------ #
     # Health snapshots                                                   #
@@ -698,7 +1158,7 @@ class StewardshipService:
         }
 
     def initiatives(self, project_id: str, status: Optional[str] = None) -> List[Dict[str, Any]]:
-        self._require(project_id)
+        self._require_known(project_id)
         sql = "SELECT * FROM project_initiatives WHERE project_id=?"
         args: List[Any] = [project_id]
         if status:

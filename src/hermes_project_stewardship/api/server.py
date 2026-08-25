@@ -16,7 +16,10 @@ no separate state anywhere.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import os
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -75,7 +78,31 @@ class ObjectiveRequest(BaseModel):
     severity: str = "medium"
     description: str = ""
     command: Optional[list[str]] = None
+    integration: Optional[str] = None
     window: str = "30d"
+    actor: str = "system"
+    interface: str = "rpc"
+
+
+class ObjectivePatch(BaseModel):
+    name: Optional[str] = None
+    evaluator_type: Optional[str] = None
+    target: Optional[str] = None
+    severity: Optional[str] = None
+    description: Optional[str] = None
+    command: Optional[list[str]] = None
+    integration: Optional[str] = None
+    window: Optional[str] = None
+    actor: str = "system"
+    interface: str = "rpc"
+
+
+class ContentUploadRequest(BaseModel):
+    filename: str
+    media_type: str
+    content_base64: str
+    actor: str = "system"
+    interface: str = "rpc"
 
 
 class InitiativeProposal(BaseModel):
@@ -317,6 +344,17 @@ def create_app(
     def freeze(project_id: str):
         return svc.freeze(project_id)
 
+    @router.get("/projects/{project_id}/objectives")
+    def objectives(project_id: str, include_archived: bool = False):
+        return {
+            "objectives": [
+                asdict(item)
+                for item in svc.objectives(
+                    project_id, include_disabled=include_archived
+                )
+            ]
+        }
+
     @router.post("/projects/{project_id}/objectives")
     def add_objective(project_id: str, body: ObjectiveRequest):
         return svc.add_objective(
@@ -327,8 +365,87 @@ def create_app(
             severity=body.severity,
             description=body.description,
             command=body.command,
+            integration=body.integration,
             window=body.window,
+            actor=body.actor,
+            interface=body.interface,
         )
+
+    @router.patch("/projects/{project_id}/objectives/{objective_id}")
+    def update_objective(
+        project_id: str, objective_id: int, body: ObjectivePatch
+    ):
+        values = body.model_dump(exclude_unset=True)
+        actor = values.pop("actor", body.actor)
+        interface = values.pop("interface", body.interface)
+        return svc.update_objective(
+            project_id,
+            objective_id,
+            actor=actor,
+            interface=interface,
+            **values,
+        )
+
+    @router.post("/projects/{project_id}/objectives/{objective_id}/archive")
+    def archive_objective(
+        project_id: str, objective_id: int, body: ApprovalAction
+    ):
+        return svc.archive_objective(
+            project_id,
+            objective_id,
+            actor=body.actor,
+            interface=body.interface,
+        )
+
+    @router.delete("/projects/{project_id}/objectives/{objective_id}")
+    def remove_objective(
+        project_id: str, objective_id: int, body: ApprovalAction
+    ):
+        return svc.remove_objective(
+            project_id,
+            objective_id,
+            actor=body.actor,
+            interface=body.interface,
+        )
+
+    @router.get("/projects/{project_id}/missions/archive")
+    def archived_missions(project_id: str):
+        return {"missions": svc.archived_missions(project_id)}
+
+    @router.post("/projects/{project_id}/mission/archive")
+    def archive_mission(project_id: str, body: ApprovalAction):
+        return svc.archive_mission(
+            project_id, actor=body.actor, interface=body.interface
+        )
+
+    @router.delete("/projects/{project_id}/mission")
+    def remove_mission(project_id: str, body: ApprovalAction):
+        return svc.remove_mission(
+            project_id, actor=body.actor, interface=body.interface
+        )
+
+    @router.get("/projects/{project_id}/content")
+    def project_content(project_id: str):
+        return {"content": svc.project_content(project_id)}
+
+    @router.post("/projects/{project_id}/content")
+    def upload_project_content(project_id: str, body: ContentUploadRequest):
+        try:
+            content = base64.b64decode(body.content_base64, validate=True)
+        except (binascii.Error, ValueError) as error:
+            raise HTTPException(422, "content_base64 must be valid base64") from error
+        return svc.upload_project_content(
+            project_id,
+            filename=body.filename,
+            media_type=body.media_type,
+            content=content,
+            actor=body.actor,
+            interface=body.interface,
+        )
+
+    @router.get("/projects/{project_id}/content/{content_id}/preview")
+    def project_content_preview(project_id: str, content_id: str):
+        return svc.project_content_preview(project_id, content_id)
 
     @router.get("/projects/{project_id}/health")
     def health(project_id: str):

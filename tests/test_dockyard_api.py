@@ -1,6 +1,7 @@
 """Dockyard RPC routes: work-items + backlog over /stewardship/v1."""
 from __future__ import annotations
 
+import base64
 import sqlite3
 
 import pytest
@@ -235,3 +236,177 @@ def test_disabled_project_settings_remain_readable(env):
     r = c.post("/stewardship/v1/projects/dy1/re-enable")
     assert r.status_code == 200, r.text
     assert r.json()["enabled"] is True
+
+
+def test_disabled_project_dashboard_reads_remain_available(env):
+    c, _ = env
+    _enable(c)
+    actor = {"actor": "sahil", "interface": "dockyard:human"}
+    created = c.post("/stewardship/v1/projects/dy1/objectives", json={
+        "name": "Keep the read-only dashboard available",
+        "target": ">=1",
+        **actor,
+    })
+    assert created.status_code == 200, created.text
+    uploaded = c.post("/stewardship/v1/projects/dy1/content", json={
+        "filename": "read-only.md",
+        "media_type": "text/markdown",
+        "content_base64": base64.b64encode(b"Readable while disabled.\n").decode("ascii"),
+        **actor,
+    })
+    assert uploaded.status_code == 200, uploaded.text
+    content_id = uploaded.json()["content_id"]
+
+    disabled = c.post("/stewardship/v1/projects/dy1/disable")
+    assert disabled.status_code == 200, disabled.text
+
+    for path in (
+        "settings",
+        "objectives?include_archived=true",
+        "missions/archive",
+        "content",
+        "initiatives",
+        "work-items",
+        "events",
+        "reports",
+    ):
+        response = c.get(f"/stewardship/v1/projects/dy1/{path}")
+        assert response.status_code == 200, (path, response.text)
+
+    preview = c.get(
+        f"/stewardship/v1/projects/dy1/content/{content_id}/preview"
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["text"] == "Readable while disabled.\n"
+
+
+def test_duplicate_objective_create_is_rejected_without_mutation(env):
+    c, _ = env
+    _enable(c)
+    actor = {"actor": "sahil", "interface": "dockyard:human"}
+    first = c.post("/stewardship/v1/projects/dy1/objectives", json={
+        "name": "Stable objective identity",
+        "description": "Original description",
+        "target": ">=1",
+        **actor,
+    })
+    assert first.status_code == 200, first.text
+    objective_id = first.json()["id"]
+    archived = c.post(
+        f"/stewardship/v1/projects/dy1/objectives/{objective_id}/archive",
+        json=actor,
+    )
+    assert archived.status_code == 200, archived.text
+
+    duplicate = c.post("/stewardship/v1/projects/dy1/objectives", json={
+        "name": "Stable objective identity",
+        "description": "Attempted overwrite",
+        "target": ">=999",
+        **actor,
+    })
+    assert duplicate.status_code == 409, duplicate.text
+    assert "already exists" in duplicate.json()["error"]["message"]
+
+    listed = c.get(
+        "/stewardship/v1/projects/dy1/objectives?include_archived=true"
+    )
+    assert listed.status_code == 200, listed.text
+    objectives = listed.json()["objectives"]
+    assert len(objectives) == 1
+    assert objectives[0]["enabled"] is False
+    assert objectives[0]["description"] == "Original description"
+    assert objectives[0]["target"] == ">=1"
+
+
+def test_mission_and_objective_management_routes(env):
+    c, _ = env
+    _enable(c)
+    actor = {"actor": "sahil", "interface": "dockyard:human"}
+
+    archived = c.post(
+        "/stewardship/v1/projects/dy1/mission/archive", json=actor
+    )
+    assert archived.status_code == 200, archived.text
+    assert archived.json()["mission"] == "m"
+    history = c.get("/stewardship/v1/projects/dy1/missions/archive")
+    assert history.status_code == 200
+    assert history.json()["missions"][0]["archive_id"] == archived.json()["archive_id"]
+
+    created = c.post("/stewardship/v1/projects/dy1/objectives", json={
+        "name": "Keep retries safe",
+        "description": "Initial",
+        "target": ">=1",
+        "severity": "medium",
+        **actor,
+    })
+    assert created.status_code == 200, created.text
+    objective_id = created.json()["id"]
+
+    edited = c.patch(
+        f"/stewardship/v1/projects/dy1/objectives/{objective_id}",
+        json={"name": "Keep payment retries safe", "severity": "high", **actor},
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["name"] == "Keep payment retries safe"
+
+    archived_objective = c.post(
+        f"/stewardship/v1/projects/dy1/objectives/{objective_id}/archive",
+        json=actor,
+    )
+    assert archived_objective.status_code == 200, archived_objective.text
+    listed = c.get(
+        "/stewardship/v1/projects/dy1/objectives?include_archived=true"
+    )
+    assert listed.status_code == 200
+    assert listed.json()["objectives"][0]["enabled"] is False
+
+    removed = c.request(
+        "DELETE",
+        f"/stewardship/v1/projects/dy1/objectives/{objective_id}",
+        json=actor,
+    )
+    assert removed.status_code == 200, removed.text
+    assert removed.json() == {"id": objective_id, "removed": True}
+
+    c.patch(
+        "/stewardship/v1/projects/dy1/settings",
+        json={"mission": "Temporary mission", **actor},
+    )
+    removed_mission = c.request(
+        "DELETE", "/stewardship/v1/projects/dy1/mission", json=actor
+    )
+    assert removed_mission.status_code == 200, removed_mission.text
+    assert removed_mission.json()["removed"] is True
+
+
+def test_project_content_routes_upload_list_and_preview(env):
+    c, _ = env
+    _enable(c)
+    raw = b"# Runbook\n\nRecovery steps.\n"
+    uploaded = c.post("/stewardship/v1/projects/dy1/content", json={
+        "filename": "runbook.md",
+        "media_type": "text/markdown",
+        "content_base64": base64.b64encode(raw).decode("ascii"),
+        "actor": "sahil",
+        "interface": "dockyard:human",
+    })
+    assert uploaded.status_code == 200, uploaded.text
+    content_id = uploaded.json()["content_id"]
+
+    listed = c.get("/stewardship/v1/projects/dy1/content")
+    assert listed.status_code == 200
+    assert listed.json()["content"][0]["filename"] == "runbook.md"
+
+    preview = c.get(
+        f"/stewardship/v1/projects/dy1/content/{content_id}/preview"
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["text"] == raw.decode("utf-8")
+
+    invalid = c.post("/stewardship/v1/projects/dy1/content", json={
+        "filename": "runbook.md",
+        "media_type": "text/markdown",
+        "content_base64": "not valid base64!",
+        "actor": "sahil",
+    })
+    assert invalid.status_code == 422

@@ -71,6 +71,24 @@ const POPULATED = {
       { ref: 'INI-DEMO-2', project_id: 'payments-relaunch', title: 'Enable one-click refunds', rationale: 'Support requests drop when refunds are self-service; rollback is a feature flag.', expected_outcome: 'Refund requests complete without support intervention.', validation_contract: { steps: ['verify feature flag rollback', 'run checkout suite'], tests: 'checkout and refund test suite' }, risk: 'medium', priority: 2, status: 'pending_approval', approval_state: 'pending', created_at: '2026-08-24T18:36:03+00:00' },
     ] },
   },
+  objectives: {
+    'demo-project': { objectives: [] },
+    'payments-relaunch': { objectives: [
+      { id: 11, project_id: 'payments-relaunch', name: 'Checkout reliability', description: 'Keep payment retries safe.', evaluator_type: 'manual', target: '>=1', severity: 'high', enabled: true, command: null, integration: null, window: '30d' },
+      { id: 12, project_id: 'payments-relaunch', name: 'Legacy webhook parity', description: 'Archived after the replacement shipped.', evaluator_type: 'manual', target: '>=1', severity: 'low', enabled: false, command: null, integration: null, window: '30d' },
+    ] },
+  },
+  missionArchive: {
+    'demo-project': { missions: [] },
+    'payments-relaunch': { missions: [{ archive_id: 'MISSION-DEMO1', project_id: 'payments-relaunch', mission: 'Stabilise the legacy checkout', archived_by: 'sahil', archived_at: '2026-08-20T12:00:00+00:00' }] },
+  },
+  content: {
+    'demo-project': { content: [] },
+    'payments-relaunch': { content: [{ content_id: 'CONTENT-DEMO1', project_id: 'payments-relaunch', filename: 'release-runbook.md', media_type: 'text/markdown', size_bytes: 48, sha256: 'a'.repeat(64), uploaded_by: 'sahil', uploaded_at: '2026-08-24T19:10:00+00:00' }] },
+  },
+  contentPreviews: {
+    'CONTENT-DEMO1': { content_id: 'CONTENT-DEMO1', project_id: 'payments-relaunch', filename: 'release-runbook.md', media_type: 'text/markdown', size_bytes: 48, sha256: 'a'.repeat(64), uploaded_by: 'sahil', uploaded_at: '2026-08-24T19:10:00+00:00', preview_kind: 'text', text: '# Release runbook\n\nUse the rollback gate.\n', truncated: false },
+  },
   events: {
     'demo-project': { events: [] },
     'payments-relaunch': { events: [] },
@@ -133,6 +151,10 @@ const EMPTY = {
   settings: {},
   workItems: {},
   initiatives: {},
+  objectives: {},
+  missionArchive: {},
+  content: {},
+  contentPreviews: {},
   events: {},
   backlog: {},
   views: {},
@@ -195,6 +217,9 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
   global.SVGElement = dom.window.SVGElement;
   global.Element = dom.window.Element;
   global.Node = dom.window.Node;
+  global.FileReader = dom.window.FileReader;
+  global.File = dom.window.File;
+  global.Blob = dom.window.Blob;
   global.MutationObserver = dom.window.MutationObserver;
   global.getComputedStyle = dom.window.getComputedStyle.bind(dom.window);
   Object.defineProperty(global, 'navigator', { value: dom.window.navigator, configurable: true });
@@ -224,6 +249,9 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       data.settings[projectId] = { project_id: projectId, mission: init.body?.mission || '', autonomy_level: 2, phase: 'active' };
       data.workItems[projectId] = { work_items: [] };
       data.initiatives[projectId] = { initiatives: [] };
+      data.objectives[projectId] = { objectives: [] };
+      data.missionArchive[projectId] = { missions: [] };
+      data.content[projectId] = { content: [] };
       data.events[projectId] = { events: [] };
       data.backlog[projectId] = { backlog: [] };
       data.views[projectId] = { views: [] };
@@ -334,6 +362,93 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       data.settings[projectId] = next;
       return clone(next);
     }
+    const objectiveCollection = path.match(/^\/projects\/([^/]+)\/objectives$/);
+    if (method === 'POST' && objectiveCollection) {
+      const projectId = decodeURIComponent(objectiveCollection[1]);
+      data.objectives[projectId] ??= { objectives: [] };
+      const id = Math.max(0, ...data.objectives[projectId].objectives.map((item) => Number(item.id))) + 1;
+      const objective = {
+        id,
+        project_id: projectId,
+        name: init.body?.name,
+        description: init.body?.description ?? '',
+        evaluator_type: init.body?.evaluator_type ?? 'manual',
+        target: init.body?.target ?? '>=1',
+        severity: init.body?.severity ?? 'medium',
+        enabled: true,
+        command: null,
+        integration: null,
+        window: init.body?.window ?? '30d',
+      };
+      data.objectives[projectId].objectives.push(objective);
+      return clone(objective);
+    }
+    const objectiveMutation = path.match(/^\/projects\/([^/]+)\/objectives\/(\d+)(?:\/(archive))?$/);
+    if (objectiveMutation) {
+      const projectId = decodeURIComponent(objectiveMutation[1]);
+      const objectiveId = Number(objectiveMutation[2]);
+      const objectives = data.objectives[projectId]?.objectives ?? [];
+      const objective = objectives.find((item) => Number(item.id) === objectiveId);
+      if (method === 'PATCH' && objective) {
+        Object.assign(objective, init.body);
+        return clone(objective);
+      }
+      if (method === 'POST' && objectiveMutation[3] === 'archive' && objective) {
+        objective.enabled = false;
+        return clone(objective);
+      }
+      if (method === 'DELETE') {
+        data.objectives[projectId].objectives = objectives.filter((item) => Number(item.id) !== objectiveId);
+        return { id: objectiveId, removed: true };
+      }
+    }
+    const missionMutation = path.match(/^\/projects\/([^/]+)\/mission(?:\/(archive))?$/);
+    if (missionMutation) {
+      const projectId = decodeURIComponent(missionMutation[1]);
+      const settings = data.settings[projectId];
+      if (method === 'POST' && missionMutation[2] === 'archive') {
+        const archived = {
+          archive_id: `MISSION-${projectId}-${Date.now()}`,
+          project_id: projectId,
+          mission: settings.mission,
+          archived_by: 'sahil',
+          archived_at: '2026-08-25T12:00:00+00:00',
+        };
+        data.missionArchive[projectId] ??= { missions: [] };
+        data.missionArchive[projectId].missions.unshift(archived);
+        settings.mission = '';
+        return clone(archived);
+      }
+      if (method === 'DELETE') {
+        settings.mission = '';
+        return { project_id: projectId, removed: true };
+      }
+    }
+    const uploadContent = path.match(/^\/projects\/([^/]+)\/content$/);
+    if (method === 'POST' && uploadContent) {
+      const projectId = decodeURIComponent(uploadContent[1]);
+      const contentId = `CONTENT-${Date.now()}`;
+      const bytes = Buffer.from(init.body?.content_base64 ?? '', 'base64');
+      const item = {
+        content_id: contentId,
+        project_id: projectId,
+        filename: init.body?.filename,
+        media_type: init.body?.media_type,
+        size_bytes: bytes.length,
+        sha256: 'b'.repeat(64),
+        uploaded_by: 'sahil',
+        uploaded_at: '2026-08-25T12:00:00+00:00',
+      };
+      data.content[projectId] ??= { content: [] };
+      data.content[projectId].content.unshift(item);
+      data.contentPreviews[contentId] = {
+        ...item,
+        preview_kind: item.media_type.startsWith('text/') ? 'text' : 'metadata',
+        text: item.media_type.startsWith('text/') ? bytes.toString('utf8') : null,
+        truncated: false,
+      };
+      return clone(item);
+    }
     const generateReport = path.match(/^\/projects\/([^/]+)\/reports$/);
     if (method === 'POST' && generateReport) {
       const projectId = decodeURIComponent(generateReport[1]);
@@ -374,17 +489,28 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
     if (method === 'GET' && reportRead) {
       return clone(data.reportDetails[decodeURIComponent(reportRead[2])] ?? {});
     }
-    const projectRead = path.match(/^\/projects\/([^/]+)\/(settings|work-items|initiatives|events|backlog|views|reports)$/);
+    const contentPreviewRead = path.match(/^\/projects\/([^/]+)\/content\/([^/]+)\/preview$/);
+    if (method === 'GET' && contentPreviewRead) {
+      return clone(data.contentPreviews[decodeURIComponent(contentPreviewRead[2])] ?? {});
+    }
+    const missionArchiveRead = path.match(/^\/projects\/([^/]+)\/missions\/archive$/);
+    if (method === 'GET' && missionArchiveRead) {
+      const projectId = decodeURIComponent(missionArchiveRead[1]);
+      return clone(data.missionArchive[projectId] ?? { missions: [] });
+    }
+    const projectRead = path.match(/^\/projects\/([^/]+)\/(settings|work-items|initiatives|objectives|events|backlog|views|reports|content)$/);
     if (projectRead) {
       const projectId = decodeURIComponent(projectRead[1]);
       const kind = projectRead[2];
       if (kind === 'settings') return clone(data.settings[projectId] ?? { project_id: projectId, mission: '', phase: 'active' });
       if (kind === 'work-items') return clone(data.workItems[projectId] ?? { work_items: [] });
       if (kind === 'initiatives') return clone(data.initiatives[projectId] ?? { initiatives: [] });
+      if (kind === 'objectives') return clone(data.objectives[projectId] ?? { objectives: [] });
       if (kind === 'events') return clone(data.events[projectId] ?? { events: [] });
       if (kind === 'backlog') return clone(data.backlog[projectId] ?? { backlog: [] });
       if (kind === 'views') return clone(data.views[projectId] ?? { views: [] });
       if (kind === 'reports') return clone(data.reports[projectId] ?? { reports: [] });
+      if (kind === 'content') return clone(data.content[projectId] ?? { content: [] });
     }
     throw new Error(`Unhandled test request: ${method} ${path}`);
   };
@@ -440,12 +566,21 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       await wait(ms);
     });
   };
+  const setFile = async (selector, file, ms = 30) => {
+    const element = dom.window.document.querySelector(selector);
+    assert(element, `missing file target: ${selector}`);
+    Object.defineProperty(element, 'files', { value: [file], configurable: true });
+    await act(async () => {
+      element.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+      await wait(ms);
+    });
+  };
   const dispose = async () => {
     await act(async () => { root.unmount(); });
     dom.window.close();
   };
 
-  return { dom, loaded, contributions, calls, navigations, clipboardWrites, data, deferred, jsdomMessages, mount, flush, click, setValue, dispose };
+  return { dom, loaded, contributions, calls, navigations, clipboardWrites, data, deferred, jsdomMessages, mount, flush, click, setValue, setFile, dispose };
 }
 
 async function testStylesAndPopulatedDashboard() {
@@ -558,6 +693,10 @@ async function testReferenceBenchmarkApprovalCardsAndReject() {
   assert.equal(doc.querySelector('[data-approval-ref="INI-DEMO-2"] [data-evidence-details]')?.hidden, false, 'evidence disclosure did not open');
 
   await runtime.click('[data-approval-ref="INI-DEMO-2"] [data-action="reject"]', 40);
+  const rejectionConfirm = doc.querySelector('[data-destructive-confirm="reject-INI-DEMO-2"]');
+  assert(rejectionConfirm && !rejectionConfirm.hidden, 'Reject did not ask for confirmation');
+  assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === '/initiatives/INI-DEMO-2/reject'), 'Reject mutated state before confirmation');
+  await runtime.click('[data-action="confirm-destructive-action"]', 40);
   assert.equal(doc.querySelector('[data-approval-ref="INI-DEMO-2"]')?.getAttribute('data-state'), 'rejected', 'rejection state was not shown');
   assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/initiatives/INI-DEMO-2/reject'), 'rejection POST was not sent');
   await runtime.flush(1000);
@@ -572,7 +711,7 @@ async function testProjectDashboardScreen() {
   const doc = runtime.dom.window.document;
   assert(doc.querySelector('[data-project-dashboard]'), 'project dashboard screen is missing');
   assert.match(doc.body.textContent, /Checkout reliability rebuild/);
-  assert.equal(doc.querySelectorAll('[data-project-view]').length, 6, 'project dashboard must expose six supported views');
+  assert.equal(doc.querySelectorAll('[data-project-view]').length, 7, 'project dashboard must expose seven supported views');
   assert(doc.querySelector('[data-project-visual]'), 'project overview is missing work visualisation');
   assert(doc.querySelector('[data-overview-work]'), 'project overview is missing current work context');
   assert(doc.querySelector('[data-overview-initiatives]'), 'project overview is missing initiative context');
@@ -581,6 +720,16 @@ async function testProjectDashboardScreen() {
   await runtime.click('[data-project-view="board"]');
   assert.equal(doc.querySelectorAll('[data-board-column]').length, 4, 'project board must expose backlog, active, review and done columns');
   assert(doc.querySelectorAll('[data-work-card]').length >= 3, 'project board did not render backend work items');
+  assert(doc.querySelector('[data-view-only="board"]'), 'project board is not visibly marked view-only');
+  assert(!doc.querySelector('[data-action="transition-work-item"]'), 'project board exposes an unsupported edit control');
+  await runtime.click('[data-work-card="HDY-12"]');
+  const workDetail = doc.querySelector('[data-work-item-detail="HDY-12"]');
+  assert(workDetail, 'board item did not open its read-only detail');
+  assert.match(workDetail.textContent, /Fix double-charge on retry path/);
+  assert.match(workDetail.textContent, /octacon-bot/);
+  assert(!workDetail.querySelector('input, textarea, select'), 'read-only item detail exposes editable controls');
+  await runtime.click('[data-action="close-work-item-detail"]');
+  assert(doc.querySelector('[data-work-item-detail-layer]')?.hidden, 'work-item detail did not close');
 
   await runtime.click('[data-project-view="settings"]');
   assert(doc.querySelector('[data-project-settings-form]'), 'project configuration form is missing');
@@ -591,13 +740,21 @@ async function testProjectDashboardScreen() {
   assert(doc.querySelector('[data-setting-field="require-tests"]'), 'verification configuration is missing');
   assert(doc.querySelector('[data-setting-field="soak-hours"]'), 'release configuration is missing');
   assert(doc.querySelector('[data-setting-field="digest"]'), 'notification configuration is missing');
+  assert(doc.querySelector('[data-setting-field="mission"]')?.matches(':disabled'), 'configuration is editable before Edit is selected');
+  assert(!doc.querySelector('[data-action="save-project-settings"]'), 'Save is available while configuration is locked');
+  await runtime.click('[data-action="edit-project-settings"]');
+  assert(!doc.querySelector('[data-setting-field="mission"]')?.matches(':disabled'), 'Edit did not unlock configuration');
   await runtime.setValue('[data-setting-field="mission"]', 'Ship payment recovery with auditable gates');
   await runtime.setValue('[data-setting-field="autonomy"]', '2');
+  const settingsReadsBeforeSave = runtime.calls.filter((call) => call.method === 'GET' && call.path === '/projects/payments-relaunch/settings').length;
   await runtime.click('[data-action="save-project-settings"]', 80);
+  await runtime.flush(300);
   const settingsPatch = runtime.calls.find((call) => call.method === 'PATCH' && call.path === '/projects/payments-relaunch/settings');
   assert(settingsPatch, 'project configuration PATCH was not sent');
   assert.equal(settingsPatch.body.mission, 'Ship payment recovery with auditable gates');
   assert.equal(settingsPatch.body.autonomy_level, 2);
+  assert(doc.querySelector('[data-setting-field="mission"]')?.matches(':disabled'), 'configuration did not lock after save');
+  assert(runtime.calls.filter((call) => call.method === 'GET' && call.path === '/projects/payments-relaunch/settings').length > settingsReadsBeforeSave, 'configuration save did not refresh canonical project data');
 
   await runtime.click('[data-project-view="reports"]', 40);
   assert(doc.querySelector('[data-project-reports]'), 'report generation surface is missing');
@@ -610,16 +767,98 @@ async function testProjectDashboardScreen() {
   await runtime.click('[data-action="copy-report"]', 40);
   assert.equal(runtime.clipboardWrites.length, 1, 'generated report was not copied through the plugin OS door');
   assert.match(runtime.clipboardWrites[0], /## Delivery/);
+  await runtime.click('[data-project-view="overview"]', 50);
+  await runtime.click('[data-project-view="reports"]', 50);
+  assert.equal(doc.querySelectorAll('[data-report-history]').length, 2, 'generated report disappeared after tab navigation');
 
   for (const path of [
     '/projects/payments-relaunch/settings',
     '/projects/payments-relaunch/work-items',
     '/projects/payments-relaunch/initiatives',
+    '/projects/payments-relaunch/objectives',
+    '/projects/payments-relaunch/missions/archive',
+    '/projects/payments-relaunch/content',
     '/projects/payments-relaunch/events',
     '/projects/payments-relaunch/reports',
   ]) {
     assert(runtime.calls.some((call) => call.path === path), `project screen did not load supported context: ${path}`);
   }
+  await runtime.dispose();
+}
+
+async function testMissionObjectiveManagementAndDestructiveGates() {
+  const runtime = await createRuntime();
+  await runtime.mount();
+  await runtime.click('[data-tab="project"]', 80);
+  await runtime.click('[data-project-view="objectives"]');
+  const doc = runtime.dom.window.document;
+
+  assert(doc.querySelector('[data-mission-manager]'), 'mission manager is missing');
+  assert.equal(doc.querySelectorAll('[data-objective-row]').length, 2, 'active and archived objectives did not render');
+  assert.match(doc.body.textContent, /Stabilise the legacy checkout/);
+
+  await runtime.click('[data-action="edit-mission"]');
+  await runtime.setValue('[data-mission-field]', 'Make checkout recovery measurable');
+  await runtime.click('[data-action="save-mission"]', 50);
+  const missionPatch = runtime.calls.find((call) => call.method === 'PATCH' && call.path === '/projects/payments-relaunch/settings' && call.body?.mission === 'Make checkout recovery measurable');
+  assert(missionPatch, 'mission edit PATCH was not sent');
+  await runtime.click('[data-project-view="overview"]', 50);
+  await runtime.click('[data-project-view="objectives"]', 50);
+  assert.match(doc.querySelector('[data-mission-manager]')?.textContent || '', /Make checkout recovery measurable/, 'saved mission disappeared after tab navigation');
+
+  await runtime.click('[data-action="archive-mission"]');
+  assert(doc.querySelector('[data-destructive-confirm="archive-mission"]'), 'mission archive did not ask for confirmation');
+  assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/mission/archive'), 'mission archive mutated before confirmation');
+  await runtime.click('[data-action="confirm-destructive-action"]', 60);
+  assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/mission/archive'), 'mission archive POST was not sent');
+
+  await runtime.click('[data-action="edit-objective"][data-objective-id="11"]');
+  await runtime.setValue('[data-objective-field="description"]', 'Keep every payment retry safe.');
+  await runtime.click('[data-action="save-objective"]', 50);
+  assert(runtime.calls.some((call) => call.method === 'PATCH' && call.path === '/projects/payments-relaunch/objectives/11'), 'objective edit PATCH was not sent');
+
+  await runtime.click('[data-action="archive-objective"][data-objective-id="11"]');
+  assert(doc.querySelector('[data-destructive-confirm="archive-objective-11"]'), 'objective archive did not ask for confirmation');
+  await runtime.click('[data-action="confirm-destructive-action"]', 50);
+  assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/objectives/11/archive'), 'objective archive POST was not sent');
+
+  await runtime.click('[data-action="remove-objective"][data-objective-id="12"]');
+  assert(doc.querySelector('[data-destructive-confirm="remove-objective-12"]'), 'objective removal did not ask for confirmation');
+  assert(!runtime.calls.some((call) => call.method === 'DELETE' && call.path === '/projects/payments-relaunch/objectives/12'), 'objective removal mutated before confirmation');
+  await runtime.click('[data-action="confirm-destructive-action"]', 50);
+  assert(runtime.calls.some((call) => call.method === 'DELETE' && call.path === '/projects/payments-relaunch/objectives/12'), 'objective removal DELETE was not sent');
+  await runtime.dispose();
+}
+
+async function testProjectContentVisibilityPreviewAndUpload() {
+  const runtime = await createRuntime();
+  await runtime.mount();
+  await runtime.click('[data-tab="project"]', 80);
+  await runtime.click('[data-project-view="content"]');
+  const doc = runtime.dom.window.document;
+
+  assert(doc.querySelector('[data-project-content]'), 'project content surface is missing');
+  assert.equal(doc.querySelectorAll('[data-project-content-item]').length, 1, 'existing project documentation did not render');
+  await runtime.click('[data-project-content-item="CONTENT-DEMO1"]');
+  assert.match(doc.querySelector('[data-content-preview]')?.textContent || '', /Use the rollback gate/);
+
+  const file = new runtime.dom.window.File(
+    ['# Release evidence\n\nVerified support.\n'],
+    'release-evidence.md',
+    { type: 'text/markdown' },
+  );
+  await runtime.setFile('[data-content-file]', file, 50);
+  assert.match(doc.body.textContent, /release-evidence\.md/);
+  await runtime.click('[data-action="upload-project-content"]', 80);
+  const upload = runtime.calls.find((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/content');
+  assert(upload, 'project content upload POST was not sent');
+  assert.equal(upload.body.filename, 'release-evidence.md');
+  assert.equal(upload.body.media_type, 'text/markdown');
+  assert.match(upload.body.content_base64, /^[A-Za-z0-9+/]+=*$/);
+  assert([...doc.querySelectorAll('[data-project-content-item]')].some((item) => item.textContent.includes('release-evidence.md')), 'uploaded content was not read back');
+  await runtime.click('[data-project-view="overview"]', 50);
+  await runtime.click('[data-project-view="content"]', 50);
+  assert([...doc.querySelectorAll('[data-project-content-item]')].some((item) => item.textContent.includes('release-evidence.md')), 'uploaded content disappeared after tab navigation');
   await runtime.dispose();
 }
 
@@ -720,6 +959,12 @@ async function testBacklogCreateFormValidationAndReadback() {
   });
   assert(form.parentElement?.hidden, 'Escape did not close the create-item modal');
   await runtime.click('[data-action="open-create-backlog-item"]');
+  await runtime.click('[data-action="close-create-backlog-item"]');
+  assert(doc.querySelector('[data-create-backlog-layer]')?.hidden, 'Close button did not close the create-item modal');
+  await runtime.click('[data-action="open-create-backlog-item"]');
+  await runtime.click('[data-create-backlog-layer]');
+  assert(doc.querySelector('[data-create-backlog-layer]')?.hidden, 'clicking the overlay did not close the create-item modal');
+  await runtime.click('[data-action="open-create-backlog-item"]');
 
   await runtime.setValue('[data-create-field="title"]', 'Verify retry idempotency');
   await runtime.setValue('[data-create-field="assignee"]', 'quan-bot');
@@ -758,6 +1003,8 @@ async function testBotTeamsScreen() {
   await runtime.click('[data-tab="teams"]', 80);
   const doc = runtime.dom.window.document;
   assert(doc.querySelector('[data-bot-teams]'), 'bot teams screen is missing');
+  assert(doc.querySelector('[data-view-only="bot-team"]'), 'bot team management is not visibly marked view-only');
+  assert(!doc.querySelector('[data-action="add-project-bot"], [data-action="remove-project-bot"], [data-action="reassign-bot-work"]'), 'bot teams expose unsupported management controls');
   assert.equal(doc.querySelectorAll('[data-bot-card]').length, 3, 'bot registry did not render');
   assert(doc.querySelector('[data-workload-visual]'), 'workload visualisation is missing');
   assert(doc.querySelector('[data-bot-group="release-crew"]'), 'bot group card did not render');
@@ -790,6 +1037,11 @@ async function testInitiativeLoopScreen() {
   assert(doc.querySelector('svg[data-loop-visual]'), 'initiative loop visualisation is missing');
   assert(doc.querySelectorAll('[data-initiative-stage]').length >= 7, 'canonical loop stages are incomplete');
   assert(doc.querySelector('[data-action="freeze-project"]'), 'safe freeze control is missing');
+  await runtime.click('[data-action="freeze-project"]');
+  assert(doc.querySelector('[data-destructive-confirm="freeze-project"]'), 'Freeze did not ask for confirmation');
+  assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/freeze'), 'Freeze mutated state before confirmation');
+  await runtime.click('[data-action="cancel-destructive-action"]');
+  assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/freeze'), 'Cancelling Freeze still mutated state');
   assert.match(doc.body.textContent, /Support requests drop when refunds are self-service/);
   await runtime.dispose();
 }
@@ -801,6 +1053,7 @@ async function testSavedViewsScreenAndCreator() {
   const doc = runtime.dom.window.document;
   assert.equal(doc.querySelector('[data-tab="workflows"]')?.textContent.trim(), 'Saved views');
   assert(doc.querySelector('[data-saved-views-screen]'), 'saved views screen is missing');
+  assert.match(doc.body.textContent, /renamed from Workflows/i);
   assert.match(doc.body.textContent, /do not run automations/i);
   assert.match(doc.body.textContent, /displayed/i);
   assert(!doc.querySelector('[data-workflow-visual]'), 'a fabricated executable workflow is still rendered');
@@ -852,7 +1105,8 @@ async function testOnboardingWizardAndToastSurface() {
   const failed = await createRuntime({ failMutationPath: '/initiatives/INI-DEMO-1/reject' });
   await failed.mount();
   await failed.click('[data-tab="inbox"]');
-  await failed.click('[data-approval-ref="INI-DEMO-1"] [data-action="reject"]', 80);
+  await failed.click('[data-approval-ref="INI-DEMO-1"] [data-action="reject"]', 40);
+  await failed.click('[data-action="confirm-destructive-action"]', 80);
   const failedDoc = failed.dom.window.document;
   const failedRow = failedDoc.querySelector('[data-approval-ref="INI-DEMO-1"]');
   const alert = failedDoc.querySelector('[data-toast-region] [role="alert"]');
@@ -877,7 +1131,9 @@ async function testApprovalFlow() {
   assert.equal(doc.querySelectorAll('[data-approval-ref]').length, 1, 'approved item did not leave the queue after refresh');
   assert(!doc.body.textContent.includes('Add weekly digest email'), 'approved item remains visible after refresh');
 
-  await runtime.click('[data-approval-ref="INI-DEMO-2"] [data-action="reject"]', 40);
+  await runtime.click('[data-approval-ref="INI-DEMO-2"] [data-action="reject"]', 20);
+  assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === '/initiatives/INI-DEMO-2/reject'), 'rejection bypassed confirmation');
+  await runtime.click('[data-action="confirm-destructive-action"]', 40);
   assert.equal(doc.querySelector('[data-approval-ref="INI-DEMO-2"]')?.getAttribute('data-state'), 'rejected', 'rejection row did not show its rejected state');
   assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/initiatives/INI-DEMO-2/reject'), 'rejection POST was not sent');
   assert.match(doc.querySelector('[data-approval-ref="INI-DEMO-2"]')?.textContent || '', /Rejected/);
@@ -969,20 +1225,34 @@ async function testChromiumLayouts() {
     dashboard: '/tmp/dockyard-dashboard.html',
     project: '/tmp/dockyard-project.html',
     projectSettings: '/tmp/dockyard-project-settings.html',
+    projectObjectives: '/tmp/dockyard-project-objectives.html',
+    projectContent: '/tmp/dockyard-project-content.html',
+    projectBoardDetail: '/tmp/dockyard-project-board-detail.html',
     projectReports: '/tmp/dockyard-project-reports.html',
     backlog: '/tmp/dockyard-backlog.html',
     backlogCreate: '/tmp/dockyard-backlog-create.html',
     teams: '/tmp/dockyard-teams.html',
     teamsTranscript: '/tmp/dockyard-teams-transcript.html',
     initiative: '/tmp/dockyard-initiative.html',
+    initiativeFreeze: '/tmp/dockyard-initiative-freeze.html',
     workflows: '/tmp/dockyard-workflows.html',
     inbox: '/tmp/dockyard-inbox.html',
+    inboxReject: '/tmp/dockyard-inbox-reject.html',
     notifications: '/tmp/dockyard-notifications.html',
     onboarding: '/tmp/dockyard-onboarding.html',
   };
   await writeSnapshot('dashboard', snapshots.dashboard);
   await writeSnapshot('project', snapshots.project);
   await writeSnapshot('project', snapshots.projectSettings, { prepare: (runtime) => runtime.click('[data-project-view="settings"]') });
+  await writeSnapshot('project', snapshots.projectObjectives, { prepare: (runtime) => runtime.click('[data-project-view="objectives"]') });
+  await writeSnapshot('project', snapshots.projectContent, { prepare: async (runtime) => {
+    await runtime.click('[data-project-view="content"]');
+    await runtime.click('[data-project-content-item="CONTENT-DEMO1"]', 50);
+  } });
+  await writeSnapshot('project', snapshots.projectBoardDetail, { prepare: async (runtime) => {
+    await runtime.click('[data-project-view="board"]');
+    await runtime.click('[data-work-card="HDY-12"]');
+  } });
   await writeSnapshot('project', snapshots.projectReports, { prepare: async (runtime) => {
     await runtime.click('[data-project-view="reports"]');
     await runtime.click('[data-action="generate-report"]', 60);
@@ -995,8 +1265,10 @@ async function testChromiumLayouts() {
     await runtime.click('[data-bot-session="sess-octacon-1"]', 50);
   } });
   await writeSnapshot('initiative', snapshots.initiative);
+  await writeSnapshot('initiative', snapshots.initiativeFreeze, { prepare: (runtime) => runtime.click('[data-action="freeze-project"]') });
   await writeSnapshot('workflows', snapshots.workflows);
   await writeSnapshot('inbox', snapshots.inbox);
+  await writeSnapshot('inbox', snapshots.inboxReject, { prepare: (runtime) => runtime.click('[data-approval-ref="INI-DEMO-2"] [data-action="reject"]') });
   await writeSnapshot('notifications', snapshots.notifications);
   await writeSnapshot('dashboard', snapshots.onboarding, { onboarding: true });
 
@@ -1008,6 +1280,11 @@ async function testChromiumLayouts() {
     { name: 'project-1400-light', file: snapshots.project, width: 1400, height: 1000, scheme: 'light' },
     { name: 'project-settings-700-light', file: snapshots.projectSettings, width: 700, height: 1000, scheme: 'light' },
     { name: 'project-settings-1400-dark', file: snapshots.projectSettings, width: 1400, height: 1000, scheme: 'dark' },
+    { name: 'project-objectives-700-dark', file: snapshots.projectObjectives, width: 700, height: 1000, scheme: 'dark' },
+    { name: 'project-objectives-1400-light', file: snapshots.projectObjectives, width: 1400, height: 1000, scheme: 'light' },
+    { name: 'project-content-700-light', file: snapshots.projectContent, width: 700, height: 1000, scheme: 'light' },
+    { name: 'project-content-1400-dark', file: snapshots.projectContent, width: 1400, height: 1000, scheme: 'dark' },
+    { name: 'project-board-detail-1200-light', file: snapshots.projectBoardDetail, width: 1200, height: 900, scheme: 'light' },
     { name: 'project-reports-700-dark', file: snapshots.projectReports, width: 700, height: 1000, scheme: 'dark' },
     { name: 'project-reports-1400-light', file: snapshots.projectReports, width: 1400, height: 1000, scheme: 'light' },
     { name: 'backlog-1400-dark', file: snapshots.backlog, width: 1400, height: 1000, scheme: 'dark' },
@@ -1016,8 +1293,10 @@ async function testChromiumLayouts() {
     { name: 'teams-transcript-700-light', file: snapshots.teamsTranscript, width: 700, height: 1000, scheme: 'light' },
     { name: 'teams-transcript-1400-dark', file: snapshots.teamsTranscript, width: 1400, height: 1000, scheme: 'dark' },
     { name: 'initiative-1400-dark', file: snapshots.initiative, width: 1400, height: 1000, scheme: 'dark' },
+    { name: 'initiative-freeze-1200-dark', file: snapshots.initiativeFreeze, width: 1200, height: 900, scheme: 'dark' },
     { name: 'workflows-1400-light', file: snapshots.workflows, width: 1400, height: 1000, scheme: 'light' },
     { name: 'inbox-1200-light', file: snapshots.inbox, width: 1200, height: 900, scheme: 'light' },
+    { name: 'inbox-reject-1200-light', file: snapshots.inboxReject, width: 1200, height: 900, scheme: 'light' },
     { name: 'notifications-1200-dark', file: snapshots.notifications, width: 1200, height: 900, scheme: 'dark' },
     { name: 'onboarding-1200-light', file: snapshots.onboarding, width: 1200, height: 900, scheme: 'light' },
     { name: 'onboarding-480-dark', file: snapshots.onboarding, width: 480, height: 900, scheme: 'dark' },
@@ -1058,6 +1337,10 @@ async function testChromiumLayouts() {
             const tabs = document.querySelector('.dockyard-tabs');
             return tabs ? Math.max(0, tabs.scrollWidth - tabs.clientWidth) : 0;
           })(),
+          projectToolbarOverflow: (() => {
+            const toolbar = document.querySelector('.dockyard-project-toolbar');
+            return toolbar ? Math.max(0, toolbar.scrollWidth - toolbar.clientWidth) : 0;
+          })(),
         };
       });
       assert(measure.documentWidth <= spec.width, `${spec.name} overflows horizontally: ${measure.documentWidth}px > ${spec.width}px`);
@@ -1066,12 +1349,15 @@ async function testChromiumLayouts() {
       assert.equal(measure.misalignedProjectIcons, 0, `${spec.name} misaligns Project-column icons`);
       assert.equal(measure.clippedFeatureCards, 0, `${spec.name} clips content inside a feature card`);
       assert.equal(measure.clippedControls, 0, `${spec.name} clips an interactive control`);
-      if (spec.width >= 700) assert.equal(measure.tabOverflow, 0, `${spec.name} hides primary navigation tabs`);
+      if (spec.width >= 700) {
+        assert.equal(measure.tabOverflow, 0, `${spec.name} hides primary navigation tabs`);
+        assert.equal(measure.projectToolbarOverflow, 0, `${spec.name} hides project navigation tabs`);
+      }
       if (measure.projectRows > 0) assert.deepEqual(measure.projectIconDisplays, ['grid'], `${spec.name} project icons lost their centring layout`);
       assert(!measure.rootFont.includes('Times New Roman'), `${spec.name} inherited Times New Roman`);
       const expectedTab = spec.name.startsWith('onboarding-') ? 'dashboard' : spec.name.split('-')[0];
       assert.equal(measure.activeScreen, `dockyard-tab-${expectedTab}`, `${spec.name} captured the wrong active screen`);
-      const expectedDialogs = spec.name.startsWith('onboarding-') || spec.name.startsWith('backlog-create-') ? 1 : 0;
+      const expectedDialogs = ['onboarding-', 'backlog-create-', 'project-board-detail-', 'initiative-freeze-', 'inbox-reject-'].some((prefix) => spec.name.startsWith(prefix)) ? 1 : 0;
       assert.equal(measure.dialogCount, expectedDialogs, `${spec.name} has the wrong modal-dialog state`);
       if (spec.width >= 1200) assert.equal(measure.clippedLoopVisuals, 0, `${spec.name} requires horizontal scrolling for a primary workflow visual`);
       const screenshot = `/tmp/dockyard-${spec.name}.png`;
@@ -1093,6 +1379,8 @@ const tests = [
   ['reference benchmark dashboard composition', testReferenceBenchmarkDashboardComposition],
   ['reference benchmark approval cards and reject', testReferenceBenchmarkApprovalCardsAndReject],
   ['project dashboard screen', testProjectDashboardScreen],
+  ['mission and objective management with destructive gates', testMissionObjectiveManagementAndDestructiveGates],
+  ['project content visibility, preview and upload', testProjectContentVisibilityPreviewAndUpload],
   ['project lifecycle state and confirmed actions', testProjectLifecycleStateAndConfirmedActions],
   ['backlog board and reason gate', testBacklogBoardAndReasonGate],
   ['backlog create form validation and readback', testBacklogCreateFormValidationAndReadback],
