@@ -46,6 +46,26 @@ def test_host_contract_router_and_health(client):
     assert r.json()["service"] == "hermes-dockyard"
 
 
+def test_proxy_rejects_invalid_success_payload(client, monkeypatch):
+    class InvalidJsonResponse:
+        status_code = 200
+        text = "not-json"
+
+        @staticmethod
+        def json():
+            raise ValueError("invalid JSON")
+
+    class InvalidJsonClient:
+        @staticmethod
+        async def request(*_args, **_kwargs):
+            return InvalidJsonResponse()
+
+    monkeypatch.setattr(plugin_api, "_client", InvalidJsonClient())
+    response = client.get("/api/plugins/hermes-dockyard/dashboard")
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Dockyard returned an invalid response"
+
+
 def test_onboard_then_dashboard_flow(client):
     r = client.post("/api/plugins/hermes-dockyard/onboard", json={
         "project_id": "alpha", "repo_path": "/srv/a",
@@ -224,6 +244,18 @@ def test_project_settings_patch_and_report_history(client):
     assert updated.json()["autonomy_level"] == 2
     assert updated.json()["policies"]["release"]["soak_hours"] == 24
 
+    with TestClient(plugin_api._app) as upstream:
+        work = upstream.post(
+            f"/stewardship/v1/projects/{project_id}/work-items",
+            json={
+                "type": "task",
+                "title": "Publish release evidence",
+                "actor_id": "octacon",
+                "actor_kind": "bot",
+            },
+        )
+        assert work.status_code == 200, work.text
+
     generated = client.post(
         f"/api/plugins/hermes-dockyard/projects/{project_id}/reports",
         json={"report_type": "executive", "include_activity": True},
@@ -237,11 +269,38 @@ def test_project_settings_patch_and_report_history(client):
     assert "## Configuration" in report["content"]
     assert "## Delivery" in report["content"]
     assert "## Risks and decisions" in report["content"]
+    assert "| Ref | Work item | Status | Assignee |" not in report["content"]
+
+    delivery = client.post(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/reports",
+        json={"report_type": "delivery", "include_activity": False},
+    )
+    assert delivery.status_code == 200, delivery.text
+    assert "## Delivery" in delivery.json()["content"]
+    assert "| Ref | Work item | Status | Assignee |" in delivery.json()["content"]
+    assert "## Recent activity" not in delivery.json()["content"]
+
+    risk = client.post(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/reports",
+        json={"report_type": "risk", "include_activity": True},
+    )
+    assert risk.status_code == 200, risk.text
+    assert "## Risks and decisions" in risk.json()["content"]
+    assert "## Delivery" not in risk.json()["content"]
+    assert "## Recent activity" not in risk.json()["content"]
+
+    full = client.post(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/reports",
+        json={"report_type": "full", "include_activity": True},
+    )
+    assert full.status_code == 200, full.text
+    assert "| Ref | Work item | Status | Assignee |" in full.json()["content"]
+    assert "## Recent activity" in full.json()["content"]
 
     history = client.get(
         f"/api/plugins/hermes-dockyard/projects/{project_id}/reports")
     assert history.status_code == 200, history.text
-    assert history.json()["reports"][0]["report_id"] == report["report_id"]
+    assert any(item["report_id"] == report["report_id"] for item in history.json()["reports"])
 
     fetched = client.get(
         f"/api/plugins/hermes-dockyard/projects/{project_id}/reports/{report['report_id']}")
@@ -296,7 +355,12 @@ def test_bot_session_transcripts_are_profile_scoped(client, tmp_path, monkeypatc
         con.execute(
             "INSERT INTO sessions VALUES(?,?,?,?,?,?,?,?,?,?)",
             ("sess-octacon-1", "discord", "gpt-test", "Fix release gate", now - 30,
-             None, 4, 1, now, 0),
+             None, 7, 1, now, 0),
+        )
+        con.execute(
+            "INSERT INTO sessions VALUES(?,?,?,?,?,?,?,?,?,?)",
+            ("hidden-session", "internal", "gpt-test", "Private session", now - 60,
+             None, 1, 0, now - 55, 1),
         )
         con.executemany(
             "INSERT INTO messages(session_id,role,content,tool_name,timestamp,active,display_kind)"
@@ -304,8 +368,12 @@ def test_bot_session_transcripts_are_profile_scoped(client, tmp_path, monkeypatc
             [
                 ("sess-octacon-1", "system", "private system prompt", None, now - 30, 1, None),
                 ("sess-octacon-1", "user", "Run the release checks", None, now - 20, 1, None),
+                ("sess-octacon-1", "assistant", "private chain of thought", None, now - 15, 1, "reasoning"),
+                ("sess-octacon-1", "assistant", "private compressed context", None, now - 14, 1, "hidden"),
+                ("sess-octacon-1", "user", "private internal notification", None, now - 13, 1, "internal_notification"),
                 ("sess-octacon-1", "assistant", "Running the focused suite.", None, now - 10, 1, None),
                 ("sess-octacon-1", "tool", "12 tests passed", "terminal", now - 5, 1, "tool"),
+                ("hidden-session", "user", "private hidden request", None, now - 55, 1, None),
             ],
         )
     monkeypatch.setenv("DOCKYARD_SESSION_ROOT", str(session_root))
@@ -324,7 +392,15 @@ def test_bot_session_transcripts_are_profile_scoped(client, tmp_path, monkeypatc
     roles = [message["role"] for message in transcript.json()["messages"]]
     assert roles == ["user", "assistant", "tool"]
     assert "private system prompt" not in transcript.text
+    assert "private chain of thought" not in transcript.text
+    assert "private compressed context" not in transcript.text
+    assert "private internal notification" not in transcript.text
     assert transcript.json()["scope_note"] == "System prompts and private reasoning are excluded."
+
+    hidden = client.get(
+        "/api/plugins/hermes-dockyard/bots/transcript-bot/sessions/hidden-session")
+    assert hidden.status_code == 404
+    assert "private hidden request" not in hidden.text
 
 
 def test_manifest_declares_required_fields():

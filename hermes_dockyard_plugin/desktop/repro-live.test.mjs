@@ -39,8 +39,16 @@ const POPULATED = {
     ],
   },
   settings: {
-    'demo-project': { project_id: 'demo-project', mission: 'Seeded demo for desktop review', autonomy_level: 1, phase: 'active' },
-    'payments-relaunch': { project_id: 'payments-relaunch', mission: 'Checkout reliability rebuild', autonomy_level: 1, phase: 'active' },
+    'demo-project': {
+      project_id: 'demo-project', mission: 'Seeded demo for desktop review', autonomy_level: 1, phase: 'active',
+      owner: { lead_profile: 'octacon', member_profiles: ['quan'] },
+      policies: { autonomy: {}, verification: { require_tests: true, max_open_initiatives: 3 }, release: { require_rollback: true, soak_hours: 24 }, notification: { severity_threshold: 'medium', digest: 'daily' } },
+    },
+    'payments-relaunch': {
+      project_id: 'payments-relaunch', mission: 'Checkout reliability rebuild', autonomy_level: 1, phase: 'active',
+      owner: { lead_profile: 'octacon', member_profiles: ['quan', 'wesker'] },
+      policies: { autonomy: {}, verification: { require_tests: true, max_open_initiatives: 2 }, release: { require_rollback: true, soak_hours: 12 }, notification: { severity_threshold: 'high', digest: 'immediate' } },
+    },
   },
   workItems: {
     'demo-project': { work_items: [
@@ -78,12 +86,31 @@ const POPULATED = {
     'demo-project': { views: [] },
     'payments-relaunch': { views: [{ name: 'Release focus', layout: 'board', filters: { status: 'in_progress' }, shared: false }] },
   },
+  reports: {
+    'demo-project': { reports: [] },
+    'payments-relaunch': { reports: [{ report_id: 'RPT-DEMO1', project_id: 'payments-relaunch', report_type: 'executive', title: 'payments-relaunch executive report', generated_by: 'sahil', generated_at: '2026-08-24T19:00:00+00:00' }] },
+  },
+  reportDetails: {
+    'RPT-DEMO1': { report_id: 'RPT-DEMO1', project_id: 'payments-relaunch', report_type: 'executive', title: 'payments-relaunch executive report', content: '# payments-relaunch executive report\n\n## Delivery\n\n- In progress: 2\n', generated_by: 'sahil', generated_at: '2026-08-24T19:00:00+00:00' },
+  },
   bots: {
     bots: [
       { id: 'octacon-bot', name: 'Octacon', status: 'busy', current_item: 'HDY-12', capabilities: ['build'] },
       { id: 'quan-bot', name: 'Quan', status: 'idle', current_item: null, capabilities: ['verification'] },
       { id: 'wesker-bot', name: 'Wesker', status: 'idle', current_item: null, capabilities: ['operations'] },
     ],
+  },
+  botSessions: {
+    'octacon-bot': { bot_id: 'octacon-bot', profile: 'octacon', available: true, scope_note: 'System prompts and private reasoning are excluded.', sessions: [{ session_id: 'sess-octacon-1', title: 'Fix release gate', source: 'discord', model: 'gpt-test', status: 'active', message_count: 3, tool_call_count: 1, last_activity_at: '2026-08-24T18:55:00+00:00' }] },
+    'quan-bot': { bot_id: 'quan-bot', profile: 'quan', available: false, scope_note: 'System prompts and private reasoning are excluded.', sessions: [] },
+    'wesker-bot': { bot_id: 'wesker-bot', profile: 'wesker', available: true, scope_note: 'System prompts and private reasoning are excluded.', sessions: [] },
+  },
+  transcripts: {
+    'octacon-bot/sess-octacon-1': { bot_id: 'octacon-bot', profile: 'octacon', scope_note: 'System prompts and private reasoning are excluded.', session: { session_id: 'sess-octacon-1', title: 'Fix release gate', source: 'discord', model: 'gpt-test' }, messages: [
+      { message_id: 1, role: 'user', content: 'Run the release checks', timestamp: '2026-08-24T18:50:00+00:00', truncated: false },
+      { message_id: 2, role: 'assistant', content: 'Running the focused suite.', timestamp: '2026-08-24T18:51:00+00:00', truncated: false },
+      { message_id: 3, role: 'tool', tool_name: 'terminal', content: '12 tests passed', timestamp: '2026-08-24T18:52:00+00:00', truncated: false },
+    ] },
   },
   workload: {
     busy: [{ bot: 'octacon-bot', item: 'HDY-12' }],
@@ -109,7 +136,11 @@ const EMPTY = {
   events: {},
   backlog: {},
   views: {},
+  reports: {},
+  reportDetails: {},
   bots: { bots: [] },
+  botSessions: {},
+  transcripts: {},
   workload: { busy: [], idle: [], offline: [], stuck: [] },
   groups: { groups: [] },
   groupMessages: {},
@@ -171,6 +202,7 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
 
   const calls = [];
   const navigations = [];
+  const clipboardWrites = [];
   const data = clone(mode === 'empty' ? EMPTY : POPULATED);
   const deferred = mode === 'loading' ? createDeferred() : null;
   let shouldFail = failOnce;
@@ -238,15 +270,66 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       data.views[projectId].views.push({ ...init.body });
       return { name: init.body?.name, layout: init.body?.layout };
     }
+    const updateSettings = path.match(/^\/projects\/([^/]+)\/settings$/);
+    if (method === 'PATCH' && updateSettings) {
+      const projectId = decodeURIComponent(updateSettings[1]);
+      const current = data.settings[projectId] ?? { project_id: projectId, owner: {}, policies: {} };
+      const next = { ...current, ...init.body };
+      next.owner = {
+        ...(current.owner ?? {}),
+        ...(init.body?.lead_profile !== undefined ? { lead_profile: init.body.lead_profile } : {}),
+        ...(init.body?.member_profiles !== undefined ? { member_profiles: init.body.member_profiles } : {}),
+      };
+      next.policies = {
+        ...(current.policies ?? {}),
+        verification: { ...(current.policies?.verification ?? {}), ...(init.body?.verification_policy ?? {}) },
+        release: { ...(current.policies?.release ?? {}), ...(init.body?.release_policy ?? {}) },
+        notification: { ...(current.policies?.notification ?? {}), ...(init.body?.notification_policy ?? {}) },
+      };
+      data.settings[projectId] = next;
+      return clone(next);
+    }
+    const generateReport = path.match(/^\/projects\/([^/]+)\/reports$/);
+    if (method === 'POST' && generateReport) {
+      const projectId = decodeURIComponent(generateReport[1]);
+      const reportId = `RPT-TEST${Object.keys(data.reportDetails).length + 1}`;
+      const report = {
+        report_id: reportId,
+        project_id: projectId,
+        report_type: init.body?.report_type ?? 'executive',
+        title: `${projectId} ${init.body?.report_type ?? 'executive'} report`,
+        content: `# ${projectId} ${init.body?.report_type ?? 'executive'} report\n\n## Delivery\n\n- In progress: 2\n`,
+        generated_by: 'sahil',
+        generated_at: '2026-08-24T20:00:00+00:00',
+      };
+      data.reportDetails[reportId] = report;
+      data.reports[projectId] ??= { reports: [] };
+      data.reports[projectId].reports.unshift({ ...report, content: undefined });
+      return clone(report);
+    }
     if (path === '/dashboard') return clone(data.dashboard);
     if (path === '/inbox') return clone(data.inbox);
     if (path === '/notifications') return clone(data.notifications);
     if (path === '/bots') return clone(data.bots);
+    const transcriptRead = path.match(/^\/bots\/([^/]+)\/sessions\/([^/]+)$/);
+    if (method === 'GET' && transcriptRead) {
+      const key = `${decodeURIComponent(transcriptRead[1])}/${decodeURIComponent(transcriptRead[2])}`;
+      return clone(data.transcripts[key] ?? { bot_id: decodeURIComponent(transcriptRead[1]), messages: [], scope_note: 'System prompts and private reasoning are excluded.' });
+    }
+    const sessionsRead = path.match(/^\/bots\/([^/]+)\/sessions$/);
+    if (method === 'GET' && sessionsRead) {
+      const botId = decodeURIComponent(sessionsRead[1]);
+      return clone(data.botSessions[botId] ?? { bot_id: botId, available: false, sessions: [], scope_note: 'System prompts and private reasoning are excluded.' });
+    }
     if (path === '/workload') return clone(data.workload);
     if (path === '/bot-groups') return clone(data.groups);
     const groupMessages = path.match(/^\/bot-groups\/([^/]+)\/messages$/);
     if (groupMessages) return clone(data.groupMessages[decodeURIComponent(groupMessages[1])] ?? { messages: [] });
-    const projectRead = path.match(/^\/projects\/([^/]+)\/(settings|work-items|initiatives|events|backlog|views)$/);
+    const reportRead = path.match(/^\/projects\/([^/]+)\/reports\/([^/]+)$/);
+    if (method === 'GET' && reportRead) {
+      return clone(data.reportDetails[decodeURIComponent(reportRead[2])] ?? {});
+    }
+    const projectRead = path.match(/^\/projects\/([^/]+)\/(settings|work-items|initiatives|events|backlog|views|reports)$/);
     if (projectRead) {
       const projectId = decodeURIComponent(projectRead[1]);
       const kind = projectRead[2];
@@ -256,6 +339,7 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       if (kind === 'events') return clone(data.events[projectId] ?? { events: [] });
       if (kind === 'backlog') return clone(data.backlog[projectId] ?? { backlog: [] });
       if (kind === 'views') return clone(data.views[projectId] ?? { views: [] });
+      if (kind === 'reports') return clone(data.reports[projectId] ?? { reports: [] });
     }
     throw new Error(`Unhandled test request: ${method} ${path}`);
   };
@@ -267,6 +351,9 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
     registerMany: (items) => contributions.push(...items),
     onDispose: () => {},
     rest,
+    os: {
+      writeClipboard: async (text) => { clipboardWrites.push(text); return true; },
+    },
   });
   const route = contributions.find((item) => item.area === 'routes');
   assert(route, 'plugin did not register a route contribution');
@@ -313,7 +400,7 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
     dom.window.close();
   };
 
-  return { dom, loaded, contributions, calls, navigations, data, deferred, jsdomMessages, mount, flush, click, setValue, dispose };
+  return { dom, loaded, contributions, calls, navigations, clipboardWrites, data, deferred, jsdomMessages, mount, flush, click, setValue, dispose };
 }
 
 async function testStylesAndPopulatedDashboard() {
@@ -440,7 +527,7 @@ async function testProjectDashboardScreen() {
   const doc = runtime.dom.window.document;
   assert(doc.querySelector('[data-project-dashboard]'), 'project dashboard screen is missing');
   assert.match(doc.body.textContent, /Checkout reliability rebuild/);
-  assert.equal(doc.querySelectorAll('[data-project-view]').length, 5, 'project dashboard must expose five supported views');
+  assert.equal(doc.querySelectorAll('[data-project-view]').length, 6, 'project dashboard must expose six supported views');
   assert(doc.querySelector('[data-project-visual]'), 'project overview is missing work visualisation');
   assert(doc.querySelector('[data-overview-work]'), 'project overview is missing current work context');
   assert(doc.querySelector('[data-overview-initiatives]'), 'project overview is missing initiative context');
@@ -449,11 +536,42 @@ async function testProjectDashboardScreen() {
   await runtime.click('[data-project-view="board"]');
   assert.equal(doc.querySelectorAll('[data-board-column]').length, 4, 'project board must expose backlog, active, review and done columns');
   assert(doc.querySelectorAll('[data-work-card]').length >= 3, 'project board did not render backend work items');
+
+  await runtime.click('[data-project-view="settings"]');
+  assert(doc.querySelector('[data-project-settings-form]'), 'project configuration form is missing');
+  assert(doc.querySelector('[data-setting-field="mission"]'), 'mission configuration is missing');
+  assert(doc.querySelector('[data-setting-field="lead-profile"]'), 'lead configuration is missing');
+  assert(doc.querySelector('[data-setting-field="members"]'), 'member configuration is missing');
+  assert(doc.querySelector('[data-setting-field="autonomy"]'), 'autonomy configuration is missing');
+  assert(doc.querySelector('[data-setting-field="require-tests"]'), 'verification configuration is missing');
+  assert(doc.querySelector('[data-setting-field="soak-hours"]'), 'release configuration is missing');
+  assert(doc.querySelector('[data-setting-field="digest"]'), 'notification configuration is missing');
+  await runtime.setValue('[data-setting-field="mission"]', 'Ship payment recovery with auditable gates');
+  await runtime.setValue('[data-setting-field="autonomy"]', '2');
+  await runtime.click('[data-action="save-project-settings"]', 80);
+  const settingsPatch = runtime.calls.find((call) => call.method === 'PATCH' && call.path === '/projects/payments-relaunch/settings');
+  assert(settingsPatch, 'project configuration PATCH was not sent');
+  assert.equal(settingsPatch.body.mission, 'Ship payment recovery with auditable gates');
+  assert.equal(settingsPatch.body.autonomy_level, 2);
+
+  await runtime.click('[data-project-view="reports"]', 40);
+  assert(doc.querySelector('[data-project-reports]'), 'report generation surface is missing');
+  assert.equal(doc.querySelectorAll('[data-report-history]').length, 1, 'report history did not render');
+  await runtime.click('[data-action="generate-report"]', 80);
+  const reportCall = runtime.calls.find((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/reports');
+  assert(reportCall, 'report generation POST was not sent');
+  assert(doc.querySelector('[data-report-preview]'), 'generated report preview is missing');
+  assert.match(doc.querySelector('[data-report-preview]').textContent, /payments-relaunch executive report/);
+  await runtime.click('[data-action="copy-report"]', 40);
+  assert.equal(runtime.clipboardWrites.length, 1, 'generated report was not copied through the plugin OS door');
+  assert.match(runtime.clipboardWrites[0], /## Delivery/);
+
   for (const path of [
     '/projects/payments-relaunch/settings',
     '/projects/payments-relaunch/work-items',
     '/projects/payments-relaunch/initiatives',
     '/projects/payments-relaunch/events',
+    '/projects/payments-relaunch/reports',
   ]) {
     assert(runtime.calls.some((call) => call.path === path), `project screen did not load supported context: ${path}`);
   }
@@ -486,7 +604,20 @@ async function testBotTeamsScreen() {
   assert(doc.querySelector('[data-workload-visual]'), 'workload visualisation is missing');
   assert(doc.querySelector('[data-bot-group="release-crew"]'), 'bot group card did not render');
   assert.match(doc.body.textContent, /Release evidence ready for verification/);
-  for (const path of ['/bots', '/workload', '/bot-groups', '/bot-groups/release-crew/messages']) {
+  await runtime.click('[data-action="open-bot-sessions"][data-bot-id="octacon-bot"]', 60);
+  assert(doc.querySelector('[data-bot-session-panel="octacon-bot"]'), 'bot session panel did not open');
+  assert.equal(doc.querySelectorAll('[data-bot-session]').length, 1, 'bot sessions did not render');
+  assert.match(doc.body.textContent, /Fix release gate/);
+  await runtime.click('[data-bot-session="sess-octacon-1"]', 60);
+  assert(doc.querySelector('[data-session-transcript="sess-octacon-1"]'), 'session transcript did not open');
+  assert.equal(doc.querySelectorAll('[data-transcript-message]').length, 3, 'session transcript messages did not render');
+  assert.match(doc.body.textContent, /Run the release checks/);
+  assert.match(doc.body.textContent, /12 tests passed/);
+  assert.match(doc.body.textContent, /System prompts and private reasoning are excluded/);
+  for (const path of [
+    '/bots', '/workload', '/bot-groups', '/bot-groups/release-crew/messages',
+    '/bots/octacon-bot/sessions', '/bots/octacon-bot/sessions/sess-octacon-1',
+  ]) {
     assert(runtime.calls.some((call) => call.path === path), `bot teams did not load supported context: ${path}`);
   }
   await runtime.dispose();
@@ -512,8 +643,18 @@ async function testWorkflowsScreenAndCreator() {
   const doc = runtime.dom.window.document;
   assert(doc.querySelector('[data-workflows-screen]'), 'workflows screen is missing');
   assert(doc.querySelector('[data-workflow-visual]'), 'workflow visualisation is missing');
+  assert.equal(doc.querySelectorAll('[data-workflow-node]').length, 4, 'workflow must expose four interactive nodes');
+  assert.equal(doc.querySelector('[data-workflow-node][aria-pressed="true"]')?.getAttribute('data-workflow-node'), 'build', 'current workflow node is not selected');
+  await runtime.click('[data-workflow-node="gate"]');
+  assert.equal(doc.querySelector('[data-workflow-node="gate"]')?.getAttribute('aria-pressed'), 'true', 'workflow node selection did not update');
+  assert.match(doc.querySelector('[data-workflow-detail]').textContent, /Owner decision/);
   assert.equal(doc.querySelectorAll('[data-saved-workflow]').length, 1, 'saved workflow/view did not render');
+  await runtime.click('[data-saved-workflow="Release focus"]');
+  assert.equal(doc.querySelector('#dockyard-workflow-name')?.value, 'Release focus', 'saved workflow did not populate the editor');
   assert(doc.querySelector('[data-workflow-creator]'), 'workflow creator is missing');
+  const style = doc.querySelector('style[data-dockyard-style]')?.textContent || '';
+  assert(style.includes('@keyframes dockyard-flow-pulse'), 'workflow motion keyframes are missing');
+  assert(style.includes('prefers-reduced-motion: reduce'), 'workflow motion lacks a reduced-motion fallback');
   assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/views'), 'workflows screen did not load saved backend views');
   await runtime.dispose();
 }
@@ -651,11 +792,12 @@ async function testContrastMetadata() {
   await runtime.dispose();
 }
 
-async function writeSnapshot(tab, target, { onboarding = false } = {}) {
+async function writeSnapshot(tab, target, { onboarding = false, prepare = null } = {}) {
   const runtime = await createRuntime();
   await runtime.mount();
   if (tab !== 'dashboard') await runtime.click(`[data-tab="${tab}"]`);
   if (onboarding) await runtime.click('[data-action="open-onboarding"]');
+  if (prepare) await prepare(runtime);
   const doc = runtime.dom.window.document;
   const harnessStyle = doc.createElement('style');
   harnessStyle.textContent = 'body{margin:0;background:#fff}';
@@ -669,8 +811,11 @@ async function testChromiumLayouts() {
   const snapshots = {
     dashboard: '/tmp/dockyard-dashboard.html',
     project: '/tmp/dockyard-project.html',
+    projectSettings: '/tmp/dockyard-project-settings.html',
+    projectReports: '/tmp/dockyard-project-reports.html',
     backlog: '/tmp/dockyard-backlog.html',
     teams: '/tmp/dockyard-teams.html',
+    teamsTranscript: '/tmp/dockyard-teams-transcript.html',
     initiative: '/tmp/dockyard-initiative.html',
     workflows: '/tmp/dockyard-workflows.html',
     inbox: '/tmp/dockyard-inbox.html',
@@ -679,8 +824,17 @@ async function testChromiumLayouts() {
   };
   await writeSnapshot('dashboard', snapshots.dashboard);
   await writeSnapshot('project', snapshots.project);
+  await writeSnapshot('project', snapshots.projectSettings, { prepare: (runtime) => runtime.click('[data-project-view="settings"]') });
+  await writeSnapshot('project', snapshots.projectReports, { prepare: async (runtime) => {
+    await runtime.click('[data-project-view="reports"]');
+    await runtime.click('[data-action="generate-report"]', 60);
+  } });
   await writeSnapshot('backlog', snapshots.backlog);
   await writeSnapshot('teams', snapshots.teams);
+  await writeSnapshot('teams', snapshots.teamsTranscript, { prepare: async (runtime) => {
+    await runtime.click('[data-action="open-bot-sessions"][data-bot-id="octacon-bot"]', 50);
+    await runtime.click('[data-bot-session="sess-octacon-1"]', 50);
+  } });
   await writeSnapshot('initiative', snapshots.initiative);
   await writeSnapshot('workflows', snapshots.workflows);
   await writeSnapshot('inbox', snapshots.inbox);
@@ -693,8 +847,14 @@ async function testChromiumLayouts() {
     { name: 'dashboard-1600-light', file: snapshots.dashboard, width: 1600, height: 1000, scheme: 'light' },
     { name: 'dashboard-1200-dark', file: snapshots.dashboard, width: 1200, height: 900, scheme: 'dark' },
     { name: 'project-1400-light', file: snapshots.project, width: 1400, height: 1000, scheme: 'light' },
+    { name: 'project-settings-700-light', file: snapshots.projectSettings, width: 700, height: 1000, scheme: 'light' },
+    { name: 'project-settings-1400-dark', file: snapshots.projectSettings, width: 1400, height: 1000, scheme: 'dark' },
+    { name: 'project-reports-700-dark', file: snapshots.projectReports, width: 700, height: 1000, scheme: 'dark' },
+    { name: 'project-reports-1400-light', file: snapshots.projectReports, width: 1400, height: 1000, scheme: 'light' },
     { name: 'backlog-1400-dark', file: snapshots.backlog, width: 1400, height: 1000, scheme: 'dark' },
     { name: 'teams-1400-light', file: snapshots.teams, width: 1400, height: 1000, scheme: 'light' },
+    { name: 'teams-transcript-700-light', file: snapshots.teamsTranscript, width: 700, height: 1000, scheme: 'light' },
+    { name: 'teams-transcript-1400-dark', file: snapshots.teamsTranscript, width: 1400, height: 1000, scheme: 'dark' },
     { name: 'initiative-1400-dark', file: snapshots.initiative, width: 1400, height: 1000, scheme: 'dark' },
     { name: 'workflows-1400-light', file: snapshots.workflows, width: 1400, height: 1000, scheme: 'light' },
     { name: 'inbox-1200-light', file: snapshots.inbox, width: 1200, height: 900, scheme: 'light' },
@@ -731,13 +891,22 @@ async function testChromiumLayouts() {
           projectIconDisplays: [...new Set([...document.querySelectorAll('.dockyard-project-icon')].map((icon) => getComputedStyle(icon).display))],
           activeScreen: document.querySelector('[role="tabpanel"]')?.getAttribute('aria-labelledby') || null,
           dialogCount: [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].filter((dialog) => dialog.getClientRects().length > 0).length,
-          clippedLoopVisuals: [...document.querySelectorAll('.dockyard-loop-visual-wrap, .dockyard-workflow-visual')].filter((visual) => visual.scrollWidth > visual.clientWidth + 1).length,
+          clippedLoopVisuals: [...document.querySelectorAll('.dockyard-loop-visual-wrap, .dockyard-workflow-graph')].filter((visual) => visual.scrollWidth > visual.clientWidth + 1).length,
+          clippedFeatureCards: [...document.querySelectorAll('.dockyard-feature-card')].filter((card) => card.scrollWidth > card.clientWidth + 1).length,
+          clippedControls: [...document.querySelectorAll('input, textarea, select, button')].filter((control) => control.scrollWidth > control.clientWidth + 2).length,
+          tabOverflow: (() => {
+            const tabs = document.querySelector('.dockyard-tabs');
+            return tabs ? Math.max(0, tabs.scrollWidth - tabs.clientWidth) : 0;
+          })(),
         };
       });
       assert(measure.documentWidth <= spec.width, `${spec.name} overflows horizontally: ${measure.documentWidth}px > ${spec.width}px`);
       assert.equal(measure.clippedProjectRows, 0, `${spec.name} clips project-row content`);
       assert.equal(measure.clippedProjectText, 0, `${spec.name} clips project names or mission text`);
       assert.equal(measure.misalignedProjectIcons, 0, `${spec.name} misaligns Project-column icons`);
+      assert.equal(measure.clippedFeatureCards, 0, `${spec.name} clips content inside a feature card`);
+      assert.equal(measure.clippedControls, 0, `${spec.name} clips an interactive control`);
+      if (spec.width >= 700) assert.equal(measure.tabOverflow, 0, `${spec.name} hides primary navigation tabs`);
       if (measure.projectRows > 0) assert.deepEqual(measure.projectIconDisplays, ['grid'], `${spec.name} project icons lost their centring layout`);
       assert(!measure.rootFont.includes('Times New Roman'), `${spec.name} inherited Times New Roman`);
       const expectedTab = spec.name.startsWith('onboarding-') ? 'dashboard' : spec.name.split('-')[0];

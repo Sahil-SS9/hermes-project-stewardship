@@ -7,11 +7,13 @@ contract expects an ``APIRouter`` named ``plugin_api`` in this module.
 """
 from __future__ import annotations
 
-import os
-import tempfile
-from pathlib import Path
-
 import logging
+import os
+import re
+import sqlite3
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, HTTPException
@@ -20,6 +22,7 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 from hermes_project_stewardship.api.server import create_app
+from hermes_project_stewardship.persistence.dockyard_store import DockyardStore
 from hermes_project_stewardship.persistence.store import Store
 
 plugin_api = APIRouter()
@@ -42,6 +45,7 @@ _DB.parent.mkdir(parents=True, exist_ok=True)
 # desktop-plugin contract exposes no router-level teardown hook, so an explicit
 # close would require a custom seam. Acceptable for single-user local tooling.
 _store = Store(_DB)
+_dockyard = DockyardStore(_store)
 _app = create_app(_store)
 
 
@@ -78,8 +82,200 @@ async def _proxy(method: str, path: str, json_body: dict | None = None,
     try:
         return response.json()
     except ValueError:
-        return {"error": {"code": "bad_upstream_body",
-                          "message": "2xx response was not valid JSON"}}
+        logger.error("Upstream returned invalid JSON on successful %s %s", method, path)
+        raise HTTPException(502, "Dockyard returned an invalid response")
+
+
+_PROFILE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+_SESSION_SCOPE_NOTE = "System prompts and private reasoning are excluded."
+
+
+class SettingsPatchBody(BaseModel):
+    mission: str | None = None
+    lead_profile: str | None = None
+    member_profiles: list[str] | None = None
+    autonomy_level: int | None = None
+    autonomy_policy: dict | None = None
+    verification_policy: dict | None = None
+    release_policy: dict | None = None
+    notification_policy: dict | None = None
+
+
+class ReportBody(BaseModel):
+    report_type: str = "executive"
+    include_activity: bool = True
+
+
+def _as_iso(value) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(value, tz=timezone.utc).isoformat()
+    return str(value)
+
+
+def _bot_session_source(bot_id: str) -> tuple[str, Path]:
+    bot = _dockyard.bot_get(bot_id)
+    if bot is None:
+        raise HTTPException(404, f"unknown bot {bot_id}")
+    profile = bot.profile or bot_id.removesuffix("-bot")
+    if not _PROFILE_NAME.fullmatch(profile):
+        raise HTTPException(422, "bot profile name is not safe to resolve")
+
+    root = Path(
+        os.environ.get("DOCKYARD_SESSION_ROOT")
+        or os.environ.get("HERMES_HOME")
+        or str(Path.home() / ".hermes")
+    ).expanduser().resolve()
+    candidate = (
+        root / "state.db"
+        if profile == "default"
+        else root / "profiles" / profile / "state.db"
+    ).resolve()
+    if candidate != root / "state.db" and root not in candidate.parents:
+        raise HTTPException(422, "bot session store escapes the Hermes home")
+    return profile, candidate
+
+
+def _open_session_store(path: Path):
+    if not path.is_file():
+        return None
+    connection = sqlite3.connect(
+        f"{path.as_uri()}?mode=ro", uri=True, timeout=2.0
+    )
+    connection.row_factory = sqlite3.Row
+    return connection
+
+
+def _table_columns(connection, table: str) -> set[str]:
+    queries = {
+        "sessions": "PRAGMA table_info(sessions)",
+        "messages": "PRAGMA table_info(messages)",
+    }
+    if table not in queries:
+        raise ValueError(f"unsupported session-store table {table!r}")
+    return {row["name"] for row in connection.execute(queries[table])}
+
+
+def _session_list(bot_id: str, limit: int = 25) -> dict:
+    profile, db_path = _bot_session_source(bot_id)
+    connection = _open_session_store(db_path)
+    if connection is None:
+        return {
+            "bot_id": bot_id,
+            "profile": profile,
+            "available": False,
+            "sessions": [],
+            "scope_note": _SESSION_SCOPE_NOTE,
+        }
+    try:
+        columns = _table_columns(connection, "sessions")
+        if "id" not in columns:
+            raise HTTPException(503, "Hermes session store has no sessions table")
+        where = "WHERE COALESCE(hidden, 0)=0" if "hidden" in columns else ""
+        order = (
+            "COALESCE(last_activity_at, started_at)"
+            if "last_activity_at" in columns
+            else "started_at"
+        )
+        rows = connection.execute(
+            f"SELECT * FROM sessions {where} ORDER BY {order} DESC LIMIT ?",
+            (max(1, min(int(limit), 100)),),
+        ).fetchall()
+        sessions = []
+        for row in rows:
+            data = dict(row)
+            sessions.append({
+                "session_id": data["id"],
+                "title": data.get("title") or data["id"],
+                "source": data.get("source") or "unknown",
+                "model": data.get("model"),
+                "started_at": _as_iso(data.get("started_at")),
+                "last_activity_at": _as_iso(
+                    data.get("last_activity_at") or data.get("started_at")
+                ),
+                "ended_at": _as_iso(data.get("ended_at")),
+                "message_count": int(data.get("message_count") or 0),
+                "tool_call_count": int(data.get("tool_call_count") or 0),
+                "status": "completed" if data.get("ended_at") else "active",
+            })
+        return {
+            "bot_id": bot_id,
+            "profile": profile,
+            "available": True,
+            "sessions": sessions,
+            "scope_note": _SESSION_SCOPE_NOTE,
+        }
+    except sqlite3.DatabaseError as exc:
+        logger.warning("Could not read bot session list for %s: %s", bot_id, exc)
+        raise HTTPException(503, "Hermes session store could not be read")
+    finally:
+        connection.close()
+
+
+def _session_transcript(bot_id: str, session_id: str, limit: int = 200) -> dict:
+    profile, db_path = _bot_session_source(bot_id)
+    connection = _open_session_store(db_path)
+    if connection is None:
+        raise HTTPException(404, "No Hermes session store is available for this bot")
+    try:
+        session = connection.execute(
+            "SELECT * FROM sessions WHERE id=?", (session_id,)
+        ).fetchone()
+        if session is None:
+            raise HTTPException(404, "session not found for this bot profile")
+        metadata = dict(session)
+        if bool(metadata.get("hidden")):
+            raise HTTPException(404, "session not found for this bot profile")
+        columns = _table_columns(connection, "messages")
+        if not {"session_id", "role"}.issubset(columns):
+            raise HTTPException(503, "Hermes session store has no transcript table")
+        active = "AND COALESCE(active, 1)=1" if "active" in columns else ""
+        private_kinds = (
+            "AND COALESCE(LOWER(display_kind), '') NOT IN "
+            "('reasoning','thinking','internal','hidden','internal_notification')"
+            if "display_kind" in columns else ""
+        )
+        order = "id" if "id" in columns else "timestamp"
+        rows = connection.execute(
+            f"SELECT * FROM messages WHERE session_id=? {active} "
+            f"AND LOWER(role) NOT IN ('system','reasoning') {private_kinds} "
+            f"ORDER BY {order} LIMIT ?",
+            (session_id, max(1, min(int(limit), 500))),
+        ).fetchall()
+        messages = []
+        for row in rows:
+            data = dict(row)
+            content = str(data.get("content") or "")
+            truncated = len(content) > 6000
+            messages.append({
+                "message_id": data.get("id"),
+                "role": data["role"],
+                "content": content[:6000],
+                "tool_name": data.get("tool_name"),
+                "timestamp": _as_iso(data.get("timestamp")),
+                "display_kind": data.get("display_kind"),
+                "truncated": truncated,
+            })
+        return {
+            "bot_id": bot_id,
+            "profile": profile,
+            "session": {
+                "session_id": metadata["id"],
+                "title": metadata.get("title") or metadata["id"],
+                "source": metadata.get("source") or "unknown",
+                "model": metadata.get("model"),
+                "started_at": _as_iso(metadata.get("started_at")),
+                "ended_at": _as_iso(metadata.get("ended_at")),
+            },
+            "messages": messages,
+            "scope_note": _SESSION_SCOPE_NOTE,
+        }
+    except sqlite3.DatabaseError as exc:
+        logger.warning("Could not read bot transcript for %s: %s", bot_id, exc)
+        raise HTTPException(503, "Hermes session transcript could not be read")
+    finally:
+        connection.close()
 
 
 @plugin_api.get("/health")
@@ -129,6 +325,55 @@ async def project_settings(project_id: str) -> dict:
     return await _proxy("GET", f"/stewardship/v1/projects/{pid}/settings")
 
 
+@plugin_api.patch("/projects/{project_id}/settings")
+async def patch_project_settings(project_id: str, body: SettingsPatchBody) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    payload = body.model_dump(exclude_unset=True)
+    payload.update({"actor": "sahil", "interface": "dockyard:human"})
+    return await _proxy(
+        "PATCH", f"/stewardship/v1/projects/{pid}/settings", payload
+    )
+
+
+@plugin_api.post("/projects/{project_id}/reports")
+async def generate_project_report(project_id: str, body: ReportBody) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    payload = {
+        **body.model_dump(),
+        "actor_id": "sahil",
+        "actor_kind": "human",
+    }
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{pid}/reports", payload
+    )
+
+
+@plugin_api.get("/projects/{project_id}/reports")
+async def project_reports(project_id: str, limit: int = 20) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{pid}/reports",
+        params={"limit": limit},
+    )
+
+
+@plugin_api.get("/projects/{project_id}/reports/{report_id}")
+async def project_report(project_id: str, report_id: str) -> dict:
+    from urllib.parse import quote
+
+    pid = quote(project_id, safe="")
+    rid = quote(report_id, safe="")
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{pid}/reports/{rid}"
+    )
+
+
 @plugin_api.get("/projects/{project_id}/initiatives")
 async def project_initiatives(project_id: str,
                               status: str | None = None) -> dict:
@@ -154,6 +399,16 @@ async def project_events(project_id: str, limit: int = 50) -> dict:
 async def bots(status: str | None = None) -> dict:
     params = {"status": status} if status else None
     return await _proxy("GET", "/stewardship/v1/bots", params=params)
+
+
+@plugin_api.get("/bots/{bot_id}/sessions")
+def bot_sessions(bot_id: str, limit: int = 25) -> dict:
+    return _session_list(bot_id, limit=limit)
+
+
+@plugin_api.get("/bots/{bot_id}/sessions/{session_id}")
+def bot_transcript(bot_id: str, session_id: str, limit: int = 200) -> dict:
+    return _session_transcript(bot_id, session_id, limit=limit)
 
 
 @plugin_api.get("/workload")
