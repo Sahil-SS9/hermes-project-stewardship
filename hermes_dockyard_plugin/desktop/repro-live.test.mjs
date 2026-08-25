@@ -1274,6 +1274,7 @@ async function testChromiumLayouts() {
 
   const specs = [
     { name: 'dashboard-700-light', file: snapshots.dashboard, width: 700, height: 1000, scheme: 'light' },
+    { name: 'dashboard-host-pane-725-dark', file: snapshots.dashboard, width: 1455, height: 940, rootWidth: 725, scheme: 'dark' },
     { name: 'dashboard-1000-light', file: snapshots.dashboard, width: 1000, height: 1000, scheme: 'light' },
     { name: 'dashboard-1600-light', file: snapshots.dashboard, width: 1600, height: 1000, scheme: 'light' },
     { name: 'dashboard-1200-dark', file: snapshots.dashboard, width: 1200, height: 900, scheme: 'dark' },
@@ -1310,6 +1311,13 @@ async function testChromiumLayouts() {
       page.on('console', (message) => { if (message.type() === 'error' || message.type() === 'warning') browserErrors.push(`${message.type()}: ${message.text()}`); });
       page.on('pageerror', (error) => browserErrors.push(`pageerror: ${error.message}`));
       await page.goto(`file://${spec.file}`, { waitUntil: 'load' });
+      if (spec.rootWidth) {
+        await page.evaluate((width) => {
+          const root = document.querySelector('.dockyard-root');
+          root.style.width = `${width}px`;
+          root.style.maxWidth = 'none';
+        }, spec.rootWidth);
+      }
       const measure = await page.evaluate(() => {
         const root = document.querySelector('.dockyard-root');
         return {
@@ -1341,6 +1349,11 @@ async function testChromiumLayouts() {
             const toolbar = document.querySelector('.dockyard-project-toolbar');
             return toolbar ? Math.max(0, toolbar.scrollWidth - toolbar.clientWidth) : 0;
           })(),
+          attentionColumnCount: (() => {
+            const card = document.querySelector('.dockyard-attention-card');
+            const columns = card ? getComputedStyle(card).gridTemplateColumns.trim() : '';
+            return columns ? columns.split(/\s+/).length : 0;
+          })(),
         };
       });
       assert(measure.documentWidth <= spec.width, `${spec.name} overflows horizontally: ${measure.documentWidth}px > ${spec.width}px`);
@@ -1349,6 +1362,10 @@ async function testChromiumLayouts() {
       assert.equal(measure.misalignedProjectIcons, 0, `${spec.name} misaligns Project-column icons`);
       assert.equal(measure.clippedFeatureCards, 0, `${spec.name} clips content inside a feature card`);
       assert.equal(measure.clippedControls, 0, `${spec.name} clips an interactive control`);
+      if (spec.rootWidth) {
+        assert(Math.abs(measure.rootWidth - spec.rootWidth) <= 1, `${spec.name} did not preserve the simulated host pane width`);
+        assert.equal(measure.attentionColumnCount, 1, `${spec.name} keeps the decision card in a squeezed two-column layout`);
+      }
       if (spec.width >= 700) {
         assert.equal(measure.tabOverflow, 0, `${spec.name} hides primary navigation tabs`);
         assert.equal(measure.projectToolbarOverflow, 0, `${spec.name} hides project navigation tabs`);

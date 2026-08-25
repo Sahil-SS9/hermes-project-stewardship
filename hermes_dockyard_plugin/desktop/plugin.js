@@ -161,6 +161,8 @@ const DOCKYARD_CSS = `
   --dy-focus: ${LIGHT_TOKENS.focus};
   --dy-disabled-text: ${LIGHT_TOKENS.disabledText};
   --dy-disabled-bg: ${LIGHT_TOKENS.disabledBg};
+  container-name: dockyard;
+  container-type: inline-size;
   min-height: 100vh;
   background: ${LIGHT_TOKENS.bg};
   color: ${LIGHT_TOKENS.text};
@@ -626,10 +628,10 @@ const DOCKYARD_CSS = `
   from { transform: translateX(-100%); }
   to { transform: translateX(100%); }
 }
-@media (max-width: 980px) {
+@container dockyard (max-width: 980px) {
   .dockyard-root .dockyard-overview-grid { grid-template-columns: 1fr; }
 }
-@media (max-width: 820px) {
+@container dockyard (max-width: 820px) {
   .dockyard-root .dockyard-shell { padding: 14px 16px 34px; }
   .dockyard-root .dockyard-consolebar { align-items: flex-start; margin-bottom: 24px; }
   .dockyard-root .dockyard-brand-copy span { display: none; }
@@ -652,7 +654,7 @@ const DOCKYARD_CSS = `
   }
   .dockyard-root .dockyard-notification-action { justify-content: flex-start; }
 }
-@media (max-width: 640px) {
+@container dockyard (max-width: 640px) {
   .dockyard-root .dockyard-consolebar { flex-direction: column; }
   .dockyard-root .dockyard-tabs { width: 100%; }
   .dockyard-root .dockyard-page-head { flex-direction: column; }
@@ -1409,23 +1411,23 @@ const DOCKYARD_CSS = `
 }
 .dockyard-root .dockyard-evidence-details[hidden] { display: none; }
 .dockyard-root .dockyard-feed-group { box-shadow: 0 4px 18px rgba(31, 42, 68, 0.04); }
-@media (min-width: 821px) and (max-width: 1350px) {
+@container dockyard (min-width: 821px) and (max-width: 1350px) {
   .dockyard-root .dockyard-main-grid .dockyard-project-head,
   .dockyard-root .dockyard-main-grid .dockyard-project-row {
     grid-template-columns: minmax(180px, 1.35fr) 100px minmax(160px, 1fr) 80px;
     gap: 12px;
   }
 }
-@media (max-width: 1200px) {
+@container dockyard (max-width: 1200px) {
   .dockyard-root .dockyard-loop-layout { grid-template-columns: 1fr; }
 }
-@media (max-width: 980px) {
+@container dockyard (max-width: 980px) {
   .dockyard-root .dockyard-main-grid { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-attention-card { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-project-overview-grid { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-content-layout { grid-template-columns: 1fr; }
 }
-@media (max-width: 820px) {
+@container dockyard (max-width: 820px) {
   .dockyard-root .dockyard-consolebar {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -1463,7 +1465,7 @@ const DOCKYARD_CSS = `
   .dockyard-root .dockyard-approval-top { grid-template-columns: 38px minmax(0, 1fr); }
   .dockyard-root .dockyard-approval-top > .dockyard-status-tag { grid-column: 2; }
 }
-@media (max-width: 640px) {
+@container dockyard (max-width: 640px) {
   .dockyard-root .dockyard-metric-strip,
   .dockyard-root .dockyard-settings-grid { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-field-wide { grid-column: auto; }
@@ -1472,7 +1474,7 @@ const DOCKYARD_CSS = `
   .dockyard-root .dockyard-upload-panel,
   .dockyard-root .dockyard-detail-grid { grid-template-columns: 1fr; }
 }
-@media (max-width: 520px) {
+@container dockyard (max-width: 520px) {
   .dockyard-root .dockyard-modal-backdrop { padding: 8px; }
   .dockyard-root .dockyard-onboarding { max-height: calc(100vh - 16px); border-radius: 13px; }
   .dockyard-root .dockyard-onboarding-head,
