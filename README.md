@@ -138,7 +138,8 @@ dashboard of the same story.
 - [Roadmap to upstream Hermes core](docs/upstream-path.md)
 - [API contract](docs/api.md)
 - [Canonical roadmap](roadmap.md)
-- [v0.2.0rc1 release packet](docs/release/0.2.0rc1-release-candidate.md)
+- [v0.2.0rc2 release packet](docs/release/0.2.0rc2-release-candidate.md)
+- [v0.2.0rc1 historical release packet](docs/release/0.2.0rc1-release-candidate.md)
 
 ## Security
 

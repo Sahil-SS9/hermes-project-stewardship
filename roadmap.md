@@ -479,7 +479,7 @@ Carried from PRD v0.3 unless the owner changes scope:
 ## Sequencing recommendation
 
 Detailed scoring, dependencies and decisions: [`docs/DOCKYARD-NEXT-PLAN.md`](docs/DOCKYARD-NEXT-PLAN.md).
-Release evidence and approval gates: [`docs/release/0.2.0rc1-release-candidate.md`](docs/release/0.2.0rc1-release-candidate.md).
+Current release evidence: [`docs/release/0.2.0rc2-release-candidate.md`](docs/release/0.2.0rc2-release-candidate.md). Historical rc1 evidence remains under `docs/release/`.
 
 1. Approve and create path-scoped local commits for DY-R0-01.
 2. Run fresh-clone, coverage and optional-lane proof on immutable commits.
