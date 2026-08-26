@@ -25,7 +25,7 @@ from typing import Any, cast, Dict, List, NoReturn, Optional
 
 try:
     from fastapi import APIRouter, FastAPI, HTTPException, Request
-    from pydantic import BaseModel, ConfigDict
+    from pydantic import BaseModel, ConfigDict, Field
 except ImportError as e:  # pragma: no cover
     raise ImportError(
         "The RPC server needs the 'desktop-panel' extra: "
@@ -33,6 +33,7 @@ except ImportError as e:  # pragma: no cover
     ) from e
 
 from ..cycles.engine import CycleEngine, CycleRefused
+from ..dockyard import Actor, ActorKind
 from ..events.bus import EventBus
 from ..gateway.handler import CommandRequest, GatewayCommandHandler
 from ..gateway.webhooks import WebhookRejected, WebhookReceiver
@@ -49,6 +50,7 @@ from ..persistence import (
     CanonicalWorkService,
 )
 from ..persistence.dockyard_service import DockyardService
+from ..persistence.dockyard_integration import DockyardIntegration, IntegrationError
 from ..persistence.service import ServiceError, StewardshipService
 from ..persistence.workflow_service import WorkflowService
 from ..persistence.store import Store
@@ -151,17 +153,22 @@ class BindBoardRequest(BaseModel):
 class CompleteRequest(BaseModel):
     outcome: Dict[str, Any]
     regressed: bool = False
+    actor_id: str = "sahil"
+    actor_kind: str = "human"
 
 
 class WorkItemCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     type: str
     title: str
     actor_id: str
     actor_kind: str = "bot"
+    body: Optional[str] = None
     parent_ref: Optional[str] = None
-    labels: List[str] = []
-    evidence_refs: List[str] = []
+    labels: List[str] = Field(default_factory=list)
+    evidence_refs: List[str] = Field(default_factory=list)
     estimate_days: Optional[float] = None
+    due: Optional[str] = None
     idempotency_key: Optional[str] = None
 
 
@@ -169,6 +176,40 @@ class WorkItemTransition(BaseModel):
     status: str
     actor_id: str
     actor_kind: str = "bot"
+
+
+class WorkItemUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: Optional[str] = None
+    type: Optional[str] = None
+    body: Optional[str] = None
+    parent_ref: Optional[str] = None
+    labels: Optional[List[str]] = None
+    evidence_refs: Optional[List[str]] = None
+    estimate_days: Optional[float] = None
+    due: Optional[str] = None
+    actor_id: str
+    actor_kind: str = "human"
+
+
+class WorkItemAssign(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    assignee_id: Optional[str] = None
+    actor_id: str
+    actor_kind: str = "human"
+
+
+class WorkItemDependency(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    dependency_ref: str
+    actor_id: str
+    actor_kind: str = "human"
+
+
+class WorkItemActor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    actor_id: str
+    actor_kind: str = "human"
 
 
 class BacklogAdd(BaseModel):
@@ -318,10 +359,16 @@ def create_app(
     work = CanonicalWorkService(store, cast(CanonicalWorkPort, adapter))
     workflows = WorkflowService(store, cast(CanonicalWorkPort, adapter))
     dy = DockyardService(store, canonical_work=work)
+    integration = DockyardIntegration(
+        dy=dy,
+        svc=svc,
+        bridge=bridge,
+        canonical_work=work,
+    )
 
     app = FastAPI(
         title="Hermes Project Stewardship RPC",
-        version="0.2.0rc1",
+        version="0.2.0rc2",
         description=(
             "Durable project ownership for Hermes agent fleets. One canonical "
             "backend serving CLI, TUI, Desktop and messaging gateways. "
@@ -520,19 +567,17 @@ def create_app(
 
     @router.post("/initiatives/{ref}/approve")
     def approve(ref: str, body: ApprovalAction):
-        result = svc.approve_initiative(ref, actor=body.actor,
-                                        interface=body.interface)
-        # zero-CLI flow (G4): approval auto-binds the board when a
-        # validation contract defines the work; failure surfaces as 409.
-        ini = svc.initiative_by_ref(ref)
-        if ini.get("validation_contract"):
-            try:
-                bound = bridge.bind(ref, start_execution=True)
-                result["board_slug"] = bound.get("board_slug")
-                result["cards"] = len(bound.get("card_ids") or [])
-            except ServiceError as e:
-                raise HTTPException(409, str(e))
-        return result
+        try:
+            return integration.approve(
+                ref,
+                actor=Actor(
+                    id=body.actor,
+                    display_name=body.actor,
+                    kind=ActorKind.HUMAN,
+                ),
+            )
+        except IntegrationError as exc:
+            raise HTTPException(409, str(exc)) from None
 
     @router.post("/initiatives/{ref}/reject")
     def reject(ref: str, body: ApprovalAction):
@@ -548,11 +593,29 @@ def create_app(
     @router.post("/initiatives/{ref}/complete")
     def complete(ref: str, body: CompleteRequest):
         try:
-            return bridge.complete_from_board(
-                ref, outcome=body.outcome, regressed=body.regressed
+            return integration.complete_from_board(
+                ref,
+                outcome=body.outcome,
+                regressed=body.regressed,
+                actor=Actor(
+                    id=body.actor_id,
+                    display_name=body.actor_id,
+                    kind=ActorKind(body.actor_kind),
+                ),
             )
-        except ServiceError as e:
-            raise HTTPException(409, str(e))
+        except (ServiceError, IntegrationError) as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @router.get("/projects/{project_id}/observations")
+    def observations(project_id: str):
+        return {"observations": integration.observations(project_id)}
+
+    @router.post("/observations/{ref}/run")
+    def run_observation(ref: str):
+        try:
+            return integration.run_observation(ref, engine)
+        except (IntegrationError, CycleRefused) as exc:
+            raise HTTPException(409, str(exc)) from None
 
     @router.post("/gateway/command")
     def gateway_command(body: GatewayCommandBody):
@@ -655,15 +718,77 @@ def create_app(
                 body.type,
                 body.title,
                 actor=_actor(body.actor_id, body.actor_kind),
+                body=body.body,
                 parent_ref=body.parent_ref,
                 labels=body.labels,
                 evidence_refs=body.evidence_refs,
                 estimate_days=body.estimate_days,
+                due=body.due,
                 idempotency_key=body.idempotency_key,
             )
         except Exception as exc:
             _raise_work_error(exc)
         return {"ref": item["ref"], "id": item["id"], "title": item["title"]}
+
+    @router.patch("/projects/{project_id}/work-items/{ref}")
+    def update_work_item(project_id: str, ref: str, body: WorkItemUpdate):
+        changes = body.model_dump(exclude_unset=True)
+        actor_id = changes.pop("actor_id")
+        actor_kind = changes.pop("actor_kind", body.actor_kind)
+        if "type" in changes:
+            changes["item_type"] = changes.pop("type")
+        try:
+            return work.update_item(
+                project_id,
+                ref,
+                actor=_actor(actor_id, actor_kind),
+                **changes,
+            )
+        except Exception as exc:
+            _raise_work_error(exc)
+
+    @router.post("/projects/{project_id}/work-items/{ref}/assign")
+    def assign_work_item(project_id: str, ref: str, body: WorkItemAssign):
+        try:
+            return work.assign_item(
+                project_id,
+                ref,
+                body.assignee_id,
+                actor=_actor(body.actor_id, body.actor_kind),
+            )
+        except Exception as exc:
+            _raise_work_error(exc)
+
+    @router.post("/projects/{project_id}/work-items/{ref}/dependencies")
+    def add_work_dependency(project_id: str, ref: str, body: WorkItemDependency):
+        try:
+            return work.add_dependency(
+                project_id,
+                ref,
+                body.dependency_ref,
+                actor=_actor(body.actor_id, body.actor_kind),
+            )
+        except Exception as exc:
+            _raise_work_error(exc)
+
+    @router.post(
+        "/projects/{project_id}/work-items/{ref}/dependencies/{dependency_ref}/remove"
+    )
+    def remove_work_dependency(
+        project_id: str,
+        ref: str,
+        dependency_ref: str,
+        body: WorkItemActor,
+    ):
+        try:
+            return work.remove_dependency(
+                project_id,
+                ref,
+                dependency_ref,
+                actor=_actor(body.actor_id, body.actor_kind),
+            )
+        except Exception as exc:
+            _raise_work_error(exc)
 
     @router.get("/projects/{project_id}/work-items/{ref}")
     def work_item_detail(project_id: str, ref: str):

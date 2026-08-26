@@ -1,6 +1,6 @@
 # Dockyard API contract
 
-Version: `0.2.0rc1`
+Version: `0.2.0rc2`
 Base path: `/stewardship/v1`
 
 The running application is authoritative. Use:
@@ -23,11 +23,12 @@ The running application is authoritative. Use:
 |---|---|---|
 | Projects | `GET /projects`, project lifecycle/settings routes | Dockyard stewardship metadata plus canonical project identity |
 | Onboarding | `POST /onboard` | Canonical Hermes project/board first; Dockyard governance second |
-| Work | `GET/POST /projects/{id}/work-items`, detail and transition routes | Canonical Hermes Kanban |
+| Work | list/create/detail/edit/assign/transition/dependency routes under `/projects/{id}/work-items` | Canonical Hermes Kanban plus Dockyard planning metadata |
 | Backlog | list, queue and rerank routes under `/projects/{id}/backlog` | Canonical work plus Dockyard rank/reason metadata |
 | Saved Views | `GET/PUT /projects/{id}/views` | Dockyard presentation metadata |
 | Workflows | define/list/start under `/projects/{id}/workflows` | Dockyard version/run journal; canonical Hermes tasks and links |
-| Initiatives | proposal, approval, rejection and board-binding routes | Dockyard governance plus canonical execution links |
+| Initiatives | proposal, approval, rejection, completion/regression and board-binding routes | Dockyard governance plus canonical execution links |
+| Observations | project observation list and `POST /observations/{ref}/run` | Durable Dockyard trigger plus idempotent stewardship cycle |
 | Milestones | create, attach and progress routes | Dockyard planning metadata over canonical work |
 | Reports | `/projects/{id}/reports` | Derived from canonical work and Dockyard governance |
 | Bot fleet | bot registry, groups, workload, A2A, inbox and notifications | Dockyard coordination metadata |

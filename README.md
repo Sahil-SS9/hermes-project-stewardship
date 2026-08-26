@@ -8,9 +8,10 @@ turns gaps into evidence-backed initiatives, executes through existing Kanban,
 enforces explicit autonomy policy, and measures whether the project actually
 improved — from every surface (CLI, RPC API, Desktop panel, Discord/gateway).
 
-> Status: **v0.2.0rc1 local release candidate.** Engineering and local quality
-> gates are green. The candidate is not committed, tagged, published, installed
-> or activated. Run `hermes verify --json` for current test and readiness evidence.
+> Status: **v0.2.0rc2 local release candidate.** O1 complete work management
+> and O2 initiative-to-observation delivery are implemented. The candidate is
+> not tagged, installed or activated. Run `hermes verify --json` for current
+> test and readiness evidence.
 
 ---
 

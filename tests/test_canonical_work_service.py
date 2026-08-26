@@ -213,7 +213,9 @@ def test_canonical_queued_item_keeps_only_binding_and_rank_metadata(
         "rank": 1,
         "priority_reason": "canonical source of truth",
     }
-    assert service.backlog_list(enabled) == [entry]
+    assert service.backlog_list(enabled) == [
+        {**entry, "initiative_ref": initiative["ref"]}
+    ]
     assert store._conn.execute(
         "SELECT COUNT(*) AS n FROM dockyard_work_items"
     ).fetchone()["n"] == 0

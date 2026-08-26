@@ -88,6 +88,22 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-root .dy-work-body, .dy-root .dy-history { white-space: pre-wrap;
   overflow-wrap: anywhere; }
 .dy-root .dy-history { max-height: 220px; overflow: auto; }
+.dy-root .dy-work-editor { display: grid; gap: 8px; margin: 14px 0;
+  padding: 12px; border: 1px solid var(--dy-line); border-radius: 8px; }
+.dy-root .dy-work-editor input, .dy-root .dy-work-editor select,
+.dy-root .dy-work-editor textarea, .dy-root .dy-dependency-editor input {
+  width: 100%; box-sizing: border-box; padding: 7px 9px; border-radius: 6px;
+  border: 1px solid var(--dy-line); background: var(--dy-bg);
+  color: var(--dy-text); font: inherit; }
+.dy-root .dy-work-editor textarea { min-height: 90px; resize: vertical; }
+.dy-root .dy-dependency-editor { display: grid; gap: 8px; margin: 14px 0; }
+.dy-root .dy-dependency-row { display: flex; gap: 8px; align-items: center;
+  justify-content: space-between; }
+.dy-root .dy-delivery-list { display: grid; gap: 12px; margin-top: 12px; }
+.dy-root .dy-delivery-card { display: grid; gap: 8px; }
+.dy-root .dy-delivery-work, .dy-root .dy-delivery-actions {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.dy-root .dy-delivery-work h3 { flex-basis: 100%; margin: 0; }
 .dy-root .dy-warning { color: var(--dy-warn); font-weight: 650; }
 @media (max-width: 1000px) {
   .dy-root .dy-work-split { grid-template-columns: 1fr; }

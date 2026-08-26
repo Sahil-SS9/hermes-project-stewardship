@@ -1,7 +1,7 @@
 # Dockyard next plan
 
 Status: proposed sequencing over the canonical [`../roadmap.md`](../roadmap.md)
-Candidate: `0.2.0rc1` local engineering candidate
+Candidate: `0.2.0rc2` local engineering candidate
 Rule: this document orders the roadmap; it does not create a second backlog.
 
 ## Recommendation
@@ -25,8 +25,8 @@ Relative WSJF = cost of delay / effort. Scores are directional, not promises.
 | 2 | DY-P2-05 | Fresh-clone bootstrap, coverage gate and optional-lane reporting | 9 | 4 | 2.3 | High | Removes environment-dependent proof gaps before pilot |
 | 3 | DY-P2-03 + DY-P2-04 | Pagination/schema consistency, OpenAPI examples and current threat model | 8 | 4 | 2.0 | High | Required before treating the API as a supported external contract |
 | 4 | DY-P3-01 + DY-P3-03 | Owner walkthrough, final artefact identity and gated pilot packet | 10 | 4 | 2.5 | High | Converts green engineering into an approvable release candidate |
-| 5 | DY-P1-01 | Full work editing, reassignment and dependency mutation in product UI | 9 | 5 | 1.8 | High | Core day-to-day usability and prerequisite for complete delivery flows |
-| 6 | DY-P1-04 | Proposal -> backlog -> approval -> execution -> observation -> regression loop | 10 | 8 | 1.3 | Medium | Closes Dockyard's central product promise end to end |
+| 5 | DY-P1-01 | Complete locally in rc2: work editing, reassignment and dependencies | 9 | 5 | 1.8 | High | Delivered and verified |
+| 6 | DY-P1-04 | Complete locally in rc2: approval -> execution -> observation -> regression | 10 | 8 | 1.3 | High | Delivered and verified |
 | 7 | DY-P1-02 + DY-P1-03 | Milestones/sprints plus role-aware Saved View queries | 7 | 7 | 1.0 | Medium | Planning depth after execution fundamentals are complete |
 | 8 | DY-P1-06 | CI/release evidence adapter, redaction and trend evaluators | 7 | 6 | 1.2 | Medium | Improves evidence quality; provider choice is still needed |
 | 9 | DY-P1-07 | Honest phase timing and cost accounting | 5 | 4 | 1.3 | High | Useful operations data, but not a blocker for the core loop |

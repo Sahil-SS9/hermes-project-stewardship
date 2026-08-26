@@ -69,12 +69,12 @@ def test_full_lifecycle_over_rpc(env):
     ref = r.json()["ref"]
     r = c.post(f"/stewardship/v1/initiatives/{ref}/approve",
                json={"actor": "h", "interface": "rpc"})
-    assert r.json()["status"] == "approved"
-    r = c.post(f"/stewardship/v1/initiatives/{ref}/bind-board", json={})
-    assert r.status_code == 200 and r.json()["board_slug"] == "p1-ops"
+    assert r.json()["status"] == "executing"
+    assert r.json()["board_slug"] == "p1-ops"
     r = c.post(f"/stewardship/v1/initiatives/{ref}/complete",
                json={"outcome": {"ok": True}})
-    assert r.json()["status"] == "completed"
+    assert r.json()["engine_status"] == "completed"
+    assert r.json()["observation_status"] == "pending"
 
 
 def test_error_envelope_shape(env):

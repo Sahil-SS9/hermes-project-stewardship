@@ -17,7 +17,7 @@ from urllib.parse import quote
 
 import httpx2 as httpx
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 logger = logging.getLogger(__name__)
 
@@ -592,6 +592,34 @@ class TransitionBody(BaseModel):
     status: str
 
 
+class WorkUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str | None = None
+    type: str | None = None
+    body: str | None = None
+    parent_ref: str | None = None
+    labels: list[str] | None = None
+    evidence_refs: list[str] | None = None
+    estimate_days: float | None = None
+    due: str | None = None
+
+
+class WorkAssignBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    assignee_id: str | None = None
+
+
+class DependencyBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    dependency_ref: str
+
+
+class InitiativeCompleteBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    verified: bool = True
+    regressed: bool = False
+
+
 class BacklogAddBody(BaseModel):
     ref: str
     rank: int
@@ -628,6 +656,53 @@ async def transition_work_item(project_id: str, ref: str,
     return await _proxy(
         "POST", f"/stewardship/v1/projects/{pid}/work-items/{item}/transition",
         {"status": body.status, "actor_id": "sahil", "actor_kind": "human"})
+
+
+@plugin_api.patch("/projects/{project_id}/work-items/{ref}")
+async def update_work_item(project_id: str, ref: str, body: WorkUpdateBody) -> dict:
+    pid = quote(project_id, safe="")
+    item = quote(ref, safe="")
+    return await _proxy(
+        "PATCH",
+        f"/stewardship/v1/projects/{pid}/work-items/{item}",
+        {**body.model_dump(exclude_unset=True), "actor_id": "sahil", "actor_kind": "human"},
+    )
+
+
+@plugin_api.post("/projects/{project_id}/work-items/{ref}/assign")
+async def assign_work_item(project_id: str, ref: str, body: WorkAssignBody) -> dict:
+    pid = quote(project_id, safe="")
+    item = quote(ref, safe="")
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{pid}/work-items/{item}/assign",
+        {"assignee_id": body.assignee_id, "actor_id": "sahil", "actor_kind": "human"},
+    )
+
+
+@plugin_api.post("/projects/{project_id}/work-items/{ref}/dependencies")
+async def add_work_dependency(project_id: str, ref: str, body: DependencyBody) -> dict:
+    pid = quote(project_id, safe="")
+    item = quote(ref, safe="")
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{pid}/work-items/{item}/dependencies",
+        {"dependency_ref": body.dependency_ref, "actor_id": "sahil", "actor_kind": "human"},
+    )
+
+
+@plugin_api.post(
+    "/projects/{project_id}/work-items/{ref}/dependencies/{dependency_ref}/remove"
+)
+async def remove_work_dependency(project_id: str, ref: str, dependency_ref: str) -> dict:
+    pid = quote(project_id, safe="")
+    item = quote(ref, safe="")
+    dependency = quote(dependency_ref, safe="")
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{pid}/work-items/{item}/dependencies/{dependency}/remove",
+        {"actor_id": "sahil", "actor_kind": "human"},
+    )
 
 
 @plugin_api.get("/projects/{project_id}/backlog")
@@ -734,6 +809,33 @@ async def reject(ref: str) -> dict:
     return await _proxy(
         "POST", f"/stewardship/v1/initiatives/{r}/reject",
         {"actor": "sahil", "interface": "dockyard:human"})
+
+
+@plugin_api.post("/initiatives/{ref}/complete")
+async def complete_initiative(ref: str, body: InitiativeCompleteBody) -> dict:
+    r = quote(ref, safe="")
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/initiatives/{r}/complete",
+        {
+            "outcome": {"verified": body.verified},
+            "regressed": body.regressed,
+            "actor_id": "sahil",
+            "actor_kind": "human",
+        },
+    )
+
+
+@plugin_api.get("/projects/{project_id}/observations")
+async def project_observations(project_id: str) -> dict:
+    pid = quote(project_id, safe="")
+    return await _proxy("GET", f"/stewardship/v1/projects/{pid}/observations")
+
+
+@plugin_api.post("/observations/{ref}/run")
+async def run_observation(ref: str) -> dict:
+    r = quote(ref, safe="")
+    return await _proxy("POST", f"/stewardship/v1/observations/{r}/run", {})
 
 
 @plugin_api.post("/notifications/{notification_id}/ack")

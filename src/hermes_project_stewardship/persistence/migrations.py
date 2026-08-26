@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 15
 
 
 @dataclass(frozen=True)
@@ -621,6 +621,51 @@ MIGRATIONS: List[Migration] = [
         downgrade_sql="""
         ALTER TABLE dockyard_workflow_runs DROP COLUMN updated_at;
         ALTER TABLE dockyard_workflow_runs DROP COLUMN status;
+        """,
+    ),
+    Migration(
+        version=14,
+        name="canonical work planning details",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS dockyard_canonical_work_details (
+            project_id TEXT NOT NULL,
+            item_id TEXT NOT NULL,
+            labels_json TEXT NOT NULL DEFAULT '[]',
+            evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+            estimate_days REAL,
+            due TEXT,
+            updated_by TEXT NOT NULL,
+            updated_by_kind TEXT NOT NULL CHECK (updated_by_kind IN ('human','bot')),
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY(project_id, item_id)
+        );
+        """,
+        downgrade_sql="""
+        DROP TABLE IF EXISTS dockyard_canonical_work_details;
+        """,
+    ),
+    Migration(
+        version=15,
+        name="initiative observation triggers",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS dockyard_observation_triggers (
+            initiative_ref TEXT PRIMARY KEY
+                REFERENCES project_initiatives(ref) ON DELETE CASCADE,
+            project_id TEXT NOT NULL,
+            trigger_key TEXT NOT NULL UNIQUE,
+            status TEXT NOT NULL DEFAULT 'pending'
+                CHECK (status IN ('pending','running','completed','failed')),
+            outcome_json TEXT NOT NULL,
+            regressed INTEGER NOT NULL CHECK (regressed IN (0,1)),
+            cycle_id INTEGER,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_observation_project_status
+            ON dockyard_observation_triggers(project_id,status);
+        """,
+        downgrade_sql="""
+        DROP TABLE IF EXISTS dockyard_observation_triggers;
         """,
     ),
 ]

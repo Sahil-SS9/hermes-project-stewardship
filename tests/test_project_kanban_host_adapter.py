@@ -28,9 +28,13 @@ _REQUIRED = {
     "list_epics",
     "create_task",
     "create_epic",
+    "update_task",
+    "assign_task",
     "update_epic",
     "transition_task",
     "link_tasks",
+    "unlink_tasks",
+    "list_links",
 }
 
 
@@ -61,6 +65,7 @@ class FakeProjectKanbanHost:
         self.create_calls: list[dict[str, Any]] = []
         self.transition_calls: list[tuple[str, str, dict[str, Any]]] = []
         self.provisioned: dict[str, dict[str, Any]] = {}
+        self.links: set[tuple[str, str]] = set()
 
     def capabilities(self) -> dict[str, Any]:
         return {"contract_version": 2, "methods": sorted(_REQUIRED - {"capabilities"})}
@@ -130,6 +135,23 @@ class FakeProjectKanbanHost:
             self.tasks[task_id] = {"id": task_id, **payload}
         return dict(self.tasks[task_id])
 
+    def update_task(self, task_id: str, **payload: Any) -> dict[str, Any]:
+        if task_id not in self.tasks:
+            raise FakeHostFailure("task_not_found")
+        self.tasks[task_id].update(payload)
+        return dict(self.tasks[task_id])
+
+    def assign_task(
+        self,
+        task_id: str,
+        profile: str | None,
+        **payload: Any,
+    ) -> dict[str, Any]:
+        if task_id not in self.tasks:
+            raise FakeHostFailure("task_not_found")
+        self.tasks[task_id]["assignee"] = profile
+        return dict(self.tasks[task_id])
+
     def transition_task(
         self,
         task_id: str,
@@ -161,9 +183,42 @@ class FakeProjectKanbanHost:
         *,
         board: str | None = None,
     ) -> dict[str, str]:
+        self.links.add((parent_task_id, child_task_id))
         return {
             "parent_task_id": parent_task_id,
             "child_task_id": child_task_id,
+        }
+
+    def unlink_tasks(
+        self,
+        parent_task_id: str,
+        child_task_id: str,
+        *,
+        board: str | None = None,
+    ) -> dict[str, str]:
+        self.links.discard((parent_task_id, child_task_id))
+        return {
+            "parent_task_id": parent_task_id,
+            "child_task_id": child_task_id,
+        }
+
+    def list_links(
+        self,
+        task_id: str,
+        *,
+        board: str | None = None,
+    ) -> dict[str, list[dict[str, str]]]:
+        return {
+            "dependencies": [
+                {"parent_task_id": parent, "child_task_id": child}
+                for parent, child in sorted(self.links)
+                if child == task_id
+            ],
+            "dependents": [
+                {"parent_task_id": parent, "child_task_id": child}
+                for parent, child in sorted(self.links)
+                if parent == task_id
+            ],
         }
 
 

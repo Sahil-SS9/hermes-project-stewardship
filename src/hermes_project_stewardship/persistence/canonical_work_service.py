@@ -5,6 +5,7 @@ records remain authoritative for task and epic state. Dockyard writes only its
 own governance metadata around those canonical records.
 """
 from __future__ import annotations
+from datetime import date
 
 from typing import Any, Protocol
 
@@ -54,6 +55,35 @@ class CanonicalWorkPort(Protocol):
         child_id: str,
     ) -> dict[str, Any]: ...
 
+    def unlink_work(
+        self,
+        project_id: str,
+        parent_id: str,
+        child_id: str,
+    ) -> dict[str, Any]: ...
+
+    def list_work_links(
+        self,
+        project_id: str,
+        item_id: str,
+    ) -> list[dict[str, Any]]: ...
+
+    def update_work(
+        self,
+        project_id: str,
+        current_kind: str,
+        item_id: str,
+        **changes: Any,
+    ) -> dict[str, Any]: ...
+
+    def assign_work(
+        self,
+        project_id: str,
+        kind: str,
+        item_id: str,
+        assignee: str | None,
+    ) -> dict[str, Any]: ...
+
 
 _CANONICAL_STATUS = {
     "backlog": "backlog",
@@ -67,6 +97,7 @@ _CANONICAL_STATUS = {
     "blocked": "blocked",
     "active": "backlog",
 }
+_UNSET = object()
 
 
 class CanonicalWorkPartialError(RuntimeError):
@@ -142,6 +173,7 @@ class CanonicalWorkService:
         items: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         bindings = self.metadata.bindings(project_id)
+        details = self.metadata.details(project_id)
         ranks = {
             (row["item_kind"], row["item_ref"]): row
             for row in self.metadata.list_backlog(project_id)
@@ -161,17 +193,25 @@ class CanonicalWorkService:
             )
             if not view.get("created_by") and binding is not None:
                 view["created_by"] = binding.get("created_by_id")
+            planning = details.get(view["ref"], {})
+            view["labels"] = list(planning.get("labels") or [])
+            view["evidence_refs"] = list(planning.get("evidence_refs") or [])
+            view["estimate_days"] = planning.get("estimate_days")
+            view["due"] = planning.get("due")
             output.append(view)
         return output
 
     @staticmethod
     def _body(
         *,
+        body: str | None = None,
         labels: list[str] | None,
         evidence_refs: list[str] | None,
         estimate_days: float | None,
     ) -> str | None:
         lines: list[str] = []
+        if body and body.strip():
+            lines.append(body.strip())
         if labels:
             lines.append("Labels: " + ", ".join(labels))
         if evidence_refs:
@@ -187,10 +227,12 @@ class CanonicalWorkService:
         title: str,
         *,
         actor: Actor,
+        body: str | None = None,
         parent_ref: str | None = None,
         labels: list[str] | None = None,
         evidence_refs: list[str] | None = None,
         estimate_days: float | None = None,
+        due: str | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         self._require_project(project_id)
@@ -202,6 +244,7 @@ class CanonicalWorkService:
             kind=kind,
             title=title.strip(),
             body=self._body(
+                body=body,
                 labels=labels,
                 evidence_refs=evidence_refs,
                 estimate_days=estimate_days,
@@ -222,6 +265,15 @@ class CanonicalWorkService:
             )
         except Exception:
             raise CanonicalWorkPartialError(view) from None
+        self.metadata.upsert_details(
+            project_id,
+            view["ref"],
+            labels=list(labels or []),
+            evidence_refs=list(evidence_refs or []),
+            estimate_days=estimate_days,
+            due=self._validate_due(due),
+            actor=actor,
+        )
         view = self._overlay_items(project_id, [view])[0]
         self._audit(
             actor=actor,
@@ -230,6 +282,17 @@ class CanonicalWorkService:
             detail={"kind": kind, "canonical": True},
         )
         return view
+
+    @staticmethod
+    def _validate_due(value: str | None) -> str | None:
+        if value is None or not str(value).strip():
+            return None
+        clean = str(value).strip()
+        try:
+            date.fromisoformat(clean)
+        except ValueError:
+            raise ValueError("due must be an ISO date (YYYY-MM-DD)") from None
+        return clean
 
     def list(
         self,
@@ -270,12 +333,203 @@ class CanonicalWorkService:
             if (row.get("parent_task_id") or row.get("parent_id")) == ref
         ]
         history = item.get("history") or item.get("events") or []
+        by_ref = {row["ref"]: row for row in items}
+        links = self.port.list_work_links(project_id, ref)
+        dependencies = [
+            by_ref[row["task_id"]]
+            for row in links
+            if row.get("direction") == "parent" and row.get("task_id") in by_ref
+        ]
+        dependents = [
+            by_ref[row["task_id"]]
+            for row in links
+            if row.get("direction") == "child" and row.get("task_id") in by_ref
+        ]
         return {
             "work_item": item,
             "parent": parent,
             "children": children,
+            "dependencies": dependencies,
+            "dependents": dependents,
             "history": history if isinstance(history, list) else [],
         }
+
+    def update_item(
+        self,
+        project_id: str,
+        ref: str,
+        *,
+        actor: Actor,
+        title: Any = _UNSET,
+        item_type: Any = _UNSET,
+        body: Any = _UNSET,
+        parent_ref: Any = _UNSET,
+        labels: Any = _UNSET,
+        evidence_refs: Any = _UNSET,
+        estimate_days: Any = _UNSET,
+        due: Any = _UNSET,
+    ) -> dict[str, Any]:
+        self._require_project(project_id)
+        current = self.get(project_id, ref)
+        if current is None:
+            raise ValueError(f"no such canonical work item {ref}")
+        changes: dict[str, Any] = {}
+        changed_fields: list[str] = []
+        if title is not _UNSET:
+            if not isinstance(title, str) or len(title.strip()) < 3:
+                raise ValueError("title must be at least 3 characters")
+            changes["title"] = title.strip()
+            changed_fields.append("title")
+        new_kind = current["kind"]
+        if item_type is not _UNSET:
+            new_kind = self._kind(str(item_type))
+            if current["kind"] == "epic" or new_kind == "epic":
+                raise ValueError("task/epic conversion is not supported")
+            changes["kind"] = new_kind
+            changed_fields.append("type")
+        if body is not _UNSET:
+            if body is not None and not isinstance(body, str):
+                raise ValueError("body must be text or null")
+            changes["body"] = body.strip() if isinstance(body, str) else None
+            changed_fields.append("body")
+        if parent_ref is not _UNSET:
+            if parent_ref == ref:
+                raise ValueError("a task cannot be its own parent")
+            if parent_ref is not None and self.get(project_id, str(parent_ref)) is None:
+                raise ValueError("parent task belongs to another project or is missing")
+            changes["parent_id"] = parent_ref
+            changed_fields.append("parent_ref")
+
+        planning = {
+            "labels": list(current.get("labels") or []),
+            "evidence_refs": list(current.get("evidence_refs") or []),
+            "estimate_days": current.get("estimate_days"),
+            "due": current.get("due"),
+        }
+        if labels is not _UNSET:
+            if not isinstance(labels, list) or any(not isinstance(v, str) for v in labels):
+                raise ValueError("labels must be a list of text values")
+            planning["labels"] = [value.strip() for value in labels if value.strip()]
+            changed_fields.append("labels")
+        if evidence_refs is not _UNSET:
+            if not isinstance(evidence_refs, list) or any(
+                not isinstance(v, str) for v in evidence_refs
+            ):
+                raise ValueError("evidence_refs must be a list of text values")
+            planning["evidence_refs"] = [
+                value.strip() for value in evidence_refs if value.strip()
+            ]
+            changed_fields.append("evidence_refs")
+        if estimate_days is not _UNSET:
+            if estimate_days is not None and (
+                not isinstance(estimate_days, (int, float)) or estimate_days < 0
+            ):
+                raise ValueError("estimate_days must be non-negative or null")
+            planning["estimate_days"] = estimate_days
+            changed_fields.append("estimate_days")
+        if due is not _UNSET:
+            planning["due"] = self._validate_due(due)
+            changed_fields.append("due")
+        if not changed_fields:
+            raise ValueError("at least one work-item field is required")
+
+        updated = self.port.update_work(
+            project_id,
+            current["kind"],
+            ref,
+            **changes,
+        )
+        if new_kind != current["kind"]:
+            self.metadata.rekey_kind(project_id, ref, current["kind"], new_kind)
+        self.metadata.upsert_details(
+            project_id,
+            ref,
+            labels=planning["labels"],
+            evidence_refs=planning["evidence_refs"],
+            estimate_days=planning["estimate_days"],
+            due=planning["due"],
+            actor=actor,
+        )
+        view = self._overlay_items(project_id, [self._view(updated)])[0]
+        self._audit(
+            actor=actor,
+            action="workitem.updated",
+            subject=ref,
+            detail={"fields": changed_fields},
+        )
+        return view
+
+    def assign_item(
+        self,
+        project_id: str,
+        ref: str,
+        assignee: str | None,
+        *,
+        actor: Actor,
+    ) -> dict[str, Any]:
+        self._require_project(project_id)
+        current = self.get(project_id, ref)
+        if current is None:
+            raise ValueError(f"no such canonical work item {ref}")
+        clean = assignee.strip() if isinstance(assignee, str) and assignee.strip() else None
+        updated = self.port.assign_work(
+            project_id,
+            current["kind"],
+            ref,
+            clean,
+        )
+        view = self._overlay_items(project_id, [self._view(updated)])[0]
+        self._audit(
+            actor=actor,
+            action="workitem.assigned",
+            subject=ref,
+            detail={"from": current.get("assignee"), "to": clean},
+        )
+        return view
+
+    def add_dependency(
+        self,
+        project_id: str,
+        ref: str,
+        dependency_ref: str,
+        *,
+        actor: Actor,
+    ) -> dict[str, Any]:
+        self._require_project(project_id)
+        current = self.get(project_id, ref)
+        dependency = self.get(project_id, dependency_ref)
+        if current is None or dependency is None:
+            raise ValueError("dependency task belongs to another project or is missing")
+        if current["kind"] == "epic" or dependency["kind"] == "epic":
+            raise ValueError("task dependencies cannot target epics")
+        result = self.port.link_work(project_id, dependency_ref, ref)
+        self._audit(
+            actor=actor,
+            action="workitem.dependency_added",
+            subject=ref,
+            detail={"dependency": dependency_ref},
+        )
+        return result
+
+    def remove_dependency(
+        self,
+        project_id: str,
+        ref: str,
+        dependency_ref: str,
+        *,
+        actor: Actor,
+    ) -> dict[str, Any]:
+        self._require_project(project_id)
+        if self.get(project_id, ref) is None or self.get(project_id, dependency_ref) is None:
+            raise ValueError("dependency task belongs to another project or is missing")
+        result = self.port.unlink_work(project_id, dependency_ref, ref)
+        self._audit(
+            actor=actor,
+            action="workitem.dependency_removed",
+            subject=ref,
+            detail={"dependency": dependency_ref},
+        )
+        return result
 
     def transition(
         self,

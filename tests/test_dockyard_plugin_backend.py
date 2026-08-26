@@ -167,7 +167,25 @@ def test_plugin_approve_and_reject_use_real_upstream_contract(client):
     approve_response = client.post(
         f"/api/plugins/hermes-dockyard/initiatives/{approved['ref']}/approve")
     assert approve_response.status_code == 200, approve_response.text
-    assert approve_response.json()["status"] == "approved"
+    assert approve_response.json()["status"] == "executing"
+
+    completed = client.post(
+        f"/api/plugins/hermes-dockyard/initiatives/{approved['ref']}/complete",
+        json={"verified": True, "regressed": False},
+    )
+    assert completed.status_code == 200, completed.text
+    assert completed.json()["engine_status"] == "completed"
+    observations = client.get(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/observations"
+    )
+    assert observations.status_code == 200, observations.text
+    assert observations.json()["observations"][0]["status"] == "pending"
+    observed = client.post(
+        f"/api/plugins/hermes-dockyard/observations/{approved['ref']}/run",
+        json={},
+    )
+    assert observed.status_code == 200, observed.text
+    assert observed.json()["status"] == "completed"
 
     reject_response = client.post(
         f"/api/plugins/hermes-dockyard/initiatives/{rejected['ref']}/reject")
@@ -228,6 +246,75 @@ def test_project_management_and_visualisation_routes(client):
     resumed = client.post(
         f"/api/plugins/hermes-dockyard/projects/{project_id}/resume")
     assert resumed.status_code == 200, resumed.text
+
+
+def test_work_item_editor_assignment_and_dependencies_through_plugin(client):
+    project_id = "work-editor-ui"
+    created = client.post("/api/plugins/hermes-dockyard/onboard", json={
+        "project_id": project_id,
+        "repo_path": "/srv/work-editor-ui",
+        "mission": "exercise complete work management",
+        "lead_profile": "octacon",
+    })
+    assert created.status_code == 200, created.text
+
+    with TestClient(plugin_api._app) as upstream:
+        first = upstream.post(
+            f"/stewardship/v1/projects/{project_id}/work-items",
+            json={"type": "task", "title": "Editable", "actor_id": "sahil"},
+        )
+        second = upstream.post(
+            f"/stewardship/v1/projects/{project_id}/work-items",
+            json={"type": "task", "title": "Dependency", "actor_id": "sahil"},
+        )
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200, second.text
+    first_ref = first.json()["ref"]
+    second_ref = second.json()["ref"]
+
+    edited = client.patch(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items/{first_ref}",
+        json={
+            "title": "Edited through Desktop",
+            "type": "bug",
+            "body": "Reproduced and bounded",
+            "labels": ["desktop", "release"],
+            "evidence_refs": ["test:plugin"],
+            "estimate_days": 1.5,
+            "due": "2026-09-03",
+        },
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["title"] == "Edited through Desktop"
+    assert edited.json()["labels"] == ["desktop", "release"]
+
+    assigned = client.post(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items/{first_ref}/assign",
+        json={"assignee_id": "octacon"},
+    )
+    assert assigned.status_code == 200, assigned.text
+    assert assigned.json()["assignee"] == "octacon"
+
+    linked = client.post(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items/{first_ref}/dependencies",
+        json={"dependency_ref": second_ref},
+    )
+    assert linked.status_code == 200, linked.text
+    detail = client.get(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items/{first_ref}"
+    )
+    assert detail.status_code == 200, detail.text
+    assert [row["ref"] for row in detail.json()["dependencies"]] == [second_ref]
+
+    removed = client.post(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items/{first_ref}/dependencies/{second_ref}/remove",
+        json={},
+    )
+    assert removed.status_code == 200, removed.text
+    detail = client.get(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items/{first_ref}"
+    )
+    assert detail.json()["dependencies"] == []
 
 
 def test_bot_group_read_routes(client):

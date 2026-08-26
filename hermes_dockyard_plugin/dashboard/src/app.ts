@@ -8,8 +8,9 @@ import { createApi } from './api';
 
 interface AppState {
   api: Api;
-  tab: 'dashboard' | 'work' | 'inbox' | 'notifications' | 'onboard';
+  tab: 'dashboard' | 'work' | 'delivery' | 'inbox' | 'notifications' | 'onboard';
   projectId?: string;
+  selectedWorkRef?: string;
   workLayout: 'board' | 'table';
 }
 
@@ -39,6 +40,7 @@ export function initApp(
         disposed || gen !== renderSeq || !main.isConnected;
       if (s.tab === 'dashboard') await renderDashboard(main, s, stale);
       else if (s.tab === 'work') await renderWork(main, s, stale);
+      else if (s.tab === 'delivery') await renderDelivery(main, s, stale);
       else if (s.tab === 'inbox') await renderInbox(main, s, stale);
       else if (s.tab === 'notifications')
         await renderNotifications(main, s, stale);
@@ -73,6 +75,7 @@ export function initApp(
   const TABS: Array<{ id: AppState['tab']; label: string }> = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'work', label: 'Work' },
+    { id: 'delivery', label: 'Delivery' },
     { id: 'inbox', label: 'Approval Inbox' },
     { id: 'notifications', label: 'Notifications' },
     { id: 'onboard', label: 'Onboard Project' },
@@ -244,6 +247,107 @@ async function renderWork(
       const history = result.history.length
         ? textEl('pre', 'dy-history', JSON.stringify(result.history, null, 2))
         : textEl('p', 'dy-dim', 'No canonical history is available.');
+      const editor = document.createElement('div');
+      editor.className = 'dy-work-editor';
+      const titleInput = workInput('Title', current.title);
+      const typeSelect = document.createElement('select');
+      typeSelect.setAttribute('aria-label', 'Type');
+      ['task', 'bug', 'spike', 'subtask', 'gate'].forEach((kind) => {
+        const option = textEl('option', '', kind, kind) as HTMLOptionElement;
+        option.selected = kind === (current.kind ?? 'task');
+        typeSelect.appendChild(option);
+      });
+      const bodyInput = document.createElement('textarea');
+      bodyInput.setAttribute('aria-label', 'Body');
+      bodyInput.value = current.body ?? '';
+      const assigneeInput = workInput('Assignee', current.assignee ?? '');
+      const labelsInput = workInput('Labels, comma separated', (current.labels ?? []).join(', '));
+      const estimateInput = workInput(
+        'Estimate days',
+        current.estimate_days == null ? '' : String(current.estimate_days),
+      );
+      estimateInput.type = 'number';
+      estimateInput.min = '0';
+      estimateInput.step = '0.5';
+      const dueInput = workInput('Due date', current.due ?? '');
+      dueInput.type = 'date';
+      const save = workLayoutButton('Save changes', false);
+      const feedback = textEl('p', 'dy-dim', '');
+      save.addEventListener('click', async () => {
+        save.disabled = true;
+        feedback.textContent = 'Saving...';
+        try {
+          const updated = await s.api.updateWork(projectId, current.ref, {
+            title: titleInput.value,
+            type: typeSelect.value,
+            body: bodyInput.value || null,
+            labels: labelsInput.value.split(',').map((v: string) => v.trim()).filter(Boolean),
+            estimate_days: estimateInput.value ? Number(estimateInput.value) : null,
+            due: dueInput.value || null,
+          });
+          if ((current.assignee ?? '') !== assigneeInput.value.trim()) {
+            await s.api.assignWork(
+              projectId,
+              current.ref,
+              assigneeInput.value.trim() || null,
+            );
+          }
+          feedback.textContent = 'Saved.';
+          openDetail(updated);
+        } catch {
+          feedback.textContent = 'Save failed.';
+          save.disabled = false;
+        }
+      });
+      editor.append(
+        titleInput,
+        typeSelect,
+        bodyInput,
+        assigneeInput,
+        labelsInput,
+        estimateInput,
+        dueInput,
+        save,
+        feedback,
+      );
+
+      const dependencyEditor = document.createElement('div');
+      dependencyEditor.className = 'dy-dependency-editor';
+      dependencyEditor.appendChild(textEl('h3', '', 'Dependencies'));
+      result.dependencies.forEach((dependency) => {
+        const row = document.createElement('div');
+        row.className = 'dy-dependency-row';
+        row.appendChild(textEl('span', '', `${dependency.ref}: ${dependency.title}`));
+        const remove = workLayoutButton('Remove', false);
+        remove.addEventListener('click', async () => {
+          remove.disabled = true;
+          try {
+            await s.api.removeDependency(projectId, current.ref, dependency.ref);
+            openDetail(current);
+          } catch {
+            remove.textContent = 'Failed';
+            remove.disabled = false;
+          }
+        });
+        row.appendChild(remove);
+        dependencyEditor.appendChild(row);
+      });
+      const dependencyInput = workInput('Dependency task ref', '');
+      const addDependency = workLayoutButton('Add dependency', false);
+      addDependency.addEventListener('click', async () => {
+        const dependencyRef = dependencyInput.value.trim();
+        if (!dependencyRef) return;
+        addDependency.disabled = true;
+        try {
+          await s.api.addDependency(projectId, current.ref, dependencyRef);
+          openDetail(current);
+        } catch {
+          addDependency.textContent = 'Add failed';
+          addDependency.disabled = false;
+        }
+      });
+      dependencyEditor.append(dependencyInput, addDependency);
+
       detail.replaceChildren(
         textEl('h2', '', current.title),
         textEl('p', 'dy-dim', `${current.ref} · ${current.kind ?? 'task'} · ${current.status}`),
@@ -253,6 +357,8 @@ async function renderWork(
           ? textEl('p', 'dy-warning', current.blocked_reason || 'Blocked; no reason supplied.')
           : textEl('span', '', ''),
         textEl('p', '', `Parent: ${result.parent?.ref ?? 'None'} · Children: ${result.children.length}`),
+        editor,
+        dependencyEditor,
         textEl('h3', '', 'History'),
         history,
       );
@@ -343,6 +449,131 @@ async function renderWork(
   const section = document.createElement('section');
   section.append(toolbar, split);
   main.replaceChildren(section);
+  if (s.selectedWorkRef) {
+    const selected = items.find((item) => item.ref === s.selectedWorkRef);
+    s.selectedWorkRef = undefined;
+    if (selected) openDetail(selected);
+  }
+}
+
+async function renderDelivery(
+  main: HTMLElement,
+  s: AppState,
+  isStale: () => boolean,
+): Promise<void> {
+  const dashboard = await s.api.dashboard();
+  const projects = dashboard.projects ?? [];
+  if (projects.length === 0) {
+    main.replaceChildren(textEl('div', 'dy-empty', 'Onboard a project to manage delivery.'));
+    return;
+  }
+  const projectId = s.projectId && projects.some((p) => p.id === s.projectId)
+    ? s.projectId
+    : projects[0].id;
+  s.projectId = projectId;
+  const [initiativeResponse, workResponse, observationResponse] = await Promise.all([
+    s.api.initiatives(projectId),
+    s.api.workItems(projectId),
+    s.api.observations(projectId),
+  ]);
+  if (isStale()) return;
+  const initiatives = initiativeResponse.initiatives ?? [];
+  const work = workResponse.work_items ?? [];
+  const observations = new Map(
+    (observationResponse.observations ?? []).map((row) => [row.initiative_ref, row]),
+  );
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'dy-work-toolbar';
+  const projectSelect = document.createElement('select');
+  projectSelect.setAttribute('aria-label', 'Delivery project');
+  projects.forEach((project) => {
+    const option = textEl('option', '', project.id, project.id) as HTMLOptionElement;
+    option.selected = project.id === projectId;
+    projectSelect.appendChild(option);
+  });
+  projectSelect.addEventListener('change', () => {
+    s.projectId = projectSelect.value;
+    void renderDelivery(main, s, isStale);
+  });
+  toolbar.append(projectSelect);
+
+  const list = document.createElement('div');
+  list.className = 'dy-delivery-list';
+  initiatives.forEach((initiative) => {
+    const card = document.createElement('article');
+    card.className = 'dy-card dy-delivery-card';
+    card.append(
+      textEl('h2', '', initiative.title),
+      textEl('p', 'dy-dim', `${initiative.ref} · ${initiative.status}`),
+      textEl('p', '', initiative.expected_outcome || 'No expected outcome supplied.'),
+      textEl('p', '', `Execution board: ${initiative.board_slug || 'Not bound'}`),
+    );
+    const linked = work.filter((item) =>
+      item.initiative_ref === initiative.ref);
+    const links = document.createElement('div');
+    links.className = 'dy-delivery-work';
+    links.appendChild(textEl('h3', '', `Bound work (${linked.length})`));
+    linked.forEach((item) => {
+      const button = workLayoutButton(`${item.ref}: ${item.title}`, false);
+      button.addEventListener('click', () => {
+        s.projectId = projectId;
+        s.selectedWorkRef = item.ref;
+        (document.querySelector('[data-tab="work"]') as HTMLButtonElement)?.click();
+      });
+      links.appendChild(button);
+    });
+    card.appendChild(links);
+
+    const observation = observations.get(initiative.ref);
+    card.appendChild(textEl(
+      'p',
+      'dy-dim',
+      observation
+        ? `Observation: ${observation.status}${observation.cycle_id ? ` · cycle ${observation.cycle_id}` : ''}`
+        : 'Observation: not scheduled',
+    ));
+    const actions = document.createElement('div');
+    actions.className = 'dy-delivery-actions';
+    const run = async (button: HTMLButtonElement, operation: () => Promise<unknown>) => {
+      button.disabled = true;
+      try {
+        await operation();
+        await renderDelivery(main, s, isStale);
+      } catch {
+        button.textContent = 'Action failed';
+        button.disabled = false;
+      }
+    };
+    if (initiative.status === 'pending_approval') {
+      const approve = workLayoutButton('Approve and start execution', false);
+      approve.addEventListener('click', () => void run(approve, () => s.api.approve(initiative.ref)));
+      actions.appendChild(approve);
+    }
+    if (initiative.status === 'executing') {
+      const complete = workLayoutButton('Complete with verified outcome', false);
+      complete.addEventListener('click', () =>
+        void run(complete, () => s.api.completeInitiative(initiative.ref, false)));
+      const regress = workLayoutButton('Record regression', false);
+      regress.addEventListener('click', () =>
+        void run(regress, () => s.api.completeInitiative(initiative.ref, true)));
+      actions.append(complete, regress);
+    }
+    if (observation?.status === 'pending') {
+      const observe = workLayoutButton('Run observation cycle', false);
+      observe.addEventListener('click', () =>
+        void run(observe, () => s.api.runObservation(initiative.ref)));
+      actions.appendChild(observe);
+    }
+    card.appendChild(actions);
+    list.appendChild(card);
+  });
+  if (initiatives.length === 0) {
+    list.appendChild(textEl('div', 'dy-empty', 'No initiatives for this project.'));
+  }
+  const section = document.createElement('section');
+  section.append(toolbar, list);
+  main.replaceChildren(section);
 }
 
 function workLayoutButton(labelText: string, active: boolean): HTMLButtonElement {
@@ -350,6 +581,13 @@ function workLayoutButton(labelText: string, active: boolean): HTMLButtonElement
   button.className = `dy-btn${active ? ' active' : ''}`;
   button.textContent = labelText;
   return button;
+}
+
+function workInput(labelText: string, value: string): HTMLInputElement {
+  const input = document.createElement('input');
+  input.setAttribute('aria-label', labelText);
+  input.value = value;
+  return input;
 }
 
 function workLink(item: WorkItem, open: (item: WorkItem) => void): HTMLButtonElement {

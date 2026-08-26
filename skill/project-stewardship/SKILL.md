@@ -5,7 +5,7 @@ description: >
   how to interpret mission/objectives, propose evidence-backed initiatives,
   run retrospectives and avoid busywork. Behaviour layer ONLY — all state
   changes go through typed stewardship tools; this skill never owns state.
-version: 0.2.0rc1
+version: 0.2.0rc2
 ---
 
 # Project Stewardship — steward behaviour

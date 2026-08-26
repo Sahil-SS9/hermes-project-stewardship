@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0rc2] - 2026-08-26
+
+### Added
+- Complete canonical work-item editing, assignment and dependency mutation
+  across RPC, Desktop proxy and dashboard UI.
+- Structured planning metadata for labels, evidence, estimates and due dates.
+- End-to-end initiative approval, canonical execution, completion/regression,
+  durable observation scheduling and idempotent internal observation cycles.
+- Delivery dashboard with initiative-to-work deep links and operator actions.
+
+### Changed
+- Approval now binds canonical work and enters execution atomically; it no
+  longer creates a legacy Dockyard work-item twin.
+- Dockyard schema advanced from version 13 to version 15.
+- Dashboard, API and CLI package metadata are aligned on `0.2.0rc2`.
+
+### Release state
+- Local engineering candidate. Publication and live activation remain separate
+  owner-controlled operations.
+
 ## [0.2.0rc1] - 2026-08-26
 
 ### Added

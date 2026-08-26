@@ -1,5 +1,6 @@
 """Dockyard governance metadata for canonical Hermes work records."""
 from __future__ import annotations
+import json
 
 from typing import Any
 
@@ -205,10 +206,107 @@ class CanonicalWorkMetadataStore:
             for row in rows
         }
 
+    def details(self, project_id: str) -> dict[str, dict[str, Any]]:
+        rows = self.store._conn.execute(
+            "SELECT * FROM dockyard_canonical_work_details WHERE project_id=?",
+            (project_id,),
+        ).fetchall()
+        return {
+            str(row["item_id"]): {
+                "labels": json.loads(row["labels_json"]),
+                "evidence_refs": json.loads(row["evidence_refs_json"]),
+                "estimate_days": row["estimate_days"],
+                "due": row["due"],
+            }
+            for row in rows
+        }
+
+    def upsert_details(
+        self,
+        project_id: str,
+        item_id: str,
+        *,
+        labels: list[str],
+        evidence_refs: list[str],
+        estimate_days: float | None,
+        due: str | None,
+        actor: Actor,
+    ) -> None:
+        with self.store.tx() as cx:
+            cx.execute(
+                """
+                INSERT INTO dockyard_canonical_work_details(
+                    project_id,item_id,labels_json,evidence_refs_json,
+                    estimate_days,due,updated_by,updated_by_kind,updated_at)
+                VALUES(?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(project_id,item_id) DO UPDATE SET
+                    labels_json=excluded.labels_json,
+                    evidence_refs_json=excluded.evidence_refs_json,
+                    estimate_days=excluded.estimate_days,
+                    due=excluded.due,
+                    updated_by=excluded.updated_by,
+                    updated_by_kind=excluded.updated_by_kind,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    project_id,
+                    item_id,
+                    json.dumps(labels, sort_keys=True),
+                    json.dumps(evidence_refs, sort_keys=True),
+                    estimate_days,
+                    due,
+                    actor.id,
+                    actor.kind.value,
+                    iso(),
+                ),
+            )
+
+    def rekey_kind(
+        self,
+        project_id: str,
+        item_id: str,
+        old_kind: str,
+        new_kind: str,
+    ) -> None:
+        if old_kind == new_kind:
+            return
+        with self.store.tx() as cx:
+            cx.execute(
+                """
+                INSERT INTO dockyard_canonical_work_bindings(
+                    project_id,item_kind,item_id,initiative_ref,
+                    created_by_id,created_by_kind,created_at)
+                SELECT project_id,?,item_id,initiative_ref,
+                       created_by_id,created_by_kind,created_at
+                FROM dockyard_canonical_work_bindings
+                WHERE project_id=? AND item_kind=? AND item_id=?
+                """,
+                (new_kind, project_id, old_kind, item_id),
+            )
+            cx.execute(
+                "UPDATE dockyard_canonical_backlog SET item_kind=? "
+                "WHERE project_id=? AND item_kind=? AND item_id=?",
+                (new_kind, project_id, old_kind, item_id),
+            )
+            cx.execute(
+                "DELETE FROM dockyard_canonical_work_bindings "
+                "WHERE project_id=? AND item_kind=? AND item_id=?",
+                (project_id, old_kind, item_id),
+            )
+
     def list_backlog(self, project_id: str) -> list[dict[str, Any]]:
         rows = self.store._conn.execute(
-            "SELECT item_id, item_kind, rank, priority_reason "
-            "FROM dockyard_canonical_backlog WHERE project_id=? ORDER BY rank",
+            """
+            SELECT b.item_id, b.item_kind, b.rank, b.priority_reason,
+                   w.initiative_ref
+            FROM dockyard_canonical_backlog AS b
+            LEFT JOIN dockyard_canonical_work_bindings AS w
+              ON w.project_id=b.project_id
+             AND w.item_kind=b.item_kind
+             AND w.item_id=b.item_id
+            WHERE b.project_id=?
+            ORDER BY b.rank
+            """,
             (project_id,),
         ).fetchall()
         return [
@@ -217,6 +315,7 @@ class CanonicalWorkMetadataStore:
                 "item_kind": str(row["item_kind"]),
                 "rank": int(row["rank"]),
                 "priority_reason": str(row["priority_reason"]),
+                "initiative_ref": row["initiative_ref"],
             }
             for row in rows
         ]

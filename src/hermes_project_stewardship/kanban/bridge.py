@@ -244,8 +244,106 @@ class ReferenceKanbanAdapter(KanbanAdapter):
         parent_id: str,
         child_id: str,
     ) -> Dict[str, Any]:
+        ids = {
+            item_id
+            for owner, _kind, item_id in self._canonical_items
+            if owner == project_id
+        }
+        if parent_id not in ids or child_id not in ids:
+            raise ValueError("dependency task belongs to another project or is missing")
+        if parent_id == child_id:
+            raise ValueError("a task cannot depend on itself")
+        stack = [child_id]
+        seen: set[str] = set()
+        while stack:
+            node = stack.pop()
+            if node == parent_id:
+                raise ValueError("dependency would create a cycle")
+            if node in seen:
+                continue
+            seen.add(node)
+            stack.extend(
+                child
+                for owner, parent, child in self._canonical_links
+                if owner == project_id and parent == node
+            )
         self._canonical_links.add((project_id, parent_id, child_id))
         return {"parent_task_id": parent_id, "child_task_id": child_id}
+
+    def unlink_work(
+        self,
+        project_id: str,
+        parent_id: str,
+        child_id: str,
+    ) -> Dict[str, Any]:
+        link = (project_id, parent_id, child_id)
+        if link not in self._canonical_links:
+            raise ValueError("dependency link was not found")
+        self._canonical_links.remove(link)
+        return {"parent_task_id": parent_id, "child_task_id": child_id}
+
+    def list_work_links(
+        self,
+        project_id: str,
+        item_id: str,
+    ) -> list[dict[str, Any]]:
+        rows = []
+        for owner, parent, child in sorted(self._canonical_links):
+            if owner != project_id:
+                continue
+            if child == item_id:
+                rows.append({"direction": "parent", "task_id": parent})
+            if parent == item_id:
+                rows.append({"direction": "child", "task_id": child})
+        return rows
+
+    def update_work(
+        self,
+        project_id: str,
+        current_kind: str,
+        item_id: str,
+        **changes: Any,
+    ) -> dict[str, Any]:
+        key = next(
+            (
+                candidate
+                for candidate in self._canonical_items
+                if candidate[0] == project_id and candidate[2] == item_id
+            ),
+            None,
+        )
+        if key is None:
+            raise ValueError(f"no such canonical work item {item_id}")
+        item = self._canonical_items[key]
+        if "title" in changes:
+            item["title"] = changes["title"]
+        if "body" in changes:
+            item["body"] = changes["body"]
+        if "parent_id" in changes:
+            item["parent_task_id"] = changes["parent_id"]
+        new_kind = str(changes.get("kind", item["kind"]))
+        item["kind"] = new_kind
+        item["type"] = new_kind
+        if new_kind != key[1]:
+            new_key = (project_id, new_kind, item_id)
+            self._canonical_items[new_key] = self._canonical_items.pop(key)
+            for idempotency_key, stored_key in list(self._canonical_keys.items()):
+                if stored_key == key:
+                    self._canonical_keys[idempotency_key] = new_key
+        return dict(item)
+
+    def assign_work(
+        self,
+        project_id: str,
+        kind: str,
+        item_id: str,
+        assignee: str | None,
+    ) -> dict[str, Any]:
+        for key, item in self._canonical_items.items():
+            if key[0] == project_id and key[2] == item_id:
+                item["assignee"] = assignee
+                return dict(item)
+        raise ValueError(f"no such canonical work item {item_id}")
 
     def cards(self, board_id: str) -> List[Dict[str, Any]]:
         rows = self.store._conn.execute(

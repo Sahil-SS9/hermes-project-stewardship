@@ -59,13 +59,37 @@ export interface WorkItem {
   blocked_reason?: string | null;
   priority_rank?: number | null;
   priority_reason?: string | null;
+  labels?: string[];
+  evidence_refs?: string[];
+  estimate_days?: number | null;
+  due?: string | null;
+  initiative_ref?: string | null;
 }
 
 export interface WorkDetail {
   work_item: WorkItem;
   parent: WorkItem | null;
   children: WorkItem[];
+  dependencies: WorkItem[];
+  dependents: WorkItem[];
   history: Array<Record<string, unknown>>;
+}
+
+export interface Initiative {
+  ref: string;
+  project_id: string;
+  title: string;
+  status: string;
+  expected_outcome?: string | null;
+  board_slug?: string | null;
+}
+
+export interface Observation {
+  initiative_ref: string;
+  project_id: string;
+  status: string;
+  cycle_id?: number | null;
+  regressed: number | boolean;
 }
 
 export function createApi(sdk: HermesPluginSDK) {
@@ -79,6 +103,12 @@ export function createApi(sdk: HermesPluginSDK) {
   const put = <T,>(path: string, body: unknown): Promise<T> =>
     sdk.fetchJSON(`${BASE}${path}`, {
       method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body ?? {}),
+    });
+  const patch = <T,>(path: string, body: unknown): Promise<T> =>
+    sdk.fetchJSON(`${BASE}${path}`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body ?? {}),
     });
@@ -100,6 +130,26 @@ export function createApi(sdk: HermesPluginSDK) {
       get<WorkDetail>(
         `/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(ref)}`,
       ),
+    updateWork: (projectId: string, ref: string, changes: Record<string, unknown>) =>
+      patch<WorkItem>(
+        `/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(ref)}`,
+        changes,
+      ),
+    assignWork: (projectId: string, ref: string, assigneeId: string | null) =>
+      post<WorkItem>(
+        `/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(ref)}/assign`,
+        { assignee_id: assigneeId },
+      ),
+    addDependency: (projectId: string, ref: string, dependencyRef: string) =>
+      post(
+        `/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(ref)}/dependencies`,
+        { dependency_ref: dependencyRef },
+      ),
+    removeDependency: (projectId: string, ref: string, dependencyRef: string) =>
+      post(
+        `/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(ref)}/dependencies/${encodeURIComponent(dependencyRef)}/remove`,
+        {},
+      ),
     views: (projectId: string) =>
       get<{ views: Array<{ name: string; layout: string; filters?: Record<string, unknown> }> }>(
         `/projects/${encodeURIComponent(projectId)}/views`,
@@ -114,6 +164,21 @@ export function createApi(sdk: HermesPluginSDK) {
     onboard: (b: { project_id: string; repo_path: string; mission: string; lead_profile: string }) =>
       post('/onboard', b),
     approve: (ref: string) => post(`/initiatives/${encodeURIComponent(ref)}/approve`, {}),
+    initiatives: (projectId: string) =>
+      get<{ initiatives: Initiative[] }>(
+        `/projects/${encodeURIComponent(projectId)}/initiatives`,
+      ),
+    observations: (projectId: string) =>
+      get<{ observations: Observation[] }>(
+        `/projects/${encodeURIComponent(projectId)}/observations`,
+      ),
+    completeInitiative: (ref: string, regressed: boolean) =>
+      post(`/initiatives/${encodeURIComponent(ref)}/complete`, {
+        verified: !regressed,
+        regressed,
+      }),
+    runObservation: (ref: string) =>
+      post(`/observations/${encodeURIComponent(ref)}/run`, {}),
     ack: (id: number) => post(`/notifications/${id}/ack`, {}),
   };
 }

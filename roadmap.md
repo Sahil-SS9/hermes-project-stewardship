@@ -1,7 +1,7 @@
 # Hermes Dockyard roadmap
 
 Status: canonical forward-looking backlog
-Updated: 25/08/2026
+Updated: 26/08/2026
 
 This file is the single roadmap for work that remains after the current Dockyard build. Historical checklists and discrepancy reports are evidence sources, not active backlogs. A box in an older document is a claim to re-test against current code.
 
@@ -50,6 +50,10 @@ The following capabilities exist in current code and are not roadmap items unles
   dependency links and human gates with recovery journalling.
 - Marker-guarded legacy migration with snapshot-backed apply and rollback.
 - Consistent operational export and isolated restore with versioned manifests.
+- Complete canonical work editing, assignment, planning metadata and dependency
+  mutation through RPC, Desktop proxy and dashboard UI.
+- End-to-end initiative approval, canonical execution, completion/regression
+  and idempotent post-delivery observation cycles.
 
 The current approved slice is only considered delivered after the exact dirty candidate passes the tests and review gates, then receives a local commit.
 
@@ -126,20 +130,16 @@ Current evidence:
 
 ### DY-P1-01 - Full work-item editing and dependency graph
 
-State: partial
+State: complete locally in `0.2.0rc2`
 Sources: PM-01, PM-02, PM-08, UX-03, UX-04
 
 Current evidence:
 
-- Create and transition routes exist.
-- Parent linkage can be set during creation.
-- Labels and estimates are stored.
-- The Desktop board lists items but does not offer a complete item editor.
-
-Remaining outcome:
-
-- Humans and bots can edit, reassign and close work items from the product UI.
-- Parent, blocked-by and related-item relationships are visible and editable.
+- Strict RPC and Desktop proxy contracts edit canonical title, type, body,
+  labels, evidence, estimate and due date.
+- Human/bot reassignment and dependency add/remove operations preserve actor
+  attribution and fail closed on cross-project or cyclic links.
+- Work detail renders and edits assignment, planning fields and dependencies.
 
 Acceptance:
 
@@ -192,18 +192,19 @@ Acceptance:
 
 ### DY-P1-04 - End-to-end initiative delivery and observation
 
-State: partial
+State: complete locally in `0.2.0rc2`
 Sources: PM-07, TE-01, UX-01, G3, historical I8/C9
 
 Current evidence:
 
-- Initiative linkage is stored on queued work and shown in the backlog.
-- Promotion and Kanban integration services exist.
-- Approval, rejection, completion and board-binding backend contracts exist.
-
-Remaining outcome:
-
-- One product flow carries proposal to prioritisation, approval, Kanban execution, measured outcome and regression handling with no CLI step.
+- Approval idempotently binds canonical work and starts execution without a
+  legacy twin or dual write.
+- Completion/regression updates bound canonical work, initiative state and A2A
+  result/reputation inputs consistently.
+- Completion schedules one durable observation trigger; the trigger runs one
+  idempotent internal cycle and records completed/failed state.
+- Delivery UI exposes bound work deep links, approval, outcome/regression and
+  observation-cycle actions without a CLI step.
 
 Acceptance:
 

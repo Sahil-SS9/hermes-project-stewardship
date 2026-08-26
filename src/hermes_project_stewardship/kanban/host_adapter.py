@@ -23,9 +23,13 @@ _REQUIRED_HOST_METHODS = frozenset(
         "list_epics",
         "create_task",
         "create_epic",
+        "update_task",
+        "assign_task",
         "update_epic",
         "transition_task",
         "link_tasks",
+        "unlink_tasks",
+        "list_links",
     }
 )
 _COLUMN_STATUS = {
@@ -112,6 +116,18 @@ class UnavailableKanbanAdapter(KanbanAdapter):
         return self._refuse()
 
     def link_work(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        return self._refuse()
+
+    def unlink_work(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        return self._refuse()
+
+    def list_work_links(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        return self._refuse()
+
+    def update_work(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        return self._refuse()
+
+    def assign_work(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return self._refuse()
 
     def list_profiles(self) -> list[dict[str, Any]]:
@@ -426,6 +442,14 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
             )
         try:
             current_status = current["status"]
+            if target == "blocked":
+                raw = self.host.block_task(
+                    item_id,
+                    reason="Dockyard work item blocked",
+                    kind="dependency",
+                    board=board,
+                )
+                return self._work_record(raw, project_id=project_id, kind=kind)
             if target == "done" and current_status in {"backlog", "triage", "todo"}:
                 self.host.transition_task(item_id, "ready", board=board)
             options: dict[str, Any] = {"board": board}
@@ -445,6 +469,85 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
         board = self.project_board(project_id)
         try:
             return dict(self.host.link_tasks(parent_id, child_id, board=board))
+        except Exception as exc:
+            raise self._mapped_error(exc) from None
+
+    def unlink_work(
+        self,
+        project_id: str,
+        parent_id: str,
+        child_id: str,
+    ) -> dict[str, Any]:
+        board = self.project_board(project_id)
+        try:
+            return dict(self.host.unlink_tasks(parent_id, child_id, board=board))
+        except Exception as exc:
+            raise self._mapped_error(exc) from None
+
+    def list_work_links(
+        self,
+        project_id: str,
+        item_id: str,
+    ) -> list[dict[str, Any]]:
+        board = self.project_board(project_id)
+        try:
+            page = self.host.list_links(item_id, board=board, limit=500)
+            return [dict(item) for item in page.get("items") or ()]
+        except Exception as exc:
+            raise self._mapped_error(exc) from None
+
+    def update_work(
+        self,
+        project_id: str,
+        current_kind: str,
+        item_id: str,
+        **changes: Any,
+    ) -> dict[str, Any]:
+        board = self.project_board(project_id)
+        try:
+            if current_kind == "epic":
+                payload = {}
+                if "title" in changes:
+                    payload["title"] = changes["title"]
+                if "body" in changes:
+                    payload["description"] = changes["body"]
+                raw = self.host.update_epic(item_id, board=board, **payload)
+                return self._work_record(raw, project_id=project_id, kind="epic")
+            payload = {}
+            if "title" in changes:
+                payload["title"] = changes["title"]
+            if "body" in changes:
+                payload["body"] = changes["body"]
+            if "kind" in changes:
+                payload["task_kind"] = changes["kind"]
+            if "parent_id" in changes:
+                payload["parent_task_id"] = changes["parent_id"]
+            raw = self.host.update_task(item_id, board=board, **payload)
+            return self._work_record(
+                raw,
+                project_id=project_id,
+                kind=str(changes.get("kind", current_kind)),
+            )
+        except Exception as exc:
+            raise self._mapped_error(exc) from None
+
+    def assign_work(
+        self,
+        project_id: str,
+        kind: str,
+        item_id: str,
+        assignee: str | None,
+    ) -> dict[str, Any]:
+        if kind == "epic":
+            raise KanbanAdapterError(
+                "validation_error",
+                "canonical epics cannot be assigned",
+                fields={"kind": kind},
+            )
+        board = self.project_board(project_id)
+        try:
+            raw = self.host.assign_task(item_id, assignee, board=board)
+            return self._work_record(raw, project_id=project_id, kind=kind)
         except Exception as exc:
             raise self._mapped_error(exc) from None
 

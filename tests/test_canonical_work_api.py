@@ -177,6 +177,7 @@ def test_api_work_and_backlog_routes_use_canonical_service_only(store, enabled):
             "item_kind": "bug",
             "rank": 1,
             "priority_reason": "highest customer impact",
+            "initiative_ref": None,
         }
     ]
     assert store._conn.execute(
