@@ -8,10 +8,9 @@ turns gaps into evidence-backed initiatives, executes through existing Kanban,
 enforces explicit autonomy policy, and measures whether the project actually
 improved — from every surface (CLI, RPC API, Desktop panel, Discord/gateway).
 
-> Status: **v0.1.0-alpha.** Core domain engine implemented and tested (174 tests, 90% coverage).
-> Hermes runtime integration points are documented contracts
-> ([docs/architecture.md](docs/architecture.md#hermes-integration-contracts)),
-> not yet wired to a live gateway.
+> Status: **v0.2.0rc1 local release candidate.** Engineering and local quality
+> gates are green. The candidate is not committed, tagged, published, installed
+> or activated. Run `hermes verify --json` for current test and readiness evidence.
 
 ---
 
@@ -40,9 +39,11 @@ the fail-closed freeze sit:
 
 ## Architecture
 
-One canonical backend, many thin surfaces. There is no second state store:
-CLI, RPC API, gateway adapters and the Desktop panel all bind to the same
-service, which is the only writer of the SQLite (WAL) database.
+Canonical Hermes Projects/Kanban owns projects, tasks, epics, hierarchy,
+dependencies and execution state. Dockyard owns stewardship policy, evidence,
+rankings, views, workflows, approvals and audit metadata in its SQLite WAL
+store. Production work writes cross the versioned host adapter; there is no
+legacy task dual-write path.
 
 ![Architecture](docs/assets/architecture.svg)
 
@@ -53,7 +54,7 @@ service, which is the only writer of the SQLite (WAL) database.
 | CLI | `stewardctl` | human output by default, `--json` on reads |
 | RPC API | `/stewardship/v1` | FastAPI optional extra; bearer auth + rate limiting |
 | Gateway commands | Discord et al. | permission binding + idempotent approvals |
-| Desktop panel | React + Vite | thin client of the same RPC |
+| Desktop plugin | host React wrapper + vanilla TypeScript | thin client of the same RPC |
 
 ## Autonomy levels
 
@@ -78,10 +79,21 @@ Requires Python 3.10+. No third-party runtime dependencies for the core engine.
 git clone https://github.com/Sahil-SS9/hermes-project-stewardship.git
 cd hermes-project-stewardship
 uv venv && uv pip install -e ".[dev]"
-pytest                      # run the test suite
+hermes verify --json         # bootstrap, full suite and readiness smoke
 stewardctl --help           # CLI
 uvicorn hermes_project_stewardship.api.server:app --port 9310   # RPC API
 ```
+
+### Operational export and isolated restore
+
+```bash
+stewardctl --db ./stewardship.db export --output ./dockyard-export
+stewardctl restore --archive ./dockyard-export --target ./restored.db
+```
+
+Exports use SQLite's online backup API and include a versioned manifest,
+SHA-256 digest, byte size, schema version and integrity result. Restore refuses
+existing targets, traversal, symlinks, checksum mismatches and invalid schemas.
 
 ## 60-second example
 
@@ -123,6 +135,9 @@ dashboard of the same story.
 - [Threat model](docs/threat-model.md)
 - [Gateway command contract](docs/gateway-contract.md)
 - [Roadmap to upstream Hermes core](docs/upstream-path.md)
+- [API contract](docs/api.md)
+- [Canonical roadmap](roadmap.md)
+- [v0.2.0rc1 release packet](docs/release/0.2.0rc1-release-candidate.md)
 
 ## Security
 

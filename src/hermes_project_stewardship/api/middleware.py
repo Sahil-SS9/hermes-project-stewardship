@@ -101,14 +101,23 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 
 def error_envelope_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Uniform error shape for every non-2xx: {error:{code,message}}."""
+    """Uniform error shape for every non-2xx response."""
     status = getattr(exc, "status_code", 500)
     detail = getattr(exc, "detail", str(exc))
-    code = {
+    default_code = {
         400: "bad_request", 401: "unauthorized", 403: "forbidden",
         404: "not_found", 409: "conflict", 413: "payload_too_large",
-        429: "rate_limited", 500: "internal_error",
+        422: "validation_error", 429: "rate_limited",
+        500: "internal_error", 503: "host_unavailable",
     }.get(status, "error")
-    return JSONResponse(
-        {"error": {"code": code, "message": str(detail)}}, status_code=status
-    )
+    if isinstance(detail, dict):
+        error: dict[str, object] = {
+            "code": str(detail.get("code") or default_code),
+            "message": str(detail.get("message") or "request failed"),
+        }
+        fields = detail.get("fields")
+        if isinstance(fields, dict) and fields:
+            error["fields"] = fields
+    else:
+        error = {"code": default_code, "message": str(detail)}
+    return JSONResponse({"error": error}, status_code=status)

@@ -6,6 +6,7 @@ and end-to-end behaviour through the plugin's own endpoints.
 from __future__ import annotations
 
 import atexit
+import asyncio
 import base64
 import os
 import shutil
@@ -33,14 +34,30 @@ from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 import plugin_api  # noqa: E402
+from hermes_project_stewardship.api.server import create_app  # noqa: E402
+from hermes_project_stewardship.kanban import ReferenceKanbanAdapter  # noqa: E402
 
 
 @pytest.fixture()
 def client():
+    previous_app = plugin_api._app
+    previous_client = plugin_api._client
+    adapter = ReferenceKanbanAdapter(plugin_api._store)
+    plugin_api._app = create_app(plugin_api._store, kanban_adapter=adapter)
+    test_client = plugin_api.httpx.AsyncClient(
+        transport=plugin_api.httpx.ASGITransport(app=plugin_api._app),
+        base_url="http://dockyard.test",
+    )
+    plugin_api._client = test_client
     app = FastAPI()
     app.include_router(plugin_api.plugin_api, prefix="/api/plugins/hermes-dockyard")
-    with TestClient(app) as c:
-        yield c
+    try:
+        with TestClient(app) as c:
+            yield c
+    finally:
+        asyncio.run(test_client.aclose())
+        plugin_api._app = previous_app
+        plugin_api._client = previous_client
 
 
 def test_host_contract_router_and_health(client):
@@ -104,12 +121,12 @@ def test_onboard_then_dashboard_flow(client):
     assert "notifications" in notes.json()
 
 
-def test_duplicate_onboarding_refused(client):
+def test_existing_onboarding_converges_idempotently(client):
     r = client.post("/api/plugins/hermes-dockyard/onboard", json={
         "project_id": "alpha", "repo_path": "/srv/a",
         "mission": "again", "lead_profile": "octacon"})
-    # C-series council fix: re-onboarding cleanly refused (409), never silent 500
-    assert r.status_code in (409, 422)
+    assert r.status_code == 200
+    assert r.json()["canonical"]["status"] == "complete"
 
 
 def test_rich_dashboard_reads_are_exposed_through_plugin_router(client):
@@ -459,7 +476,7 @@ def test_plugin_create_queued_item_proxy(client):
     )
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["ref"].startswith("HDY-") and body["rank"] == 1
+    assert body["ref"].startswith("test-t-") and body["rank"] == 1
 
     work = client.get(
         f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items"

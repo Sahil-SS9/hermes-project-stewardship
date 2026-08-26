@@ -47,6 +47,15 @@ class KanbanAdapter(ABC):
     @abstractmethod
     def move_card(self, board_id: str, card_id: str, column: str) -> None: ...
 
+    def list_profiles(self) -> List[Dict[str, Any]]:
+        raise NotImplementedError("profile listing is not supported")
+
+    def validate_project(self, **payload: Any) -> Dict[str, Any]:
+        raise NotImplementedError("project validation is not supported")
+
+    def provision_project(self, **payload: Any) -> Dict[str, Any]:
+        raise NotImplementedError("project provisioning is not supported")
+
 
 class ReferenceKanbanAdapter(KanbanAdapter):
     """Local boards stored in the stewardship DB.
@@ -76,6 +85,12 @@ class ReferenceKanbanAdapter(KanbanAdapter):
 
     def __init__(self, store: Store) -> None:
         self.store = store
+        self._canonical_items: dict[tuple[str, str, str], dict[str, Any]] = {}
+        self._canonical_keys: dict[str, tuple[str, str, str]] = {}
+        self._canonical_sequence = 0
+        self._canonical_links: set[tuple[str, str, str]] = set()
+        self._provisioned_projects: dict[str, dict[str, Any]] = {}
+        self._provisioning_requests: dict[str, dict[str, Any]] = {}
         # executescript issues an implicit COMMIT; run DDL outside an explicit
         # transaction (statements are idempotent IF NOT EXISTS).
         self.store._conn.executescript(self.SCHEMA)
@@ -111,6 +126,126 @@ class ReferenceKanbanAdapter(KanbanAdapter):
                 "UPDATE kanban_cards SET column_name=? WHERE id=? AND board_id=?",
                 (column, int(card_id), int(board_id)),
             )
+
+    def list_profiles(self) -> List[Dict[str, Any]]:
+        return [{"name": "default", "is_default": True}]
+
+    def validate_project(self, **payload: Any) -> Dict[str, Any]:
+        return dict(payload)
+
+    def provision_project(self, **payload: Any) -> Dict[str, Any]:
+        key = str(payload["idempotency_key"])
+        existing = self._provisioned_projects.get(key)
+        if existing is not None:
+            if self._provisioning_requests[key] != payload:
+                from .host_adapter import KanbanAdapterError
+
+                raise KanbanAdapterError(
+                    "idempotency_conflict",
+                    "Idempotency key was already used for different project details",
+                    fields={"idempotency_key": ["Use a new idempotency key"]},
+                )
+            return {**existing, "replayed": True}
+        slug = str(payload["slug"])
+        board_slug = str(payload.get("board_slug") or slug)
+        project_id = f"ref-p-{slug}"
+        self.ensure_board(project_id, board_slug)
+        result = {
+            "status": "complete",
+            "idempotency_key": key,
+            "replayed": False,
+            "project": {
+                "id": project_id,
+                "slug": slug,
+                "name": str(payload["name"]),
+                "board_slug": board_slug,
+            },
+            "board": {"slug": board_slug, "project_id": project_id},
+        }
+        self._provisioning_requests[key] = dict(payload)
+        self._provisioned_projects[key] = result
+        return result
+
+    def create_work(
+        self,
+        project_id: str,
+        *,
+        kind: str,
+        title: str,
+        body: str | None,
+        assignee: str | None,
+        created_by: str,
+        parent_id: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        if idempotency_key and idempotency_key in self._canonical_keys:
+            return dict(self._canonical_items[self._canonical_keys[idempotency_key]])
+        if parent_id is not None and not any(
+            key[0] == project_id and key[2] == parent_id
+            for key in self._canonical_items
+        ):
+            raise ValueError(f"parent {parent_id} not found")
+        self._canonical_sequence += 1
+        prefix = "e" if kind == "epic" else "t"
+        item_id = f"test-{prefix}-{self._canonical_sequence}"
+        item = {
+            "id": item_id,
+            "ref": item_id,
+            "kind": kind,
+            "type": kind,
+            "project_id": project_id,
+            "title": title,
+            "body": body,
+            "status": "active" if kind == "epic" else "backlog",
+            "assignee": assignee,
+            "created_by": created_by,
+            "parent_task_id": parent_id,
+        }
+        key = (project_id, kind, item_id)
+        self._canonical_items[key] = item
+        if idempotency_key:
+            self._canonical_keys[idempotency_key] = key
+        return dict(item)
+
+    def list_work(self, project_id: str) -> list[dict[str, Any]]:
+        return [
+            dict(item)
+            for (owner, _kind, _item_id), item in self._canonical_items.items()
+            if owner == project_id
+        ]
+
+    def get_work(
+        self,
+        project_id: str,
+        kind: str,
+        item_id: str,
+    ) -> dict[str, Any]:
+        for (owner, _stored_kind, stored_id), item in self._canonical_items.items():
+            if owner == project_id and stored_id == item_id:
+                return dict(item)
+        raise ValueError(f"no such canonical work item {item_id}")
+
+    def transition_work(
+        self,
+        project_id: str,
+        kind: str,
+        item_id: str,
+        status: str,
+    ) -> dict[str, Any]:
+        for key, item in self._canonical_items.items():
+            if key[0] == project_id and key[2] == item_id:
+                item["status"] = status
+                return dict(item)
+        raise ValueError(f"no such canonical work item {item_id}")
+
+    def link_work(
+        self,
+        project_id: str,
+        parent_id: str,
+        child_id: str,
+    ) -> Dict[str, Any]:
+        self._canonical_links.add((project_id, parent_id, child_id))
+        return {"parent_task_id": parent_id, "child_task_id": child_id}
 
     def cards(self, board_id: str) -> List[Dict[str, Any]]:
         rows = self.store._conn.execute(

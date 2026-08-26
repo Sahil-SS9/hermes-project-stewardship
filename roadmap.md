@@ -46,6 +46,10 @@ The following capabilities exist in current code and are not roadmap items unles
 - Kanban bridge contracts, a local reference adapter and Dockyard-to-stewardship integration seam.
 - Discord adapter and reusable message-card templates.
 - Responsive light/dark Desktop UI with keyboard navigation, reduced-motion handling and numerically checked contrast.
+- Versioned, manually started workflow graphs that materialise canonical tasks,
+  dependency links and human gates with recovery journalling.
+- Marker-guarded legacy migration with snapshot-backed apply and rollback.
+- Consistent operational export and isolated restore with versioned manifests.
 
 The current approved slice is only considered delivered after the exact dirty candidate passes the tests and review gates, then receives a local commit.
 
@@ -71,17 +75,19 @@ Acceptance:
 
 ### DY-R0-02 - Documentation and metadata coherence
 
-State: open
+State: implemented locally; pending DY-R0-01 commit
 Depends on: DY-R0-01
 
 Outcome:
 
 - README, version, changelog, route documentation and test counts describe the same product state.
 
-Current gap:
+Current evidence:
 
-- `README.md` still advertises the older alpha baseline and historical test count.
-- The old implementation checklist and mockup discrepancy matrix contain stale open markers.
+- README, changelog, package/plugin/API versions and API contract describe
+  `0.2.0rc1` and distinguish local engineering from release/activation.
+- Historical trackers point to this roadmap and remain evidence rather than
+  parallel active backlogs.
 
 Acceptance:
 
@@ -92,7 +98,7 @@ Acceptance:
 
 ### DY-R0-03 - Operational backup and export
 
-State: open
+State: implemented locally; pending DY-R0-01 commit
 Source: historical P10
 
 Outcome:
@@ -105,6 +111,14 @@ Acceptance:
 - Live SQLite consistency is preserved during export.
 - Restore is tested against a disposable database.
 - Secrets and machine-specific paths are excluded or explicitly classified.
+
+Current evidence:
+
+- `stewardctl export` uses SQLite online backup and writes manifest v1 with
+  schema, size, checksum and integrity evidence.
+- `stewardctl restore` verifies containment, symlinks, size, checksum, schema
+  and integrity before atomically publishing a new target.
+- Round-trip, tamper, traversal, symlink and CLI tests use disposable stores.
 
 ## Priority 1: complete the product loop
 
@@ -443,7 +457,9 @@ The following old open markers have current code/tests and should not be copied 
 
 - A separate end-user TUI is retired. PRD UX-01 requires the product UI; CLI remains internal plumbing.
 - The old standalone `desktop/stewardship-panel` scaffold is superseded by the active Hermes Desktop plugin surface.
-- An executable Workflow engine is not part of the delivered Saved views feature. Saved views are static presentation queries. Any future automation engine requires a separate approved product requirement, threat model and execution policy.
+- Saved Views remain presentation-only. The separate workflow subsystem is
+  manually started, versioned and journalled; it does not turn a view into an
+  automation trigger and has no activated scheduler.
 - Notifications remain a primary tab rather than an appbar popover.
 - Theme follows the host OS rather than using an in-panel toggle.
 - The Dockyard command-palette entry remains an intentional Desktop integration.
@@ -459,10 +475,14 @@ Carried from PRD v0.3 unless the owner changes scope:
 
 ## Sequencing recommendation
 
-1. Close DY-R0-01 now.
-2. Correct documentation coherence in DY-R0-02.
-3. Build DY-P1-04 next because it closes the core product promise.
-4. Build DY-P1-01 and DY-P1-02 to complete daily PM use.
-5. Add fleet coordination and remaining trust/verification depth.
-6. Run the demo and fresh-clone release gates.
-7. Ask separately for publish and activation approval.
+Detailed scoring, dependencies and decisions: [`docs/DOCKYARD-NEXT-PLAN.md`](docs/DOCKYARD-NEXT-PLAN.md).
+Release evidence and approval gates: [`docs/release/0.2.0rc1-release-candidate.md`](docs/release/0.2.0rc1-release-candidate.md).
+
+1. Approve and create path-scoped local commits for DY-R0-01.
+2. Run fresh-clone, coverage and optional-lane proof on immutable commits.
+3. Harden the API/security contract and complete the owner walkthrough.
+4. Decide whether to pilot the current RC or wait for the Priority-1 loop.
+5. Build full work editing/dependencies, then the initiative-to-outcome loop.
+6. Add planning depth, verification integrations and fleet operations in the
+   prioritised order.
+7. Ask separately for publish, activation, migration and scheduler approval.

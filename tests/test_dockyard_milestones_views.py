@@ -7,6 +7,7 @@ fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from hermes_project_stewardship.api.server import create_app  # noqa: E402
+from hermes_project_stewardship.kanban import ReferenceKanbanAdapter  # noqa: E402
 from hermes_project_stewardship.dockyard import (  # noqa: E402
     Actor,
     ActorKind,
@@ -26,7 +27,7 @@ def human() -> Actor:
 @pytest.fixture()
 def env(tmp_path):
     store = Store(tmp_path / "mv.db")
-    app = create_app(store)
+    app = create_app(store, kanban_adapter=ReferenceKanbanAdapter(store))
     c = TestClient(app)
     svc = DockyardService(store)
     r = c.post("/stewardship/v1/projects/dy1/enable", json={

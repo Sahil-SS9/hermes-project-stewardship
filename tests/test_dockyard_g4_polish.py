@@ -7,6 +7,7 @@ fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from hermes_project_stewardship.api.server import create_app  # noqa: E402
+from hermes_project_stewardship.kanban import ReferenceKanbanAdapter  # noqa: E402
 from hermes_project_stewardship.persistence.dockyard_service import (
     DockyardService,  # noqa: E402
 )
@@ -19,7 +20,9 @@ from hermes_project_stewardship.persistence.store import Store  # noqa: E402
 @pytest.fixture()
 def env(tmp_path):
     store = Store(tmp_path / "g4.db")
-    c = TestClient(create_app(store))
+    c = TestClient(
+        create_app(store, kanban_adapter=ReferenceKanbanAdapter(store))
+    )
     yield c, store
     store.close()
 

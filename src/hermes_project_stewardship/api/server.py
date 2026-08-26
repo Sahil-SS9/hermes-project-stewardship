@@ -21,11 +21,11 @@ import binascii
 import os
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, cast, Dict, List, NoReturn, Optional
 
 try:
     from fastapi import APIRouter, FastAPI, HTTPException, Request
-    from pydantic import BaseModel
+    from pydantic import BaseModel, ConfigDict
 except ImportError as e:  # pragma: no cover
     raise ImportError(
         "The RPC server needs the 'desktop-panel' extra: "
@@ -36,9 +36,21 @@ from ..cycles.engine import CycleEngine, CycleRefused
 from ..events.bus import EventBus
 from ..gateway.handler import CommandRequest, GatewayCommandHandler
 from ..gateway.webhooks import WebhookRejected, WebhookReceiver
-from ..kanban import KanbanBridge, ReferenceKanbanAdapter
+from ..kanban import (
+    KanbanAdapter,
+    KanbanAdapterError,
+    KanbanBridge,
+    UnavailableKanbanAdapter,
+    create_project_kanban_adapter,
+)
+from ..persistence import (
+    CanonicalWorkPartialError,
+    CanonicalWorkPort,
+    CanonicalWorkService,
+)
 from ..persistence.dockyard_service import DockyardService
 from ..persistence.service import ServiceError, StewardshipService
+from ..persistence.workflow_service import WorkflowService
 from ..persistence.store import Store
 from .middleware import (
     BearerAuthMiddleware,
@@ -150,6 +162,7 @@ class WorkItemCreate(BaseModel):
     labels: List[str] = []
     evidence_refs: List[str] = []
     estimate_days: Optional[float] = None
+    idempotency_key: Optional[str] = None
 
 
 class WorkItemTransition(BaseModel):
@@ -176,6 +189,7 @@ class QueuedWorkItemCreate(BaseModel):
     rank: int
     reason: str
     initiative_ref: Optional[str] = None
+    idempotency_key: Optional[str] = None
 
 
 class BacklogRerank(BaseModel):
@@ -251,12 +265,30 @@ class ReportRequest(BaseModel):
 
 
 class OnboardingRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     project_id: str
+    name: Optional[str] = None
+    slug: Optional[str] = None
     repo_path: str
     mission: str
     lead_profile: str
+    board_slug: Optional[str] = None
+    idempotency_key: Optional[str] = None
     autonomy_level: int = 2
     actor_id: str = "sahil"
+
+
+class WorkflowDefine(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    nodes: List[Dict[str, Any]]
+
+
+class WorkflowStart(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_key: str
+    version: Optional[int] = None
 
 
 def create_app(
@@ -265,6 +297,7 @@ def create_app(
     *,
     auth_token: Optional[str] = None,
     rate_limit_rpm: int = 120,
+    kanban_adapter: KanbanAdapter | None = None,
 ) -> FastAPI:
     if store is None:
         store = Store(db_path or Path("./stewardship.db"))
@@ -274,12 +307,21 @@ def create_app(
     engine.attach_events(bus)
     gateway = GatewayCommandHandler(svc, cycle_engine=engine)
     webhooks = WebhookReceiver(svc, engine)
-    bridge = KanbanBridge(svc, ReferenceKanbanAdapter(store))
-    dy = DockyardService(store)
+    if kanban_adapter is not None:
+        adapter = kanban_adapter
+    else:
+        try:
+            adapter = create_project_kanban_adapter()
+        except KanbanAdapterError as exc:
+            adapter = UnavailableKanbanAdapter(exc)
+    bridge = KanbanBridge(svc, adapter)
+    work = CanonicalWorkService(store, cast(CanonicalWorkPort, adapter))
+    workflows = WorkflowService(store, cast(CanonicalWorkPort, adapter))
+    dy = DockyardService(store, canonical_work=work)
 
     app = FastAPI(
         title="Hermes Project Stewardship RPC",
-        version="0.2.0",
+        version="0.2.0rc1",
         description=(
             "Durable project ownership for Hermes agent fleets. One canonical "
             "backend serving CLI, TUI, Desktop and messaging gateways. "
@@ -287,6 +329,9 @@ def create_app(
             "configured; all errors use the {error:{code,message}} envelope."
         ),
     )
+    app.state.kanban_adapter = adapter
+    app.state.kanban_bridge = bridge
+    app.state.canonical_work_service = work
     token = auth_token or os.environ.get("STEWARD_RPC_TOKEN")
     if token:
         app.add_middleware(BearerAuthMiddleware, token=token)
@@ -564,120 +609,156 @@ def create_app(
         return _Actor(id=actor_id, display_name=actor_id,
                       kind=_ActorKind(actor_kind))
 
+    def _raise_work_error(exc: Exception) -> NoReturn:
+        if isinstance(exc, CanonicalWorkPartialError):
+            raise HTTPException(
+                409,
+                f"canonical work {exc.item_ref} exists; ranking is incomplete",
+            ) from None
+        if isinstance(exc, KanbanAdapterError):
+            status_code = 503
+            if exc.code.endswith("_not_found"):
+                status_code = 404
+            elif exc.code == "validation_error":
+                status_code = 422
+            elif exc.code in {
+                "transition_conflict",
+                "write_conflict",
+                "idempotency_conflict",
+            }:
+                status_code = 409
+            raise HTTPException(
+                status_code,
+                {
+                    "code": exc.code,
+                    "message": exc.message,
+                    "fields": exc.fields,
+                },
+            ) from None
+        message = str(exc)
+        missing = "no such canonical work item" in message.lower()
+        raise HTTPException(404 if missing else 422, message) from None
+
     @router.get("/projects/{project_id}/work-items")
     def list_work_items(project_id: str, status: Optional[str] = None):
-        from ..dockyard import WorkItemStatus as _S
-
         try:
-            st = _S(status) if status else None
-        except ValueError:
-            raise HTTPException(422, f"invalid status {status!r}")
-        return {"work_items": [
-            w.__dict__ | {"type": w.type.value, "status": w.status.value,
-                          "assignee": w.assignee.id if w.assignee else None,
-                          "created_by": (w.created_by.id if w.created_by else None)}
-            for w in dy.list(project_id, status=st)
-        ]}
+            items = work.list(project_id, status=status)
+        except Exception as exc:
+            _raise_work_error(exc)
+        return {"work_items": items}
 
     @router.post("/projects/{project_id}/work-items")
     def create_work_item(project_id: str, body: WorkItemCreate):
-        import sqlite3 as _sq
-
         try:
-            if store._conn.execute(
-                "SELECT 1 FROM project_stewardship WHERE project_id=?",
-                    (project_id,)).fetchone() is None:
-                raise HTTPException(404, f"project {project_id} not found")
-            item = dy.create_item(
-                project_id, body.type, body.title,
+            item = work.create_item(
+                project_id,
+                body.type,
+                body.title,
                 actor=_actor(body.actor_id, body.actor_kind),
                 parent_ref=body.parent_ref,
                 labels=body.labels,
                 evidence_refs=body.evidence_refs,
                 estimate_days=body.estimate_days,
+                idempotency_key=body.idempotency_key,
             )
-        except HTTPException:
-            raise
-        except ValueError as e:
-            raise HTTPException(422, str(e))
-        except _sq.IntegrityError as e:
-            raise HTTPException(409, f"constraint violation: {e}")
-        return {"ref": item.ref, "id": item.id, "title": item.title}
+        except Exception as exc:
+            _raise_work_error(exc)
+        return {"ref": item["ref"], "id": item["id"], "title": item["title"]}
+
+    @router.get("/projects/{project_id}/work-items/{ref}")
+    def work_item_detail(project_id: str, ref: str):
+        try:
+            detail = work.detail(project_id, ref)
+        except Exception as exc:
+            _raise_work_error(exc)
+        if detail is None:
+            raise HTTPException(
+                404,
+                {
+                    "code": "task_not_found",
+                    "message": "canonical task was not found",
+                    "fields": {"task": ref},
+                },
+            )
+        return detail
 
     @router.post("/projects/{project_id}/work-items/{ref}/transition")
     def transition_work_item(project_id: str, ref: str,
                              body: WorkItemTransition):
         try:
-            item = dy.transition(project_id, ref, body.status,
-                                 actor=_actor(body.actor_id, body.actor_kind))
-        except ValueError as e:
-            raise HTTPException(404 if "no such" in str(e) else 422, str(e))
-        return {"ref": ref, "status": item.status.value}
+            item = work.transition(
+                project_id,
+                ref,
+                body.status,
+                actor=_actor(body.actor_id, body.actor_kind),
+            )
+        except Exception as exc:
+            _raise_work_error(exc)
+        return {"ref": ref, "status": item["status"]}
 
     @router.get("/projects/{project_id}/backlog")
     def list_backlog(project_id: str):
-        return {"backlog": [e.__dict__ | {
-            "aged_since": e.aged_since.isoformat()} for e in
-            dy.backlog_list(project_id)]}
+        try:
+            entries = work.backlog_list(project_id)
+        except Exception as exc:
+            _raise_work_error(exc)
+        return {"backlog": entries}
 
     @router.post("/projects/{project_id}/backlog/items")
     def create_queued_work_item(project_id: str,
                                 body: QueuedWorkItemCreate):
-        import sqlite3 as _sq
-
         try:
-            from ..dockyard import WorkItemType as _T
-
-            item, entry = dy.create_queued_item(
+            item, entry = work.create_queued_item(
                 project_id,
                 title=body.title,
-                item_type=_T(body.type),
+                item_type=body.type,
                 creator=_actor(body.creator_id, body.creator_kind),
                 assignee=_actor(body.assignee_id, body.assignee_kind),
                 rank=body.rank,
                 reason=body.reason,
                 initiative_ref=body.initiative_ref,
+                idempotency_key=body.idempotency_key,
             )
-        except ValueError as exc:
-            raise HTTPException(422, str(exc))
-        except _sq.IntegrityError:
-            raise HTTPException(
-                409,
-                "queued item conflicts with current project state",
-            )
+        except Exception as exc:
+            _raise_work_error(exc)
         return {
-            "ref": item.ref,
-            "id": item.id,
-            "type": item.type.value,
-            "title": item.title,
-            "assignee": item.assignee.id if item.assignee else None,
-            "created_by": item.created_by.id if item.created_by else None,
-            "initiative_ref": item.initiative_ref,
-            "rank": entry.rank,
-            "priority_reason": entry.priority_reason,
+            "ref": item["ref"],
+            "id": item["id"],
+            "type": item["type"],
+            "title": item["title"],
+            "assignee": item.get("assignee"),
+            "created_by": item.get("created_by"),
+            "initiative_ref": item.get("initiative_ref"),
+            "rank": entry["rank"],
+            "priority_reason": entry["priority_reason"],
         }
 
     @router.post("/projects/{project_id}/backlog")
     def backlog_add(project_id: str, body: BacklogAdd):
         try:
-            entry = dy.backlog_add(project_id, body.ref, body.rank,
-                                   reason=body.reason,
-                                   actor=_actor(body.actor_id, body.actor_kind))
-        except Exception as e:
-            msg = str(e)
-            raise HTTPException(400 if "reason" in msg else 404, msg)
-        return {"ref": entry.item_ref, "rank": entry.rank}
+            entry = work.backlog_add(
+                project_id,
+                body.ref,
+                body.rank,
+                reason=body.reason,
+                actor=_actor(body.actor_id, body.actor_kind),
+            )
+        except Exception as exc:
+            _raise_work_error(exc)
+        return {"ref": entry["item_ref"], "rank": entry["rank"]}
 
     @router.post("/projects/{project_id}/backlog/{ref}/rerank")
     def backlog_rerank(project_id: str, ref: str, body: BacklogRerank):
         try:
-            audit = dy.backlog_rerank(project_id, ref, body.new_rank,
-                                      reason=body.reason,
-                                      actor=_actor(body.actor_id,
-                                                   body.actor_kind))
-        except Exception as e:
-            msg = str(e)
-            raise HTTPException(400 if "reason" in msg else 404, msg)
+            audit = work.backlog_rerank(
+                project_id,
+                ref,
+                body.new_rank,
+                reason=body.reason,
+                actor=_actor(body.actor_id, body.actor_kind),
+            )
+        except Exception as exc:
+            _raise_work_error(exc)
         return {"ref": ref, "from_rank": audit["from_rank"],
                 "to_rank": audit["to_rank"]}
 
@@ -888,46 +969,123 @@ def create_app(
             raise HTTPException(404, str(e))
         return {"acked": notification_id}
 
+    @router.post("/projects/{project_id}/workflows")
+    def define_workflow(project_id: str, body: WorkflowDefine):
+        try:
+            return workflows.define(
+                project_id,
+                body.name,
+                {"nodes": body.nodes},
+            )
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @router.get("/projects/{project_id}/workflows")
+    def list_workflows(project_id: str):
+        return {"workflows": workflows.list(project_id)}
+
+    @router.post("/projects/{project_id}/workflows/{name}/start")
+    def start_workflow(project_id: str, name: str, body: WorkflowStart):
+        try:
+            return workflows.start(
+                project_id,
+                name,
+                body.run_key,
+                body.version,
+            )
+        except KanbanAdapterError as exc:
+            _raise_work_error(exc)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+
     @router.post("/onboard")
     def onboard(body: OnboardingRequest):
-        """Zero-setup onboarding (UX-08): point at a repo, answer 3
-        questions. Creates the project, seeds the ops group + default
-        saved view, returns the starting screen."""
-        import sqlite3 as _sq
-
-        if store._conn.execute(
-            "SELECT 1 FROM project_stewardship WHERE project_id=?",
-                (body.project_id,)).fetchone() is not None:
-            raise HTTPException(409, f"project {body.project_id} already"
-                                     " onboarded")
+        """Provision canonical Hermes state before Dockyard governance metadata."""
+        slug = (body.slug or body.project_id).strip()
+        board_slug = (body.board_slug or slug).strip()
+        name = (body.name or body.project_id.replace("-", " ").title()).strip()
+        key = (
+            body.idempotency_key
+            or f"dockyard-onboard:{body.project_id}"
+        ).strip()
+        autonomy = min(max(body.autonomy_level, 0), 3)
         try:
-            svc.enable(project_id=body.project_id,
-                       mission=body.mission,
-                       lead_profile=body.lead_profile,
-                       autonomy_level=min(max(body.autonomy_level, 0), 3))
-        except ServiceError as e:
-            raise HTTPException(409, str(e))
-        except _sq.IntegrityError as e:
-            raise HTTPException(409, f"constraint violation: {e}")
-        except Exception as e:
-            raise HTTPException(400, str(e))
-        try:
-            dy.group_create(f"{body.project_id}-ops",
-                            purpose="auto-created by onboarding")
-        except ValueError:
-            pass  # already exists
-        try:
-            dy.view_save(body.project_id, "Default board", "board",
-                         filters={}, actor=_actor(body.actor_id, "human"))
+            canonical = adapter.provision_project(
+                name=name,
+                slug=slug,
+                description=body.mission,
+                repo_path=body.repo_path,
+                lead_profile=body.lead_profile,
+                board_slug=board_slug,
+                idempotency_key=key,
+            )
+        except KanbanAdapterError as exc:
+            _raise_work_error(exc)
         except Exception:
-            pass  # view already saved
-        self_audit = store.audit(actor=body.actor_id, interface="dockyard:human",
-                                 action="project.onboarded",
-                                 subject=body.project_id,
-                                 detail={"repo": body.repo_path})
-        return {"project": body.project_id, "screen": "s2",
-                "group": f"{body.project_id}-ops",
-                "view": "Default board"}
+            raise HTTPException(
+                503,
+                {
+                    "code": "host_unavailable",
+                    "message": "canonical project and Kanban host is unavailable",
+                },
+            ) from None
+
+        try:
+            try:
+                svc.settings(body.project_id)
+            except ServiceError:
+                svc.enable(
+                    project_id=body.project_id,
+                    mission=body.mission,
+                    lead_profile=body.lead_profile,
+                    autonomy_level=autonomy,
+                )
+            try:
+                dy.group_create(
+                    f"{body.project_id}-ops",
+                    purpose="auto-created by onboarding",
+                )
+            except ValueError:
+                pass
+            try:
+                dy.view_save(
+                    body.project_id,
+                    "Default board",
+                    "board",
+                    filters={},
+                    actor=_actor(body.actor_id, "human"),
+                )
+            except ValueError:
+                pass
+        except Exception:
+            raise HTTPException(
+                409,
+                {
+                    "code": "governance_incomplete",
+                    "message": "Canonical project exists; Dockyard governance setup can be retried",
+                    "fields": {"idempotency_key": [key]},
+                },
+            ) from None
+
+        store.audit(
+            actor=body.actor_id,
+            interface="dockyard:human",
+            action="project.onboarded",
+            subject=body.project_id,
+            detail={
+                "repo": body.repo_path,
+                "canonical_project_id": canonical["project"]["id"],
+                "board_slug": canonical["board"]["slug"],
+                "idempotency_key": key,
+            },
+        )
+        return {
+            "project": body.project_id,
+            "screen": "s2",
+            "group": f"{body.project_id}-ops",
+            "view": "Default board",
+            "canonical": canonical,
+        }
 
     app.include_router(router)
 

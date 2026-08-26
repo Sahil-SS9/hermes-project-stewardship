@@ -1,7 +1,7 @@
 {
   "name": "hermes-dockyard",
   "label": "Hermes Dockyard",
-  "version": "0.1.0",
+  "version": "0.2.0rc1",
   "description": "Dockyard: PM core + bot fleet oversight for Hermes (work items, inbox, dashboard, notifications, onboarding).",
   "entry": "dist/index.js",
   "css": "dist/style.css",

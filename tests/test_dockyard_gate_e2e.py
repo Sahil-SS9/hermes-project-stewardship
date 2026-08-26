@@ -17,13 +17,16 @@ fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from hermes_project_stewardship.api.server import create_app  # noqa: E402
+from hermes_project_stewardship.kanban import ReferenceKanbanAdapter  # noqa: E402
 from hermes_project_stewardship.persistence.store import Store  # noqa: E402
 
 
 @pytest.fixture()
 def env(tmp_path):
     store = Store(tmp_path / "gate.db")
-    c = TestClient(create_app(store))
+    c = TestClient(
+        create_app(store, kanban_adapter=ReferenceKanbanAdapter(store))
+    )
     r = c.post("/stewardship/v1/projects/demo/enable", json={
         "project_id": "demo", "mission": "keep checkout healthy",
         "lead_profile": "octacon", "autonomy_level": 2})

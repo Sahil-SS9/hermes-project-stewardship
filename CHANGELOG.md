@@ -4,7 +4,40 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0-alpha] — 2026-08-21
+## [0.2.0rc1] - 2026-08-26
+
+### Added
+- Canonical Hermes Project/Kanban host contract v2 with fail-closed adapter,
+  native project/board provisioning and idempotent onboarding.
+- Canonical Board, Backlog table and work-item detail surfaces.
+- Board/Table Saved Views; Timeline remains explicitly unavailable until
+  canonical scheduling data exists.
+- Versioned, manually started workflow DAGs with deterministic task keys,
+  human gates, dependency links and crash-recovery journalling.
+- Marker-guarded legacy work migration with dry-run, snapshot-backed apply,
+  automatic failure restore and explicit rollback.
+- `stewardctl export` and `stewardctl restore` with a versioned manifest,
+  online SQLite snapshot, checksums and integrity validation.
+
+### Changed
+- Dockyard governance/ranking metadata is separated from canonical Hermes work
+  authority; production task writes no longer fall back to legacy tables.
+- Project/Kanban host contract advanced from v1 to v2.
+- Dockyard schema advanced to version 13.
+- Dashboard, API and CLI package metadata are aligned on `0.2.0rc1`.
+
+### Security
+- Host errors are redacted at the adapter boundary.
+- Migration and restore paths fail closed on missing ownership markers,
+  traversal, symlinks, existing targets, checksum mismatch and schema mismatch.
+- Dashboard source and built output remain free of prohibited DOM, execution
+  and browser-storage sinks.
+
+### Release state
+- Local engineering candidate only. No tag, publish, deployment, service
+  restart, live plugin reload or production migration is authorised here.
+
+## [0.1.0-alpha] - 2026-08-21
 
 ### Added
 - Domain model: stewardship-enabled projects with mission, ownership

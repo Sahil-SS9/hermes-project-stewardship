@@ -7,6 +7,7 @@ fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from hermes_project_stewardship.api.server import create_app  # noqa: E402
+from hermes_project_stewardship.kanban import ReferenceKanbanAdapter  # noqa: E402
 from hermes_project_stewardship.dockyard import WorkItemType  # noqa: E402
 from hermes_project_stewardship.dockyard.bots import BotStatus  # noqa: E402
 from hermes_project_stewardship.persistence.dockyard_service import (
@@ -21,7 +22,9 @@ from hermes_project_stewardship.persistence.store import Store  # noqa: E402
 @pytest.fixture()
 def env(tmp_path):
     store = Store(tmp_path / "council.db")
-    c = TestClient(create_app(store))
+    c = TestClient(
+        create_app(store, kanban_adapter=ReferenceKanbanAdapter(store))
+    )
     c.post("/stewardship/v1/onboard", json={
         "project_id": "alpha", "repo_path": "/srv/a",
         "mission": "m", "lead_profile": "l"})

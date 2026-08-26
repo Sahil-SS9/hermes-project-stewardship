@@ -7,13 +7,16 @@ fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from hermes_project_stewardship.api.server import create_app  # noqa: E402
+from hermes_project_stewardship.kanban import ReferenceKanbanAdapter  # noqa: E402
 from hermes_project_stewardship.persistence.store import Store  # noqa: E402
 
 
 @pytest.fixture()
 def c(tmp_path):
     store = Store(tmp_path / "p5.db")
-    client = TestClient(create_app(store))
+    client = TestClient(
+        create_app(store, kanban_adapter=ReferenceKanbanAdapter(store))
+    )
     yield client
     store.close()
 

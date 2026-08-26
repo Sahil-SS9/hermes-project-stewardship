@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
-import httpx
+import httpx2 as httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -348,6 +348,16 @@ async def work_items(project_id: str, status: str | None = None) -> dict:
     params = {"status": status} if status else None
     return await _proxy(
         "GET", f"/stewardship/v1/projects/{pid}/work-items", params=params)
+
+
+@plugin_api.get("/projects/{project_id}/work-items/{ref}")
+async def work_item_detail(project_id: str, ref: str) -> dict:
+    pid = quote(project_id, safe="")
+    item_ref = quote(ref, safe="")
+    return await _proxy(
+        "GET",
+        f"/stewardship/v1/projects/{pid}/work-items/{item_ref}",
+    )
 
 
 @plugin_api.get("/projects/{project_id}/settings")

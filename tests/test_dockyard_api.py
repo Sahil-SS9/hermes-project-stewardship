@@ -10,14 +10,15 @@ fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from hermes_project_stewardship.api.server import create_app  # noqa: E402
-from hermes_project_stewardship.persistence.dockyard_store import DockyardStore  # noqa: E402
+from hermes_project_stewardship.kanban import ReferenceKanbanAdapter  # noqa: E402
+from hermes_project_stewardship.persistence.canonical_work_store import CanonicalWorkMetadataStore  # noqa: E402
 from hermes_project_stewardship.persistence.store import Store  # noqa: E402
 
 
 @pytest.fixture()
 def env(tmp_path):
     store = Store(tmp_path / "dy.db")
-    app = create_app(store)
+    app = create_app(store, kanban_adapter=ReferenceKanbanAdapter(store))
     c = TestClient(app)
     yield c, store
     store.close()
@@ -38,7 +39,7 @@ def test_workitem_create_list_transition(env):
         "actor_id": "sahil", "actor_kind": "human"})
     assert r.status_code == 200
     ref = r.json()["ref"]
-    assert ref.startswith("HDY-")
+    assert ref.startswith("test-t-")
 
     r = c.get("/stewardship/v1/projects/dy1/work-items")
     assert r.status_code == 200
@@ -73,7 +74,7 @@ def test_backlog_add_rerank_reason_mandatory(env):
 
     r = c.post("/stewardship/v1/projects/dy1/backlog", json={
         "ref": ref, "rank": 2, "reason": "x", "actor_id": "qa-bot"})
-    assert r.status_code == 400  # reason too short
+    assert r.status_code == 422  # reason too short
 
     r = c.post("/stewardship/v1/projects/dy1/backlog", json={
         "ref": ref, "rank": 2, "reason": "customer-reported regression",
@@ -118,7 +119,7 @@ def test_create_queued_item_endpoint_is_atomic(env):
     })
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["ref"].startswith("HDY-") and body["rank"] == 1
+    assert body["ref"].startswith("test-t-") and body["rank"] == 1
     # Read-back: work item and backlog entry both present
     work = c.get("/stewardship/v1/projects/dy1/work-items").json()["work_items"]
     assert any(w["ref"] == body["ref"] and w["assignee"] == "qa-bot"
@@ -131,12 +132,16 @@ def test_create_queued_item_integrity_error_is_redacted(env, monkeypatch):
     c, _ = env
     _enable(c)
 
-    def fail_insert(self, cx, project_id, entry, *, actor):
+    def fail_insert(self, *args, **kwargs):
         raise sqlite3.IntegrityError(
-            "UNIQUE constraint failed: dockyard_backlog.project_id"
+            "UNIQUE constraint failed: dockyard_canonical_backlog.project_id"
         )
 
-    monkeypatch.setattr(DockyardStore, "_insert_backlog_row", fail_insert)
+    monkeypatch.setattr(
+        CanonicalWorkMetadataStore,
+        "create_binding_and_queue",
+        fail_insert,
+    )
     response = c.post("/stewardship/v1/projects/dy1/backlog/items", json={
         "type": "task", "title": "Conflicting queue item",
         "creator_id": "sahil", "creator_kind": "human",
@@ -145,9 +150,9 @@ def test_create_queued_item_integrity_error_is_redacted(env, monkeypatch):
     })
 
     assert response.status_code == 409
-    assert response.json()["error"]["message"] == (
-        "queued item conflicts with current project state"
-    )
+    message = response.json()["error"]["message"]
+    assert "ranking is incomplete" in message
+    assert "UNIQUE" not in message
 
 
 def test_create_queued_item_endpoint_rejects_same_creator_assignee(env):

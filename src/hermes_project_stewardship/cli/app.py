@@ -15,6 +15,7 @@ from typing import List, Optional
 
 from ..cycles.engine import CycleEngine, CycleRefused
 from ..gateway.errors import CommandError
+from ..persistence.backup import BackupError, export_store, restore_store
 from ..persistence.service import ServiceError, StewardshipService
 from ..persistence.store import Store
 from .ui import (
@@ -110,12 +111,28 @@ def build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--limit", type=int, default=25)
     audit.add_argument("--json", action="store_true")
 
+    export = sub.add_parser("export", help="export a consistent database snapshot")
+    export.add_argument("--output", type=Path, required=True)
+
+    restore = sub.add_parser("restore", help="restore an export into a new isolated DB")
+    restore.add_argument("--archive", type=Path, required=True)
+    restore.add_argument("--target", type=Path, required=True)
+
     return p
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if args.group == "restore":
+        try:
+            result = restore_store(args.archive, args.target)
+        except BackupError as exc:
+            print(friendly_error(str(exc)), file=sys.stderr)
+            return EXIT_ERROR
+        print(json.dumps(result, sort_keys=True))
+        return EXIT_OK
 
     store = Store(args.db)
     svc = StewardshipService(store)
@@ -126,7 +143,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     except CycleRefused as e:
         print(friendly_error(str(e)), file=sys.stderr)
         return EXIT_REFUSED
-    except (ServiceError, CommandError) as e:
+    except (ServiceError, CommandError, BackupError) as e:
         print(friendly_error(str(e)), file=sys.stderr)
         return EXIT_ERROR
     finally:
@@ -135,6 +152,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) -> int:
     g = args.group
+    if g == "export":
+        manifest = export_store(store, args.output)
+        print(json.dumps(manifest, sort_keys=True))
+        return EXIT_OK
     if g == "project":
         if args.action == "enable":
             vp = {}

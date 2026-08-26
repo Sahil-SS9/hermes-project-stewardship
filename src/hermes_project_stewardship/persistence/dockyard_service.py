@@ -34,9 +34,10 @@ _PROMOTION_LOCK = _threading.Lock()
 
 
 class DockyardService:
-    def __init__(self, store: Store) -> None:
+    def __init__(self, store: Store, *, canonical_work=None) -> None:
         self.store = store
         self.dy = DockyardStore(store)
+        self.canonical_work = canonical_work
         self._ref_seq: Dict[str, int] = {}
 
     # ------------------------------------------------------------------ #
@@ -263,16 +264,44 @@ class DockyardService:
 
     def milestone_attach(self, project_id: str, name: str, ref: str, *,
                          actor: Actor) -> None:
-        # C6: refuse attaching to non-existent milestones / phantom items
-        self.dy.milestone_progress(project_id, name)  # raises if missing
-        if self._by_ref(project_id, ref) is None:
+        # Refuse attaching to non-existent milestones or phantom canonical work.
+        self.dy.milestone_progress(project_id, name)
+        item = (
+            self.canonical_work.get(project_id, ref)
+            if self.canonical_work is not None
+            else self._by_ref(project_id, ref)
+        )
+        if item is None:
             raise ValueError(f"no such work item {ref} in {project_id}")
         self.dy.milestone_attach(project_id, name, ref)
         self._audit(actor=actor, action="milestone.attached",
                     subject=name, detail={"item": ref})
 
     def milestone_progress(self, project_id: str, name: str) -> Dict:
-        return self.dy.milestone_progress(project_id, name)
+        if self.canonical_work is None:
+            return self.dy.milestone_progress(project_id, name)
+        row = self.store._conn.execute(
+            "SELECT id, due FROM dockyard_milestones "
+            "WHERE project_id=? AND name=?",
+            (project_id, name),
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"milestone {name} not found")
+        refs = self.store._conn.execute(
+            "SELECT item_ref FROM dockyard_milestone_items WHERE milestone_id=?",
+            (row["id"],),
+        ).fetchall()
+        statuses = {
+            item["ref"]: item["status"]
+            for item in self.canonical_work.list(project_id)
+        }
+        attached = [str(item["item_ref"]) for item in refs]
+        return {
+            "name": name,
+            "total": len(attached),
+            "done": sum(1 for ref in attached if statuses.get(ref) == "done"),
+            "due": row["due"],
+        }
 
     # ------------------------------------------------------------------ #
     # Saved views (PM-05)                                                #
@@ -312,7 +341,11 @@ class DockyardService:
 
         steward = StewardshipService(self.store)
         settings = steward.settings(project_id)
-        work_items = self.list(project_id)
+        work_items = (
+            self.canonical_work.list(project_id)
+            if self.canonical_work is not None
+            else self.list(project_id)
+        )
         initiatives = steward.initiatives(project_id)
         notifications = self.store._conn.execute(
             "SELECT severity, kind, title, body, acked_at, created_at "
@@ -332,15 +365,30 @@ class DockyardService:
             text = str(value or "").replace("|", "\\|").replace("`", "\\`")
             return " ".join(text.split())
 
+        def item_value(item, name: str, default=None):
+            if isinstance(item, dict):
+                return item.get(name, default)
+            return getattr(item, name, default)
+
+        def item_status(item) -> str:
+            value = item_value(item, "status", "backlog")
+            return str(getattr(value, "value", value))
+
+        def item_assignee(item) -> str:
+            value = item_value(item, "assignee")
+            if value is None:
+                return "Unassigned"
+            return str(getattr(value, "id", value))
+
         status_counts = {
-            status: sum(1 for item in work_items if item.status.value == status)
+            status: sum(1 for item in work_items if item_status(item) == status)
             for status in ("backlog", "in_progress", "in_review", "done", "blocked")
         }
         pending = [
             item for item in initiatives
             if item.get("status") in {"proposed", "awaiting_approval"}
         ]
-        blocked = [item for item in work_items if item.status.value == "blocked"]
+        blocked = [item for item in work_items if item_status(item) == "blocked"]
         open_alerts = [row for row in notifications if not row["acked_at"]]
 
         generated_at = iso()
@@ -385,10 +433,11 @@ class DockyardService:
                         "| --- | --- | --- | --- |",
                     ])
                     for item in work_items[:30]:
-                        assignee = item.assignee.id if item.assignee else "Unassigned"
+                        assignee = item_assignee(item)
                         lines.append(
-                            f"| {clean(item.ref)} | {clean(item.title)} | "
-                            f"{clean(item.status.value)} | {clean(assignee)} |"
+                            f"| {clean(item_value(item, 'ref'))} | "
+                            f"{clean(item_value(item, 'title'))} | "
+                            f"{clean(item_status(item))} | {clean(assignee)} |"
                         )
                 else:
                     lines.append("No work items have been recorded.")
@@ -409,7 +458,10 @@ class DockyardService:
                     f"{clean(initiative.get('title'))} ({clean(initiative.get('risk'))} risk)"
                 )
             for item in blocked[:15]:
-                lines.append(f"- Blocked: {clean(item.ref)} {clean(item.title)}")
+                lines.append(
+                    f"- Blocked: {clean(item_value(item, 'ref'))} "
+                    f"{clean(item_value(item, 'title'))}"
+                )
             for alert in open_alerts[:15]:
                 lines.append(
                     f"- Alert: [{clean(alert['severity'])}] {clean(alert['title'])}"
@@ -711,11 +763,17 @@ class DockyardService:
         out["owed_decisions"] = inbox["count"]
         for p in projects:
             pid = p["project_id"]
-            counts = self.store._conn.execute(
-                "SELECT status, COUNT(*) AS n FROM dockyard_work_items"
-                " WHERE project_id=? GROUP BY status", (pid,),
-            ).fetchall()
-            by = {r["status"]: r["n"] for r in counts}
+            if self.canonical_work is not None:
+                by: Dict[str, int] = {}
+                for item in self.canonical_work.list(pid):
+                    status = str(item["status"])
+                    by[status] = by.get(status, 0) + 1
+            else:
+                counts = self.store._conn.execute(
+                    "SELECT status, COUNT(*) AS n FROM dockyard_work_items"
+                    " WHERE project_id=? GROUP BY status", (pid,),
+                ).fetchall()
+                by = {r["status"]: r["n"] for r in counts}
             active = by.get("in_progress", 0) + by.get("in_review", 0)
             health_row = self.store._conn.execute(
                 "SELECT status FROM project_health_snapshots"

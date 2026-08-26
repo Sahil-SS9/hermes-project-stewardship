@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hermes-project-stewardship"
-version = "0.1.0"
+version = "0.2.0rc1"
 description = "Durable project ownership for Hermes agent fleets: verified cycles, bounded initiatives, explicit autonomy policy."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,10 +26,11 @@ dependencies = []
 
 [project.optional-dependencies]
 desktop-panel = ["fastapi", "uvicorn"]
-dev = ["pytest>=7", "pytest-timeout"]
+dev = ["pytest>=7", "pytest-timeout", "httpx2"]
 
 [project.scripts]
 stewardctl = "hermes_project_stewardship.cli.app:main"
+dockyard-migrate-legacy = "hermes_project_stewardship.cli.migrate_legacy:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hermes_project_stewardship"]
@@ -38,8 +39,4 @@ packages = ["src/hermes_project_stewardship"]
 testpaths = ["tests"]
 timeout = 60
 addopts = "-q"
-filterwarnings = [
-  # starlette 1.x prefers httpx2 for TestClient; fastapi 0.141 still pins httpx.
-  # Remove this + add httpx2 once fastapi ships an httpx2-based testclient.
-  "ignore:Using `httpx` with `starlette.testclient` is deprecated",
-]
+filterwarnings = []

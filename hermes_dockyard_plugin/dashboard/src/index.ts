@@ -24,7 +24,7 @@ function registerPlugin(sdk: HermesPluginSDK): void {
     const ref = useRef(null);
     useEffect(() => {
       if (!ref.current) return undefined;
-      ref.current.innerHTML = '';
+      ref.current.replaceChildren();
       const dispose = initApp(sdk, ref.current as HTMLElement);
       return dispose; // cor-007: teardown on unmount/StrictMode double-invoke
     }, []);

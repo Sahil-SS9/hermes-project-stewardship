@@ -46,11 +46,39 @@ export interface NotificationItem {
   acked_at?: string | null;
 }
 
+export interface WorkItem {
+  id: string;
+  ref: string;
+  title: string;
+  body?: string | null;
+  status: string;
+  canonical_status?: string;
+  kind?: string;
+  assignee?: string | null;
+  parent_task_id?: string | null;
+  blocked_reason?: string | null;
+  priority_rank?: number | null;
+  priority_reason?: string | null;
+}
+
+export interface WorkDetail {
+  work_item: WorkItem;
+  parent: WorkItem | null;
+  children: WorkItem[];
+  history: Array<Record<string, unknown>>;
+}
+
 export function createApi(sdk: HermesPluginSDK) {
   const get = <T,>(path: string): Promise<T> => sdk.fetchJSON(`${BASE}${path}`);
   const post = <T,>(path: string, body: unknown): Promise<T> =>
     sdk.fetchJSON(`${BASE}${path}`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body ?? {}),
+    });
+  const put = <T,>(path: string, body: unknown): Promise<T> =>
+    sdk.fetchJSON(`${BASE}${path}`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body ?? {}),
     });
@@ -60,6 +88,29 @@ export function createApi(sdk: HermesPluginSDK) {
     dashboard: () => get<DashboardView>('/dashboard'),
     inbox: () => get<InboxView>('/inbox'),
     notifications: () => get<{ notifications: NotificationItem[] }>('/notifications'),
+    workItems: (projectId: string) =>
+      get<{ work_items: WorkItem[] }>(
+        `/projects/${encodeURIComponent(projectId)}/work-items`,
+      ),
+    backlog: (projectId: string) =>
+      get<{ backlog: Array<{ item_ref: string; rank: number; priority_reason?: string | null }> }>(
+        `/projects/${encodeURIComponent(projectId)}/backlog`,
+      ),
+    workDetail: (projectId: string, ref: string) =>
+      get<WorkDetail>(
+        `/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(ref)}`,
+      ),
+    views: (projectId: string) =>
+      get<{ views: Array<{ name: string; layout: string; filters?: Record<string, unknown> }> }>(
+        `/projects/${encodeURIComponent(projectId)}/views`,
+      ),
+    saveView: (projectId: string, name: string, layout: 'board' | 'table') =>
+      put(`/projects/${encodeURIComponent(projectId)}/views`, {
+        name,
+        layout,
+        filters: {},
+        shared: false,
+      }),
     onboard: (b: { project_id: string; repo_path: string; mission: string; lead_profile: string }) =>
       post('/onboard', b),
     approve: (ref: string) => post(`/initiatives/${encodeURIComponent(ref)}/approve`, {}),

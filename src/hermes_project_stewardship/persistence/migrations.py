@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 13
 
 
 @dataclass(frozen=True)
@@ -528,6 +528,99 @@ MIGRATIONS: List[Migration] = [
         downgrade_sql="""
         DROP TABLE IF EXISTS project_content;
         DROP TABLE IF EXISTS project_mission_archive;
+        """,
+    ),
+    Migration(
+        version=11,
+        name="canonical Hermes work governance overlay",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS dockyard_canonical_work_bindings (
+            project_id      TEXT NOT NULL
+                            REFERENCES project_stewardship(project_id)
+                            ON DELETE CASCADE,
+            item_kind       TEXT NOT NULL
+                            CHECK (item_kind IN ('task','bug','spike','subtask','gate','epic')),
+            item_id         TEXT NOT NULL,
+            initiative_ref  TEXT REFERENCES project_initiatives(ref)
+                            ON DELETE SET NULL,
+            created_by_id   TEXT NOT NULL,
+            created_by_kind TEXT NOT NULL CHECK (created_by_kind IN ('human','bot')),
+            created_at      TEXT NOT NULL,
+            PRIMARY KEY (project_id, item_kind, item_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_canonical_binding_initiative
+            ON dockyard_canonical_work_bindings(project_id, initiative_ref);
+
+        CREATE TABLE IF NOT EXISTS dockyard_canonical_backlog (
+            project_id        TEXT NOT NULL,
+            item_kind         TEXT NOT NULL,
+            item_id           TEXT NOT NULL,
+            rank              INTEGER NOT NULL CHECK (rank >= 1),
+            priority_reason   TEXT NOT NULL CHECK (length(trim(priority_reason)) >= 4),
+            aged_since        TEXT NOT NULL,
+            last_rerank_actor TEXT,
+            last_rerank_kind  TEXT CHECK (last_rerank_kind IN ('human','bot')),
+            last_rerank_reason TEXT,
+            PRIMARY KEY (project_id, item_kind, item_id),
+            FOREIGN KEY (project_id, item_kind, item_id)
+                REFERENCES dockyard_canonical_work_bindings(
+                    project_id, item_kind, item_id
+                ) ON DELETE CASCADE
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_canonical_backlog_project_rank
+            ON dockyard_canonical_backlog(project_id, rank);
+        """,
+        downgrade_sql="""
+        DROP TABLE IF EXISTS dockyard_canonical_backlog;
+        DROP TABLE IF EXISTS dockyard_canonical_work_bindings;
+        """,
+    ),
+    Migration(
+        version=12,
+        name="versioned canonical workflow graphs",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS dockyard_workflows (
+            project_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            definition_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY(project_id, name, version)
+        );
+        CREATE TABLE IF NOT EXISTS dockyard_workflow_runs (
+            project_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            run_key TEXT NOT NULL,
+            result_json TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            PRIMARY KEY(project_id, name, version, run_key),
+            FOREIGN KEY(project_id, name, version)
+                REFERENCES dockyard_workflows(project_id, name, version)
+                ON DELETE CASCADE
+        );
+        """,
+        downgrade_sql="""
+        DROP TABLE IF EXISTS dockyard_workflow_runs;
+        DROP TABLE IF EXISTS dockyard_workflows;
+        """,
+    ),
+    Migration(
+        version=13,
+        name="workflow run recovery journal",
+        upgrade_sql="""
+        ALTER TABLE dockyard_workflow_runs
+            ADD COLUMN status TEXT NOT NULL DEFAULT 'complete'
+            CHECK (status IN ('pending','complete','failed'));
+        ALTER TABLE dockyard_workflow_runs
+            ADD COLUMN updated_at TEXT;
+        UPDATE dockyard_workflow_runs
+            SET updated_at = started_at
+            WHERE updated_at IS NULL;
+        """,
+        downgrade_sql="""
+        ALTER TABLE dockyard_workflow_runs DROP COLUMN updated_at;
+        ALTER TABLE dockyard_workflow_runs DROP COLUMN status;
         """,
     ),
 ]

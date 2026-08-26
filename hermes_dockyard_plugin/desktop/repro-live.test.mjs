@@ -2,13 +2,15 @@
 // Exercises real React effects in jsdom, write interactions, every UI state,
 // CSS parsing, contrast metadata and Chromium layout at 700px and 1600px.
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 
 const DESKTOP_PACKAGE = '/home/kensei/repos/hermes-agent-vanilla/apps/desktop/package.json';
-const REPO_PLUGIN = '/home/kensei/repos/hermes-project-stewardship/hermes_dockyard_plugin/desktop/plugin.js';
-const LIVE_PLUGIN = '/home/kensei/.hermes/desktop-plugins/hermes-dockyard/plugin.js';
-const PLUGIN_PATH = process.env.DOCKYARD_PLUGIN_PATH || (existsSync(REPO_PLUGIN) ? REPO_PLUGIN : LIVE_PLUGIN);
+// Resolve the candidate plugin relative to this harness so a clean worktree
+// tests its own file, never a live checkout. DOCKYARD_PLUGIN_PATH overrides.
+const PLUGIN_PATH = process.env.DOCKYARD_PLUGIN_PATH
+  || fileURLToPath(new URL('./plugin.js', import.meta.url));
 const require = createRequire(DESKTOP_PACKAGE);
 const { JSDOM, VirtualConsole } = require('jsdom');
 const React = require('react');
@@ -1302,7 +1304,10 @@ async function testChromiumLayouts() {
     { name: 'onboarding-1200-light', file: snapshots.onboarding, width: 1200, height: 900, scheme: 'light' },
     { name: 'onboarding-480-dark', file: snapshots.onboarding, width: 480, height: 900, scheme: 'dark' },
   ];
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--disable-gpu'],
+  });
   const results = [];
   try {
     for (const spec of specs) {

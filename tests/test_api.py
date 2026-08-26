@@ -12,13 +12,14 @@ fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from hermes_project_stewardship.api.server import create_app  # noqa: E402
+from hermes_project_stewardship.kanban import ReferenceKanbanAdapter  # noqa: E402
 from hermes_project_stewardship.persistence.store import Store  # noqa: E402
 
 
 @pytest.fixture()
 def env(tmp_path):
     store = Store(tmp_path / "api.db")
-    app = create_app(store)
+    app = create_app(store, kanban_adapter=ReferenceKanbanAdapter(store))
     c = TestClient(app)
     yield c, store
     store.close()
@@ -27,7 +28,12 @@ def env(tmp_path):
 @pytest.fixture()
 def authed_env(tmp_path):
     store = Store(tmp_path / "apiauth.db")
-    app = create_app(store, auth_token="sekrit", rate_limit_rpm=1000)
+    app = create_app(
+        store,
+        auth_token="sekrit",
+        rate_limit_rpm=1000,
+        kanban_adapter=ReferenceKanbanAdapter(store),
+    )
     c = TestClient(app)
     c.headers.update({"Authorization": "Bearer sekrit"})
     yield c, store
@@ -100,7 +106,11 @@ def test_auth_required_when_configured(authed_env):
 
 def test_rate_limit_429(tmp_path):
     store = Store(tmp_path / "rl.db")
-    app = create_app(store, rate_limit_rpm=3)  # tiny bucket
+    app = create_app(
+        store,
+        rate_limit_rpm=3,
+        kanban_adapter=ReferenceKanbanAdapter(store),
+    )  # tiny bucket
     c = TestClient(app)
     codes = []
     for _ in range(6):

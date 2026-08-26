@@ -1,7 +1,7 @@
 {
   "name": "hermes-dockyard-plugin",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0rc1",
   "scripts": {
     "build": "node build.mjs",
     "test": "node --experimental-vm-modules --test tests/*.test.mjs"
