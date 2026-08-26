@@ -73,13 +73,8 @@ roadmap item; keep unsupported features visibly unavailable.
 
 ### D2. Independent review versus direct-only execution
 
-The roadmap requires independent review of the exact candidate. The current
-standing instruction prohibits delegation.
-
-**Recommendation:** retain direct-only implementation, but permit one read-only
-independent release review after the candidate is committed. If not permitted,
-record an explicit owner waiver; do not silently call direct self-review
-independent.
+Settled for `0.2.0rc1`: the owner's direct-only instruction is recorded as the
+independent-review waiver. This does not set policy for later releases.
 
 ### D3. Elevated autonomy
 
@@ -130,6 +125,7 @@ A roadmap item enters implementation only when it has:
 
 ## Immediate next action
 
-Request approval for a path-scoped local commit of the two verified worktrees.
-After that commit, run fresh-clone verification and prepare the owner walkthrough
-and pilot approval packet. Do not push or activate in the same approval.
+Select which broader product opportunities should enter the next build slice,
+and separately decide whether to publish or run a local Desktop pilot. Do not
+combine product selection with publish, activation, migration or scheduler
+approval.

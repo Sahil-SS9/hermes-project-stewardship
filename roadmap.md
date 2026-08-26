@@ -57,11 +57,13 @@ The current approved slice is only considered delivered after the exact dirty ca
 
 ### DY-R0-01 - Verify and commit the approved slice
 
-State: in progress
+State: complete locally
 
 Outcome:
 
-- The backlog creation and assignment slice, initiative linkage, project enablement controls and truthful Saved views surface land as one verified local commit.
+- The canonical convergence and Dockyard RC land as verified local commits:
+  Dockyard `0a65a0bb7b6da68d31f04ca5a55cfabc78d5b662` and host
+  `ce7d9d4fb407a5f43ec6691e4aeb340d0b43a6c9`.
 
 Acceptance:
 
@@ -75,7 +77,7 @@ Acceptance:
 
 ### DY-R0-02 - Documentation and metadata coherence
 
-State: implemented locally; pending DY-R0-01 commit
+State: complete locally
 Depends on: DY-R0-01
 
 Outcome:
@@ -98,7 +100,7 @@ Acceptance:
 
 ### DY-R0-03 - Operational backup and export
 
-State: implemented locally; pending DY-R0-01 commit
+State: complete locally
 Source: historical P10
 
 Outcome:
@@ -417,7 +419,7 @@ Acceptance:
 
 ### DY-P3-03 - Release candidate and activation
 
-State: gated
+State: local RC passed; publish and activation gated
 Sources: historical RL1-RL3
 Depends on: owner-selected scope from priorities 0-3
 
