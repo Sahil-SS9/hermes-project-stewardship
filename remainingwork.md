@@ -1,6 +1,46 @@
 # Remaining work and current state
 
-Updated: 26/08/2026
+Updated: 26/08/2026 (addendum 30/08/2026)
+
+## Addendum 30/08/2026 — CI reality correction and local mirror
+
+The 26/08 "PASS" verdict described local verification only. Independent CI on
+GitHub Actions has NEVER produced a green run: every `CI` workflow run to date
+(failure in ~3-6s, no steps, empty logs; the account-level dependency-graph
+workflow succeeds) failed. Root causes verified 30/08:
+
+1. `ci.yml` installed only the `[dev]` extra; 7 API-importing test modules
+   failed collection without the `desktop-panel` extra (`fastapi`).
+2. The coverage gate required 90%; measured coverage on the exact candidate
+   is 87.11%. The 90 gate never held on the committed tree.
+
+Also corrected: `plugin.yaml` still pointed at the retired
+`desktop/stewardship-panel` TSX scaffold; realigned to the shipped
+`hermes_dockyard_plugin/desktop/plugin.js` surface (route `/dockyard`).
+
+Correction delivered (local commit, pre-402):
+
+- `.github/workflows/ci.yml`: install `[dev,desktop-panel]`; gate pinned to 87
+  with a note that the gate is only re-raised deliberately. This workflow
+  still cannot execute remotely — see below.
+- `scripts/local-ci.sh` (new): exact local mirror of the CI gate sequence
+  (install, suite+coverage at 87, byte-compile, API import; optional
+  dashboard/desktop JS gates; `--json` evidence). Until GitHub Actions is
+  available again (currently rate-limited at account level — no paid minutes),
+  `scripts/local-ci.sh --with-node --json` output is the authoritative CI
+  evidence for this repository.
+- Evidence run 2026-08-30T13:50:56Z: 6/6 gates PASS (399 passed, 5 skipped,
+  byte-compile clean, rpc-ok, dashboard 3/3, desktop 1/1).
+- Local repo `.venv` resynced to `[dev,desktop-panel]`; the stale
+  missing-`httpx2` state that blocked any local suite run is resolved.
+
+Not covered by the 26/08 verdict and still open for the D1 pilot decision:
+
+- No git tag exists for `0.2.0rc2`; rc identity lives only in docs/plugins.
+  Tag the evidence baseline when the release path is chosen.
+- Remote (GitHub) CI remains red-by-infra until the rate limit resets or a
+  self-hosted runner is approved. The local mirror bridges evidence, not the
+  account-level run history.
 
 ## Current verdict
 

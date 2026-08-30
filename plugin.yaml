@@ -36,6 +36,10 @@ hooks:
   on_webhook_github: targeted_cycle   # idempotent via trigger keys
 
 desktop_panel:
-  route: /stewardship
-  component: desktop/stewardship-panel/src/StewardshipPanel.tsx
-  api_prefix: /stewardship/v1
+  # Active Desktop door: hermes_dockyard_plugin/desktop/plugin.js (id
+  # `hermes-dockyard`), registered route /dockyard via ctx.registerMany.
+  # The retired desktop/stewardship-panel TSX scaffold is kept only as
+  # historical reference and must not be referenced here.
+  route: /dockyard
+  component: hermes_dockyard_plugin/desktop/plugin.js
+  dashboard: hermes_dockyard_plugin/dashboard/manifest.json
