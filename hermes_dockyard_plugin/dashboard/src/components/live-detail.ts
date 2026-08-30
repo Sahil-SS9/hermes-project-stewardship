@@ -94,7 +94,7 @@ export function buildTaskListMini(
     mark.textContent =
       t.status === 'done' ? '✓' : t.status === 'working' ? '◐' : t.status === 'blocked' ? '✕' : '○';
     const label = document.createElement('span');
-    label.className = 'dy-tasklabel';
+    label.className = 'dy-tasklabel' + (t.status === 'done' ? ' dy-tasklabel-done' : '');
     label.textContent = t.title;
     li.append(mark, label);
     if (t.assignee) {

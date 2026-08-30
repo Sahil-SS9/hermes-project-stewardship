@@ -145,7 +145,7 @@
       mark.className = "dy-taskmark " + (t.status ?? "pending");
       mark.textContent = t.status === "done" ? "\u2713" : t.status === "working" ? "\u25D0" : t.status === "blocked" ? "\u2715" : "\u25CB";
       const label2 = document.createElement("span");
-      label2.className = "dy-tasklabel";
+      label2.className = "dy-tasklabel" + (t.status === "done" ? " dy-tasklabel-done" : "");
       label2.textContent = t.title;
       li.append(mark, label2);
       if (t.assignee) {
