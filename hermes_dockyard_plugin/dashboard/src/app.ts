@@ -5,10 +5,11 @@
 // as markup.
 import type { Api, HermesPluginSDK, WorkItem } from './api';
 import { createApi } from './api';
+import { mountWorkflowCanvas, type CanvasRun } from './workflow-canvas';
 
 interface AppState {
   api: Api;
-  tab: 'dashboard' | 'work' | 'delivery' | 'inbox' | 'notifications' | 'onboard';
+  tab: 'dashboard' | 'work' | 'delivery' | 'inbox' | 'notifications' | 'workflow' | 'onboard';
   projectId?: string;
   selectedWorkRef?: string;
   workLayout: 'board' | 'table';
@@ -42,6 +43,7 @@ export function initApp(
       else if (s.tab === 'work') await renderWork(main, s, stale);
       else if (s.tab === 'delivery') await renderDelivery(main, s, stale);
       else if (s.tab === 'inbox') await renderInbox(main, s, stale);
+      else if (s.tab === 'workflow') await renderWorkflow(main, s, stale);
       else if (s.tab === 'notifications')
         await renderNotifications(main, s, stale);
       else renderOnboard(main, s);
@@ -77,6 +79,7 @@ export function initApp(
     { id: 'work', label: 'Work' },
     { id: 'delivery', label: 'Delivery' },
     { id: 'inbox', label: 'Approval Inbox' },
+    { id: 'workflow', label: 'Workflow' },
     { id: 'notifications', label: 'Notifications' },
     { id: 'onboard', label: 'Onboard Project' },
   ];
@@ -778,6 +781,79 @@ function loadingEl(): HTMLDivElement {
   el.textContent = 'Loading…';
   return el;
 }
+
+// Read-only workflow canvas view: pick a project + workflow name, then mount
+// the SVG canvas. Gate nodes expose Approve/Reject wired to existing endpoints.
+async function renderWorkflow(
+  main: HTMLElement,
+  s: AppState,
+  isStale: () => boolean,
+): Promise<void> {
+  const view = await s.api.dashboard();
+  const projects = view.projects ?? [];
+  if (isStale()) return;
+  if (projects.length === 0) {
+    main.replaceChildren(
+      textEl('div', 'dy-empty', 'Onboard a project to view workflows.'),
+    );
+    return;
+  }
+
+  const controls = document.createElement('div');
+  controls.className = 'dy-wf-controls';
+
+  const projectSel = document.createElement('select');
+  projectSel.className = 'dy-select';
+  for (const p of projects) {
+    const opt = textEl(
+      'option',
+      '',
+      `${p.id} · ${p.health ?? 'unknown'}`,
+      p.id,
+    ) as HTMLOptionElement;
+    projectSel.appendChild(opt);
+  }
+  const nameInput = document.createElement('input');
+  nameInput.className = 'dy-input';
+  nameInput.placeholder = 'workflow name';
+  nameInput.value = 'main';
+  const go = document.createElement('button');
+  go.className = 'dy-btn primary';
+  go.textContent = 'Render';
+
+  const canvasHost = document.createElement('div');
+  canvasHost.className = 'dy-wf-host';
+
+  controls.append(
+    textEl('span', 'dy-dim', 'Project'),
+    projectSel,
+    textEl('span', 'dy-dim', 'Workflow'),
+    nameInput,
+    go,
+  );
+  main.replaceChildren(controls, canvasHost);
+
+  let dispose: (() => void) | null = null;
+  const load = () => {
+    if (dispose) dispose();
+    const pid = projectSel.value;
+    const wname = nameInput.value.trim() || 'main';
+    dispose = mountWorkflowCanvas(
+      canvasHost,
+      pid,
+      wname,
+      () => s.api.workflowRuns(pid, wname).then((r) => r.runs),
+      {
+        onApprove: (ref) => s.api.approve(ref),
+        onReject: (ref) => s.api.reject(ref),
+      },
+    );
+    (canvasHost as unknown as { dyDispose?: () => void }).dyDispose = dispose;
+  };
+  go.addEventListener('click', load);
+  load();
+}
+
 function label(text: string): HTMLLabelElement {
   const el = document.createElement('label');
   el.textContent = text;

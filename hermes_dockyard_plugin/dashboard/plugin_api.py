@@ -838,6 +838,14 @@ async def run_observation(ref: str) -> dict:
     return await _proxy("POST", f"/stewardship/v1/observations/{r}/run", {})
 
 
+@plugin_api.get("/projects/{project_id}/workflows/{name}/runs")
+async def workflow_runs(project_id: str, name: str) -> dict:
+    pid = quote(project_id, safe="")
+    wf = quote(name, safe="")
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{pid}/workflows/{wf}/runs")
+
+
 @plugin_api.post("/notifications/{notification_id}/ack")
 async def ack(notification_id: int) -> dict:
     return await _proxy(

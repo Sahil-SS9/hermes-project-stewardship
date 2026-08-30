@@ -109,3 +109,26 @@ td.bad, .bad { color: var(--dy-bad); }
   .dy-root .dy-work-split { grid-template-columns: 1fr; }
   .dy-root .dy-board { grid-template-columns: repeat(5, minmax(220px, 1fr)); }
 }
+
+/* ---- Workflow canvas ---- */
+.dy-root .dy-wf-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.dy-root .dy-wf-host { position: relative; height: 72vh; border: 1px solid var(--dy-border, #2a2f3a); border-radius: 10px; overflow: hidden; background: var(--dy-bg-deep, #0f1218); }
+.dy-root .dy-wf-wrap { position: relative; width: 100%; height: 100%; }
+.dy-root .dy-wf-svg { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+.dy-root .dy-wf-svg:active { cursor: grabbing; }
+.dy-root .dy-wf-node { cursor: pointer; }
+.dy-root .dy-wf-rect { fill: #1b2230; stroke: #3a4256; stroke-width: 1.5; }
+.dy-root .dy-wf-done .dy-wf-rect { stroke: #3fb950; }
+.dy-root .dy-wf-working .dy-wf-rect { stroke: #d29922; }
+.dy-root .dy-wf-blocked .dy-wf-rect { stroke: #f85149; }
+.dy-root .dy-wf-pending .dy-wf-rect { stroke: #6e7681; }
+.dy-root .dy-wf-label { fill: var(--dy-text, #e6edf3); font: 600 13px sans-serif; }
+.dy-root .dy-wf-sub { fill: #8b949e; font: 11px sans-serif; }
+.dy-root .dy-wf-edge { stroke: #4a5568; stroke-width: 1.5; fill: none; }
+.dy-root .dy-wf-minimap { position: absolute; right: 10px; bottom: 10px; background: rgba(15,18,24,0.85); border: 1px solid #2a2f3a; border-radius: 6px; }
+.dy-root .dy-wf-mini { fill: #6e7681; }
+.dy-root .dy-wf-mini-view { fill: none; stroke: #58a6ff; stroke-width: 2; }
+.dy-root .dy-wf-passport { position: absolute; top: 10px; right: 10px; width: 260px; background: #161b22; border: 1px solid #2a2f3a; border-radius: 8px; padding: 12px; color: var(--dy-text, #e6edf3); }
+.dy-root .dy-wf-actions { display: flex; gap: 8px; margin-top: 10px; }
+.dy-root .dy-wf-empty { fill: #8b949e; font: 13px sans-serif; }
+

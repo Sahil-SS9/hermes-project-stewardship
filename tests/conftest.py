@@ -58,6 +58,12 @@ def enabled(svc: StewardshipService) -> str:
     return pid
 
 
+def enable_project(svc: StewardshipService, pid: str) -> str:
+    svc.enable(pid, mission="keep CI green and deps fresh", lead_profile="lead",
+               member_profiles=["coder", "qa"], autonomy_level=2)
+    return pid
+
+
 def make_repo(path: Path, *, dirty: bool = False, commits: int = 1,
               readme_text: str = "example project") -> Path:
     path.mkdir(parents=True, exist_ok=True)

@@ -164,6 +164,28 @@ export function createApi(sdk: HermesPluginSDK) {
     onboard: (b: { project_id: string; repo_path: string; mission: string; lead_profile: string }) =>
       post('/onboard', b),
     approve: (ref: string) => post(`/initiatives/${encodeURIComponent(ref)}/approve`, {}),
+    reject: (ref: string) => post(`/initiatives/${encodeURIComponent(ref)}/reject`, {}),
+    workflowRuns: (projectId: string, name: string) =>
+      get<{
+        runs: Array<{
+          run_key: string;
+          version: number;
+          status: string;
+          started_at: string | null;
+          updated_at: string | null;
+          nodes: Array<{
+            node_id: string;
+            title: string;
+            depends_on: string[];
+            human_gate: boolean;
+            task_ref: string | null;
+            kind: 'task' | 'gate';
+            status: string | null;
+            assignee: string | null;
+            evidence_refs: string[];
+          }>;
+        }>;
+      }>(`/projects/${encodeURIComponent(projectId)}/workflows/${encodeURIComponent(name)}/runs`),
     initiatives: (projectId: string) =>
       get<{ initiatives: Initiative[] }>(
         `/projects/${encodeURIComponent(projectId)}/initiatives`,

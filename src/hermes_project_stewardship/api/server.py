@@ -1123,6 +1123,14 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from None
 
+    @router.get("/projects/{project_id}/workflows/{name}/runs")
+    def list_workflow_runs(project_id: str, name: str):
+        """Read-only run ledger with per-node canonical status (canvas view)."""
+        try:
+            return {"runs": workflows.runs(project_id, name)}
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from None
+
     @router.post("/onboard")
     def onboard(body: OnboardingRequest):
         """Provision canonical Hermes state before Dockyard governance metadata."""

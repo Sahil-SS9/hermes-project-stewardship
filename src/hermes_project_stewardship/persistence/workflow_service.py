@@ -88,6 +88,58 @@ class WorkflowService:
                  "version": row["version"],
                  "definition": json.loads(row["definition_json"])} for row in rows]
 
+    def runs(self, project_id: str, name: str) -> list[dict[str, Any]]:
+        """Read-only run ledger with per-node canonical status for the canvas."""
+        known = self.store._conn.execute(
+            "SELECT 1 FROM dockyard_workflows WHERE project_id=? AND name=?",
+            (project_id, name),
+        ).fetchone()
+        if known is None:
+            raise ValueError("workflow was not found")
+        rows = self.store._conn.execute(
+            "SELECT r.version, r.run_key, r.status, r.started_at, r.updated_at, "
+            "r.result_json, w.definition_json "
+            "FROM dockyard_workflow_runs r "
+            "JOIN dockyard_workflows w ON w.project_id=r.project_id "
+            "AND w.name=r.name AND w.version=r.version "
+            "WHERE r.project_id=? AND r.name=? "
+            "ORDER BY r.version DESC, r.started_at DESC, r.run_key DESC",
+            (project_id, name),
+        ).fetchall()
+        work_index = {
+            item["id"]: item for item in self.port.list_work(project_id)
+        }
+        runs: list[dict[str, Any]] = []
+        for row in rows:
+            result = json.loads(row["result_json"]) or {}
+            refs: dict[str, str] = result.get("tasks") or {}
+            nodes = []
+            for node in json.loads(row["definition_json"])["nodes"]:
+                ref = refs.get(node["id"])
+                item = work_index.get(ref) if ref else None
+                nodes.append({
+                    "node_id": node["id"],
+                    "title": node["title"],
+                    "depends_on": node["depends_on"],
+                    "human_gate": bool(node["human_gate"]),
+                    "task_ref": ref,
+                    "kind": item["kind"] if item else
+                            ("gate" if node["human_gate"] else "task"),
+                    "status": item["status"] if item else None,
+                    "assignee": item.get("assignee") if item else None,
+                    "evidence_refs": item.get("evidence_refs") or []
+                    if item else [],
+                })
+            runs.append({
+                "run_key": row["run_key"],
+                "version": row["version"],
+                "status": row["status"],
+                "started_at": row["started_at"],
+                "updated_at": row["updated_at"],
+                "nodes": nodes,
+            })
+        return runs
+
     def start(self, project_id: str, name: str, run_key: str,
               version: int | None = None) -> dict[str, Any]:
         key = str(run_key or "").strip()
