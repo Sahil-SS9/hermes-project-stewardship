@@ -128,6 +128,16 @@ test('workflow tab renders canvas with nodes and edges, then opens gate passport
   assert.ok(['map', 'read', 'full'].includes(lod.getAttribute('data-lod')), 'data-lod should be set');
   // arrow markers exist (agenttrail edge vocabulary)
   assert.ok(lod.querySelector('marker'), 'arrow markers should exist');
+  // Gate click = selection: unmistakable highlight class lands on the clicked node
+  assert.ok(gate.getAttribute('class').includes('dy-wf-selected'), 'clicked gate node should carry selected class');
+  // Activity strip exists (collapsible, top-left of canvas)
+  const feedStrip = dom.window.document.querySelector('.dy-wf-feed');
+  assert.ok(feedStrip, 'activity strip should exist');
+  assert.ok(feedStrip.querySelector('.dy-wf-feed-head'), 'activity strip header should exist');
+  // Per-node timers: clocks exist ONLY on working nodes (was: number on every node)
+  const timerOnWorking = dom.window.document.querySelectorAll('.dy-wf-node.working .dy-wf-timer').length;
+  const timerOnDone = dom.window.document.querySelectorAll('.dy-wf-node.done .dy-wf-timer').length;
+  assert.ok(timerOnDone === 0, `no clock on done nodes, got ${timerOnDone}`);
   // Expand live detail on the done TASK node (W-1 has task_ref + fixture detail)
   const taskNode = [...dom.window.document.querySelectorAll('.dy-wf-node')].find((n) =>
     (n.getAttribute('class') || '').split(/\s+/).includes('done'));

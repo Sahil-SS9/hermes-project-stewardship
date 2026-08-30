@@ -142,7 +142,41 @@ export function mountWorkflowCanvas(
   const passport = elu<HTMLDivElement>('div', 'dy-wf-passport');
   passport.setAttribute('aria-live', 'polite');
 
-  wrap.append(svg, minimap, passport);
+  // Live activity strip (agenttrail streaming feed) — top-left, collapsible.
+  // Deliberate addition to the real canvas (previously demo-only), so the
+  // canvas itself reports what's moving without opening a node.
+  const feed = elu<HTMLDivElement>('div', 'dy-wf-feed');
+  feed.setAttribute('aria-live', 'polite');
+  const feedHead = elu<HTMLButtonElement>('button', 'dy-wf-feed-head', '▾ Activity');
+  const feedBody = elu<HTMLDivElement>('div', 'dy-wf-feed-body');
+  feedHead.addEventListener('click', () => {
+    const open = feedHead.getAttribute('aria-expanded') === 'true';
+    feedHead.setAttribute('aria-expanded', String(!open));
+    feedHead.textContent = open ? '▸ Activity' : '▾ Activity';
+    feedBody.style.display = open ? 'none' : 'block';
+  });
+  feedHead.setAttribute('aria-expanded', 'true');
+  feed.append(feedHead, feedBody);
+  const feedMsgs: Array<{ ts: number; text: string; el: HTMLDivElement }> = [];
+  const feedLog = (text: string) => {
+    const item = elu<HTMLDivElement>('div', 'dy-wf-feed-item');
+    const t = elu('span', 'dy-wf-feed-time');
+    t.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const b = elu('span', '', ' ' + text);
+    item.append(t, b);
+    feedBody.prepend(item);
+    feedMsgs.unshift({ ts: Date.now(), text, el: item });
+    while (feedMsgs.length > 6) {
+      const old = feedMsgs.pop();
+      if (old) old.el.remove();
+    }
+    // wall-clock decay: older items dim progressively (agenttrail model)
+    feedMsgs.forEach((m, i) => {
+      m.el.style.opacity = String(Math.max(0.25, 1 - i * 0.15));
+    });
+  };
+
+  wrap.append(svg, feed, minimap, passport);
   host.appendChild(wrap);
 
   // camera state
@@ -230,18 +264,28 @@ export function mountWorkflowCanvas(
       label.textContent = n.title.slice(0, 24);
       const sub = sEl('text', { x: 12, y: 44, class: 'dy-wf-sub' }) as SVGTextElement;
       sub.textContent = (n.kind === 'gate' ? 'GATE · ' : '') + (n.status ?? 'pending') + (n.assignee ? ' · ' + n.assignee : '');
-      const timer = sEl('text', {
-        x: NODE_W - 12,
-        y: 25,
-        'text-anchor': 'end',
-        class: 'dy-wf-timer full',
-      }) as SVGTextElement;
-      g.append(rect, label, sub, timer);
+      // Per-node elapsed clock — ONLY on working nodes (was: empty timer on all).
+      // Base = run.updated_at (or poll time for new frames); ticks in the flow loop.
+      let timer: SVGTextElement | null = null;
+      if (n.status === 'working') {
+        timer = sEl('text', {
+          x: NODE_W - 12,
+          y: 25,
+          'text-anchor': 'end',
+          class: 'dy-wf-timer full',
+        }) as SVGTextElement;
+        timer.textContent = '00:00';
+        timer.dataset.for = n.node_id;
+      }
+      if (timer) g.append(rect, label, sub, timer);
+      else g.append(rect, label, sub);
       const dash = () => rect.setAttribute('stroke-dasharray', '4 3');
       const undash = () => rect.removeAttribute('stroke-dasharray');
       g.addEventListener('pointerenter', dash); // intent preview [archify]
-      g.addEventListener('pointerleave', undash);
-      const open = () => openPassport(n);
+      g.addEventListener('pointerleave', () => {
+        if (!g.classList.contains('dy-wf-selected')) undash();
+      });
+      const open = () => openPassport(n, g);
       g.addEventListener('click', open);
       g.addEventListener('keydown', (e) => {
         if ((e as KeyboardEvent).key === 'Enter') open();
@@ -294,7 +338,12 @@ export function mountWorkflowCanvas(
 
   // ---- passport with lazy expansion ----
   let lastFrames: CanvasRun[] = [];
-  const openPassport = (n: CanvasNode) => {
+  let selectedEl: SVGGElement | null = null;
+  const openPassport = (n: CanvasNode, g?: SVGGElement) => {
+    // unmistakable selection: clear previous, mark current
+    if (selectedEl) selectedEl.classList.remove('dy-wf-selected');
+    selectedEl = g ?? null;
+    if (selectedEl) selectedEl.classList.add('dy-wf-selected');
     passport.replaceChildren();
     passport.appendChild(elu('h3', '', n.title));
     passport.appendChild(elu('span', `badge ${n.status ?? 'pending'}`, n.status ?? 'pending'));
@@ -429,7 +478,11 @@ export function mountWorkflowCanvas(
   }, { passive: false });
 
   const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') passport.replaceChildren();
+    if (e.key === 'Escape') {
+      passport.replaceChildren();
+      if (selectedEl) selectedEl.classList.remove('dy-wf-selected');
+      selectedEl = null;
+    }
   };
   document.addEventListener('keydown', onKeyDown);
 
@@ -437,7 +490,15 @@ export function mountWorkflowCanvas(
   let flowT = 0;
   const flowTimer = setInterval(() => {
     flowT = (flowT + 0.03) % 1;
-    viewport.querySelectorAll<SVGGElement>('g.dy-wf-node').forEach(() => {});
+    // tick working-node elapsed clocks: 1s wall-clock per ~1.33s of flowT
+    // (40ms interval, 1/0.03 ticks per cycle) — driven off render time
+    viewport.querySelectorAll<SVGTextElement>('text.dy-wf-timer').forEach((t) => {
+      const cur = t.textContent ?? '00:00';
+      const [m, s] = cur.split(':').map((v) => parseInt(v, 10) || 0);
+      const total = m * 60 + s + 1;
+      t.textContent =
+        String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
+    });
     const edgeMap = new Map<string, { path: SVGPathElement; dot: SVGCircleElement }>();
     viewport.querySelectorAll<SVGPathElement>('path.dy-wf-edge').forEach((p) => {
       const key = (p.dataset.from ?? '') + '>' + (p.dataset.to ?? '');
@@ -486,24 +547,35 @@ export function mountWorkflowCanvas(
 
   // ---- polling (the event source; keep last frame, apply on arrival) ----
   let timer: ReturnType<typeof setInterval> | null = null;
-  const poll = () => {
+  let lastSig = '';
+
+  // feed-aware poll: repaints on delta AND logs status transitions to the strip
+  const pollOnce = () => {
     fetchRuns()
       .then((runs) => {
         const latest = runs && runs.length ? runs[0] : null;
-        // event-driven: repaint only when the frame actually changed
         const sig = JSON.stringify(latest?.nodes.map((n) => [n.node_id, n.status]) ?? []);
         if (sig !== lastSig) {
+          if (lastSig !== '') {
+            const prev = new Map<string, string | null>();
+            try {
+              (JSON.parse(lastSig) as Array<[string, string | null]>).forEach(([id, st]) => prev.set(id, st));
+            } catch { /* ignore */ }
+            (latest?.nodes ?? []).forEach((n) => {
+              const old = prev.get(n.node_id);
+              if (old !== undefined && old !== n.status) {
+                feedLog(`${n.title}: ${old ?? 'pending'} → ${n.status ?? 'pending'}`);
+              }
+            });
+          }
           lastSig = sig;
           render(latest);
         }
       })
-      .catch(() => {
-        /* keep last good frame */
-      });
+      .catch(() => { /* keep last good frame */ });
   };
-  let lastSig = '';
-  poll();
-  if (pollMs > 0) timer = setInterval(poll, pollMs);
+  pollOnce();
+  if (pollMs > 0) timer = setInterval(pollOnce, pollMs);
 
   disposers.push(() => {
     if (timer) clearInterval(timer);

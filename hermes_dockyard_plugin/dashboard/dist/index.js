@@ -88,10 +88,11 @@
     const wrap = document.createElement("div");
     wrap.className = "dy-activity-thread";
     const list = items.slice(0, max);
-    list.forEach((it, i) => {
+    const rows = [];
+    list.forEach((it) => {
       const row = document.createElement("div");
       row.className = "dy-activity-item";
-      if (opts.decay) row.style.opacity = String(Math.max(0.25, 1 - i * 0.13));
+      row.style.opacity = opts.decay ? "1" : "";
       if (it.ts) {
         const t = document.createElement("span");
         t.className = "dy-activity-time";
@@ -103,12 +104,26 @@
       body.textContent = it.text;
       row.appendChild(body);
       wrap.appendChild(row);
+      rows.push(row);
     });
     if (list.length === 0) {
       const empty = document.createElement("p");
       empty.className = "dy-dim";
       empty.textContent = "No recent activity.";
       wrap.appendChild(empty);
+    }
+    if (opts.decay && rows.length) {
+      const t0 = Date.now();
+      const iv = setInterval(() => {
+        const p = Math.min(1, (Date.now() - t0) / 8e3);
+        let done = true;
+        rows.forEach((row, i) => {
+          const target = Math.max(0.3, 1 - i * 0.14);
+          row.style.opacity = String(1 - (1 - target) * p);
+          if (p < 1) done = false;
+        });
+        if (done) clearInterval(iv);
+      }, 300);
     }
     return wrap;
   }
@@ -211,7 +226,36 @@
     minimap.appendChild(miniViewport);
     const passport = elu("div", "dy-wf-passport");
     passport.setAttribute("aria-live", "polite");
-    wrap.append(svg, minimap, passport);
+    const feed = elu("div", "dy-wf-feed");
+    feed.setAttribute("aria-live", "polite");
+    const feedHead = elu("button", "dy-wf-feed-head", "\u25BE Activity");
+    const feedBody = elu("div", "dy-wf-feed-body");
+    feedHead.addEventListener("click", () => {
+      const open = feedHead.getAttribute("aria-expanded") === "true";
+      feedHead.setAttribute("aria-expanded", String(!open));
+      feedHead.textContent = open ? "\u25B8 Activity" : "\u25BE Activity";
+      feedBody.style.display = open ? "none" : "block";
+    });
+    feedHead.setAttribute("aria-expanded", "true");
+    feed.append(feedHead, feedBody);
+    const feedMsgs = [];
+    const feedLog = (text) => {
+      const item = elu("div", "dy-wf-feed-item");
+      const t = elu("span", "dy-wf-feed-time");
+      t.textContent = (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      const b = elu("span", "", " " + text);
+      item.append(t, b);
+      feedBody.prepend(item);
+      feedMsgs.unshift({ ts: Date.now(), text, el: item });
+      while (feedMsgs.length > 6) {
+        const old = feedMsgs.pop();
+        if (old) old.el.remove();
+      }
+      feedMsgs.forEach((m, i) => {
+        m.el.style.opacity = String(Math.max(0.25, 1 - i * 0.15));
+      });
+    };
+    wrap.append(svg, feed, minimap, passport);
     host.appendChild(wrap);
     let panX = 0;
     let panY = 0;
@@ -290,18 +334,26 @@
         label2.textContent = n.title.slice(0, 24);
         const sub = sEl("text", { x: 12, y: 44, class: "dy-wf-sub" });
         sub.textContent = (n.kind === "gate" ? "GATE \xB7 " : "") + (n.status ?? "pending") + (n.assignee ? " \xB7 " + n.assignee : "");
-        const timer2 = sEl("text", {
-          x: NODE_W - 12,
-          y: 25,
-          "text-anchor": "end",
-          class: "dy-wf-timer full"
-        });
-        g.append(rect, label2, sub, timer2);
+        let timer2 = null;
+        if (n.status === "working") {
+          timer2 = sEl("text", {
+            x: NODE_W - 12,
+            y: 25,
+            "text-anchor": "end",
+            class: "dy-wf-timer full"
+          });
+          timer2.textContent = "00:00";
+          timer2.dataset.for = n.node_id;
+        }
+        if (timer2) g.append(rect, label2, sub, timer2);
+        else g.append(rect, label2, sub);
         const dash = () => rect.setAttribute("stroke-dasharray", "4 3");
         const undash = () => rect.removeAttribute("stroke-dasharray");
         g.addEventListener("pointerenter", dash);
-        g.addEventListener("pointerleave", undash);
-        const open = () => openPassport(n);
+        g.addEventListener("pointerleave", () => {
+          if (!g.classList.contains("dy-wf-selected")) undash();
+        });
+        const open = () => openPassport(n, g);
         g.addEventListener("click", open);
         g.addEventListener("keydown", (e) => {
           if (e.key === "Enter") open();
@@ -350,7 +402,11 @@
       updateMinimap();
     });
     let lastFrames = [];
-    const openPassport = (n) => {
+    let selectedEl = null;
+    const openPassport = (n, g) => {
+      if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
+      selectedEl = g ?? null;
+      if (selectedEl) selectedEl.classList.add("dy-wf-selected");
       passport.replaceChildren();
       passport.appendChild(elu("h3", "", n.title));
       passport.appendChild(elu("span", `badge ${n.status ?? "pending"}`, n.status ?? "pending"));
@@ -470,13 +526,21 @@
       updateMinimap();
     }, { passive: false });
     const onKeyDown = (e) => {
-      if (e.key === "Escape") passport.replaceChildren();
+      if (e.key === "Escape") {
+        passport.replaceChildren();
+        if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
+        selectedEl = null;
+      }
     };
     document.addEventListener("keydown", onKeyDown);
     let flowT = 0;
     const flowTimer = setInterval(() => {
       flowT = (flowT + 0.03) % 1;
-      viewport.querySelectorAll("g.dy-wf-node").forEach(() => {
+      viewport.querySelectorAll("text.dy-wf-timer").forEach((t) => {
+        const cur = t.textContent ?? "00:00";
+        const [m, s] = cur.split(":").map((v) => parseInt(v, 10) || 0);
+        const total = m * 60 + s + 1;
+        t.textContent = String(Math.floor(total / 60)).padStart(2, "0") + ":" + String(total % 60).padStart(2, "0");
       });
       const edgeMap = /* @__PURE__ */ new Map();
       viewport.querySelectorAll("path.dy-wf-edge").forEach((p) => {
@@ -521,20 +585,33 @@
       });
     }, 40);
     let timer = null;
-    const poll = () => {
+    let lastSig = "";
+    const pollOnce = () => {
       fetchRuns().then((runs) => {
         const latest = runs && runs.length ? runs[0] : null;
         const sig = JSON.stringify(latest?.nodes.map((n) => [n.node_id, n.status]) ?? []);
         if (sig !== lastSig) {
+          if (lastSig !== "") {
+            const prev = /* @__PURE__ */ new Map();
+            try {
+              JSON.parse(lastSig).forEach(([id, st]) => prev.set(id, st));
+            } catch {
+            }
+            (latest?.nodes ?? []).forEach((n) => {
+              const old = prev.get(n.node_id);
+              if (old !== void 0 && old !== n.status) {
+                feedLog(`${n.title}: ${old ?? "pending"} \u2192 ${n.status ?? "pending"}`);
+              }
+            });
+          }
           lastSig = sig;
           render(latest);
         }
       }).catch(() => {
       });
     };
-    let lastSig = "";
-    poll();
-    if (pollMs > 0) timer = setInterval(poll, pollMs);
+    pollOnce();
+    if (pollMs > 0) timer = setInterval(pollOnce, pollMs);
     disposers.push(() => {
       if (timer) clearInterval(timer);
       if (flowTimer) clearInterval(flowTimer);
