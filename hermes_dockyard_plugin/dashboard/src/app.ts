@@ -854,6 +854,7 @@ async function renderWorkflow(
               ref: c.ref,
               title: c.title,
               status: c.status,
+              assignee: c.assignee ?? null,
             })),
             history: (d.history ?? []).map((h) => {
               const rec = h as Record<string, unknown>;

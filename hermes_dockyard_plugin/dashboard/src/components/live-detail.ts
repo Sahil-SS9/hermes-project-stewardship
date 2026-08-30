@@ -68,9 +68,10 @@ export interface MiniTask {
   ref: string;
   title: string;
   status?: string | null;
+  assignee?: string | null;
 }
 
-// Compact sub-task checklist with status ticks and deep links.
+// Compact sub-task checklist with status ticks, assignees and deep links.
 export function buildTaskListMini(
   tasks: MiniTask[],
   onOpen?: (ref: string) => void,
@@ -93,8 +94,15 @@ export function buildTaskListMini(
     mark.textContent =
       t.status === 'done' ? '✓' : t.status === 'working' ? '◐' : t.status === 'blocked' ? '✕' : '○';
     const label = document.createElement('span');
+    label.className = 'dy-tasklabel';
     label.textContent = t.title;
     li.append(mark, label);
+    if (t.assignee) {
+      const who = document.createElement('span');
+      who.className = 'dy-taskassignee';
+      who.textContent = t.assignee;
+      li.appendChild(who);
+    }
     if (onOpen) {
       li.style.cursor = 'pointer';
       li.addEventListener('click', () => onOpen(t.ref));

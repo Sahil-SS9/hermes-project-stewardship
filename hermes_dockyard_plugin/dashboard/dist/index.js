@@ -145,8 +145,15 @@
       mark.className = "dy-taskmark " + (t.status ?? "pending");
       mark.textContent = t.status === "done" ? "\u2713" : t.status === "working" ? "\u25D0" : t.status === "blocked" ? "\u2715" : "\u25CB";
       const label2 = document.createElement("span");
+      label2.className = "dy-tasklabel";
       label2.textContent = t.title;
       li.append(mark, label2);
+      if (t.assignee) {
+        const who = document.createElement("span");
+        who.className = "dy-taskassignee";
+        who.textContent = t.assignee;
+        li.appendChild(who);
+      }
       if (onOpen) {
         li.style.cursor = "pointer";
         li.addEventListener("click", () => onOpen(t.ref));
@@ -456,16 +463,34 @@
                   body.appendChild(elu("p", "dy-dim", "Detail unavailable."));
                   return;
                 }
-                body.appendChild(elu("h4", "", "Activity"));
+                const kids = data.children;
+                const doneCount = kids.filter((c) => (c.status ?? "") === "done").length;
+                const total = kids.length;
+                body.appendChild(elu("h4", "", "Progress"));
+                const barWrap = elu("div", "dy-wf-progress");
+                const barFill = elu("div", "dy-wf-progress-fill");
+                const pct = total > 0 ? Math.round(doneCount / total * 100) : 0;
+                barFill.style.width = pct + "%";
+                barWrap.appendChild(barFill);
+                body.appendChild(barWrap);
                 body.appendChild(
-                  buildThread(data.history.map((h) => ({ ts: h.ts, text: h.text })))
+                  elu("p", "dy-wf-progress-label", `${doneCount} of ${total} sub-tasks done (${pct}%)`)
                 );
                 body.appendChild(elu("h4", "", "Sub-tasks"));
                 body.appendChild(
                   buildTasks(
-                    data.children.map((c) => ({ ref: c.ref, title: c.title, status: c.status })),
+                    kids.map((c) => ({
+                      ref: c.ref,
+                      title: c.title,
+                      status: c.status,
+                      assignee: c.assignee ?? null
+                    })),
                     (ref) => passport.dispatchEvent(new CustomEvent("openwork", { detail: ref }))
                   )
+                );
+                body.appendChild(elu("h4", "", "Activity"));
+                body.appendChild(
+                  buildThread(data.history.map((h) => ({ ts: h.ts, text: h.text })))
                 );
               }).catch(() => {
                 body.replaceChildren(elu("p", "dy-dim", "Detail unavailable."));
@@ -1370,7 +1395,8 @@
               children: (d.children ?? []).map((c) => ({
                 ref: c.ref,
                 title: c.title,
-                status: c.status
+                status: c.status,
+                assignee: c.assignee ?? null
               })),
               history: (d.history ?? []).map((h) => {
                 const rec = h;

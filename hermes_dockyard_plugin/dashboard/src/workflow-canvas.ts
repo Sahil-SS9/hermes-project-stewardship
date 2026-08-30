@@ -36,7 +36,7 @@ import {
 } from './components/live-detail';
 
 export interface ExpansionData {
-  children: Array<{ ref: string; title: string; status?: string | null }>;
+  children: Array<{ ref: string; title: string; status?: string | null; assignee?: string | null }>;
   history: Array<{ ts?: string | number | null; text: string }>;
 }
 
@@ -396,16 +396,37 @@ export function mountWorkflowCanvas(
                   body.appendChild(elu('p', 'dy-dim', 'Detail unavailable.'));
                   return;
                 }
-                body.appendChild(elu('h4', '', 'Activity'));
+                // --- progress bar (agenttrail node expansion): done/total ---
+                const kids = data.children;
+                const doneCount = kids.filter((c) => (c.status ?? '') === 'done').length;
+                const total = kids.length;
+                body.appendChild(elu('h4', '', 'Progress'));
+                const barWrap = elu('div', 'dy-wf-progress');
+                const barFill = elu('div', 'dy-wf-progress-fill');
+                const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+                barFill.style.width = pct + '%';
+                barWrap.appendChild(barFill);
+                body.appendChild(barWrap);
                 body.appendChild(
-                  buildThread(data.history.map((h) => ({ ts: h.ts, text: h.text }))),
+                  elu('p', 'dy-wf-progress-label', `${doneCount} of ${total} sub-tasks done (${pct}%)`),
                 );
+                // --- per-task checklist with assignees (agenttrail pattern) ---
                 body.appendChild(elu('h4', '', 'Sub-tasks'));
                 body.appendChild(
                   buildTasks(
-                    data.children.map((c) => ({ ref: c.ref, title: c.title, status: c.status })),
+                    kids.map((c) => ({
+                      ref: c.ref,
+                      title: c.title,
+                      status: c.status,
+                      assignee: c.assignee ?? null,
+                    })),
                     (ref) => passport.dispatchEvent(new CustomEvent('openwork', { detail: ref })),
                   ),
+                );
+                // --- activity thread last (keeps the reading order: status → who → when) ---
+                body.appendChild(elu('h4', '', 'Activity'));
+                body.appendChild(
+                  buildThread(data.history.map((h) => ({ ts: h.ts, text: h.text }))),
                 );
               })
               .catch(() => {
