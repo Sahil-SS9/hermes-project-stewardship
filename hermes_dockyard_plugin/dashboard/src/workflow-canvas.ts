@@ -434,11 +434,19 @@ export function mountWorkflowCanvas(
   let lastX = 0;
   let lastY = 0;
   svg.addEventListener('pointerdown', (e) => {
+    // Click-vs-drag disambiguation: capture on the pressed element itself, so
+    // the click event still retargets to the node on release. Capturing on
+    // the svg swallowed node clicks entirely (real-browser verified: pointer
+    // capture on the svg retargets pointerup away from the node, so the
+    // browser never synthesises a click on the node).
     dragging = true;
     lastX = (e as PointerEvent).clientX;
     lastY = (e as PointerEvent).clientY;
+    const target = e.target as Element;
+    const captureEl = (target && target.closest && target.closest('g.dy-wf-node')) as Element | SVGSVGElement | null;
+    const cap = (captureEl ?? svg) as Element;
     try {
-      svg.setPointerCapture((e as PointerEvent).pointerId);
+      cap.setPointerCapture((e as PointerEvent).pointerId);
     } catch {
       /* older engines */
     }

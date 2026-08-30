@@ -488,8 +488,11 @@
       dragging = true;
       lastX = e.clientX;
       lastY = e.clientY;
+      const target = e.target;
+      const captureEl = target && target.closest && target.closest("g.dy-wf-node");
+      const cap = captureEl ?? svg;
       try {
-        svg.setPointerCapture(e.pointerId);
+        cap.setPointerCapture(e.pointerId);
       } catch {
       }
     });
