@@ -846,6 +846,24 @@ async function renderWorkflow(
       {
         onApprove: (ref) => s.api.approve(ref),
         onReject: (ref) => s.api.reject(ref),
+        // agenttrail expansion: children -> task list, history -> activity thread
+        onExpand: async (ref) => {
+          const d = await s.api.workDetail(pid, ref);
+          return {
+            children: (d.children ?? []).map((c) => ({
+              ref: c.ref,
+              title: c.title,
+              status: c.status,
+            })),
+            history: (d.history ?? []).map((h) => {
+              const rec = h as Record<string, unknown>;
+              return {
+                ts: (rec.at ?? rec.ts ?? rec.created_at ?? null) as string | number | null,
+                text: String(rec.summary ?? rec.text ?? rec.message ?? rec.action ?? 'event'),
+              };
+            }),
+          };
+        },
       },
     );
     (canvasHost as unknown as { dyDispose?: () => void }).dyDispose = dispose;

@@ -30,11 +30,15 @@ function boot() {
 }
 
 test('registers hermes-dockyard tab with the host registry', async () => {
-  const { calls } = boot();
-  await new Promise((r) => setTimeout(r, 50)); // registration is async (whenReady)
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].name, 'hermes-dockyard');
-  assert.equal(typeof calls[0].comp, 'function');
+  const { dom, calls } = boot();
+  try {
+    await new Promise((r) => setTimeout(r, 50)); // registration is async (whenReady)
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].name, 'hermes-dockyard');
+    assert.equal(typeof calls[0].comp, 'function');
+  } finally {
+    dom.window.close();
+  }
 });
 
 test('bundle is non-empty iife without external react import', () => {
@@ -74,6 +78,20 @@ function bootWorkflow() {
       if (url.includes('/workflows/') && url.endsWith('/runs')) {
         return FIXTURE_RUNS;
       }
+      if (url.includes('/work-items/W-1')) {
+        return {
+          work_item: { ref: 'W-1', title: 'Ingest', status: 'done' },
+          parent: null,
+          children: [
+            { ref: 'W-1a', title: 'Parse payload', status: 'done' },
+            { ref: 'W-1b', title: 'Normalise', status: 'working' },
+          ],
+          history: [
+            { at: '2026-08-30T12:00:00Z', summary: 'created from initiative' },
+            { at: '2026-08-30T12:05:00Z', summary: 'status -> in_progress' },
+          ],
+        };
+      }
       if (url.endsWith('/initiatives/INIT-1/approve')) { lastApprove = true; return {}; }
       if (url.endsWith('/initiatives/INIT-1/reject')) { lastReject = true; return {}; }
       return {};
@@ -99,14 +117,37 @@ test('workflow tab renders canvas with nodes and edges, then opens gate passport
   const edges = dom.window.document.querySelectorAll('.dy-wf-edge');
   assert.ok(edges.length >= 2, `expected >=2 edges, got ${edges.length}`);
   // Click the gate node -> passport with Approve/Reject.
-  const gate = [...nodes].find((n) => n.getAttribute('class').includes('dy-wf-pending'));
+  const gate = [...nodes].find((n) => (n.getAttribute('class') || '').split(/\s+/).includes('pending'));
   assert.ok(gate, 'gate node should be present');
   gate.dispatchEvent(new dom.window.Event('click'));
   const passport = dom.window.document.querySelector('.dy-wf-passport');
   assert.ok(passport, 'passport should open on gate click');
   assert.ok(passport.querySelector('button'), 'passport should have action buttons');
+  // LOD attribute present (v3 mechanic)
+  const lod = dom.window.document.querySelector('svg.dy-wf-svg');
+  assert.ok(['map', 'read', 'full'].includes(lod.getAttribute('data-lod')), 'data-lod should be set');
+  // arrow markers exist (agenttrail edge vocabulary)
+  assert.ok(lod.querySelector('marker'), 'arrow markers should exist');
+  // Expand live detail on the done TASK node (W-1 has task_ref + fixture detail)
+  const taskNode = [...dom.window.document.querySelectorAll('.dy-wf-node')].find((n) =>
+    (n.getAttribute('class') || '').split(/\s+/).includes('done'));
+  assert.ok(taskNode, 'done task node should be present');
+  taskNode.dispatchEvent(new dom.window.Event('click'));
+  await new Promise((r) => setTimeout(r, 80));
+  const taskPassport = dom.window.document.querySelector('.dy-wf-passport');
+  const expandHead = taskPassport.querySelector('.dy-wf-expand-head');
+  assert.ok(expandHead, 'expansion toggle should exist');
+  expandHead.click();
+  await new Promise((r) => setTimeout(r, 150)); // lazy fetch
+  const body = taskPassport.querySelector('.dy-wf-expand-body');
+  assert.ok(body.querySelector('.dy-activity-item'), 'activity thread should render');
+  assert.ok(body.querySelectorAll('.dy-taskitem').length >= 2, 'sub-task list should render');
   // Clean up the canvas poll timer so the test process can exit.
   const host = dom.window.document.querySelector('.dy-wf-host');
   if (host && typeof host.dyDispose === 'function') host.dyDispose();
+  // jsdom keeps the event loop alive while windows are open; closing them
+  // lets node:test exit promptly instead of idling to the file timeout.
+  await new Promise((r) => setTimeout(r, 50));
+  dom.window.close();
 });
 

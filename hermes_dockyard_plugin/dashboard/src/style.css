@@ -116,19 +116,50 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-root .dy-wf-wrap { position: relative; width: 100%; height: 100%; }
 .dy-root .dy-wf-svg { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
 .dy-root .dy-wf-svg:active { cursor: grabbing; }
-.dy-root .dy-wf-node { cursor: pointer; }
-.dy-root .dy-wf-rect { fill: #1b2230; stroke: #3a4256; stroke-width: 1.5; }
-.dy-root .dy-wf-done .dy-wf-rect { stroke: #3fb950; }
-.dy-root .dy-wf-working .dy-wf-rect { stroke: #d29922; }
-.dy-root .dy-wf-blocked .dy-wf-rect { stroke: #f85149; }
-.dy-root .dy-wf-pending .dy-wf-rect { stroke: #6e7681; }
-.dy-root .dy-wf-label { fill: var(--dy-text, #e6edf3); font: 600 13px sans-serif; }
-.dy-root .dy-wf-sub { fill: #8b949e; font: 11px sans-serif; }
-.dy-root .dy-wf-edge { stroke: #4a5568; stroke-width: 1.5; fill: none; }
-.dy-root .dy-wf-minimap { position: absolute; right: 10px; bottom: 10px; background: rgba(15,18,24,0.85); border: 1px solid #2a2f3a; border-radius: 6px; }
-.dy-root .dy-wf-mini { fill: #6e7681; }
+/* LOD tiers (archify): map < 75% / read / full > 140% */
+.dy-root .dy-wf-svg[data-lod="map"] .dy-wf-sub,
+.dy-root .dy-wf-svg[data-lod="map"] .dy-wf-timer { opacity: 0; }
+.dy-root .dy-wf-svg .dy-wf-sub, .dy-root .dy-wf-svg .dy-wf-timer { transition: opacity .3s; }
+.dy-root .dy-wf-node { cursor: pointer; outline: none; }
+.dy-root .dy-wf-rect { fill: #1b2230; stroke: #6e7681; stroke-width: 1.5; transition: stroke .5s; }
+.dy-root .dy-wf-node.done .dy-wf-rect { stroke: #3fb950; }
+.dy-root .dy-wf-node.working .dy-wf-rect { stroke: #d29922; animation: dyPulseNode 1.5s ease-in-out infinite; }
+@keyframes dyPulseNode { 0%,100% { stroke-width: 1.5; } 50% { stroke-width: 2.6; filter: drop-shadow(0 0 7px rgba(210,153,34,.5)); } }
+.dy-root .dy-wf-node.blocked .dy-wf-rect { stroke: #f85149; }
+.dy-root .dy-wf-node.pending .dy-wf-rect { stroke: #6e7681; }
+.dy-root .dy-wf-label { fill: var(--dy-text, #e6edf3); font: 600 13px system-ui, sans-serif; pointer-events: none; }
+.dy-root .dy-wf-sub { fill: #8b949e; font: 11px system-ui, sans-serif; pointer-events: none; }
+.dy-root .dy-wf-timer { fill: #d29922; font: 11px ui-monospace, monospace; }
+.dy-root .dy-wf-edge { stroke: #3d4657; stroke-width: 1.5; fill: none; transition: stroke .4s; }
+.dy-root .dy-wf-edge.active { stroke: #58a6ff; }
+.dy-root .dy-wf-flowdot { fill: #58a6ff; }
+.dy-root .dy-wf-minimap { position: absolute; right: 10px; bottom: 10px; background: rgba(15,18,24,.88); border: 1px solid #2a2f3a; border-radius: 6px; }
 .dy-root .dy-wf-mini-view { fill: none; stroke: #58a6ff; stroke-width: 2; }
-.dy-root .dy-wf-passport { position: absolute; top: 10px; right: 10px; width: 260px; background: #161b22; border: 1px solid #2a2f3a; border-radius: 8px; padding: 12px; color: var(--dy-text, #e6edf3); }
+.dy-root .dy-wf-passport { position: absolute; top: 10px; right: 10px; width: 280px; max-height: calc(100% - 20px); overflow-y: auto; background: #161b22; border: 1px solid #2a2f3a; border-radius: 8px; padding: 12px; color: var(--dy-text, #e6edf3); }
+.dy-root .dy-wf-passport h3 { margin: 0 0 4px; font-size: 14px; }
+.dy-root .dy-wf-passport .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; border: 1px solid #6e7681; color: #8b949e; }
+.dy-root .dy-wf-passport .badge.done { border-color: #3fb950; color: #3fb950; }
+.dy-root .dy-wf-passport .badge.working { border-color: #d29922; color: #d29922; }
+.dy-root .dy-wf-passport .badge.blocked { border-color: #f85149; color: #f85149; }
+.dy-root .dy-wf-passport h4 { margin: 10px 0 4px; font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: .4px; }
 .dy-root .dy-wf-actions { display: flex; gap: 8px; margin-top: 10px; }
-.dy-root .dy-wf-empty { fill: #8b949e; font: 13px sans-serif; }
+.dy-root .dy-wf-expand { margin-top: 10px; }
+.dy-root .dy-wf-expand-head { width: 100%; text-align: left; background: #21262d; border: 1px solid #2a2f3a; border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+.dy-root .dy-wf-expand-body { padding: 8px 2px; }
+.dy-root .dy-wf-empty { fill: #8b949e; font: 13px system-ui, sans-serif; }
+
+/* ---- shared live-detail components ---- */
+.dy-root .dy-activity-thread { display: grid; gap: 2px; }
+.dy-root .dy-activity-item { display: flex; gap: 8px; font-size: 11.5px; color: #8b949e; padding: 2px 0; border-bottom: 1px dashed #23293a; }
+.dy-root .dy-activity-item .dy-activity-time { font: 10px ui-monospace, monospace; color: #59626f; flex: none; padding-top: 1px; }
+.dy-root .dy-tasklist ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.dy-root .dy-taskitem { display: flex; gap: 8px; font-size: 12px; align-items: baseline; }
+.dy-root .dy-taskmark.done { color: #3fb950; }
+.dy-root .dy-taskmark.working { color: #d29922; }
+.dy-root .dy-taskmark.blocked { color: #f85149; }
+.dy-root .dy-taskmark.pending { color: #6e7681; }
+@media (prefers-reduced-motion: reduce) {
+  .dy-root .dy-wf-node.working .dy-wf-rect { animation: none; }
+  .dy-root .dy-wf-svg .dy-wf-sub, .dy-root .dy-wf-svg .dy-wf-timer { transition: none; }
+}
 

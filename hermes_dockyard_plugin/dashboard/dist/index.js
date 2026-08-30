@@ -82,37 +82,106 @@
     return sdk;
   }
 
+  // src/components/live-detail.ts
+  function buildActivityThread(items, opts = {}) {
+    const max = opts.max ?? 8;
+    const wrap = document.createElement("div");
+    wrap.className = "dy-activity-thread";
+    const list = items.slice(0, max);
+    list.forEach((it, i) => {
+      const row = document.createElement("div");
+      row.className = "dy-activity-item";
+      if (opts.decay) row.style.opacity = String(Math.max(0.25, 1 - i * 0.13));
+      if (it.ts) {
+        const t = document.createElement("span");
+        t.className = "dy-activity-time";
+        const d = new Date(it.ts);
+        t.textContent = isNaN(d.getTime()) ? String(it.ts) : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        row.appendChild(t);
+      }
+      const body = document.createElement("span");
+      body.textContent = it.text;
+      row.appendChild(body);
+      wrap.appendChild(row);
+    });
+    if (list.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "dy-dim";
+      empty.textContent = "No recent activity.";
+      wrap.appendChild(empty);
+    }
+    return wrap;
+  }
+  function buildTaskListMini(tasks, onOpen) {
+    const wrap = document.createElement("div");
+    wrap.className = "dy-tasklist";
+    if (tasks.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "dy-dim";
+      empty.textContent = "No sub-tasks.";
+      wrap.appendChild(empty);
+      return wrap;
+    }
+    const ul = document.createElement("ul");
+    for (const t of tasks) {
+      const li = document.createElement("li");
+      li.className = "dy-taskitem";
+      const mark = document.createElement("span");
+      mark.className = "dy-taskmark " + (t.status ?? "pending");
+      mark.textContent = t.status === "done" ? "\u2713" : t.status === "working" ? "\u25D0" : t.status === "blocked" ? "\u2715" : "\u25CB";
+      const label2 = document.createElement("span");
+      label2.textContent = t.title;
+      li.append(mark, label2);
+      if (onOpen) {
+        li.style.cursor = "pointer";
+        li.addEventListener("click", () => onOpen(t.ref));
+      }
+      ul.appendChild(li);
+    }
+    wrap.appendChild(ul);
+    return wrap;
+  }
+
   // src/workflow-canvas.ts
-  var NODE_W = 180;
+  var NODE_W = 190;
   var NODE_H = 64;
-  var COL_GAP = 80;
-  var ROW_GAP = 28;
-  var PAD = 40;
+  var COL_GAP = 95;
+  var ROW_GAP = 26;
+  var PAD = 60;
   var ZOOM_MIN = 0.45;
   var ZOOM_MAX = 1.8;
+  var LOD_FULL = 1.4;
+  var ZOOM_IN = 1.1;
+  var ZOOM_OUT = 0.9;
+  var statusColor = (s) => s === "done" ? "#3fb950" : s === "working" ? "#d29922" : s === "blocked" ? "#f85149" : "#6e7681";
+  function elu(tag, cls, text) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (text !== void 0) el.textContent = text;
+    return el;
+  }
+  function sEl(tag, attrs) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+    return el;
+  }
   function buildLayout(nodes) {
     const byId = new Map(nodes.map((n) => [n.node_id, n]));
-    const depth = /* @__PURE__ */ new Map();
-    const visiting = /* @__PURE__ */ new Set();
+    const depthCache = /* @__PURE__ */ new Map();
     const computeDepth = (id) => {
-      if (depth.has(id)) return depth.get(id);
-      if (visiting.has(id)) return 0;
-      visiting.add(id);
+      if (depthCache.has(id)) return depthCache.get(id);
       const n = byId.get(id);
+      if (!n) return 0;
       let d = 0;
-      for (const dep of n?.depends_on ?? []) {
-        d = Math.max(d, computeDepth(dep) + 1);
-      }
-      visiting.delete(id);
-      depth.set(id, d);
+      for (const dep of n.depends_on) d = Math.max(d, computeDepth(dep) + 1);
+      depthCache.set(id, d);
       return d;
     };
-    for (const n of nodes) computeDepth(n.node_id);
-    const maxDepth = Math.max(0, ...[...depth.values()]);
+    nodes.forEach((n) => computeDepth(n.node_id));
     const perDepth = {};
     const positions = {};
-    for (const n of nodes) {
-      const d = depth.get(n.node_id) ?? 0;
+    nodes.forEach((n) => {
+      const d = depthCache.get(n.node_id) ?? 0;
       const row = perDepth[d] ?? 0;
       perDepth[d] = row + 1;
       positions[n.node_id] = {
@@ -120,51 +189,27 @@
         y: PAD + row * (NODE_H + ROW_GAP),
         depth: d
       };
-    }
-    const width = PAD * 2 + (maxDepth + 1) * (NODE_W + COL_GAP) - COL_GAP;
+    });
+    const maxDepth = Math.max(0, ...nodes.map((n) => depthCache.get(n.node_id) ?? 0));
     const rows = Math.max(1, ...Object.values(perDepth));
-    const height = PAD * 2 + rows * (NODE_H + ROW_GAP) - ROW_GAP;
-    return { positions, width, height };
-  }
-  var STATUS_CLASS = {
-    done: "dy-wf-done",
-    working: "dy-wf-working",
-    blocked: "dy-wf-blocked",
-    pending: "dy-wf-pending"
-  };
-  function statusClass(n) {
-    return STATUS_CLASS[n.status ?? "pending"] ?? "dy-wf-pending";
-  }
-  function svgEl(tag, attrs) {
-    const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
-    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
-    return el;
-  }
-  function textEl(tag, cls, text) {
-    const el = document.createElement(tag);
-    if (cls) el.className = cls;
-    el.textContent = text;
-    return el;
+    return {
+      positions,
+      width: PAD * 2 + (maxDepth + 1) * (NODE_W + COL_GAP) - COL_GAP,
+      height: PAD * 2 + rows * (NODE_H + ROW_GAP) - ROW_GAP
+    };
   }
   function mountWorkflowCanvas(host, projectId, runName, fetchRuns, handlers, pollMs = 8e3) {
     host.replaceChildren();
     host.className = "dy-wf";
-    const wrap = document.createElement("div");
-    wrap.className = "dy-wf-wrap";
-    const svg = svgEl("svg", { class: "dy-wf-svg" });
-    const viewport = svgEl("g", { class: "dy-wf-viewport" });
+    const wrap = elu("div", "dy-wf-wrap");
+    const svg = sEl("svg", { class: "dy-wf-svg" });
+    svg.setAttribute("data-lod", "read");
+    const viewport = sEl("g", { class: "dy-wf-viewport" });
     svg.appendChild(viewport);
-    const minimap = svgEl("svg", {
-      class: "dy-wf-minimap",
-      width: 160,
-      height: 100
-    });
-    const miniViewport = svgEl("rect", {
-      class: "dy-wf-mini-view"
-    });
+    const minimap = sEl("svg", { class: "dy-wf-minimap", width: 170, height: 104 });
+    const miniViewport = sEl("rect", { class: "dy-wf-mini-view" });
     minimap.appendChild(miniViewport);
-    const passport = document.createElement("aside");
-    passport.className = "dy-wf-passport";
+    const passport = elu("div", "dy-wf-passport");
     passport.setAttribute("aria-live", "polite");
     wrap.append(svg, minimap, passport);
     host.appendChild(wrap);
@@ -174,19 +219,36 @@
     let fullW = 0;
     let fullH = 0;
     let currentNodes = [];
-    const applyTransform = () => {
-      viewport.setAttribute(
-        "transform",
-        `translate(${panX} ${panY}) scale(${zoom})`
-      );
+    let disposers = [];
+    const apply = () => {
+      viewport.setAttribute("transform", `translate(${panX} ${panY}) scale(${zoom})`);
+      svg.setAttribute("data-lod", zoom > LOD_FULL ? "full" : zoom < 0.75 ? "map" : "read");
     };
+    const defs = sEl("defs", {});
+    const mkMarker = (id, fill) => {
+      const m = sEl("marker", {
+        id,
+        viewBox: "0 0 10 10",
+        refX: "9",
+        refY: "5",
+        markerWidth: "7",
+        markerHeight: "7",
+        orient: "auto-start-reverse"
+      });
+      m.appendChild(sEl("path", { d: "M 0 0 L 10 5 L 0 10 z", fill }));
+      return m;
+    };
+    defs.appendChild(mkMarker("dyArrowActive", "#58a6ff"));
+    defs.appendChild(mkMarker("dyArrowDim", "#3d4657"));
+    svg.appendChild(defs);
     const render = (run) => {
       viewport.replaceChildren();
+      viewport.appendChild(defs);
       if (!run || run.nodes.length === 0) {
-        viewport.appendChild(
-          svgEl("text", { x: 20, y: 40, class: "dy-wf-empty" })
-        );
-        viewport.lastChild.textContent = "No workflow nodes.";
+        const t = sEl("text", { x: 20, y: 40, class: "dy-wf-empty" });
+        t.textContent = "No workflow runs yet.";
+        viewport.appendChild(t);
+        updateMinimap();
         return;
       }
       currentNodes = run.nodes;
@@ -199,17 +261,22 @@
         for (const dep of n.depends_on) {
           const to = positions[dep];
           if (!from || !to) continue;
-          const path = svgEl("path", {
-            class: "dy-wf-edge",
-            d: `M ${to.x + NODE_W} ${to.y + NODE_H / 2} L ${from.x} ${from.y + NODE_H / 2}`
+          const path = sEl("path", {
+            class: `dy-wf-edge`,
+            d: `M ${to.x + NODE_W} ${to.y + NODE_H / 2} C ${to.x + NODE_W + COL_GAP / 2} ${to.y + NODE_H / 2}, ${from.x - COL_GAP / 2} ${from.y + NODE_H / 2}, ${from.x - 6} ${from.y + NODE_H / 2}`,
+            "marker-end": "url(#dyArrowDim)"
           });
+          path.dataset.from = dep;
+          path.dataset.to = n.node_id;
           viewport.appendChild(path);
+          const dot = sEl("circle", { class: "dy-wf-flowdot", r: 3.2, opacity: 0 });
+          viewport.appendChild(dot);
         }
       }
       for (const n of run.nodes) {
         const p = positions[n.node_id];
-        const g = svgEl("g", {
-          class: `dy-wf-node ${statusClass(n)}`,
+        const g = sEl("g", {
+          class: `dy-wf-node ${n.status ?? "pending"}`,
           transform: `translate(${p.x} ${p.y})`
         });
         g.setAttribute("tabindex", "0");
@@ -218,25 +285,22 @@
           "aria-label",
           `${n.kind === "gate" ? "Gate" : "Task"}: ${n.title} (${n.status ?? "pending"})`
         );
-        const rect = svgEl("rect", {
-          width: NODE_W,
-          height: NODE_H,
-          rx: 8,
-          class: "dy-wf-rect"
+        const rect = sEl("rect", { width: NODE_W, height: NODE_H, rx: 9, class: "dy-wf-rect" });
+        const label2 = sEl("text", { x: 12, y: 25, class: "dy-wf-label" });
+        label2.textContent = n.title.slice(0, 24);
+        const sub = sEl("text", { x: 12, y: 44, class: "dy-wf-sub" });
+        sub.textContent = (n.kind === "gate" ? "GATE \xB7 " : "") + (n.status ?? "pending") + (n.assignee ? " \xB7 " + n.assignee : "");
+        const timer2 = sEl("text", {
+          x: NODE_W - 12,
+          y: 25,
+          "text-anchor": "end",
+          class: "dy-wf-timer full"
         });
-        const label2 = svgEl("text", {
-          x: 12,
-          y: 26,
-          class: "dy-wf-label"
-        });
-        label2.textContent = n.title.slice(0, 22);
-        const sub = svgEl("text", {
-          x: 12,
-          y: 46,
-          class: "dy-wf-sub"
-        });
-        sub.textContent = (n.kind === "gate" ? "GATE \xB7 " : "") + String(n.status ?? "pending");
-        g.append(rect, label2, sub);
+        g.append(rect, label2, sub, timer2);
+        const dash = () => rect.setAttribute("stroke-dasharray", "4 3");
+        const undash = () => rect.removeAttribute("stroke-dasharray");
+        g.addEventListener("pointerenter", dash);
+        g.addEventListener("pointerleave", undash);
         const open = () => openPassport(n);
         g.addEventListener("click", open);
         g.addEventListener("keydown", (e) => {
@@ -244,59 +308,123 @@
         });
         viewport.appendChild(g);
       }
-      applyTransform();
+      apply();
+      updateMinimap();
     };
+    const updateMinimap = () => {
+      minimap.replaceChildren(miniViewport);
+      if (fullW <= 0) return;
+      const s = Math.min(170 / fullW, 104 / fullH);
+      const vx = (0 - panX) / zoom;
+      const vy = (0 - panY) / zoom;
+      const vw = (svg.clientWidth || 1300) / zoom;
+      const vh = (svg.clientHeight || 760) / zoom;
+      miniViewport.setAttribute("x", String(vx * s));
+      miniViewport.setAttribute("y", String(vy * s));
+      miniViewport.setAttribute("width", String(Math.max(10, vw * s)));
+      miniViewport.setAttribute("height", String(Math.max(7, vh * s)));
+      for (const n of currentNodes) {
+        const { positions } = buildLayout(currentNodes);
+        const p = positions[n.node_id];
+        const dot = sEl("rect", {
+          x: p.x * s,
+          y: p.y * s,
+          width: Math.max(3, NODE_W * s),
+          height: Math.max(2, NODE_H * s),
+          fill: statusColor(n.status),
+          opacity: 0.8
+        });
+        minimap.appendChild(dot);
+      }
+    };
+    minimap.addEventListener("click", (e) => {
+      const ev = e;
+      const r = minimap.getBoundingClientRect();
+      const fx = (ev.clientX - r.left) / 170;
+      const fy = (ev.clientY - r.top) / 104;
+      if (fullW <= 0) return;
+      const s = Math.min(170 / fullW, 104 / fullH);
+      panX = 650 - fx * 170 / s * zoom;
+      panY = 380 - fy * 104 / s * zoom;
+      apply();
+      updateMinimap();
+    });
+    let lastFrames = [];
     const openPassport = (n) => {
       passport.replaceChildren();
-      passport.appendChild(textEl("h3", "", n.title));
-      passport.appendChild(
-        textEl("p", "dy-dim", `${n.kind === "gate" ? "Gate" : "Task"} \xB7 ${n.status ?? "pending"}`)
-      );
-      if (n.assignee) passport.appendChild(textEl("p", "", `Assignee: ${n.assignee}`));
+      passport.appendChild(elu("h3", "", n.title));
+      passport.appendChild(elu("span", `badge ${n.status ?? "pending"}`, n.status ?? "pending"));
+      if (n.assignee) passport.appendChild(elu("p", "dy-dim", `assignee: ${n.assignee}`));
       if (n.evidence_refs.length) {
-        passport.appendChild(textEl("p", "dy-dim", "Evidence:"));
-        const ul = document.createElement("ul");
-        for (const e of n.evidence_refs) ul.appendChild(textEl("li", "", e));
-        passport.appendChild(ul);
+        const p = elu("p", "dy-dim", "evidence: " + n.evidence_refs.join(", "));
+        passport.appendChild(p);
       }
       if (n.task_ref) {
-        passport.appendChild(
-          textEl("p", "dy-dim", `Deep link: ${n.task_ref}`)
-        );
-        if (n.kind === "gate" && n.status !== "done") {
-          const row = document.createElement("div");
-          row.className = "dy-wf-actions";
-          const approve = document.createElement("button");
-          approve.className = "dy-btn primary";
-          approve.textContent = "Approve";
+        passport.appendChild(elu("p", "dy-dim", `deep link: ${n.task_ref}`));
+        if (n.kind === "gate" && n.status !== "done" && n.status !== "blocked") {
+          const row = elu("div", "dy-wf-actions");
+          const approve = elu("button", "dy-btn primary", "Approve");
+          const reject = elu("button", "dy-btn", "Reject");
           approve.addEventListener("click", async () => {
             approve.disabled = true;
-            try {
-              await handlers.onApprove(n.task_ref);
-              approve.textContent = "Approved";
-            } catch (e) {
-              approve.disabled = false;
-              approve.textContent = `Failed: ${String(e).slice(0, 40)}`;
-            }
+            reject.disabled = true;
+            approve.textContent = "Approved \u2713";
+            await handlers.onApprove(n.task_ref);
           });
-          const reject = document.createElement("button");
-          reject.className = "dy-btn";
-          reject.textContent = "Reject";
           reject.addEventListener("click", async () => {
             reject.disabled = true;
-            try {
-              await handlers.onReject(n.task_ref);
-              reject.textContent = "Rejected";
-            } catch (e) {
-              reject.disabled = false;
-              reject.textContent = `Failed: ${String(e).slice(0, 40)}`;
-            }
+            approve.disabled = true;
+            reject.textContent = "Rejected \u2715";
+            await handlers.onReject(n.task_ref);
           });
           row.append(approve, reject);
           passport.appendChild(row);
         }
+        if (handlers.onExpand) {
+          const sec = elu("div", "dy-wf-expand");
+          const head = elu("button", "dy-wf-expand-head", "\u25B8 Live detail");
+          head.setAttribute("aria-expanded", "false");
+          const body = elu("div", "dy-wf-expand-body");
+          body.style.display = "none";
+          body.appendChild(elu("p", "dy-dim", "Loading live detail\u2026"));
+          head.addEventListener("click", () => {
+            const isOpen = head.getAttribute("aria-expanded") === "true";
+            head.setAttribute("aria-expanded", String(!isOpen));
+            head.textContent = isOpen ? "\u25B8 Live detail" : "\u25BE Live detail";
+            body.style.display = isOpen ? "none" : "block";
+            if (!isOpen && !body.dataset.loaded) {
+              body.dataset.loaded = "1";
+              handlers.onExpand(n.task_ref).then((data) => {
+                body.replaceChildren();
+                if (!data) {
+                  body.appendChild(elu("p", "dy-dim", "Detail unavailable."));
+                  return;
+                }
+                body.appendChild(elu("h4", "", "Activity"));
+                body.appendChild(
+                  buildThread(data.history.map((h) => ({ ts: h.ts, text: h.text })))
+                );
+                body.appendChild(elu("h4", "", "Sub-tasks"));
+                body.appendChild(
+                  buildTasks(
+                    data.children.map((c) => ({ ref: c.ref, title: c.title, status: c.status })),
+                    (ref) => passport.dispatchEvent(new CustomEvent("openwork", { detail: ref }))
+                  )
+                );
+              }).catch(() => {
+                body.replaceChildren(elu("p", "dy-dim", "Detail unavailable."));
+              });
+            }
+          });
+          sec.append(head, body);
+          passport.appendChild(sec);
+        }
+      } else {
+        passport.appendChild(elu("p", "dy-dim", "No canonical work bound to this node yet."));
       }
     };
+    const buildThread = (items) => buildActivityThread(items, { decay: true });
+    const buildTasks = (tasks, onOpen) => buildTaskListMini(tasks, onOpen);
     let dragging = false;
     let lastX = 0;
     let lastY = 0;
@@ -304,7 +432,10 @@
       dragging = true;
       lastX = e.clientX;
       lastY = e.clientY;
-      svg.setPointerCapture(e.pointerId);
+      try {
+        svg.setPointerCapture(e.pointerId);
+      } catch {
+      }
     });
     svg.addEventListener("pointermove", (e) => {
       if (!dragging) return;
@@ -313,7 +444,7 @@
       panY += ev.clientY - lastY;
       lastX = ev.clientX;
       lastY = ev.clientY;
-      applyTransform();
+      apply();
       updateMinimap();
     });
     svg.addEventListener("pointerup", (e) => {
@@ -323,71 +454,96 @@
       } catch {
       }
     });
-    const zoomAt = (factor, cx, cy) => {
-      const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom * factor));
-      const k = next / zoom;
-      panX = cx - (cx - panX) * k;
-      panY = cy - (cy - panY) * k;
-      zoom = next;
-      applyTransform();
-      updateMinimap();
-    };
     svg.addEventListener("wheel", (e) => {
       e.preventDefault();
       const ev = e;
       const rect = svg.getBoundingClientRect();
       const cx = ev.clientX - rect.left;
       const cy = ev.clientY - rect.top;
-      zoomAt(ev.deltaY < 0 ? 1.1 : 0.9, cx, cy);
-    }, { passive: false });
-    const updateMinimap = () => {
-      minimap.replaceChildren(miniViewport);
-      const sx = 160 / Math.max(1, fullW);
-      const sy = 100 / Math.max(1, fullH);
-      const s = Math.min(sx, sy);
-      miniViewport.setAttribute("x", String(-panX * s));
-      miniViewport.setAttribute("y", String(-panY * s));
-      miniViewport.setAttribute("width", String(svg.clientWidth * s * zoom));
-      miniViewport.setAttribute("height", String(svg.clientHeight * s * zoom));
-      for (const n of currentNodes) {
-        const { positions } = buildLayout(currentNodes);
-        const p = positions[n.node_id];
-        const dot = svgEl("rect", {
-          x: p.x * s,
-          y: p.y * s,
-          width: NODE_W * s,
-          height: NODE_H * s,
-          class: `dy-wf-mini ${statusClass(n)}`
-        });
-        minimap.appendChild(dot);
-      }
-    };
-    minimap.addEventListener("click", (e) => {
-      const ev = e;
-      const rect = minimap.getBoundingClientRect();
-      const fx = (ev.clientX - rect.left) / 160;
-      const fy = (ev.clientY - rect.top) / 100;
-      const targetX = fx * fullW;
-      const targetY = fy * fullH;
-      panX = svg.clientWidth / 2 - targetX * zoom;
-      panY = svg.clientHeight / 2 - targetY * zoom;
-      applyTransform();
+      const factor = ev.deltaY < 0 ? ZOOM_IN : ZOOM_OUT;
+      const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom * factor));
+      const k = next / zoom;
+      panX = cx - (cx - panX) * k;
+      panY = cy - (cy - panY) * k;
+      zoom = next;
+      apply();
       updateMinimap();
-    });
+    }, { passive: false });
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") passport.replaceChildren();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    let flowT = 0;
+    const flowTimer = setInterval(() => {
+      flowT = (flowT + 0.03) % 1;
+      viewport.querySelectorAll("g.dy-wf-node").forEach(() => {
+      });
+      const edgeMap = /* @__PURE__ */ new Map();
+      viewport.querySelectorAll("path.dy-wf-edge").forEach((p) => {
+        const key = (p.dataset.from ?? "") + ">" + (p.dataset.to ?? "");
+        const dot = p.nextElementSibling;
+        if (dot && dot.classList.contains("dy-wf-flowdot")) edgeMap.set(key, { path: p, dot });
+      });
+      const doneIds = new Set(
+        currentNodes.filter((n) => n.status === "done").map((n) => n.node_id)
+      );
+      viewport.querySelectorAll("path.dy-wf-edge").forEach((p) => {
+        const to = currentNodes.find((n) => n.node_id === p.dataset.to);
+        const fromDone = doneIds.has(p.dataset.from ?? "");
+        p.classList.toggle("active", !!to && to.status !== "pending" && fromDone);
+      });
+      edgeMap.forEach(({ path, dot }) => {
+        if (!path.classList.contains("active")) {
+          dot.setAttribute("opacity", "0");
+          return;
+        }
+        let pt = null;
+        try {
+          const L = path.getTotalLength();
+          if (L > 0) pt = path.getPointAtLength(L * flowT);
+        } catch {
+          pt = null;
+        }
+        if (!pt || !isFinite(pt.x) || !isFinite(pt.y)) {
+          const nums = (path.getAttribute("d") || "").match(/-?\d+(\.\d+)?/g) ?? [];
+          if (nums.length >= 4 && nums[0] !== void 0 && nums[1] !== void 0) {
+            const ax = +(nums[0] ?? 0), ay = +(nums[1] ?? 0);
+            const mx = +(nums[2] ?? ax), my = +(nums[3] ?? ay);
+            const bx = +(nums[nums.length - 2] ?? ax), by = +(nums[nums.length - 1] ?? ay);
+            pt = flowT < 0.5 ? { x: ax + (mx - ax) * flowT * 2, y: ay + (my - ay) * flowT * 2 } : { x: mx + (bx - mx) * (flowT - 0.5) * 2, y: my + (by - my) * (flowT - 0.5) * 2 };
+          }
+        }
+        if (pt && isFinite(pt.x) && isFinite(pt.y)) {
+          dot.setAttribute("cx", String(pt.x));
+          dot.setAttribute("cy", String(pt.y));
+          dot.setAttribute("opacity", "0.9");
+        } else dot.setAttribute("opacity", "0");
+      });
+    }, 40);
     let timer = null;
     const poll = () => {
       fetchRuns().then((runs) => {
         const latest = runs && runs.length ? runs[0] : null;
-        render(latest);
-        updateMinimap();
+        const sig = JSON.stringify(latest?.nodes.map((n) => [n.node_id, n.status]) ?? []);
+        if (sig !== lastSig) {
+          lastSig = sig;
+          render(latest);
+        }
       }).catch(() => {
       });
     };
+    let lastSig = "";
     poll();
     if (pollMs > 0) timer = setInterval(poll, pollMs);
-    return () => {
+    disposers.push(() => {
       if (timer) clearInterval(timer);
+      if (flowTimer) clearInterval(flowTimer);
+      document.removeEventListener("keydown", onKeyDown);
       host.replaceChildren();
+    });
+    return () => {
+      disposers.forEach((d) => d());
+      disposers = [];
     };
   }
 
@@ -417,7 +573,7 @@
       } catch (err) {
         if (disposed || gen !== renderSeq || !main2.isConnected) return;
         main2.replaceChildren(
-          textEl2("div", "dy-error", `Dockyard backend unreachable: ${String(err)}`)
+          textEl("div", "dy-error", `Dockyard backend unreachable: ${String(err)}`)
         );
       }
     };
@@ -480,7 +636,7 @@
     const view = await s.api.dashboard();
     const projects = view.projects ?? [];
     if (projects.length === 0) {
-      const empty = textEl2("div", "dy-empty", "");
+      const empty = textEl("div", "dy-empty", "");
       const p = document.createElement("p");
       p.textContent = "No projects yet.";
       const btn = document.createElement("button");
@@ -505,29 +661,29 @@
       tdId.appendChild(strong);
       tr.append(
         tdId,
-        textEl2("td", "", String(p.phase ?? "")),
-        textEl2("td", "num", String(w.backlog ?? 0)),
-        textEl2("td", "num", String(w.active ?? 0)),
-        textEl2("td", w.blocked ? "num warn" : "num", String(w.blocked ?? 0)),
-        textEl2("td", "num", String(w.done ?? 0)),
-        textEl2("td", "", String(p.health ?? "Unknown"))
+        textEl("td", "", String(p.phase ?? "")),
+        textEl("td", "num", String(w.backlog ?? 0)),
+        textEl("td", "num", String(w.active ?? 0)),
+        textEl("td", w.blocked ? "num warn" : "num", String(w.blocked ?? 0)),
+        textEl("td", "num", String(w.done ?? 0)),
+        textEl("td", "", String(p.health ?? "Unknown"))
       );
       tbody.appendChild(tr);
     }
     if (isStale()) return;
     const section = document.createElement("section");
     section.className = "dy-card";
-    section.appendChild(textEl2("h2", "", "Fleet overview"));
+    section.appendChild(textEl("h2", "", "Fleet overview"));
     const table = document.createElement("table");
     table.className = "dy-table";
     const thead = document.createElement("thead");
     const hr = document.createElement("tr");
     for (const h of ["Project", "Phase", "Backlog", "Active", "Blocked", "Done", "Health"]) {
-      hr.appendChild(textEl2("th", "", h));
+      hr.appendChild(textEl("th", "", h));
     }
     thead.appendChild(hr);
     table.append(thead, tbody);
-    const dim = textEl2(
+    const dim = textEl(
       "p",
       "dy-dim",
       `Stuck bots: ${totals.stuck_bots ?? 0} \xB7 Unacked notifications: ${totals.unacked_notifications ?? 0}`
@@ -539,7 +695,7 @@
     const dashboard = await s.api.dashboard();
     const projects = dashboard.projects ?? [];
     if (projects.length === 0) {
-      main.replaceChildren(textEl2("div", "dy-empty", "Onboard a project to view work."));
+      main.replaceChildren(textEl("div", "dy-empty", "Onboard a project to view work."));
       return;
     }
     const projectId = s.projectId && projects.some((p) => p.id === s.projectId) ? s.projectId : projects[0].id;
@@ -559,7 +715,7 @@
     const projectSelect = document.createElement("select");
     projectSelect.setAttribute("aria-label", "Project");
     projects.forEach((project) => {
-      const option = textEl2("option", "", project.id, project.id);
+      const option = textEl("option", "", project.id, project.id);
       option.selected = project.id === projectId;
       projectSelect.appendChild(option);
     });
@@ -567,9 +723,9 @@
     const tableButton = workLayoutButton("Backlog table", s.workLayout === "table");
     const savedViews = document.createElement("select");
     savedViews.setAttribute("aria-label", "Saved view");
-    savedViews.appendChild(textEl2("option", "", "Saved views", ""));
+    savedViews.appendChild(textEl("option", "", "Saved views", ""));
     (viewsResponse.views ?? []).forEach((view) => {
-      savedViews.appendChild(textEl2("option", "", view.name, view.name));
+      savedViews.appendChild(textEl("option", "", view.name, view.name));
     });
     const timelineButton = workLayoutButton("Timeline unavailable", false);
     timelineButton.disabled = true;
@@ -586,20 +742,20 @@
     const content = document.createElement("div");
     const detail = document.createElement("aside");
     detail.className = "dy-work-detail";
-    detail.appendChild(textEl2("p", "dy-dim", "Select a work item to inspect it."));
+    detail.appendChild(textEl("p", "dy-dim", "Select a work item to inspect it."));
     const openDetail = (item) => {
       detail.replaceChildren(loadingEl());
       void s.api.workDetail(projectId, item.ref).then((result) => {
         if (isStale()) return;
         const current = result.work_item;
-        const history = result.history.length ? textEl2("pre", "dy-history", JSON.stringify(result.history, null, 2)) : textEl2("p", "dy-dim", "No canonical history is available.");
+        const history = result.history.length ? textEl("pre", "dy-history", JSON.stringify(result.history, null, 2)) : textEl("p", "dy-dim", "No canonical history is available.");
         const editor = document.createElement("div");
         editor.className = "dy-work-editor";
         const titleInput = workInput("Title", current.title);
         const typeSelect = document.createElement("select");
         typeSelect.setAttribute("aria-label", "Type");
         ["task", "bug", "spike", "subtask", "gate"].forEach((kind) => {
-          const option = textEl2("option", "", kind, kind);
+          const option = textEl("option", "", kind, kind);
           option.selected = kind === (current.kind ?? "task");
           typeSelect.appendChild(option);
         });
@@ -618,7 +774,7 @@
         const dueInput = workInput("Due date", current.due ?? "");
         dueInput.type = "date";
         const save = workLayoutButton("Save changes", false);
-        const feedback = textEl2("p", "dy-dim", "");
+        const feedback = textEl("p", "dy-dim", "");
         save.addEventListener("click", async () => {
           save.disabled = true;
           feedback.textContent = "Saving...";
@@ -658,11 +814,11 @@
         );
         const dependencyEditor = document.createElement("div");
         dependencyEditor.className = "dy-dependency-editor";
-        dependencyEditor.appendChild(textEl2("h3", "", "Dependencies"));
+        dependencyEditor.appendChild(textEl("h3", "", "Dependencies"));
         result.dependencies.forEach((dependency) => {
           const row = document.createElement("div");
           row.className = "dy-dependency-row";
-          row.appendChild(textEl2("span", "", `${dependency.ref}: ${dependency.title}`));
+          row.appendChild(textEl("span", "", `${dependency.ref}: ${dependency.title}`));
           const remove = workLayoutButton("Remove", false);
           remove.addEventListener("click", async () => {
             remove.disabled = true;
@@ -693,19 +849,19 @@
         });
         dependencyEditor.append(dependencyInput, addDependency);
         detail.replaceChildren(
-          textEl2("h2", "", current.title),
-          textEl2("p", "dy-dim", `${current.ref} \xB7 ${current.kind ?? "task"} \xB7 ${current.status}`),
-          textEl2("p", "dy-work-body", current.body || "No body supplied."),
-          textEl2("p", "", `Assignee: ${current.assignee || "Unassigned"}`),
-          current.status === "blocked" ? textEl2("p", "dy-warning", current.blocked_reason || "Blocked; no reason supplied.") : textEl2("span", "", ""),
-          textEl2("p", "", `Parent: ${result.parent?.ref ?? "None"} \xB7 Children: ${result.children.length}`),
+          textEl("h2", "", current.title),
+          textEl("p", "dy-dim", `${current.ref} \xB7 ${current.kind ?? "task"} \xB7 ${current.status}`),
+          textEl("p", "dy-work-body", current.body || "No body supplied."),
+          textEl("p", "", `Assignee: ${current.assignee || "Unassigned"}`),
+          current.status === "blocked" ? textEl("p", "dy-warning", current.blocked_reason || "Blocked; no reason supplied.") : textEl("span", "", ""),
+          textEl("p", "", `Parent: ${result.parent?.ref ?? "None"} \xB7 Children: ${result.children.length}`),
           editor,
           dependencyEditor,
-          textEl2("h3", "", "History"),
+          textEl("h3", "", "History"),
           history
         );
       }).catch(() => {
-        detail.replaceChildren(textEl2("p", "dy-error", "Work-item detail is unavailable."));
+        detail.replaceChildren(textEl("p", "dy-error", "Work-item detail is unavailable."));
       });
     };
     const draw = () => {
@@ -722,7 +878,7 @@
           const column = document.createElement("section");
           column.className = "dy-board-column";
           const matching = items.filter((item) => item.status === status);
-          column.appendChild(textEl2("h3", "", `${label2} (${matching.length})`));
+          column.appendChild(textEl("h3", "", `${label2} (${matching.length})`));
           matching.forEach((item) => column.appendChild(workCard(item, openDetail)));
           content.appendChild(column);
         });
@@ -731,7 +887,7 @@
         const table = document.createElement("table");
         table.className = "dy-table";
         const head = document.createElement("tr");
-        ["Rank", "Item", "Status", "Assignee", "Reason"].forEach((label2) => head.appendChild(textEl2("th", "", label2)));
+        ["Rank", "Item", "Status", "Assignee", "Reason"].forEach((label2) => head.appendChild(textEl("th", "", label2)));
         const thead = document.createElement("thead");
         thead.appendChild(head);
         const tbody = document.createElement("tbody");
@@ -741,11 +897,11 @@
           const itemCell = document.createElement("td");
           itemCell.appendChild(workLink(item, openDetail));
           row.append(
-            textEl2("td", "num", rank ? String(rank.rank) : "Unranked"),
+            textEl("td", "num", rank ? String(rank.rank) : "Unranked"),
             itemCell,
-            textEl2("td", "", item.status),
-            textEl2("td", "", item.assignee || "Unassigned"),
-            textEl2("td", "", rank?.priority_reason || "")
+            textEl("td", "", item.status),
+            textEl("td", "", item.assignee || "Unassigned"),
+            textEl("td", "", rank?.priority_reason || "")
           );
           tbody.appendChild(row);
         });
@@ -802,7 +958,7 @@
     const dashboard = await s.api.dashboard();
     const projects = dashboard.projects ?? [];
     if (projects.length === 0) {
-      main.replaceChildren(textEl2("div", "dy-empty", "Onboard a project to manage delivery."));
+      main.replaceChildren(textEl("div", "dy-empty", "Onboard a project to manage delivery."));
       return;
     }
     const projectId = s.projectId && projects.some((p) => p.id === s.projectId) ? s.projectId : projects[0].id;
@@ -823,7 +979,7 @@
     const projectSelect = document.createElement("select");
     projectSelect.setAttribute("aria-label", "Delivery project");
     projects.forEach((project) => {
-      const option = textEl2("option", "", project.id, project.id);
+      const option = textEl("option", "", project.id, project.id);
       option.selected = project.id === projectId;
       projectSelect.appendChild(option);
     });
@@ -838,15 +994,15 @@
       const card = document.createElement("article");
       card.className = "dy-card dy-delivery-card";
       card.append(
-        textEl2("h2", "", initiative.title),
-        textEl2("p", "dy-dim", `${initiative.ref} \xB7 ${initiative.status}`),
-        textEl2("p", "", initiative.expected_outcome || "No expected outcome supplied."),
-        textEl2("p", "", `Execution board: ${initiative.board_slug || "Not bound"}`)
+        textEl("h2", "", initiative.title),
+        textEl("p", "dy-dim", `${initiative.ref} \xB7 ${initiative.status}`),
+        textEl("p", "", initiative.expected_outcome || "No expected outcome supplied."),
+        textEl("p", "", `Execution board: ${initiative.board_slug || "Not bound"}`)
       );
       const linked = work.filter((item) => item.initiative_ref === initiative.ref);
       const links = document.createElement("div");
       links.className = "dy-delivery-work";
-      links.appendChild(textEl2("h3", "", `Bound work (${linked.length})`));
+      links.appendChild(textEl("h3", "", `Bound work (${linked.length})`));
       linked.forEach((item) => {
         const button = workLayoutButton(`${item.ref}: ${item.title}`, false);
         button.addEventListener("click", () => {
@@ -858,7 +1014,7 @@
       });
       card.appendChild(links);
       const observation = observations.get(initiative.ref);
-      card.appendChild(textEl2(
+      card.appendChild(textEl(
         "p",
         "dy-dim",
         observation ? `Observation: ${observation.status}${observation.cycle_id ? ` \xB7 cycle ${observation.cycle_id}` : ""}` : "Observation: not scheduled"
@@ -896,7 +1052,7 @@
       list.appendChild(card);
     });
     if (initiatives.length === 0) {
-      list.appendChild(textEl2("div", "dy-empty", "No initiatives for this project."));
+      list.appendChild(textEl("div", "dy-empty", "No initiatives for this project."));
     }
     const section = document.createElement("section");
     section.append(toolbar, list);
@@ -926,7 +1082,7 @@
     card.className = `dy-work-card${item.status === "blocked" ? " blocked" : ""}`;
     card.append(
       workLink(item, open),
-      textEl2("span", "dy-dim", `${item.ref} \xB7 ${item.assignee || "Unassigned"}`)
+      textEl("span", "dy-dim", `${item.ref} \xB7 ${item.assignee || "Unassigned"}`)
     );
     return card;
   }
@@ -937,22 +1093,22 @@
     if (items.length === 0) {
       const empty = document.createElement("div");
       empty.className = "dy-empty";
-      empty.appendChild(textEl2("p", "", "Inbox zero. Nothing is waiting on you."));
+      empty.appendChild(textEl("p", "", "Inbox zero. Nothing is waiting on you."));
       main.replaceChildren(empty);
       return;
     }
     const list = document.createElement("section");
     list.className = "dy-card";
-    list.appendChild(textEl2("h2", "", "Waiting on you"));
+    list.appendChild(textEl("h2", "", "Waiting on you"));
     items.forEach((it) => {
       const row = document.createElement("div");
       row.className = "dy-inbox-item";
       const body = document.createElement("div");
       body.className = "dy-inbox-main";
       body.append(
-        textEl2("span", "dy-pill", String(it.kind)),
-        textEl2("strong", "", String(it.title)),
-        textEl2("span", "dy-dim", `${it.project_id} \xB7 ${it.ref}`)
+        textEl("span", "dy-pill", String(it.kind)),
+        textEl("strong", "", String(it.title)),
+        textEl("span", "dy-dim", `${it.project_id} \xB7 ${it.ref}`)
       );
       row.appendChild(body);
       if (it.kind === "approval") {
@@ -965,7 +1121,7 @@
             await s.api.approve(it.ref);
             row.remove();
             if (!list.querySelector(".dy-inbox-item")) {
-              list.appendChild(textEl2("p", "dy-dim", "Inbox zero."));
+              list.appendChild(textEl("p", "dy-dim", "Inbox zero."));
             }
           } catch (e) {
             btn.disabled = false;
@@ -985,17 +1141,17 @@
     if (notes.length === 0) {
       const empty = document.createElement("div");
       empty.className = "dy-empty";
-      empty.appendChild(textEl2("p", "", "No notifications."));
+      empty.appendChild(textEl("p", "", "No notifications."));
       main.replaceChildren(empty);
       return;
     }
     const list = document.createElement("section");
     list.className = "dy-card";
-    list.appendChild(textEl2("h2", "", "Notifications"));
+    list.appendChild(textEl("h2", "", "Notifications"));
     notes.forEach((n) => {
       const row = document.createElement("div");
       row.className = "dy-note";
-      row.appendChild(textEl2("span", "", String(n.summary ?? n.title ?? "")));
+      row.appendChild(textEl("span", "", String(n.summary ?? n.title ?? "")));
       if (!n.acked_at && n.id != null) {
         const btn = document.createElement("button");
         btn.className = "dy-btn";
@@ -1019,7 +1175,7 @@
   function renderOnboard(main, s) {
     const section = document.createElement("section");
     section.className = "dy-card dy-form";
-    section.appendChild(textEl2("h2", "", "Onboard a project"));
+    section.appendChild(textEl("h2", "", "Onboard a project"));
     const idLabel = label("Project ID");
     idLabel.appendChild(inputEl("dy-ob-id", "e.g. hermes-core"));
     const repoLabel = label("Repo path");
@@ -1030,7 +1186,7 @@
     const select = document.createElement("select");
     select.id = "dy-ob-lead";
     for (const profile of ["octacon", "remii", "wesker", "ceecee", "gojo", "quan"]) {
-      select.appendChild(textEl2("option", "", profile, profile));
+      select.appendChild(textEl("option", "", profile, profile));
     }
     leadLabel.appendChild(select);
     const go = document.createElement("button");
@@ -1061,7 +1217,7 @@
     section.append(idLabel, repoLabel, missionLabel, leadLabel, go, result);
     main.replaceChildren(section);
   }
-  function textEl2(tag, className, text, value) {
+  function textEl(tag, className, text, value) {
     const el = document.createElement(tag);
     if (className) el.className = className;
     el.textContent = text;
@@ -1080,7 +1236,7 @@
     if (isStale()) return;
     if (projects.length === 0) {
       main.replaceChildren(
-        textEl2("div", "dy-empty", "Onboard a project to view workflows.")
+        textEl("div", "dy-empty", "Onboard a project to view workflows.")
       );
       return;
     }
@@ -1089,7 +1245,7 @@
     const projectSel = document.createElement("select");
     projectSel.className = "dy-select";
     for (const p of projects) {
-      const opt = textEl2(
+      const opt = textEl(
         "option",
         "",
         `${p.id} \xB7 ${p.health ?? "unknown"}`,
@@ -1107,9 +1263,9 @@
     const canvasHost = document.createElement("div");
     canvasHost.className = "dy-wf-host";
     controls.append(
-      textEl2("span", "dy-dim", "Project"),
+      textEl("span", "dy-dim", "Project"),
       projectSel,
-      textEl2("span", "dy-dim", "Workflow"),
+      textEl("span", "dy-dim", "Workflow"),
       nameInput,
       go
     );
@@ -1126,7 +1282,25 @@
         () => s.api.workflowRuns(pid, wname).then((r) => r.runs),
         {
           onApprove: (ref) => s.api.approve(ref),
-          onReject: (ref) => s.api.reject(ref)
+          onReject: (ref) => s.api.reject(ref),
+          // agenttrail expansion: children -> task list, history -> activity thread
+          onExpand: async (ref) => {
+            const d = await s.api.workDetail(pid, ref);
+            return {
+              children: (d.children ?? []).map((c) => ({
+                ref: c.ref,
+                title: c.title,
+                status: c.status
+              })),
+              history: (d.history ?? []).map((h) => {
+                const rec = h;
+                return {
+                  ts: rec.at ?? rec.ts ?? rec.created_at ?? null,
+                  text: String(rec.summary ?? rec.text ?? rec.message ?? rec.action ?? "event")
+                };
+              })
+            };
+          }
         }
       );
       canvasHost.dyDispose = dispose;
