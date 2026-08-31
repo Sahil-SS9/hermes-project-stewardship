@@ -1146,6 +1146,11 @@ def create_app(
     def dashboard():
         return dy.dashboard()
 
+    @router.get("/portfolio")
+    def portfolio():
+        """Cross-project rollup: attention, per-project standing, mix."""
+        return dy.portfolio()
+
     @router.get("/notifications")
     def fleet_notifications():
         return dy.fleet_notifications()

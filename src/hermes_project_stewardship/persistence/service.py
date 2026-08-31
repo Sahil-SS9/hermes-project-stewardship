@@ -290,12 +290,6 @@ class StewardshipService:
         """Enable/disable togglable features. Never touches stored data."""
         if not isinstance(changes, dict) or not changes:
             raise ServiceError("features must be a non-empty object of booleans")
-        row = self.store._conn.execute(
-            "SELECT features_json FROM project_stewardship WHERE project_id=?",
-            (project_id,),
-        ).fetchone()
-        if row is None:
-            raise ServiceError(f"stewardship not enabled for project '{project_id}'")
         for name, value in changes.items():
             if name in self.CORE_FEATURES:
                 raise ServiceError(
@@ -304,10 +298,23 @@ class StewardshipService:
                 raise ServiceError(f"unknown feature '{name}'")
             if not isinstance(value, bool):
                 raise ServiceError(f"feature '{name}' must be true or false")
-        current = self._resolve_features(row)
-        next_features = dict(current)
-        next_features.update(changes)
+        # Read-modify-write inside the transaction (cor-004): resolving the
+        # current map outside it would lose updates under concurrent PATCHes.
         with self.store.tx() as cx:
+            row = cx.execute(
+                "SELECT features_json FROM project_stewardship"
+                " WHERE project_id=?",
+                (project_id,),
+            ).fetchone()
+            if row is None:
+                raise ServiceError(
+                    f"stewardship not enabled for project '{project_id}'")
+            stored = self.store._uj(row["features_json"], {}) \
+                if row["features_json"] else {}
+            current = {name: bool(stored.get(name, True))
+                       for name in self.TOGGLABLE_FEATURES}
+            next_features = dict(current)
+            next_features.update(changes)
             cx.execute(
                 "UPDATE project_stewardship SET features_json=?, updated_at=?"
                 " WHERE project_id=?",

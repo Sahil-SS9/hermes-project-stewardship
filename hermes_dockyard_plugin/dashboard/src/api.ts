@@ -9,6 +9,22 @@ export interface HermesPluginSDK {
 
 const BASE = '/api/plugins/hermes-dockyard';
 
+export interface PortfolioProject {
+  project_id: string;
+  enabled?: boolean;
+  phase?: string;
+  status: 'on_track' | 'at_risk' | 'stalled' | 'idle';
+  items: { total: number; done: number; blocked: number; overdue: number };
+  next_milestone?: { name: string; due: string | null; overdue: boolean } | null;
+  last_activity?: string | null;
+}
+
+export interface PortfolioView {
+  mix: { todo: number; in_progress: number; blocked: number; done: number };
+  attention: { overdue_items: number; blocked_items: number; overdue_milestones: number };
+  projects: PortfolioProject[];
+}
+
 export interface DashboardView {
   projects: Array<{
     id: string;
@@ -134,6 +150,7 @@ export function createApi(sdk: HermesPluginSDK) {
         { features, actor: 'sahil', interface: 'dockyard:human' },
       ),
     dashboard: () => get<DashboardView>('/dashboard'),
+    portfolio: () => get<PortfolioView>('/portfolio'),
     inbox: () => get<InboxView>('/inbox'),
     notifications: () => get<{ notifications: NotificationItem[] }>('/notifications'),
     workItems: (projectId: string) =>

@@ -106,6 +106,28 @@ def test_unknown_filter_key_fails_closed(env):
     assert r.status_code == 409
 
 
+def test_view_run_milestone_with_no_items_filters_to_empty(env):
+    """cor-001 regression: an empty milestone must filter to nothing,
+    not be silently skipped."""
+    c, store = env
+    r = c.post("/stewardship/v1/projects/dy1/work-items", json={
+        "type": "task", "title": "Some task", "actor_id": "sahil"})
+    assert r.status_code == 200
+    # Milestone exists but has no attached items.
+    r = c.post("/stewardship/v1/projects/dy1/milestones", json={
+        "name": "empty-ms", "actor_id": "sahil"})
+    assert r.status_code == 200
+    r = c.put("/stewardship/v1/projects/dy1/views", json={
+        "name": "on-empty-ms", "layout": "board",
+        "filters": {"version": 1, "milestone": "empty-ms"},
+        "actor_id": "sahil"})
+    assert r.status_code == 200
+    r = c.get("/stewardship/v1/projects/dy1/views/on-empty-ms/items",
+              params={"actor_id": "sahil"})
+    assert r.status_code == 200
+    assert r.json()["items"] == []
+
+
 def test_view_run_applies_filters(env):
     c, store = env
     # Create items through the API so they are canonical-visible (the app's

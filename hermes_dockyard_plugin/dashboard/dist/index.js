@@ -29,6 +29,7 @@
         { features, actor: "sahil", interface: "dockyard:human" }
       ),
       dashboard: () => get("/dashboard"),
+      portfolio: () => get("/portfolio"),
       inbox: () => get("/inbox"),
       notifications: () => get("/notifications"),
       workItems: (projectId) => get(
@@ -803,7 +804,7 @@
     };
   }
   async function renderDashboard(main, s, isStale) {
-    const view = await s.api.dashboard();
+    const view = await s.api.portfolio();
     const projects = view.projects ?? [];
     if (projects.length === 0) {
       const empty = textEl("div", "dy-empty", "");
@@ -820,48 +821,91 @@
       main.replaceChildren(empty);
       return;
     }
-    const totals = view.totals ?? {};
-    const tbody = document.createElement("tbody");
-    for (const p of projects) {
-      const w = p.work ?? {};
-      const tr = document.createElement("tr");
-      const tdId = document.createElement("td");
-      const strong = document.createElement("strong");
-      strong.textContent = String(p.id);
-      tdId.appendChild(strong);
-      tr.append(
-        tdId,
-        textEl("td", "", String(p.phase ?? "")),
-        textEl("td", "num", String(w.backlog ?? 0)),
-        textEl("td", "num", String(w.active ?? 0)),
-        textEl("td", w.blocked ? "num warn" : "num", String(w.blocked ?? 0)),
-        textEl("td", "num", String(w.done ?? 0)),
-        textEl("td", "", String(p.health ?? "Unknown"))
-      );
-      tbody.appendChild(tr);
-    }
     if (isStale()) return;
+    const wrap = document.createElement("div");
+    wrap.className = "dy-portfolio";
+    const atRisk = projects.filter((p) => p.status === "at_risk").map((p) => p.project_id);
+    const stalled = projects.filter((p) => p.status === "stalled").map((p) => p.project_id);
+    const at = view.attention ?? { overdue_items: 0, blocked_items: 0, overdue_milestones: 0 };
+    const hasAttention = atRisk.length > 0 || stalled.length > 0 || (at.blocked_items ?? 0) > 0 || (at.overdue_items ?? 0) > 0 || (at.overdue_milestones ?? 0) > 0;
+    if (hasAttention) {
+      const strip = document.createElement("section");
+      strip.className = "dy-card dy-attention";
+      strip.appendChild(textEl("h2", "", "Needs attention"));
+      const lines = document.createElement("ul");
+      lines.className = "dy-attention-list";
+      const addLine = (cls, text) => {
+        const li = document.createElement("li");
+        li.className = cls;
+        li.textContent = text;
+        lines.appendChild(li);
+      };
+      if (atRisk.length > 0) addLine("bad", `At risk: ${atRisk.join(", ")}`);
+      if (stalled.length > 0) addLine("warn", `Stalled: ${stalled.join(", ")}`);
+      if ((at.blocked_items ?? 0) > 0) addLine("warn", `Blocked items: ${at.blocked_items}`);
+      if ((at.overdue_items ?? 0) > 0) addLine("bad", `Overdue items: ${at.overdue_items}`);
+      if ((at.overdue_milestones ?? 0) > 0) addLine("bad", `Overdue milestones: ${at.overdue_milestones}`);
+      strip.appendChild(lines);
+      wrap.appendChild(strip);
+    }
     const section = document.createElement("section");
     section.className = "dy-card";
-    section.appendChild(textEl("h2", "", "Fleet overview"));
+    section.appendChild(textEl("h2", "", "Projects"));
     const table = document.createElement("table");
     table.className = "dy-table";
     const thead = document.createElement("thead");
     const hr = document.createElement("tr");
-    for (const h of ["Project", "Phase", "Backlog", "Active", "Blocked", "Done", "Health"]) {
+    for (const h of ["Project", "Status", "Done", "Open", "Blocked", "Next milestone", "Last activity"]) {
       hr.appendChild(textEl("th", "", h));
     }
     thead.appendChild(hr);
+    const tbody = document.createElement("tbody");
+    for (const p of projects) {
+      const tr = document.createElement("tr");
+      const tdId = document.createElement("td");
+      const strong = document.createElement("strong");
+      strong.textContent = String(p.project_id);
+      tdId.appendChild(strong);
+      const items = p.items ?? { total: 0, done: 0, blocked: 0, overdue: 0 };
+      const ms = p.next_milestone;
+      let msText = "\u2014";
+      if (ms) msText = ms.overdue ? `${ms.name} (overdue)` : ms.name;
+      const act = p.last_activity ? p.last_activity.slice(0, 10) : "\u2014";
+      const open = (items.total ?? 0) - (items.done ?? 0);
+      const blocked = items.blocked ?? 0;
+      tr.append(
+        tdId,
+        textEl("td", `dy-status dy-status-${p.status}`, STATUS_LABEL[p.status] ?? p.status),
+        textEl("td", "num", String(items.done ?? 0)),
+        textEl("td", "num", String(open)),
+        textEl("td", blocked > 0 ? "num warn" : "num", String(blocked)),
+        textEl("td", ms?.overdue ? "bad" : "", msText),
+        textEl("td", "dy-dim", act)
+      );
+      tbody.appendChild(tr);
+    }
     table.append(thead, tbody);
+    const mix = view.mix ?? { todo: 0, in_progress: 0, blocked: 0, done: 0 };
     const dim = textEl(
       "p",
       "dy-dim",
-      `Stuck bots: ${totals.stuck_bots ?? 0} \xB7 Unacked notifications: ${totals.unacked_notifications ?? 0}`
+      `${projects.length} projects \xB7 ${mix.done} done \xB7 ${mix.in_progress} in progress \xB7 ${mix.todo} backlog \xB7 ${mix.blocked} blocked`
     );
     section.append(table, dim);
-    section.appendChild(await buildFeaturesPanel(s, projects, () => void renderDashboard(main, s, isStale)));
-    main.replaceChildren(section);
+    main.replaceChildren(wrap);
+    wrap.appendChild(section);
+    section.appendChild(await buildFeaturesPanel(
+      s,
+      projects.map((p) => ({ id: p.project_id })),
+      () => void renderDashboard(main, s, isStale)
+    ));
   }
+  var STATUS_LABEL = {
+    on_track: "On track",
+    at_risk: "At risk",
+    stalled: "Stalled",
+    idle: "Idle"
+  };
   var FEATURE_LABELS = {
     workflow_canvas: "Workflow canvas",
     milestones: "Milestones",
@@ -886,8 +930,10 @@
     try {
       const projectId = projects[0]?.id;
       if (!projectId) return box;
-      const res = await s.api.features(projectId);
-      s.featureMap = res.features ?? {};
+      if (!s.featureMap) {
+        const res = await s.api.features(projectId);
+        s.featureMap = res.features ?? {};
+      }
       const list = document.createElement("div");
       list.className = "dy-feature-list";
       for (const [name, on] of Object.entries(s.featureMap)) {

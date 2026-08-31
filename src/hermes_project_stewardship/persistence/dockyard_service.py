@@ -10,6 +10,7 @@ Enforces PRD rules that span domain + persistence:
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 from typing import Dict, List, Optional
 
@@ -399,17 +400,23 @@ class DockyardService:
             raise ServiceError(f"saved view query invalid: {e}") from None
         milestone_map: Dict[str, str] = {}
         if query.get("milestone"):
-            for ms in self.dy.milestone_list(project_id):
-                row = self.store._conn.execute(
-                    "SELECT m.name AS ms, mi.item_ref AS ref"
-                    " FROM dockyard_milestones m"
-                    " JOIN dockyard_milestone_items mi ON mi.milestone_id=m.id"
-                    " WHERE m.project_id=? AND m.name=?",
-                    (project_id, ms["name"]),
-                ).fetchall()
-                for r in row:
-                    milestone_map[str(r["ref"])] = str(r["ms"])
-        return apply_query(items, query, milestone_map or None)
+            # One query for the filtered milestone only — no per-milestone
+            # loop (cor-002). An empty result legitimately yields an empty
+            # map, which must filter to nothing, not be skipped.
+            row = self.store._conn.execute(
+                "SELECT mi.item_ref AS ref"
+                " FROM dockyard_milestones m"
+                " JOIN dockyard_milestone_items mi ON mi.milestone_id=m.id"
+                " WHERE m.project_id=? AND m.name=?",
+                (project_id, query["milestone"]),
+            ).fetchall()
+            for r in row:
+                milestone_map[str(r["ref"])] = query["milestone"]
+        # Pass the map even when empty: an empty map is a legitimate
+        # "milestone has no items" state and must filter to nothing —
+        # None would silently skip the filter.
+        return apply_query(items, query,
+                           milestone_map if query.get("milestone") else None)
 
     # ------------------------------------------------------------------ #
     # Generated reports                                                  #
@@ -939,3 +946,150 @@ class DockyardService:
                 (iso(), notification_id))
         if cur.rowcount == 0:  # C5: fail closed on unknown ids
             raise ValueError(f"notification {notification_id} not found")
+
+    # ------------------------------------------------------------------ #
+    # Portfolio rollup (release-cut feature)                              #
+    # ------------------------------------------------------------------ #
+
+    _STALLED_AFTER_DAYS = 14
+
+    def _portfolio_items(self, project_id: str) -> List[Dict]:
+        """Work items as plain dicts with status/due/updated_at normalised.
+
+        Prefers the canonical projection (same source the Work tab shows);
+        falls back to the dockyard table when no adapter is wired.
+        ``created_at`` rides along as a last-activity fallback (canonical
+        items carry no updated_at yet).
+        """
+        items: List[Dict] = []
+        if self.canonical_work is not None:
+            for row in self.canonical_work.list(project_id):
+                items.append({
+                    "ref": row.get("ref", ""),
+                    "status": str(row.get("status", "")),
+                    "due": row.get("due"),
+                    "updated_at": row.get("updated_at"),
+                    "created_at": row.get("created_at"),
+                })
+        else:
+            rows = self.store._conn.execute(
+                "SELECT ref, status, due, updated_at, created_at"
+                " FROM dockyard_work_items WHERE project_id=?",
+                (project_id,)).fetchall()
+            items = [dict(r) for r in rows]
+        return items
+
+    @staticmethod
+    def _parse_iso(value) -> Optional[datetime]:
+        if not value or not isinstance(value, str):
+            return None
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        # Date-only strings (e.g. due='2026-08-01', the API's own accepted
+        # shape) parse naive; normalise to UTC so comparisons against the
+        # aware clock never raise.
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    def portfolio(self) -> Dict:
+        """Cross-project cockpit: attention, per-project standing, status mix.
+
+        One read pass per project; no per-item loops against the DB.
+        Status rules (documented in docs/PORTFOLIO-DESIGN.md):
+          at_risk  — overdue item, blocked item, or overdue milestone
+          stalled  — open items but no activity in 14+ days
+          idle     — nothing in flight and no open milestone
+          on_track — everything else
+        """
+        now = datetime.now(timezone.utc)
+        projects: List[Dict] = []
+        mix = {"todo": 0, "in_progress": 0, "blocked": 0, "done": 0}
+        attention = {"overdue_items": 0, "blocked_items": 0,
+                     "overdue_milestones": 0}
+
+        for p in self.store._conn.execute(
+                "SELECT project_id, enabled, phase FROM project_stewardship"
+                " ORDER BY project_id").fetchall():
+            pid = p["project_id"]
+            items = self._portfolio_items(pid)
+            milestones = self.dy.milestone_list(pid)
+
+            counts: Dict[str, int] = {}
+            overdue_items = 0
+            blocked_items = 0
+            last_activity: Optional[datetime] = None
+            for it in items:
+                status = it.get("status") or "backlog"
+                counts[status] = counts.get(status, 0) + 1
+                if status == "blocked":
+                    blocked_items += 1
+                updated = (self._parse_iso(it.get("updated_at"))
+                          or self._parse_iso(it.get("created_at")))
+                if updated and (last_activity is None
+                                or updated > last_activity):
+                    last_activity = updated
+                due = self._parse_iso(it.get("due"))
+                if (due and due < now and status != "done"):
+                    overdue_items += 1
+
+            next_milestone = None
+            overdue_milestones = 0
+            for m in milestones:
+                if m["closed"]:
+                    continue
+                if next_milestone is None:
+                    next_milestone = m
+                due_d = None
+                if m.get("due"):
+                    due_d = self._parse_iso(m["due"])
+                if due_d and due_d < now:
+                    overdue_milestones += 1
+            total = len(items)
+            done = counts.get("done", 0)
+            open_items = total - done
+
+            if overdue_items or blocked_items or overdue_milestones:
+                status = "at_risk"
+            elif (open_items and last_activity is not None
+                    and (now - last_activity).days >= self._STALLED_AFTER_DAYS):
+                status = "stalled"
+            elif (counts.get("in_progress", 0) == 0
+                    and counts.get("in_review", 0) == 0
+                    and next_milestone is None):
+                status = "idle"
+            else:
+                status = "on_track"
+
+            mix["todo"] += counts.get("backlog", 0)
+            mix["in_progress"] += (counts.get("in_progress", 0)
+                                   + counts.get("in_review", 0))
+            mix["blocked"] += blocked_items
+            mix["done"] += done
+
+            attention["overdue_items"] += overdue_items
+            attention["blocked_items"] += blocked_items
+            attention["overdue_milestones"] += overdue_milestones
+
+            nm_due = (self._parse_iso(next_milestone.get("due"))
+                     if next_milestone else None)
+            projects.append({
+                "project_id": pid,
+                "enabled": bool(p["enabled"]),
+                "phase": p["phase"],
+                "status": status,
+                "items": {"done": done, "total": total,
+                          "blocked": blocked_items,
+                          "overdue": overdue_items},
+                "next_milestone": (
+                    {"name": next_milestone["name"],
+                     "due": next_milestone.get("due"),
+                     "overdue": bool(nm_due and nm_due < now)}
+                    if next_milestone else None),
+                "last_activity": last_activity.isoformat()
+                if last_activity else None,
+            })
+
+        return {"projects": projects, "mix": mix, "attention": attention}

@@ -325,6 +325,11 @@ async def dashboard() -> dict:
     return await _proxy("GET", "/stewardship/v1/dashboard")
 
 
+@plugin_api.get("/portfolio")
+async def portfolio() -> dict:
+    return await _proxy("GET", "/stewardship/v1/portfolio")
+
+
 @plugin_api.get("/inbox")
 async def inbox() -> dict:
     return await _proxy("GET", "/stewardship/v1/inbox")
