@@ -124,6 +124,15 @@ export function createApi(sdk: HermesPluginSDK) {
 
   return {
     health: () => get<{ ok: boolean }>('/health'),
+    features: (projectId: string) =>
+      get<{ features: Record<string, boolean> }>(
+        `/projects/${encodeURIComponent(projectId)}/features`,
+      ),
+    updateFeatures: (projectId: string, features: Record<string, boolean>) =>
+      patch<{ features: Record<string, boolean> }>(
+        `/projects/${encodeURIComponent(projectId)}/features`,
+        { features, actor: 'sahil', interface: 'dockyard:human' },
+      ),
     dashboard: () => get<DashboardView>('/dashboard'),
     inbox: () => get<InboxView>('/inbox'),
     notifications: () => get<{ notifications: NotificationItem[] }>('/notifications'),

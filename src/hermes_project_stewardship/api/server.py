@@ -296,6 +296,12 @@ class MilestoneUpdate(BaseModel):
     actor_kind: str = "human"
 
 
+class FeaturePatch(BaseModel):
+    features: Dict[str, bool]
+    actor: str = "sahil"
+    interface: str = "dockyard:human"
+
+
 class ViewSave(BaseModel):
     name: str
     layout: str
@@ -421,6 +427,17 @@ def create_app(
     @router.get("/projects/{project_id}/settings")
     def settings(project_id: str):
         return svc.settings(project_id, include_disabled=True)
+
+    @router.get("/projects/{project_id}/features")
+    def features(project_id: str):
+        return {"features": svc.features(project_id)}
+
+    @router.patch("/projects/{project_id}/features")
+    def patch_features(project_id: str, body: FeaturePatch):
+        return {"features": svc.update_features(
+            project_id, body.features,
+            actor=body.actor, interface=body.interface,
+        )}
 
     @router.patch("/projects/{project_id}/settings")
     def patch_settings(project_id: str, body: SettingsPatch):
@@ -566,6 +583,7 @@ def create_app(
 
     @router.get("/projects/{project_id}/initiatives")
     def initiatives(project_id: str, status: Optional[str] = None):
+        svc.require_feature(project_id, "initiatives")
         return {"initiatives": svc.initiatives(project_id, status=status)}
 
     @router.post("/projects/{project_id}/initiatives")
@@ -666,6 +684,7 @@ def create_app(
     def notifications(project_id: str):
         from ..events.notifications import NotificationEngine
 
+        svc.require_feature(project_id, "notifications")
         ne = NotificationEngine(store, svc)
         return {"unacked": ne.unacked(project_id),
                 "queued": ne.pending_delivery(project_id)}
@@ -898,6 +917,7 @@ def create_app(
     @router.post("/projects/{project_id}/milestones")
     def milestone_create(project_id: str, body: MilestoneCreate):
         try:
+            svc.require_feature(project_id, "milestones")
             if store._conn.execute(
                 "SELECT 1 FROM project_stewardship WHERE project_id=?",
                     (project_id,)).fetchone() is None:
@@ -914,14 +934,18 @@ def create_app(
     @router.post("/projects/{project_id}/milestones/{name}/attach")
     def milestone_attach(project_id: str, name: str, body: MilestoneAttach):
         try:
+            svc.require_feature(project_id, "milestones")
             dy.milestone_attach(project_id, name, body.ref,
                                 actor=_actor(body.actor_id, body.actor_kind))
+        except ServiceError:
+            raise
         except Exception as e:
             raise HTTPException(409, str(e))
         return {"name": name, "attached": body.ref}
 
     @router.get("/projects/{project_id}/milestones")
     def milestone_list(project_id: str):
+        svc.require_feature(project_id, "milestones")
         if store._conn.execute(
             "SELECT 1 FROM project_stewardship WHERE project_id=?",
                 (project_id,)).fetchone() is None:
@@ -931,6 +955,7 @@ def create_app(
     @router.patch("/projects/{project_id}/milestones/{name}")
     def milestone_update(project_id: str, name: str, body: MilestoneUpdate):
         try:
+            svc.require_feature(project_id, "milestones")
             dy.milestone_update(project_id, name, due=body.due,
                                 closed=body.closed,
                                 actor=_actor(body.actor_id, body.actor_kind))
@@ -950,6 +975,7 @@ def create_app(
     @router.put("/projects/{project_id}/views")
     def view_save(project_id: str, body: ViewSave):
         try:
+            svc.require_feature(project_id, "saved_views")
             dy.view_save(project_id, body.name, body.layout,
                          filters=body.filters,
                          actor=_actor(body.actor_id, body.actor_kind),
@@ -962,6 +988,7 @@ def create_app(
 
     @router.get("/projects/{project_id}/views")
     def views_list(project_id: str, actor_id: str, actor_kind: str = "human"):
+        svc.require_feature(project_id, "saved_views")
         try:
             actor = _actor(actor_id, actor_kind)
         except ValueError:
@@ -1103,6 +1130,8 @@ def create_app(
 
     @router.get("/inbox")
     def approval_inbox():
+        # Cross-project inbox: fail closed only if every enabled project has
+        # the inbox feature off; otherwise filter per project below.
         return dy.approval_inbox()
 
     @router.get("/dashboard")
@@ -1139,6 +1168,7 @@ def create_app(
     @router.post("/projects/{project_id}/workflows/{name}/start")
     def start_workflow(project_id: str, name: str, body: WorkflowStart):
         try:
+            svc.require_feature(project_id, "workflow_canvas")
             return workflows.start(
                 project_id,
                 name,
@@ -1153,6 +1183,7 @@ def create_app(
     @router.get("/projects/{project_id}/workflows/{name}/runs")
     def list_workflow_runs(project_id: str, name: str):
         """Read-only run ledger with per-node canonical status (canvas view)."""
+        svc.require_feature(project_id, "workflow_canvas")
         try:
             return {"runs": workflows.runs(project_id, name)}
         except ValueError as exc:
@@ -1256,7 +1287,13 @@ def create_app(
     @app.exception_handler(ServiceError)
     async def service_envelope(request: Request, exc: ServiceError):
         msg = str(exc).lower()
-        not_found = "not enabled" in msg or "no such" in msg or "disabled" in msg
+        not_found = "not enabled" in msg or "no such" in msg
+        # "disabled" alone is ambiguous: stewardship disabled = 404, but a
+        # togglable feature being off is a conflict the client can flip (409).
+        feature_disabled = "feature '" in msg and "is disabled" in msg
+        if feature_disabled:
+            return error_envelope_handler(
+                request, HTTPException(409, str(exc)))
         return error_envelope_handler(
             request, HTTPException(404 if not_found else 409, str(exc))
         )

@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 17
 
 
 @dataclass(frozen=True)
@@ -676,6 +676,16 @@ MIGRATIONS: List[Migration] = [
         """,
         downgrade_sql="""
         ALTER TABLE dockyard_milestones DROP COLUMN closed_at;
+        """,
+    ),
+    Migration(
+        version=17,
+        name="per-project feature toggles",
+        upgrade_sql="""
+        ALTER TABLE project_stewardship ADD COLUMN features_json TEXT;
+        """,
+        downgrade_sql="""
+        ALTER TABLE project_stewardship DROP COLUMN features_json;
         """,
     ),
 ]

@@ -221,11 +221,106 @@ class StewardshipService:
                 "release": self.store._uj(r["release_policy_json"], {}),
                 "notification": self.store._uj(r["notification_policy_json"], {}),
             },
+            "features": self._resolve_features(r),
             "phase": r["phase"],
             "created_at": r["created_at"],
             "updated_at": r["updated_at"],
             "paused_at": r["paused_at"],
         }
+
+    # ------------------------------------------------------------------ #
+    # Feature toggles (DY-FT-01): hide, never delete; re-enable restores. #
+    # ------------------------------------------------------------------ #
+
+    TOGGLABLE_FEATURES = (
+        "workflow_canvas",
+        "milestones",
+        "initiatives",
+        "inbox",
+        "notifications",
+        "saved_views",
+    )
+    # Core surfaces: the mechanism that makes toggling safe. Never togglable.
+    CORE_FEATURES = (
+        "projects",
+        "settings",
+        "audit",
+        "health",
+        "work_items",
+        "events",
+    )
+
+    def _features_row(self, project_id: str) -> Dict[str, bool]:
+        row = self.store._conn.execute(
+            "SELECT features_json FROM project_stewardship WHERE project_id=?",
+            (project_id,),
+        ).fetchone()
+        if row is None:
+            raise ServiceError(f"stewardship not enabled for project '{project_id}'")
+        return self._resolve_features(row)
+
+    def _resolve_features(self, r: sqlite3.Row) -> Dict[str, bool]:
+        stored = self.store._uj(r["features_json"], {}) if r["features_json"] else {}
+        return {name: bool(stored.get(name, True))
+                for name in self.TOGGLABLE_FEATURES}
+
+    def features(self, project_id: str) -> Dict[str, bool]:
+        """Resolved feature-toggle map for a project."""
+        return self._features_row(project_id)
+
+    def require_feature(self, project_id: str, name: str) -> None:
+        """Fail closed when a togglable feature is disabled for the project."""
+        if name in self.CORE_FEATURES:
+            return
+        if name not in self.TOGGLABLE_FEATURES:
+            raise ServiceError(f"unknown feature '{name}'")
+        features = self._features_row(project_id)
+        if not features.get(name, True):
+            raise ServiceError(
+                f"feature '{name}' is disabled for project '{project_id}'")
+
+    def update_features(
+        self,
+        project_id: str,
+        changes: Dict[str, bool],
+        *,
+        actor: str,
+        interface: str,
+    ) -> Dict[str, bool]:
+        """Enable/disable togglable features. Never touches stored data."""
+        if not isinstance(changes, dict) or not changes:
+            raise ServiceError("features must be a non-empty object of booleans")
+        row = self.store._conn.execute(
+            "SELECT features_json FROM project_stewardship WHERE project_id=?",
+            (project_id,),
+        ).fetchone()
+        if row is None:
+            raise ServiceError(f"stewardship not enabled for project '{project_id}'")
+        for name, value in changes.items():
+            if name in self.CORE_FEATURES:
+                raise ServiceError(
+                    f"feature '{name}' is core and cannot be toggled off")
+            if name not in self.TOGGLABLE_FEATURES:
+                raise ServiceError(f"unknown feature '{name}'")
+            if not isinstance(value, bool):
+                raise ServiceError(f"feature '{name}' must be true or false")
+        current = self._resolve_features(row)
+        next_features = dict(current)
+        next_features.update(changes)
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE project_stewardship SET features_json=?, updated_at=?"
+                " WHERE project_id=?",
+                (self.store._j(next_features), iso(self._clock()), project_id),
+            )
+        for name, value in sorted(changes.items()):
+            self.store.audit(
+                actor=actor,
+                interface=interface,
+                action="feature.enabled" if value else "feature.disabled",
+                subject=f"{project_id}:{name}",
+            )
+        return next_features
 
     def settings(self, project_id: str, *,
                  include_disabled: bool = False) -> Dict[str, Any]:

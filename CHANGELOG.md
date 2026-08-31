@@ -7,7 +7,20 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased] - 2026-08-31
 
 ### Added
-- **Milestones UI (DY-P1-02)**: Work tab gains a collapsible Milestones panel
+### Added
+- **Central feature toggles (DY-FT-01)**: per-project switches that turn
+  Dockyard surfaces (workflow canvas, milestones, initiatives/delivery,
+  approval inbox, notifications, saved views) on or off from one place.
+  Disabling hides the surface and fails its API paths closed (409) — it never
+  deletes or modifies any data, and re-enabling restores everything exactly
+  as it was. Core surfaces (projects, work items, settings, audit, health,
+  events) are locked and cannot be toggled off. Stored on
+  project_stewardship.features_json (migration 17); every change is
+  audit-logged with actor attribution. Dashboard gains a Features panel on
+  the fleet overview; disabled tabs hide immediately and reappear on
+  re-enable. Verified end-to-end in real Chrome (hide -> 409 -> re-enable ->
+  tab + API restored, core toggle refused).
+- **Milestones UI (DY-P1-02)**- **Milestones UI (DY-P1-02)**: Work tab gains a collapsible Milestones panel
   backed by a new milestones surface. Backend: `GET /projects/{id}/milestones`
   (ordered open-first/by-due, closed-last) and
   `PATCH /projects/{id}/milestones/{name}` for due-date changes and

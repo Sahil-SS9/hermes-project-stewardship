@@ -13,7 +13,10 @@ interface AppState {
   projectId?: string;
   selectedWorkRef?: string;
   workLayout: 'board' | 'table';
+  featureMap?: Record<string, boolean> | null;
 }
+
+type FeatureMap = Record<string, boolean>;
 
 export function initApp(
   sdk: HermesPluginSDK,
@@ -74,18 +77,33 @@ export function initApp(
   const nav = document.createElement('nav');
   nav.className = 'dy-tabs';
   nav.setAttribute('role', 'tablist');
-  const TABS: Array<{ id: AppState['tab']; label: string }> = [
+  const TABS: Array<{ id: AppState['tab']; label: string; feature?: string }> = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'work', label: 'Work' },
-    { id: 'delivery', label: 'Delivery' },
-    { id: 'inbox', label: 'Approval Inbox' },
-    { id: 'workflow', label: 'Workflow' },
-    { id: 'notifications', label: 'Notifications' },
+    { id: 'delivery', label: 'Delivery', feature: 'initiatives' },
+    { id: 'inbox', label: 'Approval Inbox', feature: 'inbox' },
+    { id: 'workflow', label: 'Workflow', feature: 'workflow_canvas' },
+    { id: 'notifications', label: 'Notifications', feature: 'notifications' },
     { id: 'onboard', label: 'Onboard Project' },
   ];
+
+  // Feature toggles (DY-FT-01): tabs for disabled features are hidden.
+  // Data is never touched — re-enabling restores the tab.
+  let featureMap: FeatureMap | null = null;
+  const featureOn = (name?: string): boolean =>
+    !name || !featureMap || featureMap[name] !== false;
+
+  const hideDisabledTabs = (): void => {
+    for (const t of TABS) {
+      const btn = nav.querySelector<HTMLButtonElement>(`button[data-tab="${t.id}"]`);
+      if (btn) btn.hidden = !featureOn(t.feature);
+    }
+  };
+
   for (const t of TABS) {
     const b = document.createElement('button');
     b.dataset.tab = t.id;
+    if (t.feature) b.dataset.feature = t.feature;
     b.setAttribute('role', 'tab');
     b.setAttribute('aria-selected', String(t.id === 'dashboard'));
     b.textContent = t.label;
@@ -113,6 +131,33 @@ export function initApp(
   );
 
   void render(main, state);
+
+  // Fetch features after the first project is known; until then default-all-on
+  // so first paint is never blocked by the toggle check (DY-FT-01).
+  const activeTab = state.tab;
+  void (async () => {
+    try {
+      const dash = await state.api.dashboard();
+      const first = (dash.projects ?? [])[0]?.id;
+      if (!first) return;
+      const res = await state.api.features(first);
+      featureMap = res.features ?? {};
+      hideDisabledTabs();
+      if (!featureOn(TABS.find((t) => t.id === activeTab)?.feature)) {
+        state.tab = 'dashboard';
+        const dashBtn = nav.querySelector('button[data-tab="dashboard"]');
+        if (dashBtn) {
+          nav.querySelectorAll('button').forEach((x) => {
+            x.classList.toggle('active', x === dashBtn);
+            x.setAttribute('aria-selected', String(x === dashBtn));
+          });
+        }
+        void render(main, state);
+      }
+    } catch {
+      // Toggles are optional; on failure everything behaves as enabled.
+    }
+  })();
 
   // cor-007: host-facing teardown — aborts in-flight renders and blocks new ones
   return () => {
@@ -185,7 +230,80 @@ async function renderDashboard(
     `Stuck bots: ${totals.stuck_bots ?? 0} · Unacked notifications: ${totals.unacked_notifications ?? 0}`,
   );
   section.append(table, dim);
+  section.appendChild(await buildFeaturesPanel(s, projects, () =>
+    void renderDashboard(main, s, isStale)));
   main.replaceChildren(section);
+}
+
+const FEATURE_LABELS: Record<string, string> = {
+  workflow_canvas: 'Workflow canvas',
+  milestones: 'Milestones',
+  initiatives: 'Initiatives & delivery',
+  inbox: 'Approval inbox',
+  notifications: 'Notifications',
+  saved_views: 'Saved views',
+};
+
+async function buildFeaturesPanel(
+  s: AppState,
+  projects: Array<{ id: string }>,
+  rerender: () => void,
+): Promise<HTMLElement> {
+  const box = document.createElement('details');
+  box.className = 'dy-features';
+  box.appendChild(textEl('summary', '', 'Features'));
+  const body = textEl('div', 'dy-features-body', 'Loading features...');
+  box.appendChild(body);
+  const refreshTabVisibility = (): void => {
+    document.querySelectorAll('.dy-tabs button[data-tab]').forEach((btn) => {
+      const feature = (btn as HTMLElement).dataset.feature;
+      if (!feature) return;
+      (btn as HTMLElement).hidden = (s.featureMap ?? {})[feature] === false;
+    });
+  };
+  try {
+    const projectId = projects[0]?.id;
+    if (!projectId) return box;
+    const res = await s.api.features(projectId);
+    s.featureMap = res.features ?? {};
+    const list = document.createElement('div');
+    list.className = 'dy-feature-list';
+    for (const [name, on] of Object.entries(s.featureMap)) {
+      const row = document.createElement('div');
+      row.className = 'dy-feature-row';
+      const label = textEl('span', 'dy-feature-name', FEATURE_LABELS[name] ?? name);
+      const stateTxt = textEl('span', 'dy-dim', on ? 'On' : 'Off');
+      const btn = workLayoutButton(on ? 'Disable' : 'Enable', false);
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        // Read CURRENT state at click time — in-place state edits would make
+        // a captured `on` stale and re-send the same transition.
+        const nowOn = (s.featureMap ?? {})[name] !== false;
+        try {
+          const updated = await s.api.updateFeatures(projectId, { [name]: !nowOn });
+          s.featureMap = updated.features ?? {};
+          stateTxt.textContent = !nowOn ? 'On' : 'Off';
+          btn.textContent = !nowOn ? 'Disable' : 'Enable';
+          btn.disabled = false;
+          refreshTabVisibility();
+        } catch {
+          btn.textContent = 'Failed';
+          btn.disabled = false;
+        }
+      });
+      row.append(label, stateTxt, btn);
+      list.appendChild(row);
+    }
+    body.replaceChildren(list);
+    const note = textEl(
+      'p', 'dy-dim',
+      'Turning a feature off hides it and blocks its API. No data is ever deleted; re-enabling restores everything.',
+    );
+    body.appendChild(note);
+  } catch {
+    body.textContent = 'Feature settings are unavailable.';
+  }
+  return box;
 }
 
 async function renderWork(

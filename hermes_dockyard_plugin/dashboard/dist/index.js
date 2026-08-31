@@ -21,6 +21,13 @@
     });
     return {
       health: () => get("/health"),
+      features: (projectId) => get(
+        `/projects/${encodeURIComponent(projectId)}/features`
+      ),
+      updateFeatures: (projectId, features) => patch(
+        `/projects/${encodeURIComponent(projectId)}/features`,
+        { features, actor: "sahil", interface: "dockyard:human" }
+      ),
       dashboard: () => get("/dashboard"),
       inbox: () => get("/inbox"),
       notifications: () => get("/notifications"),
@@ -715,15 +722,24 @@
     const TABS = [
       { id: "dashboard", label: "Dashboard" },
       { id: "work", label: "Work" },
-      { id: "delivery", label: "Delivery" },
-      { id: "inbox", label: "Approval Inbox" },
-      { id: "workflow", label: "Workflow" },
-      { id: "notifications", label: "Notifications" },
+      { id: "delivery", label: "Delivery", feature: "initiatives" },
+      { id: "inbox", label: "Approval Inbox", feature: "inbox" },
+      { id: "workflow", label: "Workflow", feature: "workflow_canvas" },
+      { id: "notifications", label: "Notifications", feature: "notifications" },
       { id: "onboard", label: "Onboard Project" }
     ];
+    let featureMap = null;
+    const featureOn = (name) => !name || !featureMap || featureMap[name] !== false;
+    const hideDisabledTabs = () => {
+      for (const t of TABS) {
+        const btn = nav.querySelector(`button[data-tab="${t.id}"]`);
+        if (btn) btn.hidden = !featureOn(t.feature);
+      }
+    };
     for (const t of TABS) {
       const b = document.createElement("button");
       b.dataset.tab = t.id;
+      if (t.feature) b.dataset.feature = t.feature;
       b.setAttribute("role", "tab");
       b.setAttribute("aria-selected", String(t.id === "dashboard"));
       b.textContent = t.label;
@@ -747,6 +763,29 @@
       })
     );
     void render(main, state);
+    const activeTab = state.tab;
+    void (async () => {
+      try {
+        const dash = await state.api.dashboard();
+        const first = (dash.projects ?? [])[0]?.id;
+        if (!first) return;
+        const res = await state.api.features(first);
+        featureMap = res.features ?? {};
+        hideDisabledTabs();
+        if (!featureOn(TABS.find((t) => t.id === activeTab)?.feature)) {
+          state.tab = "dashboard";
+          const dashBtn = nav.querySelector('button[data-tab="dashboard"]');
+          if (dashBtn) {
+            nav.querySelectorAll("button").forEach((x) => {
+              x.classList.toggle("active", x === dashBtn);
+              x.setAttribute("aria-selected", String(x === dashBtn));
+            });
+          }
+          void render(main, state);
+        }
+      } catch {
+      }
+    })();
     return () => {
       disposed = true;
       root.replaceChildren();
@@ -809,7 +848,72 @@
       `Stuck bots: ${totals.stuck_bots ?? 0} \xB7 Unacked notifications: ${totals.unacked_notifications ?? 0}`
     );
     section.append(table, dim);
+    section.appendChild(await buildFeaturesPanel(s, projects, () => void renderDashboard(main, s, isStale)));
     main.replaceChildren(section);
+  }
+  var FEATURE_LABELS = {
+    workflow_canvas: "Workflow canvas",
+    milestones: "Milestones",
+    initiatives: "Initiatives & delivery",
+    inbox: "Approval inbox",
+    notifications: "Notifications",
+    saved_views: "Saved views"
+  };
+  async function buildFeaturesPanel(s, projects, rerender) {
+    const box = document.createElement("details");
+    box.className = "dy-features";
+    box.appendChild(textEl("summary", "", "Features"));
+    const body = textEl("div", "dy-features-body", "Loading features...");
+    box.appendChild(body);
+    const refreshTabVisibility = () => {
+      document.querySelectorAll(".dy-tabs button[data-tab]").forEach((btn) => {
+        const feature = btn.dataset.feature;
+        if (!feature) return;
+        btn.hidden = (s.featureMap ?? {})[feature] === false;
+      });
+    };
+    try {
+      const projectId = projects[0]?.id;
+      if (!projectId) return box;
+      const res = await s.api.features(projectId);
+      s.featureMap = res.features ?? {};
+      const list = document.createElement("div");
+      list.className = "dy-feature-list";
+      for (const [name, on] of Object.entries(s.featureMap)) {
+        const row = document.createElement("div");
+        row.className = "dy-feature-row";
+        const label2 = textEl("span", "dy-feature-name", FEATURE_LABELS[name] ?? name);
+        const stateTxt = textEl("span", "dy-dim", on ? "On" : "Off");
+        const btn = workLayoutButton(on ? "Disable" : "Enable", false);
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          const nowOn = (s.featureMap ?? {})[name] !== false;
+          try {
+            const updated = await s.api.updateFeatures(projectId, { [name]: !nowOn });
+            s.featureMap = updated.features ?? {};
+            stateTxt.textContent = !nowOn ? "On" : "Off";
+            btn.textContent = !nowOn ? "Disable" : "Enable";
+            btn.disabled = false;
+            refreshTabVisibility();
+          } catch {
+            btn.textContent = "Failed";
+            btn.disabled = false;
+          }
+        });
+        row.append(label2, stateTxt, btn);
+        list.appendChild(row);
+      }
+      body.replaceChildren(list);
+      const note = textEl(
+        "p",
+        "dy-dim",
+        "Turning a feature off hides it and blocks its API. No data is ever deleted; re-enabling restores everything."
+      );
+      body.appendChild(note);
+    } catch {
+      body.textContent = "Feature settings are unavailable.";
+    }
+    return box;
   }
   async function renderWork(main, s, isStale) {
     const dashboard = await s.api.dashboard();

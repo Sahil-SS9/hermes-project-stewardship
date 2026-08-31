@@ -191,6 +191,13 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-root .dy-milestone-row select { background: #0d1117; color: #e6edf3; border: 1px solid #2a3140; border-radius: 6px; padding: 4px 6px; max-width: 240px; }
 .dy-root .dy-milestone-create { display: flex; align-items: center; gap: 8px; padding-top: 10px; flex-wrap: wrap; }
 .dy-root .dy-milestone-create input { background: #0d1117; color: #e6edf3; border: 1px solid #2a3140; border-radius: 6px; padding: 5px 8px; }
+.dy-root .dy-features { margin: 14px 0 0; border: 1px solid #2a3140; border-radius: 8px; background: #161b22; }
+.dy-root .dy-features summary { cursor: pointer; padding: 8px 12px; font-weight: 600; color: #e6edf3; }
+.dy-root .dy-features-body { padding: 4px 12px 10px; }
+.dy-root .dy-feature-row { display: flex; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid #21262d; }
+.dy-root .dy-feature-row:last-of-type { border-bottom: none; }
+.dy-root .dy-feature-name { flex: 1 1 auto; color: #e6edf3; }
+.dy-root .dy-feature-row .dy-btn { min-width: 84px; }
 @media (prefers-reduced-motion: reduce) {
   .dy-root .dy-wf-node.working .dy-wf-rect { animation: none; }
   .dy-root .dy-wf-svg .dy-wf-sub, .dy-root .dy-wf-svg .dy-wf-timer { transition: none; }
