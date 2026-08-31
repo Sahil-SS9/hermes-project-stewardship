@@ -4,7 +4,43 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-08-30
+## [Unreleased] - 2026-08-31
+
+### Added
+- Read-only Workflow node canvas on the dashboard surface (commit 509bd1c,
+  refined through 6782982): SVG canvas with pan / cursor-centred zoom /
+  minimap, Task and Gate nodes colour-coded from canonical status, dependency
+  arrows with heads + active-edge flow dots, LOD semantic zoom, hover intent
+  preview, 8s event-driven polling, and a collapsible live Activity strip
+  driven by poll deltas.
+- Semantic Passport per node: title, status badge, assignee, deep link, and
+  Approve/Reject on gate nodes (wired to existing initiative endpoints).
+  Selected node carries an unmistakable accent ring distinct from hover;
+  Escape clears selection.
+- Live detail expansion (agenttrail pattern): Progress bar (done/total with
+  animated fill), Sub-tasks checklist with per-task assignee and
+  strikethrough on completed items, Activity thread with wall-clock decay.
+  Backed by the existing work-detail endpoint - no new routes.
+- scripts/local-ci.sh is the authoritative CI evidence source while GitHub
+  Actions is rate-limited (see 2026-08-30 addendum in remainingwork.md).
+
+### Fixed
+- ci.yml install extras + coverage gate pinned to measured 87 (Actions had
+  never run green; root causes verified 30/08).
+- plugin.yaml desktop surface realigned to the shipped hermes_dockyard_plugin
+  door (route /dockyard).
+- Canvas frame styles moved from the never-rendered .dy-wf-host class to the
+  real mount root .dy-wf (canvas had collapsed to a ~80px strip).
+- Node clicks swallowed by svg-level pointer capture; capture now targets the
+  pressed node (click-vs-drag disambiguation verified with real input events
+  in headless Chrome).
+- Contrast: Live-detail "Live detail" button inherited UA black-on-dark text;
+  now inherits --dy-text. Pending/badge greys raised to >=4.5:1 (WCAG AA).
+
+### Changed
+- Live-detail reading order is now Progress -> Sub-tasks (with assignees,
+  done items struck through) -> Activity.
+
 
 ### Fixed
 - CI install step now includes the `desktop-panel` extra; the previous
