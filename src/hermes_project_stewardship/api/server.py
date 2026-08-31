@@ -289,6 +289,13 @@ class MilestoneAttach(BaseModel):
     actor_kind: str = "bot"
 
 
+class MilestoneUpdate(BaseModel):
+    due: Optional[str] = None
+    closed: Optional[bool] = None
+    actor_id: str
+    actor_kind: str = "human"
+
+
 class ViewSave(BaseModel):
     name: str
     layout: str
@@ -912,6 +919,26 @@ def create_app(
         except Exception as e:
             raise HTTPException(409, str(e))
         return {"name": name, "attached": body.ref}
+
+    @router.get("/projects/{project_id}/milestones")
+    def milestone_list(project_id: str):
+        if store._conn.execute(
+            "SELECT 1 FROM project_stewardship WHERE project_id=?",
+                (project_id,)).fetchone() is None:
+            raise HTTPException(404, f"project {project_id} not found")
+        return {"milestones": dy.milestone_list(project_id)}
+
+    @router.patch("/projects/{project_id}/milestones/{name}")
+    def milestone_update(project_id: str, name: str, body: MilestoneUpdate):
+        try:
+            dy.milestone_update(project_id, name, due=body.due,
+                                closed=body.closed,
+                                actor=_actor(body.actor_id, body.actor_kind))
+        except ValueError as e:
+            raise HTTPException(404, str(e))
+        except Exception as e:
+            raise HTTPException(409, str(e))
+        return dy.milestone_progress(project_id, name)
 
     @router.get("/projects/{project_id}/milestones/{name}")
     def milestone_progress(project_id: str, name: str):

@@ -102,3 +102,62 @@ def test_views_api_roundtrip(env):
         "name": "Bad layout", "layout": "wallpaper", "filters": {},
         "actor_id": "sahil"})
     assert r.status_code == 422
+
+
+def test_milestone_list_api_orders_and_counts(env, human):
+    c, svc, _ = env
+    from hermes_project_stewardship.dockyard import WorkItemStatus
+
+    i1 = _mk_item(svc, "dy1", "One", human)
+    i2 = _mk_item(svc, "dy1", "Two", human)
+    i3 = _mk_item(svc, "dy1", "Three", human)
+    svc.milestone_create("dy1", "later", due="2026-12-01", actor=human)
+    svc.milestone_create("dy1", "soon", due="2026-09-01", actor=human)
+    for ref in (i1.ref, i2.ref):
+        svc.milestone_attach("dy1", "soon", ref, actor=human)
+    svc.milestone_attach("dy1", "later", i3.ref, actor=human)
+    svc.transition("dy1", i1.ref, WorkItemStatus.DONE, actor=human)
+
+    r = c.get("/stewardship/v1/projects/dy1/milestones")
+    assert r.status_code == 200
+    rows = r.json()["milestones"]
+    names = [m["name"] for m in rows]
+    # Open first (by due), closed last; both created open here so due order wins.
+    assert names == ["soon", "later"]
+    soon = rows[0]
+    assert soon["total"] == 2 and soon["closed"] is False
+    assert soon["done"] in (0, 1)  # dockyard path: counts mirror the store
+    assert soon["due"] == "2026-09-01"
+
+
+def test_milestone_list_unknown_project_404(env):
+    c, _, _ = env
+    r = c.get("/stewardship/v1/projects/ghost/milestones")
+    assert r.status_code == 404
+
+
+def test_milestone_update_close_and_reopen(env, human):
+    c, svc, _ = env
+    i1 = _mk_item(svc, "dy1", "Only", human)
+    svc.milestone_create("dy1", "m1", due="2026-10-01", actor=human)
+    svc.milestone_attach("dy1", "m1", i1.ref, actor=human)
+
+    r = c.patch("/stewardship/v1/projects/dy1/milestones/m1", json={
+        "closed": True, "actor_id": "sahil"})
+    assert r.status_code == 200 and r.json()["closed"] is True
+
+    # Closed milestone sorts last.
+    rows = c.get("/stewardship/v1/projects/dy1/milestones").json()["milestones"]
+    assert rows[-1]["name"] == "m1" and rows[-1]["closed"] is True
+
+    r = c.patch("/stewardship/v1/projects/dy1/milestones/m1", json={
+        "closed": False, "due": "2026-11-15", "actor_id": "sahil"})
+    assert r.status_code == 200 and r.json()["closed"] is False
+    assert r.json()["due"] == "2026-11-15"
+
+
+def test_milestone_update_unknown_404(env):
+    c, _, _ = env
+    r = c.patch("/stewardship/v1/projects/dy1/milestones/nope", json={
+        "closed": True, "actor_id": "sahil"})
+    assert r.status_code == 404

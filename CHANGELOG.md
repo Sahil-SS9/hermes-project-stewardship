@@ -7,6 +7,16 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased] - 2026-08-31
 
 ### Added
+- **Milestones UI (DY-P1-02)**: Work tab gains a collapsible Milestones panel
+  backed by a new milestones surface. Backend: `GET /projects/{id}/milestones`
+  (ordered open-first/by-due, closed-last) and
+  `PATCH /projects/{id}/milestones/{name}` for due-date changes and
+  close/reopen, both with actor attribution and audit trail; store/schema
+  advance to migration 16 (`closed_at`). Dashboard: per-milestone progress bar
+  with done/total %, explicit overdue state, attach-task-to-milestone control,
+  close/reopen, and inline create. One pre-existing defect surfaced and fixed
+  during verification: the saved-views fetch omitted the now-required
+  `actor_id`, which broke the whole Work tab render (422).
 - Read-only Workflow node canvas on the dashboard surface (commit 509bd1c,
   refined through 6782982): SVG canvas with pan / cursor-centred zoom /
   minimap, Task and Gate nodes colour-coded from canonical status, dependency

@@ -156,16 +156,22 @@ Sources: PM-04, UX-03
 Current evidence:
 
 - Backend supports milestone create, attach and progress readback.
+- Milestones are listable, closable/reopenable, and manageable in the dashboard
+  Work tab (progress bar, overdue state, attach control, inline create);
+  list/update contracts exist and are tested.
 
 Remaining outcome:
 
-- Milestones are listable, editable and manageable without CLI or raw RPC calls.
+- Milestone rename/update contracts beyond due/close (full edit surface).
+- Sprint planning depth: forecast calculations using stored work state with
+  deterministic tests.
 
 Acceptance:
 
-- List, rename/update and close/archive contracts exist.
-- Committed items and progress roll-up render in project workspace and portfolio dashboard.
-- Empty, overdue and completed states are explicit.
+- List, rename/update and close/archive contracts exist. (close/archive done;
+  rename/update still pending)
+- Committed items and progress roll-up render in project workspace and portfolio dashboard. (workspace done; portfolio dashboard pending)
+- Empty, overdue and completed states are explicit. (all three render; completed state = `closed` label)
 - Forecast calculations use stored work state and have deterministic tests.
 
 ### DY-P1-03 - Real saved views and portfolio queries

@@ -75,6 +75,15 @@ export interface WorkDetail {
   history: Array<Record<string, unknown>>;
 }
 
+export interface MilestoneSummary {
+  name: string;
+  due?: string | null;
+  closed?: boolean;
+  total: number;
+  done: number;
+  created_at?: string | null;
+}
+
 export interface Initiative {
   ref: string;
   project_id: string;
@@ -150,9 +159,32 @@ export function createApi(sdk: HermesPluginSDK) {
         `/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(ref)}/dependencies/${encodeURIComponent(dependencyRef)}/remove`,
         {},
       ),
+    milestones: (projectId: string) =>
+      get<{ milestones: MilestoneSummary[] }>(
+        `/projects/${encodeURIComponent(projectId)}/milestones`,
+      ),
+    createMilestone: (projectId: string, name: string, due: string | null) =>
+      post<{ id: number; name: string }>(
+        `/projects/${encodeURIComponent(projectId)}/milestones`,
+        { name, due, actor_id: 'sahil', actor_kind: 'human' },
+      ),
+    updateMilestone: (
+      projectId: string,
+      name: string,
+      changes: { due?: string | null; closed?: boolean },
+    ) =>
+      patch<MilestoneSummary>(
+        `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}`,
+        { ...changes, actor_id: 'sahil', actor_kind: 'human' },
+      ),
+    attachMilestone: (projectId: string, name: string, ref: string) =>
+      post(
+        `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}/attach`,
+        { ref, actor_id: 'sahil', actor_kind: 'human' },
+      ),
     views: (projectId: string) =>
       get<{ views: Array<{ name: string; layout: string; filters?: Record<string, unknown> }> }>(
-        `/projects/${encodeURIComponent(projectId)}/views`,
+        `/projects/${encodeURIComponent(projectId)}/views?actor_id=sahil`,
       ),
     saveView: (projectId: string, name: string, layout: 'board' | 'table') =>
       put(`/projects/${encodeURIComponent(projectId)}/views`, {

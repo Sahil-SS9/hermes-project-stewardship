@@ -484,7 +484,7 @@ class DockyardStore:
 
     def milestone_progress(self, project_id: str, name: str) -> Dict:
         row = self.store._conn.execute(
-            "SELECT id, due FROM dockyard_milestones"
+            "SELECT id, due, closed_at FROM dockyard_milestones"
             " WHERE project_id=? AND name=?", (project_id, name),
         ).fetchone()
         if not row:
@@ -502,7 +502,47 @@ class DockyardStore:
             (row["id"],),
         ).fetchone()["n"]
         return {"name": name, "total": total, "done": done,
-                "due": row["due"]}
+                "closed": bool(row["closed_at"]), "due": row["due"]}
+
+    def milestone_list(self, project_id: str) -> list:
+        rows = self.store._conn.execute(
+            "SELECT name, due, created_at, closed_at"
+            " FROM dockyard_milestones WHERE project_id=?"
+            " ORDER BY CASE WHEN closed_at IS NULL THEN 0 ELSE 1 END, due, name",
+            (project_id,),
+        ).fetchall()
+        out = []
+        for row in rows:
+            prog = self.milestone_progress(project_id, row["name"])
+            out.append({
+                "name": row["name"],
+                "due": row["due"],
+                "created_at": row["created_at"],
+                "closed": bool(row["closed_at"]),
+                "total": prog["total"],
+                "done": prog["done"],
+            })
+        return out
+
+    def milestone_update(self, project_id: str, name: str, *, due: Optional[str],
+                         closed: Optional[bool]) -> None:
+        from .store import iso
+
+        with self.store.tx() as cx:
+            cur = cx.execute(
+                "SELECT id FROM dockyard_milestones WHERE project_id=? AND name=?",
+                (project_id, name),
+            ).fetchone()
+            if cur is None:
+                raise ValueError(f"milestone {name} not found")
+            if due is not None:
+                cx.execute("UPDATE dockyard_milestones SET due=? WHERE id=?",
+                           (due, cur["id"]))
+            if closed is not None:
+                cx.execute(
+                    "UPDATE dockyard_milestones SET closed_at=? WHERE id=?",
+                    (iso() if closed else None, cur["id"]),
+                )
 
     # ------------------------------------------------------------------ #
     # Saved views (PM-05)                                                #

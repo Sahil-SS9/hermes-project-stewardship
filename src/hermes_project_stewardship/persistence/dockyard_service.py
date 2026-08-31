@@ -281,7 +281,7 @@ class DockyardService:
         if self.canonical_work is None:
             return self.dy.milestone_progress(project_id, name)
         row = self.store._conn.execute(
-            "SELECT id, due FROM dockyard_milestones "
+            "SELECT id, due, closed_at FROM dockyard_milestones "
             "WHERE project_id=? AND name=?",
             (project_id, name),
         ).fetchone()
@@ -300,8 +300,49 @@ class DockyardService:
             "name": name,
             "total": len(attached),
             "done": sum(1 for ref in attached if statuses.get(ref) == "done"),
+            "closed": bool(row["closed_at"]),
             "due": row["due"],
         }
+
+    def milestone_list(self, project_id: str) -> list:
+        if self.canonical_work is None:
+            return self.dy.milestone_list(project_id)
+        rowset = self.store._conn.execute(
+            "SELECT name, due, created_at, closed_at"
+            " FROM dockyard_milestones WHERE project_id=?"
+            " ORDER BY CASE WHEN closed_at IS NULL THEN 0 ELSE 1 END, due, name",
+            (project_id,),
+        ).fetchall()
+        statuses = {
+            item["ref"]: item["status"]
+            for item in self.canonical_work.list(project_id)
+        }
+        out = []
+        for row in rowset:
+            refs = self.store._conn.execute(
+                "SELECT item_ref FROM dockyard_milestone_items WHERE milestone_id=?",
+                (self.store._conn.execute(
+                    "SELECT id FROM dockyard_milestones WHERE project_id=? AND name=?",
+                    (project_id, row["name"]),
+                ).fetchone()["id"],),
+            ).fetchall()
+            attached = [str(item["item_ref"]) for item in refs]
+            out.append({
+                "name": row["name"],
+                "due": row["due"],
+                "closed": bool(row["closed_at"]),
+                "total": len(attached),
+                "done": sum(1 for ref in attached if statuses.get(ref) == "done"),
+            })
+        return out
+
+    def milestone_update(self, project_id: str, name: str, *, due: Optional[str],
+                         closed: Optional[bool], actor: Actor) -> None:
+        # Validated update: refuses phantom milestones, writes audit trail.
+        self.dy.milestone_progress(project_id, name)
+        self.dy.milestone_update(project_id, name, due=due, closed=closed)
+        self._audit(actor=actor, action="milestone.updated",
+                    subject=name, detail={"due": due, "closed": closed})
 
     # ------------------------------------------------------------------ #
     # Saved views (PM-05)                                                #

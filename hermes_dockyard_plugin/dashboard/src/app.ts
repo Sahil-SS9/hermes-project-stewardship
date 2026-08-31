@@ -3,7 +3,7 @@
 // Product constraint (locked): no string→DOM sinks, no eval, no storage. All text
 // is inert (createElement + textContent); user and API strings are never parsed
 // as markup.
-import type { Api, HermesPluginSDK, WorkItem } from './api';
+import type { Api, HermesPluginSDK, MilestoneSummary, WorkItem } from './api';
 import { createApi } from './api';
 import { mountWorkflowCanvas, type CanvasRun } from './workflow-canvas';
 
@@ -446,11 +446,14 @@ async function renderWork(
   });
   draw();
 
+  const milestonesSection = buildMilestonesPanel(s, projectId, items, () =>
+    renderWork(main, s, isStale));
+
   const split = document.createElement('div');
   split.className = 'dy-work-split';
   split.append(content, detail);
   const section = document.createElement('section');
-  section.append(toolbar, split);
+  section.append(toolbar, milestonesSection, split);
   main.replaceChildren(section);
   if (s.selectedWorkRef) {
     const selected = items.find((item) => item.ref === s.selectedWorkRef);
@@ -584,6 +587,122 @@ function workLayoutButton(labelText: string, active: boolean): HTMLButtonElement
   button.className = `dy-btn${active ? ' active' : ''}`;
   button.textContent = labelText;
   return button;
+}
+
+function buildMilestonesPanel(
+  s: AppState,
+  projectId: string,
+  items: WorkItem[],
+  rerender: () => void,
+): HTMLElement {
+  const api = s.api;
+  const box = document.createElement('details');
+  box.className = 'dy-milestones';
+  const summary = textEl('summary', '', 'Milestones');
+  box.appendChild(summary);
+  const body = textEl('div', 'dy-milestones-body', 'Loading milestones...');
+  box.appendChild(body);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const overdueClass = (m: { due?: string | null; closed?: boolean }): string =>
+    !m.closed && m.due && m.due < today ? ' dy-milestone-overdue' : '';
+
+  const drawRows = (rows: MilestoneSummary[]): void => {
+    if (rows.length === 0) {
+      body.replaceChildren(textEl('p', 'dy-dim', 'No milestones yet. Create one below.'));
+      body.appendChild(creator);
+      return;
+    }
+    const list = document.createElement('div');
+    list.className = 'dy-milestone-list';
+    for (const m of rows) {
+      const row = document.createElement('div');
+      row.className = 'dy-milestone-row' + overdueClass(m);
+      const nameCell = textEl('span', 'dy-milestone-name', m.closed ? `${m.name} (closed)` : m.name);
+      const pct = m.total > 0 ? Math.round((m.done / m.total) * 100) : 0;
+      const bar = document.createElement('div');
+      bar.className = 'dy-wf-progress';
+      const fill = document.createElement('div');
+      fill.className = 'dy-wf-progress-fill';
+      fill.style.width = `${Math.min(100, pct)}%`;
+      bar.appendChild(fill);
+      const counts = textEl(
+        'span', 'dy-dim', `${m.done} of ${m.total} done (${pct}%)`);
+      const dueLabel = textEl('span', 'dy-dim', m.due ? `Due ${m.due}` : 'No due date');
+      const attachSelect = document.createElement('select');
+      attachSelect.setAttribute('aria-label', `Attach a task to ${m.name}`);
+      attachSelect.appendChild(textEl('option', '', 'Attach a task...', ''));
+      items
+        .filter((item) => item.status !== 'done')
+        .forEach((item) => {
+          attachSelect.appendChild(
+            textEl('option', '', `${item.ref}: ${item.title}`, item.ref) as HTMLOptionElement,
+          );
+        });
+      const attachBtn = workLayoutButton('Attach', false);
+      attachBtn.addEventListener('click', async () => {
+        const ref = attachSelect.value;
+        if (!ref) return;
+        attachBtn.disabled = true;
+        try {
+          await api.attachMilestone(projectId, m.name, ref);
+          rerender();
+        } catch {
+          attachBtn.textContent = 'Failed';
+          attachBtn.disabled = false;
+        }
+      });
+      const closeBtn = workLayoutButton(m.closed ? 'Reopen' : 'Close', false);
+      closeBtn.addEventListener('click', async () => {
+        closeBtn.disabled = true;
+        try {
+          await api.updateMilestone(projectId, m.name, { closed: !m.closed });
+          rerender();
+        } catch {
+          closeBtn.textContent = 'Failed';
+          closeBtn.disabled = false;
+        }
+      });
+      row.append(nameCell, bar, counts, dueLabel, attachSelect, attachBtn, closeBtn);
+      list.appendChild(row);
+    }
+    body.replaceChildren(list);
+  };
+
+  void api.milestones(projectId).then((response: { milestones: MilestoneSummary[] }) => {
+    drawRows(response.milestones ?? []);
+    body.appendChild(creator);
+  }).catch(() => {
+    body.textContent = 'Milestones are unavailable.';
+  });
+
+  const nameInput = workInput('New milestone name', '');
+  const dueInput = workInput('Due date', '');
+  dueInput.type = 'date';
+  const createBtn = workLayoutButton('Create milestone', false);
+  const feedback = textEl('p', 'dy-dim', '');
+  createBtn.addEventListener('click', async () => {
+    const nameVal = nameInput.value.trim();
+    if (!nameVal) {
+      feedback.textContent = 'Enter a milestone name first.';
+      return;
+    }
+    createBtn.disabled = true;
+    feedback.textContent = 'Creating...';
+    try {
+      await api.createMilestone(projectId, nameVal, dueInput.value || null);
+      feedback.textContent = 'Created.';
+      rerender();
+    } catch {
+      feedback.textContent = 'Create failed (name may already exist).';
+      createBtn.disabled = false;
+    }
+  });
+  const creator = document.createElement('div');
+  creator.className = 'dy-milestone-create';
+  creator.append(nameInput, dueInput, createBtn, feedback);
+  return box;
 }
 
 function workInput(labelText: string, value: string): HTMLInputElement {

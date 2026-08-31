@@ -180,6 +180,17 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-root .dy-wf-progress { height: 8px; background: #21262d; border-radius: 5px; overflow: hidden; margin: 4px 0 4px; }
 .dy-root .dy-wf-progress-fill { height: 100%; background: linear-gradient(90deg, #2ea043, #3fb950); border-radius: 5px; transition: width .6s cubic-bezier(.2,.8,.3,1); }
 .dy-root .dy-wf-progress-label { margin: 2px 0 0; font-size: 11px; color: #c9d4de; }
+.dy-root .dy-milestones { margin: 10px 0; border: 1px solid #2a3140; border-radius: 8px; background: #161b22; }
+.dy-root .dy-milestones summary { cursor: pointer; padding: 8px 12px; font-weight: 600; color: #e6edf3; }
+.dy-root .dy-milestones-body { padding: 4px 12px 10px; }
+.dy-root .dy-milestone-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #21262d; flex-wrap: wrap; }
+.dy-root .dy-milestone-row:last-child { border-bottom: none; }
+.dy-root .dy-milestone-name { min-width: 140px; font-weight: 600; color: #e6edf3; }
+.dy-root .dy-milestone-row .dy-wf-progress { flex: 0 0 140px; margin: 0; }
+.dy-root .dy-milestone-overdue .dy-milestone-name { color: #f0883e; }
+.dy-root .dy-milestone-row select { background: #0d1117; color: #e6edf3; border: 1px solid #2a3140; border-radius: 6px; padding: 4px 6px; max-width: 240px; }
+.dy-root .dy-milestone-create { display: flex; align-items: center; gap: 8px; padding-top: 10px; flex-wrap: wrap; }
+.dy-root .dy-milestone-create input { background: #0d1117; color: #e6edf3; border: 1px solid #2a3140; border-radius: 6px; padding: 5px 8px; }
 @media (prefers-reduced-motion: reduce) {
   .dy-root .dy-wf-node.working .dy-wf-rect { animation: none; }
   .dy-root .dy-wf-svg .dy-wf-sub, .dy-root .dy-wf-svg .dy-wf-timer { transition: none; }
