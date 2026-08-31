@@ -995,6 +995,14 @@ def create_app(
             raise HTTPException(422, f"invalid actor_kind {actor_kind!r}")
         return {"views": dy.views_list(project_id, actor=actor)}
 
+    @router.get("/projects/{project_id}/views/{name}/items")
+    def view_run(project_id: str, name: str, actor_id: str,
+                 actor_kind: str = "human"):
+        """Run a saved view's query; returns matching work items."""
+        svc.require_feature(project_id, "saved_views")
+        return {"items": dy.view_items(
+            project_id, name, actor=_actor(actor_id, actor_kind))}
+
     @router.post("/projects/{project_id}/reports")
     def report_generate(project_id: str, body: ReportRequest):
         try:

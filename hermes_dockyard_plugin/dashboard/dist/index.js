@@ -676,10 +676,21 @@
 
   // src/app.ts
   function initApp(sdk, root) {
+    let deepLinkView = null;
+    const hash = typeof window !== "undefined" && window.location ? window.location.hash : "";
+    const deepMatch = /^#\/work\/(.+)$/.exec(hash || "");
+    if (deepMatch) {
+      try {
+        deepLinkView = decodeURIComponent(deepMatch[1]);
+      } catch {
+        deepLinkView = deepMatch[1];
+      }
+    }
     const state = {
       api: createApi(sdk),
-      tab: "dashboard",
-      workLayout: "board"
+      tab: deepLinkView ? "work" : "dashboard",
+      workLayout: "board",
+      pendingView: deepLinkView
     };
     let renderSeq = 0;
     let disposed = false;
@@ -1151,9 +1162,22 @@
       const view = (viewsResponse.views ?? []).find((row) => row.name === savedViews.value);
       if (view?.layout === "board" || view?.layout === "table") {
         s.workLayout = view.layout;
+        s.pendingView = view.name;
         draw();
       }
     });
+    if (s.pendingView) {
+      const view = (viewsResponse.views ?? []).find(
+        (row) => row.name === s.pendingView
+      );
+      if (view) {
+        if (view.layout === "board" || view.layout === "table") {
+          s.workLayout = view.layout;
+        }
+        savedViews.value = view.name;
+      }
+      s.pendingView = null;
+    }
     saveButton.addEventListener("click", async () => {
       saveButton.disabled = true;
       try {

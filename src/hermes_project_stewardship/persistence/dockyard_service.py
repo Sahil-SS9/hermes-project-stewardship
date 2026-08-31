@@ -351,11 +351,65 @@ class DockyardService:
     def view_save(self, project_id: str, name: str, layout: str, *,
                   filters: Dict, actor: Actor,
                   shared: bool = False) -> None:
-        self.dy.view_save(project_id, name, layout, filters=filters,
+        from .view_query import QuerySchemaError, validate_query
+
+        try:
+            validated = validate_query(filters)
+        except QuerySchemaError as e:
+            raise ServiceError(f"saved view query invalid: {e}") from None
+        self.dy.view_save(project_id, name, layout, filters=validated,
                           owner_id=actor.id, shared=shared)
 
     def views_list(self, project_id: str, *, actor: Actor) -> List[Dict]:
-        return self.dy.views_list(project_id, include_private_of=actor.id)
+        # Fetch all rows then filter here: role-aware sharing needs to read
+        # shared_with from filters_json, which SQL can't match cleanly.
+        views = self.dy.views_list(project_id, include_private_of=None)
+        visible = []
+        for v in views:
+            shared_with = (v.get("filters") or {}).get("shared_with") or []
+            if (v.get("shared")
+                    or v.get("owner") == actor.id
+                    or actor.id in shared_with):
+                visible.append(v)
+        return visible
+
+    def view_items(self, project_id: str, name: str, *,
+                   actor: Actor) -> List[Dict]:
+        """Run a saved view's query and return the matching work items."""
+        from .view_query import QuerySchemaError, apply_query, validate_query
+
+        views = self.views_list(project_id, actor=actor)
+        view = next((v for v in views if v["name"] == name), None)
+        if view is None:
+            raise ServiceError(f"no such view '{name}' in {project_id}")
+        query = view.get("filters") or {}
+        try:
+            query = validate_query(query)
+            if self.canonical_work is not None:
+                items = [dict(x) for x in self.canonical_work.list(project_id)]
+            else:
+                from dataclasses import asdict
+                from enum import Enum
+                items = [asdict(w) for w in self.dy.list_items(project_id)]
+                # Normalise enum values so filters compare by string.
+                for item in items:
+                    if isinstance(item.get("status"), Enum):
+                        item["status"] = item["status"].value
+        except QuerySchemaError as e:
+            raise ServiceError(f"saved view query invalid: {e}") from None
+        milestone_map: Dict[str, str] = {}
+        if query.get("milestone"):
+            for ms in self.dy.milestone_list(project_id):
+                row = self.store._conn.execute(
+                    "SELECT m.name AS ms, mi.item_ref AS ref"
+                    " FROM dockyard_milestones m"
+                    " JOIN dockyard_milestone_items mi ON mi.milestone_id=m.id"
+                    " WHERE m.project_id=? AND m.name=?",
+                    (project_id, ms["name"]),
+                ).fetchall()
+                for r in row:
+                    milestone_map[str(r["ref"])] = str(r["ms"])
+        return apply_query(items, query, milestone_map or None)
 
     # ------------------------------------------------------------------ #
     # Generated reports                                                  #

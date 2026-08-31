@@ -572,11 +572,21 @@ class DockyardStore:
             )
 
     def views_list(self, project_id: str, *, include_private_of=None) -> List[Dict]:
-        rows = self.store._conn.execute(
-            "SELECT * FROM dockyard_saved_views WHERE project_id=?"
-            " AND (shared=1 OR owner_id=?) ORDER BY name",
-            (project_id, include_private_of or "__none__"),
-        ).fetchall()
+        # Scoped to shared rows plus the caller's private ones; when
+        # include_private_of is None, return all rows (service applies
+        # role-aware sharing, which needs to read shared_with from JSON).
+        if include_private_of is None:
+            rows = self.store._conn.execute(
+                "SELECT * FROM dockyard_saved_views WHERE project_id=?"
+                " ORDER BY name",
+                (project_id,),
+            ).fetchall()
+        else:
+            rows = self.store._conn.execute(
+                "SELECT * FROM dockyard_saved_views WHERE project_id=?"
+                " AND (shared=1 OR owner_id=?) ORDER BY name",
+                (project_id, include_private_of),
+            ).fetchall()
         return [
             {"name": r["name"], "layout": r["layout"],
              "filters": json.loads(r["filters_json"]),

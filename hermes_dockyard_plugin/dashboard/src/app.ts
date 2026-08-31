@@ -14,6 +14,7 @@ interface AppState {
   selectedWorkRef?: string;
   workLayout: 'board' | 'table';
   featureMap?: Record<string, boolean> | null;
+  pendingView?: string | null;
 }
 
 type FeatureMap = Record<string, boolean>;
@@ -22,10 +23,21 @@ export function initApp(
   sdk: HermesPluginSDK,
   root: HTMLElement,
 ): () => void {
+  // Deep link (DY-P1-03): ``#/work/<view name>`` opens the Work tab with that
+  // saved view selected. Read-only at boot; no storage sinks involved.
+  let deepLinkView: string | null = null;
+  const hash = typeof window !== 'undefined' && window.location
+    ? window.location.hash : '';
+  const deepMatch = /^#\/work\/(.+)$/.exec(hash || '');
+  if (deepMatch) {
+    try { deepLinkView = decodeURIComponent(deepMatch[1]); } catch { deepLinkView = deepMatch[1]; }
+  }
+
   const state: AppState = {
     api: createApi(sdk),
-    tab: 'dashboard',
+    tab: deepLinkView ? 'work' : 'dashboard',
     workLayout: 'board',
+    pendingView: deepLinkView,
   };
   // cor-005/007: generation token — a newer render invalidates in-flight ones;
   // disposed flag lets the host unmount abort everything cleanly.
@@ -548,9 +560,22 @@ async function renderWork(
     const view = (viewsResponse.views ?? []).find((row) => row.name === savedViews.value);
     if (view?.layout === 'board' || view?.layout === 'table') {
       s.workLayout = view.layout;
+      s.pendingView = view.name;
       draw();
     }
   });
+  // Deep link (DY-P1-03): restore a specific saved view on first render.
+  if (s.pendingView) {
+    const view = (viewsResponse.views ?? []).find(
+      (row) => row.name === s.pendingView);
+    if (view) {
+      if (view.layout === 'board' || view.layout === 'table') {
+        s.workLayout = view.layout;
+      }
+      savedViews.value = view.name;
+    }
+    s.pendingView = null;
+  }
   saveButton.addEventListener('click', async () => {
     saveButton.disabled = true;
     try {
