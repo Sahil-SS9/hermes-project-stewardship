@@ -22,19 +22,16 @@ from ..domain.constants import (
     TriggerType,
 )
 from ..domain.health import DEFAULT_HEALTH_MACHINE
-from ..domain.policy import AutonomyPolicy
 from ..events.bus import (
     CYCLE_STARTED,
     HEALTH_CHANGED,
     INITIATIVE_PROPOSED,
-    MUTATIONS_BLOCKED,
     PROJECT_CRITICAL,
     VERIFICATION_FAILED,
     EventBus,
 )
 from ..objectives.evaluators import DEFAULT_EVALUATOR, EvaluationContext
 from ..persistence.service import ServiceError, StewardshipService
-from ..security.untrusted import worst_severity
 from ..verification.engine import VerificationEngine
 
 
@@ -129,6 +126,7 @@ class CycleEngine:
             self.svc.cycle_finish(cycle_id, state=CycleState.COMPLETED.value, summary=summary)
             result["cycle_id"] = cycle_id
             self.store.trigger_mark(key)
+            self.store.prune()
             return result
         except CycleRefused:
             raise
@@ -377,7 +375,6 @@ class CycleEngine:
         return specs
 
     def _project_path(self, specs):
-        from ..verification.engine import CollectorSpec
 
         for s in specs or []:
             if getattr(s, "kind", "") in ("git_status", "git_log") and s.path:

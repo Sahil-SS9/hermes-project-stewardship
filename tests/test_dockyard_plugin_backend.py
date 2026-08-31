@@ -569,7 +569,7 @@ def test_plugin_create_queued_item_proxy(client):
         f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items"
     ).json()["work_items"]
     assert any(w["ref"] == body["ref"] and w["assignee"] == "octacon-bot"
-               and w["created_by"] == "sahil" for w in work)
+               and w["created_by"] == plugin_api._ACTOR_ID for w in work)
     entries = client.get(
         f"/api/plugins/hermes-dockyard/projects/{project_id}/backlog"
     ).json()["backlog"]
@@ -587,7 +587,7 @@ def test_plugin_create_queued_item_rejects_same_creator_assignee(client):
         f"/api/plugins/hermes-dockyard/projects/{project_id}/backlog/items",
         json={
             "type": "task", "title": "Self assigned",
-            "assignee_id": "sahil", "assignee_kind": "human",
+            "assignee_id": plugin_api._ACTOR_ID, "assignee_kind": "human",
             "rank": 1, "reason": "reasonable reason supplied",
         },
     )

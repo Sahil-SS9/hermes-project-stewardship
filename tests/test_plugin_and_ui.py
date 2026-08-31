@@ -15,12 +15,20 @@ class FakeRuntime:
         self.with_tools = with_tools
         self.with_slash = with_slash
 
-    def register_tool(self, name, fn):
-        self.tools[name] = fn
+    def register_tool(self, name, toolset, schema, handler, **kwargs):
+        assert toolset == "project-stewardship"
+        assert schema["name"] == name
+        self.tools[name] = handler
 
-    def register_slash_group(self, name, routes):
-        assert name == "project"
-        assert "status" in routes and "approve" in routes
+    def register_command(self, name, handler, description="", args_hint=""):
+        assert name.startswith("project-")
+
+    def register_skill(self, name, path):
+        assert name == "project-stewardship"
+        assert path.name == "project-stewardship"
+
+    def register_cli_command(self, name, help, setup_fn, handler_fn=None, description=""):
+        assert name == "stewardship"
 
 
 def test_register_with_full_runtime(store):
@@ -29,7 +37,7 @@ def test_register_with_full_runtime(store):
     rt = FakeRuntime()
     summary = plugin.register(rt)
     assert set(summary["tools"]) == set(plugin.TOOLS)
-    assert summary["commands"] == ["project"]
+    assert "project-status" in summary["commands"]
 
 
 def test_register_defensive_against_bare_runtime():
@@ -45,10 +53,9 @@ def test_plugin_tools_roundtrip(store, svc, enabled):
     plugin.PluginState.db_path = store.db_path
     status = plugin.tool_steward_status(enabled)
     assert status["settings"]["project_id"] == enabled
-    ini = plugin.tool_steward_propose_initiative(
+    initiative = plugin.tool_steward_propose_initiative(
         enabled, title="T", rationale="R", dedupe_key="plug-1")
-    out = plugin.tool_steward_approve(ini["ref"], actor="h")
-    assert out["status"] == "approved"
+    assert initiative["status"] == "pending_approval"
 
 
 def test_ui_pick_numbered_fallback(monkeypatch, capsys):

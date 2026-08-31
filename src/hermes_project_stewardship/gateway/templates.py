@@ -60,7 +60,7 @@ class MessageCard:
     def plain_text(self) -> str:
         """Fallback rendering for text-only platforms/tests."""
         head = f"{STATE_EMOJI.get(self.severity, '')} {self.title}".strip()
-        body = "\n".join(f"- {l}" for l in self.lines)
+        body = "\n".join(f"- {line}" for line in self.lines)
         return f"{head}\n{body}\n({self.footer})"
 
 
@@ -106,7 +106,6 @@ def approval_card(project_id: str, initiative: Dict[str, Any]) -> MessageCard:
 
 def health_alert_card(project_id: str, notification: Dict[str, Any]) -> MessageCard:
     sev = notification.get("severity", "medium")
-    emoji = STATE_EMOJI.get(notification.get("title", "").split()[-1], "")
     return MessageCard(
         kind="alert",
         title=notification.get("title", "Health alert"),
@@ -126,7 +125,7 @@ def cycle_summary_card(project_id: str, result: Dict[str, Any]) -> MessageCard:
     lines = [f"Cycle {result.get('cycle_id', '?')} complete.",
              f"Health: **{h.get('state')}** (score {h.get('score')})"]
     if created:
-        lines.append(f"Proposed: " + ", ".join(i["ref"] for i in created))
+        lines.append("Proposed: " + ", ".join(i["ref"] for i in created))
     elif refused:
         lines.append("Proposals deduped/capped — no new work.")
     else:

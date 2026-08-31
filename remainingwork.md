@@ -14,11 +14,12 @@ Updated: 26/08/2026 (addenda 30/08/2026, 31/08/2026)
   5 skipped, coverage gate 87 green); `hermes verify --json` ok:true,
   readiness HTTP 200; dashboard build/tests 4/4; portfolio tab verified
   end-to-end in real Chrome via CDP.
-- Known residual debt (documented, non-blocking): view-items milestone
-  progress still resolves per milestone inside milestone lists (cor-003);
-  HTTP status for feature-disabled uses message matching rather than
-  structured codes (cor-006); GitHub Actions remains red-by-infra until the
-  account-level rate limit resets (~07/09/2026).
+- Post-audit remediation: milestone and portfolio progress use grouped queries;
+  feature-disabled errors use a structured `feature_disabled` code; standalone
+  RPC is fail-closed without a token; vanilla Hermes plugin/host adapters are
+  shipped in the repository.
+- No known release-blocking engineering debt remains; live activation and
+  cross-platform remote CI evidence remain separate release gates.
 
 ## Addendum 30/08/2026 — CI reality correction and local mirror
 

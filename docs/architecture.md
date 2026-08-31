@@ -62,9 +62,9 @@ rather than assumed:
 3. **Kanban bridge** — approved initiatives expose `bind_board(ref, slug)` +
    validation_contract; board creation uses the host's Kanban API at
    integration time. Initiative↔board linkage persists here either way.
-4. **Desktop** — panel consumes `/stewardship/v1`; can be mounted inside
-   `hermes serve` or run standalone behind the same auth boundary as the
-   desktop backend.
+4. **Desktop** — the dashboard extension mounts through vanilla Hermes
+   dashboard plugin discovery (`dashboard/manifest.json` + `router`); the
+   Desktop plugin uses the shipped `@hermes/plugin-sdk` contract.
 
 ## Storage
 

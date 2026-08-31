@@ -23,6 +23,7 @@ from ..dockyard import (
     WorkItemType,
     make_ref,
 )
+from ..dockyard.bots import Bot
 from .dockyard_store import DockyardStore
 from .service import ServiceError, StewardshipService
 
@@ -235,7 +236,6 @@ class DockyardService:
 
     def _audit(self, *, actor, action: str, subject: str,
                detail: Optional[dict] = None) -> None:
-        from ..dockyard import Actor as _Actor
 
         if isinstance(actor, str):
             actor_id, kind = actor, "bot"
@@ -628,9 +628,7 @@ class DockyardService:
 
     def bot_register(self, bot_id: str, display_name: str, *,
                      capabilities: Optional[List[str]] = None,
-                     profile: Optional[str] = None) -> "Bot":
-        from ..dockyard.bots import Bot
-
+                     profile: Optional[str] = None) -> Bot:
         bot = Bot(id=bot_id, display_name=display_name,
                   capabilities=capabilities or [], profile=profile)
         self.dy.bot_register(bot)

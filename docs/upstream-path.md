@@ -29,7 +29,9 @@ should know what that means.
 
 ## Compatibility discipline while incubating
 
-- The engine never mutates Hermes-owned stores.
+- The engine never opens Hermes stores directly; the bundled adapter mutates
+  them only through vanilla `projects_db` and `kanban_db` domain APIs.
 - Schema changes only via numbered migrations with downgrades.
-- No dependency on unreleased Hermes APIs — integration seams are contracts
-  (docs/architecture.md) so core churn cannot break the engine itself.
+- No dependency on unreleased Hermes APIs. The plugin uses shipped registration
+  surfaces, and the bundled adapter composes vanilla `projects_db`/`kanban_db`
+  when an aggregate host contract is unavailable.

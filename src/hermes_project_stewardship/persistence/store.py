@@ -20,7 +20,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
-from .migrations import MIGRATIONS, SCHEMA_VERSION
+from .migrations import MIGRATIONS
 
 
 def utcnow() -> datetime:
@@ -71,6 +71,15 @@ class Store:
                 self._registry[id(threading.current_thread())] = conn
         return conn
 
+    def _secure_database_files(self) -> None:
+        for path in (
+            self.db_path,
+            Path(f"{self.db_path}-wal"),
+            Path(f"{self.db_path}-shm"),
+        ):
+            if path.exists():
+                path.chmod(0o600)
+
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(
             str(self.db_path), isolation_level=None, check_same_thread=False
@@ -79,6 +88,11 @@ class Store:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("PRAGMA busy_timeout=5000")
+        try:
+            self._secure_database_files()
+        except OSError:
+            conn.close()
+            raise
         return conn
 
     def close(self) -> None:
@@ -109,6 +123,8 @@ class Store:
         except BaseException:
             self._conn.execute("ROLLBACK")
             raise
+        finally:
+            self._secure_database_files()
 
     def migrate(self) -> None:
         with self.tx() as cx:
@@ -122,12 +138,19 @@ class Store:
         for m in MIGRATIONS:
             if m.version <= current:
                 continue
-            # executescript issues an implicit COMMIT before running, so the
-            # migration runs outside an explicit transaction; every statement
-            # is idempotent (IF NOT EXISTS / OR IGNORE) so a mid-way failure
-            # is recoverable by re-running migrate().
-            self._conn.executescript(m.upgrade_sql)
             with self.tx() as cx:
+                statement = ""
+                for character in m.upgrade_sql:
+                    statement += character
+                    if character == ";" and sqlite3.complete_statement(statement):
+                        sql = statement.strip()
+                        statement = ""
+                        if sql:
+                            cx.execute(sql)
+                if statement.strip():
+                    raise sqlite3.OperationalError(
+                        f"incomplete SQL in migration {m.version}"
+                    )
                 cx.execute(
                     "INSERT INTO schema_migrations(version, applied_at) VALUES(?,?)",
                     (m.version, iso(self._clock())),

@@ -3,7 +3,7 @@
   "kind": "python-package",
   "bootstrap": [
     "uv venv .venv --allow-existing",
-    "uv pip install -e '.[dev,desktop-panel]' --python .venv/bin/python"
+    "uv sync --locked --extra dev --extra plugin"
   ],
   "build": [],
   "test": [

@@ -1,45 +1,16 @@
-# Hermes plugin manifest (general plugin incubation path).
-# See docs/architecture.md §Hermes integration contracts for how these
-# registration points map onto upstream plugin capabilities.
+manifest_version: 2
+api_version: 1
 name: hermes-project-stewardship
 version: 0.3.0
-description: >
-  Durable project ownership: verified stewardship cycles, evidence-backed
-  initiatives, explicit autonomy policy, approvals from every surface.
-entry: hermes_project_stewardship.plugin:register
-
-permissions:
-  - tools.register        # typed stewardship tools for agent profiles
-  - commands.slash        # /project ... shared command registry
-  - hooks.lifecycle       # post-cycle + shutdown hooks
-  - cli.subcommands       # `hermes project steward ...` namespace
-
-tools:
+description: Durable project ownership for Hermes agent fleets.
+author: Sahil Saghir
+license: Apache-2.0
+homepage: https://github.com/Sahil-SS9/hermes-project-stewardship
+kind: standalone
+provides_tools:
   - steward_status
   - steward_run_cycle
   - steward_propose_initiative
-  - steward_approve
-  - steward_reject
-
-slash_commands:
-  - /project status [project]
-  - /project health [project]
-  - /project run [project]
-  - /project objectives [project]
-  - /project initiatives [project]
-  - /project approve <initiative-id>
-  - /project reject <initiative-id>
-  - /project pause [project]
-
-hooks:
-  on_gateway_start: wire_surfaces
-  on_webhook_github: targeted_cycle   # idempotent via trigger keys
-
-desktop_panel:
-  # Active Desktop door: hermes_dockyard_plugin/desktop/plugin.js (id
-  # `hermes-dockyard`), registered route /dockyard via ctx.registerMany.
-  # The retired desktop/stewardship-panel TSX scaffold is kept only as
-  # historical reference and must not be referenced here.
-  route: /dockyard
-  component: hermes_dockyard_plugin/desktop/plugin.js
-  dashboard: hermes_dockyard_plugin/dashboard/manifest.json
+python_dependencies:
+  - fastapi>=0.104,<1
+  - httpx2>=2.7,<3

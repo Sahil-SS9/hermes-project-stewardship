@@ -18,19 +18,29 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - name: Install
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev,desktop-panel]" pytest-cov
+      - uses: astral-sh/setup-uv@v6
+      - name: Install reproducibly
+        run: uv sync --locked --extra dev --extra plugin --python "${{ matrix.python }}"
       # NOTE: GitHub Actions is rate-limited for this account and CI cannot run
       # there for now. scripts/local-ci.sh mirrors this exact gate sequence
       # locally; its output is the authoritative CI evidence until Actions is
       # restored. The gate is pinned to the measured suite value (87) and must
       # be re-raised deliberately, not by silent drift.
       - name: Run tests with coverage gate
-        run: pytest --cov=hermes_project_stewardship --cov-report=term --cov-fail-under=87
+        run: uv run --locked --extra dev --extra plugin pytest --cov=hermes_project_stewardship --cov-report=term --cov-fail-under=87
+      - name: Lint production source
+        run: uv run --locked --extra dev --extra plugin ruff check src
+      - name: Type-check critical trust boundaries
+        run: >-
+          uv run --locked --extra dev --extra plugin ty check
+          src/hermes_project_stewardship/security/allowlist.py
+          src/hermes_project_stewardship/api/middleware.py
+          src/hermes_project_stewardship/plugin.py
+          src/hermes_project_stewardship/persistence/store.py
+      - name: Audit Python dependencies
+        run: uv run --locked --extra dev --extra plugin pip-audit
       - name: Byte-compile check
-        run: python -m compileall src tests
+        run: uv run --locked --extra dev --extra plugin python -m compileall src tests
 
   api-extra:
     runs-on: ubuntu-latest
@@ -39,9 +49,36 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
       - name: Install with API extra
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev,desktop-panel]"
+        run: uv sync --locked --extra dev --extra plugin --python "3.12"
       - name: Import RPC app
-        run: python -c "from hermes_project_stewardship.api.server import app; print('rpc-ok')"
+        run: uv run --locked --extra dev --extra plugin python -c "from hermes_project_stewardship.api.server import app; print('rpc-ok')"
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: hermes_dockyard_plugin/dashboard/package-lock.json
+      - name: Install dashboard dependencies
+        working-directory: hermes_dockyard_plugin/dashboard
+        run: npm ci
+      - name: Type-check dashboard
+        working-directory: hermes_dockyard_plugin/dashboard
+        run: npx tsc --noEmit
+      - name: Test dashboard
+        working-directory: hermes_dockyard_plugin/dashboard
+        run: npm test
+      - name: Build dashboard
+        working-directory: hermes_dockyard_plugin/dashboard
+        run: npm run build
+      - name: Audit dashboard dependencies
+        working-directory: hermes_dockyard_plugin/dashboard
+        run: npm audit --omit=dev
+      - name: Test Desktop plugin harness
+        working-directory: hermes_dockyard_plugin/desktop
+        run: node --experimental-vm-modules --test repro-live.test.mjs

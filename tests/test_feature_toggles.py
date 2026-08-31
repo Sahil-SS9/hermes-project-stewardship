@@ -58,6 +58,10 @@ def test_disable_feature_409_then_reenable_200(env):
     # Read endpoint fails closed 409...
     r = c.get("/stewardship/v1/projects/dy1/milestones")
     assert r.status_code == 409
+    assert r.json()["error"]["code"] == "feature_disabled"
+    assert r.json()["error"]["fields"] == {
+        "project_id": "dy1", "feature": "milestones"
+    }
     assert "feature 'milestones' is disabled" in r.json()["error"]["message"]
 
     # ...and no data was lost.

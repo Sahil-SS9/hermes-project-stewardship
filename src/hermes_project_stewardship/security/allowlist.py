@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, FrozenSet, List, Optional
 
@@ -49,7 +49,10 @@ def run_allowlisted(
 ) -> CommandResult:
     if not command or not isinstance(command, list):
         raise CommandNotPermitted("command must be a non-empty argv list")
-    exe = Path(command[0]).name
+    requested = str(command[0])
+    exe = Path(requested).name
+    if requested != exe:
+        raise CommandNotPermitted("command executable must be a bare executable name")
     if exe not in allowlist:
         raise CommandNotPermitted(
             f"executable '{exe}' is not on this project's allowlist "
@@ -57,11 +60,16 @@ def run_allowlisted(
         )
     env = {"PATH": "/usr/local/bin:/usr/bin:/bin", "LC_ALL": "C"}
     if env_extra:
+        forbidden = {"PATH", "PYTHONPATH", "LD_PRELOAD", "LD_LIBRARY_PATH"}
+        bad = forbidden.intersection(env_extra)
+        if bad:
+            raise CommandNotPermitted(
+                f"environment override is not permitted for {sorted(bad)}"
+            )
         env.update(env_extra)
-    # Resolve the executable via the *caller's* PATH (shutil.which), not the
-    # stripped child env: allowlist checks match on basename, and venv tools
-    # (e.g. .venv/bin/pytest) live outside the sanitised PATH above.
-    exe_path = shutil.which(str(command[0]))
+    # Resolve only from the same restricted PATH passed to the child. This
+    # prevents caller-PATH shadowing and keeps the allowlist tied to trusted bins.
+    exe_path = shutil.which(exe, path=env["PATH"])
     argv = [exe_path] + [str(c) for c in command[1:]] if exe_path else [str(c) for c in command]
     try:
         proc = subprocess.run(

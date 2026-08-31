@@ -14,17 +14,28 @@ from __future__ import annotations
 import hmac
 import threading
 import time as _time
+from contextvars import ContextVar
 from typing import Callable, Optional
 
-from fastapi import HTTPException, Request
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse, Response
 
 
+_CURRENT_PRINCIPAL: ContextVar[Optional[str]] = ContextVar(
+    "stewardship_current_principal", default=None
+)
+
+
+def current_principal() -> Optional[str]:
+    return _CURRENT_PRINCIPAL.get()
+
+
 class BearerAuthMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, token: str) -> None:
+    def __init__(self, app, token: str, principal: str = "rpc-token") -> None:
         super().__init__(app)
         self._token = token
+        self._principal = principal
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         if request.url.path == "/healthz":
@@ -39,7 +50,27 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
                 status_code=401,
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        return await call_next(request)
+        request.state.principal = self._principal
+        token = _CURRENT_PRINCIPAL.set(self._principal)
+        try:
+            return await call_next(request)
+        finally:
+            _CURRENT_PRINCIPAL.reset(token)
+
+
+class MissingAuthMiddleware(BaseHTTPMiddleware):
+    """Keep standalone deployments inert until an operator configures auth."""
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        if request.url.path == "/healthz":
+            return await call_next(request)
+        return JSONResponse(
+            {"error": {
+                "code": "auth_not_configured",
+                "message": "STEWARD_RPC_TOKEN must be configured",
+            }},
+            status_code=503,
+        )
 
 
 class TokenBucket:
@@ -69,9 +100,12 @@ class TokenBucket:
 class RateLimitMiddleware(BaseHTTPMiddleware):
     MUTATING_METHODS = {"POST", "PUT", "DELETE", "PATCH"}
 
-    def __init__(self, app, requests_per_minute: int = 120) -> None:
+    def __init__(
+        self, app, requests_per_minute: int = 120, max_buckets: int = 2048
+    ) -> None:
         super().__init__(app)
         self._rpm = requests_per_minute
+        self._max_buckets = max(1, max_buckets)
         self._buckets: dict = {}
         self._lock = threading.Lock()
 
@@ -79,6 +113,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         with self._lock:
             b = self._buckets.get(key)
             if b is None:
+                if len(self._buckets) >= self._max_buckets:
+                    oldest = next(iter(self._buckets))
+                    self._buckets.pop(oldest, None)
                 b = TokenBucket(self._rpm)
                 self._buckets[key] = b
             return b

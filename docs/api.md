@@ -1,6 +1,6 @@
 # Dockyard API contract
 
-Version: `0.2.0rc2`
+Version: `0.3.0`
 Base path: `/stewardship/v1`
 
 The running application is authoritative. Use:
@@ -11,8 +11,11 @@ The running application is authoritative. Use:
 
 ## Security and errors
 
-- Optional bearer authentication applies to stewardship routes when configured.
-- Mutating routes are rate-limited.
+- Standalone mode fails closed unless `STEWARD_RPC_TOKEN` is configured.
+- Embedded dashboard mode relies on the Hermes dashboard authentication boundary.
+- Authenticated actor identity is bound server-side; body actor fields cannot
+  override the configured principal (`STEWARD_RPC_PRINCIPAL`, default `rpc-token`).
+- Mutating routes are rate-limited with a bounded client cache.
 - Errors use `{"error":{"code","message","fields?"}}`.
 - Canonical host failures are redacted and fail closed.
 - Actor/interface attribution is explicit on policy and governance mutations.
@@ -58,7 +61,7 @@ snapshot first; failures restore automatically and preserve the failed target.
 
 ## Current limitations
 
-- List pagination and examples are not yet uniform across every older route.
+- List limits are uniformly bounded to 1–500.
 - Saved View filters are presentation metadata; the current Work UI applies
   Board/Table layout but not the full role-aware query roadmap.
 - Timeline is unavailable until canonical scheduling fields exist.

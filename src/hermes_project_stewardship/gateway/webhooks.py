@@ -16,7 +16,7 @@ import hashlib
 import hmac
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Optional
 
 MAX_BODY_BYTES = 256 * 1024
 

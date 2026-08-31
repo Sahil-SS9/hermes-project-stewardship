@@ -129,6 +129,45 @@ def test_wal_and_foreign_keys(store):
     assert fk == 1
 
 
+def test_database_files_are_owner_only(tmp_path):
+    db = tmp_path / "private.db"
+    store = Store(db)
+    try:
+        store.audit(actor="test", interface="test", action="test", subject="test")
+        files = [db, Path(f"{db}-wal"), Path(f"{db}-shm")]
+        assert all(path.stat().st_mode & 0o777 == 0o600 for path in files if path.exists())
+    finally:
+        store.close()
+
+
+def test_migrations_execute_atomically(tmp_path, monkeypatch):
+    from hermes_project_stewardship.persistence import migrations as migrations_module
+    from hermes_project_stewardship.persistence.migrations import Migration
+
+    db = tmp_path / "atomic.db"
+    original = migrations_module.MIGRATIONS
+    failing = Migration(
+        version=max(item.version for item in original) + 1,
+        name="atomic failure witness",
+        upgrade_sql="CREATE TABLE must_rollback(id INTEGER); INVALID SQL;",
+        downgrade_sql="DROP TABLE IF EXISTS must_rollback;",
+    )
+    monkeypatch.setattr(migrations_module, "MIGRATIONS", [*original, failing])
+    monkeypatch.setattr("hermes_project_stewardship.persistence.store.MIGRATIONS", [*original, failing])
+
+    with pytest.raises(sqlite3.DatabaseError):
+        Store(db)
+
+    conn = sqlite3.connect(db)
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='must_rollback'"
+        ).fetchone()
+        assert row is None
+    finally:
+        conn.close()
+
+
 def test_cascade_delete_removes_children(tmp_path):
     s = Store(tmp_path / "c.db")
     svc = None  # keep this test service-free; raw inserts

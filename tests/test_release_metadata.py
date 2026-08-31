@@ -38,3 +38,18 @@ def test_active_release_metadata_is_coherent(tmp_path):
     store.close()
     assert version in (ROOT / "README.md").read_text(encoding="utf-8")
     assert f"[{version}]" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+
+
+def test_vanilla_plugin_distribution_layout_exists():
+    assert (ROOT / "__init__.py").is_file()
+    assert (ROOT / "dashboard/manifest.json").is_file()
+    assert (ROOT / "dashboard/plugin_api.py").is_file()
+    assert (ROOT / "dashboard/dist/index.js").is_file()
+    assert (ROOT / "desktop/plugin.js").is_file()
+
+
+def test_runtime_dependencies_are_declared():
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    plugin_deps = project["project"]["optional-dependencies"]["plugin"]
+    assert any(dep.startswith("httpx2") for dep in plugin_deps)
+    assert any(dep.startswith("fastapi") for dep in plugin_deps)

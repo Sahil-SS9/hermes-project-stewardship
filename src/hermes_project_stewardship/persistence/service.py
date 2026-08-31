@@ -24,16 +24,21 @@ from typing import Any, Dict, List, Optional, Sequence
 from ..domain.constants import (
     ApprovalState,
     InitiativeStatus,
-    KnowledgeType,
     ProjectPhase,
-    TriggerType,
 )
-from ..domain.models import Initiative, Objective
+from ..domain.models import Objective
 from .store import Store, iso
 
 
 class ServiceError(RuntimeError):
     """Refusal surfaced to users (bad state, bad policy, not found)."""
+
+
+class FeatureDisabledError(ServiceError):
+    def __init__(self, project_id: str, feature: str) -> None:
+        super().__init__(f"feature '{feature}' is disabled for project '{project_id}'")
+        self.project_id = project_id
+        self.feature = feature
 
 
 _CONTENT_TYPES = {
@@ -276,8 +281,7 @@ class StewardshipService:
             raise ServiceError(f"unknown feature '{name}'")
         features = self._features_row(project_id)
         if not features.get(name, True):
-            raise ServiceError(
-                f"feature '{name}' is disabled for project '{project_id}'")
+            raise FeatureDisabledError(project_id, name)
 
     def update_features(
         self,
@@ -1111,14 +1115,11 @@ class StewardshipService:
         - suppression windows after rejection;
         - per-project concurrency cap on open initiatives.
         """
-        row = self._require(project_id)
+        self._require(project_id)
         if not rationale.strip():
             raise ServiceError("initiative requires a rationale (anti-busywork rule)")
 
         settings = self.settings(project_id)
-        auto_approve_below_risk = settings["policies"]["release"].get(
-            "auto_approve_below_risk"
-        )
         if requires_approval is None:
             requires_approval = True  # V1 default: everything needs approval
 
@@ -1461,4 +1462,4 @@ class StewardshipService:
         return {"can_approve": bool(row["can_approve"]), "can_trigger": bool(row["can_trigger"])}
 
 
-__all__ = ["StewardshipService", "ServiceError"]
+__all__ = ["StewardshipService", "ServiceError", "FeatureDisabledError"]

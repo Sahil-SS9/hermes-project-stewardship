@@ -11,10 +11,6 @@ from typing import Dict, List, Optional
 
 from .store import Store
 
-
-def _j(value) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"))
-
 from ..dockyard import (
     Actor,
     ActorKind,
@@ -24,6 +20,10 @@ from ..dockyard import (
     WorkItemStatus,
     WorkItemType,
 )
+
+
+def _j(value) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
 def _actor_from(row, id_col: str, kind_col: str) -> Optional[Actor]:
@@ -506,23 +506,30 @@ class DockyardStore:
 
     def milestone_list(self, project_id: str) -> list:
         rows = self.store._conn.execute(
-            "SELECT name, due, created_at, closed_at"
-            " FROM dockyard_milestones WHERE project_id=?"
-            " ORDER BY CASE WHEN closed_at IS NULL THEN 0 ELSE 1 END, due, name",
+            """
+            SELECT m.name, m.due, m.created_at, m.closed_at,
+                   COUNT(mi.item_ref) AS total,
+                   COALESCE(SUM(CASE WHEN w.status='done' THEN 1 ELSE 0 END), 0) AS done
+            FROM dockyard_milestones m
+            LEFT JOIN dockyard_milestone_items mi ON mi.milestone_id=m.id
+            LEFT JOIN dockyard_work_items w ON w.ref=mi.item_ref
+            WHERE m.project_id=?
+            GROUP BY m.id, m.name, m.due, m.created_at, m.closed_at
+            ORDER BY CASE WHEN m.closed_at IS NULL THEN 0 ELSE 1 END, m.due, m.name
+            """,
             (project_id,),
         ).fetchall()
-        out = []
-        for row in rows:
-            prog = self.milestone_progress(project_id, row["name"])
-            out.append({
+        return [
+            {
                 "name": row["name"],
                 "due": row["due"],
                 "created_at": row["created_at"],
                 "closed": bool(row["closed_at"]),
-                "total": prog["total"],
-                "done": prog["done"],
-            })
-        return out
+                "total": row["total"],
+                "done": row["done"],
+            }
+            for row in rows
+        ]
 
     def milestone_update(self, project_id: str, name: str, *, due: Optional[str],
                          closed: Optional[bool]) -> None:

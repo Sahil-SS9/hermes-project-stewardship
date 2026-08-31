@@ -26,6 +26,13 @@ def test_basic_cycle_healthy(engine, enabled):
     assert r["health"]["state"] == "healthy"
 
 
+def test_completed_cycle_runs_retention(engine, enabled, monkeypatch):
+    calls = []
+    monkeypatch.setattr(engine.store, "prune", lambda: calls.append(True) or {})
+    engine.run_cycle(enabled)
+    assert calls == [True]
+
+
 def test_cycle_records_snapshot_and_audit(engine, enabled, svc):
     engine.run_cycle(enabled)
     h = svc.latest_health(enabled)

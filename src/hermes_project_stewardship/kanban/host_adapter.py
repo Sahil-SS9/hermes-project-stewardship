@@ -622,9 +622,12 @@ def create_project_kanban_adapter(
 ) -> ProjectKanbanHostAdapter:
     """Compose Dockyard against the active Hermes host implementation."""
     try:
-        host_module = import_module("hermes_cli.project_kanban_host")
         constants_module = import_module("hermes_constants")
-        host_type = getattr(host_module, "ProjectKanbanHost")
+        try:
+            host_module = import_module("hermes_cli.project_kanban_host")
+            host_type = getattr(host_module, "ProjectKanbanHost")
+        except (ImportError, AttributeError):
+            from .vanilla_host import ProjectKanbanHost as host_type
         resolved_home = (
             Path(hermes_home)
             if hermes_home is not None

@@ -21,7 +21,7 @@ gives the engine three defences:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 BOUNDARY_BEGIN = "<<<UNTRUSTED_CONTENT origin={origin} >>>"

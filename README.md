@@ -6,7 +6,8 @@ Hermes can complete tasks. Stewardship makes a team of Hermes profiles
 **responsible for a project over time**: it verifies reality before acting,
 turns gaps into evidence-backed initiatives, executes through existing Kanban,
 enforces explicit autonomy policy, and measures whether the project actually
-improved — from every surface (CLI, RPC API, Desktop panel, Discord/gateway).
+improved. CLI, RPC, dashboard and Desktop share one backend; authenticated
+approval remains on RPC/dashboard and permission-bound gateway adapters.
 
 > Status: **v0.3.0 local release.** O1 complete work management
 > and O2 initiative-to-observation delivery are implemented. The release is
@@ -79,11 +80,26 @@ Requires Python 3.10+. No third-party runtime dependencies for the core engine.
 ```bash
 git clone https://github.com/Sahil-SS9/hermes-project-stewardship.git
 cd hermes-project-stewardship
-uv venv && uv pip install -e ".[dev]"
+uv sync --locked --extra dev --extra plugin
 hermes verify --json         # bootstrap, full suite and readiness smoke
-stewardctl --help           # CLI
-uvicorn hermes_project_stewardship.api.server:app --port 9310   # RPC API
+stewardctl --help            # standalone CLI
+export STEWARD_RPC_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+uvicorn hermes_project_stewardship.api.server:app --host 127.0.0.1 --port 9310
 ```
+
+### Vanilla Hermes plugin install
+
+Install the repository as a Hermes directory plugin so its Python tools,
+bundled skill, dashboard and Desktop assets stay together:
+
+```bash
+hermes plugins install Sahil-SS9/hermes-project-stewardship --enable
+```
+
+The plugin uses only shipped vanilla APIs: `register_tool`, `register_command`,
+`register_cli_command`, `register_skill`, dashboard `manifest.json`/`router`,
+and the Desktop plugin SDK. Canonical Projects/Kanban integration falls back
+to the bundled vanilla adapter when `hermes_cli.project_kanban_host` is absent.
 
 ### Operational export and isolated restore
 

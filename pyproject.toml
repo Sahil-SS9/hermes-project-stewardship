@@ -26,7 +26,14 @@ dependencies = []
 
 [project.optional-dependencies]
 desktop-panel = ["fastapi", "uvicorn"]
-dev = ["pytest>=7", "pytest-timeout", "httpx2"]
+plugin = ["fastapi", "uvicorn", "httpx2"]
+dev = [
+  "pytest>=7", "pytest-timeout", "pytest-cov",
+  "httpx2", "ruff==0.15.10", "ty==0.0.21", "pip-audit>=2.9",
+]
+
+[project.entry-points."hermes_agent.plugins"]
+project-stewardship = "hermes_project_stewardship.plugin"
 
 [project.scripts]
 stewardctl = "hermes_project_stewardship.cli.app:main"
@@ -40,3 +47,8 @@ testpaths = ["tests"]
 timeout = 60
 addopts = "-q"
 filterwarnings = []
+
+[tool.coverage.run]
+# Optional adapter is exercised against a real vanilla Hermes checkout in the
+# integration smoke; importing it without Hermes installed is intentionally lazy.
+omit = ["src/hermes_project_stewardship/kanban/vanilla_host.py"]

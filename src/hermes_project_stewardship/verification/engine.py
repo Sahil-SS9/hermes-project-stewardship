@@ -16,15 +16,14 @@ Contradiction handling (fail-closed):
 from __future__ import annotations
 
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Callable, List, Optional
 
 from ..domain.constants import HealthState, Severity
 from ..domain.models import Contradiction, Evidence, VerificationVerdict
 from ..security.untrusted import (
     EvidencePrefix,
-    make_evidence_entry,
     scan_text,
     worst_severity,
 )
@@ -117,7 +116,7 @@ class VerificationEngine:
                 root,
             )
             out = proc.stdout.decode("utf-8", errors="replace")
-            lines = [l for l in out.splitlines() if l.strip()]
+            lines = [line for line in out.splitlines() if line.strip()]
             return (
                 Evidence(
                     kind="git_log",

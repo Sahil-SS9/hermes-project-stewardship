@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, FrozenSet, List, Optional
+from typing import FrozenSet, Optional
 
 from ..domain.models import Objective, ObjectiveResult
 from ..security.allowlist import CommandNotPermitted, run_allowlisted
@@ -138,7 +138,7 @@ class ObjectiveEvaluator:
         """Exit-code-first semantics with optional numeric stdout override."""
         if result.timed_out:
             return None
-        lines = [l.strip() for l in (result.stdout or "").splitlines() if l.strip()]
+        lines = [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
         if lines:
             m = re.fullmatch(r"-?\d+(?:\.\d+)?", lines[-1])
             if m:

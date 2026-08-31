@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, cast, Dict, List, NoReturn, Optional
 
 try:
-    from fastapi import APIRouter, FastAPI, HTTPException, Request
+    from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
     from pydantic import BaseModel, ConfigDict, Field
 except ImportError as e:  # pragma: no cover
     raise ImportError(
@@ -51,12 +51,18 @@ from ..persistence import (
 )
 from ..persistence.dockyard_service import DockyardService
 from ..persistence.dockyard_integration import DockyardIntegration, IntegrationError
-from ..persistence.service import ServiceError, StewardshipService
+from ..persistence.service import (
+    FeatureDisabledError,
+    ServiceError,
+    StewardshipService,
+)
 from ..persistence.workflow_service import WorkflowService
 from ..persistence.store import Store
 from .middleware import (
     BearerAuthMiddleware,
+    MissingAuthMiddleware,
     RateLimitMiddleware,
+    current_principal,
     error_envelope_handler,
 )
 
@@ -350,9 +356,11 @@ def create_app(
     db_path: Optional[Path] = None,
     *,
     auth_token: Optional[str] = None,
+    auth_principal: str = "rpc-token",
     rate_limit_rpm: int = 120,
     kanban_adapter: KanbanAdapter | None = None,
 ) -> FastAPI:
+    embedded = store is not None
     if store is None:
         store = Store(db_path or Path("./stewardship.db"))
     svc = StewardshipService(store)
@@ -394,7 +402,13 @@ def create_app(
     app.state.canonical_work_service = work
     token = auth_token or os.environ.get("STEWARD_RPC_TOKEN")
     if token:
-        app.add_middleware(BearerAuthMiddleware, token=token)
+        app.add_middleware(
+            BearerAuthMiddleware,
+            token=token,
+            principal=auth_principal or os.environ.get("STEWARD_RPC_PRINCIPAL", "rpc-token"),
+        )
+    elif not embedded:
+        app.add_middleware(MissingAuthMiddleware)
     app.add_middleware(RateLimitMiddleware, requests_per_minute=rate_limit_rpm)
 
     router = APIRouter(prefix="/stewardship/v1")
@@ -426,7 +440,11 @@ def create_app(
 
     @router.get("/projects/{project_id}/settings")
     def settings(project_id: str):
-        return svc.settings(project_id, include_disabled=True)
+        result = svc.settings(project_id, include_disabled=True)
+        verification = result.get("policies", {}).get("verification", {})
+        if "webhook_secret" in verification:
+            verification["webhook_secret"] = "***"
+        return result
 
     @router.get("/projects/{project_id}/features")
     def features(project_id: str):
@@ -436,13 +454,13 @@ def create_app(
     def patch_features(project_id: str, body: FeaturePatch):
         return {"features": svc.update_features(
             project_id, body.features,
-            actor=body.actor, interface=body.interface,
+            actor=_principal_id(body.actor), interface=body.interface,
         )}
 
     @router.patch("/projects/{project_id}/settings")
     def patch_settings(project_id: str, body: SettingsPatch):
         changes = body.model_dump(exclude_unset=True)
-        actor = changes.pop("actor", body.actor)
+        actor = _principal_id(changes.pop("actor", body.actor))
         interface = changes.pop("interface", body.interface)
         return svc.update_settings(
             project_id, actor=actor, interface=interface, **changes
@@ -483,7 +501,7 @@ def create_app(
             command=body.command,
             integration=body.integration,
             window=body.window,
-            actor=body.actor,
+            actor=_principal_id(body.actor),
             interface=body.interface,
         )
 
@@ -492,7 +510,7 @@ def create_app(
         project_id: str, objective_id: int, body: ObjectivePatch
     ):
         values = body.model_dump(exclude_unset=True)
-        actor = values.pop("actor", body.actor)
+        actor = _principal_id(values.pop("actor", body.actor))
         interface = values.pop("interface", body.interface)
         return svc.update_objective(
             project_id,
@@ -509,7 +527,7 @@ def create_app(
         return svc.archive_objective(
             project_id,
             objective_id,
-            actor=body.actor,
+            actor=_principal_id(body.actor),
             interface=body.interface,
         )
 
@@ -520,7 +538,7 @@ def create_app(
         return svc.remove_objective(
             project_id,
             objective_id,
-            actor=body.actor,
+            actor=_principal_id(body.actor),
             interface=body.interface,
         )
 
@@ -531,13 +549,13 @@ def create_app(
     @router.post("/projects/{project_id}/mission/archive")
     def archive_mission(project_id: str, body: ApprovalAction):
         return svc.archive_mission(
-            project_id, actor=body.actor, interface=body.interface
+            project_id, actor=_principal_id(body.actor), interface=body.interface
         )
 
     @router.delete("/projects/{project_id}/mission")
     def remove_mission(project_id: str, body: ApprovalAction):
         return svc.remove_mission(
-            project_id, actor=body.actor, interface=body.interface
+            project_id, actor=_principal_id(body.actor), interface=body.interface
         )
 
     @router.get("/projects/{project_id}/content")
@@ -555,7 +573,7 @@ def create_app(
             filename=body.filename,
             media_type=body.media_type,
             content=content,
-            actor=body.actor,
+            actor=_principal_id(body.actor),
             interface=body.interface,
         )
 
@@ -596,8 +614,8 @@ def create_app(
             return integration.approve(
                 ref,
                 actor=Actor(
-                    id=body.actor,
-                    display_name=body.actor,
+                    id=_principal_id(body.actor),
+                    display_name=_principal_id(body.actor),
                     kind=ActorKind.HUMAN,
                 ),
             )
@@ -606,7 +624,7 @@ def create_app(
 
     @router.post("/initiatives/{ref}/reject")
     def reject(ref: str, body: ApprovalAction):
-        return svc.reject_initiative(ref, actor=body.actor, interface=body.interface)
+        return svc.reject_initiative(ref, actor=_principal_id(body.actor), interface=body.interface)
 
     @router.post("/initiatives/{ref}/bind-board")
     def bind_board(ref: str, body: BindBoardRequest):
@@ -623,9 +641,9 @@ def create_app(
                 outcome=body.outcome,
                 regressed=body.regressed,
                 actor=Actor(
-                    id=body.actor_id,
-                    display_name=body.actor_id,
-                    kind=ActorKind(body.actor_kind),
+                    id=_principal_id(body.actor_id),
+                    display_name=_principal_id(body.actor_id),
+                    kind=ActorKind.HUMAN if current_principal() else ActorKind(body.actor_kind),
                 ),
             )
         except (ServiceError, IntegrationError) as exc:
@@ -643,10 +661,11 @@ def create_app(
             raise HTTPException(409, str(exc)) from None
 
     @router.post("/gateway/command")
-    def gateway_command(body: GatewayCommandBody):
+    def gateway_command(body: GatewayCommandBody, request: Request):
+        sender_id = getattr(request.state, "principal", None) or body.sender_id
         req = CommandRequest(
             platform=body.platform,
-            sender_id=body.sender_id,
+            sender_id=sender_id,
             command=body.command,
             project_id=body.project_id,
             args=body.args,
@@ -676,7 +695,11 @@ def create_app(
         return {"accepted": True, "detail": res.detail, "trigger_key": res.trigger_key}
 
     @router.get("/projects/{project_id}/events")
-    def events(project_id: str, limit: int = 50, event_type: Optional[str] = None):
+    def events(
+        project_id: str,
+        limit: int = Query(50, ge=1, le=500),
+        event_type: Optional[str] = None,
+    ):
         return {"events": bus.recent(project_id=project_id, limit=limit,
                                      event_type=event_type)}
 
@@ -692,11 +715,16 @@ def create_app(
 
     # ------------------- Dockyard work management (G1) ----------------- #
 
+    def _principal_id(candidate: str) -> str:
+        return current_principal() or candidate
+
     def _actor(actor_id: str, actor_kind: str) -> Actor:
         from ..dockyard import Actor as _Actor, ActorKind as _ActorKind
 
-        return _Actor(id=actor_id, display_name=actor_id,
-                      kind=_ActorKind(actor_kind))
+        bound_id = _principal_id(actor_id)
+        bound_kind = "human" if current_principal() else actor_kind
+        return _Actor(id=bound_id, display_name=bound_id,
+                      kind=_ActorKind(bound_kind))
 
     def _raise_work_error(exc: Exception) -> NoReturn:
         if isinstance(exc, CanonicalWorkPartialError):
@@ -1017,7 +1045,7 @@ def create_app(
             raise HTTPException(422, str(exc))
 
     @router.get("/projects/{project_id}/reports")
-    def reports_list(project_id: str, limit: int = 20):
+    def reports_list(project_id: str, limit: int = Query(20, ge=1, le=500)):
         return {"reports": dy.reports_list(project_id, limit=limit)}
 
     @router.get("/projects/{project_id}/reports/{report_id}")
@@ -1126,7 +1154,7 @@ def create_app(
         return sent
 
     @router.get("/bot-groups/{name}/messages")
-    def a2a_feed(name: str, limit: int = 50):
+    def a2a_feed(name: str, limit: int = Query(50, ge=1, le=500)):
         try:
             feed = dy.a2a_feed(name, limit=limit)
         except Exception as e:
@@ -1272,7 +1300,7 @@ def create_app(
             ) from None
 
         store.audit(
-            actor=body.actor_id,
+            actor=_principal_id(body.actor_id),
             interface="dockyard:human",
             action="project.onboarded",
             subject=body.project_id,
@@ -1297,16 +1325,21 @@ def create_app(
     async def http_envelope(request: Request, exc: HTTPException):
         return error_envelope_handler(request, exc)
 
+    @app.exception_handler(FeatureDisabledError)
+    async def feature_disabled_envelope(request: Request, exc: FeatureDisabledError):
+        return error_envelope_handler(
+            request,
+            HTTPException(409, {
+                "code": "feature_disabled",
+                "message": str(exc),
+                "fields": {"project_id": exc.project_id, "feature": exc.feature},
+            }),
+        )
+
     @app.exception_handler(ServiceError)
     async def service_envelope(request: Request, exc: ServiceError):
         msg = str(exc).lower()
         not_found = "not enabled" in msg or "no such" in msg
-        # "disabled" alone is ambiguous: stewardship disabled = 404, but a
-        # togglable feature being off is a conflict the client can flip (409).
-        feature_disabled = "feature '" in msg and "is disabled" in msg
-        if feature_disabled:
-            return error_envelope_handler(
-                request, HTTPException(409, str(exc)))
         return error_envelope_handler(
             request, HTTPException(404 if not_found else 409, str(exc))
         )

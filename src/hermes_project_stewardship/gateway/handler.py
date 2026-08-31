@@ -12,7 +12,7 @@ current state with `already_done=True` rather than erroring — safe redelivery.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from ..persistence.service import ServiceError, StewardshipService
 from .errors import CommandError

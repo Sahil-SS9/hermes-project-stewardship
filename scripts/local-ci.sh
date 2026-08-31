@@ -62,10 +62,13 @@ run_gate() { # name target command...
   fi
 }
 
-# --- Gate 1: install check (mirrors CI Install step; -e . plus test deps).
+# --- Gate 1: lockfile is current (non-mutating reproducibility check).
+run_gate "lockfile" "uv lock --check" uv lock --check
+
+# --- Gate 2: install check (environment must contain declared extras).
 if ! "$PY" -c "import hermes_project_stewardship, httpx2, pytest" >/dev/null 2>&1; then
-  echo "FATAL: env incomplete (need httpx2). Sync with:" >&2
-  echo "  VIRTUAL_ENV=<venv> uv pip install -e \".[dev,desktop-panel]\" pytest-cov" >&2
+  echo "FATAL: env incomplete. Sync with:" >&2
+  echo "  uv sync --locked --extra dev --extra plugin" >&2
   exit 1
 fi
 pass "install-extras" "imports ok"
@@ -76,7 +79,16 @@ run_gate "suite+coverage" "fail-under=$COV_FAIL_UNDER" \
   "$PY" -m pytest --cov=hermes_project_stewardship --cov-report=term \
   --cov-report=json:/tmp/dy-coverage.json --cov-fail-under=$COV_FAIL_UNDER
 
-# --- Gate 3: byte-compile (mirrors ci.yml compileall step).
+# --- Gate 3: static quality/security checks.
+run_gate "ruff" "src" "$PY" -m ruff check src
+run_gate "type-check" "critical boundaries" "$PY" -m ty check \
+  src/hermes_project_stewardship/security/allowlist.py \
+  src/hermes_project_stewardship/api/middleware.py \
+  src/hermes_project_stewardship/plugin.py \
+  src/hermes_project_stewardship/persistence/store.py
+run_gate "dependency-audit" "pip-audit" "$PY" -m pip_audit
+
+# --- Gate 4: byte-compile (mirrors ci.yml compileall step).
 if [ "$QUICK" -eq 0 ]; then
   run_gate "byte-compile" "src+tests" \
     "$PY" -m compileall -q src tests
@@ -91,7 +103,10 @@ if [ "$WITH_NODE" -eq 1 ]; then
   if command -v npm >/dev/null 2>&1; then
     # pushd/popd (not subshells) so RESULTS propagate to the JSON summary.
     pushd hermes_dockyard_plugin/dashboard >/dev/null
+    run_gate "dashboard-typecheck" "tsc --noEmit" npx tsc --noEmit
     run_gate "dashboard-tests" "node --test" npm test
+    run_gate "dashboard-build" "npm run build" npm run build
+    run_gate "dashboard-audit" "npm audit" npm audit --omit=dev
     popd >/dev/null
     pushd hermes_dockyard_plugin/desktop >/dev/null
     run_gate "desktop-harness" "node --test" \

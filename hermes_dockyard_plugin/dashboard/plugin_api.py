@@ -61,6 +61,7 @@ _app = create_app(_store)
 # Hermaguard fixes: EAGER initialisation (no lazy-init race, HG-CRITICAL),
 # explicit timeouts (HG-HIGH), env-configurable base URL (HG-MEDIUM).
 _BASE_URL = os.environ.get("DOCKYARD_PLUGIN_URL", "http://dockyard.local")
+_ACTOR_ID = os.environ.get("DOCKYARD_ACTOR_ID", "dashboard-user")
 _client = httpx.AsyncClient(
     transport=httpx.ASGITransport(app=_app),
     base_url=_BASE_URL,
@@ -375,7 +376,7 @@ async def project_settings(project_id: str) -> dict:
 async def patch_project_settings(project_id: str, body: SettingsPatchBody) -> dict:
     pid = quote(project_id, safe="")
     payload = body.model_dump(exclude_unset=True)
-    payload.update({"actor": "sahil", "interface": "dockyard:human"})
+    payload.update({"actor": _ACTOR_ID, "interface": "dockyard:human"})
     return await _proxy(
         "PATCH", f"/stewardship/v1/projects/{pid}/settings", payload
     )
@@ -400,7 +401,7 @@ async def create_project_objective(
     pid = quote(project_id, safe="")
     payload = {
         **body.model_dump(),
-        "actor": "sahil",
+        "actor": _ACTOR_ID,
         "interface": "dockyard:human",
     }
     return await _proxy(
@@ -415,7 +416,7 @@ async def patch_project_objective(
     pid = quote(project_id, safe="")
     payload = {
         **body.model_dump(exclude_unset=True),
-        "actor": "sahil",
+        "actor": _ACTOR_ID,
         "interface": "dockyard:human",
     }
     return await _proxy(
@@ -431,7 +432,7 @@ async def archive_project_objective(project_id: str, objective_id: int) -> dict:
     return await _proxy(
         "POST",
         f"/stewardship/v1/projects/{pid}/objectives/{objective_id}/archive",
-        {"actor": "sahil", "interface": "dockyard:human"},
+        {"actor": _ACTOR_ID, "interface": "dockyard:human"},
     )
 
 
@@ -441,7 +442,7 @@ async def remove_project_objective(project_id: str, objective_id: int) -> dict:
     return await _proxy(
         "DELETE",
         f"/stewardship/v1/projects/{pid}/objectives/{objective_id}",
-        {"actor": "sahil", "interface": "dockyard:human"},
+        {"actor": _ACTOR_ID, "interface": "dockyard:human"},
     )
 
 
@@ -459,7 +460,7 @@ async def archive_project_mission(project_id: str) -> dict:
     return await _proxy(
         "POST",
         f"/stewardship/v1/projects/{pid}/mission/archive",
-        {"actor": "sahil", "interface": "dockyard:human"},
+        {"actor": _ACTOR_ID, "interface": "dockyard:human"},
     )
 
 
@@ -469,7 +470,7 @@ async def remove_project_mission(project_id: str) -> dict:
     return await _proxy(
         "DELETE",
         f"/stewardship/v1/projects/{pid}/mission",
-        {"actor": "sahil", "interface": "dockyard:human"},
+        {"actor": _ACTOR_ID, "interface": "dockyard:human"},
     )
 
 
@@ -486,7 +487,7 @@ async def upload_project_content(
     pid = quote(project_id, safe="")
     payload = {
         **body.model_dump(),
-        "actor": "sahil",
+        "actor": _ACTOR_ID,
         "interface": "dockyard:human",
     }
     return await _proxy(
@@ -508,7 +509,7 @@ async def generate_project_report(project_id: str, body: ReportBody) -> dict:
     pid = quote(project_id, safe="")
     payload = {
         **body.model_dump(),
-        "actor_id": "sahil",
+        "actor_id": _ACTOR_ID,
         "actor_kind": "human",
     }
     return await _proxy(
@@ -660,7 +661,7 @@ async def transition_work_item(project_id: str, ref: str,
     item = quote(ref, safe="")
     return await _proxy(
         "POST", f"/stewardship/v1/projects/{pid}/work-items/{item}/transition",
-        {"status": body.status, "actor_id": "sahil", "actor_kind": "human"})
+        {"status": body.status, "actor_id": _ACTOR_ID, "actor_kind": "human"})
 
 
 @plugin_api.patch("/projects/{project_id}/work-items/{ref}")
@@ -670,7 +671,7 @@ async def update_work_item(project_id: str, ref: str, body: WorkUpdateBody) -> d
     return await _proxy(
         "PATCH",
         f"/stewardship/v1/projects/{pid}/work-items/{item}",
-        {**body.model_dump(exclude_unset=True), "actor_id": "sahil", "actor_kind": "human"},
+        {**body.model_dump(exclude_unset=True), "actor_id": _ACTOR_ID, "actor_kind": "human"},
     )
 
 
@@ -681,7 +682,7 @@ async def assign_work_item(project_id: str, ref: str, body: WorkAssignBody) -> d
     return await _proxy(
         "POST",
         f"/stewardship/v1/projects/{pid}/work-items/{item}/assign",
-        {"assignee_id": body.assignee_id, "actor_id": "sahil", "actor_kind": "human"},
+        {"assignee_id": body.assignee_id, "actor_id": _ACTOR_ID, "actor_kind": "human"},
     )
 
 
@@ -692,7 +693,7 @@ async def add_work_dependency(project_id: str, ref: str, body: DependencyBody) -
     return await _proxy(
         "POST",
         f"/stewardship/v1/projects/{pid}/work-items/{item}/dependencies",
-        {"dependency_ref": body.dependency_ref, "actor_id": "sahil", "actor_kind": "human"},
+        {"dependency_ref": body.dependency_ref, "actor_id": _ACTOR_ID, "actor_kind": "human"},
     )
 
 
@@ -706,7 +707,7 @@ async def remove_work_dependency(project_id: str, ref: str, dependency_ref: str)
     return await _proxy(
         "POST",
         f"/stewardship/v1/projects/{pid}/work-items/{item}/dependencies/{dependency}/remove",
-        {"actor_id": "sahil", "actor_kind": "human"},
+        {"actor_id": _ACTOR_ID, "actor_kind": "human"},
     )
 
 
@@ -721,7 +722,7 @@ async def create_queued_item(project_id: str, body: QueuedItemBody) -> dict:
     pid = quote(project_id, safe="")
     payload = {
         **body.model_dump(),
-        "creator_id": "sahil",
+        "creator_id": _ACTOR_ID,
         "creator_kind": "human",
     }
     return await _proxy(
@@ -733,7 +734,7 @@ async def add_to_backlog(project_id: str, body: BacklogAddBody) -> dict:
     pid = quote(project_id, safe="")
     return await _proxy(
         "POST", f"/stewardship/v1/projects/{pid}/backlog",
-        {**body.model_dump(), "actor_id": "sahil", "actor_kind": "human"})
+        {**body.model_dump(), "actor_id": _ACTOR_ID, "actor_kind": "human"})
 
 
 @plugin_api.post("/projects/{project_id}/backlog/{ref}/rerank")
@@ -743,7 +744,7 @@ async def rerank_backlog(project_id: str, ref: str,
     item = quote(ref, safe="")
     return await _proxy(
         "POST", f"/stewardship/v1/projects/{pid}/backlog/{item}/rerank",
-        {**body.model_dump(), "actor_id": "sahil", "actor_kind": "human"})
+        {**body.model_dump(), "actor_id": _ACTOR_ID, "actor_kind": "human"})
 
 
 @plugin_api.get("/projects/{project_id}/views")
@@ -751,7 +752,7 @@ async def project_views(project_id: str) -> dict:
     pid = quote(project_id, safe="")
     return await _proxy(
         "GET", f"/stewardship/v1/projects/{pid}/views",
-        params={"actor_id": "sahil", "actor_kind": "human"})
+        params={"actor_id": _ACTOR_ID, "actor_kind": "human"})
 
 
 @plugin_api.put("/projects/{project_id}/views")
@@ -759,7 +760,7 @@ async def save_project_view(project_id: str, body: ViewSaveBody) -> dict:
     pid = quote(project_id, safe="")
     return await _proxy(
         "PUT", f"/stewardship/v1/projects/{pid}/views",
-        {**body.model_dump(), "actor_id": "sahil", "actor_kind": "human"})
+        {**body.model_dump(), "actor_id": _ACTOR_ID, "actor_kind": "human"})
 
 
 @plugin_api.post("/projects/{project_id}/freeze")
@@ -795,7 +796,7 @@ async def re_enable_project(project_id: str) -> dict:
 @plugin_api.post("/onboard")
 async def onboard(body: OnboardBody) -> dict:
     payload = body.model_dump()
-    payload["actor_id"] = "sahil"
+    payload["actor_id"] = _ACTOR_ID
     return await _proxy("POST", "/stewardship/v1/onboard", payload)
 
 
@@ -805,7 +806,7 @@ async def approve(ref: str) -> dict:
     r = quote(ref, safe="")
     return await _proxy(
         "POST", f"/stewardship/v1/initiatives/{r}/approve",
-        {"actor": "sahil", "interface": "dockyard:human"})
+        {"actor": _ACTOR_ID, "interface": "dockyard:human"})
 
 
 @plugin_api.post("/initiatives/{ref}/reject")
@@ -813,7 +814,7 @@ async def reject(ref: str) -> dict:
     r = quote(ref, safe="")
     return await _proxy(
         "POST", f"/stewardship/v1/initiatives/{r}/reject",
-        {"actor": "sahil", "interface": "dockyard:human"})
+        {"actor": _ACTOR_ID, "interface": "dockyard:human"})
 
 
 @plugin_api.post("/initiatives/{ref}/complete")
@@ -825,7 +826,7 @@ async def complete_initiative(ref: str, body: InitiativeCompleteBody) -> dict:
         {
             "outcome": {"verified": body.verified},
             "regressed": body.regressed,
-            "actor_id": "sahil",
+            "actor_id": _ACTOR_ID,
             "actor_kind": "human",
         },
     )
@@ -855,4 +856,4 @@ async def workflow_runs(project_id: str, name: str) -> dict:
 async def ack(notification_id: int) -> dict:
     return await _proxy(
         "POST", f"/stewardship/v1/notifications/{notification_id}/ack",
-        {"actor_id": "sahil"})
+        {"actor_id": _ACTOR_ID})

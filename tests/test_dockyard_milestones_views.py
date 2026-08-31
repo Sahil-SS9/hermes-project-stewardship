@@ -130,6 +130,21 @@ def test_milestone_list_api_orders_and_counts(env, human):
     assert soon["due"] == "2026-09-01"
 
 
+def test_milestone_list_uses_one_aggregate_query(env, human):
+    _, svc, store = env
+    for name in ("m1", "m2", "m3"):
+        svc.milestone_create("dy1", name, due="2026-12-01", actor=human)
+    statements = []
+    store._conn.set_trace_callback(statements.append)
+    try:
+        rows = svc.milestone_list("dy1")
+    finally:
+        store._conn.set_trace_callback(None)
+    selects = [sql for sql in statements if sql.lstrip().upper().startswith("SELECT")]
+    assert len(rows) == 3
+    assert len(selects) == 1
+
+
 def test_milestone_list_unknown_project_404(env):
     c, _, _ = env
     r = c.get("/stewardship/v1/projects/ghost/milestones")

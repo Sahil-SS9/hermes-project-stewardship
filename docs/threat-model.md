@@ -44,8 +44,9 @@ do not depend on detection quality.
 
 Objective evaluators run commands in project context. Controls:
 
-- argv lists only; `shell=False`; no interpolation ever;
-- per-project executable allowlist (default read-only/build tools);
+- bare executable names only; absolute/relative paths are rejected;
+- resolution uses the same fixed trusted PATH passed to the child;
+- per-project executable allowlist;
 - hard timeout + 64 KiB output caps;
 - refusal recorded as failed objective, not an exception path.
 

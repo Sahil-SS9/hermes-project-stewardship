@@ -71,6 +71,37 @@ def test_non_allowlisted_refused(tmp_path: Path):
         run_allowlisted(["definitely-not-allowed"], cwd=tmp_path, allowlist={"git"})
 
 
+@pytest.mark.parametrize("command", [["/tmp/git"], ["../git"], ["bin/git"]])
+def test_allowlist_rejects_executable_paths(tmp_path: Path, command):
+    """An allowed basename must not authorise an attacker-selected binary."""
+    with pytest.raises(CommandNotPermitted, match="bare executable"):
+        run_allowlisted(command, cwd=tmp_path, allowlist=frozenset({"git"}))
+
+
+def test_allowlist_resolves_from_sanitised_path(tmp_path: Path, monkeypatch):
+    evil = tmp_path / "git"
+    evil.write_text("#!/bin/sh\nprintf pwned\n", encoding="utf-8")
+    evil.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}:/usr/bin:/bin")
+
+    result = run_allowlisted(
+        ["git", "--version"], cwd=tmp_path, allowlist=frozenset({"git"})
+    )
+
+    assert result.ok
+    assert "pwned" not in result.stdout
+
+
+def test_allowlist_rejects_environment_path_override(tmp_path: Path):
+    with pytest.raises(CommandNotPermitted, match="environment override"):
+        run_allowlisted(
+            ["git", "--version"],
+            cwd=tmp_path,
+            allowlist=frozenset({"git"}),
+            env_extra={"PATH": str(tmp_path)},
+        )
+
+
 def test_timeout_kills(tmp_path: Path):
     import subprocess
 
