@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hermes-project-stewardship"
-version = "0.2.0rc2"
+version = "0.3.0"
 description = "Durable project ownership for Hermes agent fleets: verified cycles, bounded initiatives, explicit autonomy policy."
 readme = "README.md"
 requires-python = ">=3.10"

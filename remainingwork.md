@@ -1,6 +1,24 @@
 # Remaining work and current state
 
-Updated: 26/08/2026 (addendum 30/08/2026)
+Updated: 26/08/2026 (addenda 30/08/2026, 31/08/2026)
+
+## Addendum 31/08/2026 — 0.3.0 release cut
+
+- Version bumped to `0.3.0` across pyproject, plugin.yaml, dashboard
+  manifest/package/lock, CLI, API metadata; README status line updated.
+- New in this release: DY-P1-03 saved views (validated v1 queries,
+  role-aware sharing, deep links), rolled-up portfolio dashboard
+  (attention-first, derived per-project status), DY-FT-01 central feature
+  toggles, read-only workflow canvas, milestones UI.
+- Evidence run 2026-08-31: local-ci.sh ALL GATES PASS (434 passed,
+  5 skipped, coverage gate 87 green); `hermes verify --json` ok:true,
+  readiness HTTP 200; dashboard build/tests 4/4; portfolio tab verified
+  end-to-end in real Chrome via CDP.
+- Known residual debt (documented, non-blocking): view-items milestone
+  progress still resolves per milestone inside milestone lists (cor-003);
+  HTTP status for feature-disabled uses message matching rather than
+  structured codes (cor-006); GitHub Actions remains red-by-infra until the
+  account-level rate limit resets (~07/09/2026).
 
 ## Addendum 30/08/2026 — CI reality correction and local mirror
 

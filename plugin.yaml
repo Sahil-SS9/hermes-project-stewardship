@@ -2,7 +2,7 @@
 # See docs/architecture.md §Hermes integration contracts for how these
 # registration points map onto upstream plugin capabilities.
 name: hermes-project-stewardship
-version: 0.2.0rc2
+version: 0.3.0
 description: >
   Durable project ownership: verified stewardship cycles, evidence-backed
   initiatives, explicit autonomy policy, approvals from every surface.

@@ -4,9 +4,8 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-08-31
+## [0.3.0] - 2026-08-31
 
-### Added
 ### Added
 - **Central feature toggles (DY-FT-01)**: per-project switches that turn
   Dockyard surfaces (workflow canvas, milestones, initiatives/delivery,
@@ -20,7 +19,7 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   the fleet overview; disabled tabs hide immediately and reappear on
   re-enable. Verified end-to-end in real Chrome (hide -> 409 -> re-enable ->
   tab + API restored, core toggle refused).
-- **Milestones UI (DY-P1-02)**- **Milestones UI (DY-P1-02)**: Work tab gains a collapsible Milestones panel
+- **Milestones UI (DY-P1-02)**: Work tab gains a collapsible Milestones panel
   backed by a new milestones surface. Backend: `GET /projects/{id}/milestones`
   (ordered open-first/by-due, closed-last) and
   `PATCH /projects/{id}/milestones/{name}` for due-date changes and
@@ -46,8 +45,29 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   Backed by the existing work-detail endpoint - no new routes.
 - scripts/local-ci.sh is the authoritative CI evidence source while GitHub
   Actions is rate-limited (see 2026-08-30 addendum in remainingwork.md).
+- **Saved views with validated queries (DY-P1-03)**: views are no longer
+  cosmetic. Versioned query schema (v1) with strict validation and legacy
+  normalisation; real filter application (status, assignee, labels,
+  milestone); role-aware sharing (owner + `shared_with`); dedicated
+  view-run endpoint (`GET /projects/{id}/views/{name}/items`); deep links
+  (`#/work/<view>`) restore the Work tab with the view preselected.
+  An empty milestone match filters to nothing — never silently skipped.
+- **Rolled-up portfolio dashboard**: cross-project cockpit derived from a
+  single backend pass (`GET /portfolio`). Per-project standing with
+  derived status (on_track / at_risk / stalled / idle), attention
+  counters, next-milestone rollup and status mix. Attention strip renders
+  only when something actually needs attention; status is text-first with
+  colour as a secondary cue; tabular numerals; reuses the approved v4
+  palette with no new runtime dependencies.
 
 ### Fixed
+- Date-only `due` strings (API-accepted shape, e.g. `2026-08-01`) crashed
+  the portfolio rollup with a naive/aware datetime TypeError; all ISO
+  parsing now normalises to UTC.
+- View-items milestone map now resolved in one query (was one per
+  milestone); feature-toggle read-modify-write moved inside the store
+  transaction (no lost updates under concurrent PATCHes); dashboard
+  no longer double-fetches features or keeps split-brain toggle state.
 - ci.yml install extras + coverage gate pinned to measured 87 (Actions had
   never run green; root causes verified 30/08).
 - plugin.yaml desktop surface realigned to the shipped hermes_dockyard_plugin

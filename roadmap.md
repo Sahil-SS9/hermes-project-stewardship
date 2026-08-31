@@ -176,25 +176,31 @@ Acceptance:
 
 ### DY-P1-03 - Real saved views and portfolio queries
 
-State: partial
+State: complete locally in `0.3.0`
+
 Sources: PM-05, PM-06
 
 Current evidence:
 
-- Owner-scoped saved view persistence and board/table/timeline labels exist.
-- Current Desktop creator stores layout plus a status filter.
+- Saved views are role-aware queries over labels, assignee, milestone and
+  status: versioned query schema (v1) with strict validation and legacy
+  normalisation; dedicated view-run endpoint; role-aware sharing (owner +
+  `shared_with`); deep links (`#/work/<view>`) restore the exact view.
+- Portfolio rollup ships: per-project derived status (on_track / at_risk /
+  stalled / idle), attention counters, next-milestone rollup, status mix,
+  attention-first dashboard tab (0.3.0).
 
 Remaining outcome:
 
-- Saved views become role-aware queries over labels, assignee, milestone, status and project.
-- Board, table, timeline and portfolio layouts render real data.
+- Timeline layout remains unavailable until canonical scheduling data exists
+  (unchanged constraint, not part of this item's core).
 
 Acceptance:
 
-- Shared access names specific users/groups rather than a single boolean.
-- Query schema is validated and versioned.
-- Deep links restore the same view and filters.
-- Saved views remain presentation-only unless a separate automation feature is explicitly approved.
+- Shared access names specific users/groups rather than a single boolean. (done)
+- Query schema is validated and versioned. (done)
+- Deep links restore the same view and filters. (done)
+- Saved views remain presentation-only unless a separate automation feature is explicitly approved. (held)
 
 ### DY-P1-04 - End-to-end initiative delivery and observation
 
