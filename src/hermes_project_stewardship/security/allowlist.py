@@ -78,6 +78,11 @@ def run_allowlisted(
             f"(sorted: {sorted(allowlist)})"
         )
     env = {"PATH": _trusted_path(cwd), "LC_ALL": "C"}
+    if os.name == "nt":
+        for key in ("SYSTEMROOT", "WINDIR", "TEMP", "TMP", "PATHEXT"):
+            value = os.environ.get(key)
+            if value:
+                env[key] = value
     if env_extra:
         forbidden = {"PATH", "PYTHONPATH", "LD_PRELOAD", "LD_LIBRARY_PATH"}
         bad = forbidden.intersection(env_extra)
