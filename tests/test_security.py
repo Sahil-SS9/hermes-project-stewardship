@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -79,10 +80,11 @@ def test_allowlist_rejects_executable_paths(tmp_path: Path, command):
 
 
 def test_allowlist_resolves_from_sanitised_path(tmp_path: Path, monkeypatch):
-    evil = tmp_path / "git"
+    evil = tmp_path / ("git.bat" if os.name == "nt" else "git")
     evil.write_text("#!/bin/sh\nprintf pwned\n", encoding="utf-8")
     evil.chmod(0o755)
-    monkeypatch.setenv("PATH", f"{tmp_path}:/usr/bin:/bin")
+    original_path = os.environ.get("PATH", "")
+    monkeypatch.setenv("PATH", f"{tmp_path}{os.pathsep}{original_path}")
 
     result = run_allowlisted(
         ["git", "--version"], cwd=tmp_path, allowlist=frozenset({"git"})
@@ -103,8 +105,6 @@ def test_allowlist_rejects_environment_path_override(tmp_path: Path):
 
 
 def test_timeout_kills(tmp_path: Path):
-    import subprocess
-
     if sys.platform == "win32":
         pytest.skip("posix timeout test")
     r = run_allowlisted(

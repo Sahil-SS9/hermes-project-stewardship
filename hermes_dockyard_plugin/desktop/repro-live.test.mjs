@@ -6,12 +6,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
-const DESKTOP_PACKAGE = '/home/kensei/repos/hermes-agent-vanilla/apps/desktop/package.json';
+const HARNESS_PACKAGE = fileURLToPath(new URL('../dashboard/package.json', import.meta.url));
 // Resolve the candidate plugin relative to this harness so a clean worktree
 // tests its own file, never a live checkout. DOCKYARD_PLUGIN_PATH overrides.
 const PLUGIN_PATH = process.env.DOCKYARD_PLUGIN_PATH
   || fileURLToPath(new URL('./plugin.js', import.meta.url));
-const require = createRequire(DESKTOP_PACKAGE);
+const require = createRequire(HARNESS_PACKAGE);
 const { JSDOM, VirtualConsole } = require('jsdom');
 const React = require('react');
 const { act } = React;
@@ -1382,8 +1382,12 @@ async function testChromiumLayouts() {
       const expectedDialogs = ['onboarding-', 'backlog-create-', 'project-board-detail-', 'initiative-freeze-', 'inbox-reject-'].some((prefix) => spec.name.startsWith(prefix)) ? 1 : 0;
       assert.equal(measure.dialogCount, expectedDialogs, `${spec.name} has the wrong modal-dialog state`);
       if (spec.width >= 1200) assert.equal(measure.clippedLoopVisuals, 0, `${spec.name} requires horizontal scrolling for a primary workflow visual`);
-      const screenshot = `/tmp/dockyard-${spec.name}.png`;
-      await page.screenshot({ path: screenshot, fullPage: true });
+      const screenshot = process.env.DOCKYARD_CAPTURE_SCREENSHOTS === '0'
+        ? null
+        : `/tmp/dockyard-${spec.name}.png`;
+      if (screenshot) {
+        await page.screenshot({ path: screenshot, fullPage: true });
+      }
       assert.equal(browserErrors.length, 0, `${spec.name} browser warnings/errors: ${browserErrors.join(' | ')}`);
       results.push({ ...spec, screenshot, ...measure });
       await page.close();

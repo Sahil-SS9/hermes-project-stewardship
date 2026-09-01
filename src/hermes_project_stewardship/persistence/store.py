@@ -13,6 +13,7 @@ Design notes
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -72,6 +73,8 @@ class Store:
         return conn
 
     def _secure_database_files(self) -> None:
+        if os.name != "posix":
+            return
         for path in (
             self.db_path,
             Path(f"{self.db_path}-wal"),

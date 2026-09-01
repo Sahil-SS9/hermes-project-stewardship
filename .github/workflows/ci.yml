@@ -67,6 +67,9 @@ jobs:
       - name: Install dashboard dependencies
         working-directory: hermes_dockyard_plugin/dashboard
         run: npm ci
+      - name: Install Chromium for Desktop harness
+        working-directory: hermes_dockyard_plugin/dashboard
+        run: npx playwright install --with-deps chromium
       - name: Type-check dashboard
         working-directory: hermes_dockyard_plugin/dashboard
         run: npx tsc --noEmit
@@ -81,4 +84,6 @@ jobs:
         run: npm audit --omit=dev
       - name: Test Desktop plugin harness
         working-directory: hermes_dockyard_plugin/desktop
+        env:
+          DOCKYARD_CAPTURE_SCREENSHOTS: "0"
         run: node --experimental-vm-modules --test repro-live.test.mjs

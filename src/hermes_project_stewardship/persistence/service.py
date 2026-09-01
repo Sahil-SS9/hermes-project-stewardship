@@ -890,11 +890,13 @@ class StewardshipService:
         fd, temporary_name = tempfile.mkstemp(prefix=".upload-", dir=project_dir)
         temporary_path = Path(temporary_name)
         try:
-            os.fchmod(fd, 0o600)
             with os.fdopen(fd, "wb") as handle:
+                if os.name == "posix":
+                    os.fchmod(handle.fileno(), 0o600)
                 handle.write(content)
                 handle.flush()
-                os.fsync(handle.fileno())
+                if os.name == "posix":
+                    os.fsync(handle.fileno())
             os.replace(temporary_path, final_path)
             stored_path = str(final_path.relative_to(root))
             uploaded_at = iso(self._clock())

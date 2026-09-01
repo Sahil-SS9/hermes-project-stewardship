@@ -13,6 +13,7 @@ context. See docs/threat-model.md §5.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -25,6 +26,24 @@ DEFAULT_TIMEOUT_SECONDS = 60
 
 class CommandNotPermitted(Exception):
     pass
+
+
+def _trusted_path(cwd: Path) -> str:
+    if os.name != "nt":
+        return "/usr/local/bin:/usr/bin:/bin"
+    project_root = cwd.resolve()
+    safe_entries = []
+    for entry in os.environ.get("PATH", "").split(os.pathsep):
+        if not entry:
+            continue
+        try:
+            resolved = Path(entry).resolve()
+        except OSError:
+            continue
+        if resolved == project_root or project_root in resolved.parents:
+            continue
+        safe_entries.append(str(resolved))
+    return os.pathsep.join(safe_entries)
 
 
 @dataclass
@@ -58,7 +77,7 @@ def run_allowlisted(
             f"executable '{exe}' is not on this project's allowlist "
             f"(sorted: {sorted(allowlist)})"
         )
-    env = {"PATH": "/usr/local/bin:/usr/bin:/bin", "LC_ALL": "C"}
+    env = {"PATH": _trusted_path(cwd), "LC_ALL": "C"}
     if env_extra:
         forbidden = {"PATH", "PYTHONPATH", "LD_PRELOAD", "LD_LIBRARY_PATH"}
         bad = forbidden.intersection(env_extra)

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10
+    import tomli as tomllib
 
 from hermes_project_stewardship.api.server import create_app
 from hermes_project_stewardship.cli.ui import __version__

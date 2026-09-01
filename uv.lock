@@ -479,6 +479,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
     { name = "ruff" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "ty" },
 ]
 plugin = [
@@ -498,6 +499,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'" },
     { name = "pytest-timeout", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.15.10" },
+    { name = "tomli", marker = "python_full_version < '3.11' and extra == 'dev'", specifier = ">=2" },
     { name = "ty", marker = "extra == 'dev'", specifier = "==0.0.21" },
     { name = "uvicorn", marker = "extra == 'desktop-panel'" },
     { name = "uvicorn", marker = "extra == 'plugin'" },

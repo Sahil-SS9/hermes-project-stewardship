@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from pathlib import Path
 
@@ -129,6 +130,7 @@ def test_wal_and_foreign_keys(store):
     assert fk == 1
 
 
+@pytest.mark.skipif(os.name != "posix", reason="POSIX file modes only")
 def test_database_files_are_owner_only(tmp_path):
     db = tmp_path / "private.db"
     store = Store(db)
@@ -170,7 +172,6 @@ def test_migrations_execute_atomically(tmp_path, monkeypatch):
 
 def test_cascade_delete_removes_children(tmp_path):
     s = Store(tmp_path / "c.db")
-    svc = None  # keep this test service-free; raw inserts
     c = s._conn
     c.execute(
         "INSERT INTO project_stewardship(project_id, enabled, created_at, updated_at)"

@@ -67,6 +67,7 @@ def test_host_contract_router_and_health(client):
     assert r.json()["service"] == "hermes-dockyard"
 
 
+@pytest.mark.skipif(os.name != "posix", reason="POSIX file modes only")
 def test_default_plugin_database_is_durable_and_private(tmp_path, monkeypatch):
     hermes_home = tmp_path / "hermes-home"
     monkeypatch.setenv("HERMES_HOME", str(hermes_home))

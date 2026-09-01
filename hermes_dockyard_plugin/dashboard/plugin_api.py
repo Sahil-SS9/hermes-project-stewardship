@@ -39,7 +39,8 @@ def _default_db_path() -> Path:
     ).expanduser()
     data_dir = hermes_home / "plugin-data" / "hermes-dockyard"
     data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-    data_dir.chmod(0o700)
+    if os.name == "posix":
+        data_dir.chmod(0o700)
     return data_dir / "dockyard.db"
 
 
@@ -51,7 +52,8 @@ _DB.parent.mkdir(parents=True, exist_ok=True)
 # desktop-plugin contract exposes no router-level teardown hook, so an explicit
 # close would require a custom seam. Acceptable for single-user local tooling.
 _store = Store(_DB)
-_DB.chmod(0o600)
+if os.name == "posix":
+    _DB.chmod(0o600)
 _dockyard = DockyardStore(_store)
 _app = create_app(_store)
 

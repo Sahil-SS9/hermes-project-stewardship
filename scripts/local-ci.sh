@@ -110,7 +110,7 @@ if [ "$WITH_NODE" -eq 1 ]; then
     popd >/dev/null
     pushd hermes_dockyard_plugin/desktop >/dev/null
     run_gate "desktop-harness" "node --test" \
-        node --experimental-vm-modules --test repro-live.test.mjs
+        env DOCKYARD_CAPTURE_SCREENSHOTS=0 node --experimental-vm-modules --test repro-live.test.mjs
     popd >/dev/null
   else
     fail "node-gates" "npm not found; skipping requested JS gates"
