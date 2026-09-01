@@ -43,8 +43,9 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   animated fill), Sub-tasks checklist with per-task assignee and
   strikethrough on completed items, Activity thread with wall-clock decay.
   Backed by the existing work-detail endpoint - no new routes.
-- scripts/local-ci.sh is the authoritative CI evidence source while GitHub
-  Actions is rate-limited (see 2026-08-30 addendum in remainingwork.md).
+- `scripts/local-ci.sh` mirrors the release gates locally; GitHub Actions run
+  `33455039432` independently passed the full Linux/macOS/Windows matrix on
+  Python 3.10–3.12.
 - **Saved views with validated queries (DY-P1-03)**: views are no longer
   cosmetic. Versioned query schema (v1) with strict validation and legacy
   normalisation; real filter application (status, assignee, labels,
@@ -100,11 +101,10 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   scaffold is no longer referenced as an active surface.
 
 ### Added
-- `scripts/local-ci.sh`: local CI mirror (install-extras, suite + coverage,
-  byte-compile, API import, optional dashboard/desktop JS gates; `--json`
-  evidence summary). GitHub Actions is rate-limited for this account and
-  cannot run this workflow for now; the local mirror's `ALL GATES PASS`
-  output is the authoritative CI evidence until Actions is restored.
+- Historical 30/08 note: `scripts/local-ci.sh` was introduced while GitHub
+  Actions execution was unavailable. That infrastructure block was superseded
+  on 01/09 by green run `33455039432`; the local mirror remains a required
+  pre-push gate.
 - Local-CI evidence run 2026-08-30T13:50:56Z: 6/6 gates PASS (399 passed,
   5 skipped, coverage gate green at 87, byte-compile clean, RPC import ok,
   dashboard 3/3, desktop harness 1/1).

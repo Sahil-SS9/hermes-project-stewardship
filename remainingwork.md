@@ -1,6 +1,18 @@
 # Remaining work and current state
 
-Updated: 26/08/2026 (addenda 30/08/2026, 31/08/2026)
+Updated: 26/08/2026 (addenda 30/08/2026, 31/08/2026, 01/09/2026)
+
+## Addendum 01/09/2026 — GitHub Actions restored and green
+
+- GitHub Actions run `33455039432` completed successfully on commit
+  `8b102c23b2510704a6fbb4f6f5dd003b5d1e5f51`.
+- All 11 jobs passed: Linux, macOS and Windows on Python 3.10–3.12,
+  API import, frontend build/tests/audit and Desktop harness.
+- Cross-platform repairs covered Python 3.10 TOML compatibility, Windows-safe
+  file/process handling, portable Desktop harness dependencies and Chromium setup.
+- `scripts/local-ci.sh --with-node --json` remains the exact local mirror; it
+  passed with 453 tests and the 87% coverage gate before the final CI push.
+- Remote cross-platform CI is no longer a release blocker.
 
 ## Addendum 31/08/2026 — 0.3.0 release cut
 
@@ -53,13 +65,11 @@ Correction delivered (local commit, pre-402):
 - Local repo `.venv` resynced to `[dev,desktop-panel]`; the stale
   missing-`httpx2` state that blocked any local suite run is resolved.
 
-Not covered by the 26/08 verdict and still open for the D1 pilot decision:
+Items that were open on 30/08 and are now closed:
 
-- No git tag exists for `0.2.0rc2`; rc identity lives only in docs/plugins.
-  Tag the evidence baseline when the release path is chosen.
-- Remote (GitHub) CI remains red-by-infra until the rate limit resets or a
-  self-hosted runner is approved. The local mirror bridges evidence, not the
-  account-level run history.
+- The historical `0.2.0rc2` tag was superseded by the published `v0.3.0` tag.
+- GitHub Actions execution was restored; cross-platform run `33455039432`
+  passed all jobs on 01/09.
 
 ## Current verdict
 
