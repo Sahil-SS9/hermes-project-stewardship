@@ -9,8 +9,7 @@ from typing import Any, Optional
 
 from .persistence.service import StewardshipService
 from .persistence.store import Store
-
-_DEFAULT_DB = Path("./stewardship.db")
+from .runtime import open_store
 
 
 class PluginState:
@@ -18,12 +17,12 @@ class PluginState:
 
     _store: Optional[Store] = None
     _svc: Optional[StewardshipService] = None
-    db_path: Path = _DEFAULT_DB
+    db_path: Optional[Path] = None
 
     @classmethod
     def services(cls) -> StewardshipService:
         if cls._svc is None:
-            cls._store = Store(cls.db_path)
+            cls._store = open_store(cls.db_path)
             cls._svc = StewardshipService(cls._store)
         return cls._svc
 

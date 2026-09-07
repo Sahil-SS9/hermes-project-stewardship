@@ -78,8 +78,12 @@ def test_default_plugin_database_is_durable_and_private(tmp_path, monkeypatch):
     assert default_path == (
         hermes_home / "plugin-data" / "hermes-dockyard" / "dockyard.db"
     )
+    # Resolution is now read-only; private paths are created by the shared factory.
+    assert not default_path.exists()
+    opened = plugin_api.open_store(default_path)
+    opened.close()
     assert stat.S_IMODE(default_path.parent.stat().st_mode) == 0o700
-    assert stat.S_IMODE(plugin_api._DB.stat().st_mode) == 0o600
+    assert stat.S_IMODE(default_path.stat().st_mode) == 0o600
 
 
 def test_proxy_rejects_invalid_success_payload(client, monkeypatch):

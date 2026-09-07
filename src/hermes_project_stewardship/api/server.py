@@ -362,7 +362,9 @@ def create_app(
 ) -> FastAPI:
     embedded = store is not None
     if store is None:
-        store = Store(db_path or Path("./stewardship.db"))
+        from ..runtime import open_store
+
+        store = open_store(db_path)
     svc = StewardshipService(store)
     engine = CycleEngine(svc)
     bus = EventBus(store)

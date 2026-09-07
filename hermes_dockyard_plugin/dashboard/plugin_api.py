@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 from hermes_project_stewardship.api.server import create_app
 from hermes_project_stewardship.persistence.dockyard_store import DockyardStore
-from hermes_project_stewardship.persistence.store import Store
+from hermes_project_stewardship.runtime import open_store, resolve_db_path
 
 plugin_api = APIRouter()
 
@@ -34,24 +34,16 @@ router = plugin_api
 
 def _default_db_path() -> Path:
     """Return a restart-durable, profile-scoped plugin database path."""
-    hermes_home = Path(
-        os.environ.get("HERMES_HOME", str(Path.home() / ".hermes"))
-    ).expanduser()
-    data_dir = hermes_home / "plugin-data" / "hermes-dockyard"
-    data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if os.name == "posix":
-        data_dir.chmod(0o700)
-    return data_dir / "dockyard.db"
+    return resolve_db_path()
 
 
 # Single shared store for the plugin's lifetime; swap via env var.
-_DB = Path(os.environ.get("DOCKYARD_PLUGIN_DB") or _default_db_path())
-_DB.parent.mkdir(parents=True, exist_ok=True)
+_DB = _default_db_path()
 
 # NOTE (lifecycle): _store/_client are closed when the host process exits; the
 # desktop-plugin contract exposes no router-level teardown hook, so an explicit
 # close would require a custom seam. Acceptable for single-user local tooling.
-_store = Store(_DB)
+_store = open_store(_DB)
 if os.name == "posix":
     _DB.chmod(0o600)
 _dockyard = DockyardStore(_store)
