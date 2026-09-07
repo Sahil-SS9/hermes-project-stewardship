@@ -18,6 +18,7 @@ from ..gateway.errors import CommandError
 from ..persistence.backup import BackupError, export_store, restore_store
 from ..persistence.service import ServiceError, StewardshipService
 from ..persistence.store import Store
+from ..runtime import StateSelectionError, open_store
 from .ui import (
     INITIATIVE_HEADERS,
     __version__,
@@ -35,16 +36,12 @@ EXIT_REFUSED = 1
 EXIT_ERROR = 2
 
 
-def _default_db() -> Path:
-    return Path("./stewardship.db")
-
-
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="stewardctl",
         description="Durable project ownership for Hermes agent fleets.",
     )
-    p.add_argument("--db", type=Path, default=_default_db(), help="stewardship DB path")
+    p.add_argument("--db", type=Path, default=None, help="override the profile-scoped stewardship DB")
     p.add_argument("--version", action="version", version=f"stewardctl {__version__}")
     sub = p.add_subparsers(dest="group", required=True)
 
@@ -134,7 +131,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(json.dumps(result, sort_keys=True))
         return EXIT_OK
 
-    store = Store(args.db)
+    try:
+        store = open_store(args.db)
+    except (StateSelectionError, OSError) as exc:
+        print(friendly_error(str(exc)), file=sys.stderr)
+        return EXIT_ERROR
     svc = StewardshipService(store)
     engine = CycleEngine(svc)
 
