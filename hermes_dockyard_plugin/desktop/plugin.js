@@ -2665,14 +2665,61 @@ function WorkItemDetail({ item, projectId, onClose, onRefresh }) {
   const [feedback, setFeedback] = useState(null)
   const [error, setError] = useState(null)
   const [depRef, setDepRef] = useState('')
+  // Canonical baseline (round-4 Residual B): fields are compared against this
+  // refreshed record, not the stale inbox list item, so consecutive edits and
+  // re-edits both reach the backend.
+  const [baseline, setBaseline] = useState(null)
+  const rebaseFromDetail = (result) => {
+    if (!result) return null
+    const current = result.work_item ?? {}
+    const record = {
+      title: current.title ?? '',
+      type: current.type ?? 'task',
+      assignee: current.assignee ?? '',
+      status: current.status ?? 'backlog',
+      body: current.body ?? '',
+      labels: (current.labels ?? []).join(', '),
+      estimate_days: current.estimate_days == null ? '' : String(current.estimate_days),
+      due: current.due ?? '',
+      // Canonical shape supplies parent_task_id; detail.parent.ref mirrors it.
+      parent_ref: current.parent_task_id ?? result.parent?.ref ?? '',
+      evidence_refs: (current.evidence_refs ?? []).join(', '),
+      labels_raw: current.labels ?? [],
+      estimate_raw: current.estimate_days ?? null,
+      evidence_raw: current.evidence_refs ?? [],
+    }
+    setBaseline(record)
+    return record
+  }
   useEffect(() => {
-    setDraft(item ? {
+    if (!item) {
+      setDraft(null)
+      setDetail(null)
+      setBaseline(null)
+      setFeedback(null)
+      setError(null)
+      return
+    }
+    // Optimistic baseline from the list item so the drawer opens instantly;
+    // the canonical fetch below rebases it.
+    setDraft({
       title: item.title ?? '', type: item.type ?? 'task',
       assignee: item.assignee ?? '', status: item.status ?? 'backlog',
       body: item.body ?? '', labels: (item.labels ?? []).join(', '),
       estimate_days: item.estimate_days == null ? '' : String(item.estimate_days),
-      due: item.due ?? '', parent_ref: item.parent_ref ?? '',
-    } : null)
+      due: item.due ?? '', parent_ref: item.parent_task_id ?? item.parent_ref ?? '',
+      evidence_refs: (item.evidence_refs ?? []).join(', '),
+    })
+    setBaseline({
+      title: item.title ?? '', type: item.type ?? 'task',
+      assignee: item.assignee ?? '', status: item.status ?? 'backlog',
+      body: item.body ?? '', labels: (item.labels ?? []).join(', '),
+      estimate_days: item.estimate_days == null ? '' : String(item.estimate_days),
+      due: item.due ?? '', parent_ref: item.parent_task_id ?? item.parent_ref ?? '',
+      evidence_refs: (item.evidence_refs ?? []).join(', '),
+      labels_raw: item.labels ?? [], estimate_raw: item.estimate_days ?? null,
+      evidence_raw: item.evidence_refs ?? [],
+    })
     setDetail(null)
     setFeedback(null)
     setError(null)
@@ -2685,12 +2732,23 @@ function WorkItemDetail({ item, projectId, onClose, onRefresh }) {
   }, [item, onClose])
   // Full supported-field detail (P5.3): canonical relationships, evidence and
   // history come from the existing work-item detail reader.
+  const loadDetail = (ref) => {
+    if (!item) return Promise.resolve(null)
+    return api(`/projects/${encodeURIComponent(projectId || item.project_id)}/work-items/${encodeURIComponent(ref)}`)
+      .then((result) => {
+        setDetail(result)
+        const record = rebaseFromDetail(result)
+        // Rebase the draft onto canonical state, preserving any in-flight
+        // text the owner is still typing only when no mutation just happened.
+        if (record && !busy) setDraft((current) => (current ? { ...record } : current))
+        return result
+      })
+      .catch(() => { setDetail(null); return null })
+  }
   useEffect(() => {
-    if (!item) return undefined
     let disposed = false
-    api(`/projects/${encodeURIComponent(projectId || item.project_id)}/work-items/${encodeURIComponent(item.ref)}`)
-      .then((result) => { if (!disposed) setDetail(result) })
-      .catch(() => { if (!disposed) setDetail(null) })
+    if (!item) return undefined
+    loadDetail(item.ref)
     return () => { disposed = true }
   }, [item?.ref, projectId])
   const save = async () => {
@@ -2699,17 +2757,23 @@ function WorkItemDetail({ item, projectId, onClose, onRefresh }) {
     setError(null)
     setFeedback(null)
     const projectIdResolved = projectId || item.project_id
+    const base = baseline ?? draft
     const changes = {}
-    if (draft.title !== (item.title ?? '')) changes.title = draft.title
-    if (draft.type !== (item.type ?? 'task')) changes.type = draft.type
-    if (draft.body !== (item.body ?? '')) changes.body = draft.body || null
-    if (draft.labels !== (item.labels ?? []).join(', ')) {
+    if (draft.title !== base.title) changes.title = draft.title
+    if (draft.type !== base.type) changes.type = draft.type
+    if (draft.body !== base.body) changes.body = draft.body || null
+    if (draft.labels !== base.labels) {
       changes.labels = draft.labels.split(',').map((v) => v.trim()).filter(Boolean)
     }
     const estimateValue = draft.estimate_days === '' ? null : Number(draft.estimate_days)
-    if (estimateValue !== (item.estimate_days ?? null)) changes.estimate_days = estimateValue
-    if (draft.due !== (item.due ?? '')) changes.due = draft.due || null
-    if (draft.parent_ref !== (item.parent_ref ?? '')) changes.parent_ref = draft.parent_ref || null
+    if (estimateValue !== (base.estimate_days === '' ? null : Number(base.estimate_days))) {
+      changes.estimate_days = estimateValue
+    }
+    if (draft.due !== base.due) changes.due = draft.due || null
+    if (draft.parent_ref !== base.parent_ref) changes.parent_ref = draft.parent_ref || null
+    if (draft.evidence_refs !== base.evidence_refs) {
+      changes.evidence_refs = draft.evidence_refs.split(',').map((v) => v.trim()).filter(Boolean)
+    }
     try {
       if (Object.keys(changes).length > 0) {
         await api(`/projects/${encodeURIComponent(projectIdResolved)}/work-items/${encodeURIComponent(item.ref)}`, {
@@ -2717,18 +2781,22 @@ function WorkItemDetail({ item, projectId, onClose, onRefresh }) {
           body: changes,
         })
       }
-      if ((draft.assignee ?? '') !== (item.assignee ?? '')) {
+      if ((draft.assignee ?? '') !== (base.assignee ?? '')) {
         await api(`/projects/${encodeURIComponent(projectIdResolved)}/work-items/${encodeURIComponent(item.ref)}/assign`, {
           method: 'POST',
           body: { assignee_id: draft.assignee.trim() || null },
         })
       }
-      if (draft.status !== item.status) {
+      if (draft.status !== base.status) {
         await api(`/projects/${encodeURIComponent(projectIdResolved)}/work-items/${encodeURIComponent(item.ref)}/transition`, {
           method: 'POST',
           body: { status: draft.status },
         })
       }
+      // Rebase onto canonical state so the NEXT edit diffs against reality
+      // (round-4 Residual B): a second edit back to the original must send
+      // its own PATCH.
+      await loadDetail(item.ref)
       setFeedback('Saved.')
       await onRefresh?.()
     } catch (failure) {
@@ -2745,6 +2813,7 @@ function WorkItemDetail({ item, projectId, onClose, onRefresh }) {
         method: 'POST', body: { dependency_ref: depRef.trim() },
       })
       setDepRef('')
+      await loadDetail(item.ref)
       setFeedback('Dependency added.')
       await onRefresh?.()
     } catch (failure) {
@@ -2797,6 +2866,9 @@ function WorkItemDetail({ item, projectId, onClose, onRefresh }) {
           })]}),
           jsxs('label', { children: ['Parent ref ', jsx('input', {
             value: draft?.parent_ref ?? '', onChange: (event) => setDraft({ ...draft, parent_ref: event.target.value }),
+          })]}),
+          jsxs('label', { children: ['Evidence refs (comma separated) ', jsx('input', {
+            'aria-label': 'Evidence refs', value: draft?.evidence_refs ?? '', onChange: (event) => setDraft({ ...draft, evidence_refs: event.target.value }),
           })]}),
           jsxs('label', { children: ['Assignee ', jsx('input', {
             value: draft?.assignee ?? '', onChange: (event) => setDraft({ ...draft, assignee: event.target.value }),
@@ -3852,15 +3924,21 @@ function ApprovalRow({ item, onResolved }) {
     return () => { disposed = true }
   }, [item.ref])
   // The card must present the DECISION scope it will bind the fingerprint to
-  // (round-3 R1). Once fetched, the reviewed decision's content takes
-  // precedence over the stale inbox summary.
+  // (round-3 R1; field mapping corrected round-4 Residual A). The canonical
+  // decision payload carries the rationale under `reason` and the validation
+  // contract nested at `validation.contract`.
   const tone2source = reviewedDecision
     ? {
         title: reviewedDecision.title ?? item.title,
         risk: reviewedDecision.risk ?? item.risk,
-        rationale: reviewedDecision.rationale ?? (item.detail?.rationale ?? ''),
+        rationale: reviewedDecision.reason
+          ?? reviewedDecision.rationale
+          ?? (item.detail?.rationale ?? ''),
         expected_outcome: reviewedDecision.expected_outcome ?? (item.detail?.expected_outcome ?? ''),
-        validation: reviewedDecision.validation ?? item.detail?.validation_contract ?? null,
+        validation: reviewedDecision.validation?.contract
+          ?? reviewedDecision.validation
+          ?? item.detail?.validation_contract
+          ?? null,
       }
     : { title: item.title, risk: item.risk, rationale: item.detail?.rationale, expected_outcome: item.detail?.expected_outcome, validation: item.detail?.validation_contract ?? null }
   const [tone, label] = riskDetails(tone2source.risk)
