@@ -176,7 +176,8 @@ def test_api_route_live(tmp_path):
         r = c.get("/stewardship/v1/portfolio")
         assert r.status_code == 200
         body = r.json()
-        assert set(body) == {"projects", "mix", "attention"}
+        # Phase 6 adds the grouped read model; original keys stay intact.
+        assert set(body) == {"projects", "mix", "attention", "groups"}
         assert body["projects"][0]["project_id"] == "p1"
         assert body["projects"][0]["status"] in (
             "at_risk", "stalled", "idle", "on_track")

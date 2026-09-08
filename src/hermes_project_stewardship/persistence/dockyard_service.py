@@ -1007,11 +1007,23 @@ class DockyardService:
         mix = {"todo": 0, "in_progress": 0, "blocked": 0, "done": 0}
         attention = {"overdue_items": 0, "blocked_items": 0,
                      "overdue_milestones": 0}
-
+        # P6.1: evidence health stays separate from delivery status; freshness
+        # is surfaced per project as its own field, never a composite score.
+        health_freshness: Dict[str, Optional[int]] = {}
         for p in self.store._conn.execute(
                 "SELECT project_id, enabled, phase FROM project_stewardship"
                 " ORDER BY project_id").fetchall():
             pid = p["project_id"]
+            health_row = self.store._conn.execute(
+                "SELECT created_at FROM project_health_snapshots"
+                " WHERE project_id=? ORDER BY id DESC LIMIT 1",
+                (pid,)).fetchone()
+            if health_row is not None:
+                created = self._parse_iso(health_row["created_at"])
+                health_freshness[pid] = (
+                    max(0, (now - created).days) if created else None)
+            else:
+                health_freshness[pid] = None
             items = self._portfolio_items(pid)
             milestones = self.dy.milestone_list(pid)
 
@@ -1088,6 +1100,188 @@ class DockyardService:
                     if next_milestone else None),
                 "last_activity": last_activity.isoformat()
                 if last_activity else None,
+                "evidence_freshness_days": health_freshness.get(pid),
             })
 
-        return {"projects": projects, "mix": mix, "attention": attention}
+        return {"projects": projects, "mix": mix, "attention": attention,
+                "groups": self._fleet_groups()}
+
+    # ------------------------------------------------------------------ #
+    # Fleet grouping + exact deep links (Phase 6, P6.1–P6.4)              #
+    # ------------------------------------------------------------------ #
+
+    _NEXT_ACTION = {
+        "pending_decision": "Open the approval inbox and decide with the "
+                            "displayed fingerprint.",
+        "blocked_item": "Unblock or reassign the blocked work item.",
+        "overdue_item": "Reschedule, re-scope or complete the overdue item.",
+        "overdue_milestone": "Review the milestone date or close it out.",
+        "project_attention": "Open the project and resolve its lifecycle state.",
+        "stalled_project": "Check the project's last activity and re-plan.",
+        "evidence_stale": "Re-run the objective evidence collection.",
+    }
+
+    @staticmethod
+    def _deep_link_for(kind: str, project_id: str, ref: str) -> str:
+        """Exact-context deep link: names the object, never a generic screen."""
+        if kind == "initiative_approval":
+            return f"s6:initiative/{ref}"
+        if kind == "blocked_item":
+            return f"s2:work/{ref}"
+        if kind == "project_attention":
+            return f"s1:project/{project_id}"
+        if kind in ("overdue_item", "overdue_milestone"):
+            return f"s2:project/{project_id}"
+        if kind == "stalled_project":
+            return f"s1:project/{project_id}"
+        if kind == "pending_decision":
+            return f"s6:initiative/{ref}"
+        return f"s1:project/{project_id}"
+
+    def _fleet_groups(self) -> Dict:
+        """Decision / Intervention / Informational groups from existing rows.
+
+        Sources: project_initiatives (pending decisions), dockyard_work_items
+        (blocked/overdue), project_stewardship (paused/frozen/disabled),
+        project_health_snapshots (evidence staleness), notifications
+        (informational feed). Evidence health stays SEPARATE from delivery
+        status: freshness is its own field, never folded into a score.
+        """
+        now = datetime.now(timezone.utc)
+        decisions: List[Dict] = []
+        interventions: List[Dict] = []
+        informational: List[Dict] = []
+
+        pending = self.store._conn.execute(
+            "SELECT project_id, ref, title, risk, created_at"
+            " FROM project_initiatives"
+            " WHERE approval_state='pending' AND status='pending_approval'"
+            " ORDER BY created_at").fetchall()
+        for r in pending:
+            created = self._parse_iso(r["created_at"])
+            age_days = max(0, (now - created).days) if created else 0
+            decisions.append({
+                "kind": "initiative_approval",
+                "project": r["project_id"],
+                "ref": r["ref"],
+                "title": r["title"],
+                "risk": r["risk"],
+                "age_days": age_days,
+                "deep_link": self._deep_link_for(
+                    "initiative_approval", r["project_id"], r["ref"]),
+            })
+
+        for p in self.store._conn.execute(
+                "SELECT project_id, owner_lead_profile, phase, enabled"
+                " FROM project_stewardship ORDER BY project_id").fetchall():
+            pid = p["project_id"]
+            lead = p["owner_lead_profile"] or "unassigned"
+
+            blocked = self.store._conn.execute(
+                "SELECT ref, title, blocked_by_json, created_at, updated_at"
+                " FROM dockyard_work_items WHERE project_id=?"
+                " AND status='blocked' ORDER BY created_at LIMIT 20",
+                (pid,)).fetchall()
+            for w in blocked:
+                raw = (w["blocked_by_json"] or "[]").strip()
+                try:
+                    parsed = json.loads(raw)
+                except (TypeError, ValueError):
+                    parsed = []
+                if isinstance(parsed, str):
+                    reason = parsed
+                elif parsed:
+                    reason = ", ".join(str(x) for x in parsed)
+                else:
+                    reason = ""
+                created = self._parse_iso(w["created_at"])
+                interventions.append({
+                    "kind": "project_attention",
+                    "cause": "blocked_item",
+                    "project": pid,
+                    "ref": w["ref"],
+                    "title": w["title"],
+                    "detail": reason or "Blocked without a recorded reason.",
+                    "owner": lead,
+                    "age_days": max(0, (now - created).days) if created else 0,
+                    "next_action": self._NEXT_ACTION["blocked_item"],
+                    "deep_link": self._deep_link_for(
+                        "blocked_item", pid, w["ref"]),
+                })
+
+            overdue = self.store._conn.execute(
+                "SELECT ref, title, due, created_at FROM dockyard_work_items"
+                " WHERE project_id=? AND status!='done' AND due IS NOT NULL",
+                (pid,)).fetchall()
+            for w in overdue:
+                due = self._parse_iso(w["due"])
+                if due and due < now:
+                    interventions.append({
+                        "kind": "project_attention",
+                        "cause": "overdue_item",
+                        "project": pid,
+                        "ref": w["ref"],
+                        "title": w["title"],
+                        "detail": f"Due {w['due']} and not done.",
+                        "owner": lead,
+                        "age_days": max(0, (now - due).days),
+                        "next_action": self._NEXT_ACTION["overdue_item"],
+                        "deep_link": self._deep_link_for(
+                            "overdue_item", pid, w["ref"]),
+                    })
+
+            if p["phase"] == "frozen" or not p["enabled"]:
+                interventions.append({
+                    "kind": "project_attention",
+                    "cause": "project_attention",
+                    "project": pid,
+                    "ref": p["phase"] if not p["enabled"] else "frozen",
+                    "title": f"Project needs attention (phase={p['phase']})",
+                    "detail": f"Project is {p['phase'] or 'disabled'}.",
+                    "owner": lead,
+                    "age_days": 0,
+                    "next_action": self._NEXT_ACTION["project_attention"],
+                    "deep_link": self._deep_link_for(
+                        "project_attention", pid, ""),
+                })
+
+            health = self.store._conn.execute(
+                "SELECT status, created_at FROM project_health_snapshots"
+                " WHERE project_id=? ORDER BY id DESC LIMIT 1",
+                (pid,)).fetchone()
+            if health is not None:
+                created = self._parse_iso(health["created_at"])
+                freshness = max(0, (now - created).days) if created else 0
+                if freshness >= 7:
+                    interventions.append({
+                        "kind": "project_attention",
+                        "cause": "evidence_stale",
+                        "project": pid,
+                        "ref": "evidence",
+                        "title": f"Evidence is {freshness} days old",
+                        "detail": (f"Last health snapshot {freshness}d ago"
+                                   f" (status {health['status']})."),
+                        "owner": lead,
+                        "age_days": freshness,
+                        "next_action": self._NEXT_ACTION["evidence_stale"],
+                        "deep_link": self._deep_link_for(
+                            "stalled_project", pid, ""),
+                    })
+
+        notes = self.store._conn.execute(
+            "SELECT project_id, severity, kind, title, created_at"
+            " FROM notifications WHERE acked_at IS NULL"
+            " ORDER BY created_at DESC LIMIT 50").fetchall()
+        for n in notes:
+            informational.append({
+                "kind": n["kind"],
+                "project": n["project_id"],
+                "severity": n["severity"],
+                "title": n["title"],
+                "created_at": n["created_at"],
+                "deep_link": self._deep_link(n["kind"]),
+            })
+
+        return {"decisions": decisions,
+                "interventions": interventions,
+                "informational": informational}

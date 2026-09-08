@@ -2257,7 +2257,7 @@ function PortfolioVisual({ projects }) {
   ]})
 }
 
-function ProjectRow({ project, context, botNames }) {
+function ProjectRow({ project, context, botNames, onOpen }) {
   const [tone, label] = healthDetails(project.health)
   const work = project.work ?? {}
   const alerts = Number(project.unacked_notifications ?? 0)
@@ -2292,12 +2292,17 @@ function ProjectRow({ project, context, botNames }) {
       jsx(WorkBar, { work, project: true, label: `${project.id} work distribution` }),
     ]}),
     jsx('div', { className: 'dockyard-project-cell alerts', role: 'cell', children:
-      jsx('span', { className: `dockyard-alert-count${alerts > 0 ? ' has-alert' : ''}`, children: alerts > 0 ? `${number(alerts)} unread` : 'None unread' }),
+      jsxs('span', { className: `dockyard-alert-count${alerts > 0 ? ' has-alert' : ''}`, children: [
+        alerts > 0 ? `${number(alerts)} unread` : 'None unread',
+        typeof onOpen === 'function'
+          ? jsx(Button, { action: 'open', small: true, onClick: () => onOpen(`s1:project/${project.id}`), children: 'Open' })
+          : null,
+      ]}),
     }),
   ]})
 }
 
-function FleetActivity({ notifications }) {
+function FleetActivity({ notifications, onOpen }) {
   const items = [...(notifications ?? [])].sort((left, right) => String(right.created_at || '').localeCompare(String(left.created_at || ''))).slice(0, 4)
   return jsxs('aside', { className: 'dockyard-activity-card', 'data-dashboard-card': 'activity', 'data-fleet-activity': true, children: [
     jsxs('div', { className: 'dockyard-section-head', children: [
@@ -2316,6 +2321,9 @@ function FleetActivity({ notifications }) {
             jsx('p', { children: note.title || 'Fleet event' }),
             jsx('span', { className: 'dockyard-meta', children: `${note.project || 'Fleet'}${note.body ? ` / ${note.body}` : ''}` }),
             jsx('time', { children: formatWhen(note.created_at) }),
+            typeof onOpen === 'function' && note.deep_link
+              ? jsx(Button, { action: 'open', small: true, onClick: () => onOpen(note.deep_link), children: 'Open' })
+              : null,
           ]}),
         ]}, String(note.id))
       }),
@@ -2323,7 +2331,7 @@ function FleetActivity({ notifications }) {
   ]})
 }
 
-function DashboardView({ view, onInbox, onRefresh }) {
+function DashboardView({ view, onInbox, onRefresh, onOpen }) {
   const projects = sortProjects(view.projects ?? [])
   if (projects.length === 0) {
     return jsxs(Fragment, { children: [
@@ -2368,10 +2376,14 @@ function DashboardView({ view, onInbox, onRefresh }) {
             project,
             context: view.projectContext?.[project.id],
             botNames,
+            onOpen: (link) => (typeof onOpen === 'function' ? onOpen(link) : undefined),
           }, project.id)),
         ]}),
       ]}),
-      jsx(FleetActivity, { notifications: view.notifications?.notifications ?? [] }),
+      jsx(FleetActivity, {
+        notifications: view.notifications?.notifications ?? [],
+        onOpen: (link) => (typeof onOpen === 'function' ? onOpen(link) : undefined),
+      }),
     ]}),
   ]})
 }
@@ -4166,7 +4178,7 @@ function InboxView({ view, onRefresh }) {
   ]})
 }
 
-function NotificationRow({ note, onAcknowledged }) {
+function NotificationRow({ note, onAcknowledged, onOpen }) {
   const [state, setState] = useState(note.acked ? 'cleared' : 'unread')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -4191,26 +4203,29 @@ function NotificationRow({ note, onAcknowledged }) {
       jsx('p', { children: note.body ?? '' }),
       jsx('span', { className: 'dockyard-meta', children: `${note.project || 'Fleet'}${when ? ` / ${when}` : ''}` }),
     ]}),
-    jsx('div', { className: 'dockyard-notification-action', children:
+    jsxs('div', { className: 'dockyard-notification-action', children: [
+      typeof onOpen === 'function' && note.deep_link
+        ? jsx(Button, { action: 'open', small: true, onClick: () => onOpen(note.deep_link), children: 'Open' })
+        : null,
       state === 'cleared'
         ? jsx(StatusTag, { tone: 'neutral', label: 'Cleared' })
         : jsx(Button, { action: 'acknowledge', small: true, disabled: busy, onClick: acknowledge, children: busy ? 'Clearing...' : 'Acknowledge' }),
-    }),
+    ]}),
     error ? jsx('p', { className: 'dockyard-inline-error', children: `Could not clear: ${error}` }) : null,
   ]})
 }
 
-function NotificationGroup({ title, description, items, onAcknowledged }) {
+function NotificationGroup({ title, description, items, onAcknowledged, onOpen }) {
   return jsxs('section', { className: 'dockyard-feed-group', children: [
     jsxs('div', { className: 'dockyard-feed-head', children: [
       jsxs('div', { children: [jsx('h2', { children: title }), jsx('p', { children: description })] }),
       jsx('span', { className: 'dockyard-section-count', children: number(items.length) }),
     ]}),
-    items.map((note) => jsx(NotificationRow, { note, onAcknowledged }, String(note.id))),
+    items.map((note) => jsx(NotificationRow, { note, onAcknowledged, onOpen }, String(note.id))),
   ]})
 }
 
-function NotificationsView({ view, onRefresh, onAcknowledged }) {
+function NotificationsView({ view, onRefresh, onAcknowledged, onOpen }) {
   const notes = view.notifications ?? []
   if (notes.length === 0) {
     return jsxs(Fragment, { children: [
@@ -4231,8 +4246,8 @@ function NotificationsView({ view, onRefresh, onAcknowledged }) {
       status: unread.length > 0 ? `${number(unread.length)} unread` : null,
       onRefresh,
     }),
-    unread.length > 0 ? jsx(NotificationGroup, { title: 'Needs attention', description: 'Unread fleet events.', items: unread, onAcknowledged }) : null,
-    cleared.length > 0 ? jsx(NotificationGroup, { title: 'Cleared', description: 'Acknowledged events remain available for context.', items: cleared, onAcknowledged }) : null,
+    unread.length > 0 ? jsx(NotificationGroup, { title: 'Needs attention', description: 'Unread fleet events.', items: unread, onAcknowledged, onOpen }) : null,
+    cleared.length > 0 ? jsx(NotificationGroup, { title: 'Cleared', description: 'Acknowledged events remain available for context.', items: cleared, onAcknowledged, onOpen }) : null,
   ]})
 }
 
@@ -4329,6 +4344,37 @@ function DashboardPage() {
     })
     setCounts((previous) => ({ ...previous, notifications: Math.max(0, Number(previous.notifications ?? 1) - 1) }))
   }
+  // P6.4: notifications deep-link to the exact object. Open navigates only —
+  // ack stays separate from resolution (P6.5): no state change, no inbox
+  // mutation, no initiative status flip.
+  const openDeepLink = (link) => {
+    if (typeof link !== 'string' || !link.includes(':')) return
+    const [screen, rest] = link.split(':', 2)
+    const slash = rest.indexOf('/')
+    const objectKind = slash >= 0 ? rest.slice(0, slash) : ''
+    const objectId = slash >= 0 ? rest.slice(slash + 1) : rest
+    if (screen === 's4' || (screen === 's6' && objectKind === 'initiative')) {
+      setTab('inbox')
+      return
+    }
+    if (screen === 's2' || screen === 's1') {
+      if (objectId && (objectKind === 'project' || objectKind === '')) {
+        setSelectedProject(objectId)
+        setTab(screen === 's2' ? 'project' : 'project')
+        return
+      }
+      if (objectId) {
+        setSelectedProject(null)
+        setTab('project')
+        return
+      }
+    }
+    if (screen === 's5') {
+      setTab('teams')
+      return
+    }
+    setTab('dashboard')
+  }
 
   const payload = data?.tab === tab ? data.payload : null
   const activeError = error?.tab === tab ? error.error : null
@@ -4338,7 +4384,7 @@ function DashboardPage() {
   } else if (!payload) {
     content = jsx(LoadingState, {})
   } else if (tab === 'dashboard') {
-    content = jsx(DashboardView, { view: payload, onInbox: () => setTab('inbox'), onRefresh: refresh })
+    content = jsx(DashboardView, { view: payload, onInbox: () => setTab('inbox'), onRefresh: refresh, onOpen: openDeepLink })
   } else if (tab === 'project') {
     content = jsx(ProjectDashboard, { view: payload, onSelectProject: setSelectedProject, onRefresh: refresh })
   } else if (tab === 'backlog') {
@@ -4352,7 +4398,7 @@ function DashboardPage() {
   } else if (tab === 'inbox') {
     content = jsx(InboxView, { view: payload, onRefresh: refresh })
   } else {
-    content = jsx(NotificationsView, { view: payload, onRefresh: refresh, onAcknowledged: acknowledge })
+    content = jsx(NotificationsView, { view: payload, onRefresh: refresh, onAcknowledged: acknowledge, onOpen: openDeepLink })
   }
 
   return jsxs('div', { className: 'dockyard-root', children: [
