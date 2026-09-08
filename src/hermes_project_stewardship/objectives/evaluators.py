@@ -13,6 +13,7 @@ Command evaluators ALWAYS run through security.allowlist.run_allowlisted.
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
 from typing import FrozenSet, Optional
@@ -58,6 +59,15 @@ class ObjectiveEvaluator:
             return self._eval_command(objective, ctx)
         if objective.evaluator_type == "manual":
             return self._eval_manual(objective, ctx)
+        if objective.evaluator_type == "integration":
+            return ObjectiveResult(
+                objective_id=objective.id or -1,
+                name=objective.name,
+                passed=False,
+                measured=None,
+                target_met=False,
+                detail="unavailable: integration collector is not configured",
+            )
         raise ValueError(
             f"evaluator_type '{objective.evaluator_type}' not implemented in 0.1.x"
         )
@@ -73,8 +83,39 @@ class ObjectiveEvaluator:
                 passed=False,
                 measured=None,
                 target_met=False,
-                detail="no manual status recorded",
+                detail="unknown: no manual status recorded",
             )
+        if not status.get("evidence"):
+            return ObjectiveResult(
+                objective_id=objective.id or -1,
+                name=objective.name,
+                passed=False,
+                measured=None,
+                target_met=False,
+                detail="unknown: manual result has no evidence",
+            )
+        expires_at = status.get("expires_at")
+        if expires_at:
+            try:
+                expiry = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
+                if expiry <= datetime.now(timezone.utc):
+                    return ObjectiveResult(
+                        objective_id=objective.id or -1,
+                        name=objective.name,
+                        passed=False,
+                        measured=None,
+                        target_met=False,
+                        detail="stale: manual evidence has expired",
+                    )
+            except ValueError:
+                return ObjectiveResult(
+                    objective_id=objective.id or -1,
+                    name=objective.name,
+                    passed=False,
+                    measured=None,
+                    target_met=False,
+                    detail="unknown: invalid manual evidence expiry",
+                )
         measured = 1.0 if status["passed"] else 0.0
         try:
             met = _compare(measured, objective.target)
