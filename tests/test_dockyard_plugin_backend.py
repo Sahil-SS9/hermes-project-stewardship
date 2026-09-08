@@ -60,6 +60,32 @@ def client():
         plugin_api._client = previous_client
 
 
+@pytest.mark.parametrize('human', [False, True])
+def test_assessment_proxy_preserves_server_authority(client, human):
+    from hermes_project_stewardship.persistence.service import StewardshipService
+    service = StewardshipService(plugin_api._store)
+    pid = f'assessment-proxy-{human}'
+    service.enable(pid, lead_profile='fixture')
+    objective = service.add_objective(pid, name='manual', evaluator_type='manual', target='>=1')
+    previous = plugin_api._client
+    application = create_app(plugin_api._store, auth_token='proxy-test', auth_principal='verified-human', auth_principal_is_human=human, kanban_adapter=ReferenceKanbanAdapter(plugin_api._store))
+    transport = plugin_api.httpx.AsyncClient(transport=plugin_api.httpx.ASGITransport(app=application), base_url='http://test', headers={'Authorization': 'Bearer proxy-test'})
+    plugin_api._client = transport
+    try:
+        path = f'/api/plugins/hermes-dockyard/projects/{pid}/objectives/{objective["id"]}/assessment'
+        forged = client.post(path, json={'passed': True, 'evidence': ['test:1'], 'actor': 'forged'})
+        assert forged.status_code == 422
+        response = client.post(path, json={'passed': True, 'evidence': ['test:1']})
+        assert response.status_code == (200 if human else 403), response.text
+        records = service.assessments(pid)
+        assert len(records) == (1 if human else 0)
+        if human:
+            assert records[0]['verified_actor'] == 'verified-human'
+    finally:
+        plugin_api._client = previous
+        asyncio.run(transport.aclose())
+
+
 def test_host_contract_router_and_health(client):
     r = client.get("/api/plugins/hermes-dockyard/health")
     assert r.status_code == 200

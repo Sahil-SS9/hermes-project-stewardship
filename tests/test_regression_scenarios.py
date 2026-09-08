@@ -136,8 +136,11 @@ def test_scenario_5_regressed_initiative_flags_health_path(engine, enabled, svc,
 def test_scenario_6_pause_mid_cycle_blocks_new_proposals(engine, enabled, svc, tmp_path):
     repo = make_repo(tmp_path / "r6")
     wire_repo(svc, enabled, repo)
-    svc.add_objective(enabled, name="cov", evaluator_type="manual", target=">=1",
+    objective = svc.add_objective(enabled, name="cov", evaluator_type="manual", target=">=1",
                       severity="medium")
+    # A known failure reaches the proposer; absent evidence correctly blocks it.
+    svc.record_assessment(enabled, objective["id"], passed=False,
+                          evidence=["test:measured-failure"], trusted_principal="test-human")
 
     def proposer(pid, verdict, results, cycle_id):
         # pause lands mid-cycle (between assessment and proposal phase)

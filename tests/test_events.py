@@ -131,8 +131,11 @@ def test_auto_freeze_on_critical(engine, enabled, svc, tmp_path):
 def test_proposed_initiatives_emitted(engine, enabled, svc, tmp_path):
     repo = make_repo(tmp_path / "rp")
     wire_repo(svc, enabled, repo)
-    svc.add_objective(enabled, name="cov", evaluator_type="manual", target=">=1",
+    objective = svc.add_objective(enabled, name="cov", evaluator_type="manual", target=">=1",
                       severity="high")
+    # A known failure reaches the proposer; absent evidence correctly blocks it.
+    svc.record_assessment(enabled, objective["id"], passed=False,
+                          evidence=["test:measured-failure"], trusted_principal="test-human")
 
     engine.proposal_fn = lambda *a: [
         {"title": "Fix cov", "rationale": "cov failing", "dedupe_key": "fix-cov"}

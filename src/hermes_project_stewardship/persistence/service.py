@@ -17,7 +17,7 @@ import os
 import sqlite3
 import tempfile
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -579,6 +579,14 @@ class StewardshipService:
             raise ServiceError("objective description must be at most 2000 characters")
         if not clean_window or len(clean_window) > 50:
             raise ServiceError("objective window must be 1 to 50 characters")
+        import re
+        from ..objectives.evaluators import parse_target
+        if not re.fullmatch(r"([1-9][0-9]{0,3})d", clean_window):
+            raise ServiceError("objective window must be 1d to 9999d")
+        try:
+            parse_target(clean_target)
+        except ValueError as error:
+            raise ServiceError(str(error)) from error
         if evaluator_type not in ("manual", "command", "integration"):
             raise ServiceError(f"unsupported evaluator_type '{evaluator_type}'")
         if severity not in ("info", "low", "medium", "high"):
@@ -594,6 +602,8 @@ class StewardshipService:
         clean_integration = integration.strip() if isinstance(integration, str) else None
         if evaluator_type == "integration" and not clean_integration:
             raise ServiceError("integration objective requires an integration name")
+        if evaluator_type == "integration" and clean_integration != "github":
+            raise ServiceError("unsupported integration; only github is supported")
         return {
             "name": clean_name,
             "evaluator_type": evaluator_type,
@@ -804,6 +814,209 @@ class StewardshipService:
         sql += " ORDER BY id"
         rows = self.store._conn.execute(sql, (project_id,)).fetchall()
         return [Objective(**self._objective_dict(row)) for row in rows]
+
+    # ------------------------------------------------------------------ #
+    # Persisted manual assessments (P2.2)                                #
+    # ------------------------------------------------------------------ #
+
+    def record_assessment(
+        self,
+        project_id: str,
+        objective_id: int,
+        *,
+        passed: bool,
+        evidence: List[str],
+        actor: str = "system",
+        interface: str = "service",
+        detail: str = "",
+        expires_at: Optional[str] = None,
+        trusted_principal: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Record a human manual assessment for an objective.
+
+        Authority boundary (fail closed): the verified actor is ALWAYS the
+        trusted principal bound by the auth middleware. If no trusted
+        principal is available (no auth configured / caller not
+        authenticated) the write is refused rather than trusting the
+        payload actor — unauthorised agents cannot impersonate humans.
+        """
+        # 1. Trusted authority must exist. There is no "payload actor" path:
+        # without a trusted principal this operation cannot be attributed.
+        if trusted_principal is None or not str(trusted_principal).strip():
+            raise ServiceError(
+                "refused: no trusted authority available to verify a manual"
+                " assessment; assessments require an authenticated human"
+                " principal and the payload actor is never authority"
+            )
+        verified_actor = str(trusted_principal).strip()
+        # 2. The assessment must be a human sign-off, never agent-attributed.
+        if str(interface or "").strip().lower() not in (
+            "dockyard:human", "rpc", "desktop", "api", "service",
+        ) or "bot" in str(interface).lower() or "agent" in str(interface).lower():
+            raise ServiceError(
+                "refused: manual assessments must be recorded via a human"
+                " interface, not an agent/bot interface"
+            )
+        if not evidence or not all(isinstance(e, str) and e.strip() for e in evidence):
+            raise ServiceError("assessment requires at least one evidence reference")
+        if len(evidence) > 32 or any(len(e) > 500 for e in evidence):
+            raise ServiceError("evidence must be at most 500-char strings, max 32 entries")
+        if not isinstance(detail, str) or len(detail) > 2000:
+            raise ServiceError("detail must be text of at most 2000 characters")
+        if expires_at is not None:
+            try:
+                expiry = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
+                if expiry.utcoffset() is None:
+                    raise ValueError("expiry requires a timezone")
+            except ValueError:
+                raise ServiceError(
+                    f"expires_at must be an ISO-8601 timestamp, got '{expires_at}'"
+                ) from None
+        objective = self._objective_row(project_id, objective_id)
+        if objective["evaluator_type"] != "manual" or not objective["enabled"]:
+            raise ServiceError("assessment requires an active manual objective")
+        recorded_at = iso(self._clock())
+        with self.store.tx() as cx:
+            cur = cx.execute(
+                """
+                INSERT INTO project_objective_assessments(
+                    project_id, objective_id, passed, evidence_json, detail,
+                    verified_actor, interface, recorded_at, expires_at)
+                VALUES(?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    project_id, objective_id, int(bool(passed)),
+                    self.store._j(list(evidence)), detail,
+                    verified_actor, interface, recorded_at, expires_at,
+                ),
+            )
+        self.store.audit(
+            actor=verified_actor,
+            interface=interface,
+            action="objective.assessment_recorded",
+            subject=f"{project_id}:{objective_id}",
+            detail={"passed": bool(passed), "evidence_count": len(evidence)},
+        )
+        row = self.store._conn.execute(
+            "SELECT * FROM project_objective_assessments WHERE id=?",
+            (int(cur.lastrowid or 0),),
+        ).fetchone()
+        return self._assessment_dict(row)
+
+    @staticmethod
+    def _assessment_dict(row: sqlite3.Row) -> Dict[str, Any]:
+        return {
+            "id": row["id"],
+            "project_id": row["project_id"],
+            "objective_id": row["objective_id"],
+            "passed": bool(row["passed"]),
+            "evidence": json.loads(row["evidence_json"]),
+            "detail": row["detail"],
+            "verified_actor": row["verified_actor"],
+            "interface": row["interface"],
+            "recorded_at": row["recorded_at"],
+            "expires_at": row["expires_at"],
+        }
+
+    def objective_evidence(self, project_id: str, objective_id: int) -> Dict[str, Any]:
+        """Read recorded samples only; never execute commands or fetch providers on GET."""
+        import re
+        from datetime import timedelta
+
+        self._require_known(project_id)
+        row = self.store._conn.execute(
+            "SELECT * FROM project_objectives WHERE project_id=? AND id=?",
+            (project_id, objective_id),
+        ).fetchone()
+        if row is None:
+            raise ServiceError("objective not found")
+        obj = self._objective_dict(row)
+        now = self._clock()
+        match = re.fullmatch(r"([1-9][0-9]{0,3})d", obj["window"])
+        result: Dict[str, Any] = {
+            "objective_id": objective_id, "state": "unknown", "window": obj["window"],
+            "sample_count": 0, "pass_rate": None, "history": [],
+            "evidence_age_seconds": None, "detail": "insufficient data in evidence window",
+        }
+        if not match:
+            result["detail"] = "unsupported evidence window; expected 1d to 9999d"
+            return result
+        cutoff = now - timedelta(days=int(match.group(1)))
+        samples = []
+        if obj["evaluator_type"] == "manual":
+            samples = self.assessments(project_id, objective_id)
+        else:
+            rows = self.store._conn.execute(
+                "SELECT evidence_json, created_at FROM project_health_snapshots WHERE project_id=? ORDER BY id DESC",
+                (project_id,),
+            )
+            for row in rows:
+                for item in self.store._uj(row["evidence_json"], []):
+                    payload = item.get("payload_json", {})
+                    if item.get("kind") == "objective" and payload.get("objective_id") == objective_id:
+                        samples.append({**payload, "recorded_at": row["created_at"]})
+        from ..objectives.evaluators import DEFAULT_EVALUATOR, EvaluationContext
+        history = []
+        for sample in samples:
+            try:
+                timestamp = datetime.fromisoformat(sample["recorded_at"].replace("Z", "+00:00"))
+                if timestamp.utcoffset() is None or not cutoff <= timestamp <= now:
+                    continue
+                state = "passed" if sample["passed"] else "failed"
+                if obj["evaluator_type"] == "manual":
+                    manual = Objective(**obj)
+                    manual._manual_status = sample
+                    state = DEFAULT_EVALUATOR.evaluate(manual, EvaluationContext(clock=self._clock)).state
+                if obj["evaluator_type"] != "manual" and sample.get("measured") is None:
+                    state = "unknown"
+                expiry = sample.get("expires_at")
+                if expiry:
+                    expires = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
+                    state = "unknown" if expires.utcoffset() is None else ("stale" if expires <= now else state)
+                history.append({**sample, "state": state, "evidence_age_seconds": (now-timestamp).total_seconds()})
+            except (ValueError, TypeError, KeyError):
+                continue
+        history.sort(key=lambda sample: sample["evidence_age_seconds"])
+        known = [sample for sample in history if sample["state"] in {"passed", "failed"}]
+        result.update(sample_count=len(known), history=history[:100])
+        if known:
+            result["pass_rate"] = sum(sample["state"] == "passed" for sample in known) / len(known)
+        if not obj["enabled"]:
+            result.update(state="not_applicable", detail="objective archived; evidence preserved")
+            return result
+        if not history and samples:
+            result.update(state="stale", detail="no recorded evidence inside objective window")
+        if history:
+            latest = history[0]
+            result.update(state=latest["state"], evidence_age_seconds=latest["evidence_age_seconds"],
+                          detail=latest.get("detail") or f"latest recorded evidence is {latest['state']}")
+        return result
+
+    def latest_assessment(
+        self, project_id: str, objective_id: int
+    ) -> Optional[Dict[str, Any]]:
+        row = self.store._conn.execute(
+            "SELECT * FROM project_objective_assessments"
+            " WHERE project_id=? AND objective_id=?"
+            " ORDER BY id DESC LIMIT 1",
+            (project_id, objective_id),
+        ).fetchone()
+        return self._assessment_dict(row) if row is not None else None
+
+    def assessments(
+        self, project_id: str, objective_id: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        self._require_known(project_id)
+        sql = ("SELECT * FROM project_objective_assessments WHERE project_id=?")
+        params: List[Any] = [project_id]
+        if objective_id is not None:
+            sql += " AND objective_id=?"
+            params.append(objective_id)
+        sql += " ORDER BY id DESC LIMIT 200"
+        return [
+            self._assessment_dict(row)
+            for row in self.store._conn.execute(sql, params).fetchall()
+        ]
 
     # ------------------------------------------------------------------ #
     # Project supporting content                                         #

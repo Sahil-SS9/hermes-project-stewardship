@@ -2698,6 +2698,41 @@ function WorkItemDetail({ item, onClose }) {
   })
 }
 
+function ObjectiveEvidence({ objective, projectId, onSaved }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const evidence = objective.evidence || {}
+  const state = objective.enabled === false ? 'not_applicable' : evidence.state || 'unknown'
+  const save = async (event) => {
+    event.preventDefault()
+    const fields = new FormData(event.currentTarget)
+    setBusy(true)
+    setError(null)
+    try {
+      await api(`/projects/${encodeURIComponent(projectId)}/objectives/${objective.id}/assessment`, {
+        method: 'POST', body: { passed: fields.get('result') === 'passed', evidence: [String(fields.get('evidence') || '')], detail: String(fields.get('detail') || ''), expires_at: fields.get('expiry') ? new Date(String(fields.get('expiry'))).toISOString() : null },
+      })
+      await onSaved()
+    } catch (failure) { setError(String(failure?.message ?? failure)) }
+    setBusy(false)
+  }
+  return jsxs('details', { 'data-objective-evidence': objective.id, children: [
+    jsx('summary', { children: `Result: ${readableLabel(state)} · Evidence/history` }),
+    jsx('p', { children: evidence.detail || 'Insufficient data: no recorded evidence.' }),
+    jsx('p', { children: `Evidence age: ${evidence.evidence_age_seconds == null ? 'unavailable' : Math.floor(evidence.evidence_age_seconds) + ' seconds'} · Window: ${objective.window || '30d'} · Samples: ${evidence.sample_count || 0} · Pass rate: ${evidence.pass_rate == null ? 'insufficient data' : Math.round(evidence.pass_rate * 100) + '%'}` }),
+    jsx('ul', { children: (evidence.history || []).map((sample, index) => jsx('li', { children: `${sample.recorded_at} · ${sample.state} · ${sample.verified_actor || sample.source_evidence?.source || 'objective evaluator'} · ${sample.detail || ''} · ${JSON.stringify(sample.evidence || sample.source_evidence || {})}` }, index)) }),
+    objective.evaluator_type === 'manual' && objective.enabled !== false ? jsxs('form', { onSubmit: save, children: [
+      jsxs('label', { children: ['Result ', jsx('select', { name: 'result', children: ['passed', 'failed'].map(value => jsx('option', { value, children: value }, value)) })] }),
+      jsxs('label', { children: ['Evidence reference ', jsx('input', { name: 'evidence', required: true, maxLength: 500 })] }),
+      jsxs('label', { children: ['Assessment note ', jsx('input', { name: 'detail', maxLength: 2000 })] }),
+      jsxs('label', { children: ['Expires at (local time) ', jsx('input', { name: 'expiry', type: 'datetime-local' })] }),
+      jsx('button', { type: 'submit', disabled: busy || !objective.can_record_assessment, children: busy ? 'Saving and verifying…' : 'Record human assessment' }),
+      !objective.can_record_assessment ? jsx('p', { children: 'Read-only: a dedicated authenticated human principal is required to record assessments.' }) : null,
+    ]}) : null,
+    error ? jsx('p', { role: 'alert', children: error }) : null,
+  ]})
+}
+
 function ObjectivesPanel({ project, settings, objectives, missionArchive, onRefresh }) {
   const [mission, setMission] = useState(settings?.mission ?? '')
   const [missionDraft, setMissionDraft] = useState(settings?.mission ?? '')
@@ -2866,6 +2901,7 @@ function ObjectivesPanel({ project, settings, objectives, missionArchive, onRefr
           jsx(StatusTag, { tone: objective.enabled === false ? 'neutral' : severityTone(objective.severity), label: objective.enabled === false ? 'Archived' : readableLabel(objective.severity) }),
         ]}),
         jsx('p', { children: `Target ${objective.target} / ${readableLabel(objective.evaluator_type, 'Manual')} / ${objective.window || '30d'}` }),
+        jsx(ObjectiveEvidence, { objective, projectId: project.id, onSaved: async () => { const refreshed = await api(`/projects/${encoded}/objectives`); setItems(refreshed.objectives || []); onRefresh?.() } }),
         jsxs('div', { className: 'dockyard-form-actions', children: [
           objective.enabled !== false ? jsx('button', { type: 'button', className: 'dockyard-button small', 'data-action': 'edit-objective', 'data-objective-id': objective.id, onClick: () => startObjective(objective), children: 'Edit' }) : null,
           objective.enabled !== false ? jsx('button', { type: 'button', className: 'dockyard-button danger small', 'data-action': 'archive-objective', 'data-objective-id': objective.id, onClick: () => setPending({ type: 'archive-objective', id: objective.id }), children: 'Archive' }) : null,

@@ -61,6 +61,14 @@ class ObjectiveResult:
     target_met: bool
     detail: str
 
+    @property
+    def state(self) -> str:
+        if self.measured is None and self.detail.startswith("not_applicable:"):
+            return "not_applicable"
+        if self.measured is None:
+            return "stale" if self.detail.startswith("stale:") else "unknown"
+        return "passed" if self.passed else "failed"
+
 
 @dataclass
 class Evidence:

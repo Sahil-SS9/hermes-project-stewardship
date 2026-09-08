@@ -117,6 +117,14 @@ class ObjectivePatch(BaseModel):
     interface: str = "rpc"
 
 
+class ObjectiveAssessmentRequest(BaseModel):
+    passed: bool
+    evidence: list[str]
+    detail: str = ""
+    expires_at: Optional[str] = None
+    interface: str = "rpc"
+
+
 class ContentUploadRequest(BaseModel):
     filename: str
     media_type: str
@@ -357,6 +365,7 @@ def create_app(
     *,
     auth_token: Optional[str] = None,
     auth_principal: str = "rpc-token",
+    auth_principal_is_human: bool = False,
     rate_limit_rpm: int = 120,
     kanban_adapter: KanbanAdapter | None = None,
 ) -> FastAPI:
@@ -484,7 +493,7 @@ def create_app(
     def objectives(project_id: str, include_archived: bool = False):
         return {
             "objectives": [
-                asdict(item)
+                {**asdict(item), "can_record_assessment": bool(auth_principal_is_human and current_principal()), "evidence": svc.objective_evidence(project_id, item.id) if item.id is not None else None}
                 for item in svc.objectives(
                     project_id, include_disabled=include_archived
                 )
@@ -543,6 +552,44 @@ def create_app(
             actor=_principal_id(body.actor),
             interface=body.interface,
         )
+
+    @router.post("/projects/{project_id}/objectives/{objective_id}/assessment")
+    def record_assessment(
+        project_id: str, objective_id: int, body: ObjectiveAssessmentRequest
+    ):
+        # Authority: verified actor is the authenticated principal bound by
+        # the bearer middleware — never a payload field. Fail closed with 503
+        # when no trusted principal is configured.
+        principal = current_principal()
+        if not principal:
+            raise HTTPException(
+                503,
+                "no trusted principal available: manual assessments require"
+                " an authenticated human caller; the payload cannot name the"
+                " verifying actor",
+            )
+        # This capability is assigned by the server's composition, never by
+        # request fields. Shared/agent tokens retain the default denial.
+        if not auth_principal_is_human:
+            raise HTTPException(403, "manual assessments require a dedicated human principal")
+        try:
+            return svc.record_assessment(
+                project_id,
+                objective_id,
+                passed=body.passed,
+                evidence=body.evidence,
+                detail=body.detail,
+                expires_at=body.expires_at,
+                actor=principal,
+                interface=body.interface,
+                trusted_principal=principal,
+            )
+        except ServiceError as e:
+            raise HTTPException(409, str(e)) from None
+
+    @router.get("/projects/{project_id}/objectives/{objective_id}/assessments")
+    def list_assessments(project_id: str, objective_id: int):
+        return {"assessments": svc.assessments(project_id, objective_id)}
 
     @router.get("/projects/{project_id}/missions/archive")
     def archived_missions(project_id: str):

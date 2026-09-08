@@ -5,6 +5,7 @@
 // as markup.
 import type { Api, HermesPluginSDK, MilestoneSummary, WorkItem } from './api';
 import { createApi } from './api';
+import { renderObjectiveEvidence } from './objective-evidence';
 import { mountWorkflowCanvas, type CanvasRun } from './workflow-canvas';
 
 interface AppState {
@@ -259,6 +260,17 @@ async function renderDashboard(
     const strong = document.createElement('strong');
     strong.textContent = String(p.project_id);
     tdId.appendChild(strong);
+    const evidenceButton = document.createElement('button');
+    evidenceButton.textContent = 'Objective evidence';
+    evidenceButton.dataset.objectivesProject = p.project_id;
+    const evidencePanel = document.createElement('section');
+    evidencePanel.className = 'dy-card'; evidencePanel.hidden = true;
+    evidenceButton.addEventListener('click', () => {
+      evidencePanel.hidden = !evidencePanel.hidden;
+      if (!evidencePanel.hidden) void renderObjectiveEvidence(evidencePanel, s.api, p.project_id);
+    });
+    tdId.appendChild(evidenceButton);
+    wrap.appendChild(evidencePanel);
     const items = p.items ?? { total: 0, done: 0, blocked: 0, overdue: 0 };
     const ms = p.next_milestone;
     let msText = '—';

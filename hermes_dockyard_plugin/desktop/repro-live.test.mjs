@@ -2,6 +2,7 @@
 // Exercises real React effects in jsdom, write interactions, every UI state,
 // CSS parsing, contrast metadata and Chromium layout at 700px and 1600px.
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -204,7 +205,7 @@ function createDeferred() {
   return { promise, resolve, reject };
 }
 
-async function createRuntime({ mode = 'populated', failOnce = false, failMutationPath = null } = {}) {
+async function createRuntime({ mode = 'populated', failOnce = false, failMutationPath = null, objectivePayload = null } = {}) {
   const virtualConsole = new VirtualConsole();
   const jsdomMessages = [];
   virtualConsole.on('jsdomError', (error) => jsdomMessages.push(error.message));
@@ -231,6 +232,7 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
   const navigations = [];
   const clipboardWrites = [];
   const data = clone(mode === 'empty' ? EMPTY : POPULATED);
+  if (objectivePayload) data.objectives['payments-relaunch'] = objectivePayload;
   const deferred = mode === 'loading' ? createDeferred() : null;
   let shouldFail = failOnce;
 
@@ -795,6 +797,8 @@ async function testMissionObjectiveManagementAndDestructiveGates() {
   await runtime.click('[data-project-view="objectives"]');
   const doc = runtime.dom.window.document;
 
+  assert(doc.querySelector('[data-objective-evidence]'), 'objective evidence/history is missing');
+  assert.match(doc.querySelector('[data-objective-evidence]').textContent, /Unknown|unknown/);
   assert(doc.querySelector('[data-mission-manager]'), 'mission manager is missing');
   assert.equal(doc.querySelectorAll('[data-objective-row]').length, 2, 'active and archived objectives did not render');
   assert.match(doc.body.textContent, /Stabilise the legacy checkout/);
@@ -1398,7 +1402,29 @@ async function testChromiumLayouts() {
   console.log('LAYOUT_RESULTS=' + JSON.stringify(results));
 }
 
+async function testActualObjectiveEvidence() {
+  const payload = JSON.parse(execFileSync(fileURLToPath(new URL('../../.venv/bin/python', import.meta.url)), [fileURLToPath(new URL('../../tests/phase2_payload.py', import.meta.url))], { encoding: 'utf8' }));
+  const runtime = await createRuntime({ objectivePayload: payload });
+  try {
+    await runtime.mount();
+    await runtime.click('[data-tab="project"]', 80);
+    await runtime.click('[data-project-view="objectives"]');
+    const doc = runtime.dom.window.document;
+    const rows = [...doc.querySelectorAll('[data-objective-evidence]')];
+    assert.equal(rows.length, 4);
+    for (const state of ['passed', 'failed', 'stale', 'unknown']) assert(rows.some(row => row.textContent.toLowerCase().includes(state)));
+    assert(rows.some(row => row.textContent.includes('ticket:1')));
+    assert.equal(doc.querySelectorAll('[data-objective-evidence] script').length, 0);
+    assert([...doc.querySelectorAll('[data-objective-evidence] button')].every(button => button.disabled), 'unauthenticated assessment controls must fail closed');
+    if (process.env.PHASE2_RENDER_HTML) {
+      rows.forEach(row => { row.open = true; });
+      writeFileSync(process.env.PHASE2_RENDER_HTML, runtime.dom.serialize());
+    }
+  } finally { await runtime.dispose(); }
+}
+
 const tests = [
+  ['actual API objective evidence and authority', testActualObjectiveEvidence],
   ['styles and populated dashboard', testStylesAndPopulatedDashboard],
   ['loading and empty states', testLoadingAndEmptyStates],
   ['error retry', testErrorRetry],

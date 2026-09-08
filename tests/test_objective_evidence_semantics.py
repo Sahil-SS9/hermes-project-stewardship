@@ -1,5 +1,4 @@
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 
 from hermes_project_stewardship.domain.models import Objective
 from hermes_project_stewardship.objectives.evaluators import DEFAULT_EVALUATOR, EvaluationContext
@@ -21,6 +20,20 @@ def test_manual_assessment_expires_to_stale():
     result = DEFAULT_EVALUATOR.evaluate(_manual(passed=True, evidence=['ticket:1'], expires_at=(datetime.now(timezone.utc) - timedelta(days=1)).isoformat()), EvaluationContext())
     assert result.passed is False
     assert result.detail.startswith('stale:')
+
+
+def test_manual_expiry_uses_injected_clock():
+    now = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    objective = _manual(passed=True, evidence=['ticket:1'], expires_at=now.isoformat())
+    result = DEFAULT_EVALUATOR.evaluate(objective, EvaluationContext(clock=lambda: now))
+    assert result.detail.startswith('stale:')
+
+
+def test_timezone_free_expiry_is_unknown_not_a_crash():
+    objective = _manual(passed=True, evidence=['ticket:1'], expires_at='2030-01-01T00:00:00')
+    result = DEFAULT_EVALUATOR.evaluate(objective, EvaluationContext())
+    assert not result.passed
+    assert result.detail.startswith('unknown:')
 
 
 def test_unsupported_integration_is_not_a_false_pass():
