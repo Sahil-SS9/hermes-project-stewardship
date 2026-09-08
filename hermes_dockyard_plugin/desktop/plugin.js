@@ -3688,8 +3688,12 @@ function ApprovalRow({ item, onResolved }) {
     setState(action === 'approve' ? 'approving' : 'rejecting')
     setError(null)
     try {
+      const decision = await api(`/initiatives/${encodeURIComponent(item.ref)}/decision`)
+      const body = action === 'reject'
+        ? { expected_fingerprint: decision.fingerprint, reason: 'Rejected from Desktop review' }
+        : { expected_fingerprint: decision.fingerprint }
       await api(`/initiatives/${encodeURIComponent(item.ref)}/${action}`, {
-        method: 'POST', body: {}, suppressErrorToast: true,
+        method: 'POST', body, suppressErrorToast: true,
       })
       setState(resolvedState)
       setTimeout(onResolved, 850)

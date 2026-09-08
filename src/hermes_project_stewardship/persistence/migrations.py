@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 19
+SCHEMA_VERSION = 20
 
 
 @dataclass(frozen=True)
@@ -720,9 +720,7 @@ MIGRATIONS: List[Migration] = [
             CHECK (result_state IN ('improved','regressed','unknown'));
         ALTER TABLE dockyard_observation_triggers ADD COLUMN result_evidence_json TEXT;
 
-        -- P3.2: atomic claim primitive for bounded work. INSERT OR IGNORE is
-        -- the concurrency gate; NULL claimers never collide (SQLite UNIQUE
-        -- treats NULLs as distinct) so keyless rows stay unlimited.
+        -- P3.2: atomic claim primitive for bounded work.
         CREATE TABLE IF NOT EXISTS event_claims (
             claim_key  TEXT PRIMARY KEY,
             holder     TEXT,
@@ -730,11 +728,35 @@ MIGRATIONS: List[Migration] = [
         );
         """,
         downgrade_sql="""
-        CREATE TABLE IF NOT EXISTS event_claims_legacy_backup AS
-            SELECT * FROM event_claims WHERE 0;
         DROP TABLE IF EXISTS event_claims;
         ALTER TABLE dockyard_observation_triggers DROP COLUMN result_state;
         ALTER TABLE dockyard_observation_triggers DROP COLUMN result_evidence_json;
+        """,
+    ),
+    Migration(
+        version=20,
+        name="evidence-backed decision receipts",
+        upgrade_sql="""
+        ALTER TABLE project_initiatives ADD COLUMN decision_revision INTEGER NOT NULL DEFAULT 0;
+        CREATE TABLE IF NOT EXISTS stewardship_decision_receipts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            initiative_ref TEXT NOT NULL REFERENCES project_initiatives(ref) ON DELETE CASCADE,
+            decision TEXT NOT NULL CHECK (decision IN ('approved','rejected')),
+            actor TEXT NOT NULL,
+            interface TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            note TEXT NOT NULL DEFAULT '',
+            fingerprint TEXT NOT NULL,
+            revision INTEGER NOT NULL,
+            decided_at TEXT NOT NULL,
+            UNIQUE(initiative_ref, revision)
+        );
+        CREATE INDEX IF NOT EXISTS idx_decision_receipt_ref
+            ON stewardship_decision_receipts(initiative_ref, decided_at DESC);
+        """,
+        downgrade_sql="""
+        DROP TABLE IF EXISTS stewardship_decision_receipts;
+        ALTER TABLE project_initiatives DROP COLUMN decision_revision;
         """,
     ),
 ]

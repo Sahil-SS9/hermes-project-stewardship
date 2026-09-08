@@ -117,7 +117,8 @@ def test_rejection_path_leaves_board_untouched(env):
     ini = svc.propose_initiative(
         "demo", title="Bad idea",
         rationale="objective unclear: no measurable benefit")
-    svc.reject_initiative(ini["ref"], actor="sahil", interface="dockyard:human")
+    svc.reject_initiative(ini["ref"], actor="sahil", interface="dockyard:human",
+                          reason="not a fit")
     assert dy.find_promoted("demo", ini["ref"]) is None
     # no kanban board bound
     assert svc.initiative_by_ref(ini["ref"])["board_slug"] is None
