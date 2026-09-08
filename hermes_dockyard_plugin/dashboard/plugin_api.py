@@ -677,6 +677,13 @@ class InitiativeCompleteBody(BaseModel):
     regressed: bool = False
 
 
+class DecisionActionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_fingerprint: str | None = None
+    reason: str = ""
+    note: str = ""
+
+
 class BacklogAddBody(BaseModel):
     ref: str
     rank: int
@@ -851,21 +858,43 @@ async def onboard(body: OnboardBody) -> dict:
     return await _proxy("POST", "/stewardship/v1/onboard", payload)
 
 
+@plugin_api.get("/initiatives/{ref}/decision")
+async def decision(ref: str) -> dict:
+    r = quote(ref, safe="")
+    return await _proxy("GET", f"/stewardship/v1/initiatives/{r}/decision")
+
+
+@plugin_api.get("/initiatives/{ref}/decision/receipts")
+async def decision_receipts(ref: str) -> dict:
+    r = quote(ref, safe="")
+    return await _proxy("GET", f"/stewardship/v1/initiatives/{r}/decision/receipts")
+
+
 @plugin_api.post("/initiatives/{ref}/approve")
-async def approve(ref: str) -> dict:
+async def approve(ref: str, body: DecisionActionBody | None = None) -> dict:
     # Actor attribution is fixed server-side: this dashboard always acts as sahil.
     r = quote(ref, safe="")
-    return await _proxy(
-        "POST", f"/stewardship/v1/initiatives/{r}/approve",
-        {"actor": _ACTOR_ID, "interface": "dockyard:human"})
+    payload = {"actor": _ACTOR_ID, "interface": "dockyard:human"}
+    if body is not None:
+        if body.expected_fingerprint is not None:
+            payload["expected_fingerprint"] = body.expected_fingerprint
+        if body.note:
+            payload["note"] = body.note
+    return await _proxy("POST", f"/stewardship/v1/initiatives/{r}/approve", payload)
 
 
 @plugin_api.post("/initiatives/{ref}/reject")
-async def reject(ref: str) -> dict:
+async def reject(ref: str, body: DecisionActionBody | None = None) -> dict:
     r = quote(ref, safe="")
-    return await _proxy(
-        "POST", f"/stewardship/v1/initiatives/{r}/reject",
-        {"actor": _ACTOR_ID, "interface": "dockyard:human"})
+    payload = {"actor": _ACTOR_ID, "interface": "dockyard:human"}
+    if body is not None:
+        if body.expected_fingerprint is not None:
+            payload["expected_fingerprint"] = body.expected_fingerprint
+        if body.reason:
+            payload["reason"] = body.reason
+        if body.note:
+            payload["note"] = body.note
+    return await _proxy("POST", f"/stewardship/v1/initiatives/{r}/reject", payload)
 
 
 @plugin_api.post("/initiatives/{ref}/complete")

@@ -246,23 +246,10 @@ export function createApi(sdk: HermesPluginSDK) {
       get<{ receipts: Array<Record<string, unknown>> }>(
         `/initiatives/${encodeURIComponent(ref)}/decision/receipts`,
       ),
-    approve: async (ref: string, payload: { note?: string } = {}) => {
-      const decision = await get<DecisionPayload>(`/initiatives/${encodeURIComponent(ref)}/decision`);
-      return post(`/initiatives/${encodeURIComponent(ref)}/approve`, {
-        expected_fingerprint: decision.fingerprint,
-        ...payload,
-      });
-    },
-    reject: async (ref: string, payload: { expected_fingerprint?: string; reason?: string; note?: string } = {}) => {
-      const decision = payload.expected_fingerprint
-        ? { fingerprint: payload.expected_fingerprint }
-        : await get<DecisionPayload>(`/initiatives/${encodeURIComponent(ref)}/decision`);
-      return post(`/initiatives/${encodeURIComponent(ref)}/reject`, {
-        expected_fingerprint: decision.fingerprint,
-        reason: payload.reason || 'Rejected from dashboard',
-        ...payload,
-      });
-    },
+    approve: (ref: string, payload: { expected_fingerprint: string; note?: string }) =>
+      post(`/initiatives/${encodeURIComponent(ref)}/approve`, payload),
+    reject: (ref: string, payload: { expected_fingerprint: string; reason: string; note?: string }) =>
+      post(`/initiatives/${encodeURIComponent(ref)}/reject`, payload),
     workflowRuns: (projectId: string, name: string) =>
       get<{
         runs: Array<{

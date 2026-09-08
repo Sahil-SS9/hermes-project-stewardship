@@ -1571,6 +1571,11 @@ class StewardshipService:
             raise ServiceError(
                 f"initiative {ref} is not pending approval (status={ini['status']})"
             )
+        # Status change and receipt commit together (round-2 review issue 2):
+        # a receipt write failure rolls back the status change, and the guarded
+        # update serialises concurrent decisions inside one immediate tx.
+        now = iso(self._clock())
+        revision = decision["revision"] + 1
         with self.store.tx() as cx:
             res = cx.execute(
                 "UPDATE project_initiatives SET status='approved',"
@@ -1580,12 +1585,20 @@ class StewardshipService:
             )
             if res.rowcount != 1:
                 raise ServiceError(f"initiative {ref} changed state concurrently")
+            cx.execute(
+                "INSERT INTO stewardship_decision_receipts(initiative_ref,decision,"
+                "actor,interface,reason,note,fingerprint,revision,decided_at)"
+                " VALUES(?,?,?,?,?,?,?,?,?)",
+                (ref, "approved", actor, interface, "", note,
+                 decision["fingerprint"], revision, now),
+            )
         self.store.audit(actor=actor, interface=interface,
                          action="initiative.approved", subject=ref)
-        self._decision_receipt(ref=ref, decision="approved", actor=actor,
-                               interface=interface,
-                               fingerprint=decision["fingerprint"],
-                               revision=decision["revision"] + 1, note=note)
+        self.store.audit(actor=actor, interface=interface,
+                         action="initiative.decision", subject=ref,
+                         detail={"decision": "approved", "reason": "",
+                                 "note": note, "fingerprint": decision["fingerprint"],
+                                 "revision": revision})
         return self.initiative_by_ref(ref)
 
     def reject_initiative(
@@ -1613,11 +1626,34 @@ class StewardshipService:
         # keys. Reconstruct the same fallback propose_initiative uses so a
         # rejection remains atomic and still suppresses the repeated proposal.
         dedupe_key = ini["dedupe_key"] or ini["title"].strip().lower()[:80] or ref.lower()
+        reason_text = reason.strip()
+        now = iso(self._clock())
+        revision = decision["revision"] + 1
+        # Status, revision, receipt (and suppression) commit together; the
+        # status guard makes concurrent approve/reject serialise on the first
+        # writer, so no contradictory status/receipt pair can survive.
         with self.store.tx() as cx:
-            cx.execute(
+            res = cx.execute(
                 "UPDATE project_initiatives SET status='rejected',"
-                " approval_state='rejected', dedupe_key=? WHERE ref=?",
+                " approval_state='rejected', dedupe_key=?,"
+                " decision_revision=decision_revision+1"
+                " WHERE ref=? AND status IN ('pending_approval','proposed')",
                 (dedupe_key, ref),
+            )
+            if res.rowcount != 1:
+                current = cx.execute(
+                    "SELECT status FROM project_initiatives WHERE ref=?", (ref,)
+                ).fetchone()
+                current_status = current["status"] if current is not None else "missing"
+                if current_status == "rejected":
+                    return self.initiative_by_ref(ref)
+                raise ServiceError(f"initiative {ref} changed state concurrently")
+            cx.execute(
+                """INSERT INTO stewardship_decision_receipts(initiative_ref,decision,
+                actor,interface,reason,note,fingerprint,revision,decided_at)
+                VALUES(?,?,?,?,?,?,?,?,?)""",
+                (ref, "rejected", actor, interface, reason_text, note,
+                 decision["fingerprint"], revision, now),
             )
             cx.execute(
                 """
@@ -1639,11 +1675,11 @@ class StewardshipService:
             actor=actor, interface=interface, action="initiative.rejected", subject=ref,
             detail={"suppression_days": days},
         )
-        self._decision_receipt(ref=ref, decision="rejected", actor=actor,
-                               interface=interface,
-                               fingerprint=decision["fingerprint"],
-                               revision=decision["revision"] + 1,
-                               reason=reason.strip(), note=note)
+        self.store.audit(actor=actor, interface=interface,
+                         action="initiative.decision", subject=ref,
+                         detail={"decision": "rejected", "reason": reason_text,
+                                 "note": note, "fingerprint": decision["fingerprint"],
+                                 "revision": revision})
         return self.initiative_by_ref(ref)
 
     def start_execution(self, ref: str) -> Dict[str, Any]:

@@ -722,16 +722,16 @@ async function testProjectDashboardScreen() {
   assert(doc.querySelector('[data-overview-activity]'), 'project overview is missing attributed activity context');
   assert.match(doc.querySelector('[data-overview-work]').textContent, /Fix double-charge on retry path/);
   await runtime.click('[data-project-view="board"]');
-  assert.equal(doc.querySelectorAll('[data-board-column]').length, 4, 'project board must expose backlog, active, review and done columns');
+  assert.equal(doc.querySelectorAll('[data-board-column]').length, 6, 'project board must expose backlog, active, review, blocked, done and other-states columns');
   assert(doc.querySelectorAll('[data-work-card]').length >= 3, 'project board did not render backend work items');
   assert(doc.querySelector('[data-view-only="board"]'), 'project board is not visibly marked view-only');
-  assert(!doc.querySelector('[data-action="transition-work-item"]'), 'project board exposes an unsupported edit control');
   await runtime.click('[data-work-card="HDY-12"]');
   const workDetail = doc.querySelector('[data-work-item-detail="HDY-12"]');
-  assert(workDetail, 'board item did not open its read-only detail');
+  assert(workDetail, 'board item did not open its editable detail');
   assert.match(workDetail.textContent, /Fix double-charge on retry path/);
   assert.match(workDetail.textContent, /octacon-bot/);
-  assert(!workDetail.querySelector('input, textarea, select'), 'read-only item detail exposes editable controls');
+  assert(workDetail.querySelector('input, textarea, select'), 'editable item detail exposes no editing controls');
+  assert(workDetail.querySelector('[data-action="save-work-item"]'), 'editable item detail is missing Save');
   await runtime.click('[data-action="close-work-item-detail"]');
   assert(doc.querySelector('[data-work-item-detail-layer]')?.hidden, 'work-item detail did not close');
 

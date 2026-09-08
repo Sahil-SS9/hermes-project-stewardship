@@ -773,7 +773,20 @@ async function renderDelivery(
     };
     if (initiative.status === 'pending_approval') {
       const approve = workLayoutButton('Approve and start execution', false);
-      approve.addEventListener('click', () => void run(approve, () => s.api.approve(initiative.ref)));
+      approve.addEventListener('click', () => void run(approve, async () => {
+        // Submit the fingerprint of the decision the owner reviewed: fetch and
+        // display the shared decision BEFORE the action, never after the click.
+        const decision = await s.api.decision(initiative.ref);
+        const note = window.prompt(
+          'Decision note (optional). Review scope before approving:',
+          '',
+        );
+        if (note === null) throw new Error('approval cancelled');
+        await s.api.approve(initiative.ref, {
+          expected_fingerprint: decision.fingerprint,
+          note: note || '',
+        });
+      }));
       actions.appendChild(approve);
     }
     if (initiative.status === 'executing') {
@@ -980,13 +993,45 @@ async function renderInbox(
     );
     row.appendChild(body);
     if (it.kind === 'initiative_approval') {
+      // Fetch and display the shared decision when the row renders; the
+      // submit binds to the displayed fingerprint (round-2 issue 3).
+      const decisionHolder = { fingerprint: null as string | null };
+      s.api.decision(it.ref).then((decision) => {
+        decisionHolder.fingerprint = decision.fingerprint;
+        const evidence = document.createElement('div');
+        evidence.className = 'dy-inbox-decision';
+        evidence.setAttribute('data-decision-evidence', 'true');
+        evidence.append(
+          textEl('p', '', String(decision.title ?? '')),
+          textEl('p', 'dy-dim',
+            `risk ${decision.risk ?? 'unknown'} · outcome ${decision.expected_outcome ?? 'unknown'} · fingerprint ${decision.fingerprint}`),
+        );
+        row.appendChild(evidence);
+      }).catch(() => {
+        row.appendChild(textEl('p', 'dy-error',
+          'Decision evidence unavailable; refresh before deciding.'));
+      });
       const btn = document.createElement('button');
       btn.className = 'dy-btn primary';
       btn.textContent = 'Approve';
       btn.addEventListener('click', async () => {
         btn.disabled = true;
         try {
-          await s.api.approve(it.ref);
+          if (!decisionHolder.fingerprint) {
+            throw new Error('Decision evidence not reviewed yet; refresh before deciding.');
+          }
+          const note = window.prompt(
+            'Decision note (optional). Review the displayed decision before approving:',
+            '',
+          );
+          if (note === null) {
+            btn.disabled = false;
+            return;
+          }
+          await s.api.approve(it.ref, {
+            expected_fingerprint: decisionHolder.fingerprint,
+            note: note || '',
+          });
           row.remove();
           if (!list.querySelector('.dy-inbox-item')) {
             list.appendChild(textEl('p', 'dy-dim', 'Inbox zero.'));
@@ -1183,8 +1228,17 @@ async function renderWorkflow(
       wname,
       () => s.api.workflowRuns(pid, wname).then((r) => r.runs),
       {
-        onApprove: (ref) => s.api.approve(ref),
-        onReject: (ref) => s.api.reject(ref),
+        onApprove: async (ref) => {
+          const decision = await s.api.decision(ref);
+          await s.api.approve(ref, { expected_fingerprint: decision.fingerprint });
+        },
+        onReject: async (ref) => {
+          const decision = await s.api.decision(ref);
+          await s.api.reject(ref, {
+            expected_fingerprint: decision.fingerprint,
+            reason: 'Rejected from workflow gate review',
+          });
+        },
         // agenttrail expansion: children -> task list, history -> activity thread
         onExpand: async (ref) => {
           const d = await s.api.workDetail(pid, ref);
