@@ -5,6 +5,7 @@ import hashlib
 from importlib import import_module
 import json
 from pathlib import Path
+import sys
 from typing import Any, Mapping
 
 from .bridge import BoardCard, KanbanAdapter
@@ -152,6 +153,7 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
     def __init__(self, host: Any) -> None:
         self.host = host
         self._board_projects: dict[str, str] = {}
+        self.host_provenance: dict[str, Any] | None = None
         self._verify_contract()
 
     def _verify_contract(self) -> None:
@@ -622,12 +624,13 @@ def create_project_kanban_adapter(
 ) -> ProjectKanbanHostAdapter:
     """Compose Dockyard against the active Hermes host implementation."""
     try:
-        constants_module = import_module("hermes_constants")
+        host_module: Any = None
         try:
             host_module = import_module("hermes_cli.project_kanban_host")
             host_type = getattr(host_module, "ProjectKanbanHost")
         except (ImportError, AttributeError):
             from .vanilla_host import ProjectKanbanHost as host_type
+        constants_module = import_module("hermes_constants")
         resolved_home = (
             Path(hermes_home)
             if hermes_home is not None
@@ -639,4 +642,18 @@ def create_project_kanban_adapter(
             "canonical project and Kanban host is unavailable",
         ) from None
     host = host_type(hermes_home=resolved_home, board=board or "default")
-    return ProjectKanbanHostAdapter(host)
+    adapter = ProjectKanbanHostAdapter(host)
+    # P1.7: record the actually imported host so unsupported trees are
+    # diagnosable; vanilla fallback must never be confused with a fork module.
+    adapter.host_provenance = {
+        "host_module": getattr(host_type, "__module__", None),
+        "host_class": host_type.__name__,
+        "imported_paths": [
+            name for name in ("hermes_constants", "hermes_cli.project_kanban_host")
+            if name in sys.modules
+        ],
+        "host_signature": f"{host_type.__name__}(hermes_home=..., board=...)",
+        "resolved_home": str(resolved_home),
+        "contract_version": adapter.host.capabilities().get("contract_version"),
+    }
+    return adapter

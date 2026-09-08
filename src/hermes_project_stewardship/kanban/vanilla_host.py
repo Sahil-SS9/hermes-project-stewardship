@@ -181,8 +181,9 @@ class ProjectKanbanHost:
 
     @contextmanager
     def _kanban(self, board: str | None = None):
+        from hermes_cli.kanban_db_connect import connect_closing
         _, kanban_db, _ = self._modules()
-        with self._scope(board) as selected, kanban_db.connect_closing(board=selected) as conn:
+        with self._scope(board) as selected, connect_closing(board=selected) as conn:
             yield kanban_db, conn, selected
 
     @staticmethod
@@ -242,19 +243,23 @@ class ProjectKanbanHost:
             existing = None
             if idempotency_key:
                 existing = conn.execute(
-                    "SELECT id FROM tasks WHERE idempotency_key=? LIMIT 1",
+                    "SELECT id FROM tasks WHERE idempotency_key=? AND status != 'archived' ORDER BY created_at DESC LIMIT 1",
                     (idempotency_key,),
                 ).fetchone()
             if existing:
                 return self._task_record(kb.get_task(conn, str(existing["id"])))
             task_id = kb.create_task(
                 conn, title=title, body=body, assignee=assignee, created_by=created_by,
-                tenant=f"dockyard:{task_kind}", initial_status="running",
+                tenant=f"dockyard:{task_kind}",
+                initial_status="blocked" if initial_status == "blocked" else "running",
+                triage=self._native_status(initial_status) == "triage",
+                parents=(parent_task_id,) if parent_task_id else (),
                 idempotency_key=idempotency_key, board=selected, project_id=project_id,
             )
-            if parent_task_id:
-                kb.link_tasks(conn, parent_task_id, task_id)
-            self._set_status(conn, task_id, initial_status)
+            if initial_status in {"review", "done"}:
+                operation = kb.request_review if initial_status == "review" else kb.complete_task
+                if not operation(conn, task_id):
+                    raise HostError("transition_conflict", "canonical task transition was rejected")
             return self._task_record(kb.get_task(conn, task_id))
 
     def create_epic(
@@ -262,14 +267,20 @@ class ProjectKanbanHost:
         parent_epic_id: str | None = None, status: str = "active",
         board: str | None = None, **_kwargs: Any,
     ) -> dict[str, Any]:
+        if status not in {"active", "done"}:
+            raise HostError("validation_error", "epic status must be active or done")
         with self._kanban(board) as (kb, conn, selected):
+            # Epics are grouping records, never claimable agent work: they are
+            # created in triage and only ever closed through native completion.
             epic_id = kb.create_task(
                 conn, title=title, body=description, created_by="dockyard",
-                tenant="dockyard:epic", initial_status="running", board=selected,
+                tenant="dockyard:epic", triage=True, board=selected,
             )
             if parent_epic_id:
                 kb.link_tasks(conn, parent_epic_id, epic_id)
-            self._set_status(conn, epic_id, "done" if status == "done" else "ready")
+            if status == "done":
+                if not kb.specify_triage_task(conn, epic_id) or not kb.complete_task(conn, epic_id, summary="epic created as closed"):
+                    raise HostError("transition_conflict", "canonical task transition was rejected")
             return self._task_record(kb.get_task(conn, epic_id))
 
     @staticmethod
@@ -288,25 +299,35 @@ class ProjectKanbanHost:
         self, task_id: str, status: str, *, board: str | None = None,
         force_review: bool = False, **_kwargs: Any,
     ) -> dict[str, Any]:
-        del force_review
         with self._kanban(board) as (kb, conn, _):
-            if kb.get_task(conn, task_id) is None:
+            task = kb.get_task(conn, task_id)
+            if task is None:
                 raise HostError("task_not_found", "canonical task was not found")
             native_status = self._native_status(status)
+            expected_run_id = _kwargs.get("expected_run_id")
+            if task.current_run_id is not None and expected_run_id != task.current_run_id:
+                if not (native_status == "review" and force_review):
+                    raise HostError("transition_conflict", "transition requires ownership of the current claim")
             if native_status == "done":
-                if not kb.complete_task(conn, task_id, summary=_kwargs.get("summary")):
+                if not kb.complete_task(conn, task_id, summary=_kwargs.get("summary"), expected_run_id=expected_run_id):
                     raise HostError("transition_conflict", "canonical task transition was rejected")
             elif native_status == "blocked":
-                if not kb.block_task(conn, task_id, reason=_kwargs.get("reason")):
+                if not kb.block_task(conn, task_id, reason=_kwargs.get("reason"), expected_run_id=expected_run_id):
                     raise HostError("transition_conflict", "canonical task transition was rejected")
             elif native_status == "review":
                 if not kb.request_review(
                     conn, task_id, summary=_kwargs.get("summary"),
-                    expected_run_id=_kwargs.get("expected_run_id"), force=True,
+                    expected_run_id=expected_run_id, force=force_review,
                 ):
                     raise HostError("transition_conflict", "canonical task transition was rejected")
-            else:
-                self._set_status(conn, task_id, status)
+            elif native_status == "ready" and task.status == "triage":
+                if not kb.specify_triage_task(conn, task_id):
+                    raise HostError("transition_conflict", "canonical task transition was rejected")
+            elif native_status == "ready" and task.status == "blocked":
+                if not kb.unblock_task(conn, task_id):
+                    raise HostError("transition_conflict", "canonical task transition was rejected")
+            elif native_status != task.status:
+                raise HostError("transition_conflict", "canonical task transition is not supported")
             return self._task_record(kb.get_task(conn, task_id))
 
     def block_task(self, task_id: str, *, board: str | None = None, **_kwargs: Any) -> dict[str, Any]:
@@ -314,6 +335,8 @@ class ProjectKanbanHost:
 
     def update_task(self, task_id: str, *, board: str | None = None, **changes: Any) -> dict[str, Any]:
         columns = {"title": "title", "body": "body"}
+        if "task_kind" in changes and str(changes["task_kind"]) not in _TASK_KINDS:
+            raise HostError("validation_error", "canonical work type is not supported")
         with self._kanban(board) as (kb, conn, _):
             if kb.get_task(conn, task_id) is None:
                 raise HostError("task_not_found", "canonical task was not found")
@@ -333,6 +356,11 @@ class ProjectKanbanHost:
         mapped = {"title": changes.get("title"), "body": changes.get("description")}
         result = self.update_task(epic_id, board=board, **{k: v for k, v in mapped.items() if v is not None})
         if "status" in changes:
+            if changes["status"] == "done":
+                with self._kanban(board) as (kb, conn, _):
+                    task = kb.get_task(conn, epic_id)
+                if task is None or task.status != "triage":
+                    raise HostError("transition_conflict", "epic is not in its native triage lane")
             result = self.transition_task(
                 epic_id, "done" if changes["status"] == "done" else "ready", board=board
             )

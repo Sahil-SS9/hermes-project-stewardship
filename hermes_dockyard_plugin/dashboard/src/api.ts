@@ -44,11 +44,12 @@ export interface DashboardView {
 }
 
 export interface InboxItem {
-  kind: string;          // 'approval' | 'attention' ...
+  kind: 'initiative_approval' | 'project_attention';
   ref: string;
-  project_id: string;
+  project: string;
   title: string;
-  deep_link?: Record<string, string>;
+  risk?: string;
+  deep_link?: string;
 }
 
 export interface InboxView {

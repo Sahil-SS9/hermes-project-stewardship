@@ -63,6 +63,16 @@ const ZOOM_OUT = 0.9;
 const statusColor = (s: string | null): string =>
   s === 'done' ? '#3fb950' : s === 'working' ? '#d29922' : s === 'blocked' ? '#f85149' : '#6e7681';
 
+// Truthful elapsed label from a canonical timestamp. Absent timestamp ->
+// 'unavailable' (never a fabricated clock). Valid timestamps -> mm:ss elapsed.
+function elapsedLabel(updatedAt: string | null): string {
+  if (!updatedAt) return 'unavailable';
+  const base = Date.parse(updatedAt);
+  if (!isFinite(base)) return 'unavailable';
+  const secs = Math.max(0, Math.floor((Date.now() - base) / 1000));
+  return String(Math.floor(secs / 60)).padStart(2, '0') + ':' + String(secs % 60).padStart(2, '0');
+}
+
 // ---- shared inert DOM helper ----
 function elu<K extends HTMLElement>(tag: string, cls: string, text?: string): K {
   const el = document.createElement(tag);
@@ -264,8 +274,8 @@ export function mountWorkflowCanvas(
       label.textContent = n.title.slice(0, 24);
       const sub = sEl('text', { x: 12, y: 44, class: 'dy-wf-sub' }) as SVGTextElement;
       sub.textContent = (n.kind === 'gate' ? 'GATE · ' : '') + (n.status ?? 'pending') + (n.assignee ? ' · ' + n.assignee : '');
-      // Per-node elapsed clock — ONLY on working nodes (was: empty timer on all).
-      // Base = run.updated_at (or poll time for new frames); ticks in the flow loop.
+      // Workflow elapsed time, not this node's execution duration.
+      // A refresh timestamp must never reset the clock; missing start is unavailable.
       let timer: SVGTextElement | null = null;
       if (n.status === 'working') {
         timer = sEl('text', {
@@ -274,7 +284,7 @@ export function mountWorkflowCanvas(
           'text-anchor': 'end',
           class: 'dy-wf-timer full',
         }) as SVGTextElement;
-        timer.textContent = '00:00';
+        timer.textContent = `Workflow: ${elapsedLabel(run.started_at)}`;
         timer.dataset.for = n.node_id;
       }
       if (timer) g.append(rect, label, sub, timer);
@@ -358,17 +368,42 @@ export function mountWorkflowCanvas(
         const row = elu('div', 'dy-wf-actions');
         const approve = elu<HTMLButtonElement>('button', 'dy-btn primary', 'Approve');
         const reject = elu<HTMLButtonElement>('button', 'dy-btn', 'Reject');
-        approve.addEventListener('click', async () => {
+        // Truthful gate action: pending state while awaiting the server;
+        // success only AFTER server confirmation; failure is shown and
+        // retryable; a second click never duplicates an in-flight action.
+        let inFlight = false;
+        const runAction = async (
+          act: (ref: string) => Promise<unknown> | void,
+          okLabel: string,
+          pendingLabel: string,
+          failPrefix: string,
+        ) => {
+          if (inFlight) return; // duplicate-click guard
+          inFlight = true;
           approve.disabled = true;
           reject.disabled = true;
-          approve.textContent = 'Approved ✓';
-          await handlers.onApprove(n.task_ref as string);
+          approve.textContent = pendingLabel;
+          reject.textContent = pendingLabel;
+          try {
+            await act(n.task_ref as string);
+            approve.textContent = okLabel;
+            reject.textContent = 'Reject';
+            approve.disabled = true; // decision made; buttons stay disabled
+            reject.disabled = true;
+          } catch {
+            reject.textContent = 'Reject';
+            approve.textContent = failPrefix + ' failed — retry';
+            approve.disabled = false; // retryable
+            reject.disabled = false;
+          } finally {
+            inFlight = false;
+          }
+        };
+        approve.addEventListener('click', () => {
+          void runAction(handlers.onApprove, 'Approved ✓', 'Approving…', 'Approve');
         });
-        reject.addEventListener('click', async () => {
-          reject.disabled = true;
-          approve.disabled = true;
-          reject.textContent = 'Rejected ✕';
-          await handlers.onReject(n.task_ref as string);
+        reject.addEventListener('click', () => {
+          void runAction(handlers.onReject, 'Rejected ✕', 'Rejecting…', 'Reject');
         });
         row.append(approve, reject);
         passport.appendChild(row);
@@ -515,19 +550,10 @@ export function mountWorkflowCanvas(
   };
   document.addEventListener('keydown', onKeyDown);
 
-  // ---- flow dots ----
+  // ---- flow dots (40ms animation only; timer truth lives on a 1s clock) ----
   let flowT = 0;
   const flowTimer = setInterval(() => {
     flowT = (flowT + 0.03) % 1;
-    // tick working-node elapsed clocks: 1s wall-clock per ~1.33s of flowT
-    // (40ms interval, 1/0.03 ticks per cycle) — driven off render time
-    viewport.querySelectorAll<SVGTextElement>('text.dy-wf-timer').forEach((t) => {
-      const cur = t.textContent ?? '00:00';
-      const [m, s] = cur.split(':').map((v) => parseInt(v, 10) || 0);
-      const total = m * 60 + s + 1;
-      t.textContent =
-        String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
-    });
     const edgeMap = new Map<string, { path: SVGPathElement; dot: SVGCircleElement }>();
     viewport.querySelectorAll<SVGPathElement>('path.dy-wf-edge').forEach((p) => {
       const key = (p.dataset.from ?? '') + '>' + (p.dataset.to ?? '');
@@ -577,11 +603,31 @@ export function mountWorkflowCanvas(
   // ---- polling (the event source; keep last frame, apply on arrival) ----
   let timer: ReturnType<typeof setInterval> | null = null;
   let lastSig = '';
+  // Ignore responses older than the last applied response, not merely the
+  // last issued request: slow successful requests must still render.
+  let pollTicket = 0;
+  let appliedTicket = 0;
+  let disposed = false;
+  // Truthful elapsed clocks: refresh working-node timers from updated_at once
+  // per second (never per animation tick). Idle-tolerant: interval only when
+  // working nodes exist; skipped when none render.
+  const tickTimers = () => {
+    viewport.querySelectorAll<SVGTextElement>('text.dy-wf-timer').forEach((t) => {
+      const node = currentNodes.find((n) => n.node_id === t.dataset.for);
+      if (!node || node.status !== 'working') return;
+      t.textContent = `Workflow: ${elapsedLabel(currentStartedAt)}`;
+    });
+  };
+  let currentStartedAt: string | null = null;
+  const clockTimer = setInterval(tickTimers, 1000);
 
   // feed-aware poll: repaints on delta AND logs status transitions to the strip
   const pollOnce = () => {
+    const ticket = ++pollTicket;
     fetchRuns()
       .then((runs) => {
+        if (disposed || ticket < appliedTicket) return;
+        appliedTicket = ticket;
         const latest = runs && runs.length ? runs[0] : null;
         const sig = JSON.stringify(latest?.nodes.map((n) => [n.node_id, n.status]) ?? []);
         if (sig !== lastSig) {
@@ -598,17 +644,42 @@ export function mountWorkflowCanvas(
             });
           }
           lastSig = sig;
-          render(latest);
         }
+        // Re-render on ANY payload change (identity, title, evidence,
+        // assignee, timestamps), not just node_id/status — the delta path
+        // compares the full frame so changed run data reaches the canvas.
+        const frameSig = JSON.stringify(latest ?? null);
+        if (frameSig !== lastFrameSig) {
+          render(latest);
+          lastFrameSig = frameSig;
+        }
+        currentStartedAt = latest?.started_at ?? null;
+        tickTimers();
+        setStale(false);
       })
-      .catch(() => { /* keep last good frame */ });
+      .catch(() => {
+        if (disposed || ticket < appliedTicket) return;
+        appliedTicket = ticket;
+        // Keep the last good frame, but say so truthfully.
+        setStale(true);
+      });
+  };
+  let lastFrameSig = '';
+  const setStale = (on: boolean) => {
+    const existing = wrap.querySelector('.dy-wf-stale');
+    if (on && !existing) {
+      const badge = elu('div', 'dy-wf-stale', 'stale — last refresh failed, showing last known state');
+      wrap.insertBefore(badge, wrap.firstChild);
+    } else if (!on && existing) existing.remove();
   };
   pollOnce();
   if (pollMs > 0) timer = setInterval(pollOnce, pollMs);
 
   disposers.push(() => {
+    disposed = true;
     if (timer) clearInterval(timer);
     if (flowTimer) clearInterval(flowTimer);
+    clearInterval(clockTimer);
     document.removeEventListener('keydown', onKeyDown);
     host.replaceChildren();
   });

@@ -446,3 +446,95 @@ def test_create_app_composes_canonical_host_adapter_by_default(
     assert calls == ["called"]
     assert app.state.kanban_adapter is expected
     assert app.state.kanban_bridge.adapter is expected
+
+
+# --- P1.7: factory fallback provenance, no fork injected ---
+
+
+def test_factory_falls_back_to_vanilla_host_without_fork_module(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import sys
+
+    from hermes_project_stewardship.kanban.host_adapter import (
+        create_project_kanban_adapter,
+    )
+
+    pytest.importorskip("hermes_cli.kanban_db")
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "native-root"))
+    monkeypatch.setitem(sys.modules, "hermes_cli.project_kanban_host", None)
+
+    adapter = create_project_kanban_adapter(hermes_home=tmp_path / "hermes", board="demo")
+
+    from hermes_project_stewardship.kanban import vanilla_host
+
+    assert type(adapter.host).__module__ == vanilla_host.ProjectKanbanHost.__module__
+    provenance = adapter.host_provenance
+    assert provenance["host_module"] == vanilla_host.ProjectKanbanHost.__module__
+    assert "ProjectKanbanHost(" in provenance["host_signature"]
+
+    board_id = adapter.ensure_board(
+        adapter.host.provision_project(
+            idempotency_key="vanilla-fallback",
+            name="Vanilla Fallback",
+            slug="vanilla-fallback",
+            description="created through vanilla fallback",
+            repo_path=str(tmp_path),
+            lead_profile="default",
+            board_slug="vanilla-fallback",
+        )["project"]["id"],
+        "vanilla-fallback",
+    )
+    task_id = adapter.add_card(
+        board_id,
+        kanban.BoardCard(
+            title="Fallback task",
+            description="created through vanilla fallback",
+            column="todo",
+            metadata={},
+        ),
+    )
+    adapter.move_card(board_id, task_id, "done")
+    assert adapter.host.get_task(task_id, board=board_id)["task"]["status"] == "done"
+
+
+def test_factory_rejects_hostless_environment_cleanly(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Without any Hermes host importable, the factory fails closed."""
+    import subprocess
+    import textwrap
+
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "empty"))
+
+    child = textwrap.dedent(
+        """
+        from hermes_project_stewardship.kanban.host_adapter import (
+            create_project_kanban_adapter,
+        )
+        try:
+            create_project_kanban_adapter(board="demo")
+            print("NO-ERROR")
+        except Exception as exc:
+            print(type(exc).__name__, getattr(exc, "code", ""))
+        """
+    )
+    # Use the candidate venv (no Hermes host installed) so the child truly
+    # lacks any host module; the factory must fail closed, not silently fall back.
+    standalone_python = Path(__file__).resolve().parents[1] / ".venv" / "bin" / "python"
+    result = subprocess.run(
+        [str(standalone_python), "-c", child],
+        capture_output=True, text=True, timeout=60,
+        cwd=str(tmp_path),
+        env={
+            "PATH": "/usr/bin:/bin",
+            "HOME": str(tmp_path),
+            "HERMES_HOME": str(tmp_path / "empty"),
+            "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src"),
+        },
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().startswith("KanbanAdapterError host_contract_unavailable")
