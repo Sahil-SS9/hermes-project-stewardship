@@ -412,7 +412,7 @@ async function renderWork(
     s.api.views(projectId),
   ]);
   if (isStale()) return;
-  const items = workResponse.work_items ?? [];
+  const items = (workResponse.work_items ?? []).filter((item) => item.status !== 'archived');
   const ranks = new Map(
     (backlogResponse.backlog ?? []).map((row) => [row.item_ref, row]),
   );
@@ -583,10 +583,14 @@ async function renderWork(
         ['in_review', 'Review'],
         ['blocked', 'Blocked'],
         ['done', 'Done'],
+        ['unknown', 'Unknown status'],
       ] as Array<[string, string]>).forEach(([status, label]) => {
         const column = document.createElement('section');
         column.className = 'dy-board-column';
-        const matching = items.filter((item) => item.status === status);
+        const matching = items.filter((item) => {
+          const known = ['backlog', 'in_progress', 'in_review', 'blocked', 'done'];
+          return known.includes(item.status) ? item.status === status : status === 'unknown';
+        });
         column.appendChild(textEl('h3', '', `${label} (${matching.length})`));
         matching.forEach((item) => column.appendChild(workCard(item, openDetail)));
         content.appendChild(column);
