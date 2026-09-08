@@ -44,6 +44,21 @@ export interface DashboardView {
   };
 }
 
+export interface DecisionPayload {
+  action: 'approve';
+  project_id: string;
+  initiative_ref: string;
+  title: string;
+  proposer: string | number;
+  risk: string;
+  reason: string;
+  expected_outcome: string;
+  validation: { contract: Record<string, unknown>; links: string[]; age: string };
+  authority: { granted: string; scope: string[] };
+  revision: number;
+  fingerprint: string;
+}
+
 export interface InboxItem {
   kind: 'initiative_approval' | 'project_attention';
   ref: string;
@@ -225,8 +240,29 @@ export function createApi(sdk: HermesPluginSDK) {
       }),
     onboard: (b: { project_id: string; repo_path: string; mission: string; lead_profile: string }) =>
       post('/onboard', b),
-    approve: (ref: string) => post(`/initiatives/${encodeURIComponent(ref)}/approve`, {}),
-    reject: (ref: string) => post(`/initiatives/${encodeURIComponent(ref)}/reject`, {}),
+    decision: (ref: string) =>
+      get<DecisionPayload>(`/initiatives/${encodeURIComponent(ref)}/decision`),
+    decisionReceipts: (ref: string) =>
+      get<{ receipts: Array<Record<string, unknown>> }>(
+        `/initiatives/${encodeURIComponent(ref)}/decision/receipts`,
+      ),
+    approve: async (ref: string, payload: { note?: string } = {}) => {
+      const decision = await get<DecisionPayload>(`/initiatives/${encodeURIComponent(ref)}/decision`);
+      return post(`/initiatives/${encodeURIComponent(ref)}/approve`, {
+        expected_fingerprint: decision.fingerprint,
+        ...payload,
+      });
+    },
+    reject: async (ref: string, payload: { expected_fingerprint?: string; reason?: string; note?: string } = {}) => {
+      const decision = payload.expected_fingerprint
+        ? { fingerprint: payload.expected_fingerprint }
+        : await get<DecisionPayload>(`/initiatives/${encodeURIComponent(ref)}/decision`);
+      return post(`/initiatives/${encodeURIComponent(ref)}/reject`, {
+        expected_fingerprint: decision.fingerprint,
+        reason: payload.reason || 'Rejected from dashboard',
+        ...payload,
+      });
+    },
     workflowRuns: (projectId: string, name: string) =>
       get<{
         runs: Array<{

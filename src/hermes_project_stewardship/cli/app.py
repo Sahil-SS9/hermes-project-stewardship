@@ -248,7 +248,8 @@ def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) 
             print(f"{state_glyph('healthy')} {out['ref']} approved")
             return EXIT_OK
         if args.action == "reject":
-            out = svc.reject_initiative(args.ref, actor=args.actor, interface="cli")
+            out = svc.reject_initiative(args.ref, actor=args.actor, interface="cli",
+                                       reason="rejected via CLI")
             print(f"{out['ref']} rejected (suppression applied)")
             return EXIT_OK
         if args.action == "pick":

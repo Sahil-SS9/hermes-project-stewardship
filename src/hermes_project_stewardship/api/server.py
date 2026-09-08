@@ -144,8 +144,11 @@ class InitiativeProposal(BaseModel):
 
 
 class ApprovalAction(BaseModel):
-    actor: str
+    actor: str = ""
     interface: str = "rpc"
+    expected_fingerprint: Optional[str] = None
+    note: str = ""
+    reason: str = ""
 
 
 class CycleRequest(BaseModel):
@@ -664,23 +667,47 @@ def create_app(
     def propose(project_id: str, body: InitiativeProposal):
         return svc.propose_initiative(project_id, **body.model_dump())
 
+    @router.get("/initiatives/{ref}/decision")
+    def decision(ref: str):
+        return svc.decision(ref)
+
+    @router.get("/initiatives/{ref}/decision/receipts")
+    def decision_receipts(ref: str):
+        return {"receipts": svc.decision_receipts(ref)}
+
     @router.post("/initiatives/{ref}/approve")
     def approve(ref: str, body: ApprovalAction):
         try:
+            actor_id = current_principal() or body.actor
+            if not actor_id:
+                raise ServiceError("trusted actor attribution is required")
             return integration.approve(
                 ref,
                 actor=Actor(
-                    id=_principal_id(body.actor),
-                    display_name=_principal_id(body.actor),
+                    id=actor_id,
+                    display_name=actor_id,
                     kind=ActorKind.HUMAN,
                 ),
+                expected_fingerprint=body.expected_fingerprint,
+                note=body.note,
             )
-        except IntegrationError as exc:
+        except (IntegrationError, ServiceError) as exc:
             raise HTTPException(409, str(exc)) from None
 
     @router.post("/initiatives/{ref}/reject")
     def reject(ref: str, body: ApprovalAction):
-        return svc.reject_initiative(ref, actor=_principal_id(body.actor), interface=body.interface)
+        actor_id = current_principal() or body.actor
+        if not actor_id:
+            raise HTTPException(409, "trusted actor attribution is required")
+        try:
+            return svc.reject_initiative(
+                ref, actor=actor_id, interface=body.interface,
+                expected_fingerprint=body.expected_fingerprint,
+                reason=body.reason or "rejected via API",
+                note=body.note,
+            )
+        except ServiceError as exc:
+            raise HTTPException(409, str(exc)) from None
 
     @router.post("/initiatives/{ref}/bind-board")
     def bind_board(ref: str, body: BindBoardRequest):

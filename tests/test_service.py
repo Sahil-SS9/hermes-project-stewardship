@@ -129,7 +129,8 @@ def test_completed_initiative_allows_new_dedupe_match(svc, enabled):
 def test_rejection_suppression_window(svc, enabled, clock):
     a = svc.propose_initiative(enabled, title="Refactor all", rationale="feels good",
                                dedupe_key="big-refactor")
-    svc.reject_initiative(a["ref"], actor="human", interface="cli", suppress_days=14)
+    svc.reject_initiative(a["ref"], actor="human", interface="cli", suppress_days=14,
+                          reason="rejected by test")
     with pytest.raises(ServiceError, match="suppressed"):
         svc.propose_initiative(enabled, title="Refactor all", rationale="again?",
                                dedupe_key="big-refactor")
@@ -148,8 +149,8 @@ def test_reject_legacy_initiative_without_dedupe_key(svc, enabled):
     )
 
     out = svc.reject_initiative(
-        a["ref"], actor="sahil", interface="dockyard:human", suppress_days=14
-    )
+        a["ref"], actor="sahil", interface="dockyard:human", suppress_days=14,
+        reason="not in scope"    )
 
     assert out["status"] == "rejected"
     fallback_key = title.lower()
@@ -179,13 +180,13 @@ def test_approval_flow_and_idempotence_guard(svc, enabled):
     assert a["approval_state"] == "pending"
     out = svc.approve_initiative(a["ref"], actor="human", interface="cli")
     assert out["status"] == "approved"
-    with pytest.raises(ServiceError):
-        svc.approve_initiative(a["ref"], actor="human", interface="cli")
+    assert svc.approve_initiative(a["ref"], actor="human", interface="cli")["status"] == "approved"
 
 
 def test_reject_records_actor(svc, enabled):
     a = svc.propose_initiative(enabled, title="T2", rationale="R2")
-    out = svc.reject_initiative(a["ref"], actor="sahil", interface="discord")
+    out = svc.reject_initiative(a["ref"], actor="sahil", interface="discord",
+                                reason="declined by reviewer")
     assert out["status"] == "rejected"
     tail = svc.store.audit_tail(5)
     assert any(r["action"] == "initiative.rejected" and r["actor"] == "sahil"

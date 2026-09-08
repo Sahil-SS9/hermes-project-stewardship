@@ -109,8 +109,8 @@ class GatewayCommandHandler:
         if ini["status"] == "rejected":
             return CommandResponse(True, f"{ref} already rejected", already_done=True)
         out = self.svc.reject_initiative(
-            ref, actor=f"{req.platform}:{req.sender_id}", interface="gateway"
-        )
+            ref, actor=f"{req.platform}:{req.sender_id}", interface="gateway",
+            reason=str(req.args.get("reason", "rejected via gateway")),        )
         return CommandResponse(True, f"{ref} rejected (suppression window applied)",
                                data={"ref": out["ref"]})
 

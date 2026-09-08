@@ -1492,8 +1492,81 @@ class StewardshipService:
         rows = self.store._conn.execute(sql, tuple(args)).fetchall()
         return [self._initiative_row(r) for r in rows]
 
-    def approve_initiative(self, ref: str, *, actor: str, interface: str) -> Dict[str, Any]:
+    def decision(self, ref: str, *, project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Return one canonical, fingerprinted decision payload."""
         ini = self.initiative_by_ref(ref)
+        if project_id is not None and ini["project_id"] != project_id:
+            raise ServiceError("initiative does not belong to the requested project")
+        evidence = {
+            "contract": ini["validation_contract"],
+            "links": [],
+            "age": ini["created_at"],
+        }
+        payload = {
+            "action": "approve",
+            "project_id": ini["project_id"],
+            "initiative_ref": ref,
+            "title": ini["title"],
+            "proposer": ini.get("source_cycle_id") or "stewardship",
+            "risk": ini["risk"],
+            "reason": ini["rationale"],
+            "expected_outcome": ini["expected_outcome"],
+            "validation": evidence,
+            "authority": {"granted": "approve_and_start_execution",
+                          "scope": ["initiative", ref]},
+            "revision": self._decision_revision(ref),
+        }
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        payload["fingerprint"] = hashlib.sha256(canonical.encode()).hexdigest()
+        return payload
+
+    def _decision_revision(self, ref: str) -> int:
+        row = self.store._conn.execute(
+            "SELECT decision_revision FROM project_initiatives WHERE ref=?", (ref,)
+        ).fetchone()
+        if row is None:
+            raise ServiceError(f"no such initiative '{ref}'")
+        return int(row["decision_revision"])
+
+    def decision_receipts(self, ref: str) -> List[Dict[str, Any]]:
+        self.initiative_by_ref(ref)
+        rows = self.store._conn.execute(
+            "SELECT * FROM stewardship_decision_receipts WHERE initiative_ref=?"
+            " ORDER BY revision ASC", (ref,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def _check_decision_fingerprint(self, ref: str, expected: Optional[str]) -> Dict[str, Any]:
+        decision = self.decision(ref)
+        if expected and expected != decision["fingerprint"]:
+            raise ServiceError("stale decision evidence; refresh before deciding")
+        return decision
+
+    def _decision_receipt(self, *, ref: str, decision: str, actor: str,
+                         interface: str, fingerprint: str, revision: int,
+                         reason: str = "", note: str = "") -> None:
+        now = iso(self._clock())
+        with self.store.tx() as cx:
+            cx.execute(
+                "INSERT INTO stewardship_decision_receipts(initiative_ref,decision,"
+                "actor,interface,reason,note,fingerprint,revision,decided_at)"
+                " VALUES(?,?,?,?,?,?,?,?,?)",
+                (ref, decision, actor, interface, reason, note, fingerprint,
+                 revision, now),
+            )
+        self.store.audit(actor=actor, interface=interface,
+                         action="initiative.decision", subject=ref,
+                         detail={"decision": decision, "reason": reason,
+                                 "note": note, "fingerprint": fingerprint,
+                                 "revision": revision})
+
+    def approve_initiative(self, ref: str, *, actor: str, interface: str,
+                           expected_fingerprint: Optional[str] = None,
+                           note: str = "") -> Dict[str, Any]:
+        ini = self.initiative_by_ref(ref)
+        if ini["status"] == InitiativeStatus.APPROVED.value:
+            return ini
+        decision = self._check_decision_fingerprint(ref, expected_fingerprint)
         if ini["status"] != InitiativeStatus.PENDING_APPROVAL.value:
             raise ServiceError(
                 f"initiative {ref} is not pending approval (status={ini['status']})"
@@ -1501,17 +1574,18 @@ class StewardshipService:
         with self.store.tx() as cx:
             res = cx.execute(
                 "UPDATE project_initiatives SET status='approved',"
-                " approval_state='approved' WHERE ref=? AND status='pending_approval'",
+                " approval_state='approved', decision_revision=decision_revision+1"
+                " WHERE ref=? AND status='pending_approval'",
                 (ref,),
             )
             if res.rowcount != 1:
                 raise ServiceError(f"initiative {ref} changed state concurrently")
-        self.store.audit(
-            actor=actor,
-            interface=interface,
-            action="initiative.approved",
-            subject=ref,
-        )
+        self.store.audit(actor=actor, interface=interface,
+                         action="initiative.approved", subject=ref)
+        self._decision_receipt(ref=ref, decision="approved", actor=actor,
+                               interface=interface,
+                               fingerprint=decision["fingerprint"],
+                               revision=decision["revision"] + 1, note=note)
         return self.initiative_by_ref(ref)
 
     def reject_initiative(
@@ -1521,8 +1595,17 @@ class StewardshipService:
         actor: str,
         interface: str,
         suppress_days: Optional[int] = None,
+        expected_fingerprint: Optional[str] = None,
+        reason: str = "",
+        note: str = "",
     ) -> Dict[str, Any]:
+        decision = self._check_decision_fingerprint(ref, expected_fingerprint)
         ini = self.initiative_by_ref(ref)
+        if not reason.strip():
+            if suppress_days is not None:
+                reason = "rejected with suppression window"
+            else:
+                raise ServiceError("rejection reason is required")
         if ini["status"] not in (InitiativeStatus.PENDING_APPROVAL.value, InitiativeStatus.PROPOSED.value):
             raise ServiceError(f"initiative {ref} cannot be rejected from status={ini['status']}")
         days = suppress_days if suppress_days is not None else self.default_suppression_days
@@ -1556,6 +1639,11 @@ class StewardshipService:
             actor=actor, interface=interface, action="initiative.rejected", subject=ref,
             detail={"suppression_days": days},
         )
+        self._decision_receipt(ref=ref, decision="rejected", actor=actor,
+                               interface=interface,
+                               fingerprint=decision["fingerprint"],
+                               revision=decision["revision"] + 1,
+                               reason=reason.strip(), note=note)
         return self.initiative_by_ref(ref)
 
     def start_execution(self, ref: str) -> Dict[str, Any]:

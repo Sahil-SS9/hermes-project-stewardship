@@ -62,7 +62,9 @@ class DockyardIntegration:
         result.update(self._after_approval(ini, actor, promote))
         return result
 
-    def approve(self, ref: str, *, actor: Actor) -> Dict[str, Any]:
+    def approve(self, ref: str, *, actor: Actor,
+                expected_fingerprint: Optional[str] = None,
+                note: str = "") -> Dict[str, Any]:
         """Human approval, then promotion + execution start."""
         ini = self.svc.initiative_by_ref(ref)
         if ini["status"] == "pending_approval":
@@ -71,6 +73,8 @@ class DockyardIntegration:
                     ref,
                     actor=actor.id,
                     interface=f"dockyard:{actor.kind.value}",
+                    expected_fingerprint=expected_fingerprint,
+                    note=note,
                 )
             except ServiceError as e:
                 raise IntegrationError(str(e)) from e
