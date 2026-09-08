@@ -193,6 +193,12 @@ class ProjectKanbanHost:
         record["initial_status"] = record.get("status")
         return record
 
+    @staticmethod
+    def _native_status(status: str) -> str:
+        # Dockyard's backlog/todo vocabulary maps to vanilla's triage/ready
+        # vocabulary. Never write fork-only statuses into the host database.
+        return {"backlog": "triage", "todo": "ready"}.get(status, status)
+
     def get_task(self, task_id: str, *, board: str | None = None) -> dict[str, Any]:
         with self._kanban(board) as (kb, conn, _):
             task = kb.get_task(conn, task_id)
@@ -228,7 +234,19 @@ class ProjectKanbanHost:
     ) -> dict[str, Any]:
         if task_kind not in _TASK_KINDS - {"epic"}:
             raise HostError("validation_error", "canonical work type is not supported")
+        if initial_status not in {"backlog", "triage", "todo", "ready", "review", "done", "blocked"}:
+            raise HostError("validation_error", "canonical task status is invalid")
         with self._kanban(board) as (kb, conn, selected):
+            if parent_task_id and kb.get_task(conn, parent_task_id) is None:
+                raise HostError("task_not_found", "canonical parent task was not found")
+            existing = None
+            if idempotency_key:
+                existing = conn.execute(
+                    "SELECT id FROM tasks WHERE idempotency_key=? LIMIT 1",
+                    (idempotency_key,),
+                ).fetchone()
+            if existing:
+                return self._task_record(kb.get_task(conn, str(existing["id"])))
             task_id = kb.create_task(
                 conn, title=title, body=body, assignee=assignee, created_by=created_by,
                 tenant=f"dockyard:{task_kind}", initial_status="running",
@@ -259,6 +277,7 @@ class ProjectKanbanHost:
         allowed = {"backlog", "triage", "todo", "ready", "review", "done", "blocked"}
         if status not in allowed:
             raise HostError("validation_error", "canonical task status is invalid")
+        status = ProjectKanbanHost._native_status(status)
         completed = int(time.time()) if status == "done" else None
         conn.execute(
             "UPDATE tasks SET status=?, completed_at=?, claim_lock=NULL, claim_expires=NULL WHERE id=?",
@@ -273,11 +292,25 @@ class ProjectKanbanHost:
         with self._kanban(board) as (kb, conn, _):
             if kb.get_task(conn, task_id) is None:
                 raise HostError("task_not_found", "canonical task was not found")
-            self._set_status(conn, task_id, status)
+            native_status = self._native_status(status)
+            if native_status == "done":
+                if not kb.complete_task(conn, task_id, summary=_kwargs.get("summary")):
+                    raise HostError("transition_conflict", "canonical task transition was rejected")
+            elif native_status == "blocked":
+                if not kb.block_task(conn, task_id, reason=_kwargs.get("reason")):
+                    raise HostError("transition_conflict", "canonical task transition was rejected")
+            elif native_status == "review":
+                if not kb.request_review(
+                    conn, task_id, summary=_kwargs.get("summary"),
+                    expected_run_id=_kwargs.get("expected_run_id"), force=True,
+                ):
+                    raise HostError("transition_conflict", "canonical task transition was rejected")
+            else:
+                self._set_status(conn, task_id, status)
             return self._task_record(kb.get_task(conn, task_id))
 
     def block_task(self, task_id: str, *, board: str | None = None, **_kwargs: Any) -> dict[str, Any]:
-        return self.transition_task(task_id, "blocked", board=board)
+        return self.transition_task(task_id, "blocked", board=board, **_kwargs)
 
     def update_task(self, task_id: str, *, board: str | None = None, **changes: Any) -> dict[str, Any]:
         columns = {"title": "title", "body": "body"}
