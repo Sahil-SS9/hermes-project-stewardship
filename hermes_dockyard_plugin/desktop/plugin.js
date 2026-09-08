@@ -2658,13 +2658,57 @@ function ProjectReportsPanel({ project, reports, onRefresh }) {
   ]})
 }
 
-function WorkItemDetail({ item, onClose }) {
+function WorkItemDetail({ item, projectId, onClose, onRefresh }) {
+  const [draft, setDraft] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [feedback, setFeedback] = useState(null)
+  const [error, setError] = useState(null)
+  useEffect(() => {
+    setDraft(item ? {
+      title: item.title ?? '', type: item.type ?? 'task',
+      assignee: item.assignee ?? '', status: item.status ?? 'backlog',
+    } : null)
+    setFeedback(null)
+    setError(null)
+  }, [item])
   useEffect(() => {
     if (!item) return undefined
     const closeOnEscape = (event) => { if (event.key === 'Escape') onClose() }
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [item, onClose])
+  const save = async () => {
+    if (!item || !draft) return
+    setBusy(true)
+    setError(null)
+    setFeedback(null)
+    const projectIdResolved = projectId || item.project_id
+    try {
+      if (draft.title !== (item.title ?? '') || draft.type !== (item.type ?? 'task')) {
+        await api(`/projects/${encodeURIComponent(projectIdResolved)}/work-items/${encodeURIComponent(item.ref)}`, {
+          method: 'PATCH',
+          body: { title: draft.title, type: draft.type },
+        })
+      }
+      if ((draft.assignee ?? '') !== (item.assignee ?? '')) {
+        await api(`/projects/${encodeURIComponent(projectIdResolved)}/work-items/${encodeURIComponent(item.ref)}/assign`, {
+          method: 'POST',
+          body: { assignee_id: draft.assignee.trim() || null },
+        })
+      }
+      if (draft.status !== item.status) {
+        await api(`/projects/${encodeURIComponent(projectIdResolved)}/work-items/${encodeURIComponent(item.ref)}/transition`, {
+          method: 'POST',
+          body: { status: draft.status },
+        })
+      }
+      setFeedback('Saved.')
+      await onRefresh?.()
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+    setBusy(false)
+  }
   return jsx('section', {
     className: 'dockyard-modal-layer',
     'data-work-item-detail-layer': true,
@@ -2679,17 +2723,37 @@ function WorkItemDetail({ item, onClose }) {
       children: [
         jsxs('header', { className: 'dockyard-modal-head', children: [
           jsxs('div', { children: [
-            jsx('span', { className: 'dockyard-card-label', children: 'VIEW ONLY' }),
+            jsx('span', { className: 'dockyard-card-label', children: 'EDITABLE WORK ITEM' }),
             jsx('h2', { id: 'dockyard-work-item-title', children: item.title || item.ref }),
           ]}),
           jsx(Button, { action: 'close-work-item-detail', ariaLabel: 'Close work item details', onClick: onClose, children: 'Close' }),
         ]}),
-        jsx('p', { children: 'This board is a read-only view of canonical project work.' }),
+        jsxs('div', { className: 'dockyard-work-editor', children: [
+          jsxs('label', { children: ['Title ', jsx('input', {
+            value: draft?.title ?? '', onChange: (event) => setDraft({ ...draft, title: event.target.value }),
+          })]}),
+          jsxs('label', { children: ['Type ', jsx('select', {
+            value: draft?.type ?? 'task', onChange: (event) => setDraft({ ...draft, type: event.target.value }), children:
+            ['task', 'bug', 'spike', 'subtask', 'gate'].map((kind) => jsx('option', { value: kind, children: kind }, kind)),
+          })]}),
+          jsxs('label', { children: ['Assignee ', jsx('input', {
+            value: draft?.assignee ?? '', onChange: (event) => setDraft({ ...draft, assignee: event.target.value }),
+          })]}),
+          jsxs('label', { children: ['Status ', jsx('select', {
+            value: draft?.status ?? 'backlog', onChange: (event) => setDraft({ ...draft, status: event.target.value }), children:
+            ['backlog', 'in_progress', 'in_review', 'blocked', 'done'].map((status) => jsx('option', { value: status, children: readableLabel(status) }, status)),
+          })]}),
+          jsxs('div', { className: 'dockyard-form-actions', children: [
+            jsx(Button, {
+              action: 'save-work-item', variant: 'primary', disabled: busy,
+              onClick: save, children: busy ? 'Saving...' : 'Save changes',
+            }),
+            feedback ? jsx('span', { role: 'status', children: feedback }) : null,
+          ]}),
+          error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
+        ]}),
         jsxs('dl', { className: 'dockyard-detail-grid', children: [
           jsxs('div', { children: [jsx('dt', { children: 'Reference' }), jsx('dd', { children: item.ref })] }),
-          jsxs('div', { children: [jsx('dt', { children: 'Status' }), jsx('dd', { children: readableLabel(item.status) })] }),
-          jsxs('div', { children: [jsx('dt', { children: 'Type' }), jsx('dd', { children: readableLabel(item.type, 'Task') })] }),
-          jsxs('div', { children: [jsx('dt', { children: 'Assignee' }), jsx('dd', { children: item.assignee || 'Unassigned' })] }),
           jsxs('div', { children: [jsx('dt', { children: 'Initiative' }), jsx('dd', { children: item.initiative_ref || 'Not linked' })] }),
           jsxs('div', { children: [jsx('dt', { children: 'Evidence' }), jsx('dd', { children: `${number(item.evidence_refs?.length ?? 0)} attached` })] }),
         ]}),
@@ -3004,7 +3068,9 @@ function ProjectDashboard({ view, onSelectProject, onRefresh }) {
     ['backlog', 'Backlog', ['backlog']],
     ['active', 'In progress', ['in_progress', 'executing', 'active']],
     ['review', 'Review', ['in_review', 'review']],
+    ['blocked', 'Blocked', ['blocked']],
     ['done', 'Done', ['done', 'complete', 'completed']],
+    ['other', 'Other states', null],
   ]
   const projectOptions = view.projects ?? []
   let panel
@@ -3016,7 +3082,10 @@ function ProjectDashboard({ view, onSelectProject, onRefresh }) {
       ]}),
       jsx('div', { className: 'dockyard-board', children:
         columns.map(([key, label, statuses]) => {
-          const items = (view.workItems ?? []).filter((item) => statuses.includes(item.status))
+          const items = statuses === null
+            ? (view.workItems ?? []).filter((item) => item.status !== 'archived' &&
+                !['backlog', 'in_progress', 'executing', 'active', 'in_review', 'review', 'blocked', 'done', 'complete', 'completed'].includes(item.status))
+            : (view.workItems ?? []).filter((item) => item.status !== 'archived' && statuses.includes(item.status))
           return jsxs('section', { className: 'dockyard-board-column', 'data-board-column': key, children: [
             jsxs('header', { children: [jsx('h3', { children: label }), jsx('span', { children: number(items.length) })] }),
             jsx('div', { className: 'dockyard-board-cards', children:
@@ -3136,7 +3205,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh }) {
       }),
     ]}),
     panel,
-    jsx(WorkItemDetail, { item: selectedWorkItem, onClose: () => setSelectedWorkItem(null) }),
+    jsx(WorkItemDetail, { item: selectedWorkItem, projectId: project.id, onClose: () => setSelectedWorkItem(null), onRefresh }),
   ]})
 }
 
@@ -3680,6 +3749,22 @@ function ApprovalRow({ item, onResolved }) {
   const [error, setError] = useState(null)
   const [expanded, setExpanded] = useState(false)
   const [rejectConfirm, setRejectConfirm] = useState(false)
+  // Decision is fetched and displayed when the row renders, not on click;
+  // the submitted fingerprint must bind to the reviewed scope (round-2
+  // review issue 3).
+  const [reviewedDecision, setReviewedDecision] = useState(null)
+  const [decisionError, setDecisionError] = useState(null)
+  useEffect(() => {
+    let disposed = false
+    api(`/initiatives/${encodeURIComponent(item.ref)}/decision`)
+      .then((decision) => {
+        if (!disposed) setReviewedDecision(decision)
+      })
+      .catch(() => {
+        if (!disposed) setDecisionError('Decision evidence unavailable; refresh before deciding.')
+      })
+    return () => { disposed = true }
+  }, [item.ref])
   const [tone, label] = riskDetails(item.risk)
   const detail = item.detail ?? {}
   const decide = async (action) => {
@@ -3688,10 +3773,12 @@ function ApprovalRow({ item, onResolved }) {
     setState(action === 'approve' ? 'approving' : 'rejecting')
     setError(null)
     try {
-      const decision = await api(`/initiatives/${encodeURIComponent(item.ref)}/decision`)
+      if (!reviewedDecision) {
+        throw new Error('Decision evidence not reviewed yet; refresh before deciding.')
+      }
       const body = action === 'reject'
-        ? { expected_fingerprint: decision.fingerprint, reason: 'Rejected from Desktop review' }
-        : { expected_fingerprint: decision.fingerprint }
+        ? { expected_fingerprint: reviewedDecision.fingerprint, reason: 'Rejected from Desktop review' }
+        : { expected_fingerprint: reviewedDecision.fingerprint }
       await api(`/initiatives/${encodeURIComponent(item.ref)}/${action}`, {
         method: 'POST', body, suppressErrorToast: true,
       })
@@ -3758,6 +3845,9 @@ function ApprovalRow({ item, onResolved }) {
           jsx('strong', { children: validationSummary(detail.validation_contract) }),
         ]}),
       ]}),
+      decisionError
+        ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: decisionError })
+        : null,
       jsxs('div', { className: 'dockyard-approval-actions', children: [
         resolved ? jsx(StatusTag, { tone: stateTone, label: stateLabel }) : jsx(Button, {
           action: 'approve',
