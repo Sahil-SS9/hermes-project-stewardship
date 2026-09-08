@@ -30,10 +30,10 @@ def test_default_surfaces_observe_the_same_project(tmp_path):
     result = run_surface(tmp_path, f'''
 import sys, importlib, json, io, contextlib
 sys.modules["httpx"] = importlib.import_module("httpx2")
-from hermes_project_stewardship.plugin import PluginState
+from hermes_project_stewardship.plugin import PluginState, tool_steward_status
 from hermes_project_stewardship.cli.app import main
-from hermes_project_stewardship.persistence.service import StewardshipService
 from hermes_project_stewardship.api.server import create_app
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 state = PluginState.services()
 state.enable("shared", mission="one state", lead_profile="test")
@@ -46,16 +46,23 @@ with TestClient(app) as client:
     api = client.get("/stewardship/v1/projects", headers={{"Authorization": "Bearer fixture-token"}}).json()
 sys.path.insert(0, {str(ROOT / "hermes_dockyard_plugin/dashboard")!r})
 import plugin_api
+host = FastAPI()
+host.include_router(plugin_api.plugin_api, prefix="/api/plugins/hermes-dockyard")
+with TestClient(host) as client:
+    response = client.get("/api/plugins/hermes-dockyard/projects/shared/settings")
+    assert response.status_code == 200, response.text
+    plugin = response.json()["project_id"]
 print(json.dumps({{"core": str(state.store.db_path),
+                  "tool": tool_steward_status("shared")["settings"]["project_id"],
                   "cli": cli.get("settings", {{}}).get("project_id"),
                   "api": [p["project_id"] for p in api["projects"]],
-                  "plugin": [p["project_id"] for p in StewardshipService(plugin_api._store).list_projects()]}}))
+                  "plugin": plugin}}))
 ''')
     assert result.returncode == 0, result.stderr
     output = json.loads(result.stdout)
     expected = tmp_path / "profile/plugin-data/hermes-dockyard/dockyard.db"
-    assert output == {"core": str(expected), "cli": "shared",
-                      "api": ["shared"], "plugin": ["shared"]}
+    assert output == {"core": str(expected), "cli": "shared", "tool": "shared",
+                      "api": ["shared"], "plugin": "shared"}
 
 
 def test_runtime_override_is_read_after_cli_import(tmp_path):
