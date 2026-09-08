@@ -295,6 +295,31 @@ class Store:
             )
         return cur.rowcount
 
+    def claim_event(self, claim_key: str, *, holder: str) -> bool:
+        """Atomically claim bounded work; False when already claimed.
+
+        INSERT OR IGNORE is the whole concurrency gate: under BEGIN IMMEDIATE
+        exactly one concurrent caller's insert lands, so replayed or racing
+        events can never double-execute. Claims are durable, not TTL'd —
+        bounded work releases its claim explicitly when it finishes.
+        """
+        with self.tx() as cx:
+            cur = cx.execute(
+                "INSERT OR IGNORE INTO event_claims(claim_key, holder, claimed_at)"
+                " VALUES(?,?,?)",
+                (claim_key, holder, iso(self._clock())),
+            )
+        return cur.rowcount == 1
+
+    def release_event_claim(self, claim_key: str, *, holder: str) -> bool:
+        """Release a claim only for its owner; False when not the holder."""
+        with self.tx() as cx:
+            cur = cx.execute(
+                "DELETE FROM event_claims WHERE claim_key=? AND holder=?",
+                (claim_key, holder),
+            )
+        return cur.rowcount == 1
+
     # ------------------------------------------------------------------ #
     # Retention                                                          #
     # ------------------------------------------------------------------ #

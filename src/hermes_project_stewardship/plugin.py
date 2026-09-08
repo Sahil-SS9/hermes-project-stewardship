@@ -120,6 +120,20 @@ def _schema(name: str) -> dict:
 def _slash_routes() -> dict[str, Any]:
     svc = PluginState.services
 
+    def _observation_host():
+        """Resolve the observation read surface from the native host.
+
+        Uses the same factory as the API/bridge; when the host is
+        unavailable the slash command reports the honest refusal (recovery
+        without a host cannot verify anything).
+        """
+        from .kanban.host_adapter import create_project_kanban_adapter
+
+        try:
+            return create_project_kanban_adapter().host
+        except Exception:
+            return None
+
     def status(raw_args: str):
         project_id = raw_args.strip()
         if not project_id:
@@ -143,10 +157,37 @@ def _slash_routes() -> dict[str, Any]:
         result = svc().pause(parts[0])
         return f"{parts[0]} phase={result['phase']}"
 
+    def reconcile(raw_args: str):
+        from .observation.recovery import ReconcileService
+
+        parts = shlex.split(raw_args)
+        if len(parts) != 1:
+            return "usage: /project-reconcile <project-id>"
+        project_id = parts[0]
+        s = svc()
+        try:
+            s.require_feature(project_id, "reconciliation")
+        except Exception as e:
+            return f"refused: {e}"
+        recovery = ReconcileService(
+            s.store, _observation_host(), engine=None, service=s,
+        )
+        try:
+            report = recovery.reconcile(
+                project_id, actor="cli", interface="slash", trigger_type="manual"
+            )
+        except Exception as e:
+            return f"refused: {e}"
+        return (
+            f"{project_id}: recovered={len(report['recovered'])}"
+            f" observations_run={report['observations_run']}"
+        )
+
     return {
         "project-status": status,
         "project-initiatives": initiatives,
         "project-pause": pause,
+        "project-reconcile": reconcile,
     }
 
 
