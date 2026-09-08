@@ -426,6 +426,21 @@ async def project_objectives(
     )
 
 
+class AssessmentBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    passed: bool
+    evidence: list[str]
+    detail: str = ""
+    expires_at: str | None = None
+
+
+@plugin_api.post("/projects/{project_id}/objectives/{objective_id}/assessment")
+async def record_project_assessment(project_id: str, objective_id: int, body: AssessmentBody) -> dict:
+    # The downstream authenticated composition, not this payload/route, decides human authority.
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/objectives/{objective_id}/assessment",
+                        {**body.model_dump(), "interface": "desktop"})
+
+
 @plugin_api.post("/projects/{project_id}/objectives")
 async def create_project_objective(
     project_id: str, body: ObjectiveBody

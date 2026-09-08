@@ -13,10 +13,10 @@ Command evaluators ALWAYS run through security.allowlist.run_allowlisted.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 from pathlib import Path
-from typing import FrozenSet, Optional
+from typing import Callable, FrozenSet, Optional
 
 from ..domain.models import Objective, ObjectiveResult
 from ..security.allowlist import CommandNotPermitted, run_allowlisted
@@ -29,6 +29,8 @@ class EvaluationContext:
     project_path: Optional[Path] = None
     allowlist: FrozenSet[str] = frozenset()
     timeout_seconds: int = 60
+    github_evidence: Optional[dict] = None
+    clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)
 
 
 def parse_target(target: str):
@@ -55,11 +57,24 @@ def _compare(measured: float, target: str) -> bool:
 
 class ObjectiveEvaluator:
     def evaluate(self, objective: Objective, ctx: EvaluationContext) -> ObjectiveResult:
+        if not objective.enabled:
+            return ObjectiveResult(objective.id or -1, objective.name, False, None, False,
+                                   "not_applicable: objective archived")
         if objective.evaluator_type == "command":
             return self._eval_command(objective, ctx)
         if objective.evaluator_type == "manual":
             return self._eval_manual(objective, ctx)
         if objective.evaluator_type == "integration":
+            if objective.integration == "github" and ctx.github_evidence is not None:
+                evidence = ctx.github_evidence
+                state = evidence.get("state", "unknown")
+                measured = (1.0 if state == "passed" else 0.0) if state in {"passed", "failed"} else None
+                met = measured is not None and _compare(measured, objective.target)
+                return ObjectiveResult(
+                    objective_id=objective.id or -1, name=objective.name,
+                    passed=state == "passed" and met, measured=measured,
+                    target_met=met, detail=str(evidence.get("detail", "unknown: GitHub evidence unavailable")),
+                )
             return ObjectiveResult(
                 objective_id=objective.id or -1,
                 name=objective.name,
@@ -94,11 +109,26 @@ class ObjectiveEvaluator:
                 target_met=False,
                 detail="unknown: manual result has no evidence",
             )
+        recorded_at = status.get("recorded_at")
+        if recorded_at:
+            try:
+                stamp = datetime.fromisoformat(str(recorded_at).replace("Z", "+00:00"))
+                window = re.fullmatch(r"([1-9][0-9]{0,3})d", objective.window)
+                if stamp.utcoffset() is None or not window or stamp > ctx.clock():
+                    raise ValueError("invalid sample time/window")
+                if stamp < ctx.clock() - timedelta(days=int(window.group(1))):
+                    return ObjectiveResult(objective.id or -1, objective.name, False, None, False,
+                                           "stale: manual evidence outside objective window")
+            except ValueError:
+                return ObjectiveResult(objective.id or -1, objective.name, False, None, False,
+                                       "unknown: invalid sample time/window")
         expires_at = status.get("expires_at")
         if expires_at:
             try:
                 expiry = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
-                if expiry <= datetime.now(timezone.utc):
+                if expiry.utcoffset() is None:
+                    raise ValueError("evidence expiry requires a timezone")
+                if expiry <= ctx.clock():
                     return ObjectiveResult(
                         objective_id=objective.id or -1,
                         name=objective.name,
@@ -117,14 +147,11 @@ class ObjectiveEvaluator:
                     detail="unknown: invalid manual evidence expiry",
                 )
         measured = 1.0 if status["passed"] else 0.0
-        try:
-            met = _compare(measured, objective.target)
-        except ValueError:
-            met = bool(status["passed"])
+        met = _compare(measured, objective.target)
         return ObjectiveResult(
             objective_id=objective.id or -1,
             name=objective.name,
-            passed=bool(status["passed"]),
+            passed=bool(status["passed"]) and met,
             measured=measured,
             target_met=met,
             detail=str(status.get("detail", "")),

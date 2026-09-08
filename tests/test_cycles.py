@@ -20,6 +20,32 @@ def wire_repo(svc, pid: str, repo: Path) -> None:
     )
 
 
+def test_missing_manual_evidence_blocks_mutations(engine, enabled, svc):
+    svc.add_objective(enabled, name="human-check", evaluator_type="manual", target=">=1", severity="high")
+    result = engine.run_cycle(enabled)
+    assert result["health"]["state"] == "unknown"
+    assert result["initiatives"] == []
+
+
+def test_cycle_collects_and_persists_github_evidence(engine, enabled, svc, monkeypatch):
+    import json
+    from hermes_project_stewardship.objectives import github
+    monkeypatch.setattr(github, 'collect_checks', lambda *a: {
+        'source': 'github', 'repository': 'owner/repo', 'sha': 'a'*40,
+        'state': 'passed', 'checks': [{'name': 'tests', 'state': 'passed'}],
+        'detail': 'exact commit verified',
+    })
+    svc.store._conn.execute(
+        'UPDATE project_stewardship SET verification_policy_json=? WHERE project_id=?',
+        (json.dumps({'github': {'repository': 'owner/repo', 'sha': 'a'*40, 'required_checks': ['tests']}}), enabled),
+    )
+    svc.add_objective(enabled, name='checks', evaluator_type='integration', integration='github', target='>=1', severity='high')
+    result = engine.run_cycle(enabled)
+    assert result['health']['state'] == 'healthy'
+    snapshot = svc.latest_health(enabled)
+    assert 'exact commit verified' in str(snapshot)
+
+
 def test_basic_cycle_healthy(engine, enabled):
     r = engine.run_cycle(enabled)
     assert r["verification_ok"] is True

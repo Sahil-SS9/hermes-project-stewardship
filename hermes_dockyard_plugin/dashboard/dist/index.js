@@ -21,6 +21,8 @@
     });
     return {
       health: () => get("/health"),
+      objectives: (project) => get(`/projects/${encodeURIComponent(project)}/objectives`),
+      recordAssessment: (project, id, body) => post(`/projects/${encodeURIComponent(project)}/objectives/${id}/assessment`, body),
       features: (projectId) => get(
         `/projects/${encodeURIComponent(projectId)}/features`
       ),
@@ -103,6 +105,91 @@
     const sdk = window.__HERMES_PLUGIN_SDK__;
     if (!sdk || typeof sdk.fetchJSON !== "function") return null;
     return sdk;
+  }
+
+  // src/objective-evidence.ts
+  async function renderObjectiveEvidence(root, api, project) {
+    const text = (tag, value) => {
+      const node = document.createElement(tag);
+      node.textContent = value;
+      return node;
+    };
+    root.dataset.objectiveEvidencePanel = project;
+    root.replaceChildren(text("p", "Loading objective evidence\u2026"));
+    try {
+      const response = await api.objectives(project);
+      root.replaceChildren(text("h3", `Objectives \u2014 ${project}`));
+      if (!response.objectives.length) root.append(text("p", "No objectives configured."));
+      for (const objective of response.objectives) {
+        const evidence = objective.evidence;
+        const state = objective.enabled === false ? "not_applicable" : evidence?.state || "unknown";
+        const details = document.createElement("details");
+        details.append(text("summary", `${objective.name} \u2014 ${state} \u2014 Evidence/history`));
+        details.append(text("p", evidence?.detail || "Insufficient data: no recorded evidence."));
+        details.append(text("p", `Target ${objective.target} \xB7 Window ${objective.window} \xB7 Evidence age ${evidence?.evidence_age_seconds == null ? "unavailable" : Math.floor(evidence.evidence_age_seconds) + " seconds"} \xB7 Samples ${evidence?.sample_count || 0} \xB7 Pass rate ${evidence?.pass_rate == null ? "insufficient data" : Math.round(evidence.pass_rate * 100) + "%"}`));
+        const list = document.createElement("ul");
+        for (const sample of evidence?.history || []) {
+          list.append(text("li", `${sample.recorded_at} \xB7 ${sample.state} \xB7 ${sample.verified_actor || "objective evaluator"} \xB7 ${sample.detail || ""} \xB7 ${JSON.stringify(sample.evidence || sample.source_evidence || {})}`));
+        }
+        details.append(list);
+        if (objective.evaluator_type === "manual" && objective.enabled !== false) {
+          if (!objective.can_record_assessment) details.append(text("p", "Read-only: a dedicated authenticated human principal is required to record assessments."));
+          else {
+            const form = document.createElement("form");
+            const select = document.createElement("select");
+            for (const state2 of ["passed", "failed"]) {
+              const option = document.createElement("option");
+              option.value = state2;
+              option.textContent = state2;
+              select.append(option);
+            }
+            const resultLabel = text("label", "Result ");
+            resultLabel.append(select);
+            const reference = document.createElement("input");
+            reference.required = true;
+            reference.maxLength = 500;
+            const label2 = text("label", "Evidence reference ");
+            label2.append(reference);
+            const note = document.createElement("input");
+            note.maxLength = 2e3;
+            const noteLabel = text("label", "Assessment note ");
+            noteLabel.append(note);
+            const expiry = document.createElement("input");
+            expiry.type = "datetime-local";
+            const expiryLabel = text("label", "Expires at (local time) ");
+            expiryLabel.append(expiry);
+            const submit = document.createElement("button");
+            submit.type = "submit";
+            submit.textContent = "Record human assessment";
+            const status = text("p", "");
+            status.setAttribute("role", "status");
+            form.append(resultLabel, label2, noteLabel, expiryLabel, submit, status);
+            form.addEventListener("submit", async (event) => {
+              event.preventDefault();
+              if (submit.disabled) return;
+              submit.disabled = true;
+              try {
+                await api.recordAssessment(project, objective.id, { passed: select.value === "passed", evidence: [reference.value], detail: note.value, expires_at: expiry.value ? new Date(expiry.value).toISOString() : null });
+                await renderObjectiveEvidence(root, api, project);
+              } catch {
+                status.textContent = "Assessment not confirmed. Refresh evidence before retrying; check human authority.";
+                submit.disabled = false;
+              }
+            });
+            details.append(form);
+          }
+        }
+        root.append(details);
+      }
+    } catch {
+      root.replaceChildren(text("p", "Objective evidence unavailable."));
+      const retry = document.createElement("button");
+      retry.textContent = "Retry evidence";
+      retry.addEventListener("click", () => {
+        void renderObjectiveEvidence(root, api, project);
+      });
+      root.append(retry);
+    }
   }
 
   // src/components/live-detail.ts
@@ -919,6 +1006,18 @@
       const strong = document.createElement("strong");
       strong.textContent = String(p.project_id);
       tdId.appendChild(strong);
+      const evidenceButton = document.createElement("button");
+      evidenceButton.textContent = "Objective evidence";
+      evidenceButton.dataset.objectivesProject = p.project_id;
+      const evidencePanel = document.createElement("section");
+      evidencePanel.className = "dy-card";
+      evidencePanel.hidden = true;
+      evidenceButton.addEventListener("click", () => {
+        evidencePanel.hidden = !evidencePanel.hidden;
+        if (!evidencePanel.hidden) void renderObjectiveEvidence(evidencePanel, s.api, p.project_id);
+      });
+      tdId.appendChild(evidenceButton);
+      wrap.appendChild(evidencePanel);
       const items = p.items ?? { total: 0, done: 0, blocked: 0, overdue: 0 };
       const ms = p.next_milestone;
       let msText = "\u2014";

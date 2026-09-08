@@ -55,13 +55,34 @@ def test_healthz_open(env):
     assert r.status_code == 200 and r.json()["ok"] is True
 
 
+def test_objective_list_includes_recorded_evidence(env):
+    c, store = env
+    enable(c)
+    objective = c.post('/stewardship/v1/projects/p1/objectives', json={
+        'name': 'evidence', 'evaluator_type': 'manual', 'target': '>=1',
+    }).json()
+    from hermes_project_stewardship.persistence.service import StewardshipService
+    StewardshipService(store).record_assessment(
+        'p1', objective['id'], passed=True, evidence=['test:receipt'], trusted_principal='human',
+    )
+    result = c.get('/stewardship/v1/projects/p1/objectives').json()['objectives'][0]
+    assert result['evidence']['state'] == 'passed'
+    assert result['evidence']['history'][0]['verified_actor'] == 'human'
+
+
 def test_full_lifecycle_over_rpc(env):
-    c, _ = env
+    from hermes_project_stewardship.persistence.service import StewardshipService
+    c, store = env
     enable(c)
     r = c.post("/stewardship/v1/projects/p1/objectives", json={
         "name": "cov", "evaluator_type": "manual", "target": ">=1", "severity": "high",
     })
     assert r.status_code == 200
+    # Supply real recorded evidence rather than treating an unassessed objective as healthy.
+    StewardshipService(store).record_assessment(
+        "p1", r.json()["id"], passed=True, evidence=["test:verified"],
+        trusted_principal="test-human",
+    )
     r = c.post("/stewardship/v1/projects/p1/cycle", json={})
     assert r.status_code == 200 and r.json()["health"]["state"] in {
         "healthy", "watch", "degraded"}

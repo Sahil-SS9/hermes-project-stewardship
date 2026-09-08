@@ -1,4 +1,5 @@
 // Typed wrappers over the host SDK for the Dockyard plugin backend.
+import type { ObjectiveView } from './objective-evidence';
 export interface HermesPluginSDK {
   readonly sdkVersion: string;
   React: any;
@@ -141,6 +142,8 @@ export function createApi(sdk: HermesPluginSDK) {
 
   return {
     health: () => get<{ ok: boolean }>('/health'),
+    objectives: (project: string) => get<{objectives: ObjectiveView[]}>(`/projects/${encodeURIComponent(project)}/objectives`),
+    recordAssessment: (project: string, id: number, body: {passed: boolean; evidence: string[]; detail: string; expires_at: string | null}) => post(`/projects/${encodeURIComponent(project)}/objectives/${id}/assessment`, body),
     features: (projectId: string) =>
       get<{ features: Record<string, boolean> }>(
         `/projects/${encodeURIComponent(projectId)}/features`,

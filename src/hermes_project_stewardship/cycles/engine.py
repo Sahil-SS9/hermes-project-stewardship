@@ -161,14 +161,40 @@ class CycleEngine:
             ctx = EvaluationContext(
                 project_path=self._project_path(specs),
                 allowlist=self._allowlist_from(policies),
+                clock=self.svc._clock,
             )
-            for obj in self.svc.objectives(project_id):
+            objectives = self.svc.objectives(project_id)
+            if any(o.evaluator_type == "integration" and o.integration == "github" for o in objectives):
+                from ..objectives.github import collect_github_evidence
+                config = policies.get("verification", {}).get("github", {})
+                if config:
+                    try:
+                        ctx.github_evidence = collect_github_evidence(
+                            config["repository"], config["sha"], config["required_checks"],
+                            ref=config.get("ref"), release_tag=config.get("release_tag"),
+                        )
+                    except (KeyError, ValueError, TypeError):
+                        ctx.github_evidence = {"state": "unknown", "detail": "invalid GitHub evidence configuration"}
+            for obj in objectives:
+                if obj.evaluator_type == "manual" and obj.id is not None:
+                    # Persisted manual assessment: feed the recorded status
+                    # (evidence, expiry) into the evaluator via the same
+                    # contract the evaluator already consumes.
+                    latest = self.svc.latest_assessment(project_id, obj.id)
+                    if latest is not None:
+                        obj._manual_status = {
+                            "passed": latest["passed"],
+                            "evidence": latest["evidence"],
+                            "detail": latest.get("detail", ""),
+                            "expires_at": latest.get("expires_at"),
+                            "recorded_at": latest["recorded_at"],
+                        }
                 try:
                     res = DEFAULT_EVALUATOR.evaluate(obj, ctx)
                 except ValueError as e:
                     res_dict = {
                         "objective_id": obj.id, "name": obj.name, "passed": False,
-                        "measured": None, "target_met": False, "detail": f"evaluator error: {e}",
+                        "measured": None, "target_met": False, "state": "unknown", "detail": f"evaluator error: {e}",
                     }
                 else:
                     res_dict = {
@@ -177,8 +203,12 @@ class CycleEngine:
                         "passed": res.passed,
                         "measured": res.measured,
                         "target_met": res.target_met,
+                        "state": res.state,
                         "detail": res.detail,
                     }
+                if obj.evaluator_type == "integration" and obj.integration == "github" and ctx.github_evidence:
+                    res_dict["source_evidence"] = ctx.github_evidence
+                res_dict["severity"] = obj.severity
                 objective_results.append(res_dict)
                 if not res_dict["passed"]:
                     if obj.severity == "high":
@@ -202,6 +232,8 @@ class CycleEngine:
         )
         if not verdict.ok:
             state = HealthState.CRITICAL if attack_signal else HealthState.UNKNOWN
+        elif any(r["measured"] is None for r in objective_results):
+            state = HealthState.UNKNOWN
         elif high_contras:  # defensive: should not happen when ok
             state = HealthState.CRITICAL
         else:
@@ -224,7 +256,10 @@ class CycleEngine:
             project_id,
             status=state.value,
             score=score,
-            evidence=[e.__dict__ for e in verdict.evidence],
+            evidence=[e.__dict__ for e in verdict.evidence] + [
+                {"kind": "objective", "source": "objective-evaluator", "summary": r["detail"], "payload_json": r}
+                for r in objective_results
+            ],
             contradictions=[c.__dict__ for c in verdict.contradictions],
         )
         self.store.audit(
