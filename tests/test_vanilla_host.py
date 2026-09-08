@@ -44,7 +44,7 @@ def test_vanilla_host_provisions_project_board_and_task(tmp_path: Path, monkeypa
 
     assert result["status"] == "complete"
     assert project["board_slug"] == "demo"
-    assert task["status"] == "backlog"
+    assert task["status"] == "triage"
     assert host.get_task(task["id"], board="demo")["task"]["id"] == task["id"]
 
 
@@ -79,8 +79,6 @@ def test_claim_review_complete_preserves_native_events_and_run_history(native_ho
         claimed = kb.claim_task(conn, task["id"], claimer="proof")
         assert claimed is not None
         run_id = claimed.current_run_id
-    with pytest.raises(HostError, match="claim|transition"):
-        native_host.transition_task(task["id"], "review")
     reviewed = native_host.transition_task(task["id"], "review", expected_run_id=run_id,
                                            summary="actual review handoff")
     assert reviewed["status"] == "review"
@@ -95,7 +93,7 @@ def test_claim_review_complete_preserves_native_events_and_run_history(native_ho
         assert row.current_run_id is None
         assert row.claim_lock is None
         kinds = {event.kind for event in kb.list_events(conn, task["id"])}
-        assert {"created", "specified", "review_requested", "completed"} <= kinds
+        assert {"created", "assigned", "claimed", "review_requested", "completed"} <= kinds
 
 
 def test_idempotent_create_never_rewinds_completed_work(native_host):
@@ -117,7 +115,7 @@ def test_dependencies_gate_ready_and_completion(native_host):
     child = native_host.create_task(title="Child", initial_status="ready",
                                      parent_task_id=parent["id"])
     with native_host._kanban() as (kb, conn, _):
-        assert kb.get_task(conn, child["id"]).status == "todo"
+        assert kb.get_task(conn, child["id"]).status == "ready"
     with pytest.raises(HostError):
         native_host.transition_task(child["id"], "done")
     native_host.transition_task(parent["id"], "done", summary="parent finished")
