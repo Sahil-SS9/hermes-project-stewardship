@@ -326,7 +326,20 @@ class CycleEngine:
             mutation_blocked_reason = "fail-closed: verification failed"
         elif self.proposal_fn is not None and failed_objectives:
             remaining = self.max_initiatives_per_cycle
-            for prop in self.proposal_fn(project_id, verdict, objective_results, cycle_id):
+            try:
+                proposals = self.proposal_fn(project_id, verdict, objective_results, cycle_id)
+            except Exception as e:
+                # Bounded reasoning failure (P3.3): record an error, never
+                # fabricate a proposal. The cycle stays otherwise intact.
+                if self.events is not None:
+                    self.events.emit(
+                        "stewardship.reasoning.failed",
+                        project_id=project_id,
+                        subject=f"cycle:{cycle_id}",
+                        payload={"error": str(e)[:500]},
+                    )
+                proposals = []
+            for prop in proposals:
                 # Re-observe phase per item: pause/freeze may land inside the
                 # proposer callback (long-running LLM reasoning). The moment a
                 # non-active phase is observed, no further mutation happens.

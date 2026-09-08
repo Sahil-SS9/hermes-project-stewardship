@@ -244,7 +244,11 @@ class StewardshipService:
         "inbox",
         "notifications",
         "saved_views",
+        "reconciliation",
     )
+    # Features defaulting to OFF until explicitly enabled. Automation stays
+    # inactive by default (plan Phase 3); enabling is a deliberate act.
+    DEFAULT_OFF_FEATURES = ("reconciliation",)
     # Core surfaces: the mechanism that makes toggling safe. Never togglable.
     CORE_FEATURES = (
         "projects",
@@ -266,8 +270,10 @@ class StewardshipService:
 
     def _resolve_features(self, r: sqlite3.Row) -> Dict[str, bool]:
         stored = self.store._uj(r["features_json"], {}) if r["features_json"] else {}
-        return {name: bool(stored.get(name, True))
-                for name in self.TOGGLABLE_FEATURES}
+        return {
+            name: bool(stored.get(name, name not in self.DEFAULT_OFF_FEATURES))
+            for name in self.TOGGLABLE_FEATURES
+        }
 
     def features(self, project_id: str) -> Dict[str, bool]:
         """Resolved feature-toggle map for a project."""

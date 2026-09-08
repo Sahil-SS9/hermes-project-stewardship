@@ -394,3 +394,42 @@ class ProjectKanbanHost:
                 for child in kb.child_ids(conn, task_id)
             ]
         return _page(items, limit)
+
+    def get_task_runs(self, task_id: str, *, board: str | None = None) -> list[dict[str, Any]]:
+        """Observation read surface (Phase 3): native run history, read-only.
+
+        Returns vanilla's own ``task_runs`` rows for the task — the run
+        identity the observation boundary requires (never fabricated from
+        task state alone).
+        """
+        with self._kanban(board) as (kb, conn, _):
+            if kb.get_task(conn, task_id) is None:
+                raise HostError("task_not_found", "canonical task was not found")
+            rows = conn.execute(
+                "SELECT id, task_id, profile, step_key, status, started_at,"
+                " ended_at, outcome, summary, error"
+                " FROM task_runs WHERE task_id=? ORDER BY id",
+                (task_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_task_events(self, task_id: str, *, board: str | None = None) -> list[dict[str, Any]]:
+        """Observation read surface (Phase 3): native lifecycle events.
+
+        Returns vanilla's own ``task_events`` rows via kb.list_events — the
+        durable lifecycle evidence (created/claimed/completed/blocked, each
+        with its run id) that observation is built from.
+        """
+        with self._kanban(board) as (kb, conn, _):
+            if kb.get_task(conn, task_id) is None:
+                raise HostError("task_not_found", "canonical task was not found")
+            events = kb.list_events(conn, task_id)
+        return [
+            {
+                "kind": str(e.kind),
+                "payload": e.payload,
+                "created_at": e.created_at,
+                "run_id": e.run_id,
+            }
+            for e in events
+        ]

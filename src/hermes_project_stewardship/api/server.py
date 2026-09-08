@@ -57,6 +57,7 @@ from ..persistence.service import (
     StewardshipService,
 )
 from ..persistence.workflow_service import WorkflowService
+from ..observation.recovery import ReconcileService
 from ..persistence.store import Store
 from .middleware import (
     BearerAuthMiddleware,
@@ -169,6 +170,12 @@ class CompleteRequest(BaseModel):
     regressed: bool = False
     actor_id: str = "sahil"
     actor_kind: str = "human"
+
+
+class ReconcileRequest(BaseModel):
+    actor: str = "sahil"
+    interface: str = "api"
+    trigger_type: str = "manual"
 
 
 class WorkItemCreate(BaseModel):
@@ -706,6 +713,28 @@ def create_app(
     def run_observation(ref: str):
         try:
             return integration.run_observation(ref, engine)
+        except (IntegrationError, CycleRefused) as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @router.post("/projects/{project_id}/reconcile")
+    def reconcile(project_id: str, body: ReconcileRequest):
+        """Bounded reconciliation pass (manual / native-cron).
+
+        Gated by the per-project `reconciliation` feature (default OFF).
+        The caller's trigger type passes through unchanged: 'cron' stays
+        'cron', so a paused project's manual-only gate still refuses it.
+        """
+        svc.require_feature(project_id, "reconciliation")
+        recovery = ReconcileService(
+            store, adapter, engine=engine, service=svc,
+        )
+        try:
+            return recovery.reconcile(
+                project_id,
+                actor=body.actor,
+                interface=body.interface,
+                trigger_type=body.trigger_type,
+            )
         except (IntegrationError, CycleRefused) as exc:
             raise HTTPException(409, str(exc)) from None
 

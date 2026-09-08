@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 18
+SCHEMA_VERSION = 19
 
 
 @dataclass(frozen=True)
@@ -709,6 +709,32 @@ MIGRATIONS: List[Migration] = [
         """,
         downgrade_sql="""
         DROP TABLE IF EXISTS project_objective_assessments;
+        """,
+    ),
+    Migration(
+        version=19,
+        name="observation result classification and event claims",
+        upgrade_sql="""
+        -- P3.5: durable observation outcome classification with evidence.
+        ALTER TABLE dockyard_observation_triggers ADD COLUMN result_state TEXT
+            CHECK (result_state IN ('improved','regressed','unknown'));
+        ALTER TABLE dockyard_observation_triggers ADD COLUMN result_evidence_json TEXT;
+
+        -- P3.2: atomic claim primitive for bounded work. INSERT OR IGNORE is
+        -- the concurrency gate; NULL claimers never collide (SQLite UNIQUE
+        -- treats NULLs as distinct) so keyless rows stay unlimited.
+        CREATE TABLE IF NOT EXISTS event_claims (
+            claim_key  TEXT PRIMARY KEY,
+            holder     TEXT,
+            claimed_at TEXT NOT NULL
+        );
+        """,
+        downgrade_sql="""
+        CREATE TABLE IF NOT EXISTS event_claims_legacy_backup AS
+            SELECT * FROM event_claims WHERE 0;
+        DROP TABLE IF EXISTS event_claims;
+        ALTER TABLE dockyard_observation_triggers DROP COLUMN result_state;
+        ALTER TABLE dockyard_observation_triggers DROP COLUMN result_evidence_json;
         """,
     ),
 ]
