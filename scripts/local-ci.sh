@@ -35,30 +35,35 @@ done
 
 cd "$(dirname "$0")/.." || exit 1
 
-# --- Python interpreter: repo .venv first, then committed-evidence venv.
-PY=""
-for c in "./.venv/bin/python" "/tmp/dy-ci-venv/bin/python"; do
-  if [ -x "$c" ]; then PY="$c"; break; fi
-done
-if [ -z "$PY" ]; then
+# --- Use only the already-materialised candidate environment.
+PY="$PWD/.venv/bin/python"
+if [ ! -x "$PY" ]; then
   echo "FATAL: no usable python venv. Create one:" >&2
-  echo "  uv venv .venv && VIRTUAL_ENV=.venv uv pip install -e \".[dev,desktop-panel]\" pytest-cov" >&2
+  echo "  uv sync --locked --extra dev --extra plugin" >&2
   exit 1
 fi
 echo "python: $PY ($($PY --version 2>&1))"
 
+# Keep every log, including successful gates, under a unique run directory.
+EVIDENCE_PARENT="${STEWARD_CI_EVIDENCE:-${TMPDIR:-/tmp}}"
+mkdir -p "$EVIDENCE_PARENT" || exit 1
+EVIDENCE=$(mktemp -d "$EVIDENCE_PARENT/dy-localci-XXXXXX") || exit 1
+export HERMES_HOME="$EVIDENCE/hermes-home"
+export HERMES_KANBAN_HOME="$EVIDENCE/hermes-home"
+export COVERAGE_FILE="$EVIDENCE/.coverage"
+export PYTHONDONTWRITEBYTECODE=1
+unset STEWARD_DB_PATH DOCKYARD_PLUGIN_DB STEWARD_RPC_TOKEN DOCKYARD_PLUGIN_URL DOCKYARD_ACTOR_ID
+echo "evidence: $EVIDENCE"
+"$PY" -c 'from pathlib import Path; import hermes_project_stewardship as p; print("candidate import:", p.__file__); assert Path(p.__file__).resolve().is_relative_to(Path.cwd() / "src")' || exit 1
+
 run_gate() { # name target command...
   local name="$1" target="$2"; shift 2
-  local log; log=$(mktemp /tmp/dy-localci-XXXXXX.log)
+  local log="$EVIDENCE/$name.log"
   if "$@" >"$log" 2>&1; then
-    local detail; detail=$(grep -E "passed|failed|error" "$log" | tail -1 | cut -c1-60)
-    [ -z "$detail" ] && detail="ok"
-    pass "$name" "$detail"
-    rm -f "$log"
+    pass "$name" "exit=0; log=$log"
   else
-    local detail; detail=$(tail -3 "$log" | tr '\n' ' ' | cut -c1-160)
-    fail "$name" "$detail"
-    echo "  full log: $log"
+    local code=$?
+    fail "$name" "exit=$code; log=$log"
   fi
 }
 
@@ -76,8 +81,10 @@ pass "install-extras" "imports ok"
 # --- Gate 2: full suite with coverage gate (mirror of ci.yml webui gate).
 COV_FAIL_UNDER=87
 run_gate "suite+coverage" "fail-under=$COV_FAIL_UNDER" \
-  "$PY" -m pytest --cov=hermes_project_stewardship --cov-report=term \
-  --cov-report=json:/tmp/dy-coverage.json --cov-fail-under=$COV_FAIL_UNDER
+  "$PY" -m pytest -c pyproject.toml -rs -p no:cacheprovider \
+  --basetemp "$EVIDENCE/pytest" --cov=hermes_project_stewardship \
+  --cov-config=pyproject.toml --cov-report=term \
+  --cov-report="json:$EVIDENCE/coverage.json" --cov-fail-under=$COV_FAIL_UNDER
 
 # --- Gate 3: static quality/security checks.
 run_gate "ruff" "src" "$PY" -m ruff check src
@@ -103,7 +110,7 @@ if [ "$WITH_NODE" -eq 1 ]; then
   if command -v npm >/dev/null 2>&1; then
     # pushd/popd (not subshells) so RESULTS propagate to the JSON summary.
     pushd hermes_dockyard_plugin/dashboard >/dev/null
-    run_gate "dashboard-typecheck" "tsc --noEmit" npx tsc --noEmit
+    run_gate "dashboard-typecheck" "tsc --noEmit" ./node_modules/.bin/tsc --noEmit
     run_gate "dashboard-tests" "node --test" npm test
     run_gate "dashboard-build" "npm run build" npm run build
     run_gate "dashboard-audit" "npm audit" npm audit --omit=dev
@@ -121,15 +128,7 @@ fi
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 if [ "$JSON_OUT" -eq 1 ]; then
   echo "---"
-  printf '{\n  "tool": "local-ci",\n  "generated_at": "%s",\n  "python": "%s",\n  "gates": [\n' "$TIMESTAMP" "$PY"
-  first=1
-  for r in "${RESULTS[@]}"; do
-    IFS='|' read -r status name detail <<<"$r"
-    [ $first -eq 0 ] && printf ',\n'
-    printf '    {"gate": "%s", "status": "%s", "detail": "%s"}' "$name" "$status" "${detail//\"/\\\"}"
-    first=0
-  done
-  printf '\n  ],\n  "failures": %d\n}\n' "$FAILURES"
+  "$PY" -c 'import json,sys; print(json.dumps({"tool":"local-ci", "generated_at":sys.argv[1], "python":sys.argv[2], "failures":int(sys.argv[3]), "gates":[dict(zip(("status","gate","detail"), row.split("|",2))) for row in sys.argv[4:]]}, indent=2))' "$TIMESTAMP" "$PY" "$FAILURES" "${RESULTS[@]}"
 fi
 
 echo "---"
