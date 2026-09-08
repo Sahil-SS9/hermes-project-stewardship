@@ -1612,8 +1612,22 @@ class StewardshipService:
         reason: str = "",
         note: str = "",
     ) -> Dict[str, Any]:
-        decision = self._check_decision_fingerprint(ref, expected_fingerprint)
         ini = self.initiative_by_ref(ref)
+        # Sequential idempotent replay (round-3 R3): repeating the SAME
+        # recorded rejection — terminal status already rejected and the
+        # submitted fingerprint matches its saved receipt — returns the
+        # recorded result without a new receipt or side effect. Changed or
+        # conflicting decisions still fall through to the normal guards.
+        if ini["status"] == InitiativeStatus.REJECTED.value and expected_fingerprint:
+            existing = self.store._conn.execute(
+                "SELECT * FROM stewardship_decision_receipts"
+                " WHERE initiative_ref=? AND decision='rejected'"
+                " AND fingerprint=? ORDER BY revision DESC LIMIT 1",
+                (ref, expected_fingerprint),
+            ).fetchone()
+            if existing is not None:
+                return self.initiative_by_ref(ref)
+        decision = self._check_decision_fingerprint(ref, expected_fingerprint)
         if not reason.strip():
             if suppress_days is not None:
                 reason = "rejected with suppression window"

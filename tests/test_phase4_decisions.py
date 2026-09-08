@@ -194,6 +194,7 @@ def test_dashboard_proxy_forwards_decision_fields_and_exposes_readers():
 
     previous_app = plugin_api._app
     previous_client = plugin_api._client
+    previous_store = plugin_api._store
     db_dir = Path(tempfile.mkdtemp(prefix="p4-proxy-"))
     store = Store(db_dir / "dockyard.db")
     adapter = ReferenceKanbanAdapter(store)
@@ -243,4 +244,5 @@ def test_dashboard_proxy_forwards_decision_fields_and_exposes_readers():
         asyncio.run(plugin_api._client.aclose())
         plugin_api._app = previous_app
         plugin_api._client = previous_client
+        plugin_api._store = previous_store
         store.close()
