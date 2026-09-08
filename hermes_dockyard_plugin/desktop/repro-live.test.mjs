@@ -20,6 +20,8 @@ const { createRoot } = require('react-dom/client');
 const rt = require('react/jsx-runtime');
 
 const POPULATED = {
+  // Phase 4 receipts backing store: ambiguous desktop outcomes read these.
+  DECISION_RECEIPTS: {},
   dashboard: {
     projects: [
       { id: 'demo-project', enabled: true, phase: 'active', health: 'healthy', work: { backlog: 5, active: 3, done: 3, blocked: 0 }, unacked_notifications: 0 },
@@ -238,6 +240,7 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
 
   const rest = async (path, init = {}) => {
     const method = init.method || 'GET';
+    const body = init.body || {};
     calls.push({ path, method, body: init.body });
     if (method !== 'GET' && failMutationPath === path) {
       throw new Error('Synthetic mutation failure');
@@ -263,17 +266,45 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
     }
     if (method === 'POST' && path.startsWith('/initiatives/') && path.endsWith('/approve')) {
       const ref = decodeURIComponent(path.split('/')[2]);
+      if (!body?.expected_fingerprint) throw new Error('approve requires expected_fingerprint');
       data.inbox.items = data.inbox.items.filter((item) => item.ref !== ref);
       data.inbox.count = data.inbox.items.length;
       data.dashboard.owed_decisions = data.inbox.count;
-      return { ok: true, ref, status: 'approved' };
+      data.DECISION_RECEIPTS ??= {};
+      data.DECISION_RECEIPTS[ref] = { decision: 'approved', ref, fingerprint: body.expected_fingerprint };
+      return { ok: true, ref, status: 'approved', receipt: { decision: 'approved', ref } };
     }
     if (method === 'POST' && path.startsWith('/initiatives/') && path.endsWith('/reject')) {
       const ref = decodeURIComponent(path.split('/')[2]);
+      if (!body?.expected_fingerprint) throw new Error('reject requires expected_fingerprint');
+      if (!body?.reason) throw new Error('reject requires a reason');
       data.inbox.items = data.inbox.items.filter((item) => item.ref !== ref);
       data.inbox.count = data.inbox.items.length;
       data.dashboard.owed_decisions = data.inbox.count;
-      return { ok: true, ref, status: 'rejected' };
+      data.DECISION_RECEIPTS ??= {};
+      data.DECISION_RECEIPTS[ref] = { decision: 'rejected', ref, fingerprint: body.expected_fingerprint };
+      return { ok: true, ref, status: 'rejected', receipt: { decision: 'rejected', ref } };
+    }
+    // Phase 4 contract: desktop fetches and displays the decision scope before
+    // deciding (round-3 R1); ambiguous outcomes read receipts (round-3 R2).
+    const decisionRead = path.match(/^\/initiatives\/([^/]+)\/decision$/);
+    if (method === 'GET' && decisionRead) {
+      const ref = decodeURIComponent(decisionRead[1]);
+      return {
+        ref,
+        title: 'Mock decision scope',
+        reason: 'Rationale shown on the desktop card.',
+        validation: { contract: { steps: ['Checkout suite', 'Refund suite'], tests: 'checkout and refund test suite' }, links: [], age: 'fresh' },
+        expected_outcome: 'Refunds complete without support intervention',
+        fingerprint: `fp-${ref}`,
+        revision: 1,
+      };
+    }
+    const receiptsRead = path.match(/^\/initiatives\/([^/]+)\/decision\/receipts$/);
+    if (method === 'GET' && receiptsRead) {
+      const ref = decodeURIComponent(receiptsRead[1]);
+      const receipt = (data.DECISION_RECEIPTS ?? {})[ref];
+      return { receipts: receipt ? [receipt] : [] };
     }
     if (method === 'POST' && path.startsWith('/notifications/') && path.endsWith('/ack')) {
       const id = Number(path.split('/')[2]);
@@ -567,6 +598,14 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       element._valueTracker?.setValue(previous);
       element.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
       element.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+      // React 19 + jsdom: synthetic input events do not drive controlled
+      // React state (props.value stays stale). Mirror the browser by also
+      // invoking the React onChange prop directly when present.
+      const propsKey = Object.keys(element).find((k) => k.startsWith('__reactProps'));
+      const props = propsKey ? element[propsKey] : null;
+      if (props && typeof props.onChange === 'function') {
+        props.onChange({ target: element, currentTarget: element, bubbles: true });
+      }
       await wait(ms);
     });
   };
@@ -690,7 +729,9 @@ async function testReferenceBenchmarkApprovalCardsAndReject() {
     assert(card.querySelector('[data-action="reject"]'), 'approval card is missing the supported Reject action');
     assert(card.querySelector('[data-action="toggle-evidence"]'), 'approval card is missing evidence disclosure');
   }
-  assert.match(cards[0].textContent, /Support requests drop when refunds are self-service/);
+  // Phase 4 contract: the card shows the fetched decision scope (fetched at
+  // render, round-3 R1), so the rationale text comes from /decision.
+  assert.match(cards[0].textContent, /Rationale shown on the desktop card/);
   assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/initiatives'), 'approval view did not load initiative detail supported by the backend');
 
   await runtime.click('[data-approval-ref="INI-DEMO-2"] [data-action="toggle-evidence"]');
@@ -701,8 +742,19 @@ async function testReferenceBenchmarkApprovalCardsAndReject() {
   assert(rejectionConfirm && !rejectionConfirm.hidden, 'Reject did not ask for confirmation');
   assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === '/initiatives/INI-DEMO-2/reject'), 'Reject mutated state before confirmation');
   await runtime.click('[data-action="confirm-destructive-action"]', 40);
+  // Owner supplies the rejection reason (round-3 R1 contract): the submit
+  // stays disabled until a reason is captured, and the POST carries it.
+  const reasonSelector = '[data-approval-ref="INI-DEMO-2"] [data-decision-note-form] input';
+  assert(doc.querySelector(reasonSelector), 'rejection reason form did not open');
+  const beforeTyping = doc.querySelector('[data-approval-ref="INI-DEMO-2"] [data-action="confirm-reject-with-reason"]');
+  assert(beforeTyping?.disabled, 'reject submit must stay disabled without a reason');
+  await runtime.setValue(reasonSelector, 'Rollback risk not acceptable', 60);
+  await runtime.click('[data-approval-ref="INI-DEMO-2"] [data-action="confirm-reject-with-reason"]', 60);
   assert.equal(doc.querySelector('[data-approval-ref="INI-DEMO-2"]')?.getAttribute('data-state'), 'rejected', 'rejection state was not shown');
-  assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/initiatives/INI-DEMO-2/reject'), 'rejection POST was not sent');
+  const rejectionPost = runtime.calls.find((call) => call.method === 'POST' && call.path === '/initiatives/INI-DEMO-2/reject');
+  assert(rejectionPost, 'rejection POST was not sent');
+  assert.equal(rejectionPost.body?.reason, 'Rollback risk not acceptable', 'rejection POST did not carry the owner reason');
+  assert.equal(rejectionPost.body?.expected_fingerprint, `fp-INI-DEMO-2`, 'rejection POST did not bind the displayed fingerprint');
   await runtime.flush(1000);
   assert(!doc.body.textContent.includes('Enable one-click refunds'), 'rejected item remains visible after refresh');
   await runtime.dispose();
@@ -1155,12 +1207,25 @@ async function testNotificationFlow() {
   const doc = runtime.dom.window.document;
   assert.equal(doc.querySelectorAll('[data-notification-state="unread"]').length, 1, 'expected one unread notification');
   assert.equal(doc.querySelectorAll('[data-notification-state="cleared"]').length, 1, 'expected one cleared notification');
-  await runtime.click('[data-notification-id="3"] [data-action="acknowledge"]', 50);
-  assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/notifications/3/ack'), 'acknowledge POST was not sent');
-  assert.equal(doc.querySelectorAll('[data-notification-state="unread"]').length, 0, 'acknowledged notification remains unread');
-  assert.equal(doc.querySelectorAll('[data-notification-state="cleared"]').length, 2, 'acknowledged notification did not move to Cleared');
-  assert.match(doc.querySelector('[data-notification-id="3"]')?.textContent || '', /Cleared/);
+  // Phase 6: notifications expose an exact-context deep link; Open navigates
+  // only (P6.5): no ack POST fires and the row state does not change.
+  const openButtons = doc.querySelectorAll('[data-notification-id="3"] [data-action="open"]');
+  assert.equal(openButtons.length, 1, 'unread notification lacks an Open deep-link control');
+  await runtime.click('[data-notification-id="3"] [data-action="open"]', 50);
+  assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === '/notifications/3/ack'), 'Open must not acknowledge');
+  assert.equal(runtime.dom.window.document.querySelectorAll('[data-notification-state="unread"]').length, 0, 'Open did not navigate away');
   await runtime.dispose();
+
+  const second = await createRuntime();
+  await second.mount();
+  await second.click('[data-tab="notifications"]');
+  const secondDoc = second.dom.window.document;
+  await second.click('[data-notification-id="3"] [data-action="acknowledge"]', 50);
+  assert(second.calls.some((call) => call.method === 'POST' && call.path === '/notifications/3/ack'), 'acknowledge POST was not sent');
+  assert.equal(secondDoc.querySelectorAll('[data-notification-state="unread"]').length, 0, 'acknowledged notification remains unread');
+  assert.equal(secondDoc.querySelectorAll('[data-notification-state="cleared"]').length, 2, 'acknowledged notification did not move to Cleared');
+  assert.match(secondDoc.querySelector('[data-notification-id="3"]')?.textContent || '', /Cleared/);
+  await second.dispose();
 }
 
 async function testKeyboardTabsAndNames() {

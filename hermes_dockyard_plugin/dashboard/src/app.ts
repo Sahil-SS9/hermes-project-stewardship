@@ -16,9 +16,51 @@ interface AppState {
   workLayout: 'board' | 'table';
   featureMap?: Record<string, boolean> | null;
   pendingView?: string | null;
+  pendingWorkRef?: string | null;
 }
 
 type FeatureMap = Record<string, boolean>;
+
+// P6.4: exact-context deep links. ``screen:object/id`` opens the screen and,
+// where the screen supports selection, pre-selects the exact object.
+function openFleetDeepLink(link: string, s: AppState): void {
+  const sep = link.indexOf(':');
+  if (sep <= 0) return;
+  const screen = link.slice(0, sep);
+  const rest = link.slice(sep + 1);
+  const slash = rest.indexOf('/');
+  const objectKind = slash >= 0 ? rest.slice(0, slash) : '';
+  const objectId = slash >= 0 ? rest.slice(slash + 1) : rest;
+  if (screen === 's4') {
+    s.tab = 'inbox';
+    return;
+  }
+  if (screen === 's6' && objectKind === 'initiative') {
+    s.tab = 'inbox';
+    return;
+  }
+  if (screen === 's2') {
+    s.tab = 'work';
+    if (objectKind === 'work' && objectId) {
+      // Work tab is per-project: the row title already shows the project;
+      // exact object pre-selection rides pendingWorkRef for renderWork.
+      s.selectedWorkRef = objectId;
+    } else if (objectKind === 'project' && objectId) {
+      s.projectId = objectId;
+    }
+    return;
+  }
+  if (screen === 's1') {
+    s.tab = 'dashboard';
+    if (objectKind === 'project' && objectId) s.projectId = objectId;
+    return;
+  }
+  if (screen === 's5') {
+    s.tab = 'workflow';
+    return;
+  }
+  s.tab = 'dashboard';
+}
 
 export function initApp(
   sdk: HermesPluginSDK,
@@ -237,6 +279,58 @@ async function renderDashboard(
     if ((at.overdue_milestones ?? 0) > 0) addLine('bad', `Overdue milestones: ${at.overdue_milestones}`);
     strip.appendChild(lines);
     wrap.appendChild(strip);
+  }
+
+  // -- Fleet groups (P6.1): decisions / interventions / informational.
+  // Rendered ONLY from backend rows; empty groups stay hidden (anti-slop).
+  // Every row exposes its exact deep link (P6.4) plus cause/owner/next-action
+  // evidence (P6.2). Ack on notifications never resolves interventions (P6.5):
+  // groups are read-only here.
+  const groups = view.groups;
+  if (groups) {
+    const groupDefs: Array<{ key: keyof typeof groups; label: string; cls: string }> = [
+      { key: 'decisions', label: 'Decisions waiting on you', cls: 'dy-group-decisions' },
+      { key: 'interventions', label: 'Interventions', cls: 'dy-group-interventions' },
+      { key: 'informational', label: 'Informational', cls: 'dy-group-informational' },
+    ];
+    for (const g of groupDefs) {
+      const rows = groups[g.key] ?? [];
+      if (rows.length === 0) continue;
+      const card = document.createElement('section');
+      card.className = `dy-card dy-fleet-group ${g.cls}`;
+      card.appendChild(textEl('h2', '', `${g.label} (${rows.length})`));
+      const list = document.createElement('ul');
+      list.className = 'dy-fleet-group-list';
+      for (const item of rows) {
+        const li = document.createElement('li');
+        const title = textEl('span', 'dy-fleet-item-title',
+          `${item.project} · ${item.title}`);
+        li.appendChild(title);
+        const bits: string[] = [];
+        if (item.cause) bits.push(item.cause);
+        if (item.detail) bits.push(item.detail);
+        if (item.risk) bits.push(`risk: ${item.risk}`);
+        if (item.owner) bits.push(`owner: ${item.owner}`);
+        if (typeof item.age_days === 'number') bits.push(`age: ${item.age_days}d`);
+        if (item.severity) bits.push(`sev: ${item.severity}`);
+        if (bits.length > 0) li.appendChild(textEl('span', 'dy-dim', ` — ${bits.join(' · ')}`));
+        if (item.next_action) li.appendChild(textEl('div', 'dy-dim', item.next_action));
+        const link = item.deep_link;
+        if (link) {
+          const open = document.createElement('button');
+          open.className = 'dy-btn dy-fleet-open';
+          open.textContent = 'Open';
+          open.dataset.deepLink = link;
+          open.addEventListener('click', () => {
+            openFleetDeepLink(link, s);
+          });
+          li.appendChild(open);
+        }
+        list.appendChild(li);
+      }
+      card.appendChild(list);
+      wrap.appendChild(card);
+    }
   }
 
   // -- Per-project standing: one dense row each. Status is the derived
@@ -1070,7 +1164,19 @@ async function renderNotifications(
     const row = document.createElement('div');
     row.className = 'dy-note';
     row.appendChild(textEl('span', '', String(n.summary ?? n.title ?? '')));
-    if (!n.acked_at && n.id != null) {
+    // P6.4: notifications carry an exact-context deep link; ack stays separate
+    // from resolution (P6.5) — Open never mutates, Acknowledge never resolves.
+    if (n.deep_link) {
+      const open = document.createElement('button');
+      open.className = 'dy-btn dy-note-open';
+      open.textContent = 'Open';
+      open.dataset.deepLink = n.deep_link;
+      open.addEventListener('click', () => {
+        openFleetDeepLink(n.deep_link as string, s);
+      });
+      row.appendChild(open);
+    }
+    if (!n.acked && !n.acked_at && n.id != null) {
       const btn = document.createElement('button');
       btn.className = 'dy-btn';
       btn.textContent = 'Acknowledge';
@@ -1079,6 +1185,8 @@ async function renderNotifications(
         try {
           await s.api.ack(Number(n.id));
           row.classList.add('acked');
+          const ackLabel = textEl('span', 'dy-dim', 'Acknowledged');
+          row.appendChild(ackLabel);
         } catch (e) {
           btn.disabled = false;
           btn.textContent = `Failed: ${String(e).slice(0, 60)}`;

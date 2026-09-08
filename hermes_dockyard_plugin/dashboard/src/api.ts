@@ -18,12 +18,38 @@ export interface PortfolioProject {
   items: { total: number; done: number; blocked: number; overdue: number };
   next_milestone?: { name: string; due: string | null; overdue: boolean } | null;
   last_activity?: string | null;
+  evidence_freshness_days?: number | null;
+}
+
+// P6.1/P6.2/P6.4: Fleet groups derived from existing records; every row
+// carries cause/owner/next-action evidence and an exact deep link.
+export interface FleetGroupItem {
+  kind: string;
+  cause?: string;
+  project: string;
+  ref?: string;
+  title: string;
+  risk?: string;
+  detail?: string;
+  owner?: string;
+  age_days?: number;
+  next_action?: string;
+  severity?: string;
+  created_at?: string;
+  deep_link: string;
+}
+
+export interface FleetGroups {
+  decisions: FleetGroupItem[];
+  interventions: FleetGroupItem[];
+  informational: FleetGroupItem[];
 }
 
 export interface PortfolioView {
   mix: { todo: number; in_progress: number; blocked: number; done: number };
   attention: { overdue_items: number; blocked_items: number; overdue_milestones: number };
   projects: PortfolioProject[];
+  groups?: FleetGroups;
 }
 
 export interface DashboardView {
@@ -77,6 +103,11 @@ export interface NotificationItem {
   summary?: string;
   title?: string;
   acked_at?: string | null;
+  acked?: boolean;
+  deep_link?: string;
+  project?: string;
+  severity?: string;
+  kind?: string;
 }
 
 export interface WorkItem {
