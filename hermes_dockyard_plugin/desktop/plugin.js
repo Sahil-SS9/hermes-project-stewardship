@@ -2660,14 +2660,20 @@ function ProjectReportsPanel({ project, reports, onRefresh }) {
 
 function WorkItemDetail({ item, projectId, onClose, onRefresh }) {
   const [draft, setDraft] = useState(null)
+  const [detail, setDetail] = useState(null)
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState(null)
   const [error, setError] = useState(null)
+  const [depRef, setDepRef] = useState('')
   useEffect(() => {
     setDraft(item ? {
       title: item.title ?? '', type: item.type ?? 'task',
       assignee: item.assignee ?? '', status: item.status ?? 'backlog',
+      body: item.body ?? '', labels: (item.labels ?? []).join(', '),
+      estimate_days: item.estimate_days == null ? '' : String(item.estimate_days),
+      due: item.due ?? '', parent_ref: item.parent_ref ?? '',
     } : null)
+    setDetail(null)
     setFeedback(null)
     setError(null)
   }, [item])
@@ -2677,17 +2683,38 @@ function WorkItemDetail({ item, projectId, onClose, onRefresh }) {
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [item, onClose])
+  // Full supported-field detail (P5.3): canonical relationships, evidence and
+  // history come from the existing work-item detail reader.
+  useEffect(() => {
+    if (!item) return undefined
+    let disposed = false
+    api(`/projects/${encodeURIComponent(projectId || item.project_id)}/work-items/${encodeURIComponent(item.ref)}`)
+      .then((result) => { if (!disposed) setDetail(result) })
+      .catch(() => { if (!disposed) setDetail(null) })
+    return () => { disposed = true }
+  }, [item?.ref, projectId])
   const save = async () => {
     if (!item || !draft) return
     setBusy(true)
     setError(null)
     setFeedback(null)
     const projectIdResolved = projectId || item.project_id
+    const changes = {}
+    if (draft.title !== (item.title ?? '')) changes.title = draft.title
+    if (draft.type !== (item.type ?? 'task')) changes.type = draft.type
+    if (draft.body !== (item.body ?? '')) changes.body = draft.body || null
+    if (draft.labels !== (item.labels ?? []).join(', ')) {
+      changes.labels = draft.labels.split(',').map((v) => v.trim()).filter(Boolean)
+    }
+    const estimateValue = draft.estimate_days === '' ? null : Number(draft.estimate_days)
+    if (estimateValue !== (item.estimate_days ?? null)) changes.estimate_days = estimateValue
+    if (draft.due !== (item.due ?? '')) changes.due = draft.due || null
+    if (draft.parent_ref !== (item.parent_ref ?? '')) changes.parent_ref = draft.parent_ref || null
     try {
-      if (draft.title !== (item.title ?? '') || draft.type !== (item.type ?? 'task')) {
+      if (Object.keys(changes).length > 0) {
         await api(`/projects/${encodeURIComponent(projectIdResolved)}/work-items/${encodeURIComponent(item.ref)}`, {
           method: 'PATCH',
-          body: { title: draft.title, type: draft.type },
+          body: changes,
         })
       }
       if ((draft.assignee ?? '') !== (item.assignee ?? '')) {
@@ -2703,6 +2730,22 @@ function WorkItemDetail({ item, projectId, onClose, onRefresh }) {
         })
       }
       setFeedback('Saved.')
+      await onRefresh?.()
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+    setBusy(false)
+  }
+  const addDependency = async () => {
+    if (!depRef.trim()) return
+    setBusy(true)
+    setError(null)
+    try {
+      await api(`/projects/${encodeURIComponent(projectId || item.project_id)}/work-items/${encodeURIComponent(item.ref)}/dependencies`, {
+        method: 'POST', body: { dependency_ref: depRef.trim() },
+      })
+      setDepRef('')
+      setFeedback('Dependency added.')
       await onRefresh?.()
     } catch (failure) {
       setError(String(failure?.message ?? failure))
@@ -2736,6 +2779,25 @@ function WorkItemDetail({ item, projectId, onClose, onRefresh }) {
             value: draft?.type ?? 'task', onChange: (event) => setDraft({ ...draft, type: event.target.value }), children:
             ['task', 'bug', 'spike', 'subtask', 'gate'].map((kind) => jsx('option', { value: kind, children: kind }, kind)),
           })]}),
+          jsx('label', { children: 'Body' }),
+          jsx('textarea', {
+            'aria-label': 'Body', value: draft?.body ?? '', rows: 3,
+            onChange: (event) => setDraft({ ...draft, body: event.target.value }),
+          }),
+          jsxs('label', { children: ['Labels (comma separated) ', jsx('input', {
+            value: draft?.labels ?? '', onChange: (event) => setDraft({ ...draft, labels: event.target.value }),
+          })]}),
+          jsxs('label', { children: ['Estimate days ', jsx('input', {
+            type: 'number', min: 0, step: 0.5, value: draft?.estimate_days ?? '',
+            onChange: (event) => setDraft({ ...draft, estimate_days: event.target.value }),
+          })]}),
+          jsxs('label', { children: ['Due date ', jsx('input', {
+            type: 'date', value: draft?.due ?? '',
+            onChange: (event) => setDraft({ ...draft, due: event.target.value }),
+          })]}),
+          jsxs('label', { children: ['Parent ref ', jsx('input', {
+            value: draft?.parent_ref ?? '', onChange: (event) => setDraft({ ...draft, parent_ref: event.target.value }),
+          })]}),
           jsxs('label', { children: ['Assignee ', jsx('input', {
             value: draft?.assignee ?? '', onChange: (event) => setDraft({ ...draft, assignee: event.target.value }),
           })]}),
@@ -2752,11 +2814,35 @@ function WorkItemDetail({ item, projectId, onClose, onRefresh }) {
           ]}),
           error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
         ]}),
+        detail
+          ? jsxs('div', { className: 'dockyard-dependency-editor', 'data-dependency-editor': true, children: [
+              jsx('h3', { children: 'Dependencies' }),
+              (detail.dependencies ?? []).length === 0
+                ? jsx('p', { className: 'dockyard-meta', children: 'No dependencies recorded.' })
+                : jsx('ul', { children: (detail.dependencies ?? []).map((dependency) => jsx('li', { children: `${dependency.ref}: ${dependency.title}` }, dependency.ref)) }),
+              jsxs('div', { className: 'dockyard-form-actions', children: [
+                jsx('input', {
+                  'aria-label': 'Dependency task ref', placeholder: 'e.g. HDY-4',
+                  value: depRef, onChange: (event) => setDepRef(event.target.value),
+                }),
+                jsx(Button, {
+                  action: 'add-dependency', variant: 'quiet', disabled: busy || !depRef.trim(),
+                  onClick: addDependency, children: 'Add dependency',
+                }),
+              ]}),
+            ]})
+          : null,
         jsxs('dl', { className: 'dockyard-detail-grid', children: [
           jsxs('div', { children: [jsx('dt', { children: 'Reference' }), jsx('dd', { children: item.ref })] }),
-          jsxs('div', { children: [jsx('dt', { children: 'Initiative' }), jsx('dd', { children: item.initiative_ref || 'Not linked' })] }),
-          jsxs('div', { children: [jsx('dt', { children: 'Evidence' }), jsx('dd', { children: `${number(item.evidence_refs?.length ?? 0)} attached` })] }),
+          jsxs('div', { children: [jsx('dt', { children: 'Initiative' }), jsx('dd', { children: detail?.work_item?.initiative_ref || item.initiative_ref || 'Not linked' })] }),
+          jsxs('div', { children: [jsx('dt', { children: 'Evidence' }), jsx('dd', { children: `${number((detail?.work_item?.evidence_refs ?? item.evidence_refs)?.length ?? 0)} attached` })] }),
         ]}),
+        detail?.history?.length
+          ? jsxs('details', { 'data-work-history': true, children: [
+              jsx('summary', { children: 'Canonical history' }),
+              jsx('ul', { children: detail.history.map((entry, index) => jsx('li', { children: JSON.stringify(entry) }, String(entry.id ?? index))) }),
+            ]})
+          : null,
       ],
     }) : null,
   })
@@ -3765,11 +3851,36 @@ function ApprovalRow({ item, onResolved }) {
       })
     return () => { disposed = true }
   }, [item.ref])
-  const [tone, label] = riskDetails(item.risk)
-  const detail = item.detail ?? {}
+  // The card must present the DECISION scope it will bind the fingerprint to
+  // (round-3 R1). Once fetched, the reviewed decision's content takes
+  // precedence over the stale inbox summary.
+  const tone2source = reviewedDecision
+    ? {
+        title: reviewedDecision.title ?? item.title,
+        risk: reviewedDecision.risk ?? item.risk,
+        rationale: reviewedDecision.rationale ?? (item.detail?.rationale ?? ''),
+        expected_outcome: reviewedDecision.expected_outcome ?? (item.detail?.expected_outcome ?? ''),
+        validation: reviewedDecision.validation ?? item.detail?.validation_contract ?? null,
+      }
+    : { title: item.title, risk: item.risk, rationale: item.detail?.rationale, expected_outcome: item.detail?.expected_outcome, validation: item.detail?.validation_contract ?? null }
+  const [tone, label] = riskDetails(tone2source.risk)
+  const detail = {
+    ...item.detail,
+    rationale: tone2source.rationale,
+    expected_outcome: tone2source.expected_outcome,
+    validation_contract: tone2source.validation,
+  }
+  const [decisionNote, setDecisionNote] = useState('')
+  const [decisionReason, setDecisionReason] = useState('')
+  const [noteOpen, setNoteOpen] = useState(false)
   const decide = async (action) => {
     const resolvedState = action === 'approve' ? 'approved' : 'rejected'
     const actionLabel = action === 'approve' ? 'Approve' : 'Reject'
+    if (action === 'reject' && !noteOpen) {
+      // Owner must supply the rejection reason (round-3 R1): no hard-coded reason.
+      setNoteOpen(true)
+      return
+    }
     setState(action === 'approve' ? 'approving' : 'rejecting')
     setError(null)
     try {
@@ -3777,14 +3888,45 @@ function ApprovalRow({ item, onResolved }) {
         throw new Error('Decision evidence not reviewed yet; refresh before deciding.')
       }
       const body = action === 'reject'
-        ? { expected_fingerprint: reviewedDecision.fingerprint, reason: 'Rejected from Desktop review' }
-        : { expected_fingerprint: reviewedDecision.fingerprint }
+        ? {
+            expected_fingerprint: reviewedDecision.fingerprint,
+            reason: decisionReason.trim() || 'Rejected from Desktop review',
+            note: decisionNote || undefined,
+          }
+        : { expected_fingerprint: reviewedDecision.fingerprint, note: decisionNote || undefined }
       await api(`/initiatives/${encodeURIComponent(item.ref)}/${action}`, {
         method: 'POST', body, suppressErrorToast: true,
       })
       setState(resolvedState)
       setTimeout(onResolved, 850)
     } catch (failure) {
+      setNoteOpen(false)
+      // Ambiguous outcome (round-3 R2): queue disappearance is NOT proof of
+      // which decision happened. Read the authoritative receipts instead.
+      let confirmed = null
+      try {
+        const receipts = await api(`/initiatives/${encodeURIComponent(item.ref)}/decision/receipts`)
+        const rows = receipts?.receipts ?? []
+        if (rows.length > 0) {
+          const latest = rows[rows.length - 1]
+          confirmed = latest.decision === 'approved' ? 'approved' : latest.decision === 'rejected' ? 'rejected' : null
+        }
+      } catch {
+        confirmed = null
+      }
+      if (confirmed === resolvedState) {
+        setState(resolvedState)
+        emitToast('success', `Initiative ${resolvedState}; confirmed by decision receipt`)
+        setTimeout(onResolved, 850)
+        return
+      }
+      if (confirmed != null) {
+        // The other decision won; report the truth, never our attempted action.
+        setState(confirmed)
+        emitToast('warning', `Initiative was ${confirmed} by another decision; your ${actionLabel.toLowerCase()} was not applied`)
+        setTimeout(onResolved, 850)
+        return
+      }
       let stillPending = null
       try {
         const inbox = await api('/inbox')
@@ -3792,17 +3934,17 @@ function ApprovalRow({ item, onResolved }) {
       } catch {
         stillPending = null
       }
-      if (stillPending === false) {
-        setState(resolvedState)
-        emitToast('success', `Initiative ${resolvedState}; status confirmed after a response error`)
-        setTimeout(onResolved, 850)
+      if (stillPending === true) {
+        setState('failed')
+        const detailMessage = String(failure?.message ?? failure)
+        const message = `${actionLabel} was not recorded. The approval is still pending. ${detailMessage}`
+        setError(message)
+        emitToast('danger', message)
         return
       }
       setState('failed')
       const detailMessage = String(failure?.message ?? failure)
-      const message = stillPending === true
-        ? `${actionLabel} was not recorded. The approval is still pending. ${detailMessage}`
-        : `${actionLabel} could not be confirmed. Refresh before trying again. ${detailMessage}`
+      const message = `${actionLabel} could not be confirmed. Refresh before trying again. ${detailMessage}`
       setError(message)
       emitToast('danger', message)
     }
@@ -3826,7 +3968,7 @@ function ApprovalRow({ item, onResolved }) {
       jsxs('div', { className: 'dockyard-approval-top', children: [
         jsx('span', { className: `dockyard-approval-icon ${tone}`, children: jsx(Icon, { name: tone === 'danger' ? 'alert' : 'check' }) }),
         jsxs('div', { className: 'dockyard-approval-main', children: [
-          jsx('h2', { children: item.title }),
+          jsx('h2', { children: tone2source.title }),
           jsx('span', { className: 'dockyard-meta', children: `${item.project || 'Unknown project'} / ${item.ref}${created ? ` / proposed ${created}` : ''}` }),
         ]}),
         jsx(StatusTag, { tone: stateTone, label: stateLabel }),
@@ -3847,6 +3989,29 @@ function ApprovalRow({ item, onResolved }) {
       ]}),
       decisionError
         ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: decisionError })
+        : null,
+      noteOpen && !resolved
+        ? jsxs('div', { className: 'dockyard-decision-note-form', 'data-decision-note-form': true, children: [
+            jsxs('label', { children: ['Rejection reason ', jsx('input', {
+              value: decisionReason,
+              onChange: (event) => setDecisionReason(event.target.value),
+              placeholder: 'Why this initiative is rejected',
+            })]}),
+            jsxs('label', { children: ['Note (optional) ', jsx('input', {
+              value: decisionNote,
+              onChange: (event) => setDecisionNote(event.target.value),
+              placeholder: 'Optional context recorded with the decision',
+            })]}),
+            jsxs('div', { className: 'dockyard-form-actions', children: [
+              jsx(Button, {
+                action: 'confirm-reject-with-reason', variant: 'danger',
+                disabled: state === 'rejecting' || !decisionReason.trim(),
+                onClick: () => decide('reject'),
+                children: 'Reject with reason',
+              }),
+              jsx(Button, { variant: 'quiet', onClick: () => setNoteOpen(false), children: 'Cancel' }),
+            ]}),
+          ]})
         : null,
       jsxs('div', { className: 'dockyard-approval-actions', children: [
         resolved ? jsx(StatusTag, { tone: stateTone, label: stateLabel }) : jsx(Button, {
