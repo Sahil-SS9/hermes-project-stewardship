@@ -960,10 +960,10 @@ async function renderInbox(
     body.append(
       textEl('span', 'dy-pill', String(it.kind)),
       textEl('strong', '', String(it.title)),
-      textEl('span', 'dy-dim', `${it.project_id} · ${it.ref}`),
+      textEl('span', 'dy-dim', `${it.project} · ${it.ref}`),
     );
     row.appendChild(body);
-    if (it.kind === 'approval') {
+    if (it.kind === 'initiative_approval') {
       const btn = document.createElement('button');
       btn.className = 'dy-btn primary';
       btn.textContent = 'Approve';

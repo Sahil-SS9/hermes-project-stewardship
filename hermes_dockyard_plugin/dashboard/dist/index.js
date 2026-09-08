@@ -199,6 +199,13 @@
   var ZOOM_IN = 1.1;
   var ZOOM_OUT = 0.9;
   var statusColor = (s) => s === "done" ? "#3fb950" : s === "working" ? "#d29922" : s === "blocked" ? "#f85149" : "#6e7681";
+  function elapsedLabel(updatedAt) {
+    if (!updatedAt) return "unavailable";
+    const base = Date.parse(updatedAt);
+    if (!isFinite(base)) return "unavailable";
+    const secs = Math.max(0, Math.floor((Date.now() - base) / 1e3));
+    return String(Math.floor(secs / 60)).padStart(2, "0") + ":" + String(secs % 60).padStart(2, "0");
+  }
   function elu(tag, cls, text) {
     const el = document.createElement(tag);
     if (cls) el.className = cls;
@@ -372,7 +379,7 @@
             "text-anchor": "end",
             class: "dy-wf-timer full"
           });
-          timer2.textContent = "00:00";
+          timer2.textContent = `Workflow: ${elapsedLabel(run.started_at)}`;
           timer2.dataset.for = n.node_id;
         }
         if (timer2) g.append(rect, label2, sub, timer2);
@@ -451,17 +458,34 @@
           const row = elu("div", "dy-wf-actions");
           const approve = elu("button", "dy-btn primary", "Approve");
           const reject = elu("button", "dy-btn", "Reject");
-          approve.addEventListener("click", async () => {
+          let inFlight = false;
+          const runAction = async (act, okLabel, pendingLabel, failPrefix) => {
+            if (inFlight) return;
+            inFlight = true;
             approve.disabled = true;
             reject.disabled = true;
-            approve.textContent = "Approved \u2713";
-            await handlers.onApprove(n.task_ref);
+            approve.textContent = pendingLabel;
+            reject.textContent = pendingLabel;
+            try {
+              await act(n.task_ref);
+              approve.textContent = okLabel;
+              reject.textContent = "Reject";
+              approve.disabled = true;
+              reject.disabled = true;
+            } catch {
+              reject.textContent = "Reject";
+              approve.textContent = failPrefix + " failed \u2014 retry";
+              approve.disabled = false;
+              reject.disabled = false;
+            } finally {
+              inFlight = false;
+            }
+          };
+          approve.addEventListener("click", () => {
+            void runAction(handlers.onApprove, "Approved \u2713", "Approving\u2026", "Approve");
           });
-          reject.addEventListener("click", async () => {
-            reject.disabled = true;
-            approve.disabled = true;
-            reject.textContent = "Rejected \u2715";
-            await handlers.onReject(n.task_ref);
+          reject.addEventListener("click", () => {
+            void runAction(handlers.onReject, "Rejected \u2715", "Rejecting\u2026", "Reject");
           });
           row.append(approve, reject);
           passport.appendChild(row);
@@ -587,12 +611,6 @@
     let flowT = 0;
     const flowTimer = setInterval(() => {
       flowT = (flowT + 0.03) % 1;
-      viewport.querySelectorAll("text.dy-wf-timer").forEach((t) => {
-        const cur = t.textContent ?? "00:00";
-        const [m, s] = cur.split(":").map((v) => parseInt(v, 10) || 0);
-        const total = m * 60 + s + 1;
-        t.textContent = String(Math.floor(total / 60)).padStart(2, "0") + ":" + String(total % 60).padStart(2, "0");
-      });
       const edgeMap = /* @__PURE__ */ new Map();
       viewport.querySelectorAll("path.dy-wf-edge").forEach((p) => {
         const key = (p.dataset.from ?? "") + ">" + (p.dataset.to ?? "");
@@ -637,8 +655,23 @@
     }, 40);
     let timer = null;
     let lastSig = "";
+    let pollTicket = 0;
+    let appliedTicket = 0;
+    let disposed = false;
+    const tickTimers = () => {
+      viewport.querySelectorAll("text.dy-wf-timer").forEach((t) => {
+        const node = currentNodes.find((n) => n.node_id === t.dataset.for);
+        if (!node || node.status !== "working") return;
+        t.textContent = `Workflow: ${elapsedLabel(currentStartedAt)}`;
+      });
+    };
+    let currentStartedAt = null;
+    const clockTimer = setInterval(tickTimers, 1e3);
     const pollOnce = () => {
+      const ticket = ++pollTicket;
       fetchRuns().then((runs) => {
+        if (disposed || ticket < appliedTicket) return;
+        appliedTicket = ticket;
         const latest = runs && runs.length ? runs[0] : null;
         const sig = JSON.stringify(latest?.nodes.map((n) => [n.node_id, n.status]) ?? []);
         if (sig !== lastSig) {
@@ -656,16 +689,36 @@
             });
           }
           lastSig = sig;
-          render(latest);
         }
+        const frameSig = JSON.stringify(latest ?? null);
+        if (frameSig !== lastFrameSig) {
+          render(latest);
+          lastFrameSig = frameSig;
+        }
+        currentStartedAt = latest?.started_at ?? null;
+        tickTimers();
+        setStale(false);
       }).catch(() => {
+        if (disposed || ticket < appliedTicket) return;
+        appliedTicket = ticket;
+        setStale(true);
       });
+    };
+    let lastFrameSig = "";
+    const setStale = (on) => {
+      const existing = wrap.querySelector(".dy-wf-stale");
+      if (on && !existing) {
+        const badge = elu("div", "dy-wf-stale", "stale \u2014 last refresh failed, showing last known state");
+        wrap.insertBefore(badge, wrap.firstChild);
+      } else if (!on && existing) existing.remove();
     };
     pollOnce();
     if (pollMs > 0) timer = setInterval(pollOnce, pollMs);
     disposers.push(() => {
+      disposed = true;
       if (timer) clearInterval(timer);
       if (flowTimer) clearInterval(flowTimer);
+      clearInterval(clockTimer);
       document.removeEventListener("keydown", onKeyDown);
       host.replaceChildren();
     });
@@ -1508,10 +1561,10 @@
       body.append(
         textEl("span", "dy-pill", String(it.kind)),
         textEl("strong", "", String(it.title)),
-        textEl("span", "dy-dim", `${it.project_id} \xB7 ${it.ref}`)
+        textEl("span", "dy-dim", `${it.project} \xB7 ${it.ref}`)
       );
       row.appendChild(body);
-      if (it.kind === "approval") {
+      if (it.kind === "initiative_approval") {
         const btn = document.createElement("button");
         btn.className = "dy-btn primary";
         btn.textContent = "Approve";

@@ -21,9 +21,12 @@ from pydantic import BaseModel, ConfigDict
 
 logger = logging.getLogger(__name__)
 
-from hermes_project_stewardship.api.server import create_app
-from hermes_project_stewardship.persistence.dockyard_store import DockyardStore
-from hermes_project_stewardship.runtime import open_store, resolve_db_path
+from hermes_project_stewardship.persistence.dockyard_store import DockyardStore  # noqa: E402
+from hermes_project_stewardship.runtime import (  # noqa: E402
+    StateSelectionError,
+    open_store,
+    resolve_db_path,
+)
 
 plugin_api = APIRouter()
 
@@ -38,16 +41,32 @@ def _default_db_path() -> Path:
 
 
 # Single shared store for the plugin's lifetime; swap via env var.
-_DB = _default_db_path()
+# Phase1 F2: state selection is a strict improvement in fail-closed behaviour,
+# but a populated legacy database must not take the whole dashboard host down
+# at import. Surface the selection error through the plugin's own routes
+# (503 with operator guidance); never fall back to an alternate database.
+_startup_error: str | None = None
+_DB: Path | None = None
+_store = None
+_app = None
+_dockyard = None
+try:
+    # Deferred import: api.server has a module-level `app = create_app()`
+    # that would otherwise run before the guard below (Phase1 F2).
+    from hermes_project_stewardship.api.server import create_app
 
-# NOTE (lifecycle): _store/_client are closed when the host process exits; the
-# desktop-plugin contract exposes no router-level teardown hook, so an explicit
-# close would require a custom seam. Acceptable for single-user local tooling.
-_store = open_store(_DB)
-if os.name == "posix":
-    _DB.chmod(0o600)
-_dockyard = DockyardStore(_store)
-_app = create_app(_store)
+    _DB = _default_db_path()
+    _store = open_store(_DB)
+    if os.name == "posix":
+        _DB.chmod(0o600)
+    _dockyard = DockyardStore(_store)
+    _app = create_app(_store)
+except StateSelectionError as exc:
+    # Fail closed: no data moved, no alternate database chosen. The host
+    # keeps loading; proxied routes return 503 until an operator selects
+    # state explicitly (STEWARD_DB_PATH / --db).
+    _startup_error = str(exc)
+    logger.error("Dockyard plugin startup degraded: %s", exc)
 
 
 # One process-lifetime client over ASGI: no per-request TestClient churn
@@ -57,16 +76,32 @@ _app = create_app(_store)
 _BASE_URL = os.environ.get("DOCKYARD_PLUGIN_URL", "http://dockyard.local")
 _ACTOR_ID = os.environ.get("DOCKYARD_ACTOR_ID", "dashboard-user")
 _client = httpx.AsyncClient(
-    transport=httpx.ASGITransport(app=_app),
+    # Degraded startup: no Dockyard app exists yet; requests are rejected in
+    # _proxy before ever reaching the transport.
+    transport=httpx.ASGITransport(app=_app if _app is not None else APIRouter()),
     base_url=_BASE_URL,
     timeout=httpx.Timeout(10.0, read=30.0),
 )
 logger.info("Dockyard plugin HTTP client initialised (base_url=%s)", _BASE_URL)
 
 
+def _degraded_503() -> HTTPException:
+    """Fail-closed reply when state selection blocked startup (Phase1 F2)."""
+    return HTTPException(
+        503,
+        "Dockyard plugin did not start: " + (_startup_error or "unknown startup error")
+        + " Set STEWARD_DB_PATH (or --db) to select the authoritative database, "
+        "then restart the dashboard host.",
+    )
+
+
 async def _proxy(method: str, path: str, json_body: dict | None = None,
                  params: dict | None = None):
     """Forward a request to the Dockyard API app and normalise the reply."""
+    if _app is None:
+        # Fail closed: never silently pick an alternate database.
+        logger.error("Proxy %s %s rejected: plugin startup degraded", method, path)
+        raise _degraded_503()
     logger.debug("Proxying %s %s", method, path)
     response = await _client.request(method, path, json=json_body, params=params)
     logger.debug("Upstream %s %s -> %s", method, path, response.status_code)
@@ -311,6 +346,9 @@ def _session_transcript(bot_id: str, session_id: str, limit: int = 200) -> dict:
 @plugin_api.get("/health")
 async def health() -> dict:
     # No filesystem paths in responses: dashboard viewers need liveness only.
+    # Degraded startup (Phase1 F2): state selection blocked init; fail closed.
+    if _app is None:
+        return {"ok": False, "service": "hermes-dockyard", "status": "degraded"}
     return {"ok": True, "service": "hermes-dockyard"}
 
 
@@ -554,11 +592,15 @@ async def bots(status: str | None = None) -> dict:
 
 @plugin_api.get("/bots/{bot_id}/sessions")
 def bot_sessions(bot_id: str, limit: int = 25) -> dict:
+    if _dockyard is None:
+        raise _degraded_503()
     return _session_list(bot_id, limit=limit)
 
 
 @plugin_api.get("/bots/{bot_id}/sessions/{session_id}")
 def bot_transcript(bot_id: str, session_id: str, limit: int = 200) -> dict:
+    if _dockyard is None:
+        raise _degraded_503()
     return _session_transcript(bot_id, session_id, limit=limit)
 
 

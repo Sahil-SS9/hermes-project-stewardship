@@ -49,6 +49,30 @@ def test_inbox_aggregates_across_projects(env):
                if i["kind"] == "initiative_approval")
 
 
+def test_inbox_payload_contract_for_ui_consumers(env):
+    """P1.8: pin the inbox payload exactly as Dashboard/Desktop consume it."""
+    c, store = env
+    _enable(c, "alpha")
+    svc = StewardshipService(store)
+    svc.propose_initiative("alpha", title="Needs approval",
+                           rationale="objective: inbox contract check")
+    body = c.get("/stewardship/v1/inbox").json()
+    approvals = [i for i in body["items"]
+                 if i["kind"] == "initiative_approval"]
+    assert approvals, "fixture produced no initiative_approval item"
+    item = approvals[0]
+    # Field contract: project (not project_id), string deep_link, risk present.
+    assert item["project"] == "alpha"
+    assert "project_id" not in item
+    assert isinstance(item["deep_link"], str) and item["deep_link"]
+    assert item["risk"] in {"low", "medium", "high", "critical"}
+    # kind values must match what both UIs branch on.
+    kinds = {i["kind"] for i in body["items"]}
+    assert kinds <= {"initiative_approval", "project_attention"}
+    # count reflects the same item list the UIs iterate.
+    assert body["count"] == len(body["items"])
+
+
 def test_dashboard_rollup_counts_work_and_decisions(env):
     c, store = env
     _enable(c)
