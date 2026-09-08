@@ -2731,11 +2731,15 @@ function WorkItemDetail({ item, projectId, onClose, onRefresh }) {
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [item, onClose])
   // Full supported-field detail (P5.3): canonical relationships, evidence and
-  // history come from the existing work-item detail reader.
-  const loadDetail = (ref) => {
+  // history come from the existing work-item detail reader. Requests carry a
+  // lifetime/identity guard (round-5 regression): an obsolete response — one
+  // for an unmounted drawer, a different item, or a superseded load — must
+  // never rebase the currently open drawer's draft.
+  const loadDetail = (ref, guard) => {
     if (!item) return Promise.resolve(null)
     return api(`/projects/${encodeURIComponent(projectId || item.project_id)}/work-items/${encodeURIComponent(ref)}`)
       .then((result) => {
+        if (guard && !guard.current.alive) return result
         setDetail(result)
         const record = rebaseFromDetail(result)
         // Rebase the draft onto canonical state, preserving any in-flight
@@ -2743,13 +2747,20 @@ function WorkItemDetail({ item, projectId, onClose, onRefresh }) {
         if (record && !busy) setDraft((current) => (current ? { ...record } : current))
         return result
       })
-      .catch(() => { setDetail(null); return null })
+      .catch(() => {
+        if (!guard || guard.current.alive) setDetail(null)
+        return null
+      })
   }
   useEffect(() => {
-    let disposed = false
     if (!item) return undefined
-    loadDetail(item.ref)
-    return () => { disposed = true }
+    const guard = { current: { alive: true, ref: item.ref } }
+    loadDetail(item.ref, guard)
+    return () => {
+      // Any response arriving after this cleanup is obsolete: the drawer now
+      // shows a different item (effect re-ran) or is unmounted.
+      guard.current.alive = false
+    }
   }, [item?.ref, projectId])
   const save = async () => {
     if (!item || !draft) return
