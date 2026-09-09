@@ -215,6 +215,18 @@ export function createApi(sdk: HermesPluginSDK) {
       get<WorkDetail>(
         `/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(ref)}`,
       ),
+    // P8.4: canonical recovery transition (re-queue blocked -> backlog) —
+    // same route/authority the work drawer uses.
+    transitionWorkItem: (
+      projectId: string,
+      ref: string,
+      status: string,
+      actorId = 'sahil',
+    ) =>
+      post<{ ref: string; status: string }>(
+        `/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(ref)}/transition`,
+        { status, actor_id: actorId, actor_kind: 'human' },
+      ),
     updateWork: (projectId: string, ref: string, changes: Record<string, unknown>) =>
       patch<WorkItem>(
         `/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(ref)}`,

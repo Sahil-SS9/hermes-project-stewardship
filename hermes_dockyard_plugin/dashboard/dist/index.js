@@ -43,6 +43,12 @@
       workDetail: (projectId, ref) => get(
         `/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(ref)}`
       ),
+      // P8.4: canonical recovery transition (re-queue blocked -> backlog) —
+      // same route/authority the work drawer uses.
+      transitionWorkItem: (projectId, ref, status, actorId = "sahil") => post(
+        `/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(ref)}/transition`,
+        { status, actor_id: actorId, actor_kind: "human" }
+      ),
       updateWork: (projectId, ref, changes) => patch(
         `/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(ref)}`,
         changes
@@ -294,8 +300,6 @@
   var COL_GAP = 95;
   var ROW_GAP = 26;
   var PAD = 60;
-  var ZOOM_MIN = 0.45;
-  var ZOOM_MAX = 1.8;
   var LOD_FULL = 1.4;
   var ZOOM_IN = 1.1;
   var ZOOM_OUT = 0.9;
@@ -307,6 +311,14 @@
     const secs = Math.max(0, Math.floor((Date.now() - base) / 1e3));
     return String(Math.floor(secs / 60)).padStart(2, "0") + ":" + String(secs % 60).padStart(2, "0");
   }
+  var prefersReducedMotion = () => {
+    try {
+      const m = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
+      return Boolean(m && m.matches);
+    } catch {
+      return false;
+    }
+  };
   function elu(tag, cls, text) {
     const el = document.createElement(tag);
     if (cls) el.className = cls;
@@ -364,6 +376,21 @@
     minimap.appendChild(miniViewport);
     const passport = elu("div", "dy-wf-passport");
     passport.setAttribute("aria-live", "polite");
+    const zoomBar = elu("div", "dy-wf-zoombar");
+    zoomBar.setAttribute("role", "group");
+    zoomBar.setAttribute("aria-label", "Zoom controls");
+    const zoomButton = (action, label2, title) => {
+      const b = elu("button", "dy-wf-zoombtn", label2);
+      b.dataset.wfAction = action;
+      b.type = "button";
+      b.setAttribute("aria-label", title);
+      return b;
+    };
+    const zoomInBtn = zoomButton("zoom-in", "+", "Zoom in");
+    const zoomOutBtn = zoomButton("zoom-out", "\u2212", "Zoom out");
+    const zoomFitBtn = zoomButton("zoom-fit", "Fit", "Fit graph to view");
+    const zoomResetBtn = zoomButton("zoom-reset", "Reset", "Reset zoom to 100%");
+    zoomBar.append(zoomInBtn, zoomOutBtn, zoomFitBtn, zoomResetBtn);
     const feed = elu("div", "dy-wf-feed");
     feed.setAttribute("aria-live", "polite");
     const feedHead = elu("button", "dy-wf-feed-head", "\u25BE Activity");
@@ -393,7 +420,26 @@
         m.el.style.opacity = String(Math.max(0.25, 1 - i * 0.15));
       });
     };
-    wrap.append(svg, feed, minimap, passport);
+    const listView = elu("div", "dy-wf-list");
+    listView.dataset.wfList = "";
+    const listHead = elu("button", "dy-wf-list-head", "\u25B8 List view");
+    listHead.type = "button";
+    listHead.setAttribute("aria-expanded", "false");
+    const listBody = elu("div", "dy-wf-list-body");
+    listBody.setAttribute("role", "table");
+    listBody.setAttribute("aria-label", "Workflow run as list");
+    listBody.style.display = "none";
+    listHead.addEventListener("click", () => {
+      const open = listHead.getAttribute("aria-expanded") === "true";
+      listHead.setAttribute("aria-expanded", String(!open));
+      listHead.textContent = open ? "\u25B8 List view" : "\u25BE List view";
+      listBody.style.display = open ? "none" : "block";
+    });
+    listHead.setAttribute("aria-expanded", "true");
+    listHead.textContent = "\u25BE List view";
+    listBody.style.display = "block";
+    listView.append(listHead, listBody);
+    wrap.append(svg, feed, minimap, passport, zoomBar, listView);
     host.appendChild(wrap);
     let panX = 0;
     let panY = 0;
@@ -406,6 +452,31 @@
       viewport.setAttribute("transform", `translate(${panX} ${panY}) scale(${zoom})`);
       svg.setAttribute("data-lod", zoom > LOD_FULL ? "full" : zoom < 0.75 ? "map" : "read");
     };
+    const ZOOM_STEP = 1.25;
+    const ZOOM_MIN = 0.45;
+    const ZOOM_MAX = 2.4;
+    const setZoom = (next) => {
+      zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+      apply();
+    };
+    zoomInBtn.addEventListener("click", () => setZoom(zoom * ZOOM_STEP));
+    zoomOutBtn.addEventListener("click", () => setZoom(zoom / ZOOM_STEP));
+    zoomResetBtn.addEventListener("click", () => {
+      zoom = 1;
+      panX = 0;
+      panY = 0;
+      apply();
+    });
+    zoomFitBtn.addEventListener("click", () => {
+      if (!fullW || !fullH) return;
+      const sw = svg.clientWidth || 1300;
+      const sh = svg.clientHeight || 760;
+      const s = Math.min(sw / fullW, sh / fullH, 2.4);
+      zoom = Math.max(ZOOM_MIN, s);
+      panX = (sw - fullW * zoom) / 2;
+      panY = (sh - fullH * zoom) / 2;
+      apply();
+    });
     const defs = sEl("defs", {});
     const mkMarker = (id, fill) => {
       const m = sEl("marker", {
@@ -423,7 +494,46 @@
     defs.appendChild(mkMarker("dyArrowActive", "#58a6ff"));
     defs.appendChild(mkMarker("dyArrowDim", "#3d4657"));
     svg.appendChild(defs);
+    let lastRun = null;
+    const renderList = (run) => {
+      listBody.replaceChildren();
+      if (!run || run.nodes.length === 0) {
+        listBody.appendChild(elu("p", "dy-dim", "No workflow runs yet."));
+        return;
+      }
+      const titleOf = new Map(run.nodes.map((n) => [n.node_id, n.title]));
+      for (const n of run.nodes) {
+        const row = elu("div", "dy-wf-list-row");
+        row.dataset.wfListRow = n.node_id;
+        row.setAttribute("role", "row");
+        const name = elu("span", "dy-wf-list-title", n.title);
+        const kind = elu(
+          "span",
+          "dy-wf-list-kind",
+          n.kind === "gate" ? "gate" : "task"
+        );
+        const deps = elu(
+          "span",
+          "dy-wf-list-deps",
+          n.depends_on.length ? `depends on: ${n.depends_on.map((d) => titleOf.get(d) ?? d).join(", ")}` : "no dependencies"
+        );
+        const status = elu(
+          `span`,
+          `dy-wf-list-status ${n.status ?? "pending"}`,
+          n.status ?? "pending"
+        );
+        const open = () => openPassport(n, null);
+        const activate = elu("button", "dy-wf-list-open", "Open");
+        activate.type = "button";
+        activate.setAttribute("aria-label", `Open ${n.title} details`);
+        activate.addEventListener("click", open);
+        row.append(name, kind, deps, status, activate);
+        listBody.appendChild(row);
+      }
+    };
     const render = (run) => {
+      lastRun = run;
+      renderList(run);
       viewport.replaceChildren();
       viewport.appendChild(defs);
       if (!run || run.nodes.length === 0) {
@@ -463,6 +573,7 @@
         });
         g.setAttribute("tabindex", "0");
         g.setAttribute("role", "button");
+        g.setAttribute("data-node-id", n.node_id);
         g.setAttribute(
           "aria-label",
           `${n.kind === "gate" ? "Gate" : "Task"}: ${n.title} (${n.status ?? "pending"})`
@@ -494,7 +605,20 @@
         const open = () => openPassport(n, g);
         g.addEventListener("click", open);
         g.addEventListener("keydown", (e) => {
-          if (e.key === "Enter") open();
+          const ev = e;
+          if (ev.key === "Enter") {
+            open();
+            return;
+          }
+          if (ev.key === "ArrowRight" || ev.key === "ArrowDown" || ev.key === "ArrowLeft" || ev.key === "ArrowUp") {
+            ev.preventDefault();
+            const all = [...viewport.querySelectorAll(".dy-wf-node")];
+            const idx = all.indexOf(g);
+            if (idx === -1) return;
+            const step = ev.key === "ArrowRight" || ev.key === "ArrowDown" ? 1 : -1;
+            const next = all[(idx + step + all.length) % all.length];
+            if (next) next.focus();
+          }
         });
         viewport.appendChild(g);
       }
@@ -548,6 +672,11 @@
       passport.replaceChildren();
       passport.appendChild(elu("h3", "", n.title));
       passport.appendChild(elu("span", `badge ${n.status ?? "pending"}`, n.status ?? "pending"));
+      const lastConfirmed = elu("p", "dy-wf-last-confirmed");
+      const updated = lastRun?.updated_at ?? null;
+      lastConfirmed.textContent = `Last confirmed update: ${updated && isFinite(Date.parse(updated)) ? updated.replace("T", " ").slice(0, 16) + " UTC" : "unknown"}`;
+      lastConfirmed.setAttribute("data-last-confirmed", updated ?? "unknown");
+      passport.appendChild(lastConfirmed);
       if (n.assignee) passport.appendChild(elu("p", "dy-dim", `assignee: ${n.assignee}`));
       if (n.evidence_refs.length) {
         const p = elu("p", "dy-dim", "evidence: " + n.evidence_refs.join(", "));
@@ -555,41 +684,81 @@
       }
       if (n.task_ref) {
         passport.appendChild(elu("p", "dy-dim", `deep link: ${n.task_ref}`));
+        const decisionState = n.kind === "gate" && n.status !== "done" && n.status !== "blocked" ? elu("span", "dy-wf-decision-state", "Awaiting decision") : null;
+        if (decisionState) {
+          decisionState.setAttribute("data-decision-state", "awaiting_decision");
+          passport.appendChild(decisionState);
+        }
         if (n.kind === "gate" && n.status !== "done" && n.status !== "blocked") {
           const row = elu("div", "dy-wf-actions");
           const approve = elu("button", "dy-btn primary", "Approve");
           const reject = elu("button", "dy-btn", "Reject");
           let inFlight = false;
-          const runAction = async (act, okLabel, pendingLabel, failPrefix) => {
+          const setDecisionState = (state, text) => {
+            if (!decisionState) return;
+            decisionState.setAttribute("data-decision-state", state);
+            decisionState.textContent = text;
+          };
+          const runAction = async (act, okLabel, pendingLabel, failPrefix, okState, pendingState) => {
             if (inFlight) return;
             inFlight = true;
             approve.disabled = true;
             reject.disabled = true;
             approve.textContent = pendingLabel;
             reject.textContent = pendingLabel;
+            setDecisionState(pendingState, pendingLabel.replace(/…$/, "") + " in progress");
             try {
               await act(n.task_ref);
               approve.textContent = okLabel;
               reject.textContent = "Reject";
               approve.disabled = true;
               reject.disabled = true;
+              setDecisionState(okState, okLabel);
             } catch {
               reject.textContent = "Reject";
               approve.textContent = failPrefix + " failed \u2014 retry";
               approve.disabled = false;
               reject.disabled = false;
+              setDecisionState("failed", failPrefix + " failed \u2014 retry");
             } finally {
               inFlight = false;
             }
           };
           approve.addEventListener("click", () => {
-            void runAction(handlers.onApprove, "Approved \u2713", "Approving\u2026", "Approve");
+            void runAction(handlers.onApprove, "Approved \u2713", "Approving\u2026", "Approve", "approved", "approved_pending");
           });
           reject.addEventListener("click", () => {
-            void runAction(handlers.onReject, "Rejected \u2715", "Rejecting\u2026", "Reject");
+            void runAction(handlers.onReject, "Rejected \u2715", "Rejecting\u2026", "Reject", "rejected", "rejected_pending");
           });
           row.append(approve, reject);
           passport.appendChild(row);
+        }
+        if (n.kind !== "gate" && (n.status === "blocked" || n.status === "working") && handlers.onRetry) {
+          const recovery = elu("div", "dy-wf-recovery");
+          if (n.status === "blocked") {
+            const retry = elu("button", "dy-btn", "Re-queue (retry)");
+            retry.type = "button";
+            retry.setAttribute("aria-label", `Re-queue ${n.title} through the canonical transition`);
+            retry.addEventListener("click", () => {
+              retry.disabled = true;
+              try {
+                handlers.onRetry(n.task_ref);
+                retry.textContent = "Re-queued \u2713";
+              } catch {
+                retry.textContent = "Re-queue failed \u2014 retry";
+                retry.disabled = false;
+              }
+            });
+            recovery.appendChild(retry);
+          }
+          const unsupported = elu(
+            "p",
+            "dy-wf-unsupported",
+            "Pause and cancel are not supported by the native execution contract \u2014 a running worker cannot be stopped from here."
+          );
+          unsupported.setAttribute("data-unsupported-controls", "pause,cancel");
+          recovery.appendChild(unsupported);
+          passport.appendChild(recovery);
         }
         if (handlers.onExpand) {
           const sec = elu("div", "dy-wf-expand");
@@ -710,7 +879,16 @@
     };
     document.addEventListener("keydown", onKeyDown);
     let flowT = 0;
+    let flowStopped = false;
     const flowTimer = setInterval(() => {
+      if (flowStopped) return;
+      if (document.hidden || prefersReducedMotion()) {
+        flowStopped = true;
+        viewport.querySelectorAll(".dy-wf-flowdot").forEach((d) => {
+          d.setAttribute("opacity", "0");
+        });
+        return;
+      }
       flowT = (flowT + 0.03) % 1;
       const edgeMap = /* @__PURE__ */ new Map();
       viewport.querySelectorAll("path.dy-wf-edge").forEach((p) => {
@@ -768,6 +946,10 @@
     };
     let currentStartedAt = null;
     const clockTimer = setInterval(tickTimers, 1e3);
+    const onVisibility = () => {
+      if (!document.hidden) flowStopped = false;
+    };
+    document.addEventListener("visibilitychange", onVisibility);
     const pollOnce = () => {
       const ticket = ++pollTicket;
       fetchRuns().then((runs) => {
@@ -821,6 +1003,7 @@
       if (flowTimer) clearInterval(flowTimer);
       clearInterval(clockTimer);
       document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("visibilitychange", onVisibility);
       host.replaceChildren();
     });
     return () => {
@@ -2232,6 +2415,11 @@
               expected_fingerprint: decision.fingerprint,
               reason: "Rejected from workflow gate review"
             });
+          },
+          // P8.4: supported recovery — same canonical transition authority as
+          // the work drawer (re-queue a blocked task to the backlog).
+          onRetry: async (ref) => {
+            await s.api.transitionWorkItem(pid, ref, "backlog");
           },
           // agenttrail expansion: children -> task list, history -> activity thread
           onExpand: async (ref) => {

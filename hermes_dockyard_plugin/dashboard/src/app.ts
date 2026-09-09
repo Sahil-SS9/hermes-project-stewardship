@@ -1624,6 +1624,11 @@ async function renderWorkflow(
             reason: 'Rejected from workflow gate review',
           });
         },
+        // P8.4: supported recovery — same canonical transition authority as
+        // the work drawer (re-queue a blocked task to the backlog).
+        onRetry: async (ref) => {
+          await s.api.transitionWorkItem(pid, ref, 'backlog');
+        },
         // agenttrail expansion: children -> task list, history -> activity thread
         onExpand: async (ref) => {
           const d = await s.api.workDetail(pid, ref);

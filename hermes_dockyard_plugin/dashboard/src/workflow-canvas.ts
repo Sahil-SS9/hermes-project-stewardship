@@ -43,6 +43,9 @@ export interface ExpansionData {
 export interface CanvasHandlers {
   onApprove: (taskRef: string) => Promise<unknown> | void;
   onReject: (taskRef: string) => Promise<unknown> | void;
+  // P8.4: supported recovery — re-queue a blocked task through the canonical
+  // transition contract (same authority path as the work drawer).
+  onRetry?: (taskRef: string) => Promise<unknown> | void;
   // Lazy-expansion hook: app.ts backs this with GET /work-items/{ref}
   // (children -> TaskListMini, history -> ActivityThread). May return null
   // for nodes without a task_ref; the passport degrades to factuals only.
@@ -72,6 +75,20 @@ function elapsedLabel(updatedAt: string | null): string {
   const secs = Math.max(0, Math.floor((Date.now() - base) / 1000));
   return String(Math.floor(secs / 60)).padStart(2, '0') + ':' + String(secs % 60).padStart(2, '0');
 }
+
+// P8.5: decorative-update policy. Flow dots are pure decoration; they stop
+// when the document is hidden or the user prefers reduced motion. The timer
+// (truthful clock) is NOT decorative and keeps ticking while visible.
+const prefersReducedMotion = (): boolean => {
+  try {
+    const m = (typeof matchMedia === 'function')
+      ? matchMedia('(prefers-reduced-motion: reduce)')
+      : null;
+    return Boolean(m && m.matches);
+  } catch {
+    return false;
+  }
+};
 
 // ---- shared inert DOM helper ----
 function elu<K extends HTMLElement>(tag: string, cls: string, text?: string): K {
@@ -152,6 +169,24 @@ export function mountWorkflowCanvas(
   const passport = elu<HTMLDivElement>('div', 'dy-wf-passport');
   passport.setAttribute('aria-live', 'polite');
 
+  // P8.2: explicit zoom controls (in / out / fit / reset) — no pointer-wheel
+  // dependence. Keyboard operable (real buttons) with data-wf-action hooks.
+  const zoomBar = elu<HTMLDivElement>('div', 'dy-wf-zoombar');
+  zoomBar.setAttribute('role', 'group');
+  zoomBar.setAttribute('aria-label', 'Zoom controls');
+  const zoomButton = (action: string, label: string, title: string) => {
+    const b = elu<HTMLButtonElement>('button', 'dy-wf-zoombtn', label);
+    b.dataset.wfAction = action;
+    b.type = 'button';
+    b.setAttribute('aria-label', title);
+    return b;
+  };
+  const zoomInBtn = zoomButton('zoom-in', '+', 'Zoom in');
+  const zoomOutBtn = zoomButton('zoom-out', '−', 'Zoom out');
+  const zoomFitBtn = zoomButton('zoom-fit', 'Fit', 'Fit graph to view');
+  const zoomResetBtn = zoomButton('zoom-reset', 'Reset', 'Reset zoom to 100%');
+  zoomBar.append(zoomInBtn, zoomOutBtn, zoomFitBtn, zoomResetBtn);
+
   // Live activity strip (agenttrail streaming feed) — top-left, collapsible.
   // Deliberate addition to the real canvas (previously demo-only), so the
   // canvas itself reports what's moving without opening a node.
@@ -186,7 +221,30 @@ export function mountWorkflowCanvas(
     });
   };
 
-  wrap.append(svg, feed, minimap, passport);
+  // P8.2: equivalent list/table view — same nodes, dependencies, gates and
+  // statuses as the graph, derived from the SAME frame (no extra fetch).
+  // Stays usable if the canvas fails; rows are keyboard-activatable.
+  const listView = elu<HTMLDivElement>('div', 'dy-wf-list');
+  listView.dataset.wfList = '';
+  const listHead = elu<HTMLButtonElement>('button', 'dy-wf-list-head', '▸ List view');
+  listHead.type = 'button';
+  listHead.setAttribute('aria-expanded', 'false');
+  const listBody = elu<HTMLDivElement>('div', 'dy-wf-list-body');
+  listBody.setAttribute('role', 'table');
+  listBody.setAttribute('aria-label', 'Workflow run as list');
+  listBody.style.display = 'none';
+  listHead.addEventListener('click', () => {
+    const open = listHead.getAttribute('aria-expanded') === 'true';
+    listHead.setAttribute('aria-expanded', String(!open));
+    listHead.textContent = open ? '▸ List view' : '▾ List view';
+    listBody.style.display = open ? 'none' : 'block';
+  });
+  listHead.setAttribute('aria-expanded', 'true');
+  listHead.textContent = '▾ List view';
+  listBody.style.display = 'block';
+  listView.append(listHead, listBody);
+
+  wrap.append(svg, feed, minimap, passport, zoomBar, listView);
   host.appendChild(wrap);
 
   // camera state
@@ -202,6 +260,34 @@ export function mountWorkflowCanvas(
     viewport.setAttribute('transform', `translate(${panX} ${panY}) scale(${zoom})`);
     svg.setAttribute('data-lod', zoom > LOD_FULL ? 'full' : zoom < 0.75 ? 'map' : 'read');
   };
+
+  // P8.2: explicit zoom controls. Same clamps as the wheel path; fit reuses
+  // the fit-to-view computation; reset returns to identity.
+  const ZOOM_STEP = 1.25;
+  const ZOOM_MIN = 0.45;
+  const ZOOM_MAX = 2.4;
+  const setZoom = (next: number) => {
+    zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+    apply();
+  };
+  zoomInBtn.addEventListener('click', () => setZoom(zoom * ZOOM_STEP));
+  zoomOutBtn.addEventListener('click', () => setZoom(zoom / ZOOM_STEP));
+  zoomResetBtn.addEventListener('click', () => {
+    zoom = 1;
+    panX = 0;
+    panY = 0;
+    apply();
+  });
+  zoomFitBtn.addEventListener('click', () => {
+    if (!fullW || !fullH) return;
+    const sw = svg.clientWidth || 1300;
+    const sh = svg.clientHeight || 760;
+    const s = Math.min(sw / fullW, sh / fullH, 2.4);
+    zoom = Math.max(ZOOM_MIN, s);
+    panX = (sw - fullW * zoom) / 2;
+    panY = (sh - fullH * zoom) / 2;
+    apply();
+  });
 
   // ---- defs: arrow markers (inert) ----
   const defs = sEl('defs', {});
@@ -223,7 +309,39 @@ export function mountWorkflowCanvas(
   svg.appendChild(defs);
 
   // ---- render frame (event-driven: called on poll arrival / state delta) ----
+  let lastRun: CanvasRun | null = null;
+  const renderList = (run: CanvasRun | null) => {
+    listBody.replaceChildren();
+    if (!run || run.nodes.length === 0) {
+      listBody.appendChild(elu('p', 'dy-dim', 'No workflow runs yet.'));
+      return;
+    }
+    const titleOf = new Map(run.nodes.map((n) => [n.node_id, n.title] as const));
+    for (const n of run.nodes) {
+      const row = elu<HTMLDivElement>('div', 'dy-wf-list-row');
+      row.dataset.wfListRow = n.node_id;
+      row.setAttribute('role', 'row');
+      const name = elu<HTMLSpanElement>('span', 'dy-wf-list-title', n.title);
+      const kind = elu<HTMLSpanElement>('span', 'dy-wf-list-kind',
+        n.kind === 'gate' ? 'gate' : 'task');
+      const deps = elu<HTMLSpanElement>('span', 'dy-wf-list-deps',
+        n.depends_on.length
+          ? `depends on: ${n.depends_on.map((d) => titleOf.get(d) ?? d).join(', ')}`
+          : 'no dependencies');
+      const status = elu<HTMLSpanElement>(`span`, `dy-wf-list-status ${n.status ?? 'pending'}`,
+        n.status ?? 'pending');
+      const open = () => openPassport(n, null);
+      const activate = elu<HTMLButtonElement>('button', 'dy-wf-list-open', 'Open');
+      activate.type = 'button';
+      activate.setAttribute('aria-label', `Open ${n.title} details`);
+      activate.addEventListener('click', open);
+      row.append(name, kind, deps, status, activate);
+      listBody.appendChild(row);
+    }
+  };
   const render = (run: CanvasRun | null) => {
+    lastRun = run;
+    renderList(run);
     viewport.replaceChildren();
     viewport.appendChild(defs);
     if (!run || run.nodes.length === 0) {
@@ -265,6 +383,7 @@ export function mountWorkflowCanvas(
       }) as SVGGElement;
       g.setAttribute('tabindex', '0');
       g.setAttribute('role', 'button');
+      g.setAttribute('data-node-id', n.node_id);
       g.setAttribute(
         'aria-label',
         `${n.kind === 'gate' ? 'Gate' : 'Task'}: ${n.title} (${n.status ?? 'pending'})`,
@@ -298,7 +417,22 @@ export function mountWorkflowCanvas(
       const open = () => openPassport(n, g);
       g.addEventListener('click', open);
       g.addEventListener('keydown', (e) => {
-        if ((e as KeyboardEvent).key === 'Enter') open();
+        const ev = e as KeyboardEvent;
+        if (ev.key === 'Enter') {
+          open();
+          return;
+        }
+        // P8.2: arrow-key focus movement between nodes (graph roving focus).
+        if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown'
+          || ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') {
+          ev.preventDefault();
+          const all = [...viewport.querySelectorAll<SVGGElement>('.dy-wf-node')];
+          const idx = all.indexOf(g);
+          if (idx === -1) return;
+          const step = (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') ? 1 : -1;
+          const next = all[(idx + step + all.length) % all.length];
+          if (next) next.focus();
+        }
       });
       viewport.appendChild(g);
     }
@@ -349,7 +483,7 @@ export function mountWorkflowCanvas(
   // ---- passport with lazy expansion ----
   let lastFrames: CanvasRun[] = [];
   let selectedEl: SVGGElement | null = null;
-  const openPassport = (n: CanvasNode, g?: SVGGElement) => {
+  const openPassport = (n: CanvasNode, g?: SVGGElement | null) => {
     // unmistakable selection: clear previous, mark current
     if (selectedEl) selectedEl.classList.remove('dy-wf-selected');
     selectedEl = g ?? null;
@@ -357,6 +491,14 @@ export function mountWorkflowCanvas(
     passport.replaceChildren();
     passport.appendChild(elu('h3', '', n.title));
     passport.appendChild(elu('span', `badge ${n.status ?? 'pending'}`, n.status ?? 'pending'));
+    // P8.3: last-confirmed update for the run (not a node-level claim).
+    const lastConfirmed = elu<HTMLParagraphElement>('p', 'dy-wf-last-confirmed');
+    const updated = lastRun?.updated_at ?? null;
+    lastConfirmed.textContent = `Last confirmed update: ${
+      updated && isFinite(Date.parse(updated)) ? updated.replace('T', ' ').slice(0, 16) + ' UTC' : 'unknown'
+    }`;
+    lastConfirmed.setAttribute('data-last-confirmed', updated ?? 'unknown');
+    passport.appendChild(lastConfirmed);
     if (n.assignee) passport.appendChild(elu('p', 'dy-dim', `assignee: ${n.assignee}`));
     if (n.evidence_refs.length) {
       const p = elu('p', 'dy-dim', 'evidence: ' + n.evidence_refs.join(', '));
@@ -364,6 +506,16 @@ export function mountWorkflowCanvas(
     }
     if (n.task_ref) {
       passport.appendChild(elu('p', 'dy-dim', `deep link: ${n.task_ref}`));
+      // P8.3: explicit decision state. awaiting_decision -> approved/rejected
+      // after server confirmation -> failed (retryable). Phase 4 controls
+      // carry the authority; this label never overrides them.
+      const decisionState = n.kind === 'gate' && n.status !== 'done' && n.status !== 'blocked'
+        ? elu<HTMLSpanElement>('span', 'dy-wf-decision-state', 'Awaiting decision')
+        : null;
+      if (decisionState) {
+        decisionState.setAttribute('data-decision-state', 'awaiting_decision');
+        passport.appendChild(decisionState);
+      }
       if (n.kind === 'gate' && n.status !== 'done' && n.status !== 'blocked') {
         const row = elu('div', 'dy-wf-actions');
         const approve = elu<HTMLButtonElement>('button', 'dy-btn primary', 'Approve');
@@ -372,11 +524,18 @@ export function mountWorkflowCanvas(
         // success only AFTER server confirmation; failure is shown and
         // retryable; a second click never duplicates an in-flight action.
         let inFlight = false;
+        const setDecisionState = (state: string, text: string) => {
+          if (!decisionState) return;
+          decisionState.setAttribute('data-decision-state', state);
+          decisionState.textContent = text;
+        };
         const runAction = async (
           act: (ref: string) => Promise<unknown> | void,
           okLabel: string,
           pendingLabel: string,
           failPrefix: string,
+          okState: string,
+          pendingState: string,
         ) => {
           if (inFlight) return; // duplicate-click guard
           inFlight = true;
@@ -384,29 +543,60 @@ export function mountWorkflowCanvas(
           reject.disabled = true;
           approve.textContent = pendingLabel;
           reject.textContent = pendingLabel;
+          setDecisionState(pendingState, pendingLabel.replace(/…$/, '') + ' in progress');
           try {
             await act(n.task_ref as string);
             approve.textContent = okLabel;
             reject.textContent = 'Reject';
             approve.disabled = true; // decision made; buttons stay disabled
             reject.disabled = true;
+            setDecisionState(okState, okLabel);
           } catch {
             reject.textContent = 'Reject';
             approve.textContent = failPrefix + ' failed — retry';
             approve.disabled = false; // retryable
             reject.disabled = false;
+            setDecisionState('failed', failPrefix + ' failed — retry');
           } finally {
             inFlight = false;
           }
         };
         approve.addEventListener('click', () => {
-          void runAction(handlers.onApprove, 'Approved ✓', 'Approving…', 'Approve');
+          void runAction(handlers.onApprove, 'Approved ✓', 'Approving…', 'Approve', 'approved', 'approved_pending');
         });
         reject.addEventListener('click', () => {
-          void runAction(handlers.onReject, 'Rejected ✕', 'Rejecting…', 'Reject');
+          void runAction(handlers.onReject, 'Rejected ✕', 'Rejecting…', 'Reject', 'rejected', 'rejected_pending');
         });
         row.append(approve, reject);
         passport.appendChild(row);
+      }
+      // P8.4: supported retry/recovery reuses the canonical transition
+      // contract (onRetry -> POST transition backlogged). Pause/cancel of a
+      // running worker is NOT supported by the native execution contract —
+      // displayed as a fact, never offered as a control.
+      if (n.kind !== 'gate' && (n.status === 'blocked' || n.status === 'working') && handlers.onRetry) {
+        const recovery = elu('div', 'dy-wf-recovery');
+        if (n.status === 'blocked') {
+          const retry = elu<HTMLButtonElement>('button', 'dy-btn', 'Re-queue (retry)');
+          retry.type = 'button';
+          retry.setAttribute('aria-label', `Re-queue ${n.title} through the canonical transition`);
+          retry.addEventListener('click', () => {
+            retry.disabled = true;
+            try {
+              handlers.onRetry!(n.task_ref as string);
+              retry.textContent = 'Re-queued ✓';
+            } catch {
+              retry.textContent = 'Re-queue failed — retry';
+              retry.disabled = false;
+            }
+          });
+          recovery.appendChild(retry);
+        }
+        const unsupported = elu('p', 'dy-wf-unsupported',
+          'Pause and cancel are not supported by the native execution contract — a running worker cannot be stopped from here.');
+        unsupported.setAttribute('data-unsupported-controls', 'pause,cancel');
+        recovery.appendChild(unsupported);
+        passport.appendChild(recovery);
       }
       // ---- expandable live detail (agenttrail expansion pattern) ----
       if (handlers.onExpand) {
@@ -551,8 +741,21 @@ export function mountWorkflowCanvas(
   document.addEventListener('keydown', onKeyDown);
 
   // ---- flow dots (40ms animation only; timer truth lives on a 1s clock) ----
+  // P8.5: the dot animation is DECORATIVE. It stops entirely when the
+  // document is hidden or the user prefers reduced motion; when stopped,
+  // dots are forced invisible so no frozen decoration lingers. Resumes
+  // automatically on visibility regain with motion allowed.
   let flowT = 0;
+  let flowStopped = false;
   const flowTimer = setInterval(() => {
+    if (flowStopped) return;
+    if (document.hidden || prefersReducedMotion()) {
+      flowStopped = true;
+      viewport.querySelectorAll<SVGCircleElement>('.dy-wf-flowdot').forEach((d) => {
+        d.setAttribute('opacity', '0');
+      });
+      return;
+    }
     flowT = (flowT + 0.03) % 1;
     const edgeMap = new Map<string, { path: SVGPathElement; dot: SVGCircleElement }>();
     viewport.querySelectorAll<SVGPathElement>('path.dy-wf-edge').forEach((p) => {
@@ -620,6 +823,12 @@ export function mountWorkflowCanvas(
   };
   let currentStartedAt: string | null = null;
   const clockTimer = setInterval(tickTimers, 1000);
+  // P8.5: when the document becomes visible again, re-arm the decorative
+  // flow animation (it self-stops again on the next tick if it must).
+  const onVisibility = () => {
+    if (!document.hidden) flowStopped = false;
+  };
+  document.addEventListener('visibilitychange', onVisibility);
 
   // feed-aware poll: repaints on delta AND logs status transitions to the strip
   const pollOnce = () => {
@@ -681,6 +890,7 @@ export function mountWorkflowCanvas(
     if (flowTimer) clearInterval(flowTimer);
     clearInterval(clockTimer);
     document.removeEventListener('keydown', onKeyDown);
+    document.removeEventListener('visibilitychange', onVisibility);
     host.replaceChildren();
   });
   return () => {

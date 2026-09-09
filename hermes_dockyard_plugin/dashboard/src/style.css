@@ -151,6 +151,27 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-root .dy-wf-feed-time { font: 10px ui-monospace, monospace; color: #59626f; flex: none; padding-top: 1px; }
 .dy-root .dy-wf-mini-view { fill: none; stroke: #58a6ff; stroke-width: 2; }
 .dy-root .dy-wf-passport { position: absolute; top: 10px; right: 10px; width: 280px; max-height: calc(100% - 20px); overflow-y: auto; background: #161b22; border: 1px solid #2a2f3a; border-radius: 8px; padding: 12px; color: var(--dy-text, #e6edf3); }
+/* P8.2: zoom controls + keyboard focus ring + equivalent list view. */
+.dy-root .dy-wf-zoombar { display: flex; gap: 6px; margin: 6px 0; }
+.dy-root .dy-wf-zoombtn { background: #0d1117; color: var(--dy-text, #e6edf3); border: 1px solid #2a2f3a; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
+.dy-root .dy-wf-zoombtn:hover { border-color: #58a6ff; }
+.dy-root .dy-wf-node:focus { outline: 2px solid #58a6ff; outline-offset: 2px; }
+.dy-root .dy-wf-list { margin: 8px 0; }
+.dy-root .dy-wf-list-head { background: none; border: none; color: var(--dy-text, #e6edf3); font-weight: 600; cursor: pointer; padding: 4px 0; font-size: 13px; }
+.dy-root .dy-wf-list-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #21262d; flex-wrap: wrap; }
+.dy-root .dy-wf-list-row:last-child { border-bottom: none; }
+.dy-root .dy-wf-list-title { min-width: 140px; color: var(--dy-text, #e6edf3); font-weight: 600; }
+.dy-root .dy-wf-list-kind { font-size: 11px; text-transform: uppercase; color: #8b949e; border: 1px solid #2a3140; border-radius: 4px; padding: 1px 6px; }
+.dy-root .dy-wf-list-deps { color: #8b949e; font-size: 12px; flex: 1; }
+.dy-root .dy-wf-list-status { font-weight: 600; }
+.dy-root .dy-wf-list-status.done { color: #3fb950; }
+.dy-root .dy-wf-list-status.blocked { color: var(--dy-warn, #f0883e); }
+.dy-root .dy-wf-list-status.working { color: #58a6ff; }
+.dy-root .dy-wf-list-open { background: #0d1117; color: var(--dy-text, #e6edf3); border: 1px solid #2a2f3a; border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
+/* P8.3/P8.4: decision state + unsupported-control truth. */
+.dy-root .dy-wf-decision-state { display: inline-block; margin: 6px 0; padding: 2px 8px; border-radius: 6px; border: 1px solid #2a3140; font-size: 12px; color: #e3b341; }
+.dy-root .dy-wf-recovery { margin-top: 8px; }
+.dy-root .dy-wf-unsupported { color: #8b949e; font-size: 12px; margin: 6px 0 0; }
 .dy-root .dy-wf-passport h3 { margin: 0 0 4px; font-size: 14px; }
 .dy-root .dy-wf-passport .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; border: 1px solid #8fa3b8; color: #c9d4de; }
 .dy-root .dy-wf-passport .badge.done { border-color: #3fb950; color: #3fb950; }
