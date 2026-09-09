@@ -583,6 +583,16 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
             if current_status != status:
                 options: dict[str, Any] = {"board": board_id}
                 if status == "review":
+                    # Canonical path from a fresh triage card is
+                    # triage -> ready -> review; the native host refuses
+                    # triage -> review directly (even forced).
+                    if current_status == "triage":
+                        task = self.host.transition_task(
+                            str(task.get("id") or ""),
+                            "ready",
+                            **options,
+                        )
+                        current_status = task.get("status")
                     options["force_review"] = True
                 task = self.host.transition_task(
                     str(task.get("id") or ""),
