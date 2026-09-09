@@ -271,6 +271,31 @@ export function createApi(sdk: HermesPluginSDK) {
       }),
     onboard: (b: { project_id: string; repo_path: string; mission: string; lead_profile: string }) =>
       post('/onboard', b),
+    // P7.1/P7.2: host-driven discovery + host-validated preflight.
+    discover: () =>
+      get<{
+        projects: Array<{ id: string; slug: string; name: string; board_slug: string; repo_path: string }>;
+        profiles: Array<{ name: string; is_default: boolean }>;
+      }>('/onboard/discover'),
+    preflight: (b: { project_id: string; repo_path: string; mission: string; lead_profile: string }) =>
+      post<{
+        validated: Record<string, string>;
+        existing: { projects: Array<Record<string, string>>; profiles: Array<{ name: string }> };
+        mode: 'connect_existing' | 'create_new';
+      }>('/onboard/preflight', b),
+    // P7.6: onboarding completion action — the first read-only assessment.
+    firstAssessment: (projectId: string) =>
+      post<{
+        project: string;
+        assessment: {
+          cycle_id: number | null;
+          verification_ok: boolean | null;
+          health_state: string | null;
+          objective_results: Array<Record<string, unknown>>;
+          initiatives_created: number;
+        };
+        schedules_enabled: boolean;
+      }>(`/projects/${encodeURIComponent(projectId)}/first-assessment`, {}),
     decision: (ref: string) =>
       get<DecisionPayload>(`/initiatives/${encodeURIComponent(ref)}/decision`),
     decisionReceipts: (ref: string) =>

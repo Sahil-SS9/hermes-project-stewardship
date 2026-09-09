@@ -196,6 +196,12 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
         except Exception as exc:
             raise self._mapped_error(exc) from None
 
+    def list_existing_projects(self) -> dict[str, Any]:
+        try:
+            return dict(self.host.list_existing_projects())
+        except Exception as exc:
+            raise self._mapped_error(exc) from None
+
     def validate_project(self, **payload: Any) -> dict[str, Any]:
         try:
             return dict(self.host.validate_project(**payload))

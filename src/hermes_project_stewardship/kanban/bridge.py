@@ -50,6 +50,9 @@ class KanbanAdapter(ABC):
     def list_profiles(self) -> List[Dict[str, Any]]:
         raise NotImplementedError("profile listing is not supported")
 
+    def list_existing_projects(self) -> Dict[str, Any]:
+        raise NotImplementedError("project discovery is not supported")
+
     def validate_project(self, **payload: Any) -> Dict[str, Any]:
         raise NotImplementedError("project validation is not supported")
 
