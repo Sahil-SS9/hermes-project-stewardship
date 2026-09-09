@@ -17,13 +17,26 @@ interface AppState {
   featureMap?: Record<string, boolean> | null;
   pendingView?: string | null;
   pendingWorkRef?: string | null;
+  // P6.4: bound deep-link navigation, installed by initApp. Open buttons
+  // call this so a link actually navigates (state + tab strip + render).
+  openFleetLink?: (link: string) => void;
 }
 
 type FeatureMap = Record<string, boolean>;
 
 // P6.4: exact-context deep links. ``screen:object/id`` opens the screen and,
-// where the screen supports selection, pre-selects the exact object.
-function openFleetDeepLink(link: string, s: AppState): void {
+// where the screen supports selection, pre-selects the exact object. Bound
+// inside initApp so Open also drives the real render/navigation path.
+interface FleetLink {
+  link: string;
+  s: AppState;
+  tabs: HTMLElement[];
+  go: () => void;
+}
+
+function applyFleetDeepLink(
+  { link, s, tabs, go }: FleetLink,
+): void {
   const sep = link.indexOf(':');
   if (sep <= 0) return;
   const screen = link.slice(0, sep);
@@ -31,35 +44,48 @@ function openFleetDeepLink(link: string, s: AppState): void {
   const slash = rest.indexOf('/');
   const objectKind = slash >= 0 ? rest.slice(0, slash) : '';
   const objectId = slash >= 0 ? rest.slice(slash + 1) : rest;
+  const select = (tab: AppState['tab']): void => {
+    s.tab = tab;
+    // keep the tab strip in sync with the programmatic navigation
+    for (const t of tabs) {
+      const active = (t as HTMLElement).dataset.tab === tab;
+      t.classList.toggle('active', active);
+      t.setAttribute('aria-selected', String(active));
+    }
+    go();
+  };
   if (screen === 's4') {
-    s.tab = 'inbox';
+    select('inbox');
     return;
   }
   if (screen === 's6' && objectKind === 'initiative') {
-    s.tab = 'inbox';
+    select('inbox');
     return;
   }
   if (screen === 's2') {
-    s.tab = 'work';
     if (objectKind === 'work' && objectId) {
-      // Work tab is per-project: the row title already shows the project;
-      // exact object pre-selection rides pendingWorkRef for renderWork.
       s.selectedWorkRef = objectId;
-    } else if (objectKind === 'project' && objectId) {
-      s.projectId = objectId;
+      select('work');
+      return;
     }
+    if (objectKind === 'project' && objectId) {
+      s.projectId = objectId;
+      select('work');
+      return;
+    }
+    select('work');
     return;
   }
   if (screen === 's1') {
-    s.tab = 'dashboard';
     if (objectKind === 'project' && objectId) s.projectId = objectId;
+    select('dashboard');
     return;
   }
   if (screen === 's5') {
-    s.tab = 'workflow';
+    select('workflow');
     return;
   }
-  s.tab = 'dashboard';
+  select('dashboard');
 }
 
 export function initApp(
@@ -184,6 +210,19 @@ export function initApp(
       void render(main, state);
     }),
   );
+
+  // P6.4: bound navigation — Open mutates state, syncs the tab strip and
+  // drives the real render path (review R3: a bare state mutation never
+  // navigates).
+  const navigateDeepLink = (link: string): void => {
+    applyFleetDeepLink({
+      link,
+      s: state,
+      tabs: tabs as HTMLElement[],
+      go: () => void render(main, state),
+    });
+  };
+  state.openFleetLink = navigateDeepLink;
 
   void render(main, state);
 
@@ -322,7 +361,7 @@ async function renderDashboard(
           open.textContent = 'Open';
           open.dataset.deepLink = link;
           open.addEventListener('click', () => {
-            openFleetDeepLink(link, s);
+            s.openFleetLink?.(link);
           });
           li.appendChild(open);
         }
@@ -1172,7 +1211,7 @@ async function renderNotifications(
       open.textContent = 'Open';
       open.dataset.deepLink = n.deep_link;
       open.addEventListener('click', () => {
-        openFleetDeepLink(n.deep_link as string, s);
+        s.openFleetLink?.(n.deep_link as string);
       });
       row.appendChild(open);
     }

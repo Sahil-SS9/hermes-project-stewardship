@@ -989,6 +989,9 @@ const DOCKYARD_CSS = `
 .dockyard-root .dockyard-modal h2 { margin: 0; font-size: 20px; }
 .dockyard-root .dockyard-modal p { margin: 7px 0 16px; color: var(--dy-text-2); font-size: 13px; }
 .dockyard-root .dockyard-modal label { display: block; margin-bottom: 7px; font-size: 12px; font-weight: 700; }
+.dockyard-root .dockyard-work-editor { display: grid; gap: 2px; }
+.dockyard-root .dockyard-work-editor input,
+.dockyard-root .dockyard-work-editor select { width: 100%; min-width: 0; min-height: 34px; padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface-subtle); color: var(--dy-text); font: inherit; box-sizing: border-box; }
 .dockyard-root .dockyard-modal textarea { width: 100%; min-height: 110px; padding: 10px 11px; border: 1px solid var(--dy-control-border); border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text); font: inherit; resize: vertical; }
 .dockyard-root .dockyard-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .dockyard-root .dockyard-toast-region {
@@ -2030,8 +2033,11 @@ function validationSummary(contract) {
 }
 
 async function loadDashboardData() {
-  const [dashboard, inbox, notifications, bots, workload] = await Promise.all([
-    api('/dashboard'), api('/inbox'), api('/notifications'), api('/bots'), api('/workload'),
+  // P6 (review R2): the fleet groups live on /portfolio; /dashboard keeps
+  // serving the legacy summary. Load both so the grouped read model renders
+  // without losing workload/project context.
+  const [dashboard, portfolio, inbox, notifications, bots, workload] = await Promise.all([
+    api('/dashboard'), api('/portfolio'), api('/inbox'), api('/notifications'), api('/bots'), api('/workload'),
   ])
   const entries = await Promise.all((dashboard.projects ?? []).map(async (project) => {
     const projectId = encodeURIComponent(project.id)
@@ -2043,6 +2049,7 @@ async function loadDashboardData() {
   }))
   return {
     ...dashboard,
+    groups: portfolio?.groups ?? null,
     inbox,
     notifications,
     bots,
@@ -2054,7 +2061,15 @@ async function loadDashboardData() {
 async function loadProjectData(projectId) {
   const dashboard = await api('/dashboard')
   const projects = sortProjects(dashboard.projects ?? [])
-  const project = projects.find((item) => item.id === projectId) ?? projects[0]
+  // P6.4 (review R3): never substitute a different project for an explicit
+  // stale or unknown id — surface the miss explicitly instead. A null id
+  // (plain tab open, no target) keeps the first-project default.
+  const project = (projectId
+    ? projects.find((item) => item.id === projectId) ?? null
+    : projects[0] ?? null)
+  if (projectId && !project) {
+    return { ...dashboard, projects, project: null, missingProject: projectId }
+  }
   if (!project) return { ...dashboard, project: null, projects }
   const encoded = encodeURIComponent(project.id)
   const [settings, workItems, initiatives, objectives, missionArchive, content, events, reports] = await Promise.all([
@@ -2331,6 +2346,52 @@ function FleetActivity({ notifications, onOpen }) {
   ]})
 }
 
+function FleetGroups({ groups, onOpen }) {
+  const groupDefs = [
+    { key: 'decisions', label: 'Decisions waiting on you', tone: 'warning' },
+    { key: 'interventions', label: 'Interventions', tone: 'danger' },
+    { key: 'informational', label: 'Informational', tone: 'neutral' },
+  ]
+  const sections = []
+  for (const def of groups) {
+    const items = def.items ?? []
+    if (items.length === 0) continue
+    sections.push(jsxs('section', { className: 'dockyard-fleet-group', 'data-fleet-group': def.key, children: [
+      jsxs('div', { className: 'dockyard-section-head', children: [
+        jsxs('div', { children: [
+          jsx('h2', { children: def.label }),
+          jsx('p', { children: def.description }),
+        ]}),
+        jsx('span', { className: 'dockyard-section-count', children: `${number(items.length)} ${items.length === 1 ? 'item' : 'items'}` }),
+      ]}),
+      jsx('div', { className: 'dockyard-fleet-list', children:
+        items.map((item, index) => jsxs('div', { className: 'dockyard-fleet-row', 'data-fleet-row': `${def.key}:${item.ref || item.title}`, children: [
+          jsxs('span', { children: [
+            jsx('strong', { children: item.title }),
+            jsx('span', { className: 'dockyard-meta', children: `${item.project || 'Fleet'}${item.ref && item.ref !== 'evidence' ? ` / ${item.ref}` : ''}` }),
+            def.key !== 'decisions' && item.detail ? jsx('span', { className: 'dockyard-meta', children: item.detail }) : null,
+            def.key === 'informational' && item.severity ? jsx('span', { className: 'dockyard-meta', children: `sev: ${item.severity}` }) : null,
+          ]}),
+          jsx('span', { className: 'dockyard-meta', children: [
+            item.cause ? `cause: ${item.cause}` : null,
+            item.risk ? `risk: ${item.risk}` : null,
+            item.owner ? `owner: ${item.owner}` : null,
+            typeof item.age_days === 'number' ? `age: ${item.age_days}d` : null,
+          ].filter(Boolean).join(' · ') }),
+          typeof onOpen === 'function' && item.deep_link
+            ? jsx(Button, { action: 'open', small: true, onClick: () => onOpen(item.deep_link, item), children: 'Open' })
+            : null,
+        ]}, `${def.key}-${item.ref || item.title || index}`)),
+      }),
+    ]}, def.key))
+  }
+  if (sections.length === 0) {
+    return jsx('section', { className: 'dockyard-fleet-group', 'data-fleet-group': 'clear', children:
+      jsx('p', { className: 'dockyard-meta', children: 'No fleet groups need attention.' }) })
+  }
+  return jsxs(Fragment, { children: sections })
+}
+
 function DashboardView({ view, onInbox, onRefresh, onOpen }) {
   const projects = sortProjects(view.projects ?? [])
   if (projects.length === 0) {
@@ -2349,12 +2410,22 @@ function DashboardView({ view, onInbox, onRefresh, onOpen }) {
     ? `${attention.join(' and ')} ${attentionCount === 1 ? 'needs' : 'need'} review.`
     : 'No owner action is waiting.'
   const botNames = Object.fromEntries((view.bots?.bots ?? []).map((bot) => [bot.id, bot.name || bot.id]))
+  const groups = view.groups ?? { decisions: [], interventions: [], informational: [] }
+  const fleetGroups = [
+    { key: 'decisions', label: 'Decisions waiting on you', description: 'Approvals that need your fingerprinted decision.', items: groups.decisions ?? [] },
+    { key: 'interventions', label: 'Interventions', description: 'Blocked, overdue or stale work needing a correction.', items: groups.interventions ?? [] },
+    { key: 'informational', label: 'Informational', description: 'Recent fleet signals worth a glance.', items: groups.informational ?? [] },
+  ]
   return jsxs(Fragment, { children: [
     jsx(PageHead, {
       title: 'Your fleet, without the noise',
       description: `${number(projects.length)} ${plural(projects.length, 'project')} under watch. ${summary}`,
       status: owed > 0 ? `${number(owed)} ${plural(owed, 'decision')} owed` : null,
       onRefresh,
+    }),
+    jsx(FleetGroups, {
+      groups: fleetGroups,
+      onOpen: (link, item) => (typeof onOpen === 'function' ? onOpen(link, item) : undefined),
     }),
     jsx(AttentionPanel, { items: view.inbox?.items ?? [], onReview: onInbox }),
     jsx(FleetMetrics, { view }),
@@ -3236,10 +3307,29 @@ function ProjectContentPanel({ project, content, onRefresh }) {
   ]})
 }
 
-function ProjectDashboard({ view, onSelectProject, onRefresh }) {
+function ProjectDashboard({ view, onSelectProject, onRefresh, pendingWorkRef, onPendingWorkConsumed, notice }) {
   const [projectView, setProjectView] = useState('overview')
   const [selectedWorkItem, setSelectedWorkItem] = useState(null)
+  const [workNotice, setWorkNotice] = useState(null)
   const project = view.project
+  // P6.4 (review R3): a deep link targeting an exact work ref opens that
+  // ref's drawer on arrival (or surfaces an explicit notice when the ref is
+  // not in this project's board data — never a silent substitute). Hooks run
+  // unconditionally; the empty-project return happens after them.
+  useEffect(() => {
+    if (!pendingWorkRef || !project) return
+    const target = (view.workItems ?? []).find((item) => item.ref === pendingWorkRef)
+    setWorkNotice(target ? null : `Work item ${pendingWorkRef} is not in this project's board data.`)
+    if (target) setProjectView('board')
+    setSelectedWorkItem(target ?? null)
+    onPendingWorkConsumed?.()
+  }, [pendingWorkRef])
+  if (!project && view.missingProject) {
+    return jsxs('section', { className: 'dockyard-deep-link-miss', 'data-deep-link-miss': view.missingProject, children: [
+      jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: `Project ${view.missingProject} no longer exists or is not connected. Nothing was substituted.` }),
+      jsx(Button, { onClick: () => onSelectProject?.((view.projects ?? [])[0]?.id ?? null), children: 'Back to fleet' }),
+    ]})
+  }
   if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Connect a project before opening the project dashboard.', icon: 'project' })
   const [healthTone, healthLabel] = healthDetails(project.health)
   const views = [
@@ -3369,6 +3459,11 @@ function ProjectDashboard({ view, onSelectProject, onRefresh }) {
       status: project.health && project.health !== 'healthy' ? healthLabel : null,
       onRefresh,
     }),
+    workNotice || notice ? jsxs('div', { className: 'dockyard-view-only-note', role: 'alert', 'data-deep-link-notice': true, children: [
+      jsx(Icon, { name: 'alert' }),
+      jsx('span', { children: workNotice || notice }),
+    ]}) : null,
+    jsx('p', { className: 'dockyard-inline-error', role: 'alert', 'data-deep-link-error': true, hidden: !(workNotice || notice), children: workNotice || notice }),
     jsxs('div', { className: 'dockyard-project-toolbar', children: [
       jsx('label', { children: 'Project' }),
       jsx('select', { value: project.id, onChange: (event) => onSelectProject(event.target.value), children:
@@ -4262,6 +4357,9 @@ function DashboardPage() {
   const [requestVersion, setRequestVersion] = useState(0)
   const [counts, setCounts] = useState({ approvals: null, notifications: null })
   const [loadScope, setLoadScope] = useState(null)
+  // P6.4 (review R3): a deep link can pre-select an exact work item; the
+  // project dashboard opens its drawer on arrival.
+  const [pendingWorkRef, setPendingWorkRef] = useState(null)
 
   useEffect(() => {
     const timers = new Map()
@@ -4344,9 +4442,13 @@ function DashboardPage() {
     })
     setCounts((previous) => ({ ...previous, notifications: Math.max(0, Number(previous.notifications ?? 1) - 1) }))
   }
-  // P6.4: notifications deep-link to the exact object. Open navigates only —
-  // ack stays separate from resolution (P6.5): no state change, no inbox
-  // mutation, no initiative status flip.
+  // P6.4 (review R3): notifications deep-link to the EXACT object. Open
+  // navigates only — ack stays separate from resolution (P6.5). Exact
+  // targets: s2:work/<ref> opens the project the ref belongs to AND the
+  // ref's detail drawer; s1:project/<id> opens that exact project or
+  // surfaces an explicit error state (never a silent different project);
+  // s6:initiative/<ref> / s4 open the approval inbox focused on the ref.
+  const [deepLinkNotice, setDeepLinkNotice] = useState(null)
   const openDeepLink = (link) => {
     if (typeof link !== 'string' || !link.includes(':')) return
     const [screen, rest] = link.split(':', 2)
@@ -4354,20 +4456,41 @@ function DashboardPage() {
     const objectKind = slash >= 0 ? rest.slice(0, slash) : ''
     const objectId = slash >= 0 ? rest.slice(slash + 1) : rest
     if (screen === 's4' || (screen === 's6' && objectKind === 'initiative')) {
+      setDeepLinkNotice(objectId ? `Approval inbox: focus ${objectId}` : null)
       setTab('inbox')
       return
     }
+    if (screen === 's2' && objectKind === 'work' && objectId) {
+      // exact work item: open its project, board view, and the drawer
+      const known = Object.entries(data?.payload?.projectContext ?? {})
+      const ownerProject = known.find(([, context]) =>
+        (context.workItems ?? []).some((item) => item.ref === objectId))
+      setDeepLinkNotice(ownerProject ? null : `Work item ${objectId} is not in the current board data.`)
+      setSelectedProject(ownerProject ? ownerProject[0] : (selectedProject ?? data?.payload?.projects?.[0]?.id ?? null))
+      setTab('project')
+      setPendingWorkRef(objectId)
+      return
+    }
+    if (screen === 's2' && objectKind === 'project' && objectId) {
+      setDeepLinkNotice(null)
+      setSelectedProject(objectId)
+      setTab('project')
+      return
+    }
+    if (screen === 's1' && objectKind === 'project' && objectId) {
+      setDeepLinkNotice(null)
+      setSelectedProject(objectId)
+      setTab('project')
+      return
+    }
     if (screen === 's2' || screen === 's1') {
-      if (objectId && (objectKind === 'project' || objectKind === '')) {
-        setSelectedProject(objectId)
-        setTab(screen === 's2' ? 'project' : 'project')
-        return
-      }
       if (objectId) {
-        setSelectedProject(null)
+        setSelectedProject(objectId)
         setTab('project')
         return
       }
+      setTab('dashboard')
+      return
     }
     if (screen === 's5') {
       setTab('teams')
@@ -4386,7 +4509,14 @@ function DashboardPage() {
   } else if (tab === 'dashboard') {
     content = jsx(DashboardView, { view: payload, onInbox: () => setTab('inbox'), onRefresh: refresh, onOpen: openDeepLink })
   } else if (tab === 'project') {
-    content = jsx(ProjectDashboard, { view: payload, onSelectProject: setSelectedProject, onRefresh: refresh })
+    content = jsx(ProjectDashboard, {
+      view: payload,
+      onSelectProject: setSelectedProject,
+      onRefresh: refresh,
+      pendingWorkRef,
+      onPendingWorkConsumed: () => setPendingWorkRef(null),
+      notice: deepLinkNotice,
+    })
   } else if (tab === 'backlog') {
     content = jsx(BacklogView, { view: payload, onSelectProject: setSelectedProject, onRefresh: refresh })
   } else if (tab === 'teams') {

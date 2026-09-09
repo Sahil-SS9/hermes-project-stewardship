@@ -39,8 +39,8 @@ const POPULATED = {
   },
   notifications: {
     notifications: [
-      { id: 3, project: 'payments-relaunch', severity: 'medium', kind: 'bot_status', title: 'Load test flagged latency spike', body: 'p95 checkout latency exceeded 800ms under 3x load. Investigation assigned.', created_at: '2026-08-24T18:36:13.609423+00:00', acked: false, deep_link: 's2:project-board' },
-      { id: 2, project: 'demo-project', severity: 'info', kind: 'bot_status', title: 'Nightly sweep finished', body: 'Bot fleet check complete: no issues found.', created_at: '2026-08-24T18:10:07.321115+00:00', acked: true, deep_link: 's2:project-board' },
+      { id: 3, project: 'payments-relaunch', severity: 'medium', kind: 'bot_status', title: 'Load test flagged latency spike', body: 'p95 checkout latency exceeded 800ms under 3x load. Investigation assigned.', created_at: '2026-08-24T18:36:13.609423+00:00', acked: false, deep_link: 's2:project/payments-relaunch' },
+      { id: 2, project: 'demo-project', severity: 'info', kind: 'bot_status', title: 'Nightly sweep finished', body: 'Bot fleet check complete: no issues found.', created_at: '2026-08-24T18:10:07.321115+00:00', acked: true, deep_link: 's2:project/demo-project' },
     ],
   },
   settings: {
@@ -503,6 +503,7 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       return clone(report);
     }
     if (path === '/dashboard') return clone(data.dashboard);
+    if (path === '/portfolio') return clone(data.portfolio ?? { projects: [], mix: {}, attention: {}, groups: { decisions: [], interventions: [], informational: [] } });
     if (path === '/inbox') return clone(data.inbox);
     if (path === '/notifications') return clone(data.notifications);
     if (path === '/bots') return clone(data.bots);
@@ -781,7 +782,12 @@ async function testProjectDashboardScreen() {
   const workDetail = doc.querySelector('[data-work-item-detail="HDY-12"]');
   assert(workDetail, 'board item did not open its editable detail');
   assert.match(workDetail.textContent, /Fix double-charge on retry path/);
-  assert.match(workDetail.textContent, /octacon-bot/);
+  // The assignee rides an input; textContent excludes input values, so the
+  // contract is asserted on the control's value (review round-6: legacy
+  // harness assertion was checking the wrong surface, not missing data).
+  const assigneeControl = [...workDetail.querySelectorAll('input')]
+    .find((control) => control.value === 'octacon-bot');
+  assert(assigneeControl, 'assignee input must carry the octacon-bot value');
   assert(workDetail.querySelector('input, textarea, select'), 'editable item detail exposes no editing controls');
   assert(workDetail.querySelector('[data-action="save-work-item"]'), 'editable item detail is missing Save');
   await runtime.click('[data-action="close-work-item-detail"]');
@@ -1165,6 +1171,12 @@ async function testOnboardingWizardAndToastSurface() {
   await failed.click('[data-tab="inbox"]');
   await failed.click('[data-approval-ref="INI-DEMO-1"] [data-action="reject"]', 40);
   await failed.click('[data-action="confirm-destructive-action"]', 80);
+  // round-3 R1: the owner must type a rejection reason before the submit
+  // unlocks; type it, then submit (the reason form opens after confirmation).
+  const failedReasonSelector = '[data-approval-ref="INI-DEMO-1"] [data-decision-note-form] input';
+  assert(failed.dom.window.document.querySelector(failedReasonSelector), 'rejection reason form did not open for the failed-mutation journey');
+  await failed.setValue(failedReasonSelector, 'Not acceptable', 40);
+  await failed.click('[data-approval-ref="INI-DEMO-1"] [data-action="confirm-reject-with-reason"]', 80);
   const failedDoc = failed.dom.window.document;
   const failedRow = failedDoc.querySelector('[data-approval-ref="INI-DEMO-1"]');
   const alert = failedDoc.querySelector('[data-toast-region] [role="alert"]');
@@ -1192,6 +1204,11 @@ async function testApprovalFlow() {
   await runtime.click('[data-approval-ref="INI-DEMO-2"] [data-action="reject"]', 20);
   assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === '/initiatives/INI-DEMO-2/reject'), 'rejection bypassed confirmation');
   await runtime.click('[data-action="confirm-destructive-action"]', 40);
+  // round-3 R1: owner-typed reason is required before the submit unlocks.
+  const approveReasonSelector = '[data-approval-ref="INI-DEMO-2"] [data-decision-note-form] input';
+  assert(doc.querySelector(approveReasonSelector), 'rejection reason form did not open in the approval journey');
+  await runtime.setValue(approveReasonSelector, 'Rollback risk not acceptable', 40);
+  await runtime.click('[data-approval-ref="INI-DEMO-2"] [data-action="confirm-reject-with-reason"]', 60);
   assert.equal(doc.querySelector('[data-approval-ref="INI-DEMO-2"]')?.getAttribute('data-state'), 'rejected', 'rejection row did not show its rejected state');
   assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/initiatives/INI-DEMO-2/reject'), 'rejection POST was not sent');
   assert.match(doc.querySelector('[data-approval-ref="INI-DEMO-2"]')?.textContent || '', /Rejected/);
@@ -1208,12 +1225,16 @@ async function testNotificationFlow() {
   assert.equal(doc.querySelectorAll('[data-notification-state="unread"]').length, 1, 'expected one unread notification');
   assert.equal(doc.querySelectorAll('[data-notification-state="cleared"]').length, 1, 'expected one cleared notification');
   // Phase 6: notifications expose an exact-context deep link; Open navigates
-  // only (P6.5): no ack POST fires and the row state does not change.
+  // only (P6.5): no ack POST fires and the row state does not change. The
+  // link must land on the notification's own project (exact object, not a
+  // generic board).
   const openButtons = doc.querySelectorAll('[data-notification-id="3"] [data-action="open"]');
   assert.equal(openButtons.length, 1, 'unread notification lacks an Open deep-link control');
   await runtime.click('[data-notification-id="3"] [data-action="open"]', 50);
   assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === '/notifications/3/ack'), 'Open must not acknowledge');
   assert.equal(runtime.dom.window.document.querySelectorAll('[data-notification-state="unread"]').length, 0, 'Open did not navigate away');
+  const landed = runtime.dom.window.document.querySelector('[data-project-dashboard]');
+  assert.equal(landed?.getAttribute('data-project-dashboard'), 'payments-relaunch', 'Open did not open the notification project');
   await runtime.dispose();
 
   const second = await createRuntime();

@@ -906,7 +906,7 @@ class DockyardService:
     # ------------------------------------------------------------------ #
 
     def fleet_notifications(self) -> Dict:
-        """Cross-project notification feed with screen deep-links."""
+        """Cross-project notification feed with exact-context deep links."""
         rows = self.store._conn.execute(
             "SELECT n.id, n.project_id, n.severity, n.kind, n.title,"
             " n.body, n.created_at, n.acked_at"
@@ -914,7 +914,7 @@ class DockyardService:
         ).fetchall()
         items = []
         for r in rows:
-            link = self._deep_link(r["kind"])
+            link = self._deep_link(r["kind"], r["project_id"], r["body"])
             items.append({
                 "id": r["id"], "project": r["project_id"],
                 "severity": r["severity"], "kind": r["kind"],
@@ -926,13 +926,34 @@ class DockyardService:
         return {"notifications": items}
 
     @staticmethod
-    def _deep_link(kind: str) -> str:
+    def _deep_link(kind: str, project_id: str = "", body: str = "") -> str:
+        """Exact-context link: names the object, never a generic screen.
+
+        Approval notifications carry the initiative ref (subject rides the
+        body as ``ref=…`` per the notification engine's _body); health and
+        alert kinds at minimum keep their project identity. The generic
+        board label is the last-resort fallback for unknown kinds only.
+        """
         if kind.startswith("approval"):
+            ref = ""
+            for part in (body or "").split(";"):
+                part = part.strip()
+                if part.startswith("ref="):
+                    ref = part[4:].strip()
+                    break
+            if ref:
+                return f"s6:initiative/{ref}"
+            if project_id:
+                return f"s4:project/{project_id}"
             return "s4:approval-inbox"
         if "health" in kind or "regression" in kind:
+            if project_id:
+                return f"s1:project/{project_id}"
             return "s1:dashboard"
         if "handoff" in kind or "a2a" in kind:
             return "s5:bot-teams"
+        if project_id:
+            return f"s2:project/{project_id}"
         return "s2:project-board"
 
     def ack_notification(self, notification_id: int) -> None:
@@ -1138,11 +1159,74 @@ class DockyardService:
             return f"s6:initiative/{ref}"
         return f"s1:project/{project_id}"
 
+    def _work_attention_rows(self, project_id: str) -> List[Dict]:
+        """Blocked + overdue work rows from the SAME source Work/portfolio use.
+
+        Canonical first (adapter wired); legacy table only as the explicit
+        no-adapter fallback. Each row normalises the fields the group builder
+        needs: ref, title, blocked reason, due, created_at, assignee.
+        """
+        rows: List[Dict] = []
+        if self.canonical_work is not None:
+            for item in self.canonical_work.list(project_id):
+                status = str(item.get("status") or "")
+                raw_reason = item.get("blocked_reason")
+                if isinstance(raw_reason, list):
+                    reason = ", ".join(str(x) for x in raw_reason)
+                elif raw_reason:
+                    reason = str(raw_reason)
+                else:
+                    # legacy blocked_by_json carries the reason when the
+                    # canonical row does not (dockyard-backed items)
+                    meta = item.get("blocked_by")
+                    if isinstance(meta, list) and meta:
+                        reason = ", ".join(str(x) for x in meta)
+                    elif isinstance(meta, str) and meta:
+                        reason = meta
+                    else:
+                        reason = ""
+                rows.append({
+                    "ref": str(item.get("ref") or item.get("id") or ""),
+                    "title": str(item.get("title") or ""),
+                    "status": status,
+                    "reason": reason,
+                    "due": item.get("due"),
+                    "created_at": item.get("created_at"),
+                    "assignee": item.get("assignee") or None,
+                })
+        else:
+            legacy = self.store._conn.execute(
+                "SELECT ref, title, status, blocked_by_json, due,"
+                " created_at, assignee_id FROM dockyard_work_items"
+                " WHERE project_id=?",
+                (project_id,)).fetchall()
+            for w in legacy:
+                raw = (w["blocked_by_json"] or "[]").strip()
+                try:
+                    parsed = json.loads(raw)
+                except (TypeError, ValueError):
+                    parsed = []
+                if isinstance(parsed, str):
+                    reason = parsed
+                elif parsed:
+                    reason = ", ".join(str(x) for x in parsed)
+                else:
+                    reason = ""
+                rows.append({
+                    "ref": w["ref"], "title": w["title"],
+                    "status": str(w["status"] or ""), "reason": reason,
+                    "due": w["due"], "created_at": w["created_at"],
+                    "assignee": w["assignee_id"] or None,
+                })
+        return rows
+
     def _fleet_groups(self) -> Dict:
         """Decision / Intervention / Informational groups from existing rows.
 
-        Sources: project_initiatives (pending decisions), dockyard_work_items
-        (blocked/overdue), project_stewardship (paused/frozen/disabled),
+        Sources: project_initiatives (pending decisions), canonical work via
+        _work_attention_rows (blocked/overdue; falls back to
+        dockyard_work_items only when no adapter is wired),
+        project_stewardship (paused/frozen/disabled),
         project_health_snapshots (evidence staleness), notifications
         (informational feed). Evidence health stays SEPARATE from delivery
         status: freshness is its own field, never folded into a score.
@@ -1177,45 +1261,27 @@ class DockyardService:
             pid = p["project_id"]
             lead = p["owner_lead_profile"] or "unassigned"
 
-            blocked = self.store._conn.execute(
-                "SELECT ref, title, blocked_by_json, created_at, updated_at"
-                " FROM dockyard_work_items WHERE project_id=?"
-                " AND status='blocked' ORDER BY created_at LIMIT 20",
-                (pid,)).fetchall()
-            for w in blocked:
-                raw = (w["blocked_by_json"] or "[]").strip()
-                try:
-                    parsed = json.loads(raw)
-                except (TypeError, ValueError):
-                    parsed = []
-                if isinstance(parsed, str):
-                    reason = parsed
-                elif parsed:
-                    reason = ", ".join(str(x) for x in parsed)
-                else:
-                    reason = ""
-                created = self._parse_iso(w["created_at"])
-                interventions.append({
-                    "kind": "project_attention",
-                    "cause": "blocked_item",
-                    "project": pid,
-                    "ref": w["ref"],
-                    "title": w["title"],
-                    "detail": reason or "Blocked without a recorded reason.",
-                    "owner": lead,
-                    "age_days": max(0, (now - created).days) if created else 0,
-                    "next_action": self._NEXT_ACTION["blocked_item"],
-                    "deep_link": self._deep_link_for(
-                        "blocked_item", pid, w["ref"]),
-                })
-
-            overdue = self.store._conn.execute(
-                "SELECT ref, title, due, created_at FROM dockyard_work_items"
-                " WHERE project_id=? AND status!='done' AND due IS NOT NULL",
-                (pid,)).fetchall()
-            for w in overdue:
+            for w in self._work_attention_rows(pid):
+                if w["status"] == "blocked":
+                    created = self._parse_iso(w["created_at"])
+                    interventions.append({
+                        "kind": "project_attention",
+                        "cause": "blocked_item",
+                        "project": pid,
+                        "ref": w["ref"],
+                        "title": w["title"],
+                        "detail": (w["reason"]
+                                   or "Blocked without a recorded reason."),
+                        "owner": w["assignee"] or lead,
+                        "age_days": (max(0, (now - created).days)
+                                     if created else 0),
+                        "next_action": self._NEXT_ACTION["blocked_item"],
+                        "deep_link": self._deep_link_for(
+                            "blocked_item", pid, w["ref"]),
+                    })
                 due = self._parse_iso(w["due"])
-                if due and due < now:
+                if (w["status"] != "done" and due is not None
+                        and due < now):
                     interventions.append({
                         "kind": "project_attention",
                         "cause": "overdue_item",
@@ -1223,7 +1289,7 @@ class DockyardService:
                         "ref": w["ref"],
                         "title": w["title"],
                         "detail": f"Due {w['due']} and not done.",
-                        "owner": lead,
+                        "owner": w["assignee"] or lead,
                         "age_days": max(0, (now - due).days),
                         "next_action": self._NEXT_ACTION["overdue_item"],
                         "deep_link": self._deep_link_for(
@@ -1269,7 +1335,7 @@ class DockyardService:
                     })
 
         notes = self.store._conn.execute(
-            "SELECT project_id, severity, kind, title, created_at"
+            "SELECT project_id, severity, kind, title, body, created_at"
             " FROM notifications WHERE acked_at IS NULL"
             " ORDER BY created_at DESC LIMIT 50").fetchall()
         for n in notes:
@@ -1279,7 +1345,8 @@ class DockyardService:
                 "severity": n["severity"],
                 "title": n["title"],
                 "created_at": n["created_at"],
-                "deep_link": self._deep_link(n["kind"]),
+                "deep_link": self._deep_link(
+                    n["kind"], n["project_id"], n["body"]),
             })
 
         return {"decisions": decisions,
