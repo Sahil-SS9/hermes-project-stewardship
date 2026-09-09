@@ -77,6 +77,35 @@ class ProjectKanbanHost:
                     profiles.append({"name": path.name, "is_default": False})
         return profiles
 
+    def list_existing_projects(self) -> dict[str, Any]:
+        """Phase 7 preflight (P7.1): what the host ALREADY owns.
+
+        Returns the native projects (with slug/board/repo path) and the valid
+        lead profiles, read through the host's own scoped connection. Used by
+        onboarding to offer connect-existing before create-new; a read-only
+        listing that provisions nothing.
+        """
+        import hermes_constants
+
+        _, _, projects_db = self._modules()
+        token = hermes_constants.set_hermes_home_override(self.hermes_home)
+        try:
+            with projects_db.connect_closing() as conn:
+                rows = projects_db.list_projects(conn)
+        finally:
+            hermes_constants.reset_hermes_home_override(token)
+        projects = [
+            {
+                "id": str(p.id),
+                "slug": str(p.slug),
+                "name": str(p.name),
+                "board_slug": str(p.board_slug),
+                "repo_path": str(p.primary_path),
+            }
+            for p in rows
+        ]
+        return {"projects": projects, "profiles": self.list_profiles()}
+
     def _validate(self, **payload: Any) -> dict[str, Any]:
         _, kanban_db, projects_db = self._modules()
         name = str(payload.get("name") or "").strip()

@@ -1243,6 +1243,12 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
   section.className = 'dy-card dy-form';
   section.appendChild(textEl('h2', '', 'Onboard a project'));
 
+  // P7.1: host-driven discovery — connect-existing before create-new; the
+  // host is the source of both the project list and the lead profiles.
+  const discoverBox = document.createElement('div');
+  discoverBox.className = 'dy-ob-discover';
+  discoverBox.appendChild(textEl('p', 'dy-dim', 'Loading host discovery…'));
+
   const idLabel = label('Project ID');
   idLabel.appendChild(inputEl('dy-ob-id', 'e.g. hermes-core'));
 
@@ -1255,10 +1261,21 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
   const leadLabel = label('Lead profile');
   const select = document.createElement('select');
   select.id = 'dy-ob-lead';
+  // Populated from host discovery (P7.1); no hard-coded choices. Default-all
+  // keeps first paint usable when discovery is unavailable.
   for (const profile of ['octacon', 'remii', 'wesker', 'ceecee', 'gojo', 'quan']) {
     select.appendChild(textEl('option', '', profile, profile));
   }
   leadLabel.appendChild(select);
+
+  // P7.2: preflight — host-validated preview before commitment.
+  const preflight = document.createElement('p');
+  preflight.className = 'dy-dim';
+  preflight.id = 'dy-ob-preflight';
+  const preflightBtn = document.createElement('button');
+  preflightBtn.className = 'dy-btn';
+  preflightBtn.id = 'dy-ob-preflight-go';
+  preflightBtn.textContent = 'Validate before commit';
 
   const go = document.createElement('button');
   go.className = 'dy-btn primary';
@@ -1269,7 +1286,22 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
   result.id = 'dy-ob-result';
   result.className = 'dy-dim';
 
-  go.addEventListener('click', async () => {
+  // P7.6: completion action — first read-only assessment.
+  const assess = document.createElement('button');
+  assess.className = 'dy-btn';
+  assess.id = 'dy-ob-assess';
+  assess.hidden = true;
+  assess.textContent = 'Run first read-only assessment';
+  const assessment = document.createElement('pre');
+  assessment.id = 'dy-ob-assessment';
+  assessment.hidden = true;
+
+  const readInputs = (): {
+    project_id: string;
+    repo_path: string;
+    mission: string;
+    lead_profile: string;
+  } | null => {
     const body = {
       project_id: (main.querySelector('#dy-ob-id') as HTMLInputElement).value.trim(),
       repo_path: (main.querySelector('#dy-ob-repo') as HTMLInputElement).value.trim(),
@@ -1278,18 +1310,94 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
     };
     if (!body.project_id || !body.repo_path || !body.mission) {
       result.textContent = 'All fields are required.';
-      return;
+      return null;
     }
+    return body;
+  };
+
+  preflightBtn.addEventListener('click', async () => {
+    const body = readInputs();
+    if (!body) return;
+    preflightBtn.disabled = true;
+    preflight.textContent = 'Validating via host…';
     try {
-      await s.api.onboard(body);
-      result.textContent = `Project "${body.project_id}" enabled.`;
+      const pre = await s.api.preflight(body);
+      const mode = pre.mode === 'connect_existing'
+        ? 'Host already owns this project — it will be connected, not recreated.'
+        : 'Host validated the details; nothing exists yet — create-new.';
+      const profiles = (pre.existing?.profiles ?? [])
+        .map((p) => p.name).join(', ');
+      preflight.textContent = `${mode} Valid profiles: ${profiles || 'n/a'}.`;
+      preflight.className = 'dy-ok';
     } catch (e) {
-      result.textContent = `Onboarding failed: ${String(e).slice(0, 120)}`;
+      preflight.className = 'dy-error';
+      preflight.textContent = `Preflight conflict: ${String(e).slice(0, 160)}`;
+    } finally {
+      preflightBtn.disabled = false;
     }
   });
 
-  section.append(idLabel, repoLabel, missionLabel, leadLabel, go, result);
+  go.addEventListener('click', async () => {
+    const body = readInputs();
+    if (!body) return;
+    go.disabled = true;
+    try {
+      await s.api.onboard(body);
+      result.textContent = `Project "${body.project_id}" enabled.`;
+      // P7.6: the completion action appears only after successful onboarding.
+      assess.hidden = false;
+    } catch (e) {
+      result.textContent = `Onboarding failed: ${String(e).slice(0, 120)}`;
+      go.disabled = false;
+    }
+  });
+
+  assess.addEventListener('click', async () => {
+    const body = readInputs();
+    if (!body) return;
+    assess.disabled = true;
+    assessment.hidden = false;
+    assessment.textContent = 'Running read-only assessment…';
+    try {
+      const out = await s.api.firstAssessment(body.project_id);
+      assessment.textContent = JSON.stringify(out.assessment, null, 2);
+    } catch (e) {
+      assessment.textContent = `Assessment failed: ${String(e).slice(0, 140)}`;
+      assess.disabled = false;
+    }
+  });
+
+  section.append(
+    discoverBox, idLabel, repoLabel, missionLabel, leadLabel,
+    preflightBtn, preflight, go, assess, assessment, result,
+  );
   main.replaceChildren(section);
+
+  void (async () => {
+    try {
+      const d = await s.api.discover();
+      discoverBox.replaceChildren();
+      const existing = d.projects ?? [];
+      const head = textEl(
+        'p', 'dy-dim',
+        existing.length > 0
+          ? `Existing host projects: ${existing.map((p) => p.slug).join(', ')}.`
+          : 'No existing host projects; create-new below.',
+      );
+      discoverBox.appendChild(head);
+      const profiles = (d.profiles ?? []).map((p) => p.name);
+      if (profiles.length > 0) {
+        select.replaceChildren();
+        for (const name of profiles) {
+          select.appendChild(textEl('option', '', name, name));
+        }
+      }
+    } catch {
+      discoverBox.replaceChildren(
+        textEl('p', 'dy-dim', 'Host discovery unavailable; enter details manually.'),
+      );
+    }
+  })();
 }
 
 // ---- helpers ----

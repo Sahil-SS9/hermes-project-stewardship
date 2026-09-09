@@ -1335,6 +1335,66 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(404, str(exc)) from None
 
+    @router.get("/onboard/discover")
+    def onboard_discover():
+        """P7.1: host-driven discovery for onboarding — existing native
+        projects (connect-existing candidates) and valid lead profiles.
+        Read-only; no provisioning. The host itself is the source; no
+        hard-coded project or profile lists."""
+        try:
+            return adapter.list_existing_projects()
+        except KanbanAdapterError as exc:
+            _raise_work_error(exc)
+        except Exception:
+            raise HTTPException(
+                503,
+                {
+                    "code": "host_unavailable",
+                    "message": "canonical project and Kanban host is unavailable",
+                },
+            ) from None
+
+    @router.post("/onboard/preflight")
+    def onboard_preflight(body: OnboardingRequest):
+        """P7.2: the host's validate_project IS the preflight. Runs BEFORE
+        any commitment and surfaces path/profile/duplicate conflicts with the
+        host's own field errors; no second validator with different rules."""
+        slug = (body.slug or body.project_id).strip()
+        board_slug = (body.board_slug or slug).strip()
+        name = (body.name or body.project_id.replace("-", " ").title()).strip()
+        try:
+            validated = adapter.validate_project(
+                name=name,
+                slug=slug,
+                description=body.mission,
+                repo_path=body.repo_path,
+                lead_profile=body.lead_profile,
+                board_slug=board_slug,
+            )
+        except KanbanAdapterError as exc:
+            _raise_work_error(exc)
+        except Exception:
+            raise HTTPException(
+                503,
+                {
+                    "code": "host_unavailable",
+                    "message": "canonical project and Kanban host is unavailable",
+                },
+            ) from None
+        # connect-existing detection: same slug already provisioned natively
+        try:
+            existing = adapter.list_existing_projects()
+        except Exception:
+            existing = {"projects": []}
+        mode = ("connect_existing"
+                if any(p["slug"] == slug for p in existing.get("projects", []))
+                else "create_new")
+        return {
+            "validated": validated,
+            "existing": existing,
+            "mode": mode,
+        }
+
     @router.post("/onboard")
     def onboard(body: OnboardingRequest):
         """Provision canonical Hermes state before Dockyard governance metadata."""
@@ -1422,6 +1482,39 @@ def create_app(
             "group": f"{body.project_id}-ops",
             "view": "Default board",
             "canonical": canonical,
+            "next": "Run first read-only assessment",
+        }
+
+    @router.post("/projects/{project_id}/first-assessment")
+    def first_assessment(project_id: str):
+        """P7.6: the onboarding completion action — run the FIRST read-only
+        assessment now. Manual trigger, no schedule created, no initiatives
+        proposed (the engine's own gates keep mutation off when nothing is
+        proposed). Returns the evidence/result the owner reviews."""
+        try:
+            result = engine.run_cycle(
+                project_id,
+                trigger_type="manual",
+                idempotency_key=f"dockyard-first-assessment:{project_id}",
+            )
+        except CycleRefused as exc:
+            raise HTTPException(409, str(exc)) from None
+        except Exception as exc:
+            raise HTTPException(503, str(exc)) from None
+        health = svc.latest_health(project_id)
+        return {
+            "project": project_id,
+            "assessment": {
+                "cycle_id": result.get("cycle_id"),
+                "verification_ok": result.get("verification_ok"),
+                "health_state": result.get("health", {}).get("state"),
+                "objective_results": result.get("objective_results", []),
+                "initiatives_created": len(
+                    [i for i in result.get("initiatives", []) if not i.get("refused")]),
+            },
+            "health_snapshot": health,
+            "schedules_enabled": False,
+            "next": "Review the objective results; onboarding enables no automation.",
         }
 
     app.include_router(router)

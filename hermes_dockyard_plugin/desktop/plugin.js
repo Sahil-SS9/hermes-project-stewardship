@@ -1761,6 +1761,24 @@ function OnboardingWizard({ onClose, onComplete }) {
   const [leadProfile, setLeadProfile] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  // P7.1: host-driven discovery replaces hard-coded lead choices and lists
+  // existing projects (connect-existing before create-new).
+  const [discovered, setDiscovered] = useState(null)
+  const [preflightState, setPreflightState] = useState(null)
+  const [preflightBusy, setPreflightBusy] = useState(false)
+
+  useEffect(() => {
+    let current = true
+    api('/onboard/discover').then((result) => {
+      if (!current) return
+      setDiscovered(result)
+      const profiles = (result?.profiles ?? []).map((p) => p.name)
+      if (profiles.length > 0) setLeadProfile((value) => (profiles.includes(value) ? value : profiles[0]))
+    }).catch(() => {
+      if (current) setDiscovered(null)
+    })
+    return () => { current = false }
+  }, [])
 
   useEffect(() => {
     const handleKey = (event) => { if (event.key === 'Escape' && !submitting) onClose() }
@@ -1775,6 +1793,33 @@ function OnboardingWizard({ onClose, onComplete }) {
       : step === 3
         ? leadProfile.trim().length > 0
         : true
+  // P7.2: preflight runs the host's own validator BEFORE commitment.
+  const runPreflight = async () => {
+    setPreflightBusy(true)
+    setPreflightState(null)
+    try {
+      const result = await api('/onboard/preflight', {
+        method: 'POST',
+        body: {
+          project_id: projectId.trim(),
+          repo_path: repoPath.trim(),
+          mission: mission.trim(),
+          lead_profile: leadProfile.trim(),
+        },
+      })
+      setPreflightState({
+        ok: true,
+        mode: result.mode,
+        text: result.mode === 'connect_existing'
+          ? 'Host already owns this project — it will be connected, not recreated.'
+          : 'Host validated the details; nothing exists yet — create-new.',
+        projects: (result?.existing?.projects ?? []).map((p) => p.slug),
+      })
+    } catch (failure) {
+      setPreflightState({ ok: false, message: String(failure?.message ?? failure) })
+    }
+    setPreflightBusy(false)
+  }
   const submit = async () => {
     setSubmitting(true)
     setError(null)
@@ -1826,6 +1871,14 @@ function OnboardingWizard({ onClose, onComplete }) {
           jsxs('div', { className: step === 1 ? 'dockyard-wizard-step active' : 'dockyard-wizard-step', hidden: step !== 1, 'data-wizard-step': '1', children: [
             jsx('h3', { children: 'Project identity' }),
             jsx('p', { children: 'Use the stable project identifier and its absolute repository path.' }),
+            discovered
+              ? jsxs('p', { className: 'dockyard-meta', 'data-discovered-projects': true, children: [
+                  'Host projects: ',
+                  (discovered.projects ?? []).length > 0
+                    ? (discovered.projects ?? []).map((project) => project.slug).join(', ')
+                    : 'none yet — create-new below',
+                ]})
+              : jsx('p', { className: 'dockyard-meta', children: 'Host discovery unavailable; enter details manually.' }),
             jsx('label', { htmlFor: 'dockyard-project-id', children: 'Project ID' }),
             jsx('input', { id: 'dockyard-project-id', 'data-field': 'project-id', value: projectId, placeholder: 'payments-relaunch', autoComplete: 'off', onInput: (event) => setProjectId(event.target.value) }),
             jsx('small', { children: 'Lowercase letters, numbers and hyphens.' }),
@@ -1845,12 +1898,11 @@ function OnboardingWizard({ onClose, onComplete }) {
             jsx('label', { htmlFor: 'dockyard-lead-profile', children: 'Lead profile' }),
             jsx('input', { id: 'dockyard-lead-profile', 'data-field': 'lead-profile', value: leadProfile, list: 'dockyard-lead-options', placeholder: 'octacon', autoComplete: 'off', onInput: (event) => setLeadProfile(event.target.value) }),
             jsxs('datalist', { id: 'dockyard-lead-options', children: [
-              jsx('option', { value: 'octacon' }, 'octacon'),
-              jsx('option', { value: 'remii' }, 'remii'),
-              jsx('option', { value: 'wesker' }, 'wesker'),
-              jsx('option', { value: 'gojo' }, 'gojo'),
-              jsx('option', { value: 'ceecee' }, 'ceecee'),
+              (discovered?.profiles ?? []).map((profile) => jsx('option', { value: profile.name }, profile.name)),
             ]}),
+            jsx('small', { children: discovered
+              ? `Valid host profiles: ${(discovered.profiles ?? []).map((p) => p.name).join(', ') || 'n/a'}.`
+              : 'Host profile list unavailable; enter the lead profile manually.' }),
             jsx('small', { children: 'This records ownership; it does not expand permissions.' }),
           ]}),
           jsxs('div', { className: step === 4 ? 'dockyard-wizard-step active' : 'dockyard-wizard-step', hidden: step !== 4, 'data-wizard-step': '4', children: [
@@ -1861,6 +1913,20 @@ function OnboardingWizard({ onClose, onComplete }) {
               jsx('dt', { children: 'Mission' }), jsx('dd', { children: mission }),
               jsx('dt', { children: 'Lead' }), jsx('dd', { children: leadProfile }),
             ]}),
+            jsx(Button, {
+              action: 'run-onboarding-preflight',
+              disabled: preflightBusy || !valid,
+              onClick: runPreflight,
+              children: preflightBusy ? 'Validating…' : 'Validate with host before commit',
+            }),
+            preflightState
+              ? jsx('p', {
+                  className: preflightState.ok ? 'dockyard-review-note' : 'dockyard-inline-error',
+                  role: preflightState.ok ? undefined : 'alert',
+                  'data-preflight-result': preflightState.ok ? preflightState.mode : 'error',
+                  children: preflightState.ok ? `${preflightState.text} Host projects: ${preflightState.projects.join(', ') || 'none'}.` : preflightState.message,
+                })
+              : null,
             jsx('p', { className: 'dockyard-review-note', children: 'Onboarding creates the project record and its initial oversight surfaces. It does not approve future initiatives.' }),
           ]}),
         ]}),
@@ -2456,6 +2522,49 @@ function DashboardView({ view, onInbox, onRefresh, onOpen }) {
         onOpen: (link) => (typeof onOpen === 'function' ? onOpen(link) : undefined),
       }),
     ]}),
+  ]})
+}
+
+function FirstAssessmentCard({ projectId }) {
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState(null)
+  const run = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const out = await api(`/projects/${encodeURIComponent(projectId)}/first-assessment`, {
+        method: 'POST', body: {},
+      })
+      setResult(out)
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+    setBusy(false)
+  }
+  return jsxs('section', { className: 'dockyard-feature-card dockyard-first-assessment', 'data-first-assessment': true, children: [
+    jsxs('div', { className: 'dockyard-section-head', children: [
+      jsxs('div', { children: [
+        jsx('h2', { children: 'First read-only assessment' }),
+        jsx('p', { children: 'One manual cycle: verifies the repo, records health and objective evidence. Enables no schedules.' }),
+      ]}),
+      jsx(Button, {
+        action: 'run-first-assessment',
+        variant: 'primary',
+        small: true,
+        disabled: busy,
+        onClick: run,
+        children: busy ? 'Assessing…' : 'Run first assessment',
+      }),
+    ]}),
+    error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
+    result ? jsxs('dl', { className: 'dockyard-onboarding-review', 'data-assessment-result': true, children: [
+      jsx('dt', { children: 'Verification' }), jsx('dd', { children: result.assessment?.verification_ok ? 'Passed' : 'Not passed' }),
+      jsx('dt', { children: 'Health' }), jsx('dd', { children: result.assessment?.health_state ?? 'unknown' }),
+      jsx('dt', { children: 'Objectives assessed' }), jsx('dd', { children: number((result.assessment?.objective_results ?? []).length) }),
+      jsx('dt', { children: 'Initiatives created' }), jsx('dd', { children: number(result.assessment?.initiatives_created ?? 0) }),
+      jsx('dt', { children: 'Schedules' }), jsx('dd', { children: result.schedules_enabled ? 'enabled' : 'disabled (onboarding never enables automation)' }),
+    ]}) : null,
   ]})
 }
 
@@ -3450,6 +3559,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, pendingWorkRef, on
             : jsx('p', { className: 'dockyard-meta', children: 'No attributed project events recorded yet.' }),
         ]}),
       ]}),
+      jsx(FirstAssessmentCard, { projectId: project.id }),
     ]})
   }
   return jsxs('div', { 'data-project-dashboard': project.id, children: [

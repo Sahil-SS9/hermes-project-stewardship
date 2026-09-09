@@ -22,6 +22,28 @@ const rt = require('react/jsx-runtime');
 const POPULATED = {
   // Phase 4 receipts backing store: ambiguous desktop outcomes read these.
   DECISION_RECEIPTS: {},
+  // P7.GATE: host-driven onboarding surface.
+  DISCOVER: {
+    projects: [{ id: 'p_demo', slug: 'demo-project', name: 'Demo Project', board_slug: 'demo-project', repo_path: '/srv/demo' }],
+    profiles: [{ name: 'default', is_default: true }, { name: 'octacon', is_default: false }, { name: 'quan', is_default: false }],
+  },
+  PREFLIGHT: {
+    validated: { slug: 'checkout-ops', repo_path: '/srv/checkout-ops', lead_profile: 'octacon' },
+    existing: { projects: [{ id: 'p_demo', slug: 'demo-project' }], profiles: [{ name: 'default' }, { name: 'octacon' }] },
+    mode: 'create_new',
+  },
+  FIRST_ASSESSMENT: {
+    project: 'payments-relaunch',
+    assessment: {
+      cycle_id: 7,
+      verification_ok: true,
+      health_state: 'healthy',
+      objective_results: [{ name: 'demo objective', passed: true, state: 'passed' }],
+      initiatives_created: 0,
+    },
+    health_snapshot: { status: 'healthy' },
+    schedules_enabled: false,
+  },
   dashboard: {
     projects: [
       { id: 'demo-project', enabled: true, phase: 'active', health: 'healthy', work: { backlog: 5, active: 3, done: 3, blocked: 0 }, unacked_notifications: 0 },
@@ -504,6 +526,12 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
     }
     if (path === '/dashboard') return clone(data.dashboard);
     if (path === '/portfolio') return clone(data.portfolio ?? { projects: [], mix: {}, attention: {}, groups: { decisions: [], interventions: [], informational: [] } });
+    if (path === '/onboard/discover') return clone(data.DISCOVER);
+    if (method === 'POST' && path === '/onboard/preflight') return clone(data.PREFLIGHT);
+    if (method === 'POST' && /^\/projects\/[^/]+\/first-assessment$/.test(path)) {
+      data.FIRST_ASSESSMENT_CALLS = (data.FIRST_ASSESSMENT_CALLS ?? 0) + 1;
+      return clone(data.FIRST_ASSESSMENT);
+    }
     if (path === '/inbox') return clone(data.inbox);
     if (path === '/notifications') return clone(data.notifications);
     if (path === '/bots') return clone(data.bots);
@@ -1267,6 +1295,82 @@ async function testKeyboardTabsAndNames() {
   await runtime.dispose();
 }
 
+async function testOnboardingPreflightAndDiscovery() {
+  // P7.1/P7.2 (P7.GATE journey part 1): the wizard opens with host-driven
+  // discovery (existing projects + valid profiles), and the review step
+  // validates through the host BEFORE commitment.
+  const runtime = await createRuntime();
+  await runtime.mount();
+  await runtime.flush(60);
+  await runtime.click('[data-action="open-onboarding"]', 120);
+  const doc = runtime.dom.window.document;
+  assert(runtime.calls.some((call) => call.path === '/onboard/discover'), 'onboarding wizard did not load host discovery');
+  const wizard = doc.querySelector('[data-onboarding-wizard]');
+  assert(wizard, 'onboarding wizard did not open');
+  // Step 1: discovery row reflects the host projects (no hard-coded list).
+  const discovered = wizard.querySelector('[data-discovered-projects]');
+  assert(discovered, 'wizard step 1 lacks the host-driven discovery line');
+  assert.match(discovered.textContent, /demo-project/);
+  // Type through step 1-3 (keyboard + typed input, no pointer-only journey).
+  await runtime.setValue('[data-field="project-id"]', 'checkout-ops', 30);
+  await runtime.setValue('[data-field="repo-path"]', '/srv/checkout-ops', 30);
+  await runtime.click('[data-action="wizard-next"]', 40);
+  await runtime.setValue('[data-field="mission"]', 'Ship payment recovery with auditable gates', 30);
+  await runtime.click('[data-action="wizard-next"]', 40);
+  await runtime.setValue('[data-field="lead-profile"]', 'octacon', 30);
+  await runtime.click('[data-action="wizard-next"]', 40);
+  // Step 4: preflight validates through the host before the commit button.
+  await runtime.click('[data-action="run-onboarding-preflight"]', 80);
+  const preflightResult = doc.querySelector('[data-preflight-result]');
+  assert(preflightResult, 'preflight result did not render');
+  assert.equal(preflightResult.getAttribute('data-preflight-result'), 'create_new', 'preflight did not report the host mode');
+  assert.match(preflightResult.textContent, /Host validated the details/);
+  await runtime.dispose();
+}
+
+async function testOnboardingPreflightConflictSurfacesBeforeCommit() {
+  // P7.GATE: a preflight failure must show the host conflict and NOT commit.
+  const runtime = await createRuntime({ failMutationPath: '/onboard/preflight' });
+  await runtime.mount();
+  await runtime.flush(60);
+  const doc = runtime.dom.window.document;
+  await runtime.click('[data-action="open-onboarding"]', 80);
+  await runtime.setValue('[data-field="project-id"]', 'checkout-ops', 30);
+  await runtime.setValue('[data-field="repo-path"]', '/srv/checkout-ops', 30);
+  await runtime.click('[data-action="wizard-next"]', 40);
+  await runtime.setValue('[data-field="mission"]', 'Ship payment recovery with auditable gates', 30);
+  await runtime.click('[data-action="wizard-next"]', 40);
+  await runtime.setValue('[data-field="lead-profile"]', 'octacon', 30);
+  await runtime.click('[data-action="wizard-next"]', 40);
+  await runtime.click('[data-action="run-onboarding-preflight"]', 80);
+  const result = doc.querySelector('[data-preflight-result="error"]');
+  assert(result, 'preflight failure did not surface a conflict');
+  assert.match(result.textContent, /Synthetic mutation failure/);
+  assert(!runtime.calls.some((call) => call.path === '/onboard' && call.method === 'POST'), 'a failed preflight must not commit');
+  await runtime.dispose();
+}
+
+async function testFirstAssessmentCompletionAction() {
+  // P7.6 (P7.GATE journey part 2): the project overview exposes the
+  // completion action; running it shows the read-only result and no
+  // schedules were enabled.
+  const runtime = await createRuntime();
+  await runtime.mount();
+  await runtime.flush(60);
+  await runtime.click('[data-tab="project"]', 100);
+  const doc = runtime.dom.window.document;
+  const card = doc.querySelector('[data-first-assessment]');
+  assert(card, 'project dashboard lacks the first read-only assessment card');
+  await runtime.click('[data-action="run-first-assessment"]', 80);
+  const result = doc.querySelector('[data-assessment-result]');
+  assert(result, 'assessment result did not render');
+  assert.match(result.textContent, /Passed/);
+  assert.match(result.textContent, /disabled/);
+  assert(runtime.calls.some((call) => call.method === 'POST' && /\/first-assessment$/.test(call.path)), 'assessment POST was not sent');
+  assert(runtime.calls.filter((call) => call.method === 'POST' && /\/first-assessment$/.test(call.path)).length === 1, 'assessment ran more than once');
+  await runtime.dispose();
+}
+
 function relativeLuminance(hex) {
   const rgb = hex.replace('#', '').match(/.{2}/g).map((part) => parseInt(part, 16) / 255);
   const linear = rgb.map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
@@ -1529,6 +1633,9 @@ const tests = [
   ['approval flow', testApprovalFlow],
   ['notification flow', testNotificationFlow],
   ['keyboard tabs and accessible names', testKeyboardTabsAndNames],
+  ['onboarding preflight and host discovery', testOnboardingPreflightAndDiscovery],
+  ['onboarding preflight conflict surfaces before commit', testOnboardingPreflightConflictSurfacesBeforeCommit],
+  ['first assessment completion action', testFirstAssessmentCompletionAction],
   ['contrast metadata', testContrastMetadata],
   ['Chromium layouts', testChromiumLayouts],
 ];
