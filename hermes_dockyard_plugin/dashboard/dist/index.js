@@ -87,6 +87,11 @@
       // P7.1/P7.2: host-driven discovery + host-validated preflight.
       discover: () => get("/onboard/discover"),
       preflight: (b) => post("/onboard/preflight", b),
+      addObjective: (projectId, body) => post(`/projects/${encodeURIComponent(projectId)}/objectives`, {
+        ...body,
+        actor: "sahil",
+        interface: "dockyard:human"
+      }),
       // P7.6: onboarding completion action — the first read-only assessment.
       firstAssessment: (projectId) => post(`/projects/${encodeURIComponent(projectId)}/first-assessment`, {}),
       decision: (ref) => get(`/initiatives/${encodeURIComponent(ref)}/decision`),
@@ -1920,10 +1925,10 @@
     const leadLabel = label("Lead profile");
     const select = document.createElement("select");
     select.id = "dy-ob-lead";
-    for (const profile of ["octacon", "remii", "wesker", "ceecee", "gojo", "quan"]) {
-      select.appendChild(textEl("option", "", profile, profile));
-    }
     leadLabel.appendChild(select);
+    const connectBox = document.createElement("div");
+    connectBox.className = "dy-ob-connect";
+    connectBox.hidden = true;
     const preflight = document.createElement("p");
     preflight.className = "dy-dim";
     preflight.id = "dy-ob-preflight";
@@ -1931,10 +1936,18 @@
     preflightBtn.className = "dy-btn";
     preflightBtn.id = "dy-ob-preflight-go";
     preflightBtn.textContent = "Validate before commit";
+    const preview = document.createElement("pre");
+    preview.className = "dy-ob-preview";
+    preview.id = "dy-ob-preview";
+    preview.hidden = true;
+    const suggestionsBox = document.createElement("div");
+    suggestionsBox.className = "dy-ob-suggestions";
+    suggestionsBox.hidden = true;
     const go = document.createElement("button");
     go.className = "dy-btn primary";
     go.id = "dy-ob-go";
     go.textContent = "Enable project";
+    go.disabled = true;
     const result = document.createElement("p");
     result.id = "dy-ob-result";
     result.className = "dy-dim";
@@ -1946,6 +1959,24 @@
     const assessment = document.createElement("pre");
     assessment.id = "dy-ob-assessment";
     assessment.hidden = true;
+    let preflightOk = false;
+    let preflightFields = "";
+    const currentFields = () => {
+      const v = readInputs();
+      return v ? `${v.project_id}|${v.repo_path}|${v.mission}|${v.lead_profile}` : "";
+    };
+    const invalidatePreflight = () => {
+      if (!preflightOk) return;
+      preflightOk = false;
+      preflightFields = "";
+      go.disabled = true;
+      preview.hidden = true;
+      preflight.className = "dy-dim";
+      preflight.textContent = "Details changed since validation \u2014 run preflight again.";
+    };
+    for (const el of main.querySelectorAll(".dy-form input, .dy-form select")) {
+      el.addEventListener("input", invalidatePreflight);
+    }
     const readInputs = () => {
       const body = {
         project_id: main.querySelector("#dy-ob-id").value.trim(),
@@ -1953,7 +1984,7 @@
         mission: main.querySelector("#dy-ob-mission").value.trim(),
         lead_profile: main.querySelector("#dy-ob-lead").value
       };
-      if (!body.project_id || !body.repo_path || !body.mission) {
+      if (!body.project_id || !body.repo_path || !body.mission || !body.lead_profile) {
         result.textContent = "All fields are required.";
         return null;
       }
@@ -1967,10 +1998,53 @@
       try {
         const pre = await s.api.preflight(body);
         const mode = pre.mode === "connect_existing" ? "Host already owns this project \u2014 it will be connected, not recreated." : "Host validated the details; nothing exists yet \u2014 create-new.";
-        const profiles = (pre.existing?.profiles ?? []).map((p) => p.name).join(", ");
-        preflight.textContent = `${mode} Valid profiles: ${profiles || "n/a"}.`;
+        preflight.textContent = mode;
         preflight.className = "dy-ok";
+        preflightOk = true;
+        preflightFields = `${body.project_id}|${body.repo_path}|${body.mission}|${body.lead_profile}`;
+        go.disabled = false;
+        const pv = pre.preview ?? {};
+        preview.textContent = JSON.stringify(pv, null, 2);
+        preview.hidden = false;
+        const suggestions = pre.suggestions ?? [];
+        suggestionsBox.replaceChildren();
+        suggestionsBox.hidden = suggestions.length === 0;
+        for (const sug of suggestions) {
+          const row = document.createElement("div");
+          row.className = "dy-ob-suggestion";
+          row.appendChild(textEl(
+            "span",
+            "dy-dim",
+            `${sug.name} \u2014 ${sug.description} (manual objective; nothing runs automatically)`
+          ));
+          const accept = document.createElement("button");
+          accept.className = "dy-btn";
+          accept.textContent = "Add objective";
+          accept.disabled = !preflightOk;
+          accept.addEventListener("click", async () => {
+            accept.disabled = true;
+            try {
+              await s.api.addObjective(body.project_id, {
+                name: sug.name,
+                evaluator_type: "manual",
+                target: sug.target,
+                severity: sug.severity,
+                description: sug.description
+              });
+              accept.textContent = "Added";
+            } catch (err) {
+              accept.disabled = false;
+              result.textContent = `Suggestion rejected: ${String(err).slice(0, 140)}`;
+            }
+          });
+          row.appendChild(accept);
+          suggestionsBox.appendChild(row);
+        }
       } catch (e) {
+        preflightOk = false;
+        preflightFields = "";
+        go.disabled = true;
+        preview.hidden = true;
         preflight.className = "dy-error";
         preflight.textContent = `Preflight conflict: ${String(e).slice(0, 160)}`;
       } finally {
@@ -1980,6 +2054,10 @@
     go.addEventListener("click", async () => {
       const body = readInputs();
       if (!body) return;
+      if (!preflightOk || preflightFields !== `${body.project_id}|${body.repo_path}|${body.mission}|${body.lead_profile}`) {
+        result.textContent = "Validate the current details before enabling.";
+        return;
+      }
       go.disabled = true;
       try {
         await s.api.onboard(body);
@@ -1998,7 +2076,14 @@
       assessment.textContent = "Running read-only assessment\u2026";
       try {
         const out = await s.api.firstAssessment(body.project_id);
-        assessment.textContent = JSON.stringify(out.assessment, null, 2);
+        const lines = [
+          `Verification ok: ${out.assessment.verification_ok ?? "unknown"}`,
+          `Health state: ${out.assessment.health_state ?? "unknown"}`,
+          `Initiatives created: ${out.assessment.initiatives_created}`,
+          `Schedules enabled: ${out.schedules_enabled === false ? "no (automation off)" : String(out.schedules_enabled)}`,
+          `Next: ${out.next ?? "n/a"}`
+        ];
+        assessment.textContent = lines.join("\n");
       } catch (e) {
         assessment.textContent = `Assessment failed: ${String(e).slice(0, 140)}`;
         assess.disabled = false;
@@ -2006,12 +2091,15 @@
     });
     section.append(
       discoverBox,
+      connectBox,
       idLabel,
       repoLabel,
       missionLabel,
       leadLabel,
       preflightBtn,
       preflight,
+      preview,
+      suggestionsBox,
       go,
       assess,
       assessment,
@@ -2030,16 +2118,43 @@
         );
         discoverBox.appendChild(head);
         const profiles = (d.profiles ?? []).map((p) => p.name);
-        if (profiles.length > 0) {
-          select.replaceChildren();
-          for (const name of profiles) {
-            select.appendChild(textEl("option", "", name, name));
+        select.replaceChildren();
+        for (const name of profiles) {
+          select.appendChild(textEl("option", "", name, name));
+        }
+        if (existing.length > 0) {
+          connectBox.hidden = false;
+          connectBox.replaceChildren(textEl("p", "dy-dim", "Connect an existing host project:"));
+          for (const p of existing) {
+            const btn = document.createElement("button");
+            btn.className = "dy-btn";
+            btn.dataset.existingSlug = p.slug;
+            btn.textContent = `Connect ${p.slug}`;
+            btn.addEventListener("click", () => {
+              const idInput = main.querySelector("#dy-ob-id");
+              const repoInput = main.querySelector("#dy-ob-repo");
+              idInput.value = p.slug;
+              repoInput.value = p.repo_path;
+              invalidatePreflight();
+            });
+            connectBox.appendChild(btn);
           }
         }
       } catch {
+        preflightOk = false;
+        go.disabled = true;
+        select.replaceChildren();
         discoverBox.replaceChildren(
-          textEl("p", "dy-dim", "Host discovery unavailable; enter details manually.")
+          textEl("p", "dy-error", "Host discovery unavailable. Retry before onboarding \u2014 no fallback choices are offered.")
         );
+        const retry = document.createElement("button");
+        retry.className = "dy-btn";
+        retry.textContent = "Retry discovery";
+        retry.addEventListener("click", () => {
+          retry.disabled = true;
+          void renderOnboard(main, s);
+        });
+        discoverBox.appendChild(retry);
       }
     })();
   }

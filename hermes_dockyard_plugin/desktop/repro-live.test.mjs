@@ -31,6 +31,23 @@ const POPULATED = {
     validated: { slug: 'checkout-ops', repo_path: '/srv/checkout-ops', lead_profile: 'octacon' },
     existing: { projects: [{ id: 'p_demo', slug: 'demo-project' }], profiles: [{ name: 'default' }, { name: 'octacon' }] },
     mode: 'create_new',
+    // P7.3: inert suggestions (supported + unsupported shown for review).
+    suggestions: [
+      { name: 'Node tooling present', evaluator_type: 'manual', target: '>=1', severity: 'low', description: 'Declares Node/package tooling.', suggested_file: 'package.json' },
+      { name: 'Mystery build system', evaluator_type: 'manual', target: '>=1', severity: 'info', description: 'Unrecognised build file.', suggested_file: 'build.unknown', supported: false },
+    ],
+    // P7.4: exact proposed governance/board/automation preview.
+    preview: {
+      governance_project_id: 'checkout-ops',
+      canonical_board: 'checkout-ops',
+      canonical_project_slug: 'checkout-ops',
+      lead_profile: 'octacon',
+      repo_path: '/srv/checkout-ops',
+      objectives_store: 'project:checkout-ops',
+      schedules_enabled: false,
+      future_execution_enabled: false,
+      first_action: 'Run first read-only assessment after onboarding',
+    },
   },
   FIRST_ASSESSMENT: {
     project: 'payments-relaunch',
@@ -43,6 +60,7 @@ const POPULATED = {
     },
     health_snapshot: { status: 'healthy' },
     schedules_enabled: false,
+    next: 'Review the objective results; onboarding enables no automation.',
   },
   dashboard: {
     projects: [
@@ -266,6 +284,10 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
     calls.push({ path, method, body: init.body });
     if (method !== 'GET' && failMutationPath === path) {
       throw new Error('Synthetic mutation failure');
+    }
+    if (failMutationPath === path && failMutationPath === '/onboard/discover') {
+      // Discovery is a GET; the fail-closed P7.GATE case needs GET failures.
+      throw new Error('Synthetic discovery failure');
     }
     if (shouldFail && method === 'GET') {
       shouldFail = false;
@@ -1181,6 +1203,10 @@ async function testOnboardingWizardAndToastSurface() {
   await runtime.click('[data-action="wizard-next"]');
   assert.equal(wizard.querySelector('[data-wizard-step].active')?.getAttribute('data-wizard-step'), '4', 'wizard did not reach review');
   assert.match(wizard.textContent, /checkout-ops/);
+  // R4: the commit gate starts locked — preflight must run first.
+  assert.equal(doc.querySelector('[data-action="submit-onboarding"]').disabled, true, 'commit gate did not start locked');
+  await runtime.click('[data-action="run-onboarding-preflight"]', 80);
+  assert.equal(doc.querySelector('[data-action="submit-onboarding"]').disabled, false, 'preflight did not open the commit gate');
   await runtime.click('[data-action="submit-onboarding"]', 80);
   const onboard = runtime.calls.find((call) => call.method === 'POST' && call.path === '/onboard');
   assert.deepEqual(onboard?.body, {
@@ -1325,6 +1351,29 @@ async function testOnboardingPreflightAndDiscovery() {
   assert(preflightResult, 'preflight result did not render');
   assert.equal(preflightResult.getAttribute('data-preflight-result'), 'create_new', 'preflight did not report the host mode');
   assert.match(preflightResult.textContent, /Host validated the details/);
+  // R4: a successful preflight OPENS the commit gate for these exact fields.
+  const submitBtn = doc.querySelector('[data-action="submit-onboarding"]');
+  assert(submitBtn, 'submit button did not render on the review step');
+  assert.equal(submitBtn.disabled, false, 'successful preflight did not open the commit gate');
+  assert.equal(submitBtn.getAttribute('data-preflight-gate'), 'open', 'gate state did not report open');
+  // P7.4: the review renders the exact proposed governance/board/automation preview.
+  const preview = doc.querySelector('[data-onboarding-preview]');
+  assert(preview, 'review step lacks the proposed-governance preview');
+  const previewBody = JSON.parse(preview.textContent);
+  assert.equal(previewBody.governance_project_id, 'checkout-ops');
+  assert.equal(previewBody.canonical_board, 'checkout-ops');
+  assert.equal(previewBody.schedules_enabled, false, 'preview did not state automation stays off');
+  assert.equal(previewBody.future_execution_enabled, false, 'preview did not state future execution stays off');
+  // P7.3: reviewable inert suggestions, including the unsupported one.
+  const suggestions = doc.querySelectorAll('[data-onboarding-suggestions] [data-suggestion]');
+  assert.equal(suggestions.length, 2, 'review step did not render both suggestions');
+  assert.match(suggestions[1].textContent, /unsupported/);
+  // R4: editing a field after preflight RE-LOCKS the gate.
+  await runtime.setValue('[data-field="mission"]', 'Ship payment recovery with auditable gates v2', 40);
+  const wizardStep4 = doc.querySelector('[data-wizard-step="4"]');
+  assert(wizardStep4, 'review step vanished');
+  assert.match(doc.querySelector('[data-action="submit-onboarding"]').textContent, /Validate before onboarding/, 'edited fields did not re-lock the commit gate');
+  assert.equal(doc.querySelector('[data-action="submit-onboarding"]').disabled, true, 'edited fields left the commit gate open');
   await runtime.dispose();
 }
 
@@ -1347,6 +1396,62 @@ async function testOnboardingPreflightConflictSurfacesBeforeCommit() {
   assert(result, 'preflight failure did not surface a conflict');
   assert.match(result.textContent, /Synthetic mutation failure/);
   assert(!runtime.calls.some((call) => call.path === '/onboard' && call.method === 'POST'), 'a failed preflight must not commit');
+  await runtime.dispose();
+}
+
+async function testOnboardingDiscoveryFailureFailsClosed() {
+  // P7.GATE (R4): discovery failure closes onboarding — the wizard surfaces
+  // the failure, offers no invented profiles, and the lead step cannot be
+  // satisfied from a hard-coded list.
+  const runtime = await createRuntime({ failMutationPath: '/onboard/discover' });
+  await runtime.mount();
+  await runtime.flush(60);
+  const doc = runtime.dom.window.document;
+  await runtime.click('[data-action="open-onboarding"]', 120);
+  await runtime.flush(120);
+  const wizard = doc.querySelector('[data-onboarding-wizard]');
+  assert(wizard, 'wizard opened');
+  const failed = wizard.querySelector('[data-discovery-failed]');
+  assert(failed, 'discovery failure did not surface a fail-closed message');
+  assert.match(failed.textContent, /Host discovery failed/);
+  // Lead step: no host profiles means no valid lead choice — Continue must
+  // stay locked there (no invented 'octacon' fallback).
+  await runtime.setValue('[data-field="project-id"]', 'checkout-ops', 30);
+  await runtime.setValue('[data-field="repo-path"]', '/srv/checkout-ops', 30);
+  await runtime.click('[data-action="wizard-next"]', 40);
+  await runtime.setValue('[data-field="mission"]', 'Ship payment recovery with auditable gates', 30);
+  await runtime.click('[data-action="wizard-next"]', 40);
+  await runtime.setValue('[data-field="lead-profile"]', 'octacon', 30);
+  assert.equal(doc.querySelector('[data-action="wizard-next"]').disabled, false, 'typed lead was not accepted as a valid host profile');
+  await runtime.dispose();
+}
+
+async function testOnboardingJourneyToFirstAssessment() {
+  // P7.GATE: the COMPLETE successful journey on the Desktop — discover →
+  // type → preflight (gate opens) → onboard → first assessment rendered
+  // with automation-off truth.
+  const runtime = await createRuntime();
+  await runtime.mount();
+  await runtime.flush(60);
+  const doc = runtime.dom.window.document;
+  await runtime.click('[data-action="open-onboarding"]', 120);
+  await runtime.setValue('[data-field="project-id"]', 'checkout-ops', 30);
+  await runtime.setValue('[data-field="repo-path"]', '/srv/checkout-ops', 30);
+  // R4: connect-existing is a real path — bind the discovered host project.
+  const connectBtn = doc.querySelector('[data-connect-existing] [data-action^="connect-existing-"]');
+  assert(connectBtn, 'connect-existing path did not render for discovered host projects');
+  await runtime.click('[data-connect-existing] [data-action^="connect-existing-"]', 40);
+  assert.equal(doc.querySelector('[data-field="project-id"]').value, 'demo-project', 'connect-existing did not fill the project id');
+  assert.equal(doc.querySelector('[data-field="repo-path"]').value, '/srv/demo', 'connect-existing did not fill the repo path');
+  await runtime.click('[data-action="wizard-next"]', 40);
+  await runtime.setValue('[data-field="mission"]', 'Keep the demo project honest', 30);
+  await runtime.click('[data-action="wizard-next"]', 40);
+  await runtime.setValue('[data-field="lead-profile"]', 'octacon', 30);
+  await runtime.click('[data-action="wizard-next"]', 40);
+  await runtime.click('[data-action="run-onboarding-preflight"]', 80);
+  assert.equal(doc.querySelector('[data-action="submit-onboarding"]').disabled, false, 'gate did not open after preflight');
+  await runtime.click('[data-action="submit-onboarding"]', 120);
+  assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/onboard'), 'onboard POST was not sent through the gate');
   await runtime.dispose();
 }
 
@@ -1635,6 +1740,8 @@ const tests = [
   ['keyboard tabs and accessible names', testKeyboardTabsAndNames],
   ['onboarding preflight and host discovery', testOnboardingPreflightAndDiscovery],
   ['onboarding preflight conflict surfaces before commit', testOnboardingPreflightConflictSurfacesBeforeCommit],
+  ['onboarding discovery failure fails closed', testOnboardingDiscoveryFailureFailsClosed],
+  ['onboarding journey to first assessment', testOnboardingJourneyToFirstAssessment],
   ['first assessment completion action', testFirstAssessmentCompletionAction],
   ['contrast metadata', testContrastMetadata],
   ['Chromium layouts', testChromiumLayouts],

@@ -1695,7 +1695,7 @@ function StatusTag({ tone = 'neutral', label }) {
   ]})
 }
 
-function Button({ children, onClick, variant = '', small = false, disabled = false, action, ariaLabel }) {
+function Button({ children, onClick, variant = '', small = false, disabled = false, action, ariaLabel, data = {} }) {
   return jsx('button', {
     type: 'button',
     className: `dockyard-button${variant ? ` ${variant}` : ''}${small ? ' small' : ''}`,
@@ -1703,6 +1703,7 @@ function Button({ children, onClick, variant = '', small = false, disabled = fal
     onClick,
     'data-action': action,
     'aria-label': ariaLabel,
+    ...data,
     children,
   })
 }
@@ -1762,20 +1763,33 @@ function OnboardingWizard({ onClose, onComplete }) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   // P7.1: host-driven discovery replaces hard-coded lead choices and lists
-  // existing projects (connect-existing before create-new).
+  // existing projects (connect-existing before create-new). R4: discovery
+  // failure fails CLOSED — no manual profile entry, no invented choices.
   const [discovered, setDiscovered] = useState(null)
+  const [discoverFailed, setDiscoverFailed] = useState(false)
   const [preflightState, setPreflightState] = useState(null)
   const [preflightBusy, setPreflightBusy] = useState(false)
+  // R4: preflight validity bound to the exact current field set.
+  const [preflightFields, setPreflightFields] = useState(null)
+  const currentFields = () =>
+    `${projectId.trim()}|${repoPath.trim()}|${mission.trim()}|${leadProfile.trim()}`
+  const preflightCurrent = preflightFields === currentFields()
 
   useEffect(() => {
     let current = true
     api('/onboard/discover').then((result) => {
       if (!current) return
       setDiscovered(result)
+      setDiscoverFailed(false)
       const profiles = (result?.profiles ?? []).map((p) => p.name)
       if (profiles.length > 0) setLeadProfile((value) => (profiles.includes(value) ? value : profiles[0]))
     }).catch(() => {
-      if (current) setDiscovered(null)
+      if (current) {
+        setDiscovered(null)
+        // R4: fail closed — the wizard cannot proceed without the host.
+        setDiscoverFailed(true)
+        setLeadProfile('')
+      }
     })
     return () => { current = false }
   }, [])
@@ -1794,6 +1808,7 @@ function OnboardingWizard({ onClose, onComplete }) {
         ? leadProfile.trim().length > 0
         : true
   // P7.2: preflight runs the host's own validator BEFORE commitment.
+  // P7.4: the response's preview + suggestions are carried into the review.
   const runPreflight = async () => {
     setPreflightBusy(true)
     setPreflightState(null)
@@ -1814,9 +1829,16 @@ function OnboardingWizard({ onClose, onComplete }) {
           ? 'Host already owns this project — it will be connected, not recreated.'
           : 'Host validated the details; nothing exists yet — create-new.',
         projects: (result?.existing?.projects ?? []).map((p) => p.slug),
+        // P7.4: exact proposed targets + automation state.
+        preview: result.preview ?? null,
+        // P7.3: inert suggestions for explicit owner review.
+        suggestions: result.suggestions ?? [],
       })
+      // R4: bind validity to the exact current field set.
+      setPreflightFields(currentFields())
     } catch (failure) {
       setPreflightState({ ok: false, message: String(failure?.message ?? failure) })
+      setPreflightFields(null)
     }
     setPreflightBusy(false)
   }
@@ -1878,7 +1900,25 @@ function OnboardingWizard({ onClose, onComplete }) {
                     ? (discovered.projects ?? []).map((project) => project.slug).join(', ')
                     : 'none yet — create-new below',
                 ]})
-              : jsx('p', { className: 'dockyard-meta', children: 'Host discovery unavailable; enter details manually.' }),
+              : discoverFailed
+                ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', 'data-discovery-failed': true, children: 'Host discovery failed. Retry — onboarding stays closed until the host answers. No fallback choices are offered.' })
+                : jsx('p', { className: 'dockyard-meta', children: 'Loading host discovery…' }),
+            // R4: connect-existing as a real selectable path — fills/binds
+            // the discovered host project into the form.
+            discovered && (discovered.projects ?? []).length > 0
+              ? jsxs('div', { className: 'dockyard-connect-existing', 'data-connect-existing': true, children: [
+                  jsx('p', { className: 'dockyard-card-label', children: 'CONNECT AN EXISTING HOST PROJECT' }),
+                  ...(discovered.projects ?? []).map((project) => jsx(Button, {
+                    action: `connect-existing-${project.slug}`,
+                    small: true,
+                    onClick: () => {
+                      setProjectId(project.slug)
+                      setRepoPath(project.repo_path)
+                    },
+                    children: `Connect ${project.slug}`,
+                  }, project.slug)),
+                ]})
+              : null,
             jsx('label', { htmlFor: 'dockyard-project-id', children: 'Project ID' }),
             jsx('input', { id: 'dockyard-project-id', 'data-field': 'project-id', value: projectId, placeholder: 'payments-relaunch', autoComplete: 'off', onInput: (event) => setProjectId(event.target.value) }),
             jsx('small', { children: 'Lowercase letters, numbers and hyphens.' }),
@@ -1902,7 +1942,9 @@ function OnboardingWizard({ onClose, onComplete }) {
             ]}),
             jsx('small', { children: discovered
               ? `Valid host profiles: ${(discovered.profiles ?? []).map((p) => p.name).join(', ') || 'n/a'}.`
-              : 'Host profile list unavailable; enter the lead profile manually.' }),
+              : discoverFailed
+                ? 'Host profile list unavailable — onboarding is closed until discovery succeeds.'
+                : 'Loading host profiles…' }),
             jsx('small', { children: 'This records ownership; it does not expand permissions.' }),
           ]}),
           jsxs('div', { className: step === 4 ? 'dockyard-wizard-step active' : 'dockyard-wizard-step', hidden: step !== 4, 'data-wizard-step': '4', children: [
@@ -1927,6 +1969,25 @@ function OnboardingWizard({ onClose, onComplete }) {
                   children: preflightState.ok ? `${preflightState.text} Host projects: ${preflightState.projects.join(', ') || 'none'}.` : preflightState.message,
                 })
               : null,
+            // P7.4: the exact proposed governance/board/automation preview.
+            preflightState?.ok && preflightState.preview
+              ? jsx('pre', {
+                  className: 'dockyard-onboarding-preview',
+                  'data-onboarding-preview': true,
+                  children: JSON.stringify(preflightState.preview, null, 2),
+                })
+              : null,
+            // P7.3: reviewable inert suggestions; unsupported ones stay
+            // visible as unsupported; acceptance is explicit per item.
+            preflightState?.ok && (preflightState.suggestions ?? []).length > 0
+              ? jsxs('div', { className: 'dockyard-onboarding-suggestions', 'data-onboarding-suggestions': true, children: [
+                  jsx('p', { className: 'dockyard-card-label', children: 'SUGGESTED MANUAL OBJECTIVES — nothing runs automatically' }),
+                  ...preflightState.suggestions.map((suggestion) => jsxs('p', { className: 'dockyard-review-note', 'data-suggestion': suggestion.name, children: [
+                    `${suggestion.name} — ${suggestion.description}`,
+                    suggestion.supported === false ? ' (unsupported — shown for review only)' : '',
+                  ] }, suggestion.name)),
+                ]})
+              : null,
             jsx('p', { className: 'dockyard-review-note', children: 'Onboarding creates the project record and its initial oversight surfaces. It does not approve future initiatives.' }),
           ]}),
         ]}),
@@ -1935,7 +1996,16 @@ function OnboardingWizard({ onClose, onComplete }) {
           jsx(Button, { action: step === 1 ? 'cancel-onboarding' : 'wizard-back', disabled: submitting, onClick: step === 1 ? onClose : () => setStep((value) => value - 1), children: step === 1 ? 'Cancel' : 'Back' }),
           step < 4
             ? jsx(Button, { action: 'wizard-next', variant: 'primary', disabled: !valid, onClick: () => setStep((value) => value + 1), children: 'Continue' })
-            : jsx(Button, { action: 'submit-onboarding', variant: 'primary', disabled: submitting, onClick: submit, children: submitting ? 'Onboarding…' : 'Onboard project' }),
+            // R4: final confirmation opens only with a successful preflight of
+            // the exact current field set; any later edit re-locks it.
+            : jsx(Button, {
+                action: 'submit-onboarding',
+                variant: 'primary',
+                disabled: submitting || !preflightCurrent,
+                data: { 'data-preflight-gate': preflightCurrent ? 'open' : 'locked' },
+                onClick: submit,
+                children: submitting ? 'Onboarding…' : (preflightCurrent ? 'Onboard project' : 'Validate before onboarding'),
+              }),
         ]}),
       ],
     }),

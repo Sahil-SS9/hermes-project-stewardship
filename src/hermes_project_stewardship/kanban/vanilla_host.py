@@ -152,11 +152,43 @@ class ProjectKanbanHost:
         with self._scope():
             return self._validate(**payload)
 
+    def _journal_path(self) -> Path:
+        """P7.5 durable provisioning journal (plugin-owned, inside the host's
+        own hermes_home — no host schema change). Maps slug → idempotency_key
+        and the stage reached, surviving restarts."""
+        return self.hermes_home / "dockyard" / "provisioning-journal.json"
+
+    def _journal_load(self) -> dict[str, Any]:
+        path = self._journal_path()
+        try:
+            import json
+
+            return json.loads(path.read_text())
+        except Exception:
+            return {}
+
+    def _journal_save(self, journal: dict[str, Any]) -> None:
+        import json
+
+        path = self._journal_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(journal, indent=1, sort_keys=True))
+
     def provision_project(self, *, idempotency_key: str, **payload: Any) -> dict[str, Any]:
-        del idempotency_key  # vanilla create APIs are naturally idempotent by slug/path
+        """P7.5: restart- and retry-safe provisioning.
+
+        Stages: validated → project-created → board-created. A failure after
+        project creation leaves a RESUMABLE partial (never deleted), recorded
+        in the durable journal with its key. Retry with the SAME key + details
+        resumes the original operation to completion; a retry with a DIFFERENT
+        key on the same slug is an explicit idempotency conflict. A completed
+        provisioning replayed under its own key returns the existing records.
+        """
         _, kanban_db, projects_db = self._modules()
         with self._scope(payload.get("board_slug")):
             clean = self._validate(**payload)
+            journal = self._journal_load()
+            journaled = journal.get(clean["slug"]) or {}
             with projects_db.connect_closing() as conn:
                 existing = projects_db.get_project(conn, clean["slug"])
                 if existing is not None:
@@ -168,15 +200,59 @@ class ProjectKanbanHost:
                     )
                     if not same:
                         raise HostError("idempotency_conflict", "Project slug is already in use")
+                    known_key = str(journaled.get("key") or "")
+                    same_key = known_key == str(idempotency_key)
+                    if known_key and not same_key:
+                        # Provisioning was started under a different key:
+                        # explicit conflict — never duplicate or take over.
+                        raise HostError("idempotency_conflict", "Project slug is already in use")
+                    if not known_key:
+                        # Completed provisioning from an older version without
+                        # a journal entry (or connected existing): key claims
+                        # it now; replay stays read-only.
+                        journal[clean["slug"]] = {"key": str(idempotency_key), "stage": "complete"}
+                        self._journal_save(journal)
+                        journal = self._journal_load()
+                        journaled = journal[clean["slug"]]
+                    try:
+                        board = self.get_board(clean["board_slug"])
+                    except HostError:
+                        board = None
+                    if board is None:
+                        # Resume the partial: create the missing board for the
+                        # EXISTING project id (never a duplicate record).
+                        try:
+                            board = kanban_db.create_board(
+                                clean["board_slug"], name=clean["name"],
+                                description=clean["description"],
+                                default_workdir=clean["repo_path"],
+                                project_id=str(record.get("id")),
+                            )
+                        except Exception as exc:
+                            raise HostError(
+                                "provisioning_incomplete",
+                                "Previous attempt is incomplete; the canonical board could not be resumed",
+                            ) from exc
+                    if record.get("archived") is True:
+                        with projects_db.connect_closing() as conn:
+                            projects_db.restore_project(conn, str(record.get("id")))
+                        record = self.get_project(str(record.get("id")))
+                    if journaled.get("stage") != "complete":
+                        journal[clean["slug"]] = {"key": str(idempotency_key), "stage": "complete"}
+                        self._journal_save(journal)
                     return {
                         "status": "complete", "replayed": True,
-                        "project": record, "board": self.get_board(clean["board_slug"]),
+                        "project": record, "board": board,
                     }
                 project_id = projects_db.create_project(
                     conn, name=clean["name"], slug=clean["slug"],
                     description=clean["description"], primary_path=clean["repo_path"],
                     board_slug=clean["board_slug"],
                 )
+            # Journal the project-created stage BEFORE the risky board step so
+            # a crash leaves a resumable partial with its key, not debris.
+            journal[clean["slug"]] = {"key": str(idempotency_key), "stage": "project-created", "project_id": str(project_id)}
+            self._journal_save(journal)
             try:
                 board = kanban_db.create_board(
                     clean["board_slug"], name=clean["name"],
@@ -184,9 +260,14 @@ class ProjectKanbanHost:
                     project_id=project_id,
                 )
             except Exception:
+                # P7.5: keep the record as a RESUMABLE partial (archived so it
+                # never reads as live). Same-key retry resumes it; the record
+                # itself is never deleted.
                 with projects_db.connect_closing() as conn:
                     projects_db.archive_project(conn, project_id)
                 raise
+            journal[clean["slug"]] = {"key": str(idempotency_key), "stage": "complete", "project_id": str(project_id)}
+            self._journal_save(journal)
             return {
                 "status": "complete", "replayed": False,
                 "project": self.get_project(project_id), "board": board,

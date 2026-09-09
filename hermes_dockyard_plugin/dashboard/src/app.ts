@@ -1245,6 +1245,7 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
 
   // P7.1: host-driven discovery — connect-existing before create-new; the
   // host is the source of both the project list and the lead profiles.
+  // R4: discovery failure FAILS CLOSED — no invented profile choices.
   const discoverBox = document.createElement('div');
   discoverBox.className = 'dy-ob-discover';
   discoverBox.appendChild(textEl('p', 'dy-dim', 'Loading host discovery…'));
@@ -1261,12 +1262,16 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
   const leadLabel = label('Lead profile');
   const select = document.createElement('select');
   select.id = 'dy-ob-lead';
-  // Populated from host discovery (P7.1); no hard-coded choices. Default-all
-  // keeps first paint usable when discovery is unavailable.
-  for (const profile of ['octacon', 'remii', 'wesker', 'ceecee', 'gojo', 'quan']) {
-    select.appendChild(textEl('option', '', profile, profile));
-  }
+  // R4: populated ONLY from host discovery. Until a successful discovery the
+  // select is empty and the form stays disabled (fail closed, no invented
+  // valid choices).
   leadLabel.appendChild(select);
+
+  // R4: connect-existing becomes a real selectable path — picking a
+  // discovered project fills the id/repo fields from the host record.
+  const connectBox = document.createElement('div');
+  connectBox.className = 'dy-ob-connect';
+  connectBox.hidden = true;
 
   // P7.2: preflight — host-validated preview before commitment.
   const preflight = document.createElement('p');
@@ -1277,10 +1282,26 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
   preflightBtn.id = 'dy-ob-preflight-go';
   preflightBtn.textContent = 'Validate before commit';
 
+  // P7.4: proposed governance/board/automation preview (hidden until a
+  // successful preflight for the CURRENT field set).
+  const preview = document.createElement('pre');
+  preview.className = 'dy-ob-preview';
+  preview.id = 'dy-ob-preview';
+  preview.hidden = true;
+
+  // P7.3: reviewable inert suggestions (manual evaluator only). Accepting
+  // one posts through the EXISTING objective endpoint — no second system.
+  const suggestionsBox = document.createElement('div');
+  suggestionsBox.className = 'dy-ob-suggestions';
+  suggestionsBox.hidden = true;
+
   const go = document.createElement('button');
   go.className = 'dy-btn primary';
   go.id = 'dy-ob-go';
   go.textContent = 'Enable project';
+  // R4: the commit gate starts locked; only a successful preflight for the
+  // exact current field set opens it.
+  go.disabled = true;
 
   const result = document.createElement('p');
   result.id = 'dy-ob-result';
@@ -1296,6 +1317,26 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
   assessment.id = 'dy-ob-assessment';
   assessment.hidden = true;
 
+  // R4: preflight validity state — bound to the exact field set validated.
+  let preflightOk = false;
+  let preflightFields = '';
+  const currentFields = (): string => {
+    const v = readInputs();
+    return v ? `${v.project_id}|${v.repo_path}|${v.mission}|${v.lead_profile}` : '';
+  };
+  const invalidatePreflight = (): void => {
+    if (!preflightOk) return;
+    preflightOk = false;
+    preflightFields = '';
+    go.disabled = true;
+    preview.hidden = true;
+    preflight.className = 'dy-dim';
+    preflight.textContent = 'Details changed since validation — run preflight again.';
+  };
+  for (const el of main.querySelectorAll('.dy-form input, .dy-form select')) {
+    el.addEventListener('input', invalidatePreflight);
+  }
+
   const readInputs = (): {
     project_id: string;
     repo_path: string;
@@ -1308,7 +1349,7 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
       mission: (main.querySelector('#dy-ob-mission') as HTMLInputElement).value.trim(),
       lead_profile: (main.querySelector('#dy-ob-lead') as HTMLSelectElement).value,
     };
-    if (!body.project_id || !body.repo_path || !body.mission) {
+    if (!body.project_id || !body.repo_path || !body.mission || !body.lead_profile) {
       result.textContent = 'All fields are required.';
       return null;
     }
@@ -1325,11 +1366,56 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
       const mode = pre.mode === 'connect_existing'
         ? 'Host already owns this project — it will be connected, not recreated.'
         : 'Host validated the details; nothing exists yet — create-new.';
-      const profiles = (pre.existing?.profiles ?? [])
-        .map((p) => p.name).join(', ');
-      preflight.textContent = `${mode} Valid profiles: ${profiles || 'n/a'}.`;
+      preflight.textContent = mode;
       preflight.className = 'dy-ok';
+      // R4: the gate opens ONLY for this exact field set.
+      preflightOk = true;
+      preflightFields = `${body.project_id}|${body.repo_path}|${body.mission}|${body.lead_profile}`;
+      go.disabled = false;
+      // P7.4: render the proposed targets + automation state.
+      const pv = pre.preview ?? {};
+      preview.textContent = JSON.stringify(pv, null, 2);
+      preview.hidden = false;
+      // P7.3: reviewable suggestions with explicit accept buttons; nothing
+      // executes automatically. Unsupported suggestions stay visible.
+      const suggestions = pre.suggestions ?? [];
+      suggestionsBox.replaceChildren();
+      suggestionsBox.hidden = suggestions.length === 0;
+      for (const sug of suggestions) {
+        const row = document.createElement('div');
+        row.className = 'dy-ob-suggestion';
+        row.appendChild(textEl(
+          'span', 'dy-dim',
+          `${sug.name} — ${sug.description} (manual objective; nothing runs automatically)`,
+        ));
+        const accept = document.createElement('button');
+        accept.className = 'dy-btn';
+        accept.textContent = 'Add objective';
+        accept.disabled = !preflightOk;
+        accept.addEventListener('click', async () => {
+          accept.disabled = true;
+          try {
+            await s.api.addObjective(body.project_id, {
+              name: sug.name,
+              evaluator_type: 'manual',
+              target: sug.target,
+              severity: sug.severity,
+              description: sug.description,
+            });
+            accept.textContent = 'Added';
+          } catch (err) {
+            accept.disabled = false;
+            result.textContent = `Suggestion rejected: ${String(err).slice(0, 140)}`;
+          }
+        });
+        row.appendChild(accept);
+        suggestionsBox.appendChild(row);
+      }
     } catch (e) {
+      preflightOk = false;
+      preflightFields = '';
+      go.disabled = true;
+      preview.hidden = true;
       preflight.className = 'dy-error';
       preflight.textContent = `Preflight conflict: ${String(e).slice(0, 160)}`;
     } finally {
@@ -1340,6 +1426,12 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
   go.addEventListener('click', async () => {
     const body = readInputs();
     if (!body) return;
+    // R4: enforce the preflight gate — no commit without a successful
+    // preflight of the EXACT current fields (inputs preserved on failure).
+    if (!preflightOk || preflightFields !== `${body.project_id}|${body.repo_path}|${body.mission}|${body.lead_profile}`) {
+      result.textContent = 'Validate the current details before enabling.';
+      return;
+    }
     go.disabled = true;
     try {
       await s.api.onboard(body);
@@ -1360,7 +1452,16 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
     assessment.textContent = 'Running read-only assessment…';
     try {
       const out = await s.api.firstAssessment(body.project_id);
-      assessment.textContent = JSON.stringify(out.assessment, null, 2);
+      // R5: render the evidence/result, the automation-off state and the
+      // returned next step as inert text — not a raw JSON dump.
+      const lines = [
+        `Verification ok: ${out.assessment.verification_ok ?? 'unknown'}`,
+        `Health state: ${out.assessment.health_state ?? 'unknown'}`,
+        `Initiatives created: ${out.assessment.initiatives_created}`,
+        `Schedules enabled: ${out.schedules_enabled === false ? 'no (automation off)' : String(out.schedules_enabled)}`,
+        `Next: ${out.next ?? 'n/a'}`,
+      ];
+      assessment.textContent = lines.join('\n');
     } catch (e) {
       assessment.textContent = `Assessment failed: ${String(e).slice(0, 140)}`;
       assess.disabled = false;
@@ -1368,8 +1469,8 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
   });
 
   section.append(
-    discoverBox, idLabel, repoLabel, missionLabel, leadLabel,
-    preflightBtn, preflight, go, assess, assessment, result,
+    discoverBox, connectBox, idLabel, repoLabel, missionLabel, leadLabel,
+    preflightBtn, preflight, preview, suggestionsBox, go, assess, assessment, result,
   );
   main.replaceChildren(section);
 
@@ -1386,16 +1487,45 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
       );
       discoverBox.appendChild(head);
       const profiles = (d.profiles ?? []).map((p) => p.name);
-      if (profiles.length > 0) {
-        select.replaceChildren();
-        for (const name of profiles) {
-          select.appendChild(textEl('option', '', name, name));
+      // R4: host-driven profiles ONLY — never merge with invented choices.
+      select.replaceChildren();
+      for (const name of profiles) {
+        select.appendChild(textEl('option', '', name, name));
+      }
+      if (existing.length > 0) {
+        // R4: connect-existing as a real selectable path — fills/binds the
+        // discovered host project into the form.
+        connectBox.hidden = false;
+        connectBox.replaceChildren(textEl('p', 'dy-dim', 'Connect an existing host project:'));
+        for (const p of existing) {
+          const btn = document.createElement('button');
+          btn.className = 'dy-btn';
+          btn.dataset.existingSlug = p.slug;
+          btn.textContent = `Connect ${p.slug}`;
+          btn.addEventListener('click', () => {
+            const idInput = main.querySelector('#dy-ob-id') as HTMLInputElement;
+            const repoInput = main.querySelector('#dy-ob-repo') as HTMLInputElement;
+            idInput.value = p.slug;
+            repoInput.value = p.repo_path;
+            invalidatePreflight();
+          });
+          connectBox.appendChild(btn);
         }
       }
     } catch {
+      // R4: discovery failure fails CLOSED — empty profile select, commit
+      // gate stays locked, explicit retry guidance.
+      preflightOk = false;
+      go.disabled = true;
+      select.replaceChildren();
       discoverBox.replaceChildren(
-        textEl('p', 'dy-dim', 'Host discovery unavailable; enter details manually.'),
+        textEl('p', 'dy-error', 'Host discovery unavailable. Retry before onboarding — no fallback choices are offered.'),
       );
+      const retry = document.createElement('button');
+      retry.className = 'dy-btn';
+      retry.textContent = 'Retry discovery';
+      retry.addEventListener('click', () => { retry.disabled = true; void renderOnboard(main, s); });
+      discoverBox.appendChild(retry);
     }
   })();
 }

@@ -132,6 +132,110 @@ def test_preflight_uses_host_validate_and_surfaces_conflicts_early(tmp_path):
 
 
 # ------------------------------------------------------------------ #
+# P7.5 — partial failure + same-key replay (P7.GATE)                  #
+# ------------------------------------------------------------------ #
+
+def test_partial_failure_then_same_key_replay_completes(tmp_path, monkeypatch):
+    """P7.5 (P7.GATE): a failure between project-creation and board-creation
+    leaves a resumable partial state. Retrying the SAME idempotency key and
+    details completes the original provisioning — no duplicate project, no
+    destructive cleanup, no 'board not found' dead end."""
+    require_native()
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "native-root"))
+    home = tmp_path / "hermes"
+    repo = tmp_path / "partial"
+    repo.mkdir()
+    host = ProjectKanbanHost(hermes_home=home)
+    import hermes_constants
+    from hermes_cli import kanban_db, projects_db
+
+    payload = dict(
+        name="Partial", slug="partial", description="partial mission",
+        repo_path=str(repo), lead_profile="default",
+        idempotency_key="review-partial", board_slug="partial",
+    )
+    original = kanban_db.create_board
+    calls = {"n": 0}
+
+    def fail_once(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("injected board failure")
+        return original(*args, **kwargs)
+
+    kanban_db.create_board = fail_once
+    try:
+        # 1. First attempt fails after the native project record exists.
+        with pytest.raises(RuntimeError, match="injected board failure"):
+            host.provision_project(**payload)
+        token = hermes_constants.set_hermes_home_override(home)
+        try:
+            with projects_db.connect_closing() as conn:
+                rows = projects_db.list_projects(conn, include_archived=True)
+                partials = [p for p in rows if p.slug == "partial"]
+            assert len(partials) == 1, "partial record must be resumable, not deleted"
+        finally:
+            hermes_constants.reset_hermes_home_override(token)
+
+        # 2. Same-key retry with the failure removed: resumes to completion.
+        result = host.provision_project(**payload)
+        assert result["project"]["slug"] == "partial"
+        assert result["board"]["slug"] == "partial"
+        assert result["board"].get("project_id") == result["project"]["id"]
+
+        # 3. Exactly one project, not a duplicate; the project is live.
+        token = hermes_constants.set_hermes_home_override(home)
+        try:
+            with projects_db.connect_closing() as conn:
+                rows = projects_db.list_projects(conn, include_archived=True)
+                matching = [p for p in rows if p.slug == "partial"]
+            assert len(matching) == 1
+            assert not matching[0].archived
+        finally:
+            hermes_constants.reset_hermes_home_override(token)
+    finally:
+        kanban_db.create_board = original
+
+
+def test_different_key_on_partial_conflicts_without_duplicates(tmp_path, monkeypatch):
+    """P7.5 (P7.GATE): replaying the same slug with a DIFFERENT idempotency
+    key on a partial state conflicts instead of duplicating or clobbering."""
+    require_native()
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "native-root"))
+    home = tmp_path / "hermes"
+    repo = tmp_path / "partial2"
+    repo.mkdir()
+    host = ProjectKanbanHost(hermes_home=home)
+    from hermes_cli import kanban_db
+
+    payload = dict(
+        name="Partial2", slug="partial2", description="mission two",
+        repo_path=str(repo), lead_profile="default",
+        idempotency_key="key-a", board_slug="partial2",
+    )
+    original = kanban_db.create_board
+    calls = {"n": 0}
+
+    def fail_once(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("injected board failure")
+        return original(*args, **kwargs)
+
+    kanban_db.create_board = fail_once
+    try:
+        with pytest.raises(RuntimeError, match="injected board failure"):
+            host.provision_project(**payload)
+    finally:
+        kanban_db.create_board = original
+    # A different key, same slug: explicit conflict, no second project, no
+    # substitute board under a different identity.
+    with pytest.raises(HostError) as excinfo:
+        host.provision_project(**{**payload, "idempotency_key": "key-b"})
+    assert excinfo.value.code == "idempotency_conflict"
+
+
+# ------------------------------------------------------------------ #
 # P7.3 — tooling detection, inert suggestions                         #
 # ------------------------------------------------------------------ #
 
@@ -322,6 +426,195 @@ def test_first_assessment_endpoint_after_onboarding(tmp_path, monkeypatch):
             assert body["assessment"]["initiatives_created"] == 0
             assert body["assessment"]["health_state"] in (
                 "healthy", "unknown", "watch")
+        finally:
+            store.close()
+    finally:
+        hermes_constants.reset_hermes_home_override(token)
+
+
+# ------------------------------------------------------------------ #
+# P7.GATE round-2: preview fields, suggestions, duplicate identity,    #
+# missing host/profile, onboard -> first-assessment journey.          #
+# ------------------------------------------------------------------ #
+
+def test_preflight_preview_and_suggestions(tmp_path, monkeypatch):
+    """P7.4 + P7.3 (P7.GATE): preflight returns the exact proposed
+    governance/board/automation preview plus inert tooling suggestions
+    (supported and unsupported files distinguished)."""
+    require_native()
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "native-root"))
+    home = tmp_path / "hermes"
+    repo = tmp_path / "alpha"
+    repo.mkdir()
+    (repo / "pyproject.toml").write_text("[project]\nname='x'\n")
+    (repo / "unknown-tool.cfg").write_text("noise\n")
+    import hermes_constants
+    from hermes_project_stewardship.kanban.host_adapter import (
+        create_project_kanban_adapter,
+    )
+    token = hermes_constants.set_hermes_home_override(home)
+    try:
+        monkeypatch.setattr(
+            hermes_constants, "get_hermes_home", lambda: str(home))
+        store = Store(tmp_path / "dockyard.db")
+        try:
+            client = TestClient(create_app(
+                store,
+                kanban_adapter=create_project_kanban_adapter(hermes_home=home),
+            ))
+            pre = client.post(
+                "/stewardship/v1/onboard/preflight", json=_api_payload(repo))
+            assert pre.status_code == 200, pre.text
+            body = pre.json()
+            # P7.4: the exact preview fields, automation inactive.
+            preview = body["preview"]
+            assert preview["governance_project_id"] == "alpha"
+            assert preview["canonical_board"] == "alpha"
+            assert preview["canonical_project_slug"] == "alpha"
+            assert "objectives_store" in preview
+            assert preview["schedules_enabled"] is False
+            assert preview["future_execution_enabled"] is False
+            assert preview["first_action"]
+            # P7.3: suggestions ride the preflight; manual evaluator only.
+            names = [s["name"] for s in body.get("suggestions", [])]
+            assert "Python packaging present" in names
+            for s in body["suggestions"]:
+                assert s["evaluator_type"] == "manual"
+                assert not s.get("command")
+        finally:
+            store.close()
+    finally:
+        hermes_constants.reset_hermes_home_override(token)
+
+
+def test_duplicate_identity_conflict_previews_cleanly(tmp_path, monkeypatch):
+    """P7.GATE: a second onboarding attempt for an existing slug with
+    different details fails with an explicit conflict and writes nothing
+    new (duplicate identity never silently substitutes)."""
+    require_native()
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "native-root"))
+    home = tmp_path / "hermes"
+    repo = tmp_path / "alpha"
+    other = tmp_path / "beta"
+    repo.mkdir()
+    other.mkdir()
+    import hermes_constants
+    from hermes_project_stewardship.kanban.host_adapter import (
+        create_project_kanban_adapter,
+    )
+    token = hermes_constants.set_hermes_home_override(home)
+    try:
+        monkeypatch.setattr(
+            hermes_constants, "get_hermes_home", lambda: str(home))
+        store = Store(tmp_path / "dockyard.db")
+        try:
+            client = TestClient(create_app(
+                store,
+                kanban_adapter=create_project_kanban_adapter(hermes_home=home),
+            ))
+            first = client.post("/stewardship/v1/onboard", json=_payload(repo))
+            assert first.status_code == 200, first.text
+            clash = _payload(other)
+            clash["name"] = "Beta Project"
+            clash["slug"] = "alpha"
+            clash["project_id"] = "alpha"
+            clash["board_slug"] = "beta"
+            r = client.post("/stewardship/v1/onboard/preflight", json=clash)
+            assert r.status_code in (200, 409, 422), r.text
+            if r.status_code == 200:
+                # connect-existing detected; the differing details must be
+                # visible in the response (never silently replaced).
+                assert r.json()["mode"] == "connect_existing"
+            on = client.post("/stewardship/v1/onboard", json=clash)
+            assert on.status_code in (409, 422), on.text
+        finally:
+            store.close()
+    finally:
+        hermes_constants.reset_hermes_home_override(token)
+
+
+def test_missing_host_and_profile_fail_closed(tmp_path, monkeypatch):
+    """P7.GATE: an unknown profile is rejected by preflight; a missing host
+    (no hermes_cli importable) makes discovery fail closed with 503, not an
+    invented empty success."""
+    require_native()
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "native-root"))
+    home = tmp_path / "hermes"
+    repo = tmp_path / "alpha"
+    repo.mkdir()
+    import sys
+    import hermes_constants
+    from hermes_project_stewardship.kanban.host_adapter import (
+        create_project_kanban_adapter,
+    )
+    token = hermes_constants.set_hermes_home_override(home)
+    try:
+        monkeypatch.setattr(
+            hermes_constants, "get_hermes_home", lambda: str(home))
+        store = Store(tmp_path / "dockyard.db")
+        try:
+            client = TestClient(create_app(
+                store,
+                kanban_adapter=create_project_kanban_adapter(hermes_home=home),
+            ))
+            bad_profile = _payload(repo)
+            bad_profile["lead_profile"] = "does-not-exist"
+            r = client.post(
+                "/stewardship/v1/onboard/preflight", json=bad_profile)
+            assert r.status_code == 422, r.text
+            assert "lead_profile" in r.json()["error"]["fields"]
+            # missing host: hide hermes_cli modules so the adapter cannot
+            # reach the canonical stores; discovery must fail closed.
+            monkeypatch.setitem(sys.modules, "hermes_cli", None)
+            monkeypatch.setitem(sys.modules, "hermes_cli.projects_db", None)
+            monkeypatch.setitem(sys.modules, "hermes_cli.kanban_db", None)
+            gone = client.get("/stewardship/v1/onboard/discover")
+            assert gone.status_code == 503, gone.text
+            assert gone.json()["error"]["code"] == "host_unavailable"
+        finally:
+            store.close()
+    finally:
+        hermes_constants.reset_hermes_home_override(token)
+
+
+def test_onboard_to_first_assessment_journey(tmp_path, monkeypatch):
+    """P7.GATE: the complete successful journey over the real API —
+    discover → preflight (preview present) → onboard → first assessment —
+    with the final assessment reporting automation off."""
+    require_native()
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "native-root"))
+    home = tmp_path / "hermes"
+    repo = tmp_path / "alpha"
+    repo.mkdir()
+    (repo / "package.json").write_text("{}\n")
+    import hermes_constants
+    from hermes_project_stewardship.kanban.host_adapter import (
+        create_project_kanban_adapter,
+    )
+    token = hermes_constants.set_hermes_home_override(home)
+    try:
+        monkeypatch.setattr(
+            hermes_constants, "get_hermes_home", lambda: str(home))
+        store = Store(tmp_path / "dockyard.db")
+        try:
+            client = TestClient(create_app(
+                store,
+                kanban_adapter=create_project_kanban_adapter(hermes_home=home),
+            ))
+            d = client.get("/stewardship/v1/onboard/discover")
+            assert d.status_code == 200 and d.json()["projects"] == []
+            pre = client.post(
+                "/stewardship/v1/onboard/preflight", json=_api_payload(repo))
+            assert pre.status_code == 200
+            assert pre.json()["preview"]["schedules_enabled"] is False
+            on = client.post("/stewardship/v1/onboard", json=_payload(repo))
+            assert on.status_code == 200, on.text
+            assert on.json()["canonical"]["board"]["slug"] == "alpha"
+            fa = client.post("/stewardship/v1/projects/alpha/first-assessment")
+            assert fa.status_code == 200, fa.text
+            body = fa.json()
+            assert body["schedules_enabled"] is False
+            assert body["next"]
         finally:
             store.close()
     finally:

@@ -282,7 +282,25 @@ export function createApi(sdk: HermesPluginSDK) {
         validated: Record<string, string>;
         existing: { projects: Array<Record<string, string>>; profiles: Array<{ name: string }> };
         mode: 'connect_existing' | 'create_new';
+        suggestions: Array<{ name: string; evaluator_type: string; target: string; severity: string; description: string; suggested_file: string }>;
+        preview: {
+          governance_project_id: string;
+          canonical_board: string;
+          canonical_project_slug: string;
+          lead_profile: string;
+          repo_path: string;
+          objectives_store: string;
+          schedules_enabled: boolean;
+          future_execution_enabled: boolean;
+          first_action: string;
+        };
       }>('/onboard/preflight', b),
+    addObjective: (projectId: string, body: { name: string; evaluator_type: string; target: string; severity: string; description: string }) =>
+      post(`/projects/${encodeURIComponent(projectId)}/objectives`, {
+        ...body,
+        actor: 'sahil',
+        interface: 'dockyard:human',
+      }),
     // P7.6: onboarding completion action — the first read-only assessment.
     firstAssessment: (projectId: string) =>
       post<{
@@ -295,6 +313,7 @@ export function createApi(sdk: HermesPluginSDK) {
           initiatives_created: number;
         };
         schedules_enabled: boolean;
+        next: string;
       }>(`/projects/${encodeURIComponent(projectId)}/first-assessment`, {}),
     decision: (ref: string) =>
       get<DecisionPayload>(`/initiatives/${encodeURIComponent(ref)}/decision`),

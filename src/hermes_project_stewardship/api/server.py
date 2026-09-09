@@ -1358,7 +1358,10 @@ def create_app(
     def onboard_preflight(body: OnboardingRequest):
         """P7.2: the host's validate_project IS the preflight. Runs BEFORE
         any commitment and surfaces path/profile/duplicate conflicts with the
-        host's own field errors; no second validator with different rules."""
+        host's own field errors; no second validator with different rules.
+        P7.4: the response also carries the exact proposed identifiers —
+        governance project id, canonical board, objectives store, automation
+        state — so both UIs can preview what onboarding will create."""
         slug = (body.slug or body.project_id).strip()
         board_slug = (body.board_slug or slug).strip()
         name = (body.name or body.project_id.replace("-", " ").title()).strip()
@@ -1389,10 +1392,38 @@ def create_app(
         mode = ("connect_existing"
                 if any(p["slug"] == slug for p in existing.get("projects", []))
                 else "create_new")
+        # P7.4: exact proposed targets. Governance project id equals the
+        # stewardship project id (body.project_id); the canonical board is
+        # the validated board slug; automation stays inactive.
+        # P7.3: inert tooling suggestions from the VALIDATED repo path.
+        # Read-only declared-file detection; acceptance later is an explicit
+        # owner action through the normal objective endpoint. Files that are
+        # not in the declared allow-list produce no suggestions at all.
+        suggestions: list[dict] = []
+        try:
+            from hermes_project_stewardship.onboarding.tooling import (
+                suggest_objectives,
+            )
+
+            suggestions = suggest_objectives(Path(validated["repo_path"]))
+        except Exception:
+            suggestions = []
         return {
             "validated": validated,
             "existing": existing,
             "mode": mode,
+            "suggestions": suggestions,
+            "preview": {
+                "governance_project_id": body.project_id,
+                "canonical_board": validated["board_slug"],
+                "canonical_project_slug": validated["slug"],
+                "lead_profile": validated["lead_profile"],
+                "repo_path": validated["repo_path"],
+                "objectives_store": f"project:{body.project_id}",
+                "schedules_enabled": False,
+                "future_execution_enabled": False,
+                "first_action": "Run first read-only assessment after onboarding",
+            },
         }
 
     @router.post("/onboard")
