@@ -27,7 +27,11 @@ with tempfile.TemporaryDirectory(prefix='steward-inbox-contract-') as root:
   with TestClient(create_app(store, kanban_adapter=ReferenceKanbanAdapter(store))) as client:
    response = client.get('/stewardship/v1/inbox')
    assert response.status_code == 200, response.text
-   print(json.dumps(response.json()))
+   inbox = response.json()
+   approval = next(item for item in inbox['items'] if item['kind'] == 'initiative_approval')
+   decision = client.get(f"/stewardship/v1/initiatives/{approval['ref']}/decision")
+   assert decision.status_code == 200, decision.text
+   print(json.dumps({'inbox': inbox, 'decision': decision.json()}))
  finally:
   store.close()
 `], { encoding: 'utf8' }));
@@ -43,7 +47,8 @@ test('inbox renders project and approval action from actual API response', async
     React: { createElement: () => ({}) },
     hooks: { useEffect: () => {}, useRef: () => ({ current: null }) },
     fetchJSON: async (url, options) => {
-      if (url.endsWith('/inbox')) return payload;
+      if (url.endsWith('/inbox')) return payload.inbox;
+      if (url.includes('/decision')) return payload.decision;
       if (url.endsWith('/dashboard')) return { projects: [] };
       if (url.endsWith('/approve')) { posts.push({ url, options }); return {}; }
       return {};
@@ -57,12 +62,15 @@ test('inbox renders project and approval action from actual API response', async
     tab.click();
     await new Promise(resolve => setTimeout(resolve, 50));
     const rows = [...dom.window.document.querySelectorAll('.dy-inbox-item')];
-    assert.equal(rows.length, payload.items.length);
-    const approval = payload.items.find(item => item.kind === 'initiative_approval');
+    assert.equal(rows.length, payload.inbox.items.length);
+    const approval = payload.inbox.items.find(item => item.kind === 'initiative_approval');
     assert.ok(approval, 'actual backend supplied an approval');
     const row = rows.find(item => item.textContent.includes(approval.title));
     assert.ok(row);
     assert.ok(row.textContent.includes(`${approval.project} · ${approval.ref}`), 'real project identity is displayed');
+    assert.ok(
+      row.textContent.includes(`fingerprint ${payload.decision.fingerprint}`),
+      'decision evidence renders the REAL decision payload before approving');
     assert.ok(!row.textContent.includes('undefined'));
     const button = [...row.querySelectorAll('button')].find(item => item.textContent === 'Approve');
     assert.ok(button, 'actual discriminator renders the approval button');
