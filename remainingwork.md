@@ -1,6 +1,32 @@
 # Remaining work and current state
 
-Updated: 26/08/2026 (addenda 30/08/2026, 31/08/2026, 01/09/2026)
+Updated: 26/08/2026 (addenda 30/08/2026, 31/08/2026, 01/09/2026, 09/09/2026)
+
+## Addendum 09/09/2026 — phases 1–9 delivered on WIP branch
+
+- Phases 1–9 of the trustworthy daily stewardship plan are implemented on
+  branch `feat/trustworthy-daily-stewardship-20260908`, pushed to origin
+  as a WIP branch at commit `4618124` for owner testing over several days;
+  the owner merges to `main` when satisfied. The branch carries four
+  post-sign-off bounded fixes: real-host lane retargeting with
+  `HERMES_KANBAN_HOME` isolation (`a460fbe`), inbox-contract decision
+  payload (`733471e`), approval-card canonical transition walk
+  (`fe927a5`), and bind resolving the host's actual board slug before the
+  `<project>-ops` fallback (`4618124`).
+- Gate evidence at the pushed tip: `hermes verify` ok=true, 609 passed /
+  33 skipped, readiness healthz 200; host lane 7/7 native PASS under
+  `STEWARD_REQUIRE_NATIVE_HOST=1` with the pinned vanilla source.
+- FINAL demo recording was produced, then rejected by the owner ("I will
+  perform the demo myself"): all recordings, screenshots, turn evidence,
+  sandboxes and `/tmp` tooling were deleted; `phase-final/` evidence
+  directory emptied. FINAL.4–FINAL.8 remain open pending the owner-run
+  demonstration.
+- Test debris reclaimed: per-test pytest scratch trees under
+  `project-stewardship-evidence/20260908/` deleted (2.9 GB → ~0.5 GB);
+  gate logs, coverage JSON, controller reviews and capture notes kept.
+- Kanban `demo` board test-debris rows removed (board now empty); leaked
+  probe rows had been deleted earlier with the isolation incident
+  documented and resolved.
 
 ## Addendum 01/09/2026 — GitHub Actions restored and green
 
