@@ -818,7 +818,7 @@ async function testProjectDashboardScreen() {
   const doc = runtime.dom.window.document;
   assert(doc.querySelector('[data-project-dashboard]'), 'project dashboard screen is missing');
   assert.match(doc.body.textContent, /Checkout reliability rebuild/);
-  assert.equal(doc.querySelectorAll('[data-project-view]').length, 7, 'project dashboard must expose seven supported views');
+  assert.equal(doc.querySelectorAll('[data-project-view]').length, 8, 'project dashboard must expose eight supported views (incl. P9.2 planning)');
   assert(doc.querySelector('[data-project-visual]'), 'project overview is missing work visualisation');
   assert(doc.querySelector('[data-overview-work]'), 'project overview is missing current work context');
   assert(doc.querySelector('[data-overview-initiatives]'), 'project overview is missing initiative context');

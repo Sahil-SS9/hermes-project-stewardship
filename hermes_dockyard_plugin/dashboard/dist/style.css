@@ -213,7 +213,14 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-root .dy-milestone-create { display: flex; align-items: center; gap: 8px; padding-top: 10px; flex-wrap: wrap; }
 .dy-root .dy-milestone-create input { background: #0d1117; color: #e6edf3; border: 1px solid #2a3140; border-radius: 6px; padding: 5px 8px; }
 .dy-root .dy-features { margin: 14px 0 0; border: 1px solid #2a3140; border-radius: 8px; background: #161b22; }
-/* ---- Portfolio dashboard ---- */
+/* P9.2: planning summary rows (scope/WIP/risks/forecast). */
+.dy-root .dy-milestone-plan { flex-basis: 100%; padding: 8px 0 4px; border-top: 1px dashed #2a3140; }
+.dy-root .dy-milestone-risks { margin: 4px 0; padding-left: 18px; }
+.dy-root .dy-milestone-risks li[data-risk-kind="dependency_blocker"] { color: var(--dy-warn, #f0883e); }
+.dy-root .dy-milestone-risks li[data-risk-kind="overdue_item"] { color: var(--dy-bad, #f85149); }
+.dy-root .dy-milestone-forecast { color: #c9d4de; }
+.dy-root .dy-milestone-plan-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+/* Portfolio dashboard ---- */
 /* Attention strip: only rendered when something actually needs attention. */
 .dy-root .dy-attention-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .dy-root .dy-attention-list li { font-size: 13px; padding-left: 14px; position: relative; }

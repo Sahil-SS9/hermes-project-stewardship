@@ -551,6 +551,39 @@ class DockyardStore:
                     (iso() if closed else None, cur["id"]),
                 )
 
+    def milestone_rename(self, project_id: str, name: str, new_name: str) -> None:
+        """P9.1: rename in place — the row id (and attached items) survive."""
+        with self.store.tx() as cx:
+            cur = cx.execute(
+                "SELECT id FROM dockyard_milestones WHERE project_id=? AND name=?",
+                (project_id, name),
+            ).fetchone()
+            if cur is None:
+                raise ValueError(f"milestone {name} not found")
+            clash = cx.execute(
+                "SELECT 1 FROM dockyard_milestones WHERE project_id=? AND name=?",
+                (project_id, new_name),
+            ).fetchone()
+            if clash is not None:
+                raise ValueError(f"milestone {new_name} already exists")
+            cx.execute("UPDATE dockyard_milestones SET name=? WHERE id=?",
+                       (new_name, cur["id"]))
+
+    def milestone_detach(self, project_id: str, name: str, item_ref: str) -> None:
+        """P9.1: remove a work-attachment (changed scope); idempotent-friendly:
+        detaching a ref that is not attached is a no-op, not an error."""
+        with self.store.tx() as cx:
+            cur = cx.execute(
+                "SELECT id FROM dockyard_milestones WHERE project_id=? AND name=?",
+                (project_id, name),
+            ).fetchone()
+            if cur is None:
+                raise ValueError(f"milestone {name} not found")
+            cx.execute(
+                "DELETE FROM dockyard_milestone_items WHERE milestone_id=? AND item_ref=?",
+                (cur["id"], item_ref),
+            )
+
     # ------------------------------------------------------------------ #
     # Saved views (PM-05)                                                #
     # ------------------------------------------------------------------ #

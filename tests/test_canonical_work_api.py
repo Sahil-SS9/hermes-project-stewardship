@@ -14,6 +14,7 @@ class FakeCanonicalAdapter(KanbanAdapter):
     def __init__(self) -> None:
         self.items: dict[tuple[str, str, str], dict[str, Any]] = {}
         self.by_key: dict[str, tuple[str, str, str]] = {}
+        self.links: set[tuple[str, str, str]] = set()
         self.sequence = 0
 
     def ensure_board(self, project_id: str, slug: str) -> str:
@@ -93,6 +94,25 @@ class FakeCanonicalAdapter(KanbanAdapter):
                 item["status"] = status
                 return dict(item)
         raise ValueError("canonical work was not found")
+
+    def link_work(self, project_id, parent_id, child_id):
+        self.links.add((project_id, parent_id, child_id))
+        return {"parent_task_id": parent_id, "child_task_id": child_id}
+
+    def unlink_work(self, project_id, parent_id, child_id):
+        self.links.discard((project_id, parent_id, child_id))
+        return {"parent_task_id": parent_id, "child_task_id": child_id}
+
+    def list_work_links(self, project_id: str, item_id: str):
+        rows = []
+        for owner, parent, child in sorted(self.links):
+            if owner != project_id:
+                continue
+            if child == item_id:
+                rows.append({"direction": "parent", "task_id": parent})
+            if parent == item_id:
+                rows.append({"direction": "child", "task_id": child})
+        return rows
 
 
 def test_unavailable_canonical_host_fails_closed_without_legacy_write(store, enabled):
