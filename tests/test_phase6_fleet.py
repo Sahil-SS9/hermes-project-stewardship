@@ -7,6 +7,14 @@ P6.4 — Deep links to the EXACT object (project/initiative/work-item), stale
        and deleted targets handled explicitly.
 P6.5 — Acknowledgement stays separate from resolution: acking a notification
        must not change initiative status or remove an intervention row.
+
+Round-6 review corrections (688a5f5):
+R1 — group reads derive from the same canonical source the Work tab and
+     portfolio counts use; only the explicit no-adapter fallback touches the
+     legacy dockyard_work_items table.
+R3 — notification deep links keep exact object identity (never a generic
+     screen label) and stale/unknown targets surface an error row instead of
+     silently substituting another object.
 """
 from __future__ import annotations
 
@@ -163,11 +171,24 @@ def test_evidence_freshness_is_separate_from_delivery_status(store):
 # ------------------------------------------------------------------ #
 
 def test_fleet_groups_deep_link_to_exact_objects(store, client):
-    """P6.4: links name the exact target object, not a generic screen."""
+    """P6.4: links name the exact target object, not a generic screen.
+
+    Work is created through the canonical API path (the same source the Work
+    tab lists), then blocked — matching the production adapter path."""
     _enable(store, "demo")
     StewardshipService(store).propose_initiative("demo", title="Decide me",
                                                  rationale="objective: links")
-    ref = _work(store, "demo", "blocked", blocked_reason="flaky dep")
+    created = client.post(
+        "/stewardship/v1/projects/demo/work-items",
+        json={"type": "task", "title": "Blocked task", "actor_id": "sahil",
+              "actor_kind": "human"})
+    assert created.status_code == 200, created.text
+    ref = created.json()["ref"]
+    work = client.app.state.canonical_work_service
+    from hermes_project_stewardship.dockyard import Actor, ActorKind
+    work.transition("demo", ref, "blocked",
+                    actor=Actor(id="sahil", display_name="Sahil",
+                                kind=ActorKind.HUMAN))
     body = client.get("/stewardship/v1/portfolio").json()
     groups = body["groups"]
     decision = groups["decisions"][0]
@@ -190,7 +211,8 @@ def test_project_attention_links_to_project_row(store):
 
 
 def test_notification_deep_link_targets_exact_object(store, client):
-    """P6.4: approval notifications link to the exact initiative."""
+    """P6.4: approval notifications link to the exact initiative, health
+    notifications to the exact project — never a generic screen label."""
     _enable(store, "demo")
     StewardshipService(store).propose_initiative("demo", title="N",
                                                  rationale="objective: link")
@@ -203,7 +225,21 @@ def test_notification_deep_link_targets_exact_object(store, client):
     store._conn.commit()
     feed = client.get("/stewardship/v1/notifications").json()["notifications"]
     row = [n for n in feed if n["kind"] == "approval_required"][0]
-    assert row["deep_link"] == "s4:approval-inbox"
+    assert row["deep_link"] == "s6:initiative/INI-x", (
+        f"approval notification must target the exact initiative, got "
+        f"{row['deep_link']!r}")
+    # other kinds still resolve to a concrete screen, not the fallback board
+    store._conn.execute(
+        "INSERT INTO notifications (project_id, severity, kind, title,"
+        " body, created_at)"
+        " SELECT 'demo', 'high', 'health_change', 'Health moved', '', ?",
+        (_iso(_now()),))
+    store._conn.commit()
+    feed2 = client.get("/stewardship/v1/notifications").json()["notifications"]
+    health = [n for n in feed2 if n["kind"] == "health_change"][0]
+    assert health["deep_link"] == "s1:project/demo", (
+        f"health notification must target its exact project, got "
+        f"{health['deep_link']!r}")
 
 
 # ------------------------------------------------------------------ #
@@ -244,3 +280,72 @@ def test_ack_keeps_notification_visible_as_acknowledged(store, client):
     feed2 = client.get("/stewardship/v1/notifications").json()["notifications"]
     row = [n for n in feed2 if n["id"] == nid][0]
     assert row["acked"] is True, "ack must keep the record visible"
+
+
+# ------------------------------------------------------------------ #
+# Round-6 review corrections (688a5f5)                                #
+# ------------------------------------------------------------------ #
+
+class _CanonicalBlockedPort:
+    """Minimal canonical port: one blocked task, no legacy-table row.
+
+    Mirrors the production seam: Work/portfolio read canonical rows that
+    never appear in dockyard_work_items.
+    """
+
+    def __init__(self, project_id: str, title: str, reason: str):
+        self._item = {
+            "id": "test-t-9", "ref": "test-t-9", "kind": "task",
+            "type": "task", "project_id": project_id, "title": title,
+            "body": None, "status": "blocked", "assignee": "octacon",
+            "created_by": "sahil", "parent_task_id": None,
+            "blocked_reason": reason,
+        }
+
+    def list_work(self, project_id: str):
+        if project_id == self._item["project_id"]:
+            return [dict(self._item)]
+        return []
+
+    def get_work(self, project_id, kind, item_id):
+        if (project_id == self._item["project_id"]
+                and item_id == self._item["ref"]):
+            return dict(self._item)
+        raise ValueError("no such canonical work item")
+
+    def transition_work(self, project_id, kind, item_id, status):
+        item = self.get_work(project_id, kind, item_id)
+        item["status"] = status
+        self._item = item
+        return dict(item)
+
+    def list_work_links(self, project_id: str, item_id: str):
+        return []
+
+
+def test_canonical_blocked_work_appears_in_interventions(store, client):
+    """R1: groups read the canonical source Work/portfolio use. A blocked
+    canonical item with NO legacy row must still appear as an intervention."""
+    _enable(store, "pay")
+    from hermes_project_stewardship.persistence.dockyard_service import (
+        DockyardService as _DS,
+    )
+    from hermes_project_stewardship.persistence.canonical_work_service import (
+        CanonicalWorkService,
+    )
+    port = _CanonicalBlockedPort("pay", "CANONICAL_BLOCKED_WORK",
+                                 "CANONICAL_BLOCK_REASON")
+    canonical = CanonicalWorkService(store, port)
+    svc = _DS(store, canonical_work=canonical)
+    # sanity: canonical path lists it, legacy table does not hold a row
+    assert any(i["ref"] == "test-t-9" for i in canonical.list("pay"))
+    groups = svc.portfolio()["groups"]
+    blocked = [i for i in groups["interventions"]
+               if i.get("ref") == "test-t-9"]
+    assert blocked, (
+        "canonical blocked work must surface in interventions; got "
+        f"{groups['interventions']}")
+    row = blocked[0]
+    assert row["cause"] == "blocked_item"
+    assert row["detail"] == "CANONICAL_BLOCK_REASON"
+    assert row["deep_link"] == "s2:work/test-t-9"

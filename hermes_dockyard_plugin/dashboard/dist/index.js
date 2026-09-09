@@ -84,8 +84,12 @@
         shared: false
       }),
       onboard: (b) => post("/onboard", b),
-      approve: (ref) => post(`/initiatives/${encodeURIComponent(ref)}/approve`, {}),
-      reject: (ref) => post(`/initiatives/${encodeURIComponent(ref)}/reject`, {}),
+      decision: (ref) => get(`/initiatives/${encodeURIComponent(ref)}/decision`),
+      decisionReceipts: (ref) => get(
+        `/initiatives/${encodeURIComponent(ref)}/decision/receipts`
+      ),
+      approve: (ref, payload) => post(`/initiatives/${encodeURIComponent(ref)}/approve`, payload),
+      reject: (ref, payload) => post(`/initiatives/${encodeURIComponent(ref)}/reject`, payload),
       workflowRuns: (projectId, name) => get(`/projects/${encodeURIComponent(projectId)}/workflows/${encodeURIComponent(name)}/runs`),
       initiatives: (projectId) => get(
         `/projects/${encodeURIComponent(projectId)}/initiatives`
@@ -816,6 +820,56 @@
   }
 
   // src/app.ts
+  function applyFleetDeepLink({ link, s, tabs, go }) {
+    const sep = link.indexOf(":");
+    if (sep <= 0) return;
+    const screen = link.slice(0, sep);
+    const rest = link.slice(sep + 1);
+    const slash = rest.indexOf("/");
+    const objectKind = slash >= 0 ? rest.slice(0, slash) : "";
+    const objectId = slash >= 0 ? rest.slice(slash + 1) : rest;
+    const select = (tab) => {
+      s.tab = tab;
+      for (const t of tabs) {
+        const active = t.dataset.tab === tab;
+        t.classList.toggle("active", active);
+        t.setAttribute("aria-selected", String(active));
+      }
+      go();
+    };
+    if (screen === "s4") {
+      select("inbox");
+      return;
+    }
+    if (screen === "s6" && objectKind === "initiative") {
+      select("inbox");
+      return;
+    }
+    if (screen === "s2") {
+      if (objectKind === "work" && objectId) {
+        s.selectedWorkRef = objectId;
+        select("work");
+        return;
+      }
+      if (objectKind === "project" && objectId) {
+        s.projectId = objectId;
+        select("work");
+        return;
+      }
+      select("work");
+      return;
+    }
+    if (screen === "s1") {
+      if (objectKind === "project" && objectId) s.projectId = objectId;
+      select("dashboard");
+      return;
+    }
+    if (screen === "s5") {
+      select("workflow");
+      return;
+    }
+    select("dashboard");
+  }
   function initApp(sdk, root) {
     let deepLinkView = null;
     const hash = typeof window !== "undefined" && window.location ? window.location.hash : "";
@@ -914,6 +968,15 @@
         void render(main, state);
       })
     );
+    const navigateDeepLink = (link) => {
+      applyFleetDeepLink({
+        link,
+        s: state,
+        tabs,
+        go: () => void render(main, state)
+      });
+    };
+    state.openFleetLink = navigateDeepLink;
     void render(main, state);
     const activeTab = state.tab;
     void (async () => {
@@ -987,6 +1050,55 @@
       if ((at.overdue_milestones ?? 0) > 0) addLine("bad", `Overdue milestones: ${at.overdue_milestones}`);
       strip.appendChild(lines);
       wrap.appendChild(strip);
+    }
+    const groups = view.groups;
+    if (groups) {
+      const groupDefs = [
+        { key: "decisions", label: "Decisions waiting on you", cls: "dy-group-decisions" },
+        { key: "interventions", label: "Interventions", cls: "dy-group-interventions" },
+        { key: "informational", label: "Informational", cls: "dy-group-informational" }
+      ];
+      for (const g of groupDefs) {
+        const rows = groups[g.key] ?? [];
+        if (rows.length === 0) continue;
+        const card = document.createElement("section");
+        card.className = `dy-card dy-fleet-group ${g.cls}`;
+        card.appendChild(textEl("h2", "", `${g.label} (${rows.length})`));
+        const list = document.createElement("ul");
+        list.className = "dy-fleet-group-list";
+        for (const item of rows) {
+          const li = document.createElement("li");
+          const title = textEl(
+            "span",
+            "dy-fleet-item-title",
+            `${item.project} \xB7 ${item.title}`
+          );
+          li.appendChild(title);
+          const bits = [];
+          if (item.cause) bits.push(item.cause);
+          if (item.detail) bits.push(item.detail);
+          if (item.risk) bits.push(`risk: ${item.risk}`);
+          if (item.owner) bits.push(`owner: ${item.owner}`);
+          if (typeof item.age_days === "number") bits.push(`age: ${item.age_days}d`);
+          if (item.severity) bits.push(`sev: ${item.severity}`);
+          if (bits.length > 0) li.appendChild(textEl("span", "dy-dim", ` \u2014 ${bits.join(" \xB7 ")}`));
+          if (item.next_action) li.appendChild(textEl("div", "dy-dim", item.next_action));
+          const link = item.deep_link;
+          if (link) {
+            const open = document.createElement("button");
+            open.className = "dy-btn dy-fleet-open";
+            open.textContent = "Open";
+            open.dataset.deepLink = link;
+            open.addEventListener("click", () => {
+              s.openFleetLink?.(link);
+            });
+            li.appendChild(open);
+          }
+          list.appendChild(li);
+        }
+        card.appendChild(list);
+        wrap.appendChild(card);
+      }
     }
     const section = document.createElement("section");
     section.className = "dy-card";
@@ -1139,7 +1251,7 @@
       s.api.views(projectId)
     ]);
     if (isStale()) return;
-    const items = workResponse.work_items ?? [];
+    const items = (workResponse.work_items ?? []).filter((item) => item.status !== "archived");
     const ranks = new Map(
       (backlogResponse.backlog ?? []).map((row) => [row.item_ref, row])
     );
@@ -1306,11 +1418,15 @@
           ["in_progress", "In progress"],
           ["in_review", "Review"],
           ["blocked", "Blocked"],
-          ["done", "Done"]
+          ["done", "Done"],
+          ["unknown", "Unknown status"]
         ].forEach(([status, label2]) => {
           const column = document.createElement("section");
           column.className = "dy-board-column";
-          const matching = items.filter((item) => item.status === status);
+          const matching = items.filter((item) => {
+            const known = ["backlog", "in_progress", "in_review", "blocked", "done"];
+            return known.includes(item.status) ? item.status === status : status === "unknown";
+          });
           column.appendChild(textEl("h3", "", `${label2} (${matching.length})`));
           matching.forEach((item) => column.appendChild(workCard(item, openDetail)));
           content.appendChild(column);
@@ -1480,7 +1596,18 @@
       };
       if (initiative.status === "pending_approval") {
         const approve = workLayoutButton("Approve and start execution", false);
-        approve.addEventListener("click", () => void run(approve, () => s.api.approve(initiative.ref)));
+        approve.addEventListener("click", () => void run(approve, async () => {
+          const decision = await s.api.decision(initiative.ref);
+          const note = window.prompt(
+            "Decision note (optional). Review scope before approving:",
+            ""
+          );
+          if (note === null) throw new Error("approval cancelled");
+          await s.api.approve(initiative.ref, {
+            expected_fingerprint: decision.fingerprint,
+            note: note || ""
+          });
+        }));
         actions.appendChild(approve);
       }
       if (initiative.status === "executing") {
@@ -1664,13 +1791,49 @@
       );
       row.appendChild(body);
       if (it.kind === "initiative_approval") {
+        const decisionHolder = { fingerprint: null };
+        s.api.decision(it.ref).then((decision) => {
+          decisionHolder.fingerprint = decision.fingerprint;
+          const evidence = document.createElement("div");
+          evidence.className = "dy-inbox-decision";
+          evidence.setAttribute("data-decision-evidence", "true");
+          evidence.append(
+            textEl("p", "", String(decision.title ?? "")),
+            textEl(
+              "p",
+              "dy-dim",
+              `risk ${decision.risk ?? "unknown"} \xB7 outcome ${decision.expected_outcome ?? "unknown"} \xB7 fingerprint ${decision.fingerprint}`
+            )
+          );
+          row.appendChild(evidence);
+        }).catch(() => {
+          row.appendChild(textEl(
+            "p",
+            "dy-error",
+            "Decision evidence unavailable; refresh before deciding."
+          ));
+        });
         const btn = document.createElement("button");
         btn.className = "dy-btn primary";
         btn.textContent = "Approve";
         btn.addEventListener("click", async () => {
           btn.disabled = true;
           try {
-            await s.api.approve(it.ref);
+            if (!decisionHolder.fingerprint) {
+              throw new Error("Decision evidence not reviewed yet; refresh before deciding.");
+            }
+            const note = window.prompt(
+              "Decision note (optional). Review the displayed decision before approving:",
+              ""
+            );
+            if (note === null) {
+              btn.disabled = false;
+              return;
+            }
+            await s.api.approve(it.ref, {
+              expected_fingerprint: decisionHolder.fingerprint,
+              note: note || ""
+            });
             row.remove();
             if (!list.querySelector(".dy-inbox-item")) {
               list.appendChild(textEl("p", "dy-dim", "Inbox zero."));
@@ -1704,7 +1867,17 @@
       const row = document.createElement("div");
       row.className = "dy-note";
       row.appendChild(textEl("span", "", String(n.summary ?? n.title ?? "")));
-      if (!n.acked_at && n.id != null) {
+      if (n.deep_link) {
+        const open = document.createElement("button");
+        open.className = "dy-btn dy-note-open";
+        open.textContent = "Open";
+        open.dataset.deepLink = n.deep_link;
+        open.addEventListener("click", () => {
+          s.openFleetLink?.(n.deep_link);
+        });
+        row.appendChild(open);
+      }
+      if (!n.acked && !n.acked_at && n.id != null) {
         const btn = document.createElement("button");
         btn.className = "dy-btn";
         btn.textContent = "Acknowledge";
@@ -1713,6 +1886,8 @@
           try {
             await s.api.ack(Number(n.id));
             row.classList.add("acked");
+            const ackLabel = textEl("span", "dy-dim", "Acknowledged");
+            row.appendChild(ackLabel);
           } catch (e) {
             btn.disabled = false;
             btn.textContent = `Failed: ${String(e).slice(0, 60)}`;
@@ -1833,8 +2008,17 @@
         wname,
         () => s.api.workflowRuns(pid, wname).then((r) => r.runs),
         {
-          onApprove: (ref) => s.api.approve(ref),
-          onReject: (ref) => s.api.reject(ref),
+          onApprove: async (ref) => {
+            const decision = await s.api.decision(ref);
+            await s.api.approve(ref, { expected_fingerprint: decision.fingerprint });
+          },
+          onReject: async (ref) => {
+            const decision = await s.api.decision(ref);
+            await s.api.reject(ref, {
+              expected_fingerprint: decision.fingerprint,
+              reason: "Rejected from workflow gate review"
+            });
+          },
           // agenttrail expansion: children -> task list, history -> activity thread
           onExpand: async (ref) => {
             const d = await s.api.workDetail(pid, ref);

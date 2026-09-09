@@ -100,7 +100,9 @@ def test_dashboard_rollup_counts_work_and_decisions(env):
 def test_fleet_notifications_deep_link_and_ack(env):
     c, store = env
     _enable(c)
-    # seed one notification directly (engine normally writes these)
+    # seed one notification directly (engine normally writes these); the body
+    # carries the initiative ref in the engine's `ref=…` shape, so the link
+    # keeps exact object identity rather than a generic screen label.
     from datetime import datetime, timezone
 
     with store.tx() as cx:
@@ -108,11 +110,11 @@ def test_fleet_notifications_deep_link_and_ack(env):
             "INSERT INTO notifications(project_id, severity, kind, title,"
             " body, created_at) VALUES (?,?,?,?,?,?)",
             ("demo", "high", "approval_required", "Approve needed",
-             "Initiative HDY-1 awaits you",
+             "ref=INI-DEMO-0001; score=3",
              datetime.now(timezone.utc).isoformat()))
     feed = c.get("/stewardship/v1/notifications").json()["notifications"]
     n = [x for x in feed if x["title"] == "Approve needed"][0]
-    assert n["deep_link"] == "s4:approval-inbox"
+    assert n["deep_link"] == "s6:initiative/INI-DEMO-0001"
     assert n["acked"] is False
 
     r = c.post(f"/stewardship/v1/notifications/{n['id']}/ack")
