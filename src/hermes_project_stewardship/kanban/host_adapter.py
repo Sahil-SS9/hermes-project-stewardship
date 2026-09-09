@@ -6,7 +6,7 @@ from importlib import import_module
 import json
 from pathlib import Path
 import sys
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
 
 from .bridge import BoardCard, KanbanAdapter
 
@@ -236,6 +236,14 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
             raise self._mapped_error(exc) from None
         self._board_projects[slug] = str(project["id"])
         return slug
+
+    def bound_board_slug(self, project_id: str) -> Optional[str]:
+        try:
+            project = self.host.get_project(project_id)
+        except Exception:
+            return None
+        slug = str(project.get("board_slug") or "").strip()
+        return slug or None
 
     @staticmethod
     def _status_for_column(column: str) -> str:
