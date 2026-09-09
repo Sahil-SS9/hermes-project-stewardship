@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 import pytest
 
 from hermes_project_stewardship.kanban import (
@@ -19,6 +21,7 @@ class FakeHostAdapter(KanbanAdapter):
     def __init__(self) -> None:
         self.boards: dict = {}
         self.cards: list = []
+        self.bound: dict = {}
         self._next_board = 1
         self._next_card = 1
 
@@ -41,6 +44,9 @@ class FakeHostAdapter(KanbanAdapter):
         for c in self.cards:
             if c["board"] == board_id and c["id"] == card_id:
                 c["column"] = column
+
+    def bound_board_slug(self, project_id: str) -> Optional[str]:
+        return self.bound.get(project_id)
 
 
 @pytest.fixture()
@@ -93,6 +99,38 @@ def test_bind_with_fake_host_adapter(svc, enabled, approved):
     out = bridge.bind(approved["ref"], board_slug="custom-board")
     assert out["board_id"].startswith("board-")
     assert len(fake.cards) == 2
+
+
+def test_bind_prefers_host_bound_board_slug(svc, enabled, approved):
+    """Regression: onboarding may bind a board slug that is not
+    "<project>-ops". bind() must ask the adapter what the host actually
+    bound instead of guessing the -ops default (demo 2026-09-09)."""
+    fake = FakeHostAdapter()
+    fake.bound[approved["project_id"]] = "harbour-demo"
+    bridge = KanbanBridge(svc, fake)
+    out = bridge.bind(approved["ref"])
+    assert out["board_slug"] == "harbour-demo"
+    assert ini_status(svc, approved["ref"]) == "executing"
+
+
+def test_bind_falls_back_to_ops_when_host_silent(svc, enabled, approved):
+    """Adapters that cannot answer (bound_board_slug -> None) keep the
+    <project>-ops convention."""
+    fake = FakeHostAdapter()
+    bridge = KanbanBridge(svc, fake)
+    out = bridge.bind(approved["ref"])
+    assert out["board_slug"] == f"{approved['project_id']}-ops"
+
+
+def test_reference_adapter_bound_board_slug(store):
+    adapter = ReferenceKanbanAdapter(store)
+    assert adapter.bound_board_slug("p") is None  # nothing bound yet
+    adapter.ensure_board("p", "p-board")
+    assert adapter.bound_board_slug("p") == "p-board"
+
+
+def ini_status(svc, ref: str) -> str:
+    return svc.initiative_by_ref(ref)["status"]
 
 
 def test_complete_from_board_moves_cards_and_records_outcome(

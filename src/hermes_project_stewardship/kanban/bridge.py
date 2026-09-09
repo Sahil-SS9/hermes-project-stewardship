@@ -40,6 +40,16 @@ class KanbanAdapter(ABC):
     def ensure_board(self, project_id: str, slug: str) -> str:
         """Return an existing or newly-created board id for slug."""
 
+    def bound_board_slug(self, project_id: str) -> Optional[str]:
+        """Return the board slug the host actually bound this project to.
+
+        Optional: adapters that cannot answer return None, and callers fall
+        back to their own convention. Onboarding may provision a board slug
+        other than the "<project>-ops" default, so binding an approved
+        initiative must ask the host instead of guessing.
+        """
+        return None
+
     @abstractmethod
     def add_card(self, board_id: str, card: BoardCard) -> str:
         """Create a card; return its id."""
@@ -110,6 +120,15 @@ class ReferenceKanbanAdapter(KanbanAdapter):
                 (project_id, slug),
             ).fetchone()
         return str(row["id"])
+
+    def bound_board_slug(self, project_id: str) -> Optional[str]:
+        with self.store.tx() as cx:
+            row = cx.execute(
+                "SELECT slug FROM kanban_boards WHERE project_id=?"
+                " ORDER BY created_at DESC, id DESC LIMIT 1",
+                (project_id,),
+            ).fetchone()
+        return str(row["slug"]) if row else None
 
     def add_card(self, board_id: str, card: BoardCard) -> str:
         with self.store.tx() as cx:
@@ -382,7 +401,11 @@ class KanbanBridge:
             raise ServiceError(f"initiative {ref} is not approved (status={ini['status']})")
 
         project_id = ini["project_id"]
-        slug = board_slug or f"{project_id}-ops"
+        slug = (
+            board_slug
+            or self.adapter.bound_board_slug(project_id)
+            or f"{project_id}-ops"
+        )
         board_id = self.adapter.ensure_board(project_id, slug)
 
         card_ids: List[str] = []
