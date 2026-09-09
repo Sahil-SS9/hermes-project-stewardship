@@ -148,6 +148,34 @@ export interface MilestoneSummary {
   created_at?: string | null;
 }
 
+export interface MilestoneForecast {
+  state: 'complete' | 'insufficient_history' | 'not_comparable' | 'forecast';
+  sample_size?: number;
+  remaining_items?: number;
+  weekly_throughput?: { weeks: number[]; mean: number; slowest: number; fastest: number };
+  central_weeks?: number | null;
+  range_weeks?: { lower: number | null; upper: number | null; upper_open_ended: boolean };
+  assumptions?: Record<string, unknown>;
+}
+
+export interface MilestoneRisk {
+  kind: string;
+  item: string | null;
+  blockers?: string[];
+  owner?: string;
+  remaining?: number;
+}
+
+export interface MilestoneDetail extends MilestoneSummary {
+  committed?: number;
+  blocked?: number;
+  blockers?: Record<string, string[]>;
+  assignee_wip?: Record<string, number>;
+  units?: string;
+  risks?: MilestoneRisk[];
+  forecast?: MilestoneForecast;
+}
+
 export interface Initiative {
   ref: string;
   project_id: string;
@@ -250,6 +278,27 @@ export function createApi(sdk: HermesPluginSDK) {
     milestones: (projectId: string) =>
       get<{ milestones: MilestoneSummary[] }>(
         `/projects/${encodeURIComponent(projectId)}/milestones`,
+      ),
+    // P9.2: milestone detail with scope/WIP/risks/forecast, plus the same
+    // edit actions the Desktop planning panel exposes.
+    milestoneDetail: (projectId: string, name: string) =>
+      get<MilestoneDetail>(
+        `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}`,
+      ),
+    milestoneRename: (projectId: string, name: string, newName: string) =>
+      post<{ renamed: string; new_name: string }>(
+        `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}/rename`,
+        { new_name: newName, actor_id: 'sahil', actor_kind: 'human' },
+      ),
+    milestoneDetach: (projectId: string, name: string, ref: string) =>
+      post<{ name: string; detached: string }>(
+        `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}/detach`,
+        { ref, actor_id: 'sahil', actor_kind: 'human' },
+      ),
+    milestoneSetClosed: (projectId: string, name: string, closed: boolean) =>
+      patch<{ name: string; closed: boolean }>(
+        `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}`,
+        { closed, actor_id: 'sahil', actor_kind: 'human' },
       ),
     createMilestone: (projectId: string, name: string, due: string | null) =>
       post<{ id: number; name: string }>(

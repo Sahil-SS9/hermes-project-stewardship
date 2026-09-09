@@ -320,6 +320,12 @@ class MilestoneUpdate(BaseModel):
     actor_kind: str = "human"
 
 
+class MilestoneRename(BaseModel):
+    new_name: str
+    actor_id: str
+    actor_kind: str = "human"
+
+
 class FeaturePatch(BaseModel):
     features: Dict[str, bool]
     actor: str = "sahil"
@@ -1097,6 +1103,30 @@ def create_app(
         except Exception as e:
             raise HTTPException(409, str(e))
         return dy.milestone_progress(project_id, name)
+
+    @router.post("/projects/{project_id}/milestones/{name}/rename")
+    def milestone_rename(project_id: str, name: str, body: MilestoneRename):
+        try:
+            svc.require_feature(project_id, "milestones")
+            dy.milestone_rename(project_id, name, body.new_name,
+                                actor=_actor(body.actor_id, body.actor_kind))
+        except ValueError as e:
+            raise HTTPException(404 if "not found" in str(e) else 409, str(e))
+        except Exception as e:
+            raise HTTPException(409, str(e))
+        return {"renamed": name, "new_name": body.new_name}
+
+    @router.post("/projects/{project_id}/milestones/{name}/detach")
+    def milestone_detach(project_id: str, name: str, body: MilestoneAttach):
+        try:
+            svc.require_feature(project_id, "milestones")
+            dy.milestone_detach(project_id, name, body.ref,
+                                actor=_actor(body.actor_id, body.actor_kind))
+        except ValueError as e:
+            raise HTTPException(404, str(e))
+        except Exception as e:
+            raise HTTPException(409, str(e))
+        return {"name": name, "detached": body.ref}
 
     @router.get("/projects/{project_id}/milestones/{name}")
     def milestone_progress(project_id: str, name: str):

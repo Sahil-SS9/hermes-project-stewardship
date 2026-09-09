@@ -68,6 +68,23 @@
       milestones: (projectId) => get(
         `/projects/${encodeURIComponent(projectId)}/milestones`
       ),
+      // P9.2: milestone detail with scope/WIP/risks/forecast, plus the same
+      // edit actions the Desktop planning panel exposes.
+      milestoneDetail: (projectId, name) => get(
+        `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}`
+      ),
+      milestoneRename: (projectId, name, newName) => post(
+        `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}/rename`,
+        { new_name: newName, actor_id: "sahil", actor_kind: "human" }
+      ),
+      milestoneDetach: (projectId, name, ref) => post(
+        `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}/detach`,
+        { ref, actor_id: "sahil", actor_kind: "human" }
+      ),
+      milestoneSetClosed: (projectId, name, closed) => patch(
+        `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}`,
+        { closed, actor_id: "sahil", actor_kind: "human" }
+      ),
       createMilestone: (projectId, name, due) => post(
         `/projects/${encodeURIComponent(projectId)}/milestones`,
         { name, due, actor_id: "sahil", actor_kind: "human" }
@@ -1831,8 +1848,112 @@
     button.textContent = labelText;
     return button;
   }
+  var milestoneApiRef = null;
+  var detailProjectId = "";
+  function renderMilestonePlan(container, detail, onChanged, items) {
+    container.replaceChildren();
+    const apiRef = milestoneApiRef;
+    if (!apiRef) {
+      container.appendChild(textEl("p", "dy-dim", "Planning details unavailable."));
+      return;
+    }
+    const projectId = detailProjectId;
+    const scope = textEl(
+      "p",
+      "dy-dim",
+      `Scope: ${detail.committed ?? detail.total} committed, ${detail.done} done, ${detail.blocked ?? 0} blocked (${detail.units ?? "items"} \u2014 not hours).`
+    );
+    container.appendChild(scope);
+    const wip = detail.assignee_wip ?? {};
+    const wipPairs = Object.entries(wip);
+    container.appendChild(textEl(
+      "p",
+      "dy-dim",
+      wipPairs.length ? `Assignee WIP: ${wipPairs.map(([who, n]) => `${who}: ${n}`).join(", ")} (item counts).` : "No in-progress assignments."
+    ));
+    const risks = detail.risks ?? [];
+    if (risks.length) {
+      const riskList = document.createElement("ul");
+      riskList.className = "dy-milestone-risks";
+      for (const risk of risks) {
+        const li = document.createElement("li");
+        li.dataset.riskKind = risk.kind;
+        if (risk.kind === "dependency_blocker" && risk.item) {
+          li.textContent = `${risk.item} blocked by ${(risk.blockers ?? []).join(", ")} \u2014 owner ${risk.owner ?? "unassigned"}`;
+        } else if (risk.kind === "overdue_item" && risk.item) {
+          li.textContent = `${risk.item} overdue \u2014 owner ${risk.owner ?? "unassigned"}`;
+        } else if (risk.kind === "milestone_overdue") {
+          li.textContent = `Milestone past its due date with ${risk.remaining} item(s) remaining.`;
+        } else {
+          li.textContent = risk.kind;
+        }
+        riskList.appendChild(li);
+      }
+      container.appendChild(riskList);
+    } else {
+      container.appendChild(textEl("p", "dy-dim", "No blocking risks recorded."));
+    }
+    const fc = detail.forecast;
+    const fcLine = textEl("p", "dy-milestone-forecast", "");
+    if (!fc) {
+      fcLine.textContent = "Forecast unavailable.";
+    } else if (fc.state === "complete") {
+      fcLine.textContent = "Forecast: complete.";
+    } else if (fc.state === "insufficient_history") {
+      fcLine.textContent = `Forecast: insufficient history (${fc.sample_size ?? 0} completions in the last ${fc.assumptions?.window_weeks ?? 4} complete weeks; needs ${fc.assumptions?.min_sample ?? 8}).`;
+    } else if (fc.state === "not_comparable") {
+      fcLine.textContent = "Forecast: work history is not comparable.";
+    } else {
+      const range = fc.range_weeks;
+      const upper = range?.upper_open_ended ? "open-ended (a zero-throughput week was observed)" : `${range?.upper} weeks`;
+      fcLine.textContent = `Forecast: ~${fc.central_weeks} weeks central (range ${range?.lower}\u2013${upper}); based on ${fc.sample_size} completions. A count-based scenario, not a delivery promise.`;
+    }
+    container.appendChild(fcLine);
+    const actions = document.createElement("div");
+    actions.className = "dy-milestone-plan-actions";
+    const renameInput = workInput("New name", detail.name);
+    renameInput.style.maxWidth = "160px";
+    const renameBtn = workLayoutButton("Rename", false);
+    renameBtn.addEventListener("click", async () => {
+      const newName = renameInput.value.trim();
+      if (!newName || newName === detail.name) return;
+      renameBtn.disabled = true;
+      try {
+        await apiRef.milestoneRename(projectId, detail.name, newName);
+        onChanged();
+      } catch {
+        renameBtn.textContent = "Failed";
+        renameBtn.disabled = false;
+      }
+    });
+    const detachSelect = document.createElement("select");
+    detachSelect.setAttribute("aria-label", `Detach a task from ${detail.name}`);
+    detachSelect.appendChild(textEl("option", "", "Detach a task...", ""));
+    items.filter((item) => (detail.blockers ?? {})[item.ref] !== void 0 || item.status !== "done").forEach((item) => {
+      detachSelect.appendChild(
+        textEl("option", "", `${item.ref}: ${item.title}`, item.ref)
+      );
+    });
+    const detachBtn = workLayoutButton("Detach", false);
+    detachBtn.addEventListener("click", async () => {
+      const ref = detachSelect.value;
+      if (!ref) return;
+      detachBtn.disabled = true;
+      try {
+        await apiRef.milestoneDetach(projectId, detail.name, ref);
+        onChanged();
+      } catch {
+        detachBtn.textContent = "Failed";
+        detachBtn.disabled = false;
+      }
+    });
+    actions.append(renameInput, renameBtn, detachSelect, detachBtn);
+    container.appendChild(actions);
+  }
   function buildMilestonesPanel(s, projectId, items, rerender) {
     const api = s.api;
+    milestoneApiRef = api;
+    detailProjectId = projectId;
     const box = document.createElement("details");
     box.className = "dy-milestones";
     const summary = textEl("summary", "", "Milestones");
@@ -1852,6 +1973,7 @@
       for (const m of rows) {
         const row = document.createElement("div");
         row.className = "dy-milestone-row" + overdueClass(m);
+        row.dataset.milestone = m.name;
         const nameCell = textEl("span", "dy-milestone-name", m.closed ? `${m.name} (closed)` : m.name);
         const pct = m.total > 0 ? Math.round(m.done / m.total * 100) : 0;
         const bar = document.createElement("div");
@@ -1866,6 +1988,33 @@
           `${m.done} of ${m.total} done (${pct}%)`
         );
         const dueLabel = textEl("span", "dy-dim", m.due ? `Due ${m.due}` : "No due date");
+        const planBtn = workLayoutButton("Plan", false);
+        planBtn.setAttribute("aria-expanded", "false");
+        planBtn.setAttribute("aria-label", `Toggle planning summary for ${m.name}`);
+        const planBody = document.createElement("div");
+        planBody.className = "dy-milestone-plan";
+        planBody.hidden = true;
+        planBtn.addEventListener("click", async () => {
+          planBtn.disabled = true;
+          try {
+            if (planBody.hidden && !planBody.dataset.loaded) {
+              const detail = await api.milestoneDetail(projectId, m.name);
+              renderMilestonePlan(planBody, detail, () => {
+                planBody.dataset.loaded = "";
+                planBody.hidden = true;
+                rerender();
+              }, items);
+              planBody.dataset.loaded = "1";
+            }
+            planBody.hidden = !planBody.hidden;
+            planBtn.setAttribute("aria-expanded", String(!planBody.hidden));
+          } catch {
+            planBody.replaceChildren(textEl("p", "dy-dim", "Planning details unavailable."));
+            planBody.hidden = false;
+          } finally {
+            planBtn.disabled = false;
+          }
+        });
         const attachSelect = document.createElement("select");
         attachSelect.setAttribute("aria-label", `Attach a task to ${m.name}`);
         attachSelect.appendChild(textEl("option", "", "Attach a task...", ""));
@@ -1898,7 +2047,7 @@
             closeBtn.disabled = false;
           }
         });
-        row.append(nameCell, bar, counts, dueLabel, attachSelect, attachBtn, closeBtn);
+        row.append(nameCell, bar, counts, dueLabel, planBtn, planBody, attachSelect, attachBtn, closeBtn);
         list.appendChild(row);
       }
       body.replaceChildren(list);

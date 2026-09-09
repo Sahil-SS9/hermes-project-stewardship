@@ -10,7 +10,7 @@ Enforces PRD rules that span domain + persistence:
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from typing import Dict, List, Optional
 
@@ -25,6 +25,7 @@ from ..dockyard import (
 )
 from ..dockyard.bots import Bot
 from .dockyard_store import DockyardStore
+from .planning import forecast_milestone
 from .service import ServiceError, StewardshipService
 
 from .store import Store
@@ -292,18 +293,109 @@ class DockyardService:
             "SELECT item_ref FROM dockyard_milestone_items WHERE milestone_id=?",
             (row["id"],),
         ).fetchall()
+        items = self.canonical_work.list(project_id)
         statuses = {
-            item["ref"]: item["status"]
-            for item in self.canonical_work.list(project_id)
+            item["ref"]: item
+            for item in items
         }
         attached = [str(item["item_ref"]) for item in refs]
-        return {
+        done = sum(1 for ref in attached
+                   if (statuses.get(ref) or {}).get("status") == "done")
+        blocked = [ref for ref in attached
+                   if (statuses.get(ref) or {}).get("status") == "blocked"]
+        # P9.3: dependency blockers — undone dependencies per attached item.
+        blockers: Dict[str, list] = {}
+        for ref in attached:
+            if (statuses.get(ref) or {}).get("status") == "done":
+                continue
+            detail = self.canonical_work.detail(project_id, ref)
+            undone = [
+                dep["ref"] for dep in (detail or {}).get("dependencies", [])
+                if dep.get("status") != "done"
+            ]
+            if undone:
+                blockers[ref] = undone
+        # P9.3: assignee WIP — in-progress count per assignee (item counts,
+        # NOT hours). Mixed assignments sum per person.
+        assignee_wip: Dict[str, int] = {}
+        for ref in attached:
+            item = statuses.get(ref) or {}
+            if item.get("status") != "in_progress":
+                continue
+            who = item.get("assignee") or item.get("assignee_id") or "unassigned"
+            assignee_wip[who] = assignee_wip.get(who, 0) + 1
+        progress = {
             "name": name,
             "total": len(attached),
-            "done": sum(1 for ref in attached if statuses.get(ref) == "done"),
+            "done": done,
             "closed": bool(row["closed_at"]),
             "due": row["due"],
+            # P9.3 additions (counts, never hours):
+            "committed": len(attached),
+            "blocked": len(blocked),
+            "blockers": blockers,
+            "assignee_wip": assignee_wip,
+            "units": "items",
         }
+        # P9.5: what threatens this milestone — overdue/blocked/due-passed
+        # risks, each linking the blocking work item ref (drill-down target).
+        progress["risks"] = self._milestone_risks(
+            project_id, row["due"], attached, statuses, blockers)
+        # P9.4: pure read-model forecast (counts; no scheduler, no promises).
+        progress["forecast"] = forecast_milestone(
+            remaining=len(attached) - done,
+            done_items=[
+                item for item in items if item.get("status") == "done"
+            ],
+            today=None,
+        )
+        return progress
+
+    @staticmethod
+    def _milestone_risks(project_id, due, attached, statuses, blockers) -> list:
+        from .store import utcnow
+
+        risks = []
+        today = utcnow().date()
+        due_date = None
+        if due:
+            try:
+                due_date = date.fromisoformat(str(due)[:10])
+            except ValueError:
+                due_date = None
+        for ref in attached:
+            item = statuses.get(ref) or {}
+            status = item.get("status")
+            item_due = item.get("due")
+            if status == "done":
+                continue
+            if ref in blockers:
+                risks.append({
+                    "kind": "dependency_blocker",
+                    "item": ref,
+                    "blockers": blockers[ref],
+                    "owner": item.get("assignee") or "unassigned",
+                })
+            elif item_due:
+                try:
+                    if date.fromisoformat(str(item_due)[:10]) < today:
+                        risks.append({
+                            "kind": "overdue_item",
+                            "item": ref,
+                            "owner": item.get("assignee") or "unassigned",
+                        })
+                except ValueError:
+                    pass
+        if due_date is not None and due_date < today and attached:
+            remaining = sum(1 for ref in attached
+                            if (statuses.get(ref) or {}).get("status") != "done")
+            if remaining:
+                risks.append({
+                    "kind": "milestone_overdue",
+                    "item": None,
+                    "remaining": remaining,
+                })
+        return risks
 
     def milestone_list(self, project_id: str) -> list:
         if self.canonical_work is None:
@@ -344,6 +436,23 @@ class DockyardService:
         self.dy.milestone_update(project_id, name, due=due, closed=closed)
         self._audit(actor=actor, action="milestone.updated",
                     subject=name, detail={"due": due, "closed": closed})
+
+    def milestone_rename(self, project_id: str, name: str, new_name: str, *,
+                         actor: Actor) -> None:
+        """P9.1: rename preserving milestone identity (id + attachments);
+        audit trails old -> new so actor history survives the rename."""
+        self.dy.milestone_progress(project_id, name)
+        self.dy.milestone_rename(project_id, name, new_name)
+        self._audit(actor=actor, action="milestone.renamed",
+                    subject=new_name, detail={"from": name, "to": new_name})
+
+    def milestone_detach(self, project_id: str, name: str, ref: str, *,
+                         actor: Actor) -> None:
+        """P9.1: scope change — remove a work attachment (audited)."""
+        self.dy.milestone_progress(project_id, name)
+        self.dy.milestone_detach(project_id, name, ref)
+        self._audit(actor=actor, action="milestone.detached",
+                    subject=name, detail={"item": ref})
 
     # ------------------------------------------------------------------ #
     # Saved views (PM-05)                                                #
