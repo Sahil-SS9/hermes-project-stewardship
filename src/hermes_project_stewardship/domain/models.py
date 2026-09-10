@@ -12,8 +12,36 @@ from typing import Any, Dict, List, Optional
 from .constants import (
     ApprovalState,
     HealthState,
+    MembershipState,
     ProjectPhase,
 )
+
+
+@dataclass
+class ProjectMember:
+    """PM-0101: one project membership keyed by Hermes profile slug."""
+
+    project_id: str
+    profile_slug: str
+    role: str = "member"          # 'lead' | 'member'
+    state: str = MembershipState.ACTIVE.value
+    joined_at: Optional[str] = None
+    left_at: Optional[str] = None
+    display_name: Optional[str] = None  # enrichment only; never identity
+
+
+@dataclass
+class Goal:
+    """PM-0106: minimal goal entity; objective link remains nullable."""
+
+    goal_id: str
+    project_id: str
+    title: str
+    description: str = ""
+    position: int = 0
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    archived_at: Optional[str] = None
 
 
 @dataclass

@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 20
+SCHEMA_VERSION = 21
 
 
 @dataclass(frozen=True)
@@ -757,6 +757,112 @@ MIGRATIONS: List[Migration] = [
         downgrade_sql="""
         DROP TABLE IF EXISTS stewardship_decision_receipts;
         ALTER TABLE project_initiatives DROP COLUMN decision_revision;
+        """,
+    ),
+    Migration(
+        version=21,
+        name="project membership, goals and operation journal",
+        upgrade_sql="""
+        -- PM-0102/0103/0104: normalised membership — the sole writable
+        -- representation of project membership. One active lead per project
+        -- is enforced by a partial unique index. Backfill seeds rows from
+        -- every legacy owner_lead_profile / member_profiles_json.
+        CREATE TABLE IF NOT EXISTS project_members (
+            project_id    TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            profile_slug  TEXT NOT NULL,
+            role          TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('lead','member')),
+            state         TEXT NOT NULL DEFAULT 'active'
+                          CHECK (state IN ('active','departure_pending','departed','unavailable')),
+            joined_at     TEXT,
+            left_at       TEXT,
+            PRIMARY KEY (project_id, profile_slug)
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_project_members_one_lead
+            ON project_members(project_id)
+            WHERE role='lead' AND state='active';
+
+        -- Backfill: lead first, then legacy member list, for every
+        -- stewardship project that already exists at upgrade time.
+        INSERT OR IGNORE INTO project_members(project_id, profile_slug, role, state, joined_at)
+            SELECT project_id, owner_lead_profile, 'lead', 'active', created_at
+            FROM project_stewardship
+            WHERE owner_lead_profile IS NOT NULL AND owner_lead_profile != '';
+
+        INSERT OR IGNORE INTO project_members(project_id, profile_slug, role, state, joined_at)
+            SELECT s.project_id, json_each.value, 'member', 'active', s.created_at
+            FROM project_stewardship s, json_each(s.member_profiles_json)
+            WHERE json_each.value IS NOT NULL AND TRIM(json_each.value) != ''
+              AND json_each.value != s.owner_lead_profile;
+
+        -- PM-0104(fix 4): durable monotonic membership revision per project.
+        CREATE TABLE IF NOT EXISTS membership_revisions (
+            project_id TEXT PRIMARY KEY REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            revision   INTEGER NOT NULL DEFAULT 0
+        );
+        INSERT OR IGNORE INTO membership_revisions(project_id, revision)
+            SELECT project_id, 0 FROM project_stewardship;
+
+        -- PM-0106 (fix 7): goals; objective links live in a dedicated link
+        -- table so one goal can carry multiple objectives and unlinked
+        -- objectives stay untouched.
+        CREATE TABLE IF NOT EXISTS project_goals (
+            goal_id       TEXT PRIMARY KEY,
+            project_id    TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            title         TEXT NOT NULL,
+            description   TEXT NOT NULL DEFAULT '',
+            position      INTEGER NOT NULL DEFAULT 0,
+            created_at    TEXT NOT NULL,
+            updated_at    TEXT NOT NULL,
+            archived_at   TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_goals_project
+            ON project_goals(project_id, position);
+
+        CREATE TABLE IF NOT EXISTS project_objective_goals (
+            objective_id  INTEGER PRIMARY KEY
+                          REFERENCES project_objectives(id) ON DELETE CASCADE,
+            goal_id       TEXT NOT NULL REFERENCES project_goals(goal_id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_objective_goals_goal
+            ON project_objective_goals(goal_id);
+
+        -- PM-0110: durable operation journal (transfer saga and friends).
+        CREATE TABLE IF NOT EXISTS operation_journal (
+            op_id            TEXT PRIMARY KEY,
+            idempotency_key  TEXT NOT NULL UNIQUE,
+            kind             TEXT NOT NULL,
+            state            TEXT NOT NULL DEFAULT 'pending'
+                             CHECK (state IN ('pending','running','completed','failed','compensated')),
+            project_id       TEXT NOT NULL,
+            payload_hash     TEXT NOT NULL,
+            payload_json     TEXT NOT NULL DEFAULT '{}',
+            created_at       TEXT NOT NULL,
+            updated_at       TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_operation_journal_project
+            ON operation_journal(project_id, created_at DESC);
+
+        -- Per-item durable outcomes: intent recorded before any host write.
+        CREATE TABLE IF NOT EXISTS operation_items (
+            op_id        TEXT NOT NULL REFERENCES operation_journal(op_id) ON DELETE CASCADE,
+            item_id      TEXT NOT NULL,
+            item_kind    TEXT NOT NULL DEFAULT 'task',
+            revision     INTEGER NOT NULL DEFAULT 0,
+            status       TEXT,
+            outcome      TEXT NOT NULL DEFAULT 'pending'
+                         CHECK (outcome IN ('pending','completed','skipped','failed')),
+            detail       TEXT NOT NULL DEFAULT '',
+            updated_at   TEXT NOT NULL,
+            PRIMARY KEY (op_id, item_id)
+        );
+        """,
+        downgrade_sql="""
+        DROP TABLE IF EXISTS operation_items;
+        DROP TABLE IF EXISTS operation_journal;
+        DROP TABLE IF EXISTS project_objective_goals;
+        DROP TABLE IF EXISTS project_goals;
+        DROP TABLE IF EXISTS membership_revisions;
+        DROP TABLE IF EXISTS project_members;
         """,
     ),
 ]

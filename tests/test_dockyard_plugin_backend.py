@@ -444,8 +444,6 @@ def test_project_settings_patch_and_report_history(client):
         f"/api/plugins/hermes-dockyard/projects/{project_id}/settings",
         json={
             "mission": "Make delivery evidence readable and exportable",
-            "lead_profile": "octacon",
-            "member_profiles": ["quan", "wesker"],
             "autonomy_level": 2,
             "verification_policy": {
                 "require_tests": True,
