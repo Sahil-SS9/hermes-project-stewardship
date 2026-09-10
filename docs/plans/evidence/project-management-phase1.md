@@ -1,6 +1,6 @@
 # Project Management Stewardship — Phase 1 Evidence
 
-Candidate: `feat/project-management-stewardship` at Phase 0 checkpoint `604c058` (Phase 1 working tree uncommitted at evidence time; no push/merge/install/deploy).
+Candidate topology: `83405ce` contains the original seven-file Phase 1 commit. `afe3255a4d674994266e3d332f403a3e4613db11` is the dedicated correction commit containing the seven omitted source/API/migration/test modifications. This evidence and the Phase 1-only plan ledger are committed separately above that correction. No Phase 2 artefact is included.
 
 ## Verdict
 
@@ -25,7 +25,7 @@ Candidate: `feat/project-management-stewardship` at Phase 0 checkpoint `604c058`
 - Failed/host-unavailable items: remain pending for reread/retry
 
 ### 5. Revision preservation in retry
-`TransferSaga.retry()` reads `row["revision"]` from the persisted `operation_items` row and passes it unchanged to `assign_task_if_unchanged()` guard. The `_pending_blockers()` method correctly identifies retryable pending items by their reason. **DEFECT:** Original code used `int(row["revision"] or 0)` which would pass `0` if revision was 0. **FIX:** Now uses the actual stored revision. Regression: `test_pm0110_metadata_and_revision_preserved_through_retry` walks: running execute → pending → canonical ready → retry with guard `expected_revision=7` → completed → member departed.
+`TransferSaga.retry()` reads the persisted `operation_items.revision` and passes it unchanged to the `assign_task_if_unchanged()` guard. The `_pending_blockers()` method identifies retryable pending items by reason. **Root cause:** initial blocked/skipped journal records retained only `{id, reason}`, so the original item revision `7` was unavailable to the insert and became the default `0`. **Fix:** initial journal insertion now preserves `id`, `revision`, `status` and `kind`; retry reads that stored non-zero revision without reconstructing it. Regression: `test_pm0110_metadata_and_revision_preserved_through_retry` walks: running execute → pending → canonical ready → retry with guard `expected_revision=7` → completed → member departed.
 
 ### 6. Exact regression sequence verified
 ```
@@ -58,7 +58,7 @@ DB revision=7 verified before and after retry; retry now correctly reads and pas
 | compileall | 0 | clean |
 | npm ci / tsc / dashboard tests / build / npm audit | 0/0/0/0/0 | clean |
 | Desktop harness | 0 | pass |
-| hermes verify --json | 0 | ok: true |
+| hermes verify --json | 0 | ok: true; readiness HTTP 200; 686 passed, 34 skipped |
 
 ## Remaining blockers
 
