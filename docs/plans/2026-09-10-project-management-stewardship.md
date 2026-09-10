@@ -189,14 +189,22 @@ The schema and service contracts must make split-brain state visible and recover
 - `design/` prototype and journey artifacts
 - `docs/plans/evidence/project-management-ux-contract.md`
 
-- [ ] **PM-0201** Audit existing Desktop components/tokens and define one shared profile/actor picker.
-- [ ] **PM-0202** Prototype onboarding as Project → Purpose → Team and policy → Review/preflight; first assessment is a separate post-onboarding action.
-- [ ] **PM-0203** Prototype add-member, lead-transfer and remove-member-with-no-work journeys.
-- [ ] **PM-0204** Prototype member exit with work preview, target selection and exact affected-item list.
-- [ ] **PM-0205** Prototype stale-preview conflict, incomplete pagination, claimed-task refusal and partial-transfer recovery.
-- [ ] **PM-0206** Prototype minimal goals/objectives, milestone archive/restore and project archive/restore.
-- [ ] **PM-0207** Define loading, empty, unavailable-profile, offline, validation, conflict, recovery and permission-denied states.
-- [ ] **PM-0208** Validate keyboard order, focus restoration, screen-reader language, reduced motion, narrow widths and destructive-action separation; obtain Sahil’s visual/interaction approval.
+- [x] **PM-0201** Audit existing Desktop components/tokens and define one shared profile/actor picker.
+- [x] **PM-0202** Prototype onboarding as Project → Purpose → Team and policy → Review/preflight; first assessment is a separate post-onboarding action.
+- [x] **PM-0203** Prototype add-member, lead-transfer and remove-member-with-no-work journeys.
+- [x] **PM-0204** Prototype member exit with work preview, target selection and exact affected-item list.
+- [x] **PM-0205** Prototype stale-preview conflict, incomplete pagination, claimed-task refusal and partial-transfer recovery.
+- [x] **PM-0206** Prototype minimal goals/objectives, milestone archive/restore and project archive/restore.
+- [x] **PM-0207** Define loading, empty, unavailable-profile, offline, validation, conflict, recovery and permission-denied states.
+- [x] **PM-0208** Validate keyboard order, focus restoration, screen-reader language, reduced motion, narrow widths and destructive-action separation; obtain Sahil’s visual/interaction approval.
+
+**Phase 2 approval evidence (2026-09-11 BST):**
+
+- Standalone prototype: `design/project-ux/prototype/`; deterministic synthetic state only.
+- Browser gate: 37 Playwright tests passed across the required viewport/theme, interaction, keyboard, focus, recovery, motion, overflow and contrast checks.
+- Visual evidence: nine rendered PNGs in `design/project-ux/captures/`; final repaired captures have no Critical or High visual findings.
+- Sahil reviewed the live app at `http://127.0.0.1:5174/` and explicitly signed off: “it looks awesome im happy to sign it off.”
+- Full contract and evidence: `docs/plans/evidence/project-management-ux-contract.md`.
 
 **Phase 2 gate:**
 
