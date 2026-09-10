@@ -1,6 +1,6 @@
 # Project Stewardship Management — Revised Implementation Plan
 
-> **Execution status:** Approved for Phase 0 only. Later phases remain gated by Phase 0 findings and the Phase 2 UX decision.
+> **Execution status:** Phases 0 and 1 complete. Phase 2 remains gated by Sahil UX approval; Phase 3 has not started.
 >
 > **Parent WIP branch:** `feat/trustworthy-daily-stewardship-20260908`
 >
@@ -156,24 +156,26 @@ Proceed only when the milestone integrity defect is repaired and no authority, p
 - `src/hermes_project_stewardship/persistence/dockyard_service.py`
 - New focused membership, migration, authority and operation-journal tests
 
-- [ ] **PM-0101** Define `ProjectMember` with project ID, Hermes profile slug, project role, state, joined time and left time.
-- [ ] **PM-0102** Make the normalised membership model the sole writable representation; expose old lead/member fields only as compatibility projections.
-- [ ] **PM-0103** Enforce exactly one active lead through one database-backed authoritative representation.
-- [ ] **PM-0104** Define membership states: `active`, `departure_pending`, `departed` and `unavailable` display status.
-- [ ] **PM-0105** Define profile-slug/default-profile identity and explicit relink behaviour after rename or disappearance.
-- [ ] **PM-0106** Define a minimal Goal entity: stable ID, project ID, title, description, order and archive timestamps; objective link remains nullable.
-- [ ] **PM-0107** Define explicit lifecycle transitions and side effects for active, paused, frozen, disabled and archived projects.
-- [ ] **PM-0108** Define work-transfer eligibility for backlog/triage, ready, blocked, review, claimed/running, workflow-gate tasks and epics.
-- [ ] **PM-0109** Define preview fingerprints over project/board, membership revision, member/replacement, exact task set and available task revisions.
-- [ ] **PM-0110** Define the durable operation/saga states, idempotency key, retry rules, compensation limits and reconciliation outcome.
-- [ ] **PM-0111** Define capabilities for membership administration, lead transfer, bulk reassignment, project archive and managed-file removal.
-- [ ] **PM-0112** Implement forward migration, newer-schema fail-closed behaviour, pre-upgrade snapshot and snapshot-restoration tests; no in-place production downgrade.
-- [ ] **PM-0113** Prove existing mission, owner, member, objective, milestone, workflow, evidence and audit state survives migration.
-- [ ] **PM-0114** Add invariant/race tests for one lead, duplicate membership, interrupted migration and partial operation recovery.
+- [x] **PM-0101** Define `ProjectMember` with project ID, Hermes profile slug, project role, state, joined time and left time.
+- [x] **PM-0102** Make the normalised membership model the sole writable representation; expose old lead/member fields only as compatibility projections.
+- [x] **PM-0103** Enforce exactly one active lead through one database-backed authoritative representation.
+- [x] **PM-0104** Define membership states: `active`, `departure_pending`, `departed` and `unavailable` display status.
+- [x] **PM-0105** Define profile-slug/default-profile identity and explicit relink behaviour after rename or disappearance.
+- [x] **PM-0106** Define a minimal Goal entity: stable ID, project ID, title, description, order and archive timestamps; objective link remains nullable.
+- [x] **PM-0107** Define explicit lifecycle transitions and side effects for active, paused, frozen, disabled and archived projects.
+- [x] **PM-0108** Define work-transfer eligibility for backlog/triage, ready, blocked, review, claimed/running, workflow-gate tasks and epics.
+- [x] **PM-0109** Define preview fingerprints over project/board, membership revision, member/replacement, exact task set and available task revisions.
+- [x] **PM-0110** Define the durable operation/saga states, idempotency key, retry rules, compensation limits and reconciliation outcome.
+- [x] **PM-0111** Define capabilities for membership administration, lead transfer, bulk reassignment, project archive and managed-file removal.
+- [x] **PM-0112** Implement forward migration, newer-schema fail-closed behaviour, pre-upgrade snapshot and snapshot-restoration tests; no in-place production downgrade.
+- [x] **PM-0113** Prove existing mission, owner, member, objective, milestone, workflow, evidence and audit state survives migration.
+- [x] **PM-0114** Add invariant/race tests for one lead, duplicate membership, interrupted migration and partial operation recovery.
 
 **Phase 1 gate:**
 
 The schema and service contracts must make split-brain state visible and recoverable. No API may write both legacy and normalised ownership representations independently.
+
+**Phase 1 implementation correction:** `afe3255a4d674994266e3d332f403a3e4613db11` (dedicated seven-file correction on top of `83405ce`; clean-head verification recorded in `docs/plans/evidence/project-management-phase1.md`).
 
 ---
 
