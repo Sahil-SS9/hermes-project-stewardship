@@ -666,6 +666,24 @@ class WorkAssignBody(BaseModel):
     assignee_id: str | None = None
 
 
+class MilestoneCreateBody(BaseModel):
+    name: str
+    due: str | None = None
+
+
+class MilestoneAttachBody(BaseModel):
+    ref: str
+
+
+class MilestoneRenameBody(BaseModel):
+    new_name: str
+
+
+class MilestoneUpdateBody(BaseModel):
+    due: str | None = None
+    closed: bool | None = None
+
+
 class DependencyBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     dependency_ref: str
@@ -767,6 +785,63 @@ async def remove_work_dependency(project_id: str, ref: str, dependency_ref: str)
         f"/stewardship/v1/projects/{pid}/work-items/{item}/dependencies/{dependency}/remove",
         {"actor_id": _ACTOR_ID, "actor_kind": "human"},
     )
+
+
+@plugin_api.post("/projects/{project_id}/milestones")
+async def create_milestone(project_id: str, body: MilestoneCreateBody) -> dict:
+    pid = quote(project_id, safe="")
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{pid}/milestones",
+        {**body.model_dump(), "actor_id": _ACTOR_ID, "actor_kind": "human"})
+
+
+@plugin_api.get("/projects/{project_id}/milestones")
+async def list_milestones(project_id: str) -> dict:
+    pid = quote(project_id, safe="")
+    return await _proxy("GET", f"/stewardship/v1/projects/{pid}/milestones")
+
+
+@plugin_api.get("/projects/{project_id}/milestones/{name}")
+async def milestone_detail(project_id: str, name: str) -> dict:
+    pid = quote(project_id, safe="")
+    milestone = quote(name, safe="")
+    return await _proxy("GET", f"/stewardship/v1/projects/{pid}/milestones/{milestone}")
+
+
+@plugin_api.patch("/projects/{project_id}/milestones/{name}")
+async def update_milestone(project_id: str, name: str, body: MilestoneUpdateBody) -> dict:
+    pid = quote(project_id, safe="")
+    milestone = quote(name, safe="")
+    return await _proxy(
+        "PATCH", f"/stewardship/v1/projects/{pid}/milestones/{milestone}",
+        {**body.model_dump(exclude_unset=True), "actor_id": _ACTOR_ID, "actor_kind": "human"})
+
+
+@plugin_api.post("/projects/{project_id}/milestones/{name}/rename")
+async def rename_milestone(project_id: str, name: str, body: MilestoneRenameBody) -> dict:
+    pid = quote(project_id, safe="")
+    milestone = quote(name, safe="")
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{pid}/milestones/{milestone}/rename",
+        {**body.model_dump(), "actor_id": _ACTOR_ID, "actor_kind": "human"})
+
+
+@plugin_api.post("/projects/{project_id}/milestones/{name}/attach")
+async def attach_milestone(project_id: str, name: str, body: MilestoneAttachBody) -> dict:
+    pid = quote(project_id, safe="")
+    milestone = quote(name, safe="")
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{pid}/milestones/{milestone}/attach",
+        {**body.model_dump(), "actor_id": _ACTOR_ID, "actor_kind": "human"})
+
+
+@plugin_api.post("/projects/{project_id}/milestones/{name}/detach")
+async def detach_milestone(project_id: str, name: str, body: MilestoneAttachBody) -> dict:
+    pid = quote(project_id, safe="")
+    milestone = quote(name, safe="")
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{pid}/milestones/{milestone}/detach",
+        {**body.model_dump(), "actor_id": _ACTOR_ID, "actor_kind": "human"})
 
 
 @plugin_api.get("/projects/{project_id}/backlog")

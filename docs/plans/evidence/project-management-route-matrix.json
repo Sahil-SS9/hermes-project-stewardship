@@ -1,0 +1,1555 @@
+{
+ "generated_by": "Kensei Phase 0 verification pass \u2014 paren-balanced api() extractor, top-level init method detection, act() wrapper expansion with per-call method, lifecycle/decision dynamic templates statically resolved, params normalised to {}",
+ "frontend_source": "hermes_dockyard_plugin/desktop/plugin.js",
+ "proxy_source": "hermes_dockyard_plugin/dashboard/plugin_api.py",
+ "backend_source": "src/hermes_project_stewardship/api/server.py",
+ "summary": {
+  "frontend_call_count": 77,
+  "distinct_frontend_shapes": 60,
+  "proxy_route_count": 66,
+  "backend_route_count": 90,
+  "exact_count": 72,
+  "flagged_count": 5,
+  "unresolved_count": 0,
+  "self_served_proxy_shapes": [
+   "/bots/{}/sessions",
+   "/bots/{}/sessions/{}",
+   "/health"
+  ]
+ },
+ "frontend_calls": [
+  {
+   "method": "GET",
+   "frontend_path": "/onboard/discover",
+   "proxy_path": null,
+   "backend_path": null,
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 1780,
+   "parity": "flagged",
+   "reason": "no proxy route with matching method+path shape",
+   "resolution": "proxied-by-host-wiring",
+   "resolution_evidence": "Desktop onboarding calls /onboard/discover directly against the plugin-mounted backend app (route exists in backend server.py); no dashboard proxy hop \u2014 verified: 0 proxy decorators, backend GET /onboard/discover exists, plugin router is mounted by the host web_server per plugin_api.py:33-34"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/onboard/preflight",
+   "proxy_path": null,
+   "backend_path": null,
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 1816,
+   "parity": "flagged",
+   "reason": "no proxy route with matching method+path shape",
+   "resolution": "proxied-by-host-wiring",
+   "resolution_evidence": "Same direct-backend pattern as /onboard/discover: backend POST /onboard/preflight exists; intentional single-hop route"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/onboard",
+   "proxy_path": "/onboard",
+   "backend_path": "/onboard",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 1849,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/dashboard",
+   "proxy_path": "/dashboard",
+   "backend_path": "/dashboard",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2176,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/portfolio",
+   "proxy_path": "/portfolio",
+   "backend_path": "/portfolio",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2176,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/inbox",
+   "proxy_path": "/inbox",
+   "backend_path": "/inbox",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2176,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/notifications",
+   "proxy_path": "/notifications",
+   "backend_path": "/notifications",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2176,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/bots",
+   "proxy_path": "/bots",
+   "backend_path": "/bots",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2176,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/workload",
+   "proxy_path": "/workload",
+   "backend_path": "/workload",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2176,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/settings",
+   "proxy_path": "/projects/{project_id}/settings",
+   "backend_path": "/projects/{project_id}/settings",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2181,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/work-items",
+   "proxy_path": "/projects/{project_id}/work-items",
+   "backend_path": "/projects/{project_id}/work-items",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2182,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/dashboard",
+   "proxy_path": "/dashboard",
+   "backend_path": "/dashboard",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2198,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/settings",
+   "proxy_path": "/projects/{project_id}/settings",
+   "backend_path": "/projects/{project_id}/settings",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2212,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/work-items",
+   "proxy_path": "/projects/{project_id}/work-items",
+   "backend_path": "/projects/{project_id}/work-items",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2213,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/initiatives",
+   "proxy_path": "/projects/{project_id}/initiatives",
+   "backend_path": "/projects/{project_id}/initiatives",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2214,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/objectives",
+   "proxy_path": "/projects/{project_id}/objectives",
+   "backend_path": "/projects/{project_id}/objectives",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2215,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/missions/archive",
+   "proxy_path": "/projects/{project_id}/missions/archive",
+   "backend_path": "/projects/{project_id}/missions/archive",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2216,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/content",
+   "proxy_path": "/projects/{project_id}/content",
+   "backend_path": "/projects/{project_id}/content",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2217,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/events",
+   "proxy_path": "/projects/{project_id}/events",
+   "backend_path": "/projects/{project_id}/events",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2218,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/reports",
+   "proxy_path": "/projects/{project_id}/reports",
+   "backend_path": "/projects/{project_id}/reports",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2219,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/milestones",
+   "proxy_path": "/projects/{project_id}/milestones",
+   "backend_path": "/projects/{project_id}/milestones",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2220,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/dashboard",
+   "proxy_path": "/dashboard",
+   "backend_path": "/dashboard",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2239,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/backlog",
+   "proxy_path": "/projects/{project_id}/backlog",
+   "backend_path": "/projects/{project_id}/backlog",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2245,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/work-items",
+   "proxy_path": "/projects/{project_id}/work-items",
+   "backend_path": "/projects/{project_id}/work-items",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2246,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/initiatives",
+   "proxy_path": "/projects/{project_id}/initiatives",
+   "backend_path": "/projects/{project_id}/initiatives",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2247,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/bots",
+   "proxy_path": "/bots",
+   "backend_path": "/bots",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2248,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/dashboard",
+   "proxy_path": "/dashboard",
+   "backend_path": "/dashboard",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2261,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/views",
+   "proxy_path": "/projects/{project_id}/views",
+   "backend_path": "/projects/{project_id}/views",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2265,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/bots",
+   "proxy_path": "/bots",
+   "backend_path": "/bots",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2271,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/workload",
+   "proxy_path": "/workload",
+   "backend_path": "/workload",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2271,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/bot-groups",
+   "proxy_path": "/bot-groups",
+   "backend_path": "/bot-groups",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2271,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/bot-groups/{}/messages",
+   "proxy_path": "/bot-groups/{name}/messages",
+   "backend_path": "/bot-groups/{name}/messages",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2275,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/inbox",
+   "proxy_path": "/inbox",
+   "backend_path": "/inbox",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2282,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/initiatives",
+   "proxy_path": "/projects/{project_id}/initiatives",
+   "backend_path": "/projects/{project_id}/initiatives",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2285,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/first-assessment",
+   "proxy_path": null,
+   "backend_path": null,
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2608,
+   "parity": "flagged",
+   "reason": "no proxy route with matching method+path shape",
+   "resolution": "proxied-by-host-wiring",
+   "resolution_evidence": "Backend POST /projects/{project_id}/first-assessment exists (server.py:1549); frontend calls it directly through the mounted app"
+  },
+  {
+   "method": "PATCH",
+   "frontend_path": "/projects/{}/settings",
+   "proxy_path": "/projects/{project_id}/settings",
+   "backend_path": "/projects/{project_id}/settings",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2697,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/{}",
+   "proxy_path": null,
+   "backend_path": null,
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2736,
+   "parity": "flagged",
+   "reason": "no proxy route with matching method+path shape",
+   "resolution": "lifecycle-config-static-resolved",
+   "resolution_evidence": "Resolved from LIFECYCLE_CONFIG at plugin.js:2676-2680 to /re-enable|/disable|/pause|/resume; all four shapes exist as proxy+backend routes and are matched in their resolved entries"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/settings",
+   "proxy_path": "/projects/{project_id}/settings",
+   "backend_path": "/projects/{project_id}/settings",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2737,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/reports/{}",
+   "proxy_path": "/projects/{project_id}/reports/{report_id}",
+   "backend_path": "/projects/{project_id}/reports/{report_id}",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2858,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/reports",
+   "proxy_path": "/projects/{project_id}/reports",
+   "backend_path": "/projects/{project_id}/reports",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2867,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/work-items/{}",
+   "proxy_path": "/projects/{project_id}/work-items/{ref}",
+   "backend_path": "/projects/{project_id}/work-items/{ref}",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3004,
+   "parity": "exact"
+  },
+  {
+   "method": "PATCH",
+   "frontend_path": "/projects/{}/work-items/{}",
+   "proxy_path": "/projects/{project_id}/work-items/{ref}",
+   "backend_path": "/projects/{project_id}/work-items/{ref}",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3054,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/work-items/{}/assign",
+   "proxy_path": "/projects/{project_id}/work-items/{ref}/assign",
+   "backend_path": "/projects/{project_id}/work-items/{ref}/assign",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3060,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/work-items/{}/transition",
+   "proxy_path": "/projects/{project_id}/work-items/{ref}/transition",
+   "backend_path": "/projects/{project_id}/work-items/{ref}/transition",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3066,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/work-items/{}/dependencies",
+   "proxy_path": "/projects/{project_id}/work-items/{ref}/dependencies",
+   "backend_path": "/projects/{project_id}/work-items/{ref}/dependencies",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3087,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/objectives/{}/assessment",
+   "proxy_path": "/projects/{project_id}/objectives/{objective_id}/assessment",
+   "backend_path": "/projects/{project_id}/objectives/{objective_id}/assessment",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3209,
+   "parity": "exact"
+  },
+  {
+   "method": "PATCH",
+   "frontend_path": "/projects/{}/settings",
+   "proxy_path": "/projects/{project_id}/settings",
+   "backend_path": "/projects/{project_id}/settings",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3261,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/objectives",
+   "proxy_path": "/projects/{project_id}/objectives",
+   "backend_path": "/projects/{project_id}/objectives",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3283,
+   "parity": "exact"
+  },
+  {
+   "method": "PATCH",
+   "frontend_path": "/projects/{}/objectives/{}",
+   "proxy_path": "/projects/{project_id}/objectives/{objective_id}",
+   "backend_path": "/projects/{project_id}/objectives/{objective_id}",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3286,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/mission/archive",
+   "proxy_path": "/projects/{project_id}/mission/archive",
+   "backend_path": "/projects/{project_id}/mission/archive",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3302,
+   "parity": "exact"
+  },
+  {
+   "method": "DELETE",
+   "frontend_path": "/projects/{}/mission",
+   "proxy_path": "/projects/{project_id}/mission",
+   "backend_path": "/projects/{project_id}/mission",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3308,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/objectives/{}/archive",
+   "proxy_path": "/projects/{project_id}/objectives/{objective_id}/archive",
+   "backend_path": "/projects/{project_id}/objectives/{objective_id}/archive",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3313,
+   "parity": "exact"
+  },
+  {
+   "method": "DELETE",
+   "frontend_path": "/projects/{}/objectives/{}",
+   "proxy_path": "/projects/{project_id}/objectives/{objective_id}",
+   "backend_path": "/projects/{project_id}/objectives/{objective_id}",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3316,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/objectives",
+   "proxy_path": "/projects/{project_id}/objectives",
+   "backend_path": "/projects/{project_id}/objectives",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3401,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/content/{}/preview",
+   "proxy_path": "/projects/{project_id}/content/{content_id}/preview",
+   "backend_path": "/projects/{project_id}/content/{content_id}/preview",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3427,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/content",
+   "proxy_path": "/projects/{project_id}/content",
+   "backend_path": "/projects/{project_id}/content",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3443,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/projects/{}/milestones/{}",
+   "proxy_path": "/projects/{project_id}/milestones/{name}",
+   "backend_path": "/projects/{project_id}/milestones/{name}",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3505,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/backlog/{}/rerank",
+   "proxy_path": "/projects/{project_id}/backlog/{ref}/rerank",
+   "backend_path": "/projects/{project_id}/backlog/{ref}/rerank",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3800,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/backlog/items",
+   "proxy_path": "/projects/{project_id}/backlog/items",
+   "backend_path": "/projects/{project_id}/backlog/items",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3840,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/bots/{}/sessions",
+   "proxy_path": "/bots/{bot_id}/sessions",
+   "backend_path": "/bots/{bot_id}/sessions",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3978,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/bots/{}/sessions/{}",
+   "proxy_path": "/bots/{bot_id}/sessions/{session_id}",
+   "backend_path": "/bots/{bot_id}/sessions/{session_id}",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3990,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/freeze",
+   "proxy_path": "/projects/{project_id}/freeze",
+   "backend_path": "/projects/{project_id}/freeze",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 4143,
+   "parity": "exact"
+  },
+  {
+   "method": "PUT",
+   "frontend_path": "/projects/{}/views",
+   "proxy_path": "/projects/{project_id}/views",
+   "backend_path": "/projects/{project_id}/views",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 4233,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/initiatives/{}/decision",
+   "proxy_path": "/initiatives/{ref}/decision",
+   "backend_path": "/initiatives/{ref}/decision",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 4311,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/initiatives/{}/{}",
+   "proxy_path": null,
+   "backend_path": null,
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 4369,
+   "parity": "flagged",
+   "reason": "no proxy route with matching method+path shape",
+   "resolution": "decision-actions-static-resolved",
+   "resolution_evidence": "Resolved from decision branches at plugin.js:4362-4368 to /approve|/reject; both proxy (plugin_api.py:942+) and backend routes exist and are matched in resolved entries"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/initiatives/{}/decision/receipts",
+   "proxy_path": "/initiatives/{ref}/decision/receipts",
+   "backend_path": "/initiatives/{ref}/decision/receipts",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 4380,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/inbox",
+   "proxy_path": "/inbox",
+   "backend_path": "/inbox",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 4404,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/notifications/{}/ack",
+   "proxy_path": "/notifications/{notification_id}/ack",
+   "backend_path": "/notifications/{notification_id}/ack",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 4561,
+   "parity": "exact"
+  },
+  {
+   "method": "GET",
+   "frontend_path": "/notifications",
+   "proxy_path": "/notifications",
+   "backend_path": "/notifications",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 4680,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/milestones/{}/rename",
+   "proxy_path": "/projects/{project_id}/milestones/{name}/rename",
+   "backend_path": "/projects/{project_id}/milestones/{name}/rename",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3518,
+   "parity": "exact"
+  },
+  {
+   "method": "PATCH",
+   "frontend_path": "/projects/{}/milestones/{}",
+   "proxy_path": "/projects/{project_id}/milestones/{name}",
+   "backend_path": "/projects/{project_id}/milestones/{name}",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 3521,
+   "parity": "exact"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/re-enable",
+   "proxy_path": "/projects/{project_id}/re-enable",
+   "backend_path": "/projects/{project_id}/re-enable",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2736,
+   "parity": "exact",
+   "resolved_from": "LIFECYCLE_CONFIG table at plugin.js:2676-2680"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/disable",
+   "proxy_path": "/projects/{project_id}/disable",
+   "backend_path": "/projects/{project_id}/disable",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2736,
+   "parity": "exact",
+   "resolved_from": "LIFECYCLE_CONFIG table at plugin.js:2676-2680"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/pause",
+   "proxy_path": "/projects/{project_id}/pause",
+   "backend_path": "/projects/{project_id}/pause",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2736,
+   "parity": "exact",
+   "resolved_from": "LIFECYCLE_CONFIG table at plugin.js:2676-2680"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/projects/{}/resume",
+   "proxy_path": "/projects/{project_id}/resume",
+   "backend_path": "/projects/{project_id}/resume",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 2736,
+   "parity": "exact",
+   "resolved_from": "LIFECYCLE_CONFIG table at plugin.js:2676-2680"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/initiatives/{}/approve",
+   "proxy_path": "/initiatives/{ref}/approve",
+   "backend_path": "/initiatives/{ref}/approve",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 4369,
+   "parity": "exact",
+   "resolved_from": "decision action branches at plugin.js:4362-4368"
+  },
+  {
+   "method": "POST",
+   "frontend_path": "/initiatives/{}/reject",
+   "proxy_path": "/initiatives/{ref}/reject",
+   "backend_path": "/initiatives/{ref}/reject",
+   "source_file": "hermes_dockyard_plugin/desktop/plugin.js",
+   "line": 4369,
+   "parity": "exact",
+   "resolved_from": "decision action branches at plugin.js:4362-4368"
+  }
+ ],
+ "proxy_routes": [
+  {
+   "method": "GET",
+   "path": "/health",
+   "line": 346
+  },
+  {
+   "method": "GET",
+   "path": "/dashboard",
+   "line": 356
+  },
+  {
+   "method": "GET",
+   "path": "/portfolio",
+   "line": 361
+  },
+  {
+   "method": "GET",
+   "path": "/inbox",
+   "line": 366
+  },
+  {
+   "method": "GET",
+   "path": "/notifications",
+   "line": 371
+  },
+  {
+   "method": "GET",
+   "path": "/projects",
+   "line": 376
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/work-items",
+   "line": 381
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/work-items/{ref}",
+   "line": 391
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/settings",
+   "line": 401
+  },
+  {
+   "method": "PATCH",
+   "path": "/projects/{project_id}/settings",
+   "line": 407
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/objectives",
+   "line": 417
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/objectives/{objective_id}/assessment",
+   "line": 437
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/objectives",
+   "line": 444
+  },
+  {
+   "method": "PATCH",
+   "path": "/projects/{project_id}/objectives/{objective_id}",
+   "line": 459
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/objectives/{objective_id}/archive",
+   "line": 476
+  },
+  {
+   "method": "DELETE",
+   "path": "/projects/{project_id}/objectives/{objective_id}",
+   "line": 486
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/missions/archive",
+   "line": 496
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/mission/archive",
+   "line": 504
+  },
+  {
+   "method": "DELETE",
+   "path": "/projects/{project_id}/mission",
+   "line": 514
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/content",
+   "line": 524
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/content",
+   "line": 530
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/content/{content_id}/preview",
+   "line": 545
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/reports",
+   "line": 554
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/reports",
+   "line": 567
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/reports/{report_id}",
+   "line": 576
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/initiatives",
+   "line": 585
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/events",
+   "line": 594
+  },
+  {
+   "method": "GET",
+   "path": "/bots",
+   "line": 602
+  },
+  {
+   "method": "GET",
+   "path": "/bots/{bot_id}/sessions",
+   "line": 608
+  },
+  {
+   "method": "GET",
+   "path": "/bots/{bot_id}/sessions/{session_id}",
+   "line": 615
+  },
+  {
+   "method": "GET",
+   "path": "/workload",
+   "line": 622
+  },
+  {
+   "method": "GET",
+   "path": "/bot-groups",
+   "line": 627
+  },
+  {
+   "method": "GET",
+   "path": "/bot-groups/{name}/messages",
+   "line": 632
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/work-items/{ref}/transition",
+   "line": 733
+  },
+  {
+   "method": "PATCH",
+   "path": "/projects/{project_id}/work-items/{ref}",
+   "line": 743
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/work-items/{ref}/assign",
+   "line": 754
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/work-items/{ref}/dependencies",
+   "line": 765
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/work-items/{ref}/dependencies/{dependency_ref}/remove",
+   "line": 776
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/milestones",
+   "line": 790
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/milestones",
+   "line": 798
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/milestones/{name}",
+   "line": 804
+  },
+  {
+   "method": "PATCH",
+   "path": "/projects/{project_id}/milestones/{name}",
+   "line": 811
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/milestones/{name}/rename",
+   "line": 820
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/milestones/{name}/attach",
+   "line": 829
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/milestones/{name}/detach",
+   "line": 838
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/backlog",
+   "line": 847
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/backlog/items",
+   "line": 853
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/backlog",
+   "line": 865
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/backlog/{ref}/rerank",
+   "line": 873
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/views",
+   "line": 883
+  },
+  {
+   "method": "PUT",
+   "path": "/projects/{project_id}/views",
+   "line": 891
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/freeze",
+   "line": 899
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/pause",
+   "line": 905
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/resume",
+   "line": 911
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/disable",
+   "line": 917
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/re-enable",
+   "line": 923
+  },
+  {
+   "method": "POST",
+   "path": "/onboard",
+   "line": 929
+  },
+  {
+   "method": "GET",
+   "path": "/initiatives/{ref}/decision",
+   "line": 936
+  },
+  {
+   "method": "GET",
+   "path": "/initiatives/{ref}/decision/receipts",
+   "line": 942
+  },
+  {
+   "method": "POST",
+   "path": "/initiatives/{ref}/approve",
+   "line": 948
+  },
+  {
+   "method": "POST",
+   "path": "/initiatives/{ref}/reject",
+   "line": 961
+  },
+  {
+   "method": "POST",
+   "path": "/initiatives/{ref}/complete",
+   "line": 975
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/observations",
+   "line": 990
+  },
+  {
+   "method": "POST",
+   "path": "/observations/{ref}/run",
+   "line": 996
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/workflows/{name}/runs",
+   "line": 1002
+  },
+  {
+   "method": "POST",
+   "path": "/notifications/{notification_id}/ack",
+   "line": 1010
+  }
+ ],
+ "backend_routes": [
+  {
+   "method": "GET",
+   "path": "/projects",
+   "line": 443
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/enable",
+   "line": 447
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/disable",
+   "line": 460
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/re-enable",
+   "line": 464
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/settings",
+   "line": 468
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/features",
+   "line": 476
+  },
+  {
+   "method": "PATCH",
+   "path": "/projects/{project_id}/features",
+   "line": 480
+  },
+  {
+   "method": "PATCH",
+   "path": "/projects/{project_id}/settings",
+   "line": 487
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/pause",
+   "line": 496
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/resume",
+   "line": 500
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/freeze",
+   "line": 504
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/objectives",
+   "line": 508
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/objectives",
+   "line": 519
+  },
+  {
+   "method": "PATCH",
+   "path": "/projects/{project_id}/objectives/{objective_id}",
+   "line": 535
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/objectives/{objective_id}/archive",
+   "line": 550
+  },
+  {
+   "method": "DELETE",
+   "path": "/projects/{project_id}/objectives/{objective_id}",
+   "line": 561
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/objectives/{objective_id}/assessment",
+   "line": 572
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/objectives/{objective_id}/assessments",
+   "line": 606
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/missions/archive",
+   "line": 610
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/mission/archive",
+   "line": 614
+  },
+  {
+   "method": "DELETE",
+   "path": "/projects/{project_id}/mission",
+   "line": 620
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/content",
+   "line": 626
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/content",
+   "line": 630
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/content/{content_id}/preview",
+   "line": 645
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/health",
+   "line": 649
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/cycle",
+   "line": 656
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/initiatives",
+   "line": 667
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/initiatives",
+   "line": 672
+  },
+  {
+   "method": "GET",
+   "path": "/initiatives/{ref}/decision",
+   "line": 676
+  },
+  {
+   "method": "GET",
+   "path": "/initiatives/{ref}/decision/receipts",
+   "line": 680
+  },
+  {
+   "method": "POST",
+   "path": "/initiatives/{ref}/approve",
+   "line": 684
+  },
+  {
+   "method": "POST",
+   "path": "/initiatives/{ref}/reject",
+   "line": 703
+  },
+  {
+   "method": "POST",
+   "path": "/initiatives/{ref}/bind-board",
+   "line": 718
+  },
+  {
+   "method": "POST",
+   "path": "/initiatives/{ref}/complete",
+   "line": 725
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/observations",
+   "line": 741
+  },
+  {
+   "method": "POST",
+   "path": "/observations/{ref}/run",
+   "line": 745
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/reconcile",
+   "line": 752
+  },
+  {
+   "method": "POST",
+   "path": "/gateway/command",
+   "line": 774
+  },
+  {
+   "method": "POST",
+   "path": "/webhooks/{project_id}",
+   "line": 792
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/events",
+   "line": 808
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/notifications",
+   "line": 817
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/work-items",
+   "line": 870
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/work-items",
+   "line": 878
+  },
+  {
+   "method": "PATCH",
+   "path": "/projects/{project_id}/work-items/{ref}",
+   "line": 898
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/work-items/{ref}/assign",
+   "line": 915
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/work-items/{ref}/dependencies",
+   "line": 927
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/work-items/{ref}/dependencies/{dependency_ref}/remove",
+   "line": 939
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/work-items/{ref}",
+   "line": 958
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/work-items/{ref}/transition",
+   "line": 975
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/backlog",
+   "line": 989
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/backlog/items",
+   "line": 997
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/backlog",
+   "line": 1026
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/backlog/{ref}/rerank",
+   "line": 1040
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/milestones",
+   "line": 1056
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/milestones/{name}/attach",
+   "line": 1073
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/milestones",
+   "line": 1085
+  },
+  {
+   "method": "PATCH",
+   "path": "/projects/{project_id}/milestones/{name}",
+   "line": 1094
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/milestones/{name}/rename",
+   "line": 1107
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/milestones/{name}/detach",
+   "line": 1119
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/milestones/{name}",
+   "line": 1131
+  },
+  {
+   "method": "PUT",
+   "path": "/projects/{project_id}/views",
+   "line": 1138
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/views",
+   "line": 1152
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/views/{name}/items",
+   "line": 1161
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/reports",
+   "line": 1169
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/reports",
+   "line": 1182
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/reports/{report_id}",
+   "line": 1186
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/bots",
+   "line": 1196
+  },
+  {
+   "method": "GET",
+   "path": "/bots",
+   "line": 1206
+  },
+  {
+   "method": "POST",
+   "path": "/bots/{bot_id}/status",
+   "line": 1221
+  },
+  {
+   "method": "GET",
+   "path": "/workload",
+   "line": 1233
+  },
+  {
+   "method": "GET",
+   "path": "/bots/{bot_id}/reputation",
+   "line": 1237
+  },
+  {
+   "method": "POST",
+   "path": "/bot-groups",
+   "line": 1244
+  },
+  {
+   "method": "GET",
+   "path": "/bot-groups",
+   "line": 1260
+  },
+  {
+   "method": "POST",
+   "path": "/bot-groups/{name}/members",
+   "line": 1269
+  },
+  {
+   "method": "POST",
+   "path": "/a2a",
+   "line": 1279
+  },
+  {
+   "method": "GET",
+   "path": "/bot-groups/{name}/messages",
+   "line": 1291
+  },
+  {
+   "method": "GET",
+   "path": "/inbox",
+   "line": 1302
+  },
+  {
+   "method": "GET",
+   "path": "/dashboard",
+   "line": 1308
+  },
+  {
+   "method": "GET",
+   "path": "/portfolio",
+   "line": 1312
+  },
+  {
+   "method": "GET",
+   "path": "/notifications",
+   "line": 1317
+  },
+  {
+   "method": "POST",
+   "path": "/notifications/{notification_id}/ack",
+   "line": 1321
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/workflows",
+   "line": 1329
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/workflows",
+   "line": 1340
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/workflows/{name}/start",
+   "line": 1344
+  },
+  {
+   "method": "GET",
+   "path": "/projects/{project_id}/workflows/{name}/runs",
+   "line": 1359
+  },
+  {
+   "method": "GET",
+   "path": "/onboard/discover",
+   "line": 1368
+  },
+  {
+   "method": "POST",
+   "path": "/onboard/preflight",
+   "line": 1387
+  },
+  {
+   "method": "POST",
+   "path": "/onboard",
+   "line": 1459
+  },
+  {
+   "method": "POST",
+   "path": "/projects/{project_id}/first-assessment",
+   "line": 1549
+  },
+  {
+   "method": "GET",
+   "path": "/healthz",
+   "line": 1606
+  }
+ ],
+ "flagged_findings": {
+  "frontend_without_proxy": [
+   {
+    "method": "GET",
+    "path": "/onboard/discover",
+    "line": 1780,
+    "reason": "no proxy route with matching method+path shape"
+   },
+   {
+    "method": "POST",
+    "path": "/onboard/preflight",
+    "line": 1816,
+    "reason": "no proxy route with matching method+path shape"
+   },
+   {
+    "method": "POST",
+    "path": "/projects/{}/first-assessment",
+    "line": 2608,
+    "reason": "no proxy route with matching method+path shape"
+   },
+   {
+    "method": "POST",
+    "path": "/projects/{}/{}",
+    "line": 2736,
+    "reason": "no proxy route with matching method+path shape"
+   },
+   {
+    "method": "POST",
+    "path": "/initiatives/{}/{}",
+    "line": 4369,
+    "reason": "no proxy route with matching method+path shape"
+   }
+  ],
+  "proxy_without_backend": []
+ }
+}

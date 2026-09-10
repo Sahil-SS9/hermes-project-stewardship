@@ -2217,7 +2217,7 @@ async function loadProjectData(projectId) {
     api(`/projects/${encoded}/content`),
     api(`/projects/${encoded}/events`),
     api(`/projects/${encoded}/reports`),
-    api(`/projects/${encoded}/milestones`).catch(() => ({ milestones: [] })),
+    api(`/projects/${encoded}/milestones`),
   ])
   return {
     ...dashboard,
@@ -3523,8 +3523,8 @@ function PlanningPanel({ project, milestones, workItems, onRefresh }) {
     { method: 'PATCH', body: JSON.stringify({ closed: !m.closed, actor_id: 'sahil', actor_kind: 'human' }) })
   if (!milestones.length) {
     return jsxs('section', { className: 'dockyard-feature-card', 'data-planning-panel': true, children: [
-      jsx('h2', { children: 'Milestone planning' }),
-      jsx('p', { className: 'dockyard-meta', children: 'No milestones yet. Create one in the Dockyard dashboard; it appears here for review.' }),
+      jsx('h2', { children: 'Milestone planning' }, 'title'),
+      jsx('p', { className: 'dockyard-meta', children: 'No milestones yet. Create one in the Dockyard dashboard; it appears here for review.' }, 'empty'),
     ]})
   }
   const forecastLine = (fc) => {
@@ -3543,21 +3543,21 @@ function PlanningPanel({ project, milestones, workItems, onRefresh }) {
     notice && jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: notice }),
     jsx('p', { className: 'dockyard-meta', children: 'Counts are item counts, not hour estimates. Forecast is a scenario from completed-item history, never a delivery promise.' }),
     jsx('div', { className: 'dockyard-planning-table', role: 'table', 'aria-label': 'Milestones and delivery risk', children:
-      milestones.map((m) => {
+      milestones.map((m, index) => {
         const overdue = !m.closed && m.due && m.due < today
         const isOpen = expanded === m.name
         const d = isOpen ? detail : null
         return jsxs('div', { className: `dockyard-planning-row${overdue ? ' dockyard-milestone-overdue' : ''}`, 'data-milestone-row': m.name, role: 'row', children: [
           jsxs('button', { type: 'button', className: 'dockyard-planning-toggle', onClick: () => loadDetail(m.name), 'aria-expanded': String(isOpen), children: [
-            jsx('span', { className: 'dockyard-planning-name', children: m.closed ? `${m.name} (closed)` : m.name }),
-            jsx('span', { children: m.due ? `Due ${m.due}` : 'No due date' }),
-            jsx('span', { children: `${m.done}/${m.total} done` }),
+            jsx('span', { className: 'dockyard-planning-name', children: m.closed ? `${m.name} (closed)` : m.name }, 'name'),
+            jsx('span', { children: m.due ? `Due ${m.due}` : 'No due date' }, 'due'),
+            jsx('span', { children: `${m.done}/${m.total} done` }, 'count'),
           ]}),
           d && jsx('div', { className: 'dockyard-planning-detail', children: [
-            jsx('p', { className: 'dockyard-meta', children: `Scope: ${d.committed ?? d.total} committed, ${d.done} done, ${d.blocked ?? 0} blocked (${d.units || 'items'}, not hours).` }),
+            jsx('p', { className: 'dockyard-meta', children: `Scope: ${d.committed ?? d.total} committed, ${d.done} done, ${d.blocked ?? 0} blocked (${d.units || 'items'}, not hours).` }, 'scope'),
             (d.assignee_wip && Object.keys(d.assignee_wip).length > 0)
-              ? jsx('p', { className: 'dockyard-meta', children: `Assignee WIP: ${Object.entries(d.assignee_wip).map(([who, n]) => `${who}: ${n}`).join(', ')} (item counts).` })
-              : jsx('p', { className: 'dockyard-meta', children: 'No in-progress assignments.' }),
+              ? jsx('p', { className: 'dockyard-meta', children: `Assignee WIP: ${Object.entries(d.assignee_wip).map(([who, n]) => `${who}: ${n}`).join(', ')} (item counts).` }, 'wip')
+              : jsx('p', { className: 'dockyard-meta', children: 'No in-progress assignments.' }, 'no-wip'),
             (d.risks ?? []).length > 0
               ? jsx('ul', { className: 'dockyard-planning-risks', children: d.risks.map((risk, index) => jsxs('li', { 'data-risk-kind': risk.kind, children: [
                   risk.kind === 'dependency_blocker' && risk.item
@@ -3567,12 +3567,12 @@ function PlanningPanel({ project, milestones, workItems, onRefresh }) {
                       : risk.kind === 'milestone_overdue'
                         ? `Milestone past its due date with ${risk.remaining} item(s) remaining.`
                         : risk.kind,
-                ] }, `${risk.kind}:${risk.item ?? index}`)) })
-              : jsx('p', { className: 'dockyard-meta', children: 'No blocking risks recorded.' }),
-            jsx('p', { className: 'dockyard-planning-forecast', children: forecastLine(d.forecast) }),
-            jsx('p', { className: 'dockyard-meta', children: 'Open a work item ref in the Board tab to drill into a blocker. Nothing is auto-reassigned or replanned.' }),
+                ] }, `${risk.kind}:${risk.item ?? 'risk'}:${index}`)) })
+              : jsx('p', { className: 'dockyard-meta', children: 'No blocking risks recorded.' }, 'no-risks'),
+            jsx('p', { className: 'dockyard-planning-forecast', children: forecastLine(d.forecast) }, 'forecast'),
+            jsx('p', { className: 'dockyard-meta', children: 'Open a work item ref in the Board tab to drill into a blocker. Nothing is auto-reassigned or replanned.' }, 'note'),
           ] }),
-        ] }, m.name)
+        ]}, `${m.name}:item:${index}`)
       })
     }),
   ]})
