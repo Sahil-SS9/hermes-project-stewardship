@@ -82,6 +82,10 @@ class StewardshipService:
         notification_policy: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         now = iso(self._clock())
+        # PM-0102 (fix 1, atomic seeding): the project row is inserted with
+        # EMPTY projection fields; normalised membership is seeded and the
+        # projections derived in the SAME transaction, so a seeding failure
+        # can never leave user-supplied ownership in legacy columns.
         with self.store.tx() as cx:
             cx.execute(
                 """
@@ -94,8 +98,8 @@ class StewardshipService:
                 ON CONFLICT(project_id) DO UPDATE SET
                     enabled=1,
                     mission=excluded.mission,
-                    owner_lead_profile=excluded.owner_lead_profile,
-                    member_profiles_json=excluded.member_profiles_json,
+                    owner_lead_profile=NULL,
+                    member_profiles_json='[]',
                     autonomy_level=excluded.autonomy_level,
                     verification_policy_json=excluded.verification_policy_json,
                     release_policy_json=excluded.release_policy_json,
@@ -107,8 +111,8 @@ class StewardshipService:
                     project_id,
                     1,
                     mission,
-                    lead_profile,
-                    json.dumps(list(member_profiles or [])),
+                    None,
+                    json.dumps([]),
                     int(autonomy_level),
                     self.store._j(verification_policy or {}),
                     self.store._j(release_policy or {}),
@@ -117,6 +121,11 @@ class StewardshipService:
                     now,
                     now,
                 ),
+            )
+            self._membership().seed_members_in_tx(
+                cx, project_id,
+                lead_profile=lead_profile,
+                member_profiles=list(member_profiles or []),
             )
         self.store.audit(
             actor=lead_profile or "system",
@@ -207,6 +216,12 @@ class StewardshipService:
         if row is None:
             raise ServiceError(f"stewardship not enabled for project '{project_id}'")
         return row
+
+    def _membership(self):
+        """Normalised membership layer (Phase 1): sole writable representation."""
+        from .membership import MembershipService
+
+        return MembershipService(self.store, self, clock=self._clock)
 
     def _row_settings(self, r: sqlite3.Row) -> Dict[str, Any]:
         """Serialise a raw stewardship row regardless of enabled flag."""
@@ -374,10 +389,11 @@ class StewardshipService:
                 raise ServiceError("mission must be text of at most 2000 characters")
             current["mission"] = mission.strip()
             changed.append("mission")
+        membership_changes: Dict[str, Any] = {}
         if lead_profile is not None:
             if not isinstance(lead_profile, str) or len(lead_profile.strip()) > 100:
                 raise ServiceError("lead_profile must be text of at most 100 characters")
-            current["owner"]["lead_profile"] = lead_profile.strip() or None
+            membership_changes["lead_profile"] = lead_profile.strip() or None
             changed.append("lead_profile")
         if member_profiles is not None:
             members = list(member_profiles)
@@ -386,7 +402,7 @@ class StewardshipService:
                 for profile in members
             ):
                 raise ServiceError("member_profiles must contain at most 32 valid profile names")
-            current["owner"]["member_profiles"] = [profile.strip() for profile in members]
+            membership_changes["member_profiles"] = [p.strip() for p in members if p.strip()]
             changed.append("member_profiles")
         if autonomy_level is not None:
             if isinstance(autonomy_level, bool) or not isinstance(autonomy_level, int) or not 0 <= autonomy_level <= 5:
@@ -421,11 +437,15 @@ class StewardshipService:
             return current
 
         now = iso(self._clock())
+        # Fix 2 (atomic reconciliation): validation happened above; mission,
+        # policies, full roster reconciliation and the legacy projections
+        # commit in ONE transaction — a membership failure rolls back
+        # mission/policy changes too.
         with self.store.tx() as cx:
             cx.execute(
                 """
                 UPDATE project_stewardship SET
-                    mission=?, owner_lead_profile=?, member_profiles_json=?,
+                    mission=?,
                     autonomy_level=?, autonomy_policy_json=?,
                     verification_policy_json=?, release_policy_json=?,
                     notification_policy_json=?, updated_at=?
@@ -433,8 +453,6 @@ class StewardshipService:
                 """,
                 (
                     current["mission"],
-                    current["owner"]["lead_profile"],
-                    self.store._j(current["owner"]["member_profiles"]),
                     current["autonomy_level"],
                     self.store._j(current["policies"]["autonomy"]),
                     self.store._j(current["policies"]["verification"]),
@@ -444,6 +462,16 @@ class StewardshipService:
                     project_id,
                 ),
             )
+            if membership_changes:
+                self._membership().reconcile_in_tx(
+                    cx, project_id,
+                    lead_profile=membership_changes.get(
+                        "lead_profile", current["owner"]["lead_profile"]
+                    ),
+                    member_profiles=membership_changes.get(
+                        "member_profiles", current["owner"]["member_profiles"]
+                    ),
+                )
         self.store.audit(
             actor=actor,
             interface=interface,

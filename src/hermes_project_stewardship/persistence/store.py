@@ -21,7 +21,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
-from .migrations import MIGRATIONS
+from .migrations import MIGRATIONS, SCHEMA_VERSION
+
+
+class NewerSchemaError(RuntimeError):
+    """Database was migrated by a newer binary; refuse to open (PM-0112)."""
 
 
 def utcnow() -> datetime:
@@ -138,6 +142,12 @@ class Store:
         current = self._conn.execute(
             "SELECT COALESCE(MAX(version),0) AS v FROM schema_migrations"
         ).fetchone()["v"]
+        if current > max((m.version for m in MIGRATIONS), default=0):
+            raise NewerSchemaError(
+                f"database schema version {current} is newer than this binary"
+                f" supports (max {SCHEMA_VERSION}); refusing to open a"
+                " database migrated by a newer Hermes build"
+            )
         for m in MIGRATIONS:
             if m.version <= current:
                 continue

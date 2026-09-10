@@ -33,6 +33,7 @@ except ImportError as e:  # pragma: no cover
     ) from e
 
 from ..cycles.engine import CycleEngine, CycleRefused
+from ..domain.constants import Capability
 from ..dockyard import Actor, ActorKind
 from ..events.bus import EventBus
 from ..gateway.handler import CommandRequest, GatewayCommandHandler
@@ -77,6 +78,22 @@ class EnableRequest(BaseModel):
     verification_policy: Dict[str, Any] = {}
     release_policy: Dict[str, Any] = {}
     notification_policy: Dict[str, Any] = {}
+
+
+class MemberRequest(BaseModel):
+    profile_slug: str
+    role: str = "member"
+    actor: str = ""  # attribution only; never authorisation
+
+
+class MemberStateRequest(BaseModel):
+    state: str
+    actor: str = ""
+
+
+class RelinkRequest(BaseModel):
+    new_profile_slug: str
+    actor: str = ""
 
 
 class SettingsPatch(BaseModel):
@@ -384,6 +401,7 @@ def create_app(
     auth_principal_is_human: bool = False,
     rate_limit_rpm: int = 120,
     kanban_adapter: KanbanAdapter | None = None,
+    capabilities=None,
 ) -> FastAPI:
     embedded = store is not None
     if store is None:
@@ -461,6 +479,93 @@ def create_app(
     def disable(project_id: str):
         return svc.disable(project_id)
 
+    # ------------------------------------------------------------------ #
+    # Membership (Phase 1, PM-0102/0103/0104/0105/0111). Authority: a     #
+    # verified human principal is required; capability is composed by the #
+    # server, never by request fields. Fail closed with 503 when no       #
+    # trusted principal exists.                                           #
+    # ------------------------------------------------------------------ #
+
+    def _membership():
+        from ..persistence.membership import MembershipService
+        return MembershipService(store, svc)
+
+    # Fix 5: the server composes the capability set bound to the verified
+    # principal. Payloads can never grant capabilities; shared/agent
+    # principals carry the default denial for privileged membership work.
+    # Fix 6: the capability set is composed by the SERVER (explicit
+    # per-principal grant), never by the request. A verified human without
+    # a capability gets exactly 403.
+    principal_capabilities: frozenset = (
+        frozenset(capabilities) if capabilities is not None
+        else (frozenset({c.value for c in Capability}) if auth_principal_is_human else frozenset())
+    )
+
+    def _membership_authority(capability_name: str) -> str:
+        principal = current_principal()
+        if not principal:
+            raise HTTPException(
+                503,
+                "no trusted principal available: membership changes require"
+                " an authenticated human caller; a payload actor string is"
+                " attribution, never authority",
+            )
+        if capability_name not in principal_capabilities:
+            raise HTTPException(
+                403,
+                f"verified principal '{principal}' lacks the '{capability_name}' capability",
+            )
+        return principal
+
+    @router.get("/projects/{project_id}/members")
+    def list_members(project_id: str):
+        return {"members": [m.__dict__ for m in _membership().list_members(project_id)]}
+
+    @router.post("/projects/{project_id}/members")
+    def add_member(project_id: str, body: MemberRequest):
+        principal = _membership_authority("membership_admin")
+        try:
+            member = _membership().add_member(
+                project_id, body.profile_slug, role=body.role, actor=principal
+            )
+        except ServiceError as e:
+            raise HTTPException(409, str(e)) from None
+        return member.__dict__
+
+    @router.delete("/projects/{project_id}/members/{profile_slug}")
+    def remove_member(project_id: str, profile_slug: str, body: MemberRequest):
+        principal = _membership_authority("membership_admin")
+        try:
+            return _membership().remove_member(project_id, profile_slug, actor=principal).__dict__
+        except ServiceError as e:
+            raise HTTPException(409, str(e)) from None
+
+    @router.post("/projects/{project_id}/members/{profile_slug}/lead")
+    def transfer_lead(project_id: str, profile_slug: str, body: MemberRequest):
+        principal = _membership_authority("lead_transfer")
+        try:
+            return _membership().transfer_lead(project_id, profile_slug, actor=principal).__dict__
+        except ServiceError as e:
+            raise HTTPException(409, str(e)) from None
+
+    @router.post("/projects/{project_id}/members/{profile_slug}/state")
+    def set_member_state(project_id: str, profile_slug: str, body: MemberStateRequest):
+        principal = _membership_authority("membership_admin")
+        try:
+            return _membership().set_state(project_id, profile_slug, body.state, actor=principal).__dict__
+        except ServiceError as e:
+            raise HTTPException(409, str(e)) from None
+
+    @router.post("/projects/{project_id}/members/{profile_slug}/relink")
+    def relink_member(project_id: str, profile_slug: str, body: RelinkRequest):
+        principal = _membership_authority("membership_admin")
+        try:
+            return _membership().relink_profile(
+                project_id, profile_slug, body.new_profile_slug, actor=principal
+            ).__dict__
+        except ServiceError as e:
+            raise HTTPException(409, str(e)) from None
+
     @router.post("/projects/{project_id}/re-enable")
     def re_enable(project_id: str):
         return svc.re_enable(project_id)
@@ -487,11 +592,19 @@ def create_app(
     @router.patch("/projects/{project_id}/settings")
     def patch_settings(project_id: str, body: SettingsPatch):
         changes = body.model_dump(exclude_unset=True)
+        if "lead_profile" in changes or "member_profiles" in changes:
+            raise HTTPException(
+                status_code=409,
+                detail="settings PATCH cannot change lead_profile or member_profiles; use membership authority endpoints",
+            )
         actor = _principal_id(changes.pop("actor", body.actor))
         interface = changes.pop("interface", body.interface)
-        return svc.update_settings(
-            project_id, actor=actor, interface=interface, **changes
-        )
+        try:
+            return svc.update_settings(
+                project_id, actor=actor, interface=interface, **changes
+            )
+        except ServiceError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from None
 
     @router.post("/projects/{project_id}/pause")
     def pause(project_id: str):

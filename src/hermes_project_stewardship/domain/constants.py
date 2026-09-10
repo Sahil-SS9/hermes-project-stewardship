@@ -82,6 +82,106 @@ class ProjectPhase(str, Enum):
     ACTIVE = "active"
     PAUSED = "paused"
     FROZEN = "frozen"
+    DISABLED = "disabled"
+    ARCHIVED = "archived"
+
+
+class ProjectLifecycle:
+    """PM-0107 (fix 7): explicit transition matrix with side effects.
+
+    Allowed transitions (from -> {to}):
+      active    -> paused, frozen, disabled, archived
+      paused    -> active, disabled, archived
+      frozen    -> active, disabled, archived
+      disabled  -> active (re-enable; restores prior phase side effects)
+      archived  -> active (restore)
+    Any transition not listed is refused. Side effects record the phase
+    timestamps the service writes with the UPDATE (paused_at on pause/
+    freeze; cleared on resume; updated_at always).
+    """
+
+    TRANSITIONS: dict[str, frozenset] = {
+        ProjectPhase.ACTIVE.value: frozenset({
+            ProjectPhase.PAUSED.value, ProjectPhase.FROZEN.value,
+            ProjectPhase.DISABLED.value, ProjectPhase.ARCHIVED.value,
+        }),
+        ProjectPhase.PAUSED.value: frozenset({
+            ProjectPhase.ACTIVE.value, ProjectPhase.DISABLED.value,
+            ProjectPhase.ARCHIVED.value,
+        }),
+        ProjectPhase.FROZEN.value: frozenset({
+            ProjectPhase.ACTIVE.value, ProjectPhase.DISABLED.value,
+            ProjectPhase.ARCHIVED.value,
+        }),
+        ProjectPhase.DISABLED.value: frozenset({ProjectPhase.ACTIVE.value}),
+        ProjectPhase.ARCHIVED.value: frozenset({ProjectPhase.ACTIVE.value}),
+    }
+
+    @classmethod
+    def can_transition(cls, current: str, target: str) -> bool:
+        return target in cls.TRANSITIONS.get(str(current), frozenset())
+
+    @classmethod
+    def require_transition(cls, current: str, target: str) -> None:
+        if not cls.can_transition(current, target):
+            raise ValueError(
+                f"project lifecycle transition '{current}' -> '{target}' is not allowed"
+            )
+
+    @classmethod
+    def side_effects(cls, target: str) -> dict:
+        """Phase side effects applied with every transition (PM-0107)."""
+        paused = target in {ProjectPhase.PAUSED.value, ProjectPhase.FROZEN.value}
+        return {"paused_at": "now" if paused else None, "phase": target}
+
+
+class MembershipState(str, Enum):
+    """PM-0104: membership lifecycle states."""
+
+    ACTIVE = "active"
+    DEPARTURE_PENDING = "departure_pending"
+    DEPARTED = "departed"
+    UNAVAILABLE = "unavailable"  # display status for a profile that vanished
+
+
+class TransferEligibility:
+    """PM-0108: work-transfer eligibility by canonical status/kind.
+
+    Claimed/running work is non-transferable in this release (Phase 0
+    decision); epics are grouping records and never assignable.
+    """
+
+    ELIGIBLE_STATUSES = frozenset({"backlog", "triage", "todo", "ready", "blocked", "review"})
+    NON_TRANSFERABLE_STATUSES = frozenset({"claimed", "running", "done", "archived", "scheduled"})
+
+    @classmethod
+    def is_eligible(cls, status_or_kind: str) -> bool:
+        value = str(status_or_kind or "").strip().lower()
+        if value == "epic":
+            return False
+        if value in cls.NON_TRANSFERABLE_STATUSES:
+            return False
+        return value in cls.ELIGIBLE_STATUSES
+
+
+class Capability(str, Enum):
+    """PM-0111: explicit capabilities required for privileged operations."""
+
+    MEMBERSHIP_ADMIN = "membership_admin"
+    LEAD_TRANSFER = "lead_transfer"
+    BULK_REASSIGNMENT = "bulk_reassignment"
+    PROJECT_ARCHIVE = "project_archive"
+    MANAGED_FILE_REMOVAL = "managed_file_removal"
+
+
+class OperationState(str, Enum):
+    """PM-0110: durable saga states."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    COMPENSATED = "compensated"
 
 
 # Alias kept for API symmetry with Risk/Severity vocabularies.
