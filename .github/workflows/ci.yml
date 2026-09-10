@@ -86,4 +86,4 @@ jobs:
         working-directory: hermes_dockyard_plugin/desktop
         env:
           DOCKYARD_CAPTURE_SCREENSHOTS: "0"
-        run: node --experimental-vm-modules --test repro-live.test.mjs
+        run: node --experimental-vm-modules --test repro-live.test.mjs milestone-chain.test.mjs

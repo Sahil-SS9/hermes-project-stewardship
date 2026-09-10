@@ -584,6 +584,11 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       const projectId = decodeURIComponent(missionArchiveRead[1]);
       return clone(data.missionArchive[projectId] ?? { missions: [] });
     }
+    const milestonesRead = path.match(/^\/projects\/([^/]+)\/milestones$/);
+    if (milestonesRead) {
+      const projectId = decodeURIComponent(milestonesRead[1]);
+      return clone(data.milestones?.[projectId] ?? { milestones: [] });
+    }
     const projectRead = path.match(/^\/projects\/([^/]+)\/(settings|work-items|initiatives|objectives|events|backlog|views|reports|content)$/);
     if (projectRead) {
       const projectId = decodeURIComponent(projectRead[1]);

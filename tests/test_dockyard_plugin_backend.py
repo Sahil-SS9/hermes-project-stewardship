@@ -93,6 +93,71 @@ def test_host_contract_router_and_health(client):
     assert r.json()["service"] == "hermes-dockyard"
 
 
+def test_milestone_proxy_round_trip_is_not_false_empty(client):
+    from hermes_project_stewardship.persistence.service import StewardshipService
+    project_id = "milestone-proxy-round-trip"
+    service = StewardshipService(plugin_api._store)
+    service.enable(project_id, lead_profile="fixture")
+    created = client.post(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/milestones",
+        json={"name": "Release", "due": "2026-12-01"},
+    )
+    assert created.status_code == 200, created.text
+    listed = client.get(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/milestones"
+    )
+    assert listed.status_code == 200, listed.text
+    assert [item["name"] for item in listed.json()["milestones"]] == ["Release"]
+    detail = client.get(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/milestones/Release"
+    )
+    assert detail.status_code == 200, detail.text
+
+
+def test_all_milestone_operations_cross_proxy_and_backend(client):
+    from hermes_project_stewardship.persistence.service import StewardshipService
+    pid = "milestone-all-operations"
+    StewardshipService(plugin_api._store).enable(pid, lead_profile="fixture")
+    base = f"/api/plugins/hermes-dockyard/projects/{pid}/milestones"
+    assert client.post(base, json={"name": "Plan", "due": "2026-12-01"}).status_code == 200
+    assert client.patch(f"{base}/Plan", json={"closed": True}).status_code == 200
+    assert client.post(f"{base}/Plan/rename", json={"new_name": "Shipped"}).status_code == 200
+    # The route is crossed even when the canonical ref is rejected by the backend.
+    assert client.post(f"{base}/Shipped/attach", json={"ref": "WI-1"}).status_code == 409
+    assert client.post(f"{base}/Shipped/detach", json={"ref": "WI-1"}).status_code == 200
+    assert client.get(f"{base}/Shipped").status_code == 200
+    assert client.get(base).json()["milestones"][0]["name"] == "Shipped"
+
+
+def test_milestone_server_error_branches_are_explicit(client):
+    base = "/api/plugins/hermes-dockyard/projects/missing/milestones"
+    assert client.get(base).status_code == 404
+    assert client.get(f"{base}/none").status_code == 404
+    assert client.patch(f"{base}/none", json={"closed": True}).status_code == 409
+    assert client.post(f"{base}/none/rename", json={"new_name": "x"}).status_code == 409
+    assert client.post(f"{base}/none/detach", json={"ref": "x"}).status_code == 409
+
+
+@pytest.mark.parametrize(("status", "payload"), [
+    (404, {"detail": "missing"}),
+    (422, {"detail": "invalid"}),
+    (500, {"detail": "boom"}),
+])
+def test_milestone_proxy_propagates_backend_failures(client, monkeypatch, status, payload):
+    class Response:
+        status_code = status
+        text = str(payload)
+        def json(self):
+            return payload
+    class Backend:
+        async def request(self, *_args, **_kwargs):
+            return Response()
+    monkeypatch.setattr(plugin_api, "_client", Backend())
+    response = client.get("/api/plugins/hermes-dockyard/projects/p/milestones")
+    assert response.status_code == status
+    assert response.json()["detail"]["detail"] == payload["detail"]
+
+
 @pytest.mark.skipif(os.name != "posix", reason="POSIX file modes only")
 def test_default_plugin_database_is_durable_and_private(tmp_path, monkeypatch):
     hermes_home = tmp_path / "hermes-home"
