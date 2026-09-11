@@ -217,12 +217,46 @@ def test_onboard_then_dashboard_flow(client):
     assert "notifications" in notes.json()
 
 
-def test_existing_onboarding_converges_idempotently(client):
+def test_onboarding_member_contract_survives_proxy_and_persists(client):
+    payload = {
+        "project_id": "member-path",
+        "repo_path": "/srv/member-path",
+        "mission": "prove desktop proxy member persistence",
+        "lead_profile": "octacon",
+        "member_profiles": ["quan", "wesker"],
+        "idempotency_key": "member-path-key",
+    }
+    preflight = client.post(
+        "/api/plugins/hermes-dockyard/onboard/preflight", json=payload
+    )
+    assert preflight.status_code == 200, preflight.text
+    contract = preflight.json()["preflight"]
+    created = client.post(
+        "/api/plugins/hermes-dockyard/onboard",
+        json={
+            **payload,
+            "expected_membership_revision": contract["membership_revision"],
+            "preflight_token": contract["token"],
+        },
+    )
+    assert created.status_code == 200, created.text
+    settings = client.get(
+        "/api/plugins/hermes-dockyard/projects/member-path/settings"
+    )
+    assert settings.status_code == 200
+    assert settings.json()["owner"] == {
+        "lead_profile": "octacon",
+        "member_profiles": ["quan", "wesker"],
+        "owner_team_id": None,
+    }
+
+
+def test_existing_onboarding_rejects_conflicting_default_key_reuse(client):
     r = client.post("/api/plugins/hermes-dockyard/onboard", json={
         "project_id": "alpha", "repo_path": "/srv/a",
         "mission": "again", "lead_profile": "octacon"})
-    assert r.status_code == 200
-    assert r.json()["canonical"]["status"] == "complete"
+    assert r.status_code == 409
+    assert r.json()["detail"]["error"]["code"] == "idempotency_conflict"
 
 
 def test_rich_dashboard_reads_are_exposed_through_plugin_router(client):

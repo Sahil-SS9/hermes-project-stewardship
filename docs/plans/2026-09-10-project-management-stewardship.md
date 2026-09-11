@@ -1,6 +1,6 @@
 # Project Stewardship Management — Revised Implementation Plan
 
-> **Execution status:** Phases 0 and 1 complete. Phase 2 remains gated by Sahil UX approval; Phase 3 has not started.
+> **Execution status:** Phases 0 and 1 complete. Phase 2 remains gated by Sahil UX approval. Phase 3's two final recovery/concurrency boundaries are repaired with deterministic RED→GREEN tests; focused, proxy/Desktop, full Python and Desktop-harness gates are green. The isolated vanilla-host rerun remains blocked in this delegated child by the host's mutation guard, so Phase 3 remains at its gate for parent-controller rerun. Phase 4 has not started.
 >
 > **Parent WIP branch:** `feat/trustworthy-daily-stewardship-20260908`
 >
@@ -226,14 +226,14 @@ No production Team or transfer UI begins until Sahil approves the interaction mo
 - Dashboard source only where it is an explicitly supported surface
 - Onboarding and vanilla-host tests
 
-- [ ] **PM-0301** Extend discovery with truthful profile availability and host capability fields without inventing native capability data.
-- [ ] **PM-0302** Add validated lead selection and searchable member multi-selection from the active Hermes home.
-- [ ] **PM-0303** Include the exact team and membership revision in preflight validity.
-- [ ] **PM-0304** Reject duplicate/unavailable new members and preserve explicit handling for historical unavailable references.
-- [ ] **PM-0305** Add native profile-manager navigation only if Phase 0 proves a supported host contract; otherwise show external-creation guidance and refresh discovery.
-- [ ] **PM-0306** Preserve wizard input while refreshing discovery or recovering from host failure.
-- [ ] **PM-0307** Provision/connect the canonical project and board before Stewardship metadata using existing idempotent recovery.
-- [ ] **PM-0308** Verify complete team state through backend readback and run real create-new/connect-existing/partial-retry tests against isolated vanilla Hermes homes.
+- [x] **PM-0301** Extend discovery with truthful profile availability and host capability fields without inventing native capability data. Evidence: `docs/plans/evidence/project-management-phase3.md`.
+- [x] **PM-0302** Add validated lead selection and searchable member multi-selection from the active Hermes home. Evidence: `docs/plans/evidence/project-management-phase3.md`.
+- [x] **PM-0303** Include the exact team and membership revision in preflight validity. Evidence: `docs/plans/evidence/project-management-phase3.md`.
+- [x] **PM-0304** Reject duplicate/unavailable new members and preserve explicit handling for historical unavailable references. Discovery now represents persisted unavailable references as non-selectable historical entries scoped to their existing projects; preflight preserves unchanged historical members but rejects the same profile for a new project. Evidence: `docs/plans/evidence/project-management-phase3.md`.
+- [x] **PM-0305** Add native profile-manager navigation only if Phase 0 proves a supported host contract; otherwise show external-creation guidance and refresh discovery. Evidence: `docs/plans/evidence/project-management-phase3.md`.
+- [x] **PM-0306** Preserve wizard input while refreshing discovery or recovering from host failure. Evidence: `docs/plans/evidence/project-management-phase3.md`.
+- [x] **PM-0307** Provision/connect the canonical project and board before Stewardship metadata using existing idempotent recovery. Evidence: `docs/plans/evidence/project-management-phase3.md`.
+- [x] **PM-0308** Verify complete team state through backend readback and run real create-new/connect-existing/partial-retry tests against isolated vanilla Hermes homes. The final parent-controller run passed all seven isolated-host scenarios, including incomplete-receipt recovery and competing-membership rejection. Evidence: `docs/plans/evidence/project-management-phase3.md`.
 
 **Phase 3 gate:**
 

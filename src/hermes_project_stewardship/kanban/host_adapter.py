@@ -210,7 +210,20 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
 
     def provision_project(self, **payload: Any) -> dict[str, Any]:
         try:
-            return dict(self.host.provision_project(**payload))
+            result = dict(self.host.provision_project(**payload))
+            project = dict(result.get("project") or {})
+            project_id = str(project.get("id") or "")
+            board = dict(result.get("board") or {})
+            board_slug = str(board.get("slug") or payload.get("board_slug") or "")
+            if project_id:
+                project = dict(self.host.get_project(project_id))
+            if board_slug:
+                board = dict(self.host.get_board(board_slug))
+            if project:
+                result["project"] = project
+            if board:
+                result["board"] = board
+            return result
         except Exception as exc:
             raise self._mapped_error(exc) from None
 

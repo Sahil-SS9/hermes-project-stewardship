@@ -25,12 +25,18 @@ const POPULATED = {
   // P7.GATE: host-driven onboarding surface.
   DISCOVER: {
     projects: [{ id: 'p_demo', slug: 'demo-project', name: 'Demo Project', board_slug: 'demo-project', repo_path: '/srv/demo' }],
-    profiles: [{ name: 'default', is_default: true }, { name: 'octacon', is_default: false }, { name: 'quan', is_default: false }],
+    profiles: [
+      { name: 'default', is_default: true, available: true, selectable: true, host_capabilities: ['lead', 'member'] },
+      { name: 'octacon', is_default: false, available: true, selectable: true, host_capabilities: ['lead', 'member'] },
+      { name: 'quan', is_default: false, available: true, selectable: true, host_capabilities: ['member'] },
+      { name: 'retired', is_default: false, available: false, selectable: false, historical_reference: true, project_ids: ['demo-project'], host_capabilities: [] },
+    ],
   },
   PREFLIGHT: {
     validated: { slug: 'checkout-ops', repo_path: '/srv/checkout-ops', lead_profile: 'octacon' },
     existing: { projects: [{ id: 'p_demo', slug: 'demo-project' }], profiles: [{ name: 'default' }, { name: 'octacon' }] },
     mode: 'create_new',
+    preflight: { team_revision: 0, membership_revision: 0, lead_profile: 'octacon', member_profiles: ['quan'], historical_unavailable_profiles: [], token: 'review-token-0' },
     // P7.3: inert suggestions (supported + unsupported shown for review).
     suggestions: [
       { name: 'Node tooling present', evaluator_type: 'manual', target: '>=1', severity: 'low', description: 'Declares Node/package tooling.', suggested_file: 'package.json' },
@@ -1205,6 +1211,7 @@ async function testOnboardingWizardAndToastSurface() {
   await runtime.setValue('[data-field="mission"]', 'Reduce payment failures without weakening release gates.');
   await runtime.click('[data-action="wizard-next"]');
   await runtime.setValue('[data-field="lead-profile"]', 'octacon');
+  await runtime.click('[data-member-option="quan"] input');
   await runtime.click('[data-action="wizard-next"]');
   assert.equal(wizard.querySelector('[data-wizard-step].active')?.getAttribute('data-wizard-step'), '4', 'wizard did not reach review');
   assert.match(wizard.textContent, /checkout-ops/);
@@ -1219,7 +1226,11 @@ async function testOnboardingWizardAndToastSurface() {
     repo_path: '/home/sahil/repos/checkout',
     mission: 'Reduce payment failures without weakening release gates.',
     lead_profile: 'octacon',
-  }, 'wizard did not submit the supported onboarding contract');
+    member_profiles: ['quan'],
+    idempotency_key: 'dockyard-onboard:checkout-ops',
+    expected_membership_revision: 0,
+    preflight_token: 'review-token-0',
+  }, 'wizard did not submit the complete reviewed onboarding contract');
   assert(!doc.querySelector('[data-onboarding-wizard]'), 'wizard remained open after successful onboarding');
   assert.match(doc.querySelector('[data-toast-region]')?.textContent || '', /Project checkout-ops onboarded/);
   assert.equal(doc.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute('data-tab'), 'project', 'successful onboarding did not open the new project');
@@ -1404,6 +1415,47 @@ async function testOnboardingPreflightConflictSurfacesBeforeCommit() {
   await runtime.dispose();
 }
 
+async function testOnboardingDiscoverySuccessRefreshPreservesWizardInput() {
+  const runtime = await createRuntime();
+  await runtime.mount();
+  await runtime.flush(60);
+  const doc = runtime.dom.window.document;
+  await runtime.click('[data-action="open-onboarding"]', 120);
+  await runtime.setValue('[data-field="project-id"]', 'preserve-success', 30);
+  await runtime.setValue('[data-field="repo-path"]', '/srv/preserve-success', 30);
+  assert(doc.querySelector('[data-profile-guidance]'), 'successful discovery hides external profile guidance');
+  assert(doc.querySelector('[data-action="refresh-onboarding-discovery"]'), 'successful discovery hides refresh');
+  await runtime.click('[data-action="refresh-onboarding-discovery"]', 120);
+  assert.equal(doc.querySelector('[data-field="project-id"]').value, 'preserve-success');
+  assert.equal(doc.querySelector('[data-field="repo-path"]').value, '/srv/preserve-success');
+  await runtime.click('[data-action="wizard-next"]', 40);
+  await runtime.setValue('[data-field="mission"]', 'Preserve every entered field', 30);
+  await runtime.click('[data-action="wizard-next"]', 40);
+  const retiredLead = doc.querySelector('[data-field="lead-profile"] option[value="retired"]');
+  const retiredMember = doc.querySelector('[data-member-option="retired"] input');
+  assert(retiredLead?.disabled, 'historical unavailable lead remains selectable');
+  assert(retiredMember?.disabled, 'historical unavailable member remains selectable');
+  assert.match(doc.querySelector('[data-member-option="retired"]')?.textContent || '', /unavailable/);
+  await runtime.dispose();
+}
+
+async function testOnboardingDiscoveryRefreshPreservesWizardInput() {
+  const runtime = await createRuntime({ failMutationPath: '/onboard/discover' });
+  await runtime.mount();
+  await runtime.flush(60);
+  const doc = runtime.dom.window.document;
+  await runtime.click('[data-action="open-onboarding"]', 120);
+  await runtime.setValue('[data-field="project-id"]', 'preserve-me', 30);
+  await runtime.setValue('[data-field="repo-path"]', '/srv/preserve-me', 30);
+  const refresh = doc.querySelector('[data-action="refresh-onboarding-discovery"]');
+  assert(refresh, 'onboarding discovery needs an explicit refresh action');
+  await runtime.click('[data-action="refresh-onboarding-discovery"]', 120);
+  assert.equal(doc.querySelector('[data-field="project-id"]').value, 'preserve-me', 'refresh discarded project input');
+  assert.equal(doc.querySelector('[data-field="repo-path"]').value, '/srv/preserve-me', 'refresh discarded repository input');
+  assert.match(doc.querySelector('[data-discovery-failed]')?.textContent || '', /profile manager/i, 'failure lacks external profile-manager guidance');
+  await runtime.dispose();
+}
+
 async function testOnboardingDiscoveryFailureFailsClosed() {
   // P7.GATE (R4): discovery failure closes onboarding — the wizard surfaces
   // the failure, offers no invented profiles, and the lead step cannot be
@@ -1427,7 +1479,7 @@ async function testOnboardingDiscoveryFailureFailsClosed() {
   await runtime.setValue('[data-field="mission"]', 'Ship payment recovery with auditable gates', 30);
   await runtime.click('[data-action="wizard-next"]', 40);
   await runtime.setValue('[data-field="lead-profile"]', 'octacon', 30);
-  assert.equal(doc.querySelector('[data-action="wizard-next"]').disabled, false, 'typed lead was not accepted as a valid host profile');
+  assert.equal(doc.querySelector('[data-action="wizard-next"]').disabled, true, 'discovery failure allowed an unverified lead profile');
   await runtime.dispose();
 }
 
@@ -1746,6 +1798,8 @@ const tests = [
   ['onboarding preflight and host discovery', testOnboardingPreflightAndDiscovery],
   ['onboarding preflight conflict surfaces before commit', testOnboardingPreflightConflictSurfacesBeforeCommit],
   ['onboarding discovery failure fails closed', testOnboardingDiscoveryFailureFailsClosed],
+  ['onboarding discovery success refresh preserves input', testOnboardingDiscoverySuccessRefreshPreservesWizardInput],
+  ['onboarding discovery failure refresh preserves input', testOnboardingDiscoveryRefreshPreservesWizardInput],
   ['onboarding journey to first assessment', testOnboardingJourneyToFirstAssessment],
   ['first assessment completion action', testFirstAssessmentCompletionAction],
   ['contrast metadata', testContrastMetadata],

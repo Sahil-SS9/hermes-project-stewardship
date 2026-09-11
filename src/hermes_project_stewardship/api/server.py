@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
+import json
 import os
 from dataclasses import asdict
 from pathlib import Path
@@ -59,7 +61,7 @@ from ..persistence.service import (
 )
 from ..persistence.workflow_service import WorkflowService
 from ..observation.recovery import ReconcileService
-from ..persistence.store import Store
+from ..persistence.store import Store, iso
 from .middleware import (
     BearerAuthMiddleware,
     MissingAuthMiddleware,
@@ -374,10 +376,13 @@ class OnboardingRequest(BaseModel):
     repo_path: str
     mission: str
     lead_profile: str
+    member_profiles: List[str] = Field(default_factory=list)
     board_slug: Optional[str] = None
     idempotency_key: Optional[str] = None
     autonomy_level: int = 2
     actor_id: str = "sahil"
+    expected_membership_revision: Optional[int] = None
+    preflight_token: Optional[str] = None
 
 
 class WorkflowDefine(BaseModel):
@@ -1478,6 +1483,71 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(404, str(exc)) from None
 
+    def _onboarding_discovery() -> dict[str, Any]:
+        """Merge host discovery with explicitly non-selectable historical refs."""
+        result = dict(adapter.list_existing_projects())
+        referenced: dict[str, set[str]] = {}
+        rows = store._conn.execute(
+            "SELECT project_id, profile_slug FROM project_members"
+            " WHERE state != 'departed' ORDER BY project_id, profile_slug"
+        ).fetchall()
+        for row in rows:
+            referenced.setdefault(str(row["profile_slug"]), set()).add(
+                str(row["project_id"])
+            )
+
+        profiles: list[dict[str, Any]] = []
+        host_names: set[str] = set()
+        for profile in result.get("profiles", []):
+            item = dict(profile)
+            name = str(item.get("name") or "")
+            host_names.add(name)
+            item.setdefault("available", True)
+            item.setdefault("host_capabilities", [])
+            if not item["available"] and name in referenced:
+                item.update(
+                    selectable=False,
+                    historical_reference=True,
+                    project_ids=sorted(referenced[name]),
+                )
+            else:
+                item.setdefault("selectable", bool(item["available"]))
+                item.setdefault("historical_reference", False)
+                item.setdefault("project_ids", [])
+            profiles.append(item)
+        for name in sorted(set(referenced) - host_names):
+            profiles.append(
+                {
+                    "name": name,
+                    "available": False,
+                    "selectable": False,
+                    "historical_reference": True,
+                    "project_ids": sorted(referenced[name]),
+                    "host_capabilities": [],
+                }
+            )
+        return {**result, "profiles": profiles}
+
+    def _onboarding_fingerprint(body: OnboardingRequest) -> str:
+        payload = {
+            "project_id": body.project_id.strip(),
+            "name": (body.name or body.project_id.replace("-", " ").title()).strip(),
+            "slug": (body.slug or body.project_id).strip(),
+            "repo_path": body.repo_path.strip(),
+            "mission": body.mission.strip(),
+            "lead_profile": body.lead_profile.strip(),
+            "member_profiles": [str(p).strip() for p in body.member_profiles],
+            "board_slug": (body.board_slug or body.slug or body.project_id).strip(),
+            "autonomy_level": min(max(body.autonomy_level, 0), 3),
+        }
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(encoded.encode()).hexdigest()
+
+    def _preflight_token(body: OnboardingRequest, revision: int) -> str:
+        return hashlib.sha256(
+            f"{_onboarding_fingerprint(body)}:{revision}".encode()
+        ).hexdigest()
+
     @router.get("/onboard/discover")
     def onboard_discover():
         """P7.1: host-driven discovery for onboarding — existing native
@@ -1485,7 +1555,7 @@ def create_app(
         Read-only; no provisioning. The host itself is the source; no
         hard-coded project or profile lists."""
         try:
-            return adapter.list_existing_projects()
+            return _onboarding_discovery()
         except KanbanAdapterError as exc:
             _raise_work_error(exc)
         except Exception:
@@ -1527,14 +1597,81 @@ def create_app(
                     "message": "canonical project and Kanban host is unavailable",
                 },
             ) from None
-        # connect-existing detection: same slug already provisioned natively
+        # Team selection is validated from the same live discovery snapshot used
+        # by mutation; discovery failure is never converted into an empty list.
         try:
-            existing = adapter.list_existing_projects()
+            existing = _onboarding_discovery()
+        except NotImplementedError:
+            if type(adapter).list_existing_projects is not KanbanAdapter.list_existing_projects:
+                raise HTTPException(
+                    503,
+                    {"code": "host_unavailable", "message": "canonical project and Kanban host is unavailable"},
+                ) from None
+            try:
+                listed = {str(item.get("name")): dict(item) for item in adapter.list_profiles()}
+            except NotImplementedError:
+                listed = {}
+            names = [body.lead_profile, *body.member_profiles]
+            # Legacy in-process adapters have no external project registry. Their
+            # list_profiles result remains authoritative when provided; otherwise
+            # submitted profiles form the synthetic test-host universe.
+            profiles = []
+            for name in dict.fromkeys(names):
+                item = listed.get(name, {"name": name})
+                profiles.append({
+                    **item,
+                    "available": item.get("available", True),
+                    "selectable": item.get("selectable", True),
+                    "host_capabilities": item.get("host_capabilities", ["lead", "member"]),
+                })
+            existing = {"projects": [], "profiles": profiles}
         except Exception:
-            existing = {"projects": []}
+            raise HTTPException(
+                503,
+                {"code": "host_unavailable", "message": "canonical project and Kanban host is unavailable"},
+            ) from None
         mode = ("connect_existing"
                 if any(p["slug"] == slug for p in existing.get("projects", []))
                 else "create_new")
+        profiles = {str(p.get("name")): p for p in existing.get("profiles", [])}
+        members = [str(p).strip() for p in body.member_profiles]
+        errors: dict[str, list[str]] = {}
+        if any(not name for name in members) or len(set(members)) != len(members) or body.lead_profile.strip() in members:
+            errors["member_profiles"] = ["Member profiles must be non-empty, unique and cannot include the lead"]
+        historical_unavailable: list[str] = []
+        unavailable: list[str] = []
+        for profile_name in members:
+            profile = profiles.get(profile_name)
+            if profile is None:
+                continue
+            if profile.get("available", True) and profile.get("selectable", True):
+                capabilities = profile.get("host_capabilities", [])
+                if capabilities and "member" not in capabilities:
+                    unavailable.append(profile_name)
+                continue
+            if (
+                profile.get("historical_reference") is True
+                and body.project_id in profile.get("project_ids", [])
+            ):
+                historical_unavailable.append(profile_name)
+            else:
+                unavailable.append(profile_name)
+        lead = profiles.get(body.lead_profile.strip())
+        if lead is not None and (
+            not lead.get("available", True)
+            or not lead.get("selectable", True)
+            or (lead.get("host_capabilities", []) and "lead" not in lead.get("host_capabilities", []))
+        ):
+            errors["lead_profile"] = [f"Profile '{body.lead_profile.strip()}' is unavailable as lead"]
+        if unavailable:
+            errors["member_profiles"] = [f"Profile '{p}' is unavailable" for p in unavailable]
+        unknown = [p for p in members + [body.lead_profile] if p not in profiles]
+        if unknown:
+            errors.setdefault("profiles", []).extend(f"Profile '{p}' is not available" for p in unknown)
+        if errors:
+            raise HTTPException(status_code=422, detail={"code": "validation_error", "message": "Member selection is invalid", "fields": errors})
+        row = store._conn.execute("SELECT revision FROM membership_revisions WHERE project_id=?", (body.project_id,)).fetchone()
+        membership_revision = int(row["revision"]) if row else 0
         # P7.4: exact proposed targets. Governance project id equals the
         # stewardship project id (body.project_id); the canonical board is
         # the validated board slug; automation stays inactive.
@@ -1555,6 +1692,14 @@ def create_app(
             "validated": validated,
             "existing": existing,
             "mode": mode,
+            "preflight": {
+                "team_revision": membership_revision,
+                "membership_revision": membership_revision,
+                "member_profiles": members,
+                "lead_profile": body.lead_profile,
+                "historical_unavailable_profiles": historical_unavailable,
+                "token": _preflight_token(body, membership_revision),
+            },
             "suggestions": suggestions,
             "preview": {
                 "governance_project_id": body.project_id,
@@ -1580,6 +1725,80 @@ def create_app(
             or f"dockyard-onboard:{body.project_id}"
         ).strip()
         autonomy = min(max(body.autonomy_level, 0), 3)
+        fingerprint = _onboarding_fingerprint(body)
+        operation = store._conn.execute(
+            "SELECT * FROM onboarding_operations WHERE idempotency_key=?",
+            (key,),
+        ).fetchone()
+        if operation is not None:
+            if operation["request_fingerprint"] != fingerprint:
+                raise HTTPException(
+                    409,
+                    {"code": "idempotency_conflict", "message": "Idempotency key is already bound to a different onboarding request"},
+                )
+            if operation["state"] == "completed":
+                return json.loads(operation["result_json"])
+        prior_rows = store._conn.execute(
+            "SELECT detail_json FROM stewardship_audit_log WHERE action='project.onboarded' ORDER BY id DESC"
+        ).fetchall()
+        for prior_row in prior_rows:
+            detail = json.loads(prior_row["detail_json"])
+            if detail.get("idempotency_key") != key:
+                continue
+            if detail.get("request_fingerprint") != fingerprint:
+                raise HTTPException(
+                    409,
+                    {"code": "idempotency_conflict", "message": "Idempotency key is already bound to a different onboarding request"},
+                )
+            return detail["result"]
+
+        reviewed = onboard_preflight(body)["preflight"]
+        current_revision = int(reviewed["membership_revision"])
+        legacy_reference_submission = (
+            type(adapter).list_existing_projects is KanbanAdapter.list_existing_projects
+            and body.expected_membership_revision is None
+            and body.preflight_token is None
+        )
+        if operation is None and not legacy_reference_submission and (
+            body.expected_membership_revision is None
+            or body.preflight_token is None
+            or body.expected_membership_revision != current_revision
+            or body.preflight_token != _preflight_token(body, current_revision)
+        ):
+            raise HTTPException(
+                409,
+                {
+                    "code": "stale_preflight",
+                    "message": "Team membership changed or this exact onboarding request was not reviewed",
+                    "fields": {"membership_revision": [current_revision]},
+                },
+            )
+        if operation is None:
+            expected_revision = current_revision
+            now = iso(store._clock())
+            try:
+                with store.tx() as cx:
+                    cx.execute(
+                        "INSERT INTO onboarding_operations("
+                        "idempotency_key, request_fingerprint, project_id,"
+                        " expected_revision, state, created_at, updated_at)"
+                        " VALUES(?,?,?,?, 'incomplete', ?, ?)",
+                        (key, fingerprint, body.project_id, expected_revision, now, now),
+                    )
+            except Exception:
+                raced = store._conn.execute(
+                    "SELECT * FROM onboarding_operations WHERE idempotency_key=?",
+                    (key,),
+                ).fetchone()
+                if raced is None or raced["request_fingerprint"] != fingerprint:
+                    raise HTTPException(
+                        409,
+                        {"code": "idempotency_conflict", "message": "Idempotency key is already bound to a different onboarding request"},
+                    ) from None
+                operation = raced
+                expected_revision = int(raced["expected_revision"])
+        else:
+            expected_revision = int(operation["expected_revision"])
         try:
             canonical = adapter.provision_project(
                 name=name,
@@ -1603,14 +1822,25 @@ def create_app(
 
         try:
             try:
-                svc.settings(body.project_id)
-            except ServiceError:
-                svc.enable(
-                    project_id=body.project_id,
+                svc.accept_onboarding_membership(
+                    body.project_id,
+                    idempotency_key=key,
+                    expected_revision=expected_revision,
                     mission=body.mission,
                     lead_profile=body.lead_profile,
+                    member_profiles=body.member_profiles,
                     autonomy_level=autonomy,
                 )
+            except ServiceError as exc:
+                if "membership changed" in str(exc):
+                    raise HTTPException(
+                        409,
+                        {
+                            "code": "stale_preflight",
+                            "message": "Team membership changed after preflight; canonical project remains recoverable",
+                        },
+                    ) from None
+                raise
             try:
                 dy.group_create(
                     f"{body.project_id}-ops",
@@ -1628,6 +1858,8 @@ def create_app(
                 )
             except ValueError:
                 pass
+        except HTTPException:
+            raise
         except Exception:
             raise HTTPException(
                 409,
@@ -1638,6 +1870,14 @@ def create_app(
                 },
             ) from None
 
+        result = {
+            "project": body.project_id,
+            "screen": "s2",
+            "group": f"{body.project_id}-ops",
+            "view": "Default board",
+            "canonical": canonical,
+            "next": "Run first read-only assessment",
+        }
         store.audit(
             actor=_principal_id(body.actor_id),
             interface="dockyard:human",
@@ -1648,16 +1888,17 @@ def create_app(
                 "canonical_project_id": canonical["project"]["id"],
                 "board_slug": canonical["board"]["slug"],
                 "idempotency_key": key,
+                "request_fingerprint": fingerprint,
+                "result": result,
             },
         )
-        return {
-            "project": body.project_id,
-            "screen": "s2",
-            "group": f"{body.project_id}-ops",
-            "view": "Default board",
-            "canonical": canonical,
-            "next": "Run first read-only assessment",
-        }
+        with store.tx() as cx:
+            cx.execute(
+                "UPDATE onboarding_operations SET state='completed', result_json=?,"
+                " updated_at=? WHERE idempotency_key=?",
+                (store._j(result), iso(store._clock()), key),
+            )
+        return result
 
     @router.post("/projects/{project_id}/first-assessment")
     def first_assessment(project_id: str):
