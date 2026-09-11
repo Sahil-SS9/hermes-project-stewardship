@@ -103,6 +103,8 @@ class TransferSaga:
         to_profile: str,
         items: List[Dict[str, Any]],
         membership: Any = None,
+        defer_completion: bool = False,
+        initiating_actor: str | None = None,
     ) -> Dict[str, Any]:
         # Fix 6: conflicting reuse of op_id or idempotency key is rejected
         # BEFORE any replay lookup.
@@ -175,6 +177,7 @@ class TransferSaga:
                     self.store._j({
                         "from": from_profile,
                         "to": to_profile,
+                        "initiating_actor": initiating_actor,
                         "fingerprint_items": [
                             {"id": str(i.get("id")), "revision": int(i.get("revision") or 0)}
                             for i in items
@@ -262,16 +265,25 @@ class TransferSaga:
             final_state = OperationState.RUNNING
         else:
             final_state = OperationState.COMPLETED
+        durable_state = (
+            OperationState.RUNNING
+            if defer_completion and final_state == OperationState.COMPLETED
+            else final_state
+        )
         with self.store.tx() as cx:
             cx.execute(
                 "UPDATE operation_journal SET state=?, updated_at=? WHERE op_id=?",
-                (final_state.value, iso(self._clock()), op_id),
+                (durable_state.value, iso(self._clock()), op_id),
             )
 
         # Fix 6: membership resolves to departed only when the transfer is
         # complete with zero blockers; claimed/running (or any failure)
         # keeps the member at departure_pending.
-        if membership is not None and final_state == OperationState.COMPLETED:
+        if (
+            membership is not None
+            and final_state == OperationState.COMPLETED
+            and not defer_completion
+        ):
             membership.set_state(project_id, from_profile, "departed")
 
         return {
@@ -298,7 +310,10 @@ class TransferSaga:
                     f"{column} '{value}' was already used for a different operation payload"
                 )
 
-    def retry(self, op_id: str, *, membership: Any = None) -> Dict[str, Any]:
+    def retry(
+        self, op_id: str, *, membership: Any = None,
+        defer_completion: bool = False,
+    ) -> Dict[str, Any]:
         """Resumable retry: only pending/failed items are re-attempted.
 
         Fix 4: a task whose canonical assignee is ALREADY to_profile is
@@ -375,12 +390,17 @@ class TransferSaga:
             final = OperationState.FAILED
         else:
             final = OperationState.RUNNING
+        durable_state = (
+            OperationState.RUNNING
+            if defer_completion and final == OperationState.COMPLETED
+            else final
+        )
         with self.store.tx() as cx:
             cx.execute(
                 "UPDATE operation_journal SET state=?, updated_at=? WHERE op_id=?",
-                (final.value, iso(self._clock()), op_id),
+                (durable_state.value, iso(self._clock()), op_id),
             )
-        if membership is not None and final == OperationState.COMPLETED:
+        if membership is not None and final == OperationState.COMPLETED and not defer_completion:
             membership.set_state(journal["project_id"], from_profile, "departed")
         return {
             "op_id": op_id,

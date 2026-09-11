@@ -1,6 +1,6 @@
 # Project Stewardship Management — Revised Implementation Plan
 
-> **Execution status:** Phases 0 and 1 complete. Phase 2 remains gated by Sahil UX approval. Phase 3's two final recovery/concurrency boundaries are repaired with deterministic RED→GREEN tests; focused, proxy/Desktop, full Python and Desktop-harness gates are green. The isolated vanilla-host rerun remains blocked in this delegated child by the host's mutation guard, so Phase 3 remains at its gate for parent-controller rerun. Phase 4 has not started.
+> **Execution status:** Phases 0–4 complete. Phase 3 checkpoint: `8fb34ba07094758ec5fc00dc639f67eb91f9f496`. Phase 4 PM-0401..PM-0412 passed independent review and is checkpointed by the commit containing this record; evidence is in `docs/plans/evidence/project-management-phase4.md`. Phase 5 is authorised but has not started in this checkpoint.
 >
 > **Parent WIP branch:** `feat/trustworthy-daily-stewardship-20260908`
 >
@@ -253,18 +253,18 @@ A user can connect or create a project, select a real Hermes lead/team, review e
 - `hermes_dockyard_plugin/desktop/plugin.js`
 - Work-management, race and real-host integration tests
 
-- [ ] **PM-0401** Add project-team list with lead, role, Hermes availability and complete paginated workload counts.
-- [ ] **PM-0402** Add existing Hermes profile as a project member under verified membership-admin authority.
-- [ ] **PM-0403** Transfer leadership while preserving one active lead and recording the verified principal.
-- [ ] **PM-0404** Replace free-text member/lead/assignee controls with the shared discovered-profile picker.
-- [ ] **PM-0405** Produce a complete consequence preview with exact items, eligibility, claimed/running exclusions and preview fingerprint.
-- [ ] **PM-0406** Reject stale/incomplete previews with 409 and require a fresh preview.
-- [ ] **PM-0407** Execute selected or all eligible assignments through canonical batch assignment or the approved durable saga.
-- [ ] **PM-0408** Keep membership at `departure_pending` until canonical readback proves every eligible assignment outcome.
-- [ ] **PM-0409** Surface durable progress, partial failure, retry and operator-recovery state; never show false success.
-- [ ] **PM-0410** Prevent claimed/running transfer unless a supported handoff operation was proven; reject epic assignment under current host rules.
-- [ ] **PM-0411** Add bulk selection/reassignment to the canonical work view and verify actor, operation and per-item audit history.
-- [ ] **PM-0412** Run >100-task pagination, concurrent task creation, simultaneous lead/member changes, host failure and crash-recovery tests.
+- [x] **PM-0401** Add project-team list with lead, role, Hermes availability and complete paginated workload counts. Evidence: `docs/plans/evidence/project-management-phase4.md`.
+- [x] **PM-0402** Add existing Hermes profile as a project member under verified membership-admin authority. Evidence: `docs/plans/evidence/project-management-phase4.md`.
+- [x] **PM-0403** Transfer leadership while preserving one active lead and recording the verified principal. Evidence: `docs/plans/evidence/project-management-phase4.md`.
+- [x] **PM-0404** Replace free-text member/lead/assignee controls with the shared discovered-profile picker. Evidence: shared search/keyboard/unavailable contract and unchanged assignment payload in the Desktop harness.
+- [x] **PM-0405** Produce a complete consequence preview with exact items, eligibility, claimed/running exclusions and preview fingerprint. Evidence: `docs/plans/evidence/project-management-phase4.md`.
+- [x] **PM-0406** Reject stale/incomplete previews with 409 and require a fresh preview. Evidence: `docs/plans/evidence/project-management-phase4.md`.
+- [x] **PM-0407** Execute selected or all eligible assignments through canonical batch assignment or the approved durable saga. Evidence: `docs/plans/evidence/project-management-phase4.md`.
+- [x] **PM-0408** Keep membership at `departure_pending` until canonical readback proves every eligible assignment outcome. Evidence: `docs/plans/evidence/project-management-phase4.md`.
+- [x] **PM-0409** Surface durable progress, partial failure, retry and operator-recovery state; never show false success. Evidence: `docs/plans/evidence/project-management-phase4.md`.
+- [x] **PM-0410** Prevent claimed/running transfer unless a supported handoff operation was proven; reject epic assignment under current host rules. Evidence: `docs/plans/evidence/project-management-phase4.md`.
+- [x] **PM-0411** Add bulk selection/reassignment to the canonical work view and verify actor, operation and per-item audit history. Evidence: Desktop Backlog subset journey plus authenticated API/durable readback in `docs/plans/evidence/project-management-phase4.md`.
+- [x] **PM-0412** Run >100-task pagination, concurrent task creation, simultaneous lead/member changes, host failure and crash-recovery tests. Evidence: deterministic execute-time barrier on the isolated vanilla host proves a 106th task cannot be hidden by pagination and stale execution writes nothing.
 
 **Phase 4 gate:**
 

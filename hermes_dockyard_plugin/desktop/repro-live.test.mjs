@@ -29,6 +29,8 @@ const POPULATED = {
       { name: 'default', is_default: true, available: true, selectable: true, host_capabilities: ['lead', 'member'] },
       { name: 'octacon', is_default: false, available: true, selectable: true, host_capabilities: ['lead', 'member'] },
       { name: 'quan', is_default: false, available: true, selectable: true, host_capabilities: ['member'] },
+      { name: 'octacon-bot', is_default: false, available: true, selectable: true, host_capabilities: ['lead', 'member'] },
+      { name: 'quan-bot', is_default: false, available: true, selectable: true, host_capabilities: ['member'] },
       { name: 'retired', is_default: false, available: false, selectable: false, historical_reference: true, project_ids: ['demo-project'], host_capabilities: [] },
     ],
   },
@@ -420,6 +422,14 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       }
       return { ref, rank: entry?.rank ?? null };
     }
+    const assignWork = path.match(/^\/projects\/([^/]+)\/work-items\/([^/]+)\/assign$/);
+    if (method === 'POST' && assignWork) {
+      const projectId = decodeURIComponent(assignWork[1]);
+      const ref = decodeURIComponent(assignWork[2]);
+      const item = data.workItems[projectId]?.work_items.find((candidate) => candidate.ref === ref);
+      if (item) item.assignee = init.body?.assignee_id ?? null;
+      return clone(item ?? { ref, assignee: init.body?.assignee_id ?? null });
+    }
     const saveView = path.match(/^\/projects\/([^/]+)\/views$/);
     if (method === 'PUT' && saveView) {
       const projectId = decodeURIComponent(saveView[1]);
@@ -552,6 +562,26 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       data.reports[projectId].reports.unshift({ ...report, content: undefined });
       return clone(report);
     }
+    const teamRead = path.match(/^\/projects\/([^/]+)\/team$/);
+    if (method === 'GET' && teamRead) return {
+      project_id: decodeURIComponent(teamRead[1]), membership_revision: 3, complete: true,
+      work_item_count: 2,
+      members: [
+        { profile_slug: 'octacon', role: 'lead', state: 'active', hermes_available: true, workload: { total: 1 } },
+        { profile_slug: 'quan', role: 'member', state: 'active', hermes_available: true, workload: { total: 1 } },
+      ],
+    };
+    if (method === 'POST' && /^\/projects\/[^/]+\/transfers\/preview$/.test(path)) return {
+      complete: true, enumerated_count: 2, membership_revision: 3, fingerprint: 'phase4-fingerprint',
+      eligible_items: [
+        { id: 'HDY-12', title: 'Fix double-charge on retry path', status: 'backlog', revision: 7 },
+        { id: 'HDY-13', title: 'Add payment idempotency keys', status: 'backlog', revision: 8 },
+      ], excluded_items: [],
+    };
+    if (method === 'POST' && /^\/projects\/[^/]+\/transfers\/execute$/.test(path)) return { op_id: 'OP-PHASE4', state: 'completed' };
+    if (method === 'POST' && /^\/projects\/[^/]+\/reassignments$/.test(path)) return { op_id: 'OP-BULK', state: 'completed', actor: 'sahil' };
+    if (method === 'GET' && path === '/operations/OP-PHASE4') return { op_id: 'OP-PHASE4', state: 'completed', actor: 'sahil', items: [{ item_id: 'HDY-12', outcome: 'completed', actor: 'sahil' }, { item_id: 'HDY-13', outcome: 'completed', actor: 'sahil' }] };
+    if (method === 'GET' && path === '/operations/OP-BULK') return { op_id: 'OP-BULK', state: 'completed', actor: 'sahil', operation_audit: { operation: 'OP-BULK', actor: 'sahil' }, items: [{ item_id: 'HDY-13', outcome: 'completed', audit: { actor: 'sahil', action: 'workitem.reassigned' } }] };
     if (path === '/dashboard') return clone(data.dashboard);
     if (path === '/portfolio') return clone(data.portfolio ?? { projects: [], mix: {}, attention: {}, groups: { decisions: [], interventions: [], informational: [] } });
     if (path === '/onboard/discover') return clone(data.DISCOVER);
@@ -846,9 +876,13 @@ async function testProjectDashboardScreen() {
   // The assignee rides an input; textContent excludes input values, so the
   // contract is asserted on the control's value (review round-6: legacy
   // harness assertion was checking the wrong surface, not missing data).
-  const assigneeControl = [...workDetail.querySelectorAll('input')]
-    .find((control) => control.value === 'octacon-bot');
-  assert(assigneeControl, 'assignee input must carry the octacon-bot value');
+  const assigneeControl = workDetail.querySelector('[data-profile-picker="work-assignee"] select');
+  assert.equal(assigneeControl?.value, 'octacon-bot', 'shared assignee picker must carry the canonical value unchanged');
+  assert(!workDetail.querySelector('[data-work-field="assignee"] input'), 'legacy free-text assignee editor remains present');
+  await runtime.setValue('[data-profile-picker="work-assignee"] select', 'quan-bot');
+  await runtime.click('[data-action="save-work-item"]', 40);
+  const assignment = runtime.calls.find((call) => call.method === 'POST' && call.path.endsWith('/work-items/HDY-12/assign'));
+  assert.equal(assignment?.body?.assignee_id, 'quan-bot', 'selected discovered profile changed on the Desktop-to-proxy assignment payload');
   assert(workDetail.querySelector('input, textarea, select'), 'editable item detail exposes no editing controls');
   assert(workDetail.querySelector('[data-action="save-work-item"]'), 'editable item detail is missing Save');
   await runtime.click('[data-action="close-work-item-detail"]');
@@ -1122,14 +1156,59 @@ async function testBacklogCreateFormValidationAndReadback() {
   await runtime.dispose();
 }
 
+async function testBacklogBulkReassignment() {
+  const runtime = await createRuntime();
+  await runtime.mount();
+  await runtime.click('[data-tab="backlog"]', 80);
+  const doc = runtime.dom.window.document;
+  const first = doc.querySelector('[data-bulk-select="HDY-13"]');
+  assert(first, 'canonical backlog item has no bulk-selection control');
+  first.focus();
+  doc.defaultView.dispatchEvent(new doc.defaultView.KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+  first.click();
+  await runtime.flush(20);
+  const picker = doc.querySelector('[data-profile-picker="bulk-replacement"]');
+  assert(picker, 'bulk action does not reuse the shared discovered-profile picker');
+  await runtime.setValue('[data-profile-picker="bulk-replacement"] [data-profile-search]', 'quan');
+  assert.equal(picker.querySelectorAll('option').length, 3, 'profile search did not narrow choices');
+  assert(picker.querySelector('option[value="retired"]') === null, 'search unexpectedly retained unrelated unavailable profile');
+  await runtime.setValue('[data-profile-picker="bulk-replacement"] [data-profile-search]', 'retired');
+  assert(picker.querySelector('option[value="retired"]')?.disabled, 'unavailable discovered profile is selectable');
+  await runtime.setValue('[data-profile-picker="bulk-replacement"] [data-profile-search]', '');
+  await runtime.setValue('[data-profile-picker="bulk-replacement"] select', 'quan');
+  await runtime.click('[data-action="preview-bulk-reassignment"]', 30);
+  assert(doc.querySelector('[data-bulk-preview="phase4-fingerprint"]'), 'exact bulk preview/fingerprint did not render');
+  assert.match(doc.body.textContent, /HDY-13.*eligible/s);
+  await runtime.click('[data-action="execute-bulk-reassignment"]', 50);
+  const post = runtime.calls.find((call) => call.method === 'POST' && /\/reassignments$/.test(call.path));
+  assert.deepEqual(post?.body?.selected_ids, ['HDY-13'], 'selected canonical item ids were not preserved');
+  assert.equal(post?.body?.to_profile, 'quan', 'selected profile id was not preserved');
+  assert(doc.querySelector('[data-bulk-operation="OP-BULK"]'), 'durable bulk operation readback did not render');
+  assert.match(doc.body.textContent, /sahil.*workitem\.reassigned/s, 'verified actor/per-item audit outcome was not rendered');
+  assert(!runtime.calls.some((call) => /\/transfers\/execute$/.test(call.path)), 'bulk subset incorrectly used departure execution');
+  await runtime.dispose();
+}
+
 async function testBotTeamsScreen() {
   const runtime = await createRuntime();
   await runtime.mount();
   await runtime.click('[data-tab="teams"]', 80);
   const doc = runtime.dom.window.document;
   assert(doc.querySelector('[data-bot-teams]'), 'bot teams screen is missing');
-  assert(doc.querySelector('[data-view-only="bot-team"]'), 'bot team management is not visibly marked view-only');
-  assert(!doc.querySelector('[data-action="add-project-bot"], [data-action="remove-project-bot"], [data-action="reassign-bot-work"]'), 'bot teams expose unsupported management controls');
+  assert(doc.querySelector('[data-team-management]'), 'project team management surface is missing');
+  assert(doc.querySelector('[data-action="add-project-member"]'), 'add-member action is missing');
+  assert(doc.querySelector('[data-action="transfer-project-lead"]'), 'lead-transfer action is missing');
+  assert(doc.querySelector('[data-action="preview-work-transfer"]'), 'work-transfer preview action is missing');
+  await runtime.flush(40);
+  await runtime.click('[data-action="preview-work-transfer"]', 40);
+  assert(doc.querySelector('[data-transfer-preview="phase4-fingerprint"]'), 'exact transfer preview did not render');
+  assert.match(doc.body.textContent, /HDY-12.*Fix double-charge on retry path/s);
+  await runtime.click('[data-action="execute-work-transfer"]', 60);
+  assert(doc.querySelector('[data-transfer-operation="OP-PHASE4"]'), 'durable operation readback did not render');
+  assert.match(doc.body.textContent, /2 of 2 transferred/);
+  assert(runtime.calls.some((call) => call.method === 'POST' && /\/transfers\/preview$/.test(call.path)), 'Desktop did not invoke preview through the plugin proxy');
+  assert(runtime.calls.some((call) => call.method === 'POST' && /\/transfers\/execute$/.test(call.path)), 'Desktop did not invoke execute through the plugin proxy');
+  assert(runtime.calls.some((call) => call.method === 'GET' && call.path === '/operations/OP-PHASE4'), 'Desktop did not perform durable operation readback');
   assert.equal(doc.querySelectorAll('[data-bot-card]').length, 3, 'bot registry did not render');
   assert(doc.querySelector('[data-workload-visual]'), 'workload visualisation is missing');
   assert(doc.querySelector('[data-bot-group="release-crew"]'), 'bot group card did not render');
@@ -1788,6 +1867,7 @@ const tests = [
   ['project lifecycle state and confirmed actions', testProjectLifecycleStateAndConfirmedActions],
   ['backlog board and reason gate', testBacklogBoardAndReasonGate],
   ['backlog create form validation and readback', testBacklogCreateFormValidationAndReadback],
+  ['backlog bulk reassignment and durable audit', testBacklogBulkReassignment],
   ['bot teams screen', testBotTeamsScreen],
   ['initiative loop screen', testInitiativeLoopScreen],
   ['saved views screen and creator', testSavedViewsScreenAndCreator],

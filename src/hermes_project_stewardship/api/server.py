@@ -98,6 +98,17 @@ class RelinkRequest(BaseModel):
     actor: str = ""
 
 
+class TransferPreviewRequest(BaseModel):
+    from_profile: str
+    to_profile: str
+
+
+class TransferExecuteRequest(TransferPreviewRequest):
+    fingerprint: str
+    idempotency_key: str
+    selected_ids: Optional[List[str]] = None
+
+
 class SettingsPatch(BaseModel):
     mission: Optional[str] = None
     lead_profile: Optional[str] = None
@@ -428,6 +439,10 @@ def create_app(
             adapter = UnavailableKanbanAdapter(exc)
     bridge = KanbanBridge(svc, adapter)
     work = CanonicalWorkService(store, cast(CanonicalWorkPort, adapter))
+    from ..persistence.membership import MembershipService
+    from ..persistence.team_management import PreviewConflict, TeamManagementService
+    membership_service = MembershipService(store, svc)
+    team_management = TeamManagementService(store, svc, membership_service, adapter)
     workflows = WorkflowService(store, cast(CanonicalWorkPort, adapter))
     dy = DockyardService(store, canonical_work=work)
     integration = DockyardIntegration(
@@ -492,8 +507,7 @@ def create_app(
     # ------------------------------------------------------------------ #
 
     def _membership():
-        from ..persistence.membership import MembershipService
-        return MembershipService(store, svc)
+        return membership_service
 
     # Fix 5: the server composes the capability set bound to the verified
     # principal. Payloads can never grant capabilities; shared/agent
@@ -526,13 +540,24 @@ def create_app(
     def list_members(project_id: str):
         return {"members": [m.__dict__ for m in _membership().list_members(project_id)]}
 
+    @router.get("/projects/{project_id}/team")
+    def project_team(project_id: str):
+        try:
+            return team_management.team(project_id)
+        except KanbanAdapterError as exc:
+            raise HTTPException(503, {"code": exc.code, "message": exc.message}) from None
+        except (ServiceError, PreviewConflict) as exc:
+            raise HTTPException(409, str(exc)) from None
+
     @router.post("/projects/{project_id}/members")
     def add_member(project_id: str, body: MemberRequest):
         principal = _membership_authority("membership_admin")
         try:
-            member = _membership().add_member(
-                project_id, body.profile_slug, role=body.role, actor=principal
-            )
+            if body.role != "member":
+                raise ServiceError("add members as role 'member'; use lead transfer separately")
+            member = team_management.add_member(project_id, body.profile_slug, actor=principal)
+        except KanbanAdapterError as e:
+            raise HTTPException(503, {"code": e.code, "message": e.message}) from None
         except ServiceError as e:
             raise HTTPException(409, str(e)) from None
         return member.__dict__
@@ -549,9 +574,59 @@ def create_app(
     def transfer_lead(project_id: str, profile_slug: str, body: MemberRequest):
         principal = _membership_authority("lead_transfer")
         try:
-            return _membership().transfer_lead(project_id, profile_slug, actor=principal).__dict__
+            return team_management.transfer_lead(project_id, profile_slug, actor=principal).__dict__
         except ServiceError as e:
             raise HTTPException(409, str(e)) from None
+
+    @router.post("/projects/{project_id}/transfers/preview")
+    def transfer_preview(project_id: str, body: TransferPreviewRequest):
+        _membership_authority("bulk_reassignment")
+        try:
+            return team_management.preview(project_id, body.from_profile, body.to_profile)
+        except KanbanAdapterError as exc:
+            raise HTTPException(503, {"code": exc.code, "message": exc.message}) from None
+        except (ServiceError, PreviewConflict) as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @router.post("/projects/{project_id}/transfers/execute")
+    def transfer_execute(project_id: str, body: TransferExecuteRequest):
+        principal = _membership_authority("bulk_reassignment")
+        try:
+            return team_management.execute_departure(
+                project_id, body.from_profile, body.to_profile,
+                fingerprint=body.fingerprint, selected_ids=body.selected_ids,
+                idempotency_key=body.idempotency_key, actor=principal,
+            )
+        except (ServiceError, PreviewConflict, ValueError) as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @router.post("/projects/{project_id}/reassignments")
+    def bulk_reassign(project_id: str, body: TransferExecuteRequest):
+        principal = _membership_authority("bulk_reassignment")
+        try:
+            return team_management.execute_bulk(
+                project_id, body.from_profile, body.to_profile,
+                fingerprint=body.fingerprint, selected_ids=body.selected_ids,
+                idempotency_key=body.idempotency_key, actor=principal,
+            )
+        except (ServiceError, PreviewConflict, ValueError) as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @router.get("/operations/{op_id}")
+    def transfer_operation(op_id: str):
+        _membership_authority("bulk_reassignment")
+        try:
+            return team_management.operation(op_id)
+        except KeyError:
+            raise HTTPException(404, "transfer operation not found") from None
+
+    @router.post("/operations/{op_id}/retry")
+    def retry_transfer(op_id: str):
+        principal = _membership_authority("bulk_reassignment")
+        try:
+            return team_management.retry(op_id, actor=principal)
+        except KeyError:
+            raise HTTPException(404, "transfer operation not found") from None
 
     @router.post("/projects/{project_id}/members/{profile_slug}/state")
     def set_member_state(project_id: str, profile_slug: str, body: MemberStateRequest):
