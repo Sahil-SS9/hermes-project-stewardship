@@ -2255,7 +2255,7 @@ async function loadProjectData(projectId) {
   }
   if (!project) return { ...dashboard, project: null, projects }
   const encoded = encodeURIComponent(project.id)
-  const [settings, workItems, initiatives, objectives, missionArchive, content, events, reports, milestones] = await Promise.all([
+  const [settings, workItems, initiatives, objectives, missionArchive, content, events, reports, milestones, discovery] = await Promise.all([
     api(`/projects/${encoded}/settings`),
     api(`/projects/${encoded}/work-items`),
     api(`/projects/${encoded}/initiatives`),
@@ -2265,6 +2265,7 @@ async function loadProjectData(projectId) {
     api(`/projects/${encoded}/events`),
     api(`/projects/${encoded}/reports`),
     api(`/projects/${encoded}/milestones`),
+    api('/onboard/discover'),
   ])
   return {
     ...dashboard,
@@ -2279,6 +2280,7 @@ async function loadProjectData(projectId) {
     events: events.events ?? [],
     reports: reports.reports ?? [],
     milestones: milestones.milestones ?? [],
+    profiles: discovery.profiles ?? [],
   }
 }
 
@@ -2288,11 +2290,12 @@ async function loadBacklogData(projectId) {
   const project = projects.find((item) => item.id === projectId) ?? projects[0]
   if (!project) return { project: null, projects, backlog: [], workItems: [], initiatives: [], bots: [] }
   const encoded = encodeURIComponent(project.id)
-  const [backlog, workItems, initiatives, bots] = await Promise.all([
+  const [backlog, workItems, initiatives, bots, discovery] = await Promise.all([
     api(`/projects/${encoded}/backlog`),
     api(`/projects/${encoded}/work-items`),
     api(`/projects/${encoded}/initiatives`),
     api('/bots'),
+    api('/onboard/discover'),
   ])
   return {
     project,
@@ -2301,6 +2304,7 @@ async function loadBacklogData(projectId) {
     workItems: workItems.work_items ?? [],
     initiatives: initiatives.initiatives ?? [],
     bots: bots.bots ?? [],
+    profiles: discovery.profiles ?? [],
   }
 }
 
@@ -2314,15 +2318,19 @@ async function loadSavedViewsData(projectId) {
 }
 
 async function loadTeamsData() {
-  const [bots, workload, groups] = await Promise.all([
-    api('/bots'), api('/workload'), api('/bot-groups'),
+  const [bots, workload, groups, dashboard, discovery] = await Promise.all([
+    api('/bots'), api('/workload'), api('/bot-groups'), api('/dashboard'), api('/onboard/discover'),
   ])
+  const projects = sortProjects(dashboard.projects ?? [])
+  const project = projects[0] ?? null
+  const team = project ? await api(`/projects/${encodeURIComponent(project.id)}/team`) : null
   const messages = {}
   await Promise.all((groups.groups ?? []).map(async (group) => {
     const result = await api(`/bot-groups/${encodeURIComponent(group.name)}/messages`)
     messages[group.name] = result.messages ?? []
   }))
-  return { bots: bots.bots ?? [], workload, groups: groups.groups ?? [], messages }
+  return { bots: bots.bots ?? [], workload, groups: groups.groups ?? [], messages,
+    projects, project, team, profiles: discovery.profiles ?? [] }
 }
 
 async function loadInboxData() {
@@ -2338,6 +2346,32 @@ async function loadInboxData() {
     ...inbox,
     items: (inbox.items ?? []).map((item) => ({ ...item, detail: detailByRef[item.ref] ?? null })),
   }
+}
+
+// PM-0404: one discovery-backed profile-picker contract for every member,
+// lead and canonical assignee action. Search only filters the discovered set;
+// unavailable profiles remain visible but disabled and values are never
+// rewritten between selection and the API payload.
+function DiscoveredProfilePicker({ profiles = [], value = '', onChange, name, label = 'Hermes profile', disabled = false }) {
+  const [search, setSearch] = useState('')
+  const normalised = profiles.map((profile) => ({
+    ...profile,
+    value: profile.slug || profile.name || profile.id,
+    label: profile.display_name || profile.slug || profile.name || profile.id,
+  })).filter((profile) => profile.value)
+  if (value && !normalised.some((profile) => profile.value === value)) {
+    normalised.push({ value, label: value, available: false, selectable: false, historical_reference: true })
+  }
+  const query = search.trim().toLowerCase()
+  const visible = normalised.filter((profile) => !query || profile.label.toLowerCase().includes(query) || profile.value.toLowerCase().includes(query))
+  return jsxs('div', { className: 'dockyard-field dockyard-profile-picker', 'data-profile-picker': name, children: [
+    jsx('label', { htmlFor: `dockyard-profile-search-${name}`, children: `${label} search` }),
+    jsx('input', { id: `dockyard-profile-search-${name}`, 'data-profile-search': true, value: search, placeholder: 'Search discovered profiles', disabled, onInput: (event) => setSearch(event.target.value), onChange: (event) => setSearch(event.target.value) }),
+    jsx('select', { value, disabled, 'aria-label': label, onChange: (event) => onChange?.(event.target.value), children: [
+      jsx('option', { value: '', children: 'Choose an available profile' }, 'none'),
+      ...visible.map((profile) => jsx('option', { value: profile.value, disabled: profile.available === false || profile.selectable === false, children: `${profile.label}${profile.available === false || profile.selectable === false ? ' (unavailable)' : ''}` }, profile.value)),
+    ] }),
+  ] })
 }
 
 function AttentionPanel({ items, onReview }) {
@@ -2969,7 +3003,7 @@ function ProjectReportsPanel({ project, reports, onRefresh }) {
   ]})
 }
 
-function WorkItemDetail({ item, projectId, onClose, onRefresh }) {
+function WorkItemDetail({ item, projectId, profiles, onClose, onRefresh }) {
   const [draft, setDraft] = useState(null)
   const [detail, setDetail] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -3192,9 +3226,10 @@ function WorkItemDetail({ item, projectId, onClose, onRefresh }) {
           jsxs('label', { children: ['Evidence refs (comma separated) ', jsx('input', {
             'aria-label': 'Evidence refs', value: draft?.evidence_refs ?? '', onChange: (event) => setDraft({ ...draft, evidence_refs: event.target.value }),
           })]}),
-          jsxs('label', { children: ['Assignee ', jsx('input', {
-            value: draft?.assignee ?? '', onChange: (event) => setDraft({ ...draft, assignee: event.target.value }),
-          })]}),
+          jsx(DiscoveredProfilePicker, {
+            profiles, name: 'work-assignee', label: 'Assignee', value: draft?.assignee ?? '',
+            onChange: (value) => setDraft({ ...draft, assignee: value }), disabled: busy,
+          }),
           jsxs('label', { children: ['Status ', jsx('select', {
             value: draft?.status ?? 'backlog', onChange: (event) => setDraft({ ...draft, status: event.target.value }), children:
             ['backlog', 'in_progress', 'in_review', 'blocked', 'done'].map((status) => jsx('option', { value: status, children: readableLabel(status) }, status)),
@@ -3804,7 +3839,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, pendingWorkRef, on
       }),
     ]}),
     panel,
-    jsx(WorkItemDetail, { item: selectedWorkItem, projectId: project.id, onClose: () => setSelectedWorkItem(null), onRefresh }),
+    jsx(WorkItemDetail, { item: selectedWorkItem, projectId: project.id, profiles: view.profiles ?? [], onClose: () => setSelectedWorkItem(null), onRefresh }),
   ]})
 }
 
@@ -3820,6 +3855,12 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
   const [createForm, setCreateForm] = useState({
     type: 'task', title: '', assignee: '', initiative: '', rank: '1', reason: '',
   })
+  const [bulkSelected, setBulkSelected] = useState([])
+  const [bulkReplacement, setBulkReplacement] = useState('')
+  const [bulkPreview, setBulkPreview] = useState(null)
+  const [bulkOperation, setBulkOperation] = useState(null)
+  const [bulkError, setBulkError] = useState(null)
+  const [bulkBusy, setBulkBusy] = useState(false)
   useEffect(() => {
     if (!createOpen) return undefined
     const closeOnEscape = (event) => {
@@ -3893,6 +3934,46 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
     }
     setCreateSaving(false)
   }
+  const selectedItems = bulkSelected.map((ref) => workByRef[ref]).filter(Boolean)
+  const bulkSource = selectedItems[0]?.assignee || ''
+  const bulkSameSource = selectedItems.length > 0 && selectedItems.every((item) => item.assignee === bulkSource)
+  const toggleBulk = (ref) => {
+    setBulkSelected((current) => current.includes(ref) ? current.filter((item) => item !== ref) : [...current, ref])
+    setBulkPreview(null); setBulkOperation(null); setBulkError(null)
+  }
+  const previewBulk = async () => {
+    setBulkBusy(true); setBulkError(null); setBulkPreview(null)
+    try {
+      setBulkPreview(await api(`/projects/${encodeURIComponent(project.id)}/transfers/preview`, { method: 'POST', body: { from_profile: bulkSource, to_profile: bulkReplacement } }))
+    } catch (failure) { setBulkError(String(failure?.message ?? failure)) }
+    setBulkBusy(false)
+  }
+  const executeBulk = async () => {
+    setBulkBusy(true); setBulkError(null)
+    try {
+      const result = await api(`/projects/${encodeURIComponent(project.id)}/reassignments`, { method: 'POST', body: {
+        from_profile: bulkSource, to_profile: bulkReplacement, fingerprint: bulkPreview.fingerprint,
+        selected_ids: bulkSelected, idempotency_key: `desktop-bulk-${bulkPreview.fingerprint}-${bulkSelected.join('-')}`,
+      } })
+      setBulkOperation(await api(`/operations/${encodeURIComponent(result.op_id)}`))
+      await onRefresh?.()
+    } catch (failure) {
+      setBulkPreview(null)
+      setBulkError(`Preview is stale or reassignment failed: ${String(failure?.message ?? failure)}. Refresh the preview and retry.`)
+    }
+    setBulkBusy(false)
+  }
+  const retryBulk = async () => {
+    setBulkBusy(true); setBulkError(null)
+    try {
+      await api(`/operations/${encodeURIComponent(bulkOperation.op_id)}/retry`, { method: 'POST', body: {} })
+      setBulkOperation(await api(`/operations/${encodeURIComponent(bulkOperation.op_id)}`))
+      await onRefresh?.()
+    } catch (failure) { setBulkError(String(failure?.message ?? failure)) }
+    setBulkBusy(false)
+  }
+  const previewEligible = new Set((bulkPreview?.eligible_items ?? []).map((item) => item.id))
+  const selectedEligible = bulkSelected.length > 0 && bulkSelected.every((ref) => previewEligible.has(ref))
   return jsxs('div', { 'data-backlog-board': project.id, children: [
     jsx(PageHead, {
       title: 'Prioritised backlog',
@@ -3908,6 +3989,25 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
       jsx('span', { className: 'dockyard-meta', children: 'Drag a row or use the move controls. Saving always requires a reason.' }),
       jsx(Button, { action: 'open-create-backlog-item', variant: 'primary', small: true, disabled: !canCreate, onClick: openCreate, children: 'Create item' }),
     ]}),
+    jsxs('section', { className: 'dockyard-feature-card', 'data-bulk-reassignment': true, children: [
+      jsxs('header', { children: [jsx('h2', { children: 'Bulk reassignment' }), jsx('span', { children: `${bulkSelected.length} selected` })] }),
+      jsx('p', { className: 'dockyard-meta', children: 'Select canonical backlog items with one current assignee. This reassigns only the selected subset and never starts member departure.' }),
+      jsx(DiscoveredProfilePicker, { profiles: view.profiles ?? [], name: 'bulk-replacement', label: 'Replacement', value: bulkReplacement, onChange: (value) => { setBulkReplacement(value); setBulkPreview(null); setBulkOperation(null) }, disabled: bulkBusy }),
+      !bulkSameSource && bulkSelected.length > 0 ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: 'Selected items must have the same current assignee.' }) : null,
+      jsx(Button, { action: 'preview-bulk-reassignment', disabled: bulkBusy || !bulkSameSource || !bulkReplacement || bulkReplacement === bulkSource, onClick: previewBulk, children: bulkBusy ? 'Working…' : 'Preview selected reassignment' }),
+      bulkError ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: bulkError }) : null,
+      bulkPreview ? jsxs('div', { 'data-bulk-preview': bulkPreview.fingerprint, children: [
+        jsx('strong', { children: `${number(bulkPreview.enumerated_count)} complete current items · fingerprint ${bulkPreview.fingerprint}` }),
+        jsx('ul', { children: [...(bulkPreview.eligible_items ?? []), ...(bulkPreview.excluded_items ?? [])].map((item) => jsx('li', { children: `${item.id} · ${item.title || ''} · ${item.status} · ${item.reason || 'eligible'}` }, item.id)) }),
+        jsx(Button, { action: 'execute-bulk-reassignment', variant: 'primary', disabled: bulkBusy || !selectedEligible, onClick: executeBulk, children: 'Reassign selected items' }),
+      ] }) : null,
+      bulkOperation ? jsxs('div', { 'data-bulk-operation': bulkOperation.op_id, role: 'status', children: [
+        jsx('strong', { children: `${bulkOperation.op_id} · ${bulkOperation.state} · actor ${bulkOperation.actor || 'verified principal'}` }),
+        jsx('span', { children: `${(bulkOperation.items ?? []).filter((item) => item.outcome === 'completed').length} of ${(bulkOperation.items ?? []).length} completed` }),
+        jsx('ul', { children: (bulkOperation.items ?? []).map((item) => jsx('li', { children: `${item.item_id} · ${item.outcome} · ${item.audit?.actor || bulkOperation.actor || 'verified principal'} · ${item.audit?.action || 'audit pending'}${item.detail ? ` · ${item.detail}` : ''}` }, item.item_id)) }),
+        bulkOperation.state !== 'completed' ? jsx(Button, { action: 'retry-bulk-reassignment', disabled: bulkBusy, onClick: retryBulk, children: 'Retry remaining items' }) : null,
+      ] }) : null,
+    ] }),
     entries.length > 0 ? jsx('section', { className: 'dockyard-backlog-list', children:
       entries.map((entry) => {
         const item = workByRef[entry.item_ref] ?? { ref: entry.item_ref, title: entry.item_ref, status: 'backlog', type: 'item' }
@@ -3924,6 +4024,7 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
             setDraggedRef(null)
           },
           children: [
+            jsx('input', { type: 'checkbox', 'data-bulk-select': entry.item_ref, 'aria-label': `Select ${item.title} for bulk reassignment`, checked: bulkSelected.includes(entry.item_ref), onChange: () => toggleBulk(entry.item_ref) }),
             jsx('span', { className: 'dockyard-rank', children: number(entry.rank) }),
             jsxs('span', { className: 'dockyard-backlog-copy', children: [
               jsx('strong', { children: item.title }),
@@ -4015,6 +4116,56 @@ function TeamsView({ view, onRefresh }) {
   const [transcript, setTranscript] = useState(null)
   const [sessionState, setSessionState] = useState('idle')
   const [sessionError, setSessionError] = useState(null)
+  const [profiles, setProfiles] = useState(view.profiles ?? [])
+  const [team, setTeam] = useState(view.team ?? null)
+  const [teamError, setTeamError] = useState(null)
+  const [chosenProfile, setChosenProfile] = useState('')
+  const [transferFrom, setTransferFrom] = useState('')
+  const [transferTo, setTransferTo] = useState('')
+  const [preview, setPreview] = useState(null)
+  const [operation, setOperation] = useState(null)
+  const projectId = view.project?.id || view.projects?.[0]?.id || ''
+  useEffect(() => {
+    const members = team?.members ?? []
+    setProfiles((view.profiles ?? []).filter((profile) => profile.available !== false))
+    setTransferFrom(members.find((member) => member.role !== 'lead')?.profile_slug || '')
+    setTransferTo(members.find((member) => member.role === 'lead')?.profile_slug || '')
+  }, [projectId])
+  const refreshTeam = async () => setTeam(await api(`/projects/${encodeURIComponent(projectId)}/team`))
+  const addMember = async () => {
+    setTeamError(null)
+    try {
+      await api(`/projects/${encodeURIComponent(projectId)}/members`, { method: 'POST', body: { profile_slug: chosenProfile, role: 'member' } })
+      await refreshTeam()
+    } catch (failure) { setTeamError(String(failure?.message ?? failure)) }
+  }
+  const transferLead = async () => {
+    setTeamError(null)
+    try {
+      await api(`/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(chosenProfile)}/lead`, { method: 'POST', body: { profile_slug: chosenProfile } })
+      await refreshTeam()
+    } catch (failure) { setTeamError(String(failure?.message ?? failure)) }
+  }
+  const previewTransfer = async () => {
+    setTeamError(null); setPreview(null)
+    try { setPreview(await api(`/projects/${encodeURIComponent(projectId)}/transfers/preview`, { method: 'POST', body: { from_profile: transferFrom, to_profile: transferTo } })) }
+    catch (failure) { setTeamError(String(failure?.message ?? failure)) }
+  }
+  const executeTransfer = async () => {
+    setTeamError(null)
+    try {
+      const result = await api(`/projects/${encodeURIComponent(projectId)}/transfers/execute`, { method: 'POST', body: { from_profile: transferFrom, to_profile: transferTo, fingerprint: preview.fingerprint, idempotency_key: `desktop-${preview.fingerprint}` } })
+      setOperation(await api(`/operations/${encodeURIComponent(result.op_id)}`))
+      await refreshTeam()
+    } catch (failure) { setPreview(null); setTeamError(`Preview is stale or transfer failed: ${String(failure?.message ?? failure)}`) }
+  }
+  const retryTransfer = async () => {
+    try {
+      await api(`/operations/${encodeURIComponent(operation.op_id)}/retry`, { method: 'POST', body: {} })
+      setOperation(await api(`/operations/${encodeURIComponent(operation.op_id)}`))
+      await refreshTeam()
+    } catch (failure) { setTeamError(String(failure?.message ?? failure)) }
+  }
   const openSessions = async (botId) => {
     setSelectedBot(botId)
     setTranscript(null)
@@ -4048,9 +4199,36 @@ function TeamsView({ view, onRefresh }) {
       status: workload.stuck?.length > 0 ? `${number(workload.stuck.length)} stuck` : null,
       onRefresh,
     }),
-    jsxs('div', { className: 'dockyard-view-only-note', 'data-view-only': 'bot-team', children: [
-      jsx(Icon, { name: 'eye' }),
-      jsx('span', { children: 'View only. Project membership, task assignment and reassignment are managed in the canonical work system.' }),
+    jsxs('section', { className: 'dockyard-feature-card', 'data-team-management': true, children: [
+      jsxs('header', { children: [jsx('h2', { children: 'Project team' }), jsx('span', { children: team ? `Revision ${team.membership_revision}` : 'Loading canonical roster…' })] }),
+      teamError ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: teamError }) : null,
+      jsx('div', { className: 'dockyard-bot-grid', children: (team?.members ?? []).map((member) => jsxs('article', { className: 'dockyard-bot-card', 'data-project-member': member.profile_slug, children: [
+        jsxs('strong', { children: [member.profile_slug, member.role === 'lead' ? ' · Lead' : ' · Member'] }),
+        jsx(StatusTag, { tone: member.hermes_available ? 'success' : 'warning', label: member.hermes_available ? 'Hermes available' : 'Unavailable' }),
+        jsx('span', { children: `${number(member.workload?.total ?? 0)} canonical work items` }),
+        jsx('small', { children: member.state }),
+      ] }, member.profile_slug)) }),
+      jsx(DiscoveredProfilePicker, { profiles, name: 'team-member-lead', label: 'Discovered Hermes profile', value: chosenProfile, onChange: setChosenProfile }),
+      jsxs('div', { className: 'dockyard-modal-actions', children: [
+        jsx(Button, { action: 'add-project-member', disabled: !chosenProfile || !projectId, onClick: addMember, children: 'Add member' }),
+        jsx(Button, { action: 'transfer-project-lead', disabled: !chosenProfile || !projectId, onClick: transferLead, children: 'Transfer lead' }),
+      ] }),
+      jsxs('div', { className: 'dockyard-settings-grid', children: [
+        jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Member leaving' }), jsx('select', { 'data-transfer-from': true, value: transferFrom, onChange: (event) => setTransferFrom(event.target.value), children: (team?.members ?? []).map((member) => jsx('option', { value: member.profile_slug, children: member.profile_slug }, member.profile_slug)) })] }),
+        jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Replacement' }), jsx('select', { 'data-transfer-to': true, value: transferTo, onChange: (event) => setTransferTo(event.target.value), children: (team?.members ?? []).map((member) => jsx('option', { value: member.profile_slug, children: member.profile_slug }, member.profile_slug)) })] }),
+      ] }),
+      jsx(Button, { action: 'preview-work-transfer', disabled: !transferFrom || !transferTo || transferFrom === transferTo, onClick: previewTransfer, children: 'Preview exact consequences' }),
+      preview ? jsxs('div', { 'data-transfer-preview': preview.fingerprint, children: [
+        jsx('strong', { children: `${number(preview.enumerated_count)} items enumerated · fingerprint ${preview.fingerprint}` }),
+        jsx('ul', { children: [...(preview.eligible_items ?? []), ...(preview.excluded_items ?? [])].map((item) => jsx('li', { children: `${item.id} · ${item.title || ''} · ${item.status} · ${item.reason || 'eligible'}` }, item.id)) }),
+        jsx(Button, { action: 'execute-work-transfer', variant: 'primary', disabled: preview.complete !== true || (preview.excluded_items ?? []).length > 0, onClick: executeTransfer, children: 'Confirm exact transfer' }),
+      ] }) : null,
+      operation ? jsxs('div', { 'data-transfer-operation': operation.op_id, role: 'status', children: [
+        jsx('strong', { children: `${operation.op_id} · ${operation.state}` }),
+        jsx('span', { children: `${(operation.items ?? []).filter((item) => item.outcome === 'completed').length} of ${(operation.items ?? []).length} transferred` }),
+        jsx('ul', { children: (operation.items ?? []).map((item) => jsx('li', { children: `${item.item_id} · ${item.outcome}${item.detail ? ` · ${item.detail}` : ''}` }, item.item_id)) }),
+        operation.state !== 'completed' ? jsx(Button, { action: 'retry-work-transfer', onClick: retryTransfer, children: 'Retry remaining items' }) : null,
+      ] }) : null,
     ]}),
     jsxs('section', { className: 'dockyard-workload-card', 'data-workload-visual': true, children: [
       jsxs('div', { children: [jsx('h2', { children: 'Workload heat' }), jsx('p', { children: 'Current fleet availability from owned work.' })] }),

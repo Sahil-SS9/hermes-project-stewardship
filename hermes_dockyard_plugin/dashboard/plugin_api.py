@@ -388,6 +388,64 @@ async def work_items(project_id: str, status: str | None = None) -> dict:
         "GET", f"/stewardship/v1/projects/{pid}/work-items", params=params)
 
 
+class MemberBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    profile_slug: str
+    role: str = "member"
+
+
+class TransferPreviewBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    from_profile: str
+    to_profile: str
+
+
+class TransferExecuteBody(TransferPreviewBody):
+    fingerprint: str
+    idempotency_key: str
+    selected_ids: list[str] | None = None
+
+
+@plugin_api.get("/projects/{project_id}/team")
+async def project_team(project_id: str) -> dict:
+    return await _proxy("GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/team")
+
+
+@plugin_api.post("/projects/{project_id}/members")
+async def add_project_member(project_id: str, body: MemberBody) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/members", body.model_dump())
+
+
+@plugin_api.post("/projects/{project_id}/members/{profile_slug}/lead")
+async def transfer_project_lead(project_id: str, profile_slug: str) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/members/{quote(profile_slug, safe='')}/lead", {"profile_slug": profile_slug})
+
+
+@plugin_api.post("/projects/{project_id}/transfers/preview")
+async def preview_project_transfer(project_id: str, body: TransferPreviewBody) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/transfers/preview", body.model_dump())
+
+
+@plugin_api.post("/projects/{project_id}/transfers/execute")
+async def execute_project_transfer(project_id: str, body: TransferExecuteBody) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/transfers/execute", body.model_dump())
+
+
+@plugin_api.post("/projects/{project_id}/reassignments")
+async def bulk_project_reassignment(project_id: str, body: TransferExecuteBody) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/reassignments", body.model_dump())
+
+
+@plugin_api.get("/operations/{op_id}")
+async def project_transfer_operation(op_id: str) -> dict:
+    return await _proxy("GET", f"/stewardship/v1/operations/{quote(op_id, safe='')}")
+
+
+@plugin_api.post("/operations/{op_id}/retry")
+async def retry_project_transfer(op_id: str) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/operations/{quote(op_id, safe='')}/retry", {})
+
+
 @plugin_api.get("/projects/{project_id}/work-items/{ref}")
 async def work_item_detail(project_id: str, ref: str) -> dict:
     pid = quote(project_id, safe="")

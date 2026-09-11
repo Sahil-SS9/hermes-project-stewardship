@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import asdict
+import hashlib
+import json
 from pathlib import Path
 import re
 import time
@@ -34,11 +36,15 @@ def _record(value: Any) -> dict[str, Any]:
     return asdict(value)
 
 
-def _page(items: list[dict[str, Any]], limit: int) -> dict[str, Any]:
+def _page(items: list[dict[str, Any]], limit: int, offset: int = 0) -> dict[str, Any]:
     if isinstance(limit, bool) or not 1 <= int(limit) <= MAX_PAGE_SIZE:
         raise HostError("validation_error", "limit must be between 1 and 500")
     size = int(limit)
-    return {"items": items[:size], "limit": size, "has_more": len(items) > size}
+    start = max(0, int(offset))
+    end = start + size
+    return {"items": items[start:end], "limit": size, "offset": start,
+            "next_offset": end if end < len(items) else None,
+            "has_more": end < len(items)}
 
 
 class ProjectKanbanHost:
@@ -291,10 +297,21 @@ class ProjectKanbanHost:
 
     @contextmanager
     def _kanban(self, board: str | None = None):
-        from hermes_cli.kanban_db_connect import connect_closing
         _, kanban_db, _ = self._modules()
-        with self._scope(board) as selected, connect_closing(board=selected) as conn:
-            yield kanban_db, conn, selected
+        selected = board or self.board
+        try:
+            from importlib import import_module
+            connect_closing = import_module("hermes_cli.kanban_db_connect").connect_closing
+        except ImportError:
+            with self._scope(selected):
+                conn = kanban_db.connect(board=selected)
+                try:
+                    yield kanban_db, conn, selected
+                finally:
+                    conn.close()
+        else:
+            with self._scope(selected), connect_closing(board=selected) as conn:
+                yield kanban_db, conn, selected
 
     @staticmethod
     def _task_record(task: Any) -> dict[str, Any]:
@@ -302,6 +319,15 @@ class ProjectKanbanHost:
         tenant = str(record.get("tenant") or "")
         record["task_kind"] = tenant.removeprefix("dockyard:") if tenant.startswith("dockyard:") else "task"
         record["initial_status"] = record.get("status")
+        revision_fields = {
+            key: record.get(key)
+            for key in ("assignee", "status", "claim_lock", "claim_expires", "current_run_id")
+        }
+        record["revision"] = int.from_bytes(
+            hashlib.sha256(
+                json.dumps(revision_fields, sort_keys=True, separators=(",", ":")).encode()
+            ).digest()[:8], "big"
+        ) & ((1 << 63) - 1)
         return record
 
     @staticmethod
@@ -324,17 +350,17 @@ class ProjectKanbanHost:
                 raise HostError("epic_not_found", "canonical epic was not found")
             return self._task_record(task)
 
-    def _list(self, *, epic: bool, board: str | None, limit: int) -> dict[str, Any]:
+    def _list(self, *, epic: bool, board: str | None, limit: int, offset: int = 0) -> dict[str, Any]:
         with self._kanban(board) as (kb, conn, _):
             items = [self._task_record(task) for task in kb.list_tasks(conn, include_archived=False)]
         items = [item for item in items if (item["task_kind"] == "epic") is epic]
-        return _page(items, limit)
+        return _page(items, limit, offset)
 
-    def list_tasks(self, *, board: str | None = None, limit: int = 100) -> dict[str, Any]:
-        return self._list(epic=False, board=board, limit=limit)
+    def list_tasks(self, *, board: str | None = None, limit: int = 100, offset: int = 0) -> dict[str, Any]:
+        return self._list(epic=False, board=board, limit=limit, offset=offset)
 
-    def list_epics(self, *, board: str | None = None, limit: int = 100) -> dict[str, Any]:
-        return self._list(epic=True, board=board, limit=limit)
+    def list_epics(self, *, board: str | None = None, limit: int = 100, offset: int = 0) -> dict[str, Any]:
+        return self._list(epic=True, board=board, limit=limit, offset=offset)
 
     def create_task(
         self, *, title: str, body: str | None = None, assignee: str | None = None,
@@ -480,6 +506,40 @@ class ProjectKanbanHost:
         with self._kanban(board) as (kb, conn, _):
             if not kb.assign_task(conn, task_id, assignee):
                 raise HostError("task_not_found", "canonical task was not found")
+            return self._task_record(kb.get_task(conn, task_id))
+
+    def assign_task_if_unchanged(
+        self, task_id: str, from_profile: str, to_profile: str,
+        guard: dict[str, Any], *, board: str | None = None,
+    ) -> dict[str, Any]:
+        """Atomically verify transfer guards and assign in one host transaction."""
+        with self._kanban(board) as (kb, conn, _):
+            with kb.write_txn(conn):
+                task = kb.get_task(conn, task_id)
+                if task is None:
+                    raise HostError("task_not_found", "canonical task was not found")
+                record = self._task_record(task)
+                if record.get("task_kind") == "epic":
+                    raise HostError("write_conflict", "epic_assignment_unsupported")
+                if str(record.get("assignee") or "") != str(guard.get("expect_assignee") or from_profile):
+                    raise HostError("write_conflict", "assignee_changed")
+                if str(record.get("status") or "") not in set(guard.get("eligible_statuses") or ()):
+                    raise HostError("write_conflict", "claimed_or_running")
+                if guard.get("claim_lock_absent") and (
+                    record.get("claim_lock") or record.get("current_run_id")
+                ):
+                    raise HostError("write_conflict", "claimed_or_running")
+                if int(record["revision"]) != int(guard.get("expected_revision", -1)):
+                    raise HostError("write_conflict", "revision_changed")
+                changed = conn.execute(
+                    "UPDATE tasks SET assignee=?, consecutive_failures=0, "
+                    "last_failure_error=NULL WHERE id=? AND assignee=? AND status=? "
+                    "AND claim_lock IS NULL AND current_run_id IS NULL",
+                    (to_profile, task_id, from_profile, record["status"]),
+                )
+                if changed.rowcount != 1:
+                    raise HostError("write_conflict", "canonical task changed before assignment")
+            kb.notify_task_updated(conn, task_id, ("assignee",))
             return self._task_record(kb.get_task(conn, task_id))
 
     def link_tasks(self, parent_id: str, child_id: str, *, board: str | None = None) -> dict[str, Any]:

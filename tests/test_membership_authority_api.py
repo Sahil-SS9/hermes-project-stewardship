@@ -4,7 +4,6 @@ never authorise (Phase 0 §1.5, locked decision).
 """
 from __future__ import annotations
 
-import pytest
 from fastapi.testclient import TestClient
 
 from hermes_project_stewardship.api.server import create_app
@@ -12,12 +11,17 @@ from hermes_project_stewardship.domain.constants import Capability
 from hermes_project_stewardship.persistence.store import Store
 
 
+class _ProfileDiscoveryAdapter:
+    def list_profiles(self):
+        return [{"slug": "sahil", "available": True}, {"slug": "octacon", "available": True}]
+
+
 def _client(tmp_path, *, token: str | None = "t0k", principal: str = "sahil",
             is_human: bool = True, capabilities=None):
     store = Store(tmp_path / "authority.db")
     app = create_app(store=store, auth_token=token,
                      auth_principal=principal, auth_principal_is_human=is_human,
-                     capabilities=capabilities)
+                     capabilities=capabilities, kanban_adapter=_ProfileDiscoveryAdapter())
     client = TestClient(app)
     return client, store
 

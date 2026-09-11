@@ -336,10 +336,32 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
         board = self.project_board(project_id)
         native_project_id = self._board_projects.get(board)
         try:
-            task_page = self.host.list_tasks(board=board, limit=100)
-            epic_page = self.host.list_epics(board=board, limit=100)
+            def all_pages(method):
+                output = []
+                offset = 0
+                while True:
+                    try:
+                        page = method(board=board, limit=500, offset=offset)
+                    except TypeError as exc:
+                        if offset:
+                            raise KanbanAdapterError(
+                                "host_unavailable", "canonical pagination was incomplete"
+                            ) from exc
+                        page = method(board=board, limit=500)
+                    output.extend(page.get("items") or ())
+                    if not page.get("has_more"):
+                        return output
+                    next_offset = page.get("next_offset")
+                    if next_offset is None or int(next_offset) <= offset:
+                        raise KanbanAdapterError(
+                            "host_unavailable", "canonical pagination was incomplete"
+                        )
+                    offset = int(next_offset)
+
+            task_rows = all_pages(self.host.list_tasks)
+            epic_rows = all_pages(self.host.list_epics)
             tasks = []
-            for raw in task_page.get("items") or ():
+            for raw in task_rows:
                 owner = raw.get("project_id")
                 if owner not in (None, "", project_id, native_project_id):
                     continue
@@ -348,7 +370,7 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
                 )
             epics = [
                 self._work_record(raw, project_id=project_id, kind="epic")
-                for raw in epic_page.get("items") or ()
+                for raw in epic_rows
             ]
             return tasks + epics
         except KanbanAdapterError:
@@ -579,6 +601,38 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
             return self._work_record(raw, project_id=project_id, kind=kind)
         except Exception as exc:
             raise self._mapped_error(exc) from None
+
+    def get_task(self, task_id: str) -> dict[str, Any]:
+        """TransferSaga canonical readback through the bound project board."""
+        for board, project_id in self._board_projects.items():
+            try:
+                raw = self.host.get_task(task_id, board=board)
+                return {"task": self._work_record(
+                    raw.get("task", raw), project_id=project_id, kind="task"
+                )}
+            except Exception as exc:
+                mapped = self._mapped_error(exc)
+                if mapped.code != "task_not_found":
+                    raise mapped from None
+        raise KanbanAdapterError("task_not_found", "canonical task was not found")
+
+    def assign_task_if_unchanged(
+        self, task_id: str, from_profile: str, to_profile: str, guard: dict[str, Any]
+    ) -> dict[str, Any]:
+        from ..persistence.transfer import TaskStateConflict
+        for board, project_id in self._board_projects.items():
+            try:
+                raw = self.host.assign_task_if_unchanged(
+                    task_id, from_profile, to_profile, guard, board=board
+                )
+                return self._work_record(raw, project_id=project_id, kind="task")
+            except Exception as exc:
+                mapped = self._mapped_error(exc)
+                if mapped.code == "write_conflict":
+                    raise TaskStateConflict(mapped.message) from None
+                if mapped.code != "task_not_found":
+                    raise mapped from None
+        raise KanbanAdapterError("task_not_found", "canonical task was not found")
 
     def add_card(self, board_id: str, card: BoardCard) -> str:
         project_id = self._board_projects.get(board_id)
