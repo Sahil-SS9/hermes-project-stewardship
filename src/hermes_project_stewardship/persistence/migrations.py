@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 21
+SCHEMA_VERSION = 22
 
 
 @dataclass(frozen=True)
@@ -864,5 +864,24 @@ MIGRATIONS: List[Migration] = [
         DROP TABLE IF EXISTS membership_revisions;
         DROP TABLE IF EXISTS project_members;
         """,
+    ),
+    Migration(
+        version=22,
+        name="durable onboarding operation binding",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS onboarding_operations (
+            idempotency_key TEXT PRIMARY KEY,
+            request_fingerprint TEXT NOT NULL,
+            project_id TEXT NOT NULL,
+            expected_revision INTEGER NOT NULL,
+            local_applied_revision INTEGER,
+            state TEXT NOT NULL DEFAULT 'incomplete'
+                  CHECK (state IN ('incomplete','completed')),
+            result_json TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """,
+        downgrade_sql="""DROP TABLE IF EXISTS onboarding_operations;""",
     ),
 ]

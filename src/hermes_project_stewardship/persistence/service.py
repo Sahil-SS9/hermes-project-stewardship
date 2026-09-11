@@ -136,6 +136,94 @@ class StewardshipService:
         )
         return self.settings(project_id)
 
+    def accept_onboarding_membership(
+        self, project_id: str, *, idempotency_key: str,
+        expected_revision: int, mission: str, lead_profile: str,
+        member_profiles: Sequence[str], autonomy_level: int,
+    ) -> Dict[str, Any]:
+        """Conditionally persist the reviewed roster or recognise our own write."""
+        now = iso(self._clock())
+        lead = lead_profile.strip()
+        wanted_members = sorted(
+            {str(value).strip() for value in member_profiles if str(value).strip()}
+            - {lead}
+        )
+        with self.store.tx() as cx:
+            operation = cx.execute(
+                "SELECT local_applied_revision FROM onboarding_operations"
+                " WHERE idempotency_key=? AND project_id=?",
+                (idempotency_key, project_id),
+            ).fetchone()
+            if operation is None:
+                raise ServiceError("onboarding operation binding is missing")
+            revision_row = cx.execute(
+                "SELECT revision FROM membership_revisions WHERE project_id=?",
+                (project_id,),
+            ).fetchone()
+            current_revision = int(revision_row["revision"]) if revision_row else 0
+            applied_revision = operation["local_applied_revision"]
+            if applied_revision is not None:
+                rows = cx.execute(
+                    "SELECT profile_slug, role, state FROM project_members"
+                    " WHERE project_id=? AND state != 'departed'",
+                    (project_id,),
+                ).fetchall()
+                current_leads = [
+                    r["profile_slug"] for r in rows
+                    if r["role"] == "lead" and r["state"] == "active"
+                ]
+                current_members = sorted(
+                    r["profile_slug"] for r in rows
+                    if r["role"] == "member" and r["state"] == "active"
+                )
+                if (
+                    current_revision != int(applied_revision)
+                    or current_leads != [lead]
+                    or current_members != wanted_members
+                ):
+                    raise ServiceError(
+                        "onboarding membership changed after this operation was applied"
+                    )
+                row = cx.execute(
+                    "SELECT * FROM project_stewardship WHERE project_id=?",
+                    (project_id,),
+                ).fetchone()
+                return self._row_settings(row)
+            if current_revision != int(expected_revision):
+                raise ServiceError("onboarding membership changed after preflight")
+
+            cx.execute(
+                """
+                INSERT INTO project_stewardship(
+                    project_id, enabled, mission, owner_lead_profile,
+                    member_profiles_json, autonomy_level,
+                    verification_policy_json, release_policy_json,
+                    notification_policy_json, phase, created_at, updated_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(project_id) DO UPDATE SET
+                    enabled=1, mission=excluded.mission,
+                    owner_lead_profile=NULL, member_profiles_json='[]',
+                    autonomy_level=excluded.autonomy_level,
+                    updated_at=excluded.updated_at, phase='active', paused_at=NULL
+                """,
+                (project_id, 1, mission, None, "[]", int(autonomy_level),
+                 "{}", "{}", "{}", ProjectPhase.ACTIVE.value, now, now),
+            )
+            self._membership().seed_members_in_tx(
+                cx, project_id, lead_profile=lead,
+                member_profiles=list(member_profiles),
+            )
+            applied = cx.execute(
+                "SELECT revision FROM membership_revisions WHERE project_id=?",
+                (project_id,),
+            ).fetchone()
+            cx.execute(
+                "UPDATE onboarding_operations SET local_applied_revision=?,"
+                " updated_at=? WHERE idempotency_key=?",
+                (int(applied["revision"]), now, idempotency_key),
+            )
+        return self.settings(project_id)
+
     def disable(self, project_id: str) -> Dict[str, Any]:
         self._require(project_id)
         with self.store.tx() as cx:

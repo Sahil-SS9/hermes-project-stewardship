@@ -9,6 +9,7 @@ from hermes_project_stewardship.api.server import create_app
 from hermes_project_stewardship.kanban import KanbanAdapterError
 from hermes_project_stewardship.kanban.bridge import BoardCard, KanbanAdapter
 from hermes_project_stewardship.persistence.dockyard_service import DockyardService
+from hermes_project_stewardship.persistence.service import StewardshipService
 from hermes_project_stewardship.persistence.store import Store
 
 
@@ -130,8 +131,7 @@ def test_onboarding_provisions_canonical_project_before_governance_and_replays(t
 
     replay = client.post("/stewardship/v1/onboard", json=_payload(repo))
     assert replay.status_code == 200, replay.text
-    assert replay.json()["canonical"]["project"]["id"] == "p_native_alpha"
-    assert replay.json()["canonical"]["replayed"] is True
+    assert replay.json() == first.json()
     assert store._conn.execute(
         "SELECT COUNT(*) AS n FROM project_stewardship WHERE project_id='alpha'"
     ).fetchone()["n"] == 1
@@ -185,4 +185,82 @@ def test_onboarding_retry_finishes_governance_after_local_failure(tmp_path, monk
     replay = client.post("/stewardship/v1/onboard", json=_payload(repo))
     assert replay.status_code == 200, replay.text
     assert replay.json()["canonical"]["replayed"] is True
+    store.close()
+
+
+def test_onboarding_success_receipt_failure_preserves_binding_and_resumes(tmp_path, monkeypatch):
+    repo = tmp_path / "receipt"
+    repo.mkdir()
+    store = Store(tmp_path / "dockyard.db")
+    adapter = ProvisioningAdapter(store)
+    client = TestClient(
+        create_app(store, kanban_adapter=adapter), raise_server_exceptions=False
+    )
+    payload = _payload(repo)
+    original_audit = store.audit
+
+    def fail_receipt(*args, **kwargs):
+        if kwargs.get("action") == "project.onboarded":
+            raise RuntimeError("injected final receipt failure")
+        return original_audit(*args, **kwargs)
+
+    monkeypatch.setattr(store, "audit", fail_receipt)
+    first = client.post("/stewardship/v1/onboard", json=payload)
+    assert first.status_code == 500
+    bound = store._conn.execute(
+        "SELECT state, local_applied_revision FROM onboarding_operations"
+        " WHERE idempotency_key=?",
+        (payload["idempotency_key"],),
+    ).fetchone()
+    assert dict(bound) == {"state": "incomplete", "local_applied_revision": 1}
+
+    monkeypatch.setattr(store, "audit", original_audit)
+    retry = client.post("/stewardship/v1/onboard", json=payload)
+    assert retry.status_code == 200, retry.text
+    changed = client.post(
+        "/stewardship/v1/onboard", json={**payload, "member_profiles": ["default"]}
+    )
+    assert changed.status_code == 409
+    assert changed.json()["error"]["code"] == "idempotency_conflict"
+    store.close()
+
+
+def test_onboarding_rejects_real_membership_change_between_host_and_local_write(
+    tmp_path, monkeypatch
+):
+    repo = tmp_path / "race"
+    repo.mkdir()
+    store = Store(tmp_path / "dockyard.db")
+    adapter = ProvisioningAdapter(store)
+    client = TestClient(create_app(store, kanban_adapter=adapter))
+    original = adapter.provision_project
+    competitor_errors: list[Exception] = []
+
+    def provision_then_compete(**kwargs):
+        result = original(**kwargs)
+        try:
+            StewardshipService(store).enable(
+                "alpha", mission="competitor", lead_profile="default",
+                member_profiles=["octacon"],
+            )
+        except Exception as exc:
+            competitor_errors.append(exc)
+        return result
+
+    monkeypatch.setattr(adapter, "provision_project", provision_then_compete)
+    response = client.post("/stewardship/v1/onboard", json=_payload(repo))
+    assert competitor_errors == []
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "stale_preflight"
+    assert StewardshipService(store).settings("alpha")["owner"] == {
+        "lead_profile": "default",
+        "member_profiles": ["octacon"],
+        "owner_team_id": None,
+    }
+    operation = store._conn.execute(
+        "SELECT state, local_applied_revision FROM onboarding_operations"
+        " WHERE idempotency_key='dockyard-onboard-alpha'"
+    ).fetchone()
+    assert dict(operation) == {"state": "incomplete", "local_applied_revision": None}
+    assert "dockyard-onboard-alpha" in adapter.by_key
     store.close()

@@ -1760,6 +1760,8 @@ function OnboardingWizard({ onClose, onComplete }) {
   const [repoPath, setRepoPath] = useState('')
   const [mission, setMission] = useState('')
   const [leadProfile, setLeadProfile] = useState('')
+  const [memberProfiles, setMemberProfiles] = useState([])
+  const [memberSearch, setMemberSearch] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   // P7.1: host-driven discovery replaces hard-coded lead choices and lists
@@ -1767,32 +1769,38 @@ function OnboardingWizard({ onClose, onComplete }) {
   // failure fails CLOSED — no manual profile entry, no invented choices.
   const [discovered, setDiscovered] = useState(null)
   const [discoverFailed, setDiscoverFailed] = useState(false)
+  const [discoveryRefresh, setDiscoveryRefresh] = useState(0)
   const [preflightState, setPreflightState] = useState(null)
   const [preflightBusy, setPreflightBusy] = useState(false)
   // R4: preflight validity bound to the exact current field set.
   const [preflightFields, setPreflightFields] = useState(null)
-  const currentFields = () =>
-    `${projectId.trim()}|${repoPath.trim()}|${mission.trim()}|${leadProfile.trim()}`
+  const [preflightContract, setPreflightContract] = useState(null)
+  const currentFields = () => JSON.stringify({
+    project_id: projectId.trim(),
+    repo_path: repoPath.trim(),
+    mission: mission.trim(),
+    lead_profile: leadProfile.trim(),
+    member_profiles: memberProfiles,
+  })
   const preflightCurrent = preflightFields === currentFields()
 
   useEffect(() => {
     let current = true
+    setDiscoverFailed(false)
     api('/onboard/discover').then((result) => {
       if (!current) return
       setDiscovered(result)
       setDiscoverFailed(false)
-      const profiles = (result?.profiles ?? []).map((p) => p.name)
-      if (profiles.length > 0) setLeadProfile((value) => (profiles.includes(value) ? value : profiles[0]))
+      // Refresh must not overwrite values already entered in the wizard.
     }).catch(() => {
       if (current) {
         setDiscovered(null)
-        // R4: fail closed — the wizard cannot proceed without the host.
+        // Keep wizard input intact while explaining how to recover externally.
         setDiscoverFailed(true)
-        setLeadProfile('')
       }
     })
     return () => { current = false }
-  }, [])
+  }, [discoveryRefresh])
 
   useEffect(() => {
     const handleKey = (event) => { if (event.key === 'Escape' && !submitting) onClose() }
@@ -1820,6 +1828,7 @@ function OnboardingWizard({ onClose, onComplete }) {
           repo_path: repoPath.trim(),
           mission: mission.trim(),
           lead_profile: leadProfile.trim(),
+          member_profiles: memberProfiles,
         },
       })
       setPreflightState({
@@ -1836,9 +1845,11 @@ function OnboardingWizard({ onClose, onComplete }) {
       })
       // R4: bind validity to the exact current field set.
       setPreflightFields(currentFields())
+      setPreflightContract(result.preflight ?? null)
     } catch (failure) {
       setPreflightState({ ok: false, message: String(failure?.message ?? failure) })
       setPreflightFields(null)
+      setPreflightContract(null)
     }
     setPreflightBusy(false)
   }
@@ -1853,6 +1864,10 @@ function OnboardingWizard({ onClose, onComplete }) {
           repo_path: repoPath.trim(),
           mission: mission.trim(),
           lead_profile: leadProfile.trim(),
+          member_profiles: memberProfiles,
+          idempotency_key: `dockyard-onboard:${projectId.trim()}`,
+          expected_membership_revision: preflightContract?.membership_revision,
+          preflight_token: preflightContract?.token,
         },
       })
       onComplete(result)
@@ -1894,15 +1909,25 @@ function OnboardingWizard({ onClose, onComplete }) {
             jsx('h3', { children: 'Project identity' }),
             jsx('p', { children: 'Use the stable project identifier and its absolute repository path.' }),
             discovered
-              ? jsxs('p', { className: 'dockyard-meta', 'data-discovered-projects': true, children: [
-                  'Host projects: ',
-                  (discovered.projects ?? []).length > 0
-                    ? (discovered.projects ?? []).map((project) => project.slug).join(', ')
-                    : 'none yet — create-new below',
+              ? jsxs('div', { children: [
+                  jsxs('p', { className: 'dockyard-meta', 'data-discovered-projects': true, children: [
+                    'Host projects: ',
+                    (discovered.projects ?? []).length > 0
+                      ? (discovered.projects ?? []).map((project) => project.slug).join(', ')
+                      : 'none yet — create-new below',
+                  ]}),
+                  jsx('p', { className: 'dockyard-meta', 'data-profile-guidance': true, children: 'Profiles are managed in the Hermes host profile manager.' }),
+                  jsx(Button, { action: 'refresh-onboarding-discovery', small: true, onClick: () => setDiscoveryRefresh((value) => value + 1), children: 'Refresh host discovery' }),
                 ]})
               : discoverFailed
-                ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', 'data-discovery-failed': true, children: 'Host discovery failed. Retry — onboarding stays closed until the host answers. No fallback choices are offered.' })
-                : jsx('p', { className: 'dockyard-meta', children: 'Loading host discovery…' }),
+                ? jsxs('div', { children: [
+                    jsx('p', { className: 'dockyard-inline-error', role: 'alert', 'data-discovery-failed': true, children: 'Host discovery failed. Retry — onboarding stays closed until the host answers. No fallback choices are offered. If profiles are missing, manage them in the Hermes host profile manager, then retry.' }),
+                    jsx(Button, { action: 'refresh-onboarding-discovery', small: true, onClick: () => setDiscoveryRefresh((value) => value + 1), children: 'Retry host discovery' }),
+                  ]})
+                : jsxs('div', { children: [
+                    jsx('p', { className: 'dockyard-meta', children: 'Loading host discovery…' }),
+                    jsx(Button, { action: 'refresh-onboarding-discovery', small: true, onClick: () => setDiscoveryRefresh((value) => value + 1), children: 'Refresh host discovery' }),
+                  ]}),
             // R4: connect-existing as a real selectable path — fills/binds
             // the discovered host project into the form.
             discovered && (discovered.projects ?? []).length > 0
@@ -1936,15 +1961,36 @@ function OnboardingWizard({ onClose, onComplete }) {
             jsx('h3', { children: 'Lead ownership' }),
             jsx('p', { children: 'Assign the specialist profile accountable for the project.' }),
             jsx('label', { htmlFor: 'dockyard-lead-profile', children: 'Lead profile' }),
-            jsx('input', { id: 'dockyard-lead-profile', 'data-field': 'lead-profile', value: leadProfile, list: 'dockyard-lead-options', placeholder: 'octacon', autoComplete: 'off', onInput: (event) => setLeadProfile(event.target.value) }),
-            jsxs('datalist', { id: 'dockyard-lead-options', children: [
-              (discovered?.profiles ?? []).map((profile) => jsx('option', { value: profile.name }, profile.name)),
+            jsx('select', { id: 'dockyard-lead-profile', 'data-field': 'lead-profile', value: leadProfile, onChange: (event) => setLeadProfile(event.target.value), children: [
+              jsx('option', { value: '', children: 'Select a lead profile' }),
+              ...(discovered?.profiles ?? []).map((profile) => jsx('option', {
+                value: profile.name,
+                disabled: profile.available === false || profile.selectable === false || ((profile.host_capabilities ?? []).length > 0 && !(profile.host_capabilities ?? []).includes('lead')),
+                children: `${profile.name}${profile.available === false || profile.selectable === false ? ' — unavailable' : ''}`,
+              }, profile.name)),
             ]}),
             jsx('small', { children: discovered
-              ? `Valid host profiles: ${(discovered.profiles ?? []).map((p) => p.name).join(', ') || 'n/a'}.`
+              ? `Valid host profiles: ${(discovered.profiles ?? []).map((p) => `${p.name}${p.available === false || p.selectable === false ? ' (unavailable)' : ''}`).join(', ') || 'n/a'}.`
               : discoverFailed
                 ? 'Host profile list unavailable — onboarding is closed until discovery succeeds.'
                 : 'Loading host profiles…' }),
+            jsx('label', { htmlFor: 'dockyard-member-search', children: 'Team members' }),
+            jsx('input', { id: 'dockyard-member-search', 'data-field': 'member-search', value: memberSearch, placeholder: 'Search profiles', autoComplete: 'off', onInput: (event) => setMemberSearch(event.target.value) }),
+            jsx('div', { 'data-member-picker': true, children: (discovered?.profiles ?? [])
+              .filter((profile) => profile.name.toLowerCase().includes(memberSearch.trim().toLowerCase()))
+              .filter((profile) => profile.name !== leadProfile)
+              .map((profile) => {
+                const selectable = profile.available !== false && profile.selectable !== false && ((profile.host_capabilities ?? []).length === 0 || (profile.host_capabilities ?? []).includes('member'))
+                return jsxs('label', { 'data-member-option': profile.name, children: [
+                  jsx('input', {
+                    type: 'checkbox',
+                    checked: memberProfiles.includes(profile.name),
+                    disabled: !selectable,
+                    onChange: (event) => setMemberProfiles((current) => event.target.checked ? [...current, profile.name] : current.filter((name) => name !== profile.name)),
+                  }),
+                  `${profile.name}${selectable ? '' : ' — unavailable'}`,
+                ] }, profile.name)
+              }) }),
             jsx('small', { children: 'This records ownership; it does not expand permissions.' }),
           ]}),
           jsxs('div', { className: step === 4 ? 'dockyard-wizard-step active' : 'dockyard-wizard-step', hidden: step !== 4, 'data-wizard-step': '4', children: [
@@ -1954,6 +2000,7 @@ function OnboardingWizard({ onClose, onComplete }) {
               jsx('dt', { children: 'Repository' }), jsx('dd', { children: repoPath }),
               jsx('dt', { children: 'Mission' }), jsx('dd', { children: mission }),
               jsx('dt', { children: 'Lead' }), jsx('dd', { children: leadProfile }),
+              jsx('dt', { children: 'Members' }), jsx('dd', { children: memberProfiles.join(', ') || 'None' }),
             ]}),
             jsx(Button, {
               action: 'run-onboarding-preflight',

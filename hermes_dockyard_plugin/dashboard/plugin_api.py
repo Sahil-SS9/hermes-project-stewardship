@@ -639,10 +639,20 @@ async def bot_group_messages(name: str, limit: int = 50) -> dict:
 
 # --------------------------------------------------------------- writes --
 class OnboardBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     project_id: str
+    name: str | None = None
+    slug: str | None = None
     repo_path: str
     mission: str
     lead_profile: str
+    member_profiles: list[str] = []
+    board_slug: str | None = None
+    idempotency_key: str | None = None
+    autonomy_level: int = 2
+    expected_membership_revision: int | None = None
+    preflight_token: str | None = None
+    actor_id: str | None = None
 
 
 class TransitionBody(BaseModel):
@@ -926,9 +936,22 @@ async def re_enable_project(project_id: str) -> dict:
     return await _proxy("POST", f"/stewardship/v1/projects/{pid}/re-enable")
 
 
+@plugin_api.get("/onboard/discover")
+async def onboard_discover() -> dict:
+    """Return host-owned projects and profiles for the onboarding wizard."""
+    return await _proxy("GET", "/stewardship/v1/onboard/discover")
+
+
+@plugin_api.post("/onboard/preflight")
+async def onboard_preflight(body: OnboardBody) -> dict:
+    return await _proxy(
+        "POST", "/stewardship/v1/onboard/preflight", body.model_dump(exclude_none=True)
+    )
+
+
 @plugin_api.post("/onboard")
 async def onboard(body: OnboardBody) -> dict:
-    payload = body.model_dump()
+    payload = body.model_dump(exclude_none=True)
     payload["actor_id"] = _ACTOR_ID
     return await _proxy("POST", "/stewardship/v1/onboard", payload)
 
