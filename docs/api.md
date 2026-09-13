@@ -25,16 +25,26 @@ The running application is authoritative. Use:
 | Group | Representative routes | Authority |
 |---|---|---|
 | Projects | `GET /projects`, project lifecycle/settings routes | Dockyard stewardship metadata plus canonical project identity |
+| Lifecycle | `POST /projects/{id}/{pause,resume,freeze,disable,re-enable,archive,restore}` | Dockyard phase state, guarded by the Phase 1 transition matrix |
 | Onboarding | `POST /onboard` | Canonical Hermes project/board first; Dockyard governance second |
+| Membership and team | `GET /projects/{id}/members`, `GET /projects/{id}/team`, `POST /projects/{id}/members`, `DELETE /projects/{id}/members/{slug}`, `POST .../lead`, `POST .../state`, `POST .../relink` | Dockyard membership store; requires a verified principal holding `membership_admin` or `lead_transfer` |
+| Transfers and operations | `POST /projects/{id}/transfers/preview`, `POST .../transfers/execute`, `POST .../reassignments`, `GET /operations/{op_id}`, `POST /operations/{op_id}/retry` | Durable Dockyard saga journal plus conditional canonical Kanban writes and readback; requires `bulk_reassignment` |
 | Work | list/create/detail/edit/assign/transition/dependency routes under `/projects/{id}/work-items` | Canonical Hermes Kanban plus Dockyard planning metadata |
 | Backlog | list, queue and rerank routes under `/projects/{id}/backlog` | Canonical work plus Dockyard rank/reason metadata |
+| Goals and planning | `/projects/{id}/goals` (create/edit/order/archive/restore), `/projects/{id}/milestones` (archive/restore/rename/attach/detach) | Dockyard planning metadata |
 | Saved Views | `GET/PUT /projects/{id}/views` | Dockyard presentation metadata |
-| Workflows | define/list/start under `/projects/{id}/workflows` | Dockyard version/run journal; canonical Hermes tasks and links |
+| Workflows | define/list/start/versions/runs/archive/restore under `/projects/{id}/workflows` | Dockyard version/run journal; canonical Hermes tasks and links |
+| Managed content | `/projects/{id}/content` (upload/list/detail/preview/dependencies/archive/restore) and removal | Dockyard managed files under `<database parent>/project-content`; removal requires `managed_file_removal` and truncates the verified inode to a zero-byte marker |
 | Initiatives | proposal, approval, rejection, completion/regression and board-binding routes | Dockyard governance plus canonical execution links |
-| Observations | project observation list and `POST /observations/{ref}/run` | Durable Dockyard trigger plus idempotent stewardship cycle |
-| Milestones | create, attach and progress routes | Dockyard planning metadata over canonical work |
+| Observations and recovery | project observation list, `POST /observations/{ref}/run`, `POST /projects/{id}/reconcile` | Durable Dockyard trigger plus idempotent stewardship cycle |
+| Mission | `GET/POST /projects/{id}/mission`, `GET /projects/{id}/missions/archive`, `POST .../mission/archive` | Dockyard governance metadata |
 | Reports | `/projects/{id}/reports` | Derived from canonical work and Dockyard governance |
 | Bot fleet | bot registry, groups, workload, A2A, inbox and notifications | Dockyard coordination metadata |
+| Health and events | `GET /projects/{id}/health`, `GET /projects/{id}/events`, `GET /projects/{id}/notifications`, `GET /projects/{id}/cycle`, `/workload` | Dockyard observation and notification metadata |
+
+This table is a summary, not the contract. `/openapi.json` from the running
+application is authoritative; a route appearing here is not evidence that Phase 6
+route-parity work has been done.
 
 ## Canonical-host contract
 

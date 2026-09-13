@@ -36,6 +36,16 @@ class CommandResponse:
 
 
 class GatewayCommandHandler:
+    # PM-0603: messaging receives discovery/approval/deep links only.
+    # Destructive stewardship verbs are refused with an explicit surface
+    # statement — never silently mapped to "unknown command".
+    DESTRUCTIVE_COMMANDS = frozenset({
+        "archive", "restore", "disable", "enable", "re-enable",
+        "pause", "resume", "freeze", "unfreeze",
+        "remove", "delete", "destroy", "purge",
+        "transfer", "reassign", "relink", "bulk",
+    })
+
     def __init__(self, service: StewardshipService, *, cycle_engine=None) -> None:
         self.svc = service
         self.engine = cycle_engine
@@ -48,6 +58,14 @@ class GatewayCommandHandler:
                 req.project_id, platform=req.platform, sender_id=req.sender_id
             )
             cmd = req.command.strip().lower()
+            if cmd in self.DESTRUCTIVE_COMMANDS:
+                return CommandResponse(
+                    False,
+                    f"'{cmd}' is not supported over messaging: project archive, "
+                    "membership, managed-content and work-transfer mutations "
+                    "require the Hermes Desktop management surface or the "
+                    "recovery CLI (stewardctl)",
+                )
             if cmd in ("status", "health", "initiatives"):
                 return self._read(req)
             if cmd == "approve":

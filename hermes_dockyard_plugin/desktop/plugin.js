@@ -1708,6 +1708,62 @@ function Button({ children, onClick, variant = '', small = false, disabled = fal
   })
 }
 
+// PM-0604/Phase6 UX hardening (Lane-B-03): one focus manager for MODAL
+// dialog surfaces (ConfirmDialog, OnboardingWizard). Behaviour, driven only
+// by real DOM events:
+//   1. initial focus moves to the first enabled focusable element inside
+//      the dialog on mount (the least-destructive control for confirms);
+//   2. Tab / Shift+Tab are trapped — they cycle within the dialog and
+//      never escape it while it is mounted;
+//   3. on unmount, focus returns to the control that was active at mount
+//      (the trigger a real browser focused on click/keyboard activation).
+// Inline fields such as DiscoveredProfilePicker are deliberately NOT wired:
+// they are not dialogs, and trapping Tab inside an inline field would make
+// it impossible to keyboard-navigate past it. Inside the wizard they are
+// covered by the wizard's dialog-level manager.
+function useDialogFocusManager(containerSelector) {
+  useEffect(() => {
+    if (!containerSelector) return undefined
+    const container = () => document.querySelector(containerSelector)
+    const focusables = (root) => Array.from(
+      root.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((element) => !element.closest('[hidden]'))
+    const restoreTo = document.activeElement
+    // Initial focus: first enabled focusable inside the container.
+    const initial = focusables(container())
+    initial[0]?.focus()
+    // Tab containment: cycle focus inside the container on real keydowns.
+    const onKeydown = (event) => {
+      if (event.key !== 'Tab') return
+      const root = container()
+      if (!root) return
+      const items = focusables(root)
+      if (items.length === 0) return
+      const current = document.activeElement
+      const index = items.indexOf(current)
+      event.preventDefault()
+      let next
+      if (event.shiftKey) {
+        next = items[(index <= 0 ? items.length : index) - 1]
+      } else {
+        next = items[(index + 1) % items.length]
+        if (index === -1) next = items[0]
+      }
+      next?.focus()
+    }
+    window.addEventListener('keydown', onKeydown, true)
+    return () => {
+      window.removeEventListener('keydown', onKeydown, true)
+      // Return focus to the trigger that opened the dialog.
+      if (restoreTo && typeof restoreTo.focus === 'function') {
+        restoreTo.focus()
+      }
+    }
+  }, [containerSelector])
+}
+
 function ConfirmDialog({ confirmKey, title, description, confirmLabel, busy = false, onConfirm, onCancel }) {
   useEffect(() => {
     const closeOnEscape = (event) => {
@@ -1716,6 +1772,7 @@ function ConfirmDialog({ confirmKey, title, description, confirmLabel, busy = fa
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [busy, onCancel])
+  useDialogFocusManager('[data-destructive-confirm]')
   return jsx('section', {
     className: 'dockyard-modal-layer',
     'data-destructive-confirm': confirmKey,
@@ -1755,6 +1812,7 @@ function ToastRegion({ toasts, onDismiss }) {
 }
 
 function OnboardingWizard({ onClose, onComplete }) {
+  useDialogFocusManager('[data-onboarding-wizard]')
   const [step, setStep] = useState(1)
   const [projectId, setProjectId] = useState('')
   const [repoPath, setRepoPath] = useState('')

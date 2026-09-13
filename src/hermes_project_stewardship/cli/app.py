@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import sys
 from pathlib import Path
 from typing import List, Optional
@@ -65,6 +66,44 @@ def build_parser() -> argparse.ArgumentParser:
     st = psub.add_parser("status")
     st.add_argument("project_id")
     st.add_argument("--json", action="store_true")
+    # PM-0602: project archive recovery (archive itself stays a Desktop
+    # management action; the CLI carries list/restore for recovery).
+    par = psub.add_parser("archive", help="list archived projects or archive one")
+    par.add_argument("project_id", nargs="?", default=None)
+    par.add_argument("--list", action="store_true")
+    par.add_argument("--json", action="store_true")
+    pre = psub.add_parser("restore", help="restore an archived project")
+    pre.add_argument("project_id")
+
+    team = sub.add_parser("team", help="project team membership (PM-0602)")
+    tsub = team.add_subparsers(dest="action", required=True)
+    tm = tsub.add_parser("members", help="list members incl. pending departures")
+    tm.add_argument("project_id")
+    tm.add_argument("--json", action="store_true")
+
+    xfer = sub.add_parser("transfer", help="pending transfer operations (PM-0602)")
+    xsub = xfer.add_subparsers(dest="action", required=True)
+    xl = xsub.add_parser("list", help="list resumable transfer operations")
+    xl.add_argument("--project", dest="project_id", default=None)
+    xl.add_argument("--all", action="store_true", help="include completed/failed history")
+    xl.add_argument("--json", action="store_true")
+    xr = xsub.add_parser("retry", help="retry/resume a pending transfer operation")
+    xr.add_argument("op_id")
+    xr.add_argument(
+        "--hermes-home", default=None,
+        help="Hermes home of the Kanban host to resume against; required "
+             "because the CLI process binds no host of its own",
+    )
+
+    content = sub.add_parser("content", help="managed project content (PM-0602)")
+    csub = content.add_subparsers(dest="action", required=True)
+    cr = csub.add_parser("remove", help="remove a managed file (destructive)")
+    cr.add_argument("project_id")
+    cr.add_argument("content_id")
+    cr.add_argument(
+        "--confirm", action="store_true",
+        help="required: explicitly confirm the managed-file removal",
+    )
 
     obj = sub.add_parser("objective", help="objective management")
     osub = obj.add_subparsers(dest="action", required=True)
@@ -151,6 +190,37 @@ def main(argv: Optional[List[str]] = None) -> int:
         store.close()
 
 
+def _transfer_host(hermes_home: Optional[str]):
+    """Build the host-bound transfer retry surface, or refuse truthfully.
+
+    The CLI has no host process binding of its own. Transfer retries write
+    to the canonical Kanban through the adapter contract, so they run only
+    when the operator explicitly supplies a Hermes home and the pinned
+    vanilla runtime is importable. Anything else fails closed BEFORE the
+    operation journal is touched — a pending operation is never reported
+    as recovered when no host runtime exists.
+    """
+    if not hermes_home:
+        return None, (
+            "transfer retry needs a connected Hermes Kanban host runtime: "
+            "pass --hermes-home <path>, or resume the operation from the "
+            "Desktop backend, which binds the host process"
+        )
+    from ..kanban.vanilla_host import ProjectKanbanHost
+
+    host = ProjectKanbanHost(hermes_home=hermes_home)
+    try:
+        host._modules()  # force the lazy vanilla imports; fail closed if absent
+    except ImportError as exc:
+        return None, (
+            f"vanilla Hermes runtime is not importable ({exc}); "
+            "the pending operation was left untouched"
+        )
+    if not hasattr(host, "assign_task_if_unchanged"):
+        return None, "host adapter does not implement the transfer contract"
+    return host, None
+
+
 def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) -> int:
     g = args.group
     if g == "export":
@@ -189,6 +259,162 @@ def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) 
             else:
                 print(health_line(s["project_id"], h, s))
                 print(paint(f"mission: {s['mission'] or '(none)'}", "grey"))
+            return EXIT_OK
+        if args.action == "archive":
+            # PM-0602: essential archive recovery — list, or archive one.
+            if args.list or args.project_id is None:
+                archived = []
+                for row in svc.list_projects():
+                    settings = svc.settings(row["project_id"], include_disabled=True)
+                    if settings.get("archived_at"):
+                        archived.append(settings)
+                if args.json:
+                    print(json.dumps({"archived": [
+                        {
+                            "project_id": s["project_id"],
+                            "phase": s["phase"],
+                            "archived_at": s["archived_at"],
+                            "archived_by": s["archived_by"],
+                        }
+                        for s in archived
+                    ]}))
+                else:
+                    if not archived:
+                        print("No archived projects.")
+                    for s in archived:
+                        print(f"- {s['project_id']} archived_at={s['archived_at']}")
+                return EXIT_OK
+            try:
+                svc.archive_project(args.project_id, actor="cli-user", interface="cli")
+            except ServiceError as e:
+                print(friendly_error(str(e)), file=sys.stderr)
+                return EXIT_ERROR
+            print(f"archived {args.project_id}")
+            return EXIT_OK
+        if args.action == "restore":
+            try:
+                out = svc.restore_project(args.project_id, actor="cli-user", interface="cli")
+            except ServiceError as e:
+                print(friendly_error(str(e)), file=sys.stderr)
+                return EXIT_ERROR
+            print(f"restored {args.project_id} (phase={out['phase']})")
+            return EXIT_OK
+
+    if g == "team":
+        if args.action == "members":
+            from ..persistence.membership import MembershipService
+
+            members = MembershipService(svc.store, svc).list_members(args.project_id)
+            payload = {
+                "project_id": args.project_id,
+                "members": [m.__dict__ for m in members],
+            }
+            if args.json:
+                print(json.dumps(payload))
+            else:
+                if not members:
+                    print("No members.")
+                for m in members:
+                    marker = " (departure pending)" if m.state == "departure_pending" else ""
+                    print(f"- {m.profile_slug} [{m.role}] {m.state}{marker}")
+            return EXIT_OK
+
+    if g == "transfer":
+        if args.action == "list":
+            sql = (
+                "SELECT op_id, state, kind, project_id, created_at, updated_at"
+                " FROM operation_journal"
+            )
+            params: list = []
+            clauses = []
+            if not getattr(args, "all", False):
+                clauses.append("state IN ('pending','running')")
+            if args.project_id:
+                clauses.append("project_id=?")
+                params.append(args.project_id)
+            if clauses:
+                sql += " WHERE " + " AND ".join(clauses)
+            sql += " ORDER BY created_at DESC"
+            rows = store._conn.execute(sql, params).fetchall()
+            ops = [
+                {
+                    "op_id": r["op_id"],
+                    "state": r["state"],
+                    "kind": r["kind"],
+                    "project_id": r["project_id"],
+                    "created_at": r["created_at"],
+                    "updated_at": r["updated_at"],
+                }
+                for r in rows
+            ]
+            if args.json:
+                print(json.dumps({"operations": ops}))
+            else:
+                if not ops:
+                    print("No pending transfer operations.")
+                for op in ops:
+                    print(f"- {op['op_id']} [{op['state']}] {op['project_id']}"
+                          f" ({op['created_at']})")
+            return EXIT_OK
+        if args.action == "retry":
+            try:
+                row = store._conn.execute(
+                    "SELECT op_id FROM operation_journal WHERE op_id=?",
+                    (args.op_id,),
+                ).fetchone()
+            except sqlite3.Error as exc:
+                print(friendly_error(f"operation journal unreadable: {exc}"),
+                      file=sys.stderr)
+                return EXIT_ERROR
+            if row is None:
+                print(friendly_error("transfer operation not found: "
+                                     f"{args.op_id}"), file=sys.stderr)
+                return EXIT_ERROR
+            host, refusal = _transfer_host(getattr(args, "hermes_home", None))
+            if host is None:
+                # Fail closed before any journal or canonical write.
+                print(friendly_error(refusal or "transfer host unavailable"),
+                      file=sys.stderr)
+                return EXIT_ERROR
+            from ..persistence.membership import MembershipService
+            from ..persistence.team_management import PreviewConflict, TeamManagementService
+
+            membership = MembershipService(svc.store, svc)
+            tm = TeamManagementService(svc.store, svc, membership, host)
+            try:
+                result = tm.retry(args.op_id, actor="cli-user")
+            except KeyError:
+                print(friendly_error("transfer operation not found: "
+                                     f"{args.op_id}"), file=sys.stderr)
+                return EXIT_ERROR
+            except (ServiceError, PreviewConflict, ValueError) as e:
+                print(friendly_error(str(e)), file=sys.stderr)
+                return EXIT_ERROR
+            print(f"{args.op_id}: {result['state']} "
+                  f"(completed={result['completed_items']}, "
+                  f"failed={len(result['failed_items'])})")
+            return EXIT_OK if result["state"] in ("completed", "running") else EXIT_REFUSED
+
+    if g == "content":
+        if args.action == "remove":
+            if not args.confirm:
+                print(friendly_error(
+                    "managed-file removal is destructive and requires explicit"
+                    " confirmation; rerun with --confirm to erase the recorded"
+                    " managed file (it is truncated to a zero-byte marker, not"
+                    " securely physically erased)"
+                ), file=sys.stderr)
+                return EXIT_REFUSED
+            try:
+                result = svc.remove_project_content(
+                    args.project_id, args.content_id,
+                    actor="cli-user", interface="cli",
+                )
+            except ServiceError as e:
+                print(friendly_error(str(e)), file=sys.stderr)
+                return EXIT_ERROR
+            print(f"removed {args.content_id} (removal_state="
+                  f"{result['removal_state']})")
             return EXIT_OK
 
     if g == "objective":

@@ -160,6 +160,11 @@ class ObjectivePatchBody(BaseModel):
     window: str | None = None
 
 
+class FeaturePatchBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    features: dict[str, bool]
+
+
 class GoalCreateBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title: str
@@ -1113,6 +1118,20 @@ async def save_project_view(project_id: str, body: ViewSaveBody) -> dict:
     return await _proxy(
         "PUT", f"/stewardship/v1/projects/{pid}/views",
         {**body.model_dump(), "actor_id": _ACTOR_ID, "actor_kind": "human"})
+
+
+@plugin_api.get("/projects/{project_id}/features")
+async def project_features(project_id: str) -> dict:
+    pid = quote(project_id, safe="")
+    return await _proxy("GET", f"/stewardship/v1/projects/{pid}/features")
+
+
+@plugin_api.patch("/projects/{project_id}/features")
+async def patch_project_features(project_id: str, body: FeaturePatchBody) -> dict:
+    pid = quote(project_id, safe="")
+    return await _proxy(
+        "PATCH", f"/stewardship/v1/projects/{pid}/features",
+        {"features": body.features})
 
 
 @plugin_api.post("/projects/{project_id}/freeze")

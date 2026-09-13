@@ -9,10 +9,16 @@ enforces explicit autonomy policy, and measures whether the project actually
 improved. CLI, RPC, dashboard and Desktop share one backend; authenticated
 approval remains on RPC/dashboard and permission-bound gateway adapters.
 
-> Status: **v0.3.0 local release.** O1 complete work management
-> and O2 initiative-to-observation delivery are implemented. The release is
-> not installed or activated. Run `hermes verify --json` for current
-> test and readiness evidence.
+> Status: **v0.3.0 local release candidate.** O1 complete work management
+> and O2 initiative-to-observation delivery are implemented. Phases 0–5 of the
+> project-management plan (`docs/plans/2026-09-10-project-management-stewardship.md`)
+> are checkpointed. Phase 6 (surface, security and vanilla-compatibility
+> hardening), Phase 7 (final regression, accessibility and visual proof) and
+> Phase 8 (parent reconciliation, independent QA and merge) are **not complete**.
+> The release is **not installed and not activated**; production rollout is not
+> authorised. Run `hermes verify --json` for current test and readiness evidence
+> on your own checkout, and read `docs/guides/canonical-ownership-and-surfaces.md`
+> for what each surface does and does not support today.
 
 ---
 
@@ -47,16 +53,26 @@ rankings, views, workflows, approvals and audit metadata in its SQLite WAL
 store. Production work writes cross the versioned host adapter; there is no
 legacy task dual-write path.
 
+Ownership is one-way: Stewardship never becomes a second source of project
+identity, work records or profile existence, and it never claims
+cross-database atomicity between its own store and Hermes Kanban. The full
+owner-by-owner table, the authority model, and what every surface supports at
+this commit are in
+[Canonical ownership and surface support](docs/guides/canonical-ownership-and-surfaces.md).
+
 ![Architecture](docs/assets/architecture.svg)
 
 ### Surfaces
 
 | Surface | Entry point | Notes |
 |---|---|---|
-| CLI | `stewardctl` | human output by default, `--json` on reads |
-| RPC API | `/stewardship/v1` | FastAPI optional extra; bearer auth + rate limiting |
-| Gateway commands | Discord et al. | permission binding + idempotent approvals |
-| Desktop plugin | host React wrapper + vanilla TypeScript | thin client of the same RPC |
+| Desktop plugin | host React wrapper + vanilla TypeScript, route `/dockyard` | Intended as the **complete** management surface; installed-app journey proof is still outstanding (Phase 7) |
+| RPC API | `/stewardship/v1` | FastAPI optional extra; bearer auth + rate limiting; fails closed without a token |
+| CLI | `stewardctl` (and `hermes stewardship`) | human output by default, `--json` on reads. Member / pending-transfer / project-archive recovery commands are Phase 6 work and are not present here |
+| Dashboard plugin | `hermes_dockyard_plugin/dashboard` | Supported **subset** of the same backend contracts; the exact subset statement is Phase 6 work |
+| Gateway commands | Discord et al. | permission binding + idempotent approvals. Read status/health/initiatives, approve/reject, run — no membership, archive or file-removal mutations |
+| Model tools | `project-stewardship` toolset | `steward_status`, `steward_run_cycle`, `steward_propose_initiative`; approval is deliberately not a model tool |
+| TUI | — | no stewardship TUI surface exists in this release |
 
 ## Autonomy levels
 
@@ -112,6 +128,13 @@ Exports use SQLite's online backup API and include a versioned manifest,
 SHA-256 digest, byte size, schema version and integrity result. Restore refuses
 existing targets, traversal, symlinks, checksum mismatches and invalid schemas.
 
+The archive contains the Stewardship **database only**. Managed project content
+lives outside it, at `<database parent>/project-content`, so a restore does not
+bring managed files back — back that directory up separately. See
+[Migration, backup and recovery prerequisites](docs/guides/migration-backup-recovery.md)
+for the difference between database rollback, irreversible file removal and
+backup restoration.
+
 ## 60-second example
 
 ```python
@@ -147,7 +170,19 @@ dashboard of the same story.
 
 ## Documentation
 
+Ownership, lifecycle and operations
+
+- [Canonical ownership and surface support](docs/guides/canonical-ownership-and-surfaces.md)
+- [Lifecycle, archive/restore and managed-content removal](docs/guides/lifecycle-archive-restore.md)
+- [Migration, backup and recovery prerequisites](docs/guides/migration-backup-recovery.md)
+- [Shared runtime state and database selection](docs/RUNTIME-STATE.md)
+- [Native task lifecycle semantics](docs/native-lifecycle-semantics.md)
+
+Reference and history
+
 - [PRD v0.2](docs/prd-v0.2.md) — product requirements this implementation satisfies
+- [PRD v0.3](docs/dockyard-prd-v0.3.md) — current product requirements (canonical ownership correction in §3.4)
+- [Authoritative implementation plan](docs/plans/2026-09-10-project-management-stewardship.md)
 - [Architecture](docs/architecture.md)
 - [Threat model](docs/threat-model.md)
 - [Gateway command contract](docs/gateway-contract.md)
@@ -156,6 +191,13 @@ dashboard of the same story.
 - [Canonical roadmap](roadmap.md)
 - [v0.2.0rc2 release packet](docs/release/0.2.0rc2-release-candidate.md)
 - [v0.2.0rc1 historical release packet](docs/release/0.2.0rc1-release-candidate.md)
+
+Phase 8 preparation (planning records — no merge, install or activation is implied)
+
+- [Parent reconciliation plan](docs/release/0.3.0-phase8-reconciliation-plan.md)
+- [Post-integration test and evidence checklist](docs/release/0.3.0-post-integration-test-checklist.md)
+- [Independent review packet template](docs/release/0.3.0-phase8-independent-review-packet.md)
+- [Deployment decision checklist](docs/release/0.3.0-deployment-decision-checklist.md)
 
 ## Security
 
