@@ -2255,16 +2255,18 @@ async function loadProjectData(projectId) {
   }
   if (!project) return { ...dashboard, project: null, projects }
   const encoded = encodeURIComponent(project.id)
-  const [settings, workItems, initiatives, objectives, missionArchive, content, events, reports, milestones, discovery] = await Promise.all([
+  const [settings, workItems, initiatives, objectives, goals, missionArchive, content, events, reports, milestones, workflows, discovery] = await Promise.all([
     api(`/projects/${encoded}/settings`),
     api(`/projects/${encoded}/work-items`),
     api(`/projects/${encoded}/initiatives`),
     api(`/projects/${encoded}/objectives`),
+    api(`/projects/${encoded}/goals`),
     api(`/projects/${encoded}/missions/archive`),
     api(`/projects/${encoded}/content`),
     api(`/projects/${encoded}/events`),
     api(`/projects/${encoded}/reports`),
     api(`/projects/${encoded}/milestones`),
+    api(`/projects/${encoded}/workflows`),
     api('/onboard/discover'),
   ])
   return {
@@ -2275,11 +2277,13 @@ async function loadProjectData(projectId) {
     workItems: workItems.work_items ?? [],
     initiatives: initiatives.initiatives ?? [],
     objectives: objectives.objectives ?? [],
+    goals: goals.goals ?? [],
     missionArchive: missionArchive.missions ?? [],
     content: content.content ?? [],
     events: events.events ?? [],
     reports: reports.reports ?? [],
     milestones: milestones.milestones ?? [],
+    workflows: workflows.workflows ?? [],
     profiles: discovery.profiles ?? [],
   }
 }
@@ -2759,15 +2763,20 @@ function ProjectSettingsPanel({ project, settings, onRefresh }) {
     pause: { endpoint: 'pause', label: 'Pause', past: 'paused' },
     resume: { endpoint: 'resume', label: 'Resume', past: 'resumed' },
     freeze: { endpoint: 'freeze', label: 'Freeze', past: 'frozen' },
+    archive: { endpoint: 'archive', label: 'Archive', past: 'archived' },
+    restore: { endpoint: 'restore', label: 'Restore', past: 'restored' },
   }
-  const lifecycleActions = !enabled
+  const archived = Boolean(lifecycleState?.archived_at)
+  const lifecycleActions = archived
+    ? ['restore']
+    : !enabled
     ? ['enable']
     : phase === 'active'
-      ? ['pause', 'freeze', 'disable']
+      ? ['pause', 'freeze', 'archive', 'disable']
       : phase === 'paused'
-        ? ['resume', 'freeze', 'disable']
+        ? ['resume', 'freeze', 'archive', 'disable']
         : phase === 'frozen'
-          ? ['resume', 'disable']
+          ? ['resume', 'archive', 'disable']
           : ['disable']
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }))
   const save = async () => {
@@ -2839,7 +2848,7 @@ function ProjectSettingsPanel({ project, settings, onRefresh }) {
         jsxs('div', { children: [jsx('h3', { children: 'Project lifecycle' }), jsx('p', { children: enabled ? 'Only actions valid for the current phase are available.' : 'Configuration remains readable while the project is disabled.' })] }),
         jsx('div', { className: 'dockyard-lifecycle-actions', children: lifecycleActions.map((action) => jsx('button', {
           type: 'button',
-          className: `dockyard-button small${['disable', 'freeze'].includes(action) ? ' danger' : action === 'enable' ? ' primary' : ''}`,
+          className: `dockyard-button small${['disable', 'freeze', 'archive'].includes(action) ? ' danger' : ['enable', 'restore'].includes(action) ? ' primary' : ''}`,
           'data-lifecycle-action': action,
           disabled: lifecycleBusy,
           onClick: () => setPendingLifecycle(action),
@@ -2916,10 +2925,12 @@ function ProjectSettingsPanel({ project, settings, onRefresh }) {
     jsxs('section', { className: 'dockyard-modal-layer', 'data-lifecycle-confirm': true, hidden: !pendingLifecycle, children: [
       jsxs('div', { className: 'dockyard-modal', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'dockyard-lifecycle-title', children: [
         jsx('h2', { id: 'dockyard-lifecycle-title', children: `${lifecycleCopy[pendingLifecycle]?.label || 'Change'} project?` }),
-        jsx('p', { children: `This changes ${project.id} from its current ${enabled ? 'enabled' : 'disabled'} and ${phase} state.` }),
+        jsx('p', { children: pendingLifecycle === 'archive'
+          ? `This archives ${project.id} in stewardship only. The canonical project, board, tasks and repository remain untouched and available for explicit restore.`
+          : `This changes ${project.id} from its current ${enabled ? 'enabled' : 'disabled'} and ${phase} state.` }),
         jsxs('div', { className: 'dockyard-modal-actions', children: [
           jsx(Button, { disabled: lifecycleBusy, onClick: () => setPendingLifecycle(null), children: 'Cancel' }),
-          jsx(Button, { action: 'confirm-lifecycle-action', variant: ['disable', 'freeze'].includes(pendingLifecycle) ? 'danger' : 'primary', disabled: lifecycleBusy, onClick: confirmLifecycle, children: lifecycleBusy ? 'Applying...' : `Confirm ${lifecycleCopy[pendingLifecycle]?.label || 'change'}` }),
+          jsx(Button, { action: 'confirm-lifecycle-action', variant: ['disable', 'freeze', 'archive'].includes(pendingLifecycle) ? 'danger' : 'primary', disabled: lifecycleBusy, onClick: confirmLifecycle, children: lifecycleBusy ? 'Applying...' : `Confirm ${lifecycleCopy[pendingLifecycle]?.label || 'change'}` }),
         ]}),
       ]}),
     ]}),
@@ -3312,7 +3323,106 @@ function ObjectiveEvidence({ objective, projectId, onSaved }) {
   ]})
 }
 
-function ObjectivesPanel({ project, settings, objectives, missionArchive, onRefresh }) {
+function GoalsManager({ project, goals, objectives, onRefresh }) {
+  const [rows, setRows] = useState(goals ?? [])
+  const [editor, setEditor] = useState(null)
+  const [form, setForm] = useState({ title: '', description: '', objective_ids: [] })
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const encoded = encodeURIComponent(project.id)
+  const start = (goal = null) => {
+    setEditor(goal?.goal_id ?? 'new')
+    setForm({
+      title: goal?.title ?? '',
+      description: goal?.description ?? '',
+      objective_ids: [...(goal?.objective_ids ?? [])],
+    })
+    setError(null)
+  }
+  const toggleObjective = (objectiveId) => setForm((current) => ({
+    ...current,
+    objective_ids: current.objective_ids.includes(objectiveId)
+      ? current.objective_ids.filter((value) => value !== objectiveId)
+      : [...current.objective_ids, objectiveId],
+  }))
+  const save = async () => {
+    if (!form.title.trim()) return
+    setBusy(true); setError(null)
+    try {
+      const body = { ...form, title: form.title.trim(), description: form.description.trim() }
+      const saved = editor === 'new'
+        ? await api(`/projects/${encoded}/goals`, { method: 'POST', body })
+        : await api(`/projects/${encoded}/goals/${encodeURIComponent(editor)}`, { method: 'PATCH', body })
+      setRows((current) => editor === 'new'
+        ? [...current, saved]
+        : current.map((goal) => goal.goal_id === saved.goal_id ? saved : goal))
+      setEditor(null)
+      onRefresh?.()
+    } catch (failure) { setError(String(failure?.message ?? failure)) }
+    setBusy(false)
+  }
+  const move = async (goalId, direction) => {
+    const active = rows.filter((goal) => !goal.archived_at).sort((a, b) => a.position - b.position)
+    const index = active.findIndex((goal) => goal.goal_id === goalId)
+    const target = index + direction
+    if (index < 0 || target < 0 || target >= active.length) return
+    const reordered = [...active]
+    ;[reordered[index], reordered[target]] = [reordered[target], reordered[index]]
+    setBusy(true); setError(null)
+    try {
+      const result = await api(`/projects/${encoded}/goals/order`, { method: 'PUT', body: { goal_ids: reordered.map((goal) => goal.goal_id) } })
+      const archived = rows.filter((goal) => goal.archived_at)
+      setRows([...(result.goals ?? []), ...archived])
+      onRefresh?.()
+    } catch (failure) { setError(String(failure?.message ?? failure)) }
+    setBusy(false)
+  }
+  const lifecycle = async (goal, action) => {
+    setBusy(true); setError(null)
+    try {
+      const saved = await api(`/projects/${encoded}/goals/${encodeURIComponent(goal.goal_id)}/${action}`, { method: 'POST', body: {} })
+      setRows((current) => current.map((item) => item.goal_id === saved.goal_id ? saved : item))
+      onRefresh?.()
+    } catch (failure) { setError(String(failure?.message ?? failure)) }
+    setBusy(false)
+  }
+  const objectiveName = (id) => objectives.find((item) => Number(item.id) === Number(id))?.name ?? `Objective ${id}`
+  const active = rows.filter((goal) => !goal.archived_at).sort((a, b) => a.position - b.position)
+  const archived = rows.filter((goal) => goal.archived_at)
+  return jsxs('section', { className: 'dockyard-feature-card', 'data-goals-manager': true, children: [
+    jsxs('div', { className: 'dockyard-section-head', children: [
+      jsxs('div', { children: [jsx('span', { className: 'dockyard-card-label', children: 'GOALS' }), jsx('h2', { children: `${active.length} active` }), jsx('p', { children: 'Goals order outcomes. Objectives may stay unlinked.' })] }),
+      jsx(Button, { action: 'add-goal', variant: 'primary', small: true, onClick: () => start(), children: 'Add goal' }),
+    ]}),
+    editor !== null ? jsxs('div', { className: 'dockyard-inline-editor', 'data-goal-editor': String(editor), children: [
+      jsxs('label', { children: [jsx('span', { children: 'Title' }), jsx('input', { 'data-goal-field': 'title', value: form.title, onChange: (event) => setForm((current) => ({ ...current, title: event.target.value })) })] }),
+      jsxs('label', { children: [jsx('span', { children: 'Description' }), jsx('textarea', { 'data-goal-field': 'description', rows: 3, value: form.description, onChange: (event) => setForm((current) => ({ ...current, description: event.target.value })) })] }),
+      jsxs('fieldset', { 'data-goal-objectives': true, children: [
+        jsx('legend', { children: 'Linked objectives (optional)' }),
+        ...(objectives ?? []).map((objective) => jsxs('label', { children: [jsx('input', { type: 'checkbox', value: String(objective.id), checked: form.objective_ids.includes(Number(objective.id)), onChange: () => toggleObjective(Number(objective.id)) }), objective.name] }, String(objective.id))),
+      ]}),
+      jsxs('div', { className: 'dockyard-form-actions', children: [
+        jsx(Button, { disabled: busy, onClick: () => setEditor(null), children: 'Cancel' }),
+        jsx(Button, { action: 'save-goal', variant: 'primary', disabled: busy || !form.title.trim(), onClick: save, children: busy ? 'Saving...' : editor === 'new' ? 'Create goal' : 'Save goal' }),
+      ]}),
+    ]}) : null,
+    jsx('div', { className: 'dockyard-objective-list', children: [...active, ...archived].map((goal, index) => jsxs('article', { 'data-goal-row': goal.goal_id, className: goal.archived_at ? 'archived' : '', children: [
+      jsxs('div', { className: 'dockyard-objective-copy', children: [jsxs('span', { children: [jsx('strong', { children: goal.title }), jsx('small', { children: goal.description || 'No description supplied.' })] }), jsx(StatusTag, { tone: goal.archived_at ? 'neutral' : 'success', label: goal.archived_at ? 'Archived' : `Order ${goal.position + 1}` })] }),
+      jsx('p', { children: goal.objective_ids?.length ? `Objectives: ${goal.objective_ids.map(objectiveName).join(', ')}` : 'No linked objectives.' }),
+      jsxs('div', { className: 'dockyard-form-actions', children: goal.archived_at ? [
+        jsx(Button, { action: 'restore-goal', small: true, disabled: busy, onClick: () => lifecycle(goal, 'restore'), children: 'Restore' }, 'restore'),
+      ] : [
+        jsx(Button, { action: 'move-goal-up', small: true, disabled: busy || index === 0, onClick: () => move(goal.goal_id, -1), children: 'Move up' }, 'up'),
+        jsx(Button, { action: 'move-goal-down', small: true, disabled: busy || index === active.length - 1, onClick: () => move(goal.goal_id, 1), children: 'Move down' }, 'down'),
+        jsx(Button, { action: 'edit-goal', small: true, disabled: busy, onClick: () => start(goal), children: 'Edit' }, 'edit'),
+        jsx(Button, { action: 'archive-goal', small: true, disabled: busy, onClick: () => lifecycle(goal, 'archive'), children: 'Archive' }, 'archive'),
+      ] }),
+    ]}, goal.goal_id)) }),
+    error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
+  ]})
+}
+
+function ObjectivesPanel({ project, settings, objectives, goals, missionArchive, onRefresh }) {
   const [mission, setMission] = useState(settings?.mission ?? '')
   const [missionDraft, setMissionDraft] = useState(settings?.mission ?? '')
   const [missionEditing, setMissionEditing] = useState(false)
@@ -3432,6 +3542,7 @@ function ObjectivesPanel({ project, settings, objectives, missionArchive, onRefr
     },
   }[pending.type] : null
   return jsxs('div', { className: 'dockyard-objectives-layout', children: [
+    jsx(GoalsManager, { project, goals, objectives: items, onRefresh }),
     jsxs('section', { className: 'dockyard-feature-card', 'data-mission-manager': true, children: [
       jsxs('div', { className: 'dockyard-section-head', children: [
         jsxs('div', { children: [jsx('span', { className: 'dockyard-card-label', children: 'MISSION' }), jsx('h2', { children: mission || 'No active mission' })] }),
@@ -3500,6 +3611,8 @@ function ProjectContentPanel({ project, content, onRefresh }) {
   const [file, setFile] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
+  const [contentAction, setContentAction] = useState(null)
+  const [actionBusy, setActionBusy] = useState(false)
   const encoded = encodeURIComponent(project.id)
   const openPreview = async (item) => {
     setSelected(item)
@@ -3534,6 +3647,31 @@ function ProjectContentPanel({ project, content, onRefresh }) {
     }
     setUploading(false)
   }
+  const applyContentAction = async () => {
+    if (!selected || !contentAction) return
+    setActionBusy(true)
+    setError(null)
+    try {
+      const cid = encodeURIComponent(selected.content_id)
+      if (contentAction === 'remove') {
+        const dependencyResult = await api(`/projects/${encoded}/content/${cid}/dependencies`)
+        if ((dependencyResult.dependencies ?? []).length > 0) throw new Error('Removal blocked: this content is still referenced.')
+        await api(`/projects/${encoded}/content/${cid}`, { method: 'DELETE' })
+      } else {
+        await api(`/projects/${encoded}/content/${cid}/${contentAction}`, { method: 'POST', body: {} })
+      }
+      const refreshed = await api(`/projects/${encoded}/content`)
+      setItems(refreshed.content ?? [])
+      setSelected(null)
+      setPreviewState('idle')
+      setContentAction(null)
+      emitToast('success', `Content ${contentAction === 'remove' ? 'removed' : `${contentAction}d`}.`)
+      onRefresh?.()
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+    setActionBusy(false)
+  }
   return jsxs('div', { className: 'dockyard-content-layout', 'data-project-content': project.id, children: [
     jsxs('section', { className: 'dockyard-feature-card', children: [
       jsxs('div', { className: 'dockyard-section-head', children: [
@@ -3566,7 +3704,101 @@ function ProjectContentPanel({ project, content, onRefresh }) {
           : previewState === 'idle'
             ? jsx('p', { className: 'dockyard-meta', children: 'Text and Markdown files can be read here. Other formats show verified metadata.' })
             : null,
+      selected ? jsxs('div', { className: 'dockyard-form-actions', children: [
+        selected.archived_at
+          ? jsx(Button, { action: 'restore-project-content', disabled: actionBusy, onClick: () => setContentAction('restore'), children: 'Restore' })
+          : jsx(Button, { action: 'archive-project-content', disabled: actionBusy, onClick: () => setContentAction('archive'), children: 'Archive' }),
+        jsx(Button, { action: 'remove-project-content', variant: 'danger', disabled: actionBusy, onClick: () => setContentAction('remove'), children: 'Remove file' }),
+      ]}) : null,
     ]}),
+    contentAction ? jsx(ConfirmDialog, {
+      confirmKey: `content-${contentAction}`,
+      title: `${contentAction === 'remove' ? 'Remove' : readableLabel(contentAction)} this content?`,
+      description: contentAction === 'remove' ? 'The managed file is deleted only after authority, dependency, containment and identity checks pass.' : 'The content record and history are retained.',
+      confirmLabel: contentAction === 'remove' ? 'Remove managed file' : readableLabel(contentAction),
+      busy: actionBusy,
+      onConfirm: applyContentAction,
+      onCancel: () => setContentAction(null),
+    }) : null,
+  ]})
+}
+
+function ExecutableWorkflowsPanel({ project, workflows, onRefresh }) {
+  const [name, setName] = useState('')
+  const [title, setTitle] = useState('')
+  const [runKey, setRunKey] = useState('')
+  const [error, setError] = useState(null)
+  const [inspected, setInspected] = useState(null)
+  const [runs, setRuns] = useState([])
+  const encoded = encodeURIComponent(project.id)
+  const grouped = Object.values((workflows ?? []).reduce((all, row) => {
+    const current = all[row.name] ?? { name: row.name, archived_at: row.archived_at, versions: [] }
+    current.versions.push(row)
+    current.archived_at = row.archived_at
+    all[row.name] = current
+    return all
+  }, {}))
+  const mutate = async (path, body = {}) => {
+    setError(null)
+    try {
+      await api(path, { method: 'POST', body })
+      onRefresh?.()
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+  }
+  const define = () => {
+    if (!name.trim() || !title.trim()) return
+    const existing = grouped.find((item) => item.name === name.trim())
+    mutate(`/projects/${encoded}/workflows${existing ? `/${encodeURIComponent(name.trim())}/versions` : ''}`, {
+      ...(existing ? {} : { name: name.trim() }),
+      nodes: [{ id: 'step-1', title: title.trim(), depends_on: [], human_gate: false }],
+    })
+    setTitle('')
+  }
+  const inspect = async (workflow) => {
+    setInspected(workflow.name)
+    setError(null)
+    try {
+      const history = await api(`/projects/${encoded}/workflows/${encodeURIComponent(workflow.name)}/runs`)
+      setRuns(history.runs ?? [])
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+  }
+  return jsxs('section', { className: 'dockyard-feature-card', 'data-executable-workflows': project.id, children: [
+    jsxs('header', { className: 'dockyard-section-head', children: [
+      jsxs('div', { children: [jsx('h2', { children: 'Executable workflows' }), jsx('p', { children: 'Versioned task definitions. Separate from Saved views.' })] }),
+      jsx(StatusTag, { tone: 'neutral', label: `${number(grouped.length)} defined` }),
+    ]}),
+    jsxs('div', { className: 'dockyard-inline-editor', children: [
+      jsxs('label', { children: [jsx('span', { children: 'Workflow name' }), jsx('input', { 'data-workflow-name': true, value: name, onChange: (event) => setName(event.target.value) })] }),
+      jsxs('label', { children: [jsx('span', { children: 'Step title' }), jsx('input', { 'data-workflow-title': true, value: title, onChange: (event) => setTitle(event.target.value) })] }),
+      jsx(Button, { action: 'define-workflow', variant: 'primary', disabled: !name.trim() || !title.trim(), onClick: define, children: grouped.some((item) => item.name === name.trim()) ? 'Create version' : 'Define workflow' }),
+    ]}),
+    error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
+    grouped.map((workflow) => jsxs('article', { className: 'dockyard-objective-row', 'data-workflow': workflow.name, children: [
+      jsxs('div', { children: [jsx('strong', { children: workflow.name }), jsx('small', { children: `Versions ${workflow.versions.map((item) => item.version).join(', ')}` })] }),
+      jsxs('label', { children: [jsx('span', { children: 'Run key' }), jsx('input', { 'data-workflow-run-key': workflow.name, value: runKey, onChange: (event) => setRunKey(event.target.value) })] }),
+      jsx('div', { className: 'dockyard-form-actions', children: [
+        jsx(Button, { action: 'inspect-workflow', onClick: () => inspect(workflow), children: inspected === workflow.name ? 'Refresh details' : 'Inspect definitions & runs' }),
+        ...workflow.versions.map((version) => jsx(Button, { action: 'start-workflow', disabled: Boolean(workflow.archived_at) || !runKey.trim(), onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(workflow.name)}/start`, { version: version.version, run_key: runKey.trim() }), children: `Start v${version.version}` }, String(version.version))),
+        workflow.archived_at
+          ? jsx(Button, { action: 'restore-workflow', onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(workflow.name)}/restore`), children: 'Restore' })
+          : jsx(Button, { action: 'archive-workflow', variant: 'danger', onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(workflow.name)}/archive`), children: 'Archive' }),
+      ]}),
+      inspected === workflow.name ? jsxs('div', { className: 'dockyard-workflow-inspector', 'data-workflow-inspector': workflow.name, children: [
+        jsx('h3', { children: 'Stored definitions' }),
+        ...workflow.versions.map((version) => jsxs('section', { 'data-workflow-definition-version': version.version, children: [
+          jsx('strong', { children: `Version ${version.version}` }),
+          jsx('pre', { children: JSON.stringify(version.definition?.nodes ?? [], null, 2) }),
+        ]}, `definition-${version.version}`)),
+        jsx('h3', { children: 'Run history' }),
+        runs.length
+          ? jsx('ul', { 'data-workflow-run-history': true, children: runs.map((run) => jsx('li', { children: `${run.run_key} — v${run.version} — ${run.status}` }, run.run_key)) })
+          : jsx('p', { 'data-workflow-run-history': true, className: 'dockyard-meta', children: 'No runs recorded.' }),
+      ]}) : null,
+    ]}, workflow.name)),
   ]})
 }
 
@@ -3588,11 +3820,19 @@ function PlanningPanel({ project, milestones, workItems, onRefresh }) {
       .then((d) => setDetail(d))
       .catch(() => setNotice(`Planning details for ${name} are unavailable.`))
   }
-  const act = (path, body) => {
+  const act = (path, body = {}, method = 'POST') => {
     setNotice(null)
-    api(path, { method: 'POST', body: JSON.stringify(body) })
+    api(path, { method, body })
       .then(() => { setExpanded(null); setDetail(null); onRefresh?.() })
       .catch((error) => setNotice(error?.message || 'Action failed.'))
+  }
+  const create = () => {
+    if (!newName.trim()) return
+    act(`/projects/${encodeURIComponent(project.id)}/milestones`, {
+      name: newName.trim(), due: newDue || null,
+    })
+    setNewName('')
+    setNewDue('')
   }
   const rename = (name) => {
     const target = detail?.renameValue?.trim()
@@ -3602,13 +3842,10 @@ function PlanningPanel({ project, milestones, workItems, onRefresh }) {
   }
   const closeReopen = (m) => act(
     `/projects/${encodeURIComponent(project.id)}/milestones/${encodeURIComponent(m.name)}`,
-    { method: 'PATCH', body: JSON.stringify({ closed: !m.closed, actor_id: 'sahil', actor_kind: 'human' }) })
-  if (!milestones.length) {
-    return jsxs('section', { className: 'dockyard-feature-card', 'data-planning-panel': true, children: [
-      jsx('h2', { children: 'Milestone planning' }, 'title'),
-      jsx('p', { className: 'dockyard-meta', children: 'No milestones yet. Create one in the Dockyard dashboard; it appears here for review.' }, 'empty'),
-    ]})
-  }
+    { closed: !m.closed }, 'PATCH')
+  const updateDue = (m) => act(
+    `/projects/${encodeURIComponent(project.id)}/milestones/${encodeURIComponent(m.name)}`,
+    { due: detail?.dueValue || null }, 'PATCH')
   const forecastLine = (fc) => {
     if (!fc) return 'Forecast unavailable.'
     if (fc.state === 'complete') return 'Forecast: complete.'
@@ -3624,6 +3861,12 @@ function PlanningPanel({ project, milestones, workItems, onRefresh }) {
     jsx('h2', { children: 'Milestone planning' }),
     notice && jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: notice }),
     jsx('p', { className: 'dockyard-meta', children: 'Counts are item counts, not hour estimates. Forecast is a scenario from completed-item history, never a delivery promise.' }),
+    jsxs('div', { className: 'dockyard-inline-editor', 'data-milestone-create': true, children: [
+      jsxs('label', { children: [jsx('span', { children: 'Milestone name' }), jsx('input', { 'data-milestone-name': true, value: newName, onChange: (event) => setNewName(event.target.value) })] }),
+      jsxs('label', { children: [jsx('span', { children: 'Due date' }), jsx('input', { 'data-milestone-due': true, type: 'date', value: newDue, onChange: (event) => setNewDue(event.target.value) })] }),
+      jsx(Button, { action: 'create-milestone', variant: 'primary', disabled: !newName.trim(), onClick: create, children: 'Create milestone' }),
+    ]}),
+    milestones.length === 0 ? jsx('p', { className: 'dockyard-meta', children: 'No milestones yet.' }) : null,
     jsx('div', { className: 'dockyard-planning-table', role: 'table', 'aria-label': 'Milestones and delivery risk', children:
       milestones.map((m, index) => {
         const overdue = !m.closed && m.due && m.due < today
@@ -3652,6 +3895,19 @@ function PlanningPanel({ project, milestones, workItems, onRefresh }) {
                 ] }, `${risk.kind}:${risk.item ?? 'risk'}:${index}`)) })
               : jsx('p', { className: 'dockyard-meta', children: 'No blocking risks recorded.' }, 'no-risks'),
             jsx('p', { className: 'dockyard-planning-forecast', children: forecastLine(d.forecast) }, 'forecast'),
+            jsxs('div', { className: 'dockyard-inline-editor', children: [
+              jsxs('label', { children: [jsx('span', { children: 'Rename' }), jsx('input', { 'data-milestone-rename': m.name, defaultValue: m.name, onChange: (event) => setDetail((current) => ({ ...current, renameValue: event.target.value })) })] }),
+              jsx(Button, { action: 'rename-milestone', onClick: () => rename(m.name), children: 'Rename' }),
+              jsxs('label', { children: [jsx('span', { children: 'Due date' }), jsx('input', { type: 'date', 'data-milestone-edit-due': m.name, defaultValue: m.due || '', onChange: (event) => setDetail((current) => ({ ...current, dueValue: event.target.value })) })] }),
+              jsx(Button, { action: 'update-milestone-due', onClick: () => updateDue(m), children: 'Update due date' }),
+              jsx(Button, { action: m.closed ? 'reopen-milestone' : 'close-milestone', onClick: () => closeReopen(m), children: m.closed ? 'Reopen' : 'Close' }),
+              m.archived_at
+                ? jsx(Button, { action: 'restore-milestone', onClick: () => act(`/projects/${encodeURIComponent(project.id)}/milestones/${encodeURIComponent(m.name)}/restore`), children: 'Restore' })
+                : jsx(Button, { action: 'archive-milestone', variant: 'danger', onClick: () => act(`/projects/${encodeURIComponent(project.id)}/milestones/${encodeURIComponent(m.name)}/archive`), children: 'Archive' }),
+              jsxs('label', { children: [jsx('span', { children: 'Scope item' }), jsx('select', { 'data-milestone-scope': m.name, defaultValue: '', onChange: (event) => setDetail((current) => ({ ...current, scopeRef: event.target.value })), children: [jsx('option', { value: '', children: 'Select work item' }, 'empty'), ...workItems.map((item) => jsx('option', { value: item.ref, children: `${item.ref} — ${item.title}` }, item.ref))] })] }),
+              jsx(Button, { action: 'attach-milestone-scope', disabled: !d.scopeRef, onClick: () => act(`/projects/${encodeURIComponent(project.id)}/milestones/${encodeURIComponent(m.name)}/attach`, { ref: d.scopeRef }), children: 'Attach' }),
+              (d.item_refs ?? []).map((ref) => jsx(Button, { action: 'detach-milestone-scope', onClick: () => act(`/projects/${encodeURIComponent(project.id)}/milestones/${encodeURIComponent(m.name)}/detach`, { ref }), children: `Detach ${ref}` }, ref)),
+            ]}),
             jsx('p', { className: 'dockyard-meta', children: 'Open a work item ref in the Board tab to drill into a blocker. Nothing is auto-reassigned or replanned.' }, 'note'),
           ] }),
         ]}, `${m.name}:item:${index}`)
@@ -3686,7 +3942,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, pendingWorkRef, on
   if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Connect a project before opening the project dashboard.', icon: 'project' })
   const [healthTone, healthLabel] = healthDetails(project.health)
   const views = [
-    ['overview', 'Overview'], ['board', 'Board'], ['objectives', 'Objectives'], ['planning', 'Planning'], ['content', 'Content'], ['activity', 'Activity'], ['settings', 'Settings'], ['reports', 'Reports'],
+    ['overview', 'Overview'], ['board', 'Board'], ['objectives', 'Objectives'], ['planning', 'Planning'], ['workflows', 'Workflows'], ['content', 'Content'], ['activity', 'Activity'], ['settings', 'Settings'], ['reports', 'Reports'],
   ]
   const columns = [
     ['backlog', 'Backlog', ['backlog']],
@@ -3726,11 +3982,13 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, pendingWorkRef, on
       }),
     ]})
   } else if (projectView === 'objectives') {
-    panel = jsx(ObjectivesPanel, { project, settings: view.settings ?? {}, objectives: view.objectives ?? [], missionArchive: view.missionArchive ?? [], onRefresh }, project.id)
+    panel = jsx(ObjectivesPanel, { project, settings: view.settings ?? {}, objectives: view.objectives ?? [], goals: view.goals ?? [], missionArchive: view.missionArchive ?? [], onRefresh }, project.id)
   } else if (projectView === 'planning') {
     // P9.2: milestone planning — table/summary first (no Gantt, no new
     // scheduling engine). Same actions/contracts the Dashboard exposes.
     panel = jsx(PlanningPanel, { project, view, milestones: view.milestones ?? [], workItems: view.workItems ?? [], onRefresh }, project.id)
+  } else if (projectView === 'workflows') {
+    panel = jsx(ExecutableWorkflowsPanel, { project, workflows: view.workflows ?? [], onRefresh }, project.id)
   } else if (projectView === 'content') {
     panel = jsx(ProjectContentPanel, { project, content: view.content ?? [], onRefresh }, project.id)
   } else if (projectView === 'activity') {

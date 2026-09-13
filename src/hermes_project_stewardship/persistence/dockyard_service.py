@@ -264,10 +264,16 @@ class DockyardService:
                         subject=name, detail={"due": due})
         return mid
 
+    def _active_milestone(self, project_id: str, name: str) -> Dict:
+        milestone = self.dy.milestone_progress(project_id, name)
+        if milestone.get("archived_at"):
+            raise ValueError(f"milestone {name} is archived; restore it before editing")
+        return milestone
+
     def milestone_attach(self, project_id: str, name: str, ref: str, *,
                          actor: Actor) -> None:
         # Refuse attaching to non-existent milestones or phantom canonical work.
-        self.dy.milestone_progress(project_id, name)
+        self._active_milestone(project_id, name)
         item = (
             self.canonical_work.get(project_id, ref)
             if self.canonical_work is not None
@@ -283,7 +289,8 @@ class DockyardService:
         if self.canonical_work is None:
             return self.dy.milestone_progress(project_id, name)
         row = self.store._conn.execute(
-            "SELECT id, due, closed_at FROM dockyard_milestones "
+            "SELECT id, due, created_at, closed_at, archived_at, archived_by"
+            " FROM dockyard_milestones "
             "WHERE project_id=? AND name=?",
             (project_id, name),
         ).fetchone()
@@ -330,6 +337,10 @@ class DockyardService:
             "done": done,
             "closed": bool(row["closed_at"]),
             "due": row["due"],
+            "created_at": row["created_at"],
+            "archived_at": row["archived_at"],
+            "archived_by": row["archived_by"],
+            "item_refs": attached,
             # P9.3 additions (counts, never hours):
             "committed": len(attached),
             "blocked": len(blocked),
@@ -397,13 +408,15 @@ class DockyardService:
                 })
         return risks
 
-    def milestone_list(self, project_id: str) -> list:
+    def milestone_list(self, project_id: str, *, include_archived: bool = False) -> list:
         if self.canonical_work is None:
-            return self.dy.milestone_list(project_id)
+            return self.dy.milestone_list(project_id, include_archived=include_archived)
+        archive_clause = "" if include_archived else " AND archived_at IS NULL"
         rowset = self.store._conn.execute(
-            "SELECT name, due, created_at, closed_at"
-            " FROM dockyard_milestones WHERE project_id=?"
-            " ORDER BY CASE WHEN closed_at IS NULL THEN 0 ELSE 1 END, due, name",
+            "SELECT id, name, due, created_at, closed_at, archived_at, archived_by"
+            f" FROM dockyard_milestones WHERE project_id=?{archive_clause}"
+            " ORDER BY CASE WHEN archived_at IS NULL THEN 0 ELSE 1 END,"
+            " CASE WHEN closed_at IS NULL THEN 0 ELSE 1 END, due, name",
             (project_id,),
         ).fetchall()
         statuses = {
@@ -413,17 +426,19 @@ class DockyardService:
         out = []
         for row in rowset:
             refs = self.store._conn.execute(
-                "SELECT item_ref FROM dockyard_milestone_items WHERE milestone_id=?",
-                (self.store._conn.execute(
-                    "SELECT id FROM dockyard_milestones WHERE project_id=? AND name=?",
-                    (project_id, row["name"]),
-                ).fetchone()["id"],),
+                "SELECT item_ref FROM dockyard_milestone_items WHERE milestone_id=?"
+                " ORDER BY item_ref",
+                (row["id"],),
             ).fetchall()
             attached = [str(item["item_ref"]) for item in refs]
             out.append({
                 "name": row["name"],
                 "due": row["due"],
+                "created_at": row["created_at"],
                 "closed": bool(row["closed_at"]),
+                "archived_at": row["archived_at"],
+                "archived_by": row["archived_by"],
+                "item_refs": attached,
                 "total": len(attached),
                 "done": sum(1 for ref in attached if statuses.get(ref) == "done"),
             })
@@ -432,7 +447,7 @@ class DockyardService:
     def milestone_update(self, project_id: str, name: str, *, due: Optional[str],
                          closed: Optional[bool], actor: Actor) -> None:
         # Validated update: refuses phantom milestones, writes audit trail.
-        self.dy.milestone_progress(project_id, name)
+        self._active_milestone(project_id, name)
         self.dy.milestone_update(project_id, name, due=due, closed=closed)
         self._audit(actor=actor, action="milestone.updated",
                     subject=name, detail={"due": due, "closed": closed})
@@ -441,18 +456,30 @@ class DockyardService:
                          actor: Actor) -> None:
         """P9.1: rename preserving milestone identity (id + attachments);
         audit trails old -> new so actor history survives the rename."""
-        self.dy.milestone_progress(project_id, name)
+        self._active_milestone(project_id, name)
         self.dy.milestone_rename(project_id, name, new_name)
         self._audit(actor=actor, action="milestone.renamed",
                     subject=new_name, detail={"from": name, "to": new_name})
 
     def milestone_detach(self, project_id: str, name: str, ref: str, *,
                          actor: Actor) -> None:
-        """P9.1: scope change — remove a work attachment (audited)."""
-        self.dy.milestone_progress(project_id, name)
+        """P9.1: scope change — remove a work-attachment (audited)."""
+        self._active_milestone(project_id, name)
         self.dy.milestone_detach(project_id, name, ref)
         self._audit(actor=actor, action="milestone.detached",
                     subject=name, detail={"item": ref})
+
+    def milestone_archive(self, project_id: str, name: str, *, actor: Actor) -> Dict:
+        self._active_milestone(project_id, name)
+        self.dy.milestone_archive(project_id, name, actor=actor.id)
+        self._audit(actor=actor, action="milestone.archived", subject=name)
+        return self.milestone_progress(project_id, name)
+
+    def milestone_restore(self, project_id: str, name: str, *, actor: Actor) -> Dict:
+        self.dy.milestone_progress(project_id, name)
+        self.dy.milestone_restore(project_id, name)
+        self._audit(actor=actor, action="milestone.restored", subject=name)
+        return self.milestone_progress(project_id, name)
 
     # ------------------------------------------------------------------ #
     # Saved views (PM-05)                                                #

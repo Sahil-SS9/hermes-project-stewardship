@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 22
+SCHEMA_VERSION = 24
 
 
 @dataclass(frozen=True)
@@ -883,5 +883,88 @@ MIGRATIONS: List[Migration] = [
         );
         """,
         downgrade_sql="""DROP TABLE IF EXISTS onboarding_operations;""",
+    ),
+    Migration(
+        version=23,
+        name="phase 5 reversible management lifecycle and managed file identity",
+        upgrade_sql="""
+        ALTER TABLE project_stewardship ADD COLUMN archived_at TEXT;
+        ALTER TABLE project_stewardship ADD COLUMN archived_by TEXT;
+
+        ALTER TABLE dockyard_milestones ADD COLUMN archived_at TEXT;
+        ALTER TABLE dockyard_milestones ADD COLUMN archived_by TEXT;
+
+        ALTER TABLE dockyard_workflows ADD COLUMN archived_at TEXT;
+        ALTER TABLE dockyard_workflows ADD COLUMN archived_by TEXT;
+
+        ALTER TABLE project_content ADD COLUMN archived_at TEXT;
+        ALTER TABLE project_content ADD COLUMN archived_by TEXT;
+        ALTER TABLE project_content ADD COLUMN removal_state TEXT NOT NULL DEFAULT 'active'
+            CHECK (removal_state IN ('active','pending','file_removed'));
+        ALTER TABLE project_content ADD COLUMN file_dev INTEGER;
+        ALTER TABLE project_content ADD COLUMN file_ino INTEGER;
+        ALTER TABLE project_content ADD COLUMN removed_at TEXT;
+        ALTER TABLE project_content ADD COLUMN removed_by TEXT;
+        """,
+        downgrade_sql="""
+        ALTER TABLE project_content DROP COLUMN removed_by;
+        ALTER TABLE project_content DROP COLUMN removed_at;
+        ALTER TABLE project_content DROP COLUMN file_ino;
+        ALTER TABLE project_content DROP COLUMN file_dev;
+        ALTER TABLE project_content DROP COLUMN removal_state;
+        ALTER TABLE project_content DROP COLUMN archived_by;
+        ALTER TABLE project_content DROP COLUMN archived_at;
+
+        ALTER TABLE dockyard_workflows DROP COLUMN archived_by;
+        ALTER TABLE dockyard_workflows DROP COLUMN archived_at;
+
+        ALTER TABLE dockyard_milestones DROP COLUMN archived_by;
+        ALTER TABLE dockyard_milestones DROP COLUMN archived_at;
+
+        ALTER TABLE project_stewardship DROP COLUMN archived_by;
+        ALTER TABLE project_stewardship DROP COLUMN archived_at;
+        """,
+    ),
+    Migration(
+        version=24,
+        name="managed content quarantine state",
+        upgrade_sql="""
+        CREATE TABLE project_content_v24 (
+            content_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            filename TEXT NOT NULL,
+            stored_path TEXT NOT NULL,
+            media_type TEXT NOT NULL CHECK (media_type IN (
+                'text/plain','text/markdown','application/pdf',
+                'image/png','image/jpeg','image/webp')),
+            size_bytes INTEGER NOT NULL CHECK (size_bytes BETWEEN 1 AND 5242880),
+            sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+            uploaded_by TEXT NOT NULL,
+            uploaded_at TEXT NOT NULL,
+            archived_at TEXT,
+            archived_by TEXT,
+            removal_state TEXT NOT NULL DEFAULT 'active'
+                CHECK (removal_state IN ('active','pending','quarantined','file_removed')),
+            file_dev INTEGER,
+            file_ino INTEGER,
+            removed_at TEXT,
+            removed_by TEXT,
+            UNIQUE(project_id, stored_path)
+        );
+        INSERT INTO project_content_v24(
+            content_id, project_id, filename, stored_path, media_type,
+            size_bytes, sha256, uploaded_by, uploaded_at, archived_at,
+            archived_by, removal_state, file_dev, file_ino, removed_at, removed_by
+        )
+        SELECT content_id, project_id, filename, stored_path, media_type,
+               size_bytes, sha256, uploaded_by, uploaded_at, archived_at,
+               archived_by, removal_state, file_dev, file_ino, removed_at, removed_by
+        FROM project_content;
+        DROP TABLE project_content;
+        ALTER TABLE project_content_v24 RENAME TO project_content;
+        CREATE INDEX idx_project_content_project_time
+            ON project_content(project_id, uploaded_at DESC);
+        """,
+        downgrade_sql="""SELECT 1;""",
     ),
 ]

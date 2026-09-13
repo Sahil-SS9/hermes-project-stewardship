@@ -131,16 +131,35 @@ const POPULATED = {
       { id: 12, project_id: 'payments-relaunch', name: 'Legacy webhook parity', description: 'Archived after the replacement shipped.', evaluator_type: 'manual', target: '>=1', severity: 'low', enabled: false, command: null, integration: null, window: '30d' },
     ] },
   },
+  goals: {
+    'demo-project': { goals: [] },
+    'payments-relaunch': { goals: [
+      { goal_id: 'GOAL-DEMO1', project_id: 'payments-relaunch', title: 'Reliable checkout', description: 'Keep retries safe.', position: 0, archived_at: null, objective_ids: [11] },
+      { goal_id: 'GOAL-DEMO2', project_id: 'payments-relaunch', title: 'Operational clarity', description: 'Keep runbooks current.', position: 1, archived_at: null, objective_ids: [] },
+    ] },
+  },
+  workflows: {
+    'demo-project': { workflows: [] },
+    'payments-relaunch': { workflows: [{ project_id: 'payments-relaunch', name: 'release', version: 1, definition: { nodes: [{ id: 'build', title: 'Build release', depends_on: [], human_gate: false }] }, archived_at: null, archived_by: null }] },
+  },
+  milestones: {
+    'demo-project': { milestones: [] },
+    'payments-relaunch': { milestones: [{ name: 'Launch', due: '2026-10-01', closed: false, archived_at: null, archived_by: null, item_refs: [], total: 0, done: 0 }] },
+  },
   missionArchive: {
     'demo-project': { missions: [] },
     'payments-relaunch': { missions: [{ archive_id: 'MISSION-DEMO1', project_id: 'payments-relaunch', mission: 'Stabilise the legacy checkout', archived_by: 'sahil', archived_at: '2026-08-20T12:00:00+00:00' }] },
   },
   content: {
     'demo-project': { content: [] },
-    'payments-relaunch': { content: [{ content_id: 'CONTENT-DEMO1', project_id: 'payments-relaunch', filename: 'release-runbook.md', media_type: 'text/markdown', size_bytes: 48, sha256: 'a'.repeat(64), uploaded_by: 'sahil', uploaded_at: '2026-08-24T19:10:00+00:00' }] },
+    'payments-relaunch': { content: [
+      { content_id: 'CONTENT-DEMO1', project_id: 'payments-relaunch', filename: 'release-runbook.md', media_type: 'text/markdown', size_bytes: 48, sha256: 'a'.repeat(64), uploaded_by: 'sahil', uploaded_at: '2026-08-24T19:10:00+00:00' },
+      { content_id: 'CONTENT-BLOCKED', project_id: 'payments-relaunch', filename: 'required-evidence.md', media_type: 'text/markdown', size_bytes: 20, sha256: 'b'.repeat(64), uploaded_by: 'sahil', uploaded_at: '2026-08-24T19:11:00+00:00' },
+    ] },
   },
   contentPreviews: {
     'CONTENT-DEMO1': { content_id: 'CONTENT-DEMO1', project_id: 'payments-relaunch', filename: 'release-runbook.md', media_type: 'text/markdown', size_bytes: 48, sha256: 'a'.repeat(64), uploaded_by: 'sahil', uploaded_at: '2026-08-24T19:10:00+00:00', preview_kind: 'text', text: '# Release runbook\n\nUse the rollback gate.\n', truncated: false },
+    'CONTENT-BLOCKED': { content_id: 'CONTENT-BLOCKED', project_id: 'payments-relaunch', filename: 'required-evidence.md', media_type: 'text/markdown', size_bytes: 20, sha256: 'b'.repeat(64), uploaded_by: 'sahil', uploaded_at: '2026-08-24T19:11:00+00:00', preview_kind: 'text', text: '# Required evidence', truncated: false },
   },
   events: {
     'demo-project': { events: [] },
@@ -205,6 +224,9 @@ const EMPTY = {
   workItems: {},
   initiatives: {},
   objectives: {},
+  goals: {},
+  workflows: {},
+  milestones: {},
   missionArchive: {},
   content: {},
   contentPreviews: {},
@@ -309,6 +331,7 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       data.workItems[projectId] = { work_items: [] };
       data.initiatives[projectId] = { initiatives: [] };
       data.objectives[projectId] = { objectives: [] };
+      data.goals[projectId] = { goals: [] };
       data.missionArchive[projectId] = { missions: [] };
       data.content[projectId] = { content: [] };
       data.events[projectId] = { events: [] };
@@ -396,7 +419,7 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       data.backlog[projectId].backlog.sort((left, right) => left.rank - right.rank);
       return { ...item, rank, priority_reason: init.body?.reason };
     }
-    const lifecycle = path.match(/^\/projects\/([^/]+)\/(disable|re-enable|pause|resume|freeze)$/);
+    const lifecycle = path.match(/^\/projects\/([^/]+)\/(disable|re-enable|pause|resume|freeze|archive|restore)$/);
     if (method === 'POST' && lifecycle) {
       const projectId = decodeURIComponent(lifecycle[1]);
       const action = lifecycle[2];
@@ -407,6 +430,8 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       if (action === 'pause') settings.phase = 'paused';
       if (action === 'resume') settings.phase = 'active';
       if (action === 'freeze') settings.phase = 'frozen';
+      if (action === 'archive') { settings.enabled = false; settings.archived_at = '2026-09-12T12:00:00+00:00'; }
+      if (action === 'restore') { settings.enabled = true; settings.phase = 'active'; settings.paused_at = null; settings.archived_at = null; }
       if (project) { project.enabled = settings.enabled; project.phase = settings.phase; }
       return clone(settings);
     }
@@ -456,6 +481,43 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       };
       data.settings[projectId] = next;
       return clone(next);
+    }
+    const goalCollection = path.match(/^\/projects\/([^/]+)\/goals$/);
+    if (method === 'POST' && goalCollection) {
+      const projectId = decodeURIComponent(goalCollection[1]);
+      data.goals[projectId] ??= { goals: [] };
+      const goal = {
+        goal_id: `GOAL-${Date.now()}`, project_id: projectId,
+        title: init.body?.title, description: init.body?.description ?? '',
+        position: data.goals[projectId].goals.filter((item) => !item.archived_at).length,
+        archived_at: null, objective_ids: init.body?.objective_ids ?? [],
+      };
+      data.goals[projectId].goals.push(goal);
+      return clone(goal);
+    }
+    const goalOrder = path.match(/^\/projects\/([^/]+)\/goals\/order$/);
+    if (method === 'PUT' && goalOrder) {
+      const projectId = decodeURIComponent(goalOrder[1]);
+      const goals = data.goals[projectId]?.goals ?? [];
+      (init.body?.goal_ids ?? []).forEach((goalId, position) => {
+        const goal = goals.find((item) => item.goal_id === goalId);
+        if (goal) goal.position = position;
+      });
+      return { goals: clone(goals.filter((goal) => !goal.archived_at).sort((a, b) => a.position - b.position)) };
+    }
+    const goalMutation = path.match(/^\/projects\/([^/]+)\/goals\/([^/]+)(?:\/(archive|restore))?$/);
+    if (goalMutation) {
+      const projectId = decodeURIComponent(goalMutation[1]);
+      const goalId = decodeURIComponent(goalMutation[2]);
+      const goal = data.goals[projectId]?.goals.find((item) => item.goal_id === goalId);
+      if (method === 'PATCH' && goal) {
+        Object.assign(goal, init.body);
+        return clone(goal);
+      }
+      if (method === 'POST' && goal && goalMutation[3]) {
+        goal.archived_at = goalMutation[3] === 'archive' ? '2026-08-25T12:00:00+00:00' : null;
+        return clone(goal);
+      }
     }
     const objectiveCollection = path.match(/^\/projects\/([^/]+)\/objectives$/);
     if (method === 'POST' && objectiveCollection) {
@@ -611,9 +673,97 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
     if (method === 'GET' && reportRead) {
       return clone(data.reportDetails[decodeURIComponent(reportRead[2])] ?? {});
     }
+    const contentDependencies = path.match(/^\/projects\/([^/]+)\/content\/([^/]+)\/dependencies$/);
+    if (method === 'GET' && contentDependencies) {
+      const contentId = decodeURIComponent(contentDependencies[2]);
+      return { dependencies: contentId === 'CONTENT-BLOCKED' ? [{ kind: 'assessment', ref: 'OBJ-1:1' }] : [] };
+    }
+    const contentLifecycle = path.match(/^\/projects\/([^/]+)\/content\/([^/]+)(?:\/(archive|restore))?$/);
+    if (contentLifecycle && (method === 'POST' || method === 'DELETE')) {
+      const projectId = decodeURIComponent(contentLifecycle[1]);
+      const contentId = decodeURIComponent(contentLifecycle[2]);
+      const action = contentLifecycle[3] ?? 'remove';
+      const rows = data.content[projectId]?.content ?? [];
+      const item = rows.find((row) => row.content_id === contentId);
+      if (!item) throw new Error('unknown content');
+      if (action === 'archive') item.archived_at = '2026-09-12T12:00:00+00:00';
+      if (action === 'restore') item.archived_at = null;
+      if (action === 'remove') item.removal_state = 'file_removed';
+      return clone(item);
+    }
+    const workflowCollection = path.match(/^\/projects\/([^/]+)\/workflows$/);
+    if (method === 'POST' && workflowCollection) {
+      const projectId = decodeURIComponent(workflowCollection[1]);
+      const row = { project_id: projectId, name: init.body.name, version: 1, definition: { nodes: init.body.nodes }, archived_at: null, archived_by: null };
+      data.workflows[projectId] ??= { workflows: [] };
+      data.workflows[projectId].workflows.push(row);
+      return clone(row);
+    }
+    const workflowAction = path.match(/^\/projects\/([^/]+)\/workflows\/([^/]+)\/(versions|start|archive|restore)$/);
+    if (method === 'POST' && workflowAction) {
+      const projectId = decodeURIComponent(workflowAction[1]);
+      const name = decodeURIComponent(workflowAction[2]);
+      const action = workflowAction[3];
+      const rows = data.workflows[projectId].workflows.filter((row) => row.name === name);
+      if (action === 'versions') {
+        const row = { project_id: projectId, name, version: Math.max(...rows.map((item) => item.version)) + 1, definition: { nodes: init.body.nodes }, archived_at: null, archived_by: null };
+        data.workflows[projectId].workflows.push(row);
+        return clone(row);
+      }
+      if (action === 'start') {
+        data.workflowRuns ??= {};
+        const key = `${projectId}:${name}`;
+        data.workflowRuns[key] ??= [];
+        const run = { project_id: projectId, name, version: init.body.version, run_key: init.body.run_key, status: 'complete', replayed: false, tasks: { 'step-1': 'HDY-NEW' } };
+        data.workflowRuns[key].push(run);
+        return clone(run);
+      }
+      rows.forEach((row) => { row.archived_at = action === 'archive' ? '2026-09-12T12:00:00+00:00' : null; });
+      return { project_id: projectId, name, versions: clone(rows) };
+    }
+    const workflowRuns = path.match(/^\/projects\/([^/]+)\/workflows\/([^/]+)\/runs$/);
+    if (method === 'GET' && workflowRuns) {
+      const key = `${decodeURIComponent(workflowRuns[1])}:${decodeURIComponent(workflowRuns[2])}`;
+      return { runs: clone(data.workflowRuns?.[key] ?? []) };
+    }
+    const milestoneDetail = path.match(/^\/projects\/([^/]+)\/milestones\/([^/]+)$/);
+    if (method === 'GET' && milestoneDetail) {
+      const projectId = decodeURIComponent(milestoneDetail[1]);
+      const name = decodeURIComponent(milestoneDetail[2]);
+      return clone(data.milestones[projectId].milestones.find((item) => item.name === name));
+    }
+    const milestoneCollectionMutation = path.match(/^\/projects\/([^/]+)\/milestones$/);
+    if (method === 'POST' && milestoneCollectionMutation) {
+      const projectId = decodeURIComponent(milestoneCollectionMutation[1]);
+      const row = { name: init.body.name, due: init.body.due, closed: false, archived_at: null, archived_by: null, item_refs: [], total: 0, done: 0 };
+      data.milestones[projectId] ??= { milestones: [] };
+      data.milestones[projectId].milestones.push(row);
+      return clone(row);
+    }
+    const milestoneMutation = path.match(/^\/projects\/([^/]+)\/milestones\/([^/]+)(?:\/(rename|attach|detach|archive|restore))?$/);
+    if (milestoneMutation && ['POST', 'PATCH'].includes(method)) {
+      const projectId = decodeURIComponent(milestoneMutation[1]);
+      const name = decodeURIComponent(milestoneMutation[2]);
+      const action = milestoneMutation[3] ?? 'update';
+      const row = data.milestones[projectId].milestones.find((item) => item.name === name);
+      if (action === 'update') {
+        if (Object.prototype.hasOwnProperty.call(init.body, 'closed')) row.closed = Boolean(init.body.closed);
+        if (Object.prototype.hasOwnProperty.call(init.body, 'due')) row.due = init.body.due;
+      }
+      if (action === 'rename') row.name = init.body.new_name;
+      if (action === 'attach' && !row.item_refs.includes(init.body.ref)) row.item_refs.push(init.body.ref);
+      if (action === 'detach') row.item_refs = row.item_refs.filter((ref) => ref !== init.body.ref);
+      if (action === 'archive') row.archived_at = '2026-09-12T12:00:00+00:00';
+      if (action === 'restore') row.archived_at = null;
+      row.total = row.item_refs.length;
+      return clone(row);
+    }
     const contentPreviewRead = path.match(/^\/projects\/([^/]+)\/content\/([^/]+)\/preview$/);
     if (method === 'GET' && contentPreviewRead) {
-      return clone(data.contentPreviews[decodeURIComponent(contentPreviewRead[2])] ?? {});
+      const projectId = decodeURIComponent(contentPreviewRead[1]);
+      const contentId = decodeURIComponent(contentPreviewRead[2]);
+      const row = data.content[projectId]?.content?.find((item) => item.content_id === contentId) ?? {};
+      return { ...clone(data.contentPreviews[contentId] ?? {}), ...clone(row) };
     }
     const missionArchiveRead = path.match(/^\/projects\/([^/]+)\/missions\/archive$/);
     if (method === 'GET' && missionArchiveRead) {
@@ -625,7 +775,7 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       const projectId = decodeURIComponent(milestonesRead[1]);
       return clone(data.milestones?.[projectId] ?? { milestones: [] });
     }
-    const projectRead = path.match(/^\/projects\/([^/]+)\/(settings|work-items|initiatives|objectives|events|backlog|views|reports|content)$/);
+    const projectRead = path.match(/^\/projects\/([^/]+)\/(settings|work-items|initiatives|objectives|goals|workflows|events|backlog|views|reports|content)$/);
     if (projectRead) {
       const projectId = decodeURIComponent(projectRead[1]);
       const kind = projectRead[2];
@@ -633,6 +783,8 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       if (kind === 'work-items') return clone(data.workItems[projectId] ?? { work_items: [] });
       if (kind === 'initiatives') return clone(data.initiatives[projectId] ?? { initiatives: [] });
       if (kind === 'objectives') return clone(data.objectives[projectId] ?? { objectives: [] });
+      if (kind === 'goals') return clone(data.goals[projectId] ?? { goals: [] });
+      if (kind === 'workflows') return clone(data.workflows[projectId] ?? { workflows: [] });
       if (kind === 'events') return clone(data.events[projectId] ?? { events: [] });
       if (kind === 'backlog') return clone(data.backlog[projectId] ?? { backlog: [] });
       if (kind === 'views') return clone(data.views[projectId] ?? { views: [] });
@@ -859,7 +1011,7 @@ async function testProjectDashboardScreen() {
   const doc = runtime.dom.window.document;
   assert(doc.querySelector('[data-project-dashboard]'), 'project dashboard screen is missing');
   assert.match(doc.body.textContent, /Checkout reliability rebuild/);
-  assert.equal(doc.querySelectorAll('[data-project-view]').length, 8, 'project dashboard must expose eight supported views (incl. P9.2 planning)');
+  assert.equal(doc.querySelectorAll('[data-project-view]').length, 9, 'project dashboard must expose nine supported views (including planning and executable workflows)');
   assert(doc.querySelector('[data-project-visual]'), 'project overview is missing work visualisation');
   assert(doc.querySelector('[data-overview-work]'), 'project overview is missing current work context');
   assert(doc.querySelector('[data-overview-initiatives]'), 'project overview is missing initiative context');
@@ -933,6 +1085,7 @@ async function testProjectDashboardScreen() {
     '/projects/payments-relaunch/work-items',
     '/projects/payments-relaunch/initiatives',
     '/projects/payments-relaunch/objectives',
+    '/projects/payments-relaunch/goals',
     '/projects/payments-relaunch/missions/archive',
     '/projects/payments-relaunch/content',
     '/projects/payments-relaunch/events',
@@ -952,9 +1105,32 @@ async function testMissionObjectiveManagementAndDestructiveGates() {
 
   assert(doc.querySelector('[data-objective-evidence]'), 'objective evidence/history is missing');
   assert.match(doc.querySelector('[data-objective-evidence]').textContent, /Unknown|unknown/);
+  assert(doc.querySelector('[data-goals-manager]'), 'goal manager is missing');
+  assert.equal(doc.querySelectorAll('[data-goal-row]').length, 2, 'active goals did not render');
+  assert.match(doc.querySelector('[data-goal-row="GOAL-DEMO1"]').textContent, /Checkout reliability/, 'linked objective was not rendered on its goal');
+  assert.match(doc.querySelector('[data-goal-row="GOAL-DEMO2"]').textContent, /No linked objectives/, 'nullable objective relationship was not visible');
   assert(doc.querySelector('[data-mission-manager]'), 'mission manager is missing');
   assert.equal(doc.querySelectorAll('[data-objective-row]').length, 2, 'active and archived objectives did not render');
   assert.match(doc.body.textContent, /Stabilise the legacy checkout/);
+
+  await runtime.click('[data-action="add-goal"]');
+  await runtime.setValue('[data-goal-field="title"]', 'Preserve objective history');
+  const objectiveChoice = doc.querySelector('[data-goal-objectives] input[value="12"]');
+  assert(objectiveChoice, 'goal editor did not expose optional objective linking');
+  objectiveChoice.click();
+  await runtime.flush(20);
+  await runtime.click('[data-action="save-goal"]', 50);
+  const goalCreate = runtime.calls.find((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/goals');
+  assert.deepEqual(goalCreate?.body?.objective_ids, [12], 'goal create did not preserve the selected objective ids');
+  assert.equal(doc.querySelectorAll('[data-objective-row]').length, 2, 'linking a goal removed or hid an objective');
+
+  await runtime.click('[data-goal-row="GOAL-DEMO1"] [data-action="move-goal-down"]', 40);
+  const order = runtime.calls.find((call) => call.method === 'PUT' && call.path === '/projects/payments-relaunch/goals/order');
+  assert.deepEqual(order?.body?.goal_ids?.slice(0, 2), ['GOAL-DEMO2', 'GOAL-DEMO1'], 'goal order was not sent explicitly');
+  await runtime.click('[data-goal-row="GOAL-DEMO1"] [data-action="archive-goal"]', 40);
+  assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/goals/GOAL-DEMO1/archive'), 'goal archive was not sent');
+  await runtime.click('[data-goal-row="GOAL-DEMO1"] [data-action="restore-goal"]', 40);
+  assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/goals/GOAL-DEMO1/restore'), 'goal restore was not sent');
 
   await runtime.click('[data-action="edit-mission"]');
   await runtime.setValue('[data-mission-field]', 'Make checkout recovery measurable');
@@ -997,7 +1173,7 @@ async function testProjectContentVisibilityPreviewAndUpload() {
   const doc = runtime.dom.window.document;
 
   assert(doc.querySelector('[data-project-content]'), 'project content surface is missing');
-  assert.equal(doc.querySelectorAll('[data-project-content-item]').length, 1, 'existing project documentation did not render');
+  assert.equal(doc.querySelectorAll('[data-project-content-item]').length, 2, 'existing project documentation did not render');
   await runtime.click('[data-project-content-item="CONTENT-DEMO1"]');
   assert.match(doc.querySelector('[data-content-preview]')?.textContent || '', /Use the rollback gate/);
 
@@ -1080,6 +1256,105 @@ async function testProjectLifecycleStateAndConfirmedActions() {
   assert.equal(doc.querySelector('[data-project-phase-state]')?.textContent.trim(), 'Frozen');
   assertAction('resume');
   assertAction('freeze', false);
+  await runtime.dispose();
+}
+
+async function testPhase5ManagementJourneys() {
+  const runtime = await createRuntime();
+  await runtime.mount();
+  await runtime.click('[data-tab="project"]', 80);
+  const doc = runtime.dom.window.document;
+
+  await runtime.click('[data-project-view="planning"]');
+  assert(doc.querySelector('[data-action="create-milestone"]'), 'milestone create control is missing');
+  await runtime.setValue('[data-milestone-name]', 'Verification');
+  await runtime.click('[data-action="create-milestone"]', 80);
+  assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/milestones' && call.body.name === 'Verification'), 'milestone create did not reach proxy');
+  await runtime.click('[data-milestone-row="Launch"] .dockyard-planning-toggle', 60);
+  assert(doc.querySelector('[data-action="rename-milestone"]'), 'milestone rename control is missing');
+  assert(doc.querySelector('[data-action="close-milestone"]'), 'milestone close control is missing');
+  assert(doc.querySelector('[data-action="archive-milestone"]'), 'milestone archive control is missing');
+  assert(doc.querySelector('[data-action="attach-milestone-scope"]'), 'milestone scope control is missing');
+  await runtime.setValue('[data-milestone-edit-due="Launch"]', '2026-11-15');
+  await runtime.click('[data-action="update-milestone-due"]', 80);
+  assert(runtime.calls.some((call) => call.method === 'PATCH' && call.path === '/projects/payments-relaunch/milestones/Launch' && call.body.due === '2026-11-15'), 'existing milestone due-date edit did not reach proxy');
+  await runtime.click('[data-milestone-row="Launch"] .dockyard-planning-toggle', 60);
+  await runtime.setValue('[data-milestone-rename="Launch"]', 'Launch verified');
+  await runtime.click('[data-action="rename-milestone"]', 80);
+  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/milestones/Launch/rename' && call.body.new_name === 'Launch verified'), 'milestone rename did not execute');
+  await runtime.click('[data-milestone-row="Launch verified"] .dockyard-planning-toggle', 60);
+  await runtime.click('[data-action="close-milestone"]', 80);
+  await runtime.click('[data-milestone-row="Launch verified"] .dockyard-planning-toggle', 60);
+  await runtime.click('[data-action="reopen-milestone"]', 80);
+  await runtime.click('[data-milestone-row="Launch verified"] .dockyard-planning-toggle', 60);
+  await runtime.setValue('[data-milestone-scope="Launch verified"]', 'HDY-12');
+  await runtime.click('[data-action="attach-milestone-scope"]', 80);
+  await runtime.click('[data-milestone-row="Launch verified"] .dockyard-planning-toggle', 60);
+  await runtime.click('[data-action="detach-milestone-scope"]', 80);
+  await runtime.click('[data-milestone-row="Launch verified"] .dockyard-planning-toggle', 60);
+  await runtime.click('[data-action="archive-milestone"]', 80);
+  await runtime.click('[data-milestone-row="Launch verified"] .dockyard-planning-toggle', 60);
+  await runtime.click('[data-action="restore-milestone"]', 80);
+  const milestoneCalls = runtime.calls.filter((call) => call.path.includes('/milestones/Launch%20verified'));
+  assert(milestoneCalls.some((call) => call.method === 'PATCH' && call.body.closed === true), 'milestone close did not execute');
+  assert(milestoneCalls.some((call) => call.method === 'PATCH' && call.body.closed === false), 'milestone reopen did not execute');
+  for (const suffix of ['/attach', '/detach', '/archive', '/restore']) {
+    assert(milestoneCalls.some((call) => call.path.endsWith(suffix)), `milestone ${suffix.slice(1)} did not execute`);
+  }
+
+  await runtime.click('[data-project-view="workflows"]');
+  assert(doc.querySelector('[data-executable-workflows]'), 'executable workflow surface is missing');
+  await runtime.setValue('[data-workflow-name]', 'release');
+  await runtime.setValue('[data-workflow-title]', 'Verify release');
+  await runtime.click('[data-action="define-workflow"]', 80);
+  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/workflows/release/versions'), 'workflow version definition did not reach proxy');
+  await runtime.click('[data-project-view="workflows"]');
+  await runtime.setValue('[data-workflow-run-key="release"]', 'browser-run-1');
+  await runtime.click('[data-action="start-workflow"]', 80);
+  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/workflows/release/start' && call.body.version === 1 && call.body.run_key === 'browser-run-1'), 'explicit workflow version start did not reach proxy');
+  await runtime.click('[data-project-view="workflows"]');
+  await runtime.click('[data-action="inspect-workflow"]', 80);
+  assert(doc.querySelector('[data-workflow-definition-version="1"]'), 'stored workflow definition is not inspectable');
+  assert.match(doc.querySelector('[data-workflow-run-history]')?.textContent ?? '', /browser-run-1 — v1 — complete/, 'workflow run history did not render the real run_key contract');
+  await runtime.click('[data-action="archive-workflow"]', 80);
+  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/workflows/release/archive'), 'workflow archive did not reach proxy');
+  await runtime.click('[data-project-view="workflows"]');
+  await runtime.click('[data-action="restore-workflow"]', 80);
+  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/workflows/release/restore'), 'workflow restore did not reach proxy');
+
+  await runtime.click('[data-project-view="content"]');
+  await runtime.click('[data-project-content-item="CONTENT-DEMO1"]');
+  await runtime.click('[data-action="archive-project-content"]');
+  assert(doc.querySelector('[data-destructive-confirm="content-archive"]'), 'content archive did not ask for confirmation');
+  await runtime.click('[data-action="confirm-destructive-action"]', 80);
+  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/content/CONTENT-DEMO1/archive'), 'content archive did not reach proxy');
+  await runtime.click('[data-project-view="content"]');
+  await runtime.click('[data-project-content-item="CONTENT-DEMO1"]');
+  await runtime.click('[data-action="restore-project-content"]');
+  await runtime.click('[data-action="confirm-destructive-action"]', 80);
+  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/content/CONTENT-DEMO1/restore'), 'content restore did not reach proxy');
+  await runtime.click('[data-project-view="content"]');
+  await runtime.click('[data-project-content-item="CONTENT-DEMO1"]');
+  await runtime.click('[data-action="remove-project-content"]');
+  await runtime.click('[data-action="confirm-destructive-action"]', 80);
+  assert(runtime.calls.some((call) => call.method === 'DELETE' && call.path === '/projects/payments-relaunch/content/CONTENT-DEMO1'), 'content removal did not reach proxy');
+  await runtime.click('[data-project-view="content"]');
+  await runtime.click('[data-project-content-item="CONTENT-BLOCKED"]');
+  await runtime.click('[data-action="remove-project-content"]');
+  await runtime.click('[data-action="confirm-destructive-action"]', 80);
+  assert([...doc.querySelectorAll('[role="alert"]')].some((node) => /Removal blocked/i.test(node.textContent ?? '')), 'content dependency refusal was not surfaced');
+  assert(!runtime.calls.some((call) => call.method === 'DELETE' && call.path === '/projects/payments-relaunch/content/CONTENT-BLOCKED'), 'dependency-blocked content reached DELETE');
+
+  await runtime.click('[data-project-view="settings"]');
+  await runtime.click('[data-lifecycle-action="archive"]');
+  assert(doc.querySelector('[data-lifecycle-confirm]') && !doc.querySelector('[data-lifecycle-confirm]').hidden, 'project archive did not ask for confirmation');
+  assert.match(doc.querySelector('[data-lifecycle-confirm]')?.textContent ?? '', /canonical project, board, tasks and repository remain untouched/i, 'project archive confirmation omits canonical retention assurance');
+  await runtime.click('[data-action="confirm-lifecycle-action"]', 100);
+  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/archive'), 'project archive did not reach proxy');
+  assert(doc.querySelector('[data-lifecycle-action="restore"]'), 'project restore control is missing after archive');
+  await runtime.click('[data-lifecycle-action="restore"]');
+  await runtime.click('[data-action="confirm-lifecycle-action"]', 100);
+  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/restore'), 'project restore did not reach proxy');
   await runtime.dispose();
 }
 
@@ -1865,6 +2140,7 @@ const tests = [
   ['mission and objective management with destructive gates', testMissionObjectiveManagementAndDestructiveGates],
   ['project content visibility, preview and upload', testProjectContentVisibilityPreviewAndUpload],
   ['project lifecycle state and confirmed actions', testProjectLifecycleStateAndConfirmedActions],
+  ['Phase 5 management journeys', testPhase5ManagementJourneys],
   ['backlog board and reason gate', testBacklogBoardAndReasonGate],
   ['backlog create form validation and readback', testBacklogCreateFormValidationAndReadback],
   ['backlog bulk reassignment and durable audit', testBacklogBulkReassignment],

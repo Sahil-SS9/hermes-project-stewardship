@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import sqlite3
+import stat
 import tempfile
 import uuid
 from datetime import datetime, timedelta
@@ -244,6 +245,10 @@ class StewardshipService:
         ).fetchone()
         if row is None:
             raise ServiceError(f"stewardship not enabled for project '{project_id}'")
+        if "archived_at" in row.keys() and row["archived_at"] is not None:
+            raise ServiceError(
+                f"project '{project_id}' is archived; use the explicit restore operation"
+            )
         if row["enabled"]:
             return self._row_settings(row)
         with self.store.tx() as cx:
@@ -334,7 +339,38 @@ class StewardshipService:
             "created_at": r["created_at"],
             "updated_at": r["updated_at"],
             "paused_at": r["paused_at"],
+            "archived_at": r["archived_at"] if "archived_at" in r.keys() else None,
+            "archived_by": r["archived_by"] if "archived_by" in r.keys() else None,
         }
+
+    def archive_project(self, project_id: str, *, actor: str, interface: str = "service") -> Dict[str, Any]:
+        row = self._require_known(project_id)
+        if row["archived_at"] is not None:
+            raise ServiceError(f"project '{project_id}' is already archived")
+        stamp = iso(self._clock())
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE project_stewardship SET enabled=0, archived_at=?, archived_by=?, updated_at=? WHERE project_id=?",
+                (stamp, actor, stamp, project_id),
+            )
+        untouched = ["project", "board", "tasks", "repository"]
+        self.store.audit(actor=actor, interface=interface, action="project.archived", subject=project_id, detail={"canonical_untouched": untouched})
+        return {**self._row_settings(self._require_known(project_id)), "canonical_untouched": untouched}
+
+    def restore_project(self, project_id: str, *, actor: str, interface: str = "service") -> Dict[str, Any]:
+        row = self._require_known(project_id)
+        if row["archived_at"] is None:
+            raise ServiceError(f"project '{project_id}' is not archived")
+        stamp = iso(self._clock())
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE project_stewardship SET enabled=1, phase='active', paused_at=NULL,"
+                " archived_at=NULL, archived_by=NULL, updated_at=? WHERE project_id=?",
+                (stamp, project_id),
+            )
+        untouched = ["project", "board", "tasks", "repository"]
+        self.store.audit(actor=actor, interface=interface, action="project.restored", subject=project_id, detail={"canonical_untouched": untouched})
+        return {**self._row_settings(self._require_known(project_id)), "canonical_untouched": untouched}
 
     # ------------------------------------------------------------------ #
     # Feature toggles (DY-FT-01): hide, never delete; re-enable restores. #
@@ -657,6 +693,224 @@ class StewardshipService:
             " ORDER BY project_id"
         ).fetchall()
         return [dict(r) for r in rows]
+
+    # ------------------------------------------------------------------ #
+    # Goals                                                              #
+    # ------------------------------------------------------------------ #
+
+    def _goal_row(self, project_id: str, goal_id: str) -> sqlite3.Row:
+        self._require_known(project_id)
+        row = self.store._conn.execute(
+            "SELECT * FROM project_goals WHERE project_id=? AND goal_id=?",
+            (project_id, goal_id),
+        ).fetchone()
+        if row is None:
+            raise ServiceError(f"unknown goal '{goal_id}' for project '{project_id}'")
+        return row
+
+    def _goal_dict(self, row: sqlite3.Row) -> Dict[str, Any]:
+        objective_ids = [
+            int(link["objective_id"])
+            for link in self.store._conn.execute(
+                "SELECT objective_id FROM project_objective_goals WHERE goal_id=?"
+                " ORDER BY objective_id",
+                (row["goal_id"],),
+            ).fetchall()
+        ]
+        return {
+            "goal_id": row["goal_id"],
+            "project_id": row["project_id"],
+            "title": row["title"],
+            "description": row["description"],
+            "position": row["position"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "archived_at": row["archived_at"],
+            "objective_ids": objective_ids,
+        }
+
+    @staticmethod
+    def _validate_goal_values(title: str, description: str, position: int) -> tuple[str, str, int]:
+        clean_title = title.strip() if isinstance(title, str) else ""
+        clean_description = description.strip() if isinstance(description, str) else ""
+        if not clean_title or len(clean_title) > 200:
+            raise ServiceError("goal title must be 1 to 200 characters")
+        if len(clean_description) > 2000:
+            raise ServiceError("goal description must be at most 2000 characters")
+        if isinstance(position, bool) or int(position) < 0:
+            raise ServiceError("goal position must be a non-negative integer")
+        return clean_title, clean_description, int(position)
+
+    @staticmethod
+    def _replace_goal_links_in_tx(
+        cx: sqlite3.Connection,
+        project_id: str,
+        goal_id: str,
+        objective_ids: Sequence[int],
+    ) -> None:
+        requested = list(dict.fromkeys(int(value) for value in objective_ids))
+        if requested:
+            placeholders = ",".join("?" for _ in requested)
+            rows = cx.execute(
+                f"SELECT id FROM project_objectives WHERE project_id=? AND id IN ({placeholders})",
+                (project_id, *requested),
+            ).fetchall()
+            found = {int(row["id"]) for row in rows}
+            missing = sorted(set(requested) - found)
+            if missing:
+                raise ServiceError(f"unknown project objective ids: {missing}")
+            conflicts = cx.execute(
+                f"SELECT objective_id, goal_id FROM project_objective_goals "
+                f"WHERE objective_id IN ({placeholders}) AND goal_id != ?",
+                (*requested, goal_id),
+            ).fetchall()
+            if conflicts:
+                raise ServiceError(
+                    f"objective {conflicts[0]['objective_id']} is linked to another goal"
+                )
+        cx.execute("DELETE FROM project_objective_goals WHERE goal_id=?", (goal_id,))
+        for objective_id in requested:
+            cx.execute(
+                "INSERT INTO project_objective_goals(objective_id, goal_id) VALUES(?,?)",
+                (objective_id, goal_id),
+            )
+
+    def create_goal(
+        self,
+        project_id: str,
+        *,
+        title: str,
+        description: str = "",
+        position: Optional[int] = None,
+        objective_ids: Sequence[int] = (),
+        actor: str = "system",
+        interface: str = "service",
+    ) -> Dict[str, Any]:
+        self._require(project_id)
+        if position is None:
+            row = self.store._conn.execute(
+                "SELECT COALESCE(MAX(position), -1) + 1 AS position FROM project_goals"
+                " WHERE project_id=? AND archived_at IS NULL",
+                (project_id,),
+            ).fetchone()
+            position = int(row["position"])
+        clean_title, clean_description, clean_position = self._validate_goal_values(
+            title, description, position
+        )
+        now = iso(self._clock())
+        goal_id = f"GOAL-{uuid.uuid4().hex[:16].upper()}"
+        with self.store.tx() as cx:
+            cx.execute(
+                "INSERT INTO project_goals(goal_id, project_id, title, description,"
+                " position, created_at, updated_at) VALUES(?,?,?,?,?,?,?)",
+                (goal_id, project_id, clean_title, clean_description, clean_position, now, now),
+            )
+            self._replace_goal_links_in_tx(cx, project_id, goal_id, objective_ids)
+        self.store.audit(
+            actor=actor, interface=interface, action="goal.created", subject=goal_id,
+            detail={"project_id": project_id, "objective_ids": list(objective_ids)},
+        )
+        return self._goal_dict(self._goal_row(project_id, goal_id))
+
+    def update_goal(
+        self,
+        project_id: str,
+        goal_id: str,
+        *,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        position: Optional[int] = None,
+        objective_ids: Optional[Sequence[int]] = None,
+        actor: str = "system",
+        interface: str = "service",
+    ) -> Dict[str, Any]:
+        existing = self._goal_row(project_id, goal_id)
+        clean_title, clean_description, clean_position = self._validate_goal_values(
+            existing["title"] if title is None else title,
+            existing["description"] if description is None else description,
+            existing["position"] if position is None else position,
+        )
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE project_goals SET title=?, description=?, position=?, updated_at=?"
+                " WHERE project_id=? AND goal_id=?",
+                (clean_title, clean_description, clean_position, iso(self._clock()), project_id, goal_id),
+            )
+            if objective_ids is not None:
+                self._replace_goal_links_in_tx(cx, project_id, goal_id, objective_ids)
+        self.store.audit(
+            actor=actor, interface=interface, action="goal.updated", subject=goal_id,
+        )
+        return self._goal_dict(self._goal_row(project_id, goal_id))
+
+    def goals(self, project_id: str, *, include_archived: bool = False) -> List[Dict[str, Any]]:
+        self._require_known(project_id)
+        sql = "SELECT * FROM project_goals WHERE project_id=?"
+        if not include_archived:
+            sql += " AND archived_at IS NULL"
+        sql += " ORDER BY position, created_at, goal_id"
+        return [self._goal_dict(row) for row in self.store._conn.execute(sql, (project_id,)).fetchall()]
+
+    def reorder_goals(
+        self,
+        project_id: str,
+        goal_ids: Sequence[str],
+        *,
+        actor: str = "system",
+        interface: str = "service",
+    ) -> List[Dict[str, Any]]:
+        self._require(project_id)
+        requested = list(dict.fromkeys(str(value) for value in goal_ids))
+        active = [row["goal_id"] for row in self.store._conn.execute(
+            "SELECT goal_id FROM project_goals WHERE project_id=? AND archived_at IS NULL",
+            (project_id,),
+        ).fetchall()]
+        if len(requested) != len(goal_ids) or set(requested) != set(active):
+            raise ServiceError("goal order must contain every active goal exactly once")
+        with self.store.tx() as cx:
+            for position, goal_id in enumerate(requested):
+                cx.execute(
+                    "UPDATE project_goals SET position=?, updated_at=?"
+                    " WHERE project_id=? AND goal_id=? AND archived_at IS NULL",
+                    (position, iso(self._clock()), project_id, goal_id),
+                )
+        self.store.audit(
+            actor=actor, interface=interface, action="goal.reordered", subject=project_id,
+            detail={"goal_ids": requested},
+        )
+        return self.goals(project_id)
+
+    def archive_goal(
+        self, project_id: str, goal_id: str, *, actor: str, interface: str
+    ) -> Dict[str, Any]:
+        self._require(project_id)
+        self._goal_row(project_id, goal_id)
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE project_goals SET archived_at=COALESCE(archived_at,?), updated_at=?"
+                " WHERE project_id=? AND goal_id=?",
+                (iso(self._clock()), iso(self._clock()), project_id, goal_id),
+            )
+        self.store.audit(
+            actor=actor, interface=interface, action="goal.archived", subject=goal_id,
+        )
+        return self._goal_dict(self._goal_row(project_id, goal_id))
+
+    def restore_goal(
+        self, project_id: str, goal_id: str, *, actor: str, interface: str
+    ) -> Dict[str, Any]:
+        self._require(project_id)
+        self._goal_row(project_id, goal_id)
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE project_goals SET archived_at=NULL, updated_at=?"
+                " WHERE project_id=? AND goal_id=?",
+                (iso(self._clock()), project_id, goal_id),
+            )
+        self.store.audit(
+            actor=actor, interface=interface, action="goal.restored", subject=goal_id,
+        )
+        return self._goal_dict(self._goal_row(project_id, goal_id))
 
     # ------------------------------------------------------------------ #
     # Objectives                                                         #
@@ -1145,8 +1399,19 @@ class StewardshipService:
     # ------------------------------------------------------------------ #
 
     def _content_root(self) -> Path:
-        root = (self.store.db_path.parent / "project-content").resolve()
-        root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        raw_root = self.store.db_path.parent / "project-content"
+        try:
+            if raw_root.exists() or raw_root.is_symlink():
+                root_info = os.lstat(raw_root)
+                if stat.S_ISLNK(root_info.st_mode):
+                    raise ServiceError("project content root cannot be a symlink")
+                if not stat.S_ISDIR(root_info.st_mode):
+                    raise ServiceError("project content root is not a directory")
+            else:
+                raw_root.mkdir(parents=True, exist_ok=False, mode=0o700)
+            root = raw_root.resolve(strict=True)
+        except OSError as exc:
+            raise ServiceError("project content root is unavailable") from exc
         return root
 
     def _content_metadata(self, row: sqlite3.Row) -> Dict[str, Any]:
@@ -1159,6 +1424,11 @@ class StewardshipService:
             "sha256": row["sha256"],
             "uploaded_by": row["uploaded_by"],
             "uploaded_at": row["uploaded_at"],
+            "archived_at": row["archived_at"],
+            "archived_by": row["archived_by"],
+            "removal_state": row["removal_state"],
+            "removed_at": row["removed_at"],
+            "removed_by": row["removed_by"],
         }
 
     def _validate_content_bytes(self, media_type: str, content: bytes) -> None:
@@ -1236,13 +1506,14 @@ class StewardshipService:
             stored_path = str(final_path.relative_to(root))
             uploaded_at = iso(self._clock())
             digest = hashlib.sha256(content).hexdigest()
+            identity = os.stat(final_path, follow_symlinks=False)
             try:
                 with self.store.tx() as cx:
                     cx.execute(
                         """INSERT INTO project_content(
                         content_id, project_id, filename, stored_path, media_type,
-                        size_bytes, sha256, uploaded_by, uploaded_at)
-                        VALUES(?,?,?,?,?,?,?,?,?)""",
+                        size_bytes, sha256, uploaded_by, uploaded_at, file_dev, file_ino)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
                         (
                             content_id,
                             project_id,
@@ -1253,6 +1524,8 @@ class StewardshipService:
                             digest,
                             actor,
                             uploaded_at,
+                            int(identity.st_dev),
+                            int(identity.st_ino),
                         ),
                     )
             except BaseException:
@@ -1273,14 +1546,508 @@ class StewardshipService:
         )
         return self._content_metadata(row)
 
-    def project_content(self, project_id: str) -> List[Dict[str, Any]]:
+    def project_content(
+        self, project_id: str, *, include_archived: bool = False,
+        include_removed: bool = False,
+    ) -> List[Dict[str, Any]]:
         self._require_known(project_id)
-        rows = self.store._conn.execute(
-            "SELECT * FROM project_content WHERE project_id=?"
-            " ORDER BY uploaded_at DESC, content_id DESC",
-            (project_id,),
-        ).fetchall()
+        sql = "SELECT * FROM project_content WHERE project_id=?"
+        if not include_archived:
+            sql += " AND archived_at IS NULL"
+        if not include_removed:
+            sql += " AND removal_state != 'file_removed'"
+        sql += " ORDER BY uploaded_at DESC, content_id DESC"
+        rows = self.store._conn.execute(sql, (project_id,)).fetchall()
         return [self._content_metadata(row) for row in rows]
+
+    def _project_content_row(self, project_id: str, content_id: str) -> sqlite3.Row:
+        self._require_known(project_id)
+        row = self.store._conn.execute(
+            "SELECT * FROM project_content WHERE project_id=? AND content_id=?",
+            (project_id, content_id),
+        ).fetchone()
+        if row is None:
+            raise ServiceError(f"unknown project content '{content_id}'")
+        return row
+
+    @staticmethod
+    def _json_contains(value: Any, target: str) -> bool:
+        if isinstance(value, dict):
+            return any(StewardshipService._json_contains(item, target) for item in value.values())
+        if isinstance(value, list):
+            return any(StewardshipService._json_contains(item, target) for item in value)
+        return value == target
+
+    def project_content_dependencies(
+        self, project_id: str, content_id: str
+    ) -> List[Dict[str, str]]:
+        self._project_content_row(project_id, content_id)
+        dependencies: List[Dict[str, str]] = []
+        sources = (
+            ("objective_assessment", "project_objective_assessments", "id", ("evidence_json",)),
+            ("canonical_work", "dockyard_canonical_work_details", "item_id", ("evidence_refs_json",)),
+            ("legacy_work", "dockyard_work_items", "ref", ("evidence_refs_json",)),
+            ("initiative", "project_initiatives", "ref", ("validation_contract_json", "outcome_json")),
+        )
+        for kind, table, id_column, json_columns in sources:
+            selected = ",".join((id_column, *json_columns))
+            rows = self.store._conn.execute(
+                f"SELECT {selected} FROM {table} WHERE project_id=?", (project_id,)
+            ).fetchall()
+            for row in rows:
+                for column in json_columns:
+                    try:
+                        payload = json.loads(row[column])
+                    except (TypeError, json.JSONDecodeError):
+                        continue
+                    if self._json_contains(payload, content_id):
+                        dependencies.append({"kind": kind, "ref": str(row[id_column])})
+                        break
+        return sorted(dependencies, key=lambda item: (item["kind"], item["ref"]))
+
+    def archive_project_content(
+        self, project_id: str, content_id: str, *, actor: str,
+        interface: str = "service",
+    ) -> Dict[str, Any]:
+        self._require(project_id)
+        row = self._project_content_row(project_id, content_id)
+        if row["removal_state"] == "file_removed":
+            raise ServiceError("removed project content cannot be archived")
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE project_content SET archived_at=COALESCE(archived_at,?),"
+                " archived_by=COALESCE(archived_by,?) WHERE project_id=? AND content_id=?",
+                (iso(self._clock()), actor, project_id, content_id),
+            )
+        self.store.audit(
+            actor=actor, interface=interface, action="project.content_archived",
+            subject=f"{project_id}:{content_id}",
+        )
+        return self._content_metadata(self._project_content_row(project_id, content_id))
+
+    def restore_project_content(
+        self, project_id: str, content_id: str, *, actor: str,
+        interface: str = "service",
+    ) -> Dict[str, Any]:
+        self._require(project_id)
+        row = self._project_content_row(project_id, content_id)
+        if row["removal_state"] == "file_removed":
+            raise ServiceError("removed project content cannot be restored")
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE project_content SET archived_at=NULL, archived_by=NULL"
+                " WHERE project_id=? AND content_id=?",
+                (project_id, content_id),
+            )
+        self.store.audit(
+            actor=actor, interface=interface, action="project.content_restored",
+            subject=f"{project_id}:{content_id}",
+        )
+        return self._content_metadata(self._project_content_row(project_id, content_id))
+
+    def _managed_content_candidate(
+        self, row: sqlite3.Row, *, allow_missing: bool = False
+    ) -> tuple[Path, os.stat_result | None]:
+        root = self._content_root()
+        stored = str(row["stored_path"] or "")
+        relative = Path(stored)
+        if (
+            not stored or relative.is_absolute()
+            or any(part in {"", ".", ".."} for part in relative.parts)
+        ):
+            raise ServiceError("project content does not have a managed relative path")
+        raw_candidate = root
+        info: os.stat_result | None = None
+        for index, part in enumerate(relative.parts):
+            raw_candidate = raw_candidate / part
+            try:
+                info = os.lstat(raw_candidate)
+            except FileNotFoundError as exc:
+                if allow_missing and index == len(relative.parts) - 1:
+                    info = None
+                    break
+                raise ServiceError("project content file is unavailable") from exc
+            if stat.S_ISLNK(info.st_mode):
+                raise ServiceError("project content path contains a symlink")
+        try:
+            candidate = (root / relative).resolve(strict=info is not None)
+            candidate.relative_to(root)
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise ServiceError("project content path escaped its managed root") from exc
+        if info is not None and not stat.S_ISREG(info.st_mode):
+            raise ServiceError("project content path is not a managed regular file")
+        return candidate, info
+
+    def _verify_managed_content_identity(
+        self, row: sqlite3.Row, candidate: Path, info: os.stat_result
+    ) -> None:
+        if row["file_dev"] is None or row["file_ino"] is None:
+            raise ServiceError("project content file identity is unavailable; removal refused")
+        expected_identity = (int(row["file_dev"]), int(row["file_ino"]))
+        if (int(info.st_dev), int(info.st_ino)) != expected_identity:
+            raise ServiceError("project content file identity changed; removal refused")
+        if int(info.st_size) != int(row["size_bytes"]):
+            raise ServiceError("project content file identity changed; removal refused")
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            descriptor = os.open(candidate, flags)
+        except OSError as exc:
+            raise ServiceError("project content file could not be opened safely") from exc
+        try:
+            opened = os.fstat(descriptor)
+            if (int(opened.st_dev), int(opened.st_ino)) != expected_identity:
+                raise ServiceError("project content file identity changed during verification")
+            with os.fdopen(descriptor, "rb", closefd=False) as handle:
+                raw = handle.read(_MAX_CONTENT_BYTES + 1)
+        finally:
+            os.close(descriptor)
+        if len(raw) != int(row["size_bytes"]) or hashlib.sha256(raw).hexdigest() != row["sha256"]:
+            raise ServiceError("project content failed its integrity check; removal refused")
+
+    def _open_managed_content_parent(self, row: sqlite3.Row) -> tuple[int, str]:
+        """Open the managed parent without following mutable pathnames."""
+        root = self._content_root()
+        relative = Path(str(row["stored_path"] or ""))
+        if (
+            not relative.parts or relative.is_absolute()
+            or any(part in {"", ".", ".."} for part in relative.parts)
+        ):
+            raise ServiceError("project content does not have a managed relative path")
+        directory_flags = (
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        )
+        directory_fd = os.open(root, directory_flags)
+        try:
+            for part in relative.parts[:-1]:
+                next_fd = os.open(part, directory_flags, dir_fd=directory_fd)
+                os.close(directory_fd)
+                directory_fd = next_fd
+            return directory_fd, relative.name
+        except BaseException:
+            os.close(directory_fd)
+            raise
+
+    def _verify_open_content_file(self, row: sqlite3.Row, file_fd: int) -> None:
+        opened = os.fstat(file_fd)
+        if not stat.S_ISREG(opened.st_mode):
+            raise ServiceError("project content path is not a managed regular file")
+        expected = (int(row["file_dev"]), int(row["file_ino"]))
+        if (int(opened.st_dev), int(opened.st_ino)) != expected:
+            raise ServiceError("project content file identity changed before removal")
+        with os.fdopen(file_fd, "rb", closefd=False) as handle:
+            raw = handle.read(_MAX_CONTENT_BYTES + 1)
+        if len(raw) != int(row["size_bytes"]) or hashlib.sha256(raw).hexdigest() != row["sha256"]:
+            raise ServiceError("project content failed its integrity check; removal refused")
+
+    def _open_managed_content_file(self, row: sqlite3.Row) -> tuple[int, str, int]:
+        """Open the managed parent and file without following mutable pathnames."""
+        directory_fd, filename = self._open_managed_content_parent(row)
+        file_fd: int | None = None
+        try:
+            file_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            file_fd = os.open(filename, file_flags, dir_fd=directory_fd)
+            self._verify_open_content_file(row, file_fd)
+            return directory_fd, filename, file_fd
+        except BaseException:
+            if file_fd is not None:
+                os.close(file_fd)
+            os.close(directory_fd)
+            raise
+
+    def _insert_content_removal_audit(
+        self, cx: sqlite3.Connection, *, project_id: str, content_id: str,
+        actor: str, interface: str, stored_path: str,
+    ) -> None:
+        existing = cx.execute(
+            "SELECT 1 FROM stewardship_audit_log WHERE action='project.content_file_removed' AND subject=? LIMIT 1",
+            (f"{project_id}:{content_id}",),
+        ).fetchone()
+        if existing is None:
+            cx.execute(
+                "INSERT INTO stewardship_audit_log(ts, actor, interface, action, subject, detail_json) VALUES(?,?,?,?,?,?)",
+                (
+                    iso(self._clock()), actor, interface, "project.content_file_removed",
+                    f"{project_id}:{content_id}", self.store._j({"stored_path": stored_path}),
+                ),
+            )
+
+    def remove_project_content(
+        self, project_id: str, content_id: str, *, actor: str,
+        interface: str = "service",
+    ) -> Dict[str, Any]:
+        self._require(project_id)
+        row = self._project_content_row(project_id, content_id)
+        if row["removal_state"] == "file_removed":
+            return self._content_metadata(row)
+        dependencies = self.project_content_dependencies(project_id, content_id)
+        if dependencies:
+            refs = ", ".join(f"{item['kind']}:{item['ref']}" for item in dependencies)
+            raise ServiceError(f"project content removal blocked by dependencies: {refs}")
+        candidate, info = self._managed_content_candidate(
+            row, allow_missing=row["removal_state"] in {"pending", "quarantined"}
+        )
+        tombstone = f".{content_id}.removing"
+        if info is None:
+            parent_fd, _ = self._open_managed_content_parent(row)
+            tombstone_fd: int | None = None
+            final_fd: int | None = None
+            try:
+                try:
+                    tombstone_fd = os.open(
+                        tombstone,
+                        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                        dir_fd=parent_fd,
+                    )
+                except FileNotFoundError:
+                    tombstone_fd = None
+                if tombstone_fd is None:
+                    raise ServiceError(
+                        "managed quarantine marker is unavailable; removal refused"
+                    )
+                tombstone_info = os.fstat(tombstone_fd)
+                expected_identity = (int(row["file_dev"]), int(row["file_ino"]))
+                actual_identity = (
+                    int(tombstone_info.st_dev), int(tombstone_info.st_ino)
+                )
+                if (
+                    row["removal_state"] == "quarantined"
+                    and actual_identity == expected_identity
+                    and tombstone_info.st_size == 0
+                ):
+                    with self.store.tx() as cx:
+                        dependencies = self.project_content_dependencies(project_id, content_id)
+                        if dependencies:
+                            refs = ", ".join(
+                                f"{item['kind']}:{item['ref']}" for item in dependencies
+                            )
+                            raise ServiceError(
+                                f"project content removal blocked by dependencies: {refs}"
+                            )
+                        cx.execute(
+                            "UPDATE project_content SET removal_state='file_removed', removed_at=?,"
+                            " removed_by=? WHERE project_id=? AND content_id=?"
+                            " AND removal_state='quarantined'",
+                            (iso(self._clock()), actor, project_id, content_id),
+                        )
+                        self._insert_content_removal_audit(
+                            cx, project_id=project_id, content_id=content_id, actor=actor,
+                            interface=interface, stored_path=str(row["stored_path"]),
+                        )
+                    return self._content_metadata(
+                        self._project_content_row(project_id, content_id)
+                    )
+                self._verify_open_content_file(row, tombstone_fd)
+                with self.store.tx() as cx:
+                    dependencies = self.project_content_dependencies(project_id, content_id)
+                    if dependencies:
+                        refs = ", ".join(
+                            f"{item['kind']}:{item['ref']}" for item in dependencies
+                        )
+                        raise ServiceError(
+                            f"project content removal blocked by dependencies: {refs}"
+                        )
+                    if row["removal_state"] == "pending":
+                        cx.execute(
+                            "UPDATE project_content SET removal_state='quarantined'"
+                            " WHERE project_id=? AND content_id=? AND removal_state='pending'",
+                            (project_id, content_id),
+                        )
+                # Persist recovery intent before the irreversible filesystem effect.
+                # A failed erase must not roll this transition back to pending.
+                with self.store.tx() as cx:
+                    dependencies = self.project_content_dependencies(project_id, content_id)
+                    if dependencies:
+                        refs = ", ".join(
+                            f"{item['kind']}:{item['ref']}" for item in dependencies
+                        )
+                        raise ServiceError(
+                            f"project content removal blocked by dependencies: {refs}"
+                        )
+                    current = os.stat(
+                        tombstone, dir_fd=parent_fd, follow_symlinks=False
+                    )
+                    opened = os.fstat(tombstone_fd)
+                    if (
+                        stat.S_ISLNK(current.st_mode)
+                        or int(current.st_dev) != int(opened.st_dev)
+                        or int(current.st_ino) != int(opened.st_ino)
+                    ):
+                        raise ServiceError(
+                            "quarantined content identity changed; removal refused"
+                        )
+                    final_fd = os.open(
+                        tombstone,
+                        os.O_RDWR | getattr(os, "O_NOFOLLOW", 0),
+                        dir_fd=parent_fd,
+                    )
+                    self._verify_open_content_file(row, final_fd)
+                    try:
+                        os.ftruncate(final_fd, 0)
+                        os.fsync(final_fd)
+                        if os.fstat(final_fd).st_size != 0:
+                            raise ServiceError(
+                                "verified managed content could not be erased; removal refused"
+                            )
+                    except ServiceError:
+                        raise
+                    except OSError as exc:
+                        raise ServiceError(
+                            "managed file removal is quarantined after a filesystem failure; retry is safe"
+                        ) from exc
+                    cx.execute(
+                        "UPDATE project_content SET removal_state='file_removed', removed_at=?,"
+                        " removed_by=? WHERE project_id=? AND content_id=?"
+                        " AND removal_state='quarantined'",
+                        (iso(self._clock()), actor, project_id, content_id),
+                    )
+                    self._insert_content_removal_audit(
+                        cx, project_id=project_id, content_id=content_id, actor=actor,
+                        interface=interface, stored_path=str(row["stored_path"]),
+                    )
+            except ServiceError:
+                raise
+            except OSError as exc:
+                raise ServiceError(
+                    "managed file removal is quarantined after a filesystem failure; retry is safe"
+                ) from exc
+            finally:
+                if final_fd is not None:
+                    os.close(final_fd)
+                if tombstone_fd is not None:
+                    os.close(tombstone_fd)
+                os.close(parent_fd)
+            return self._content_metadata(self._project_content_row(project_id, content_id))
+
+        self._verify_managed_content_identity(row, candidate, info)
+        with self.store.tx() as cx:
+            dependencies = self.project_content_dependencies(project_id, content_id)
+            if dependencies:
+                refs = ", ".join(f"{item['kind']}:{item['ref']}" for item in dependencies)
+                raise ServiceError(f"project content removal blocked by dependencies: {refs}")
+            cx.execute(
+                "UPDATE project_content SET removal_state='pending', removed_by=?"
+                " WHERE project_id=? AND content_id=? AND removal_state IN ('active','pending')",
+                (actor, project_id, content_id),
+            )
+        parent_fd, filename, file_fd = self._open_managed_content_file(row)
+        try:
+            with self.store.tx() as cx:
+                dependencies = self.project_content_dependencies(project_id, content_id)
+                if dependencies:
+                    refs = ", ".join(f"{item['kind']}:{item['ref']}" for item in dependencies)
+                    raise ServiceError(f"project content removal blocked by dependencies: {refs}")
+                try:
+                    current = os.stat(filename, dir_fd=parent_fd, follow_symlinks=False)
+                    opened = os.fstat(file_fd)
+                    if (
+                        stat.S_ISLNK(current.st_mode)
+                        or int(current.st_dev) != int(opened.st_dev)
+                        or int(current.st_ino) != int(opened.st_ino)
+                    ):
+                        raise ServiceError("project content file identity changed before removal")
+                    os.rename(
+                        filename,
+                        tombstone,
+                        src_dir_fd=parent_fd,
+                        dst_dir_fd=parent_fd,
+                    )
+                    quarantined = os.stat(
+                        tombstone, dir_fd=parent_fd, follow_symlinks=False
+                    )
+                    if (
+                        stat.S_ISLNK(quarantined.st_mode)
+                        or int(quarantined.st_dev) != int(opened.st_dev)
+                        or int(quarantined.st_ino) != int(opened.st_ino)
+                    ):
+                        try:
+                            os.stat(filename, dir_fd=parent_fd, follow_symlinks=False)
+                        except FileNotFoundError:
+                            os.rename(
+                                tombstone,
+                                filename,
+                                src_dir_fd=parent_fd,
+                                dst_dir_fd=parent_fd,
+                            )
+                        raise ServiceError(
+                            "project content file identity changed during quarantine; removal refused"
+                        )
+                except ServiceError:
+                    raise
+                except OSError as exc:
+                    raise ServiceError(
+                        "managed file removal is pending after a filesystem failure; retry is safe"
+                    ) from exc
+                cx.execute(
+                    "UPDATE project_content SET removal_state='quarantined'"
+                    " WHERE project_id=? AND content_id=? AND removal_state='pending'",
+                    (project_id, content_id),
+                )
+            tombstone_fd = os.open(
+                tombstone,
+                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=parent_fd,
+            )
+            final_fd: int | None = None
+            try:
+                self._verify_open_content_file(row, tombstone_fd)
+                with self.store.tx() as cx:
+                    dependencies = self.project_content_dependencies(project_id, content_id)
+                    if dependencies:
+                        refs = ", ".join(
+                            f"{item['kind']}:{item['ref']}" for item in dependencies
+                        )
+                        raise ServiceError(
+                            f"project content removal blocked by dependencies: {refs}"
+                        )
+                    current = os.stat(
+                        tombstone, dir_fd=parent_fd, follow_symlinks=False
+                    )
+                    opened = os.fstat(tombstone_fd)
+                    if (
+                        stat.S_ISLNK(current.st_mode)
+                        or int(current.st_dev) != int(opened.st_dev)
+                        or int(current.st_ino) != int(opened.st_ino)
+                    ):
+                        raise ServiceError(
+                            "quarantined content identity changed; removal refused"
+                        )
+                    final_fd = os.open(
+                        tombstone,
+                        os.O_RDWR | getattr(os, "O_NOFOLLOW", 0),
+                        dir_fd=parent_fd,
+                    )
+                    self._verify_open_content_file(row, final_fd)
+                    try:
+                        os.ftruncate(final_fd, 0)
+                        os.fsync(final_fd)
+                        if os.fstat(final_fd).st_size != 0:
+                            raise ServiceError(
+                                "verified managed content could not be erased; removal refused"
+                            )
+                    except ServiceError:
+                        raise
+                    except OSError as exc:
+                        raise ServiceError(
+                            "managed file removal is quarantined after a filesystem failure; retry is safe"
+                        ) from exc
+                    cx.execute(
+                        "UPDATE project_content SET removal_state='file_removed', removed_at=?,"
+                        " removed_by=? WHERE project_id=? AND content_id=?"
+                        " AND removal_state='quarantined'",
+                        (iso(self._clock()), actor, project_id, content_id),
+                    )
+                    self._insert_content_removal_audit(
+                        cx, project_id=project_id, content_id=content_id, actor=actor,
+                        interface=interface, stored_path=str(row["stored_path"]),
+                    )
+            finally:
+                if final_fd is not None:
+                    os.close(final_fd)
+                os.close(tombstone_fd)
+        finally:
+            os.close(file_fd)
+            os.close(parent_fd)
+        return self._content_metadata(self._project_content_row(project_id, content_id))
 
     def project_content_preview(
         self, project_id: str, content_id: str

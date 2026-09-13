@@ -160,6 +160,44 @@ class ObjectivePatchBody(BaseModel):
     window: str | None = None
 
 
+class GoalCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str
+    description: str = ""
+    position: int | None = None
+    objective_ids: list[int] = []
+
+
+class GoalPatchBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str | None = None
+    description: str | None = None
+    position: int | None = None
+    objective_ids: list[int] | None = None
+
+
+class GoalOrderBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    goal_ids: list[str]
+
+
+class WorkflowDefineBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    nodes: list[dict]
+
+
+class WorkflowVersionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    nodes: list[dict]
+
+
+class WorkflowStartBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_key: str
+    version: int
+
+
 class ContentUploadBody(BaseModel):
     filename: str
     media_type: str
@@ -472,6 +510,58 @@ async def patch_project_settings(project_id: str, body: SettingsPatchBody) -> di
     )
 
 
+@plugin_api.get("/projects/{project_id}/goals")
+async def project_goals(project_id: str, include_archived: bool = True) -> dict:
+    pid = quote(project_id, safe="")
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{pid}/goals",
+        params={"include_archived": include_archived},
+    )
+
+
+@plugin_api.post("/projects/{project_id}/goals")
+async def create_project_goal(project_id: str, body: GoalCreateBody) -> dict:
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/goals",
+        body.model_dump(exclude_none=True),
+    )
+
+
+@plugin_api.put("/projects/{project_id}/goals/order")
+async def order_project_goals(project_id: str, body: GoalOrderBody) -> dict:
+    return await _proxy(
+        "PUT", f"/stewardship/v1/projects/{quote(project_id, safe='')}/goals/order",
+        body.model_dump(),
+    )
+
+
+@plugin_api.patch("/projects/{project_id}/goals/{goal_id}")
+async def patch_project_goal(project_id: str, goal_id: str, body: GoalPatchBody) -> dict:
+    return await _proxy(
+        "PATCH",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/goals/{quote(goal_id, safe='')}",
+        body.model_dump(exclude_unset=True),
+    )
+
+
+@plugin_api.post("/projects/{project_id}/goals/{goal_id}/archive")
+async def archive_project_goal(project_id: str, goal_id: str) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/goals/{quote(goal_id, safe='')}/archive",
+        {},
+    )
+
+
+@plugin_api.post("/projects/{project_id}/goals/{goal_id}/restore")
+async def restore_project_goal(project_id: str, goal_id: str) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/goals/{quote(goal_id, safe='')}/restore",
+        {},
+    )
+
+
 @plugin_api.get("/projects/{project_id}/objectives")
 async def project_objectives(
     project_id: str, include_archived: bool = True
@@ -580,9 +670,15 @@ async def remove_project_mission(project_id: str) -> dict:
 
 
 @plugin_api.get("/projects/{project_id}/content")
-async def project_content(project_id: str) -> dict:
+async def project_content(
+    project_id: str, include_archived: bool = True,
+    include_removed: bool = False,
+) -> dict:
     pid = quote(project_id, safe="")
-    return await _proxy("GET", f"/stewardship/v1/projects/{pid}/content")
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{pid}/content",
+        params={"include_archived": include_archived, "include_removed": include_removed},
+    )
 
 
 @plugin_api.post("/projects/{project_id}/content")
@@ -606,6 +702,40 @@ async def project_content_preview(project_id: str, content_id: str) -> dict:
     cid = quote(content_id, safe="")
     return await _proxy(
         "GET", f"/stewardship/v1/projects/{pid}/content/{cid}/preview"
+    )
+
+
+@plugin_api.get("/projects/{project_id}/content/{content_id}/dependencies")
+async def project_content_dependencies(project_id: str, content_id: str) -> dict:
+    return await _proxy(
+        "GET",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/content/{quote(content_id, safe='')}/dependencies",
+    )
+
+
+@plugin_api.post("/projects/{project_id}/content/{content_id}/archive")
+async def archive_project_content(project_id: str, content_id: str) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/content/{quote(content_id, safe='')}/archive",
+        {},
+    )
+
+
+@plugin_api.post("/projects/{project_id}/content/{content_id}/restore")
+async def restore_project_content(project_id: str, content_id: str) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/content/{quote(content_id, safe='')}/restore",
+        {},
+    )
+
+
+@plugin_api.delete("/projects/{project_id}/content/{content_id}")
+async def remove_project_content(project_id: str, content_id: str) -> dict:
+    return await _proxy(
+        "DELETE",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/content/{quote(content_id, safe='')}",
     )
 
 
@@ -864,9 +994,12 @@ async def create_milestone(project_id: str, body: MilestoneCreateBody) -> dict:
 
 
 @plugin_api.get("/projects/{project_id}/milestones")
-async def list_milestones(project_id: str) -> dict:
+async def list_milestones(project_id: str, include_archived: bool = True) -> dict:
     pid = quote(project_id, safe="")
-    return await _proxy("GET", f"/stewardship/v1/projects/{pid}/milestones")
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{pid}/milestones",
+        params={"include_archived": include_archived},
+    )
 
 
 @plugin_api.get("/projects/{project_id}/milestones/{name}")
@@ -892,6 +1025,24 @@ async def rename_milestone(project_id: str, name: str, body: MilestoneRenameBody
     return await _proxy(
         "POST", f"/stewardship/v1/projects/{pid}/milestones/{milestone}/rename",
         {**body.model_dump(), "actor_id": _ACTOR_ID, "actor_kind": "human"})
+
+
+@plugin_api.post("/projects/{project_id}/milestones/{name}/archive")
+async def archive_milestone(project_id: str, name: str) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/milestones/{quote(name, safe='')}/archive",
+        {},
+    )
+
+
+@plugin_api.post("/projects/{project_id}/milestones/{name}/restore")
+async def restore_milestone(project_id: str, name: str) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/milestones/{quote(name, safe='')}/restore",
+        {},
+    )
 
 
 @plugin_api.post("/projects/{project_id}/milestones/{name}/attach")
@@ -994,6 +1145,18 @@ async def re_enable_project(project_id: str) -> dict:
     return await _proxy("POST", f"/stewardship/v1/projects/{pid}/re-enable")
 
 
+@plugin_api.post("/projects/{project_id}/archive")
+async def archive_project(project_id: str) -> dict:
+    pid = quote(project_id, safe="")
+    return await _proxy("POST", f"/stewardship/v1/projects/{pid}/archive")
+
+
+@plugin_api.post("/projects/{project_id}/restore")
+async def restore_project(project_id: str) -> dict:
+    pid = quote(project_id, safe="")
+    return await _proxy("POST", f"/stewardship/v1/projects/{pid}/restore")
+
+
 @plugin_api.get("/onboard/discover")
 async def onboard_discover() -> dict:
     """Return host-owned projects and profiles for the onboarding wizard."""
@@ -1078,6 +1241,68 @@ async def project_observations(project_id: str) -> dict:
 async def run_observation(ref: str) -> dict:
     r = quote(ref, safe="")
     return await _proxy("POST", f"/stewardship/v1/observations/{r}/run", {})
+
+
+@plugin_api.get("/projects/{project_id}/workflows")
+async def workflows(project_id: str, include_archived: bool = True) -> dict:
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows",
+        params={"include_archived": include_archived},
+    )
+
+
+@plugin_api.post("/projects/{project_id}/workflows")
+async def define_workflow(project_id: str, body: WorkflowDefineBody) -> dict:
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows",
+        body.model_dump(),
+    )
+
+
+@plugin_api.post("/projects/{project_id}/workflows/{name}/versions")
+async def define_workflow_version(
+    project_id: str, name: str, body: WorkflowVersionBody
+) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{quote(name, safe='')}/versions",
+        body.model_dump(),
+    )
+
+
+@plugin_api.post("/projects/{project_id}/workflows/{name}/start")
+async def start_workflow(project_id: str, name: str, body: WorkflowStartBody) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{quote(name, safe='')}/start",
+        body.model_dump(),
+    )
+
+
+@plugin_api.get("/projects/{project_id}/workflows/{name}/runs")
+async def list_workflow_runs(project_id: str, name: str) -> dict:
+    return await _proxy(
+        "GET",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{quote(name, safe='')}/runs",
+    )
+
+
+@plugin_api.post("/projects/{project_id}/workflows/{name}/archive")
+async def archive_workflow(project_id: str, name: str) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{quote(name, safe='')}/archive",
+        {},
+    )
+
+
+@plugin_api.post("/projects/{project_id}/workflows/{name}/restore")
+async def restore_workflow(project_id: str, name: str) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{quote(name, safe='')}/restore",
+        {},
+    )
 
 
 @plugin_api.get("/projects/{project_id}/workflows/{name}/runs")

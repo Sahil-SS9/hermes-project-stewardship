@@ -1,6 +1,6 @@
 # Project Stewardship Management — Revised Implementation Plan
 
-> **Execution status:** Phases 0–4 complete. Phase 3 checkpoint: `8fb34ba07094758ec5fc00dc639f67eb91f9f496`. Phase 4 PM-0401..PM-0412 passed independent review and is checkpointed by the commit containing this record; evidence is in `docs/plans/evidence/project-management-phase4.md`. Phase 5 is authorised but has not started in this checkpoint.
+> **Execution status:** Phases 0–4 complete. Phase 5 corrected candidate is ready for re-review on checkpoint `13370ce9b9bc85582b8ae13245eaa3ac0341e707`; PM-0501..PM-0509 are implemented, independent-review findings are repaired, and final evidence is in `docs/plans/evidence/project-management-phase5.md`. Phase 5 remains uncommitted.
 >
 > **Parent WIP branch:** `feat/trustworthy-daily-stewardship-20260908`
 >
@@ -276,15 +276,15 @@ No member can become departed while eligible work is silently retained, hidden o
 
 **Purpose:** Complete the management hierarchy without introducing low-value permanent deletion.
 
-- [ ] **PM-0501** Add minimal Goal create/edit/order/archive/restore and nullable objective linking.
-- [ ] **PM-0502** Preserve existing unlinked objectives and existing objective create/edit/archive/remove behaviour.
-- [ ] **PM-0503** Add milestone create/edit/rename/close/reopen/archive/restore and scope attach/detach using working proxy routes.
-- [ ] **PM-0504** Preserve milestone/work attribution and treat removal as archive in this release.
-- [ ] **PM-0505** Expose existing workflow definitions, explicit new versions, archive/restore, explicit-version start and run history.
-- [ ] **PM-0506** Keep Saved Views visibly and technically separate from executable Workflow definitions.
-- [ ] **PM-0507** Add managed-content archive/restore and dependency-aware removal under verified authority.
-- [ ] **PM-0508** Implement safe managed-file removal with raw-path symlink checks, managed-root containment and fail-closed file identity verification; never accept arbitrary paths.
-- [ ] **PM-0509** Add project archive/restore with the Phase 1 lifecycle side effects; explicitly state canonical project, board, tasks and repository remain untouched.
+- [x] **PM-0501** Add minimal Goal create/edit/order/archive/restore and nullable objective linking.
+- [x] **PM-0502** Preserve existing unlinked objectives and existing objective create/edit/archive/remove behaviour.
+- [x] **PM-0503** Add milestone create/edit/rename/close/reopen/archive/restore and scope attach/detach using working proxy routes.
+- [x] **PM-0504** Preserve milestone/work attribution and treat removal as archive in this release.
+- [x] **PM-0505** Expose existing workflow definitions, explicit new versions, archive/restore, explicit-version start and run history.
+- [x] **PM-0506** Keep Saved Views visibly and technically separate from executable Workflow definitions.
+- [x] **PM-0507** Add managed-content archive/restore and dependency-aware removal under verified authority.
+- [x] **PM-0508** Implement safe managed-file removal with raw-path symlink checks, managed-root containment and fail-closed file identity verification; never accept arbitrary paths.
+- [x] **PM-0509** Add project archive/restore with the Phase 1 lifecycle side effects; explicitly state canonical project, board, tasks and repository remain untouched.
 
 **Phase 5 gate:**
 
