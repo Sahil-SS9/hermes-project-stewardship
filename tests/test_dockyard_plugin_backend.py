@@ -378,6 +378,72 @@ def test_project_management_and_visualisation_routes(client):
     assert resumed.status_code == 200, resumed.text
 
 
+def test_project_archive_restore_roundtrip_through_plugin_proxy(client):
+    from hermes_project_stewardship.domain.constants import Capability
+
+    previous = plugin_api._client
+    authenticated_app = create_app(
+        plugin_api._store,
+        kanban_adapter=ReferenceKanbanAdapter(plugin_api._store),
+        auth_token="phase5-proxy",
+        auth_principal="verified-human",
+        auth_principal_is_human=True,
+        capabilities={item.value for item in Capability},
+    )
+    transport = plugin_api.httpx.AsyncClient(
+        transport=plugin_api.httpx.ASGITransport(app=authenticated_app),
+        base_url="http://phase5.test",
+        headers={"Authorization": "Bearer phase5-proxy"},
+    )
+    plugin_api._client = transport
+    try:
+        project_id = "phase5-archive-proxy"
+        created = client.post("/api/plugins/hermes-dockyard/onboard", json={
+            "project_id": project_id,
+            "repo_path": "/srv/phase5-archive-proxy",
+            "mission": "verify archive proxy parity",
+            "lead_profile": "octacon",
+        })
+        assert created.status_code == 200, created.text
+
+        defined = client.post(
+            f"/api/plugins/hermes-dockyard/projects/{project_id}/workflows",
+            json={
+                "name": "release",
+                "nodes": [{
+                    "id": "verify", "title": "Verify release",
+                    "depends_on": [], "human_gate": False,
+                }],
+            },
+        )
+        assert defined.status_code == 200, defined.text
+        started = client.post(
+            f"/api/plugins/hermes-dockyard/projects/{project_id}/workflows/release/start",
+            json={"version": 1, "run_key": "proxy-run-1"},
+        )
+        assert started.status_code == 200, started.text
+        history = client.get(
+            f"/api/plugins/hermes-dockyard/projects/{project_id}/workflows/release/runs"
+        )
+        assert history.status_code == 200, history.text
+        assert history.json()["runs"][0]["version"] == 1
+
+        archived = client.post(
+            f"/api/plugins/hermes-dockyard/projects/{project_id}/archive")
+        assert archived.status_code == 200, archived.text
+        assert archived.json()["enabled"] is False
+        assert archived.json()["archived_at"]
+
+        restored = client.post(
+            f"/api/plugins/hermes-dockyard/projects/{project_id}/restore")
+        assert restored.status_code == 200, restored.text
+        assert restored.json()["enabled"] is True
+        assert restored.json()["archived_at"] is None
+    finally:
+        asyncio.run(transport.aclose())
+        plugin_api._client = previous
+
+
 def test_work_item_editor_assignment_and_dependencies_through_plugin(client):
     project_id = "work-editor-ui"
     created = client.post("/api/plugins/hermes-dockyard/onboard", json={

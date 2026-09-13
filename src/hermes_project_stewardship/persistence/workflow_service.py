@@ -64,6 +64,13 @@ class WorkflowService:
             raise ValueError("workflow name is required")
         clean = self._validated(definition)
         with self.store.tx() as cx:
+            lifecycle = cx.execute(
+                "SELECT archived_at FROM dockyard_workflows WHERE project_id=? AND name=?"
+                " ORDER BY version DESC LIMIT 1",
+                (project_id, clean_name),
+            ).fetchone()
+            if lifecycle is not None and lifecycle["archived_at"] is not None:
+                raise ValueError("workflow is archived; restore it before creating a new version")
             row = cx.execute(
                 "SELECT COALESCE(MAX(version), 0) AS version FROM dockyard_workflows "
                 "WHERE project_id=? AND name=?",
@@ -71,22 +78,70 @@ class WorkflowService:
             ).fetchone()
             version = int(row["version"]) + 1
             cx.execute(
-                "INSERT INTO dockyard_workflows VALUES(?,?,?,?,?)",
+                "INSERT INTO dockyard_workflows("
+                "project_id,name,version,definition_json,created_at) VALUES(?,?,?,?,?)",
                 (project_id, clean_name, version, json.dumps(clean, sort_keys=True),
                  iso(self.store._clock())),
             )
         return {"project_id": project_id, "name": clean_name,
                 "version": version, "definition": clean}
 
-    def list(self, project_id: str) -> list[dict[str, Any]]:
+    def list(self, project_id: str, *, include_archived: bool = False) -> list[dict[str, Any]]:
+        archive_clause = "" if include_archived else " AND archived_at IS NULL"
         rows = self.store._conn.execute(
-            "SELECT project_id,name,version,definition_json FROM dockyard_workflows "
-            "WHERE project_id=? ORDER BY name,version",
+            "SELECT project_id,name,version,definition_json,created_at,"
+            " archived_at,archived_by FROM dockyard_workflows "
+            f"WHERE project_id=?{archive_clause} ORDER BY name,version",
             (project_id,),
         ).fetchall()
         return [{"project_id": row["project_id"], "name": row["name"],
                  "version": row["version"],
-                 "definition": json.loads(row["definition_json"])} for row in rows]
+                 "definition": json.loads(row["definition_json"]),
+                 "created_at": row["created_at"],
+                 "archived_at": row["archived_at"],
+                 "archived_by": row["archived_by"]} for row in rows]
+
+    def archive(
+        self, project_id: str, name: str, *, actor: str, interface: str = "service"
+    ) -> dict[str, Any]:
+        rows = self.list(project_id, include_archived=True)
+        selected = [row for row in rows if row["name"] == name]
+        if not selected:
+            raise ValueError("workflow was not found")
+        stamp = iso(self.store._clock())
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE dockyard_workflows SET archived_at=COALESCE(archived_at,?),"
+                " archived_by=COALESCE(archived_by,?) WHERE project_id=? AND name=?",
+                (stamp, actor, project_id, name),
+            )
+        self.store.audit(
+            actor=actor, interface=interface, action="workflow.archived",
+            subject=f"{project_id}:{name}",
+        )
+        return {"project_id": project_id, "name": name,
+                "versions": [row for row in self.list(project_id, include_archived=True)
+                             if row["name"] == name]}
+
+    def restore(
+        self, project_id: str, name: str, *, actor: str, interface: str = "service"
+    ) -> dict[str, Any]:
+        rows = self.list(project_id, include_archived=True)
+        if not any(row["name"] == name for row in rows):
+            raise ValueError("workflow was not found")
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE dockyard_workflows SET archived_at=NULL, archived_by=NULL"
+                " WHERE project_id=? AND name=?",
+                (project_id, name),
+            )
+        self.store.audit(
+            actor=actor, interface=interface, action="workflow.restored",
+            subject=f"{project_id}:{name}",
+        )
+        return {"project_id": project_id, "name": name,
+                "versions": [row for row in self.list(project_id, include_archived=True)
+                             if row["name"] == name]}
 
     def runs(self, project_id: str, name: str) -> list[dict[str, Any]]:
         """Read-only run ledger with per-node canonical status for the canvas."""
@@ -155,6 +210,8 @@ class WorkflowService:
                 (project_id, name, version)).fetchone()
         if row is None:
             raise ValueError("workflow was not found")
+        if row["archived_at"] is not None:
+            raise ValueError("workflow is archived; restore it before starting a run")
         existing = self.store._conn.execute(
             "SELECT result_json,status FROM dockyard_workflow_runs WHERE project_id=? AND name=? "
             "AND version=? AND run_key=?",

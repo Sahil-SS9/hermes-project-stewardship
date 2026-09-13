@@ -484,7 +484,8 @@ class DockyardStore:
 
     def milestone_progress(self, project_id: str, name: str) -> Dict:
         row = self.store._conn.execute(
-            "SELECT id, due, closed_at FROM dockyard_milestones"
+            "SELECT id, due, created_at, closed_at, archived_at, archived_by"
+            " FROM dockyard_milestones"
             " WHERE project_id=? AND name=?", (project_id, name),
         ).fetchone()
         if not row:
@@ -501,21 +502,32 @@ class DockyardStore:
             """,
             (row["id"],),
         ).fetchone()["n"]
+        item_refs = [str(item["item_ref"]) for item in self.store._conn.execute(
+            "SELECT item_ref FROM dockyard_milestone_items WHERE milestone_id=?"
+            " ORDER BY item_ref", (row["id"],)
+        ).fetchall()]
         return {"name": name, "total": total, "done": done,
-                "closed": bool(row["closed_at"]), "due": row["due"]}
+                "closed": bool(row["closed_at"]), "due": row["due"],
+                "created_at": row["created_at"], "archived_at": row["archived_at"],
+                "archived_by": row["archived_by"], "item_refs": item_refs}
 
-    def milestone_list(self, project_id: str) -> list:
+    def milestone_list(self, project_id: str, *, include_archived: bool = False) -> list:
+        archive_clause = "" if include_archived else " AND m.archived_at IS NULL"
         rows = self.store._conn.execute(
-            """
+            f"""
             SELECT m.name, m.due, m.created_at, m.closed_at,
+                   m.archived_at, m.archived_by,
                    COUNT(mi.item_ref) AS total,
-                   COALESCE(SUM(CASE WHEN w.status='done' THEN 1 ELSE 0 END), 0) AS done
+                   COALESCE(SUM(CASE WHEN w.status='done' THEN 1 ELSE 0 END), 0) AS done,
+                   GROUP_CONCAT(mi.item_ref, CHAR(31)) AS item_refs
             FROM dockyard_milestones m
             LEFT JOIN dockyard_milestone_items mi ON mi.milestone_id=m.id
             LEFT JOIN dockyard_work_items w ON w.ref=mi.item_ref
-            WHERE m.project_id=?
-            GROUP BY m.id, m.name, m.due, m.created_at, m.closed_at
-            ORDER BY CASE WHEN m.closed_at IS NULL THEN 0 ELSE 1 END, m.due, m.name
+            WHERE m.project_id=? {archive_clause}
+            GROUP BY m.id, m.name, m.due, m.created_at, m.closed_at,
+                     m.archived_at, m.archived_by
+            ORDER BY CASE WHEN m.archived_at IS NULL THEN 0 ELSE 1 END,
+                     CASE WHEN m.closed_at IS NULL THEN 0 ELSE 1 END, m.due, m.name
             """,
             (project_id,),
         ).fetchall()
@@ -525,8 +537,11 @@ class DockyardStore:
                 "due": row["due"],
                 "created_at": row["created_at"],
                 "closed": bool(row["closed_at"]),
+                "archived_at": row["archived_at"],
+                "archived_by": row["archived_by"],
                 "total": row["total"],
                 "done": row["done"],
+                "item_refs": str(row["item_refs"]).split(chr(31)) if row["item_refs"] else [],
             }
             for row in rows
         ]
@@ -583,6 +598,28 @@ class DockyardStore:
                 "DELETE FROM dockyard_milestone_items WHERE milestone_id=? AND item_ref=?",
                 (cur["id"], item_ref),
             )
+
+    def milestone_archive(self, project_id: str, name: str, *, actor: str) -> None:
+        from .store import iso
+
+        with self.store.tx() as cx:
+            changed = cx.execute(
+                "UPDATE dockyard_milestones SET archived_at=COALESCE(archived_at,?),"
+                " archived_by=COALESCE(archived_by,?) WHERE project_id=? AND name=?",
+                (iso(), actor, project_id, name),
+            )
+            if changed.rowcount != 1:
+                raise ValueError(f"milestone {name} not found")
+
+    def milestone_restore(self, project_id: str, name: str) -> None:
+        with self.store.tx() as cx:
+            changed = cx.execute(
+                "UPDATE dockyard_milestones SET archived_at=NULL, archived_by=NULL"
+                " WHERE project_id=? AND name=?",
+                (project_id, name),
+            )
+            if changed.rowcount != 1:
+                raise ValueError(f"milestone {name} not found")
 
     # ------------------------------------------------------------------ #
     # Saved views (PM-05)                                                #

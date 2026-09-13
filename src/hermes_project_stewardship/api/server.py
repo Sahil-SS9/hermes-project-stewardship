@@ -148,6 +148,27 @@ class ObjectivePatch(BaseModel):
     interface: str = "rpc"
 
 
+class GoalCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str
+    description: str = ""
+    position: Optional[int] = None
+    objective_ids: List[int] = Field(default_factory=list)
+
+
+class GoalPatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: Optional[str] = None
+    description: Optional[str] = None
+    position: Optional[int] = None
+    objective_ids: Optional[List[int]] = None
+
+
+class GoalOrderRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    goal_ids: List[str]
+
+
 class ObjectiveAssessmentRequest(BaseModel):
     passed: bool
     evidence: list[str]
@@ -399,6 +420,11 @@ class OnboardingRequest(BaseModel):
 class WorkflowDefine(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
+    nodes: List[Dict[str, Any]]
+
+
+class WorkflowVersionDefine(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     nodes: List[Dict[str, Any]]
 
 
@@ -698,6 +724,77 @@ def create_app(
     def freeze(project_id: str):
         return svc.freeze(project_id)
 
+    @router.post("/projects/{project_id}/archive")
+    def archive_project(project_id: str):
+        principal = _membership_authority("project_archive")
+        try:
+            return svc.archive_project(project_id, actor=principal, interface="rpc")
+        except ServiceError as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @router.post("/projects/{project_id}/restore")
+    def restore_project(project_id: str):
+        principal = _membership_authority("project_archive")
+        try:
+            return svc.restore_project(project_id, actor=principal, interface="rpc")
+        except ServiceError as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @router.get("/projects/{project_id}/goals")
+    def goals(project_id: str, include_archived: bool = False):
+        return {"goals": svc.goals(project_id, include_archived=include_archived)}
+
+    @router.post("/projects/{project_id}/goals")
+    def create_goal(project_id: str, body: GoalCreateRequest):
+        principal = _membership_authority("project_archive")
+        try:
+            return svc.create_goal(
+                project_id, actor=principal, interface="rpc", **body.model_dump()
+            )
+        except ServiceError as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @router.patch("/projects/{project_id}/goals/{goal_id}")
+    def update_goal(project_id: str, goal_id: str, body: GoalPatchRequest):
+        principal = _membership_authority("project_archive")
+        try:
+            return svc.update_goal(
+                project_id, goal_id, actor=principal, interface="rpc",
+                **body.model_dump(exclude_unset=True),
+            )
+        except ServiceError as exc:
+            raise HTTPException(404 if "unknown goal" in str(exc) else 409, str(exc)) from None
+
+    @router.put("/projects/{project_id}/goals/order")
+    def reorder_goals(project_id: str, body: GoalOrderRequest):
+        principal = _membership_authority("project_archive")
+        try:
+            return {"goals": svc.reorder_goals(
+                project_id, body.goal_ids, actor=principal, interface="rpc"
+            )}
+        except ServiceError as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @router.post("/projects/{project_id}/goals/{goal_id}/archive")
+    def archive_goal(project_id: str, goal_id: str):
+        principal = _membership_authority("project_archive")
+        try:
+            return svc.archive_goal(
+                project_id, goal_id, actor=principal, interface="rpc"
+            )
+        except ServiceError as exc:
+            raise HTTPException(404 if "unknown goal" in str(exc) else 409, str(exc)) from None
+
+    @router.post("/projects/{project_id}/goals/{goal_id}/restore")
+    def restore_goal(project_id: str, goal_id: str):
+        principal = _membership_authority("project_archive")
+        try:
+            return svc.restore_goal(
+                project_id, goal_id, actor=principal, interface="rpc"
+            )
+        except ServiceError as exc:
+            raise HTTPException(404 if "unknown goal" in str(exc) else 409, str(exc)) from None
+
     @router.get("/projects/{project_id}/objectives")
     def objectives(project_id: str, include_archived: bool = False):
         return {
@@ -817,8 +914,14 @@ def create_app(
         )
 
     @router.get("/projects/{project_id}/content")
-    def project_content(project_id: str):
-        return {"content": svc.project_content(project_id)}
+    def project_content(
+        project_id: str, include_archived: bool = False,
+        include_removed: bool = False,
+    ):
+        return {"content": svc.project_content(
+            project_id, include_archived=include_archived,
+            include_removed=include_removed,
+        )}
 
     @router.post("/projects/{project_id}/content")
     def upload_project_content(project_id: str, body: ContentUploadRequest):
@@ -838,6 +941,40 @@ def create_app(
     @router.get("/projects/{project_id}/content/{content_id}/preview")
     def project_content_preview(project_id: str, content_id: str):
         return svc.project_content_preview(project_id, content_id)
+
+    @router.get("/projects/{project_id}/content/{content_id}/dependencies")
+    def project_content_dependencies(project_id: str, content_id: str):
+        return {"dependencies": svc.project_content_dependencies(project_id, content_id)}
+
+    @router.post("/projects/{project_id}/content/{content_id}/archive")
+    def archive_project_content(project_id: str, content_id: str):
+        principal = _membership_authority("managed_file_removal")
+        try:
+            return svc.archive_project_content(
+                project_id, content_id, actor=principal, interface="rpc"
+            )
+        except ServiceError as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @router.post("/projects/{project_id}/content/{content_id}/restore")
+    def restore_project_content(project_id: str, content_id: str):
+        principal = _membership_authority("managed_file_removal")
+        try:
+            return svc.restore_project_content(
+                project_id, content_id, actor=principal, interface="rpc"
+            )
+        except ServiceError as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @router.delete("/projects/{project_id}/content/{content_id}")
+    def remove_project_content(project_id: str, content_id: str):
+        principal = _membership_authority("managed_file_removal")
+        try:
+            return svc.remove_project_content(
+                project_id, content_id, actor=principal, interface="rpc"
+            )
+        except ServiceError as exc:
+            raise HTTPException(409, str(exc)) from None
 
     @router.get("/projects/{project_id}/health")
     def health(project_id: str):
@@ -1276,13 +1413,15 @@ def create_app(
         return {"name": name, "attached": body.ref}
 
     @router.get("/projects/{project_id}/milestones")
-    def milestone_list(project_id: str):
+    def milestone_list(project_id: str, include_archived: bool = False):
         svc.require_feature(project_id, "milestones")
         if store._conn.execute(
             "SELECT 1 FROM project_stewardship WHERE project_id=?",
                 (project_id,)).fetchone() is None:
             raise HTTPException(404, f"project {project_id} not found")
-        return {"milestones": dy.milestone_list(project_id)}
+        return {"milestones": dy.milestone_list(
+            project_id, include_archived=include_archived
+        )}
 
     @router.patch("/projects/{project_id}/milestones/{name}")
     def milestone_update(project_id: str, name: str, body: MilestoneUpdate):
@@ -1308,6 +1447,28 @@ def create_app(
         except Exception as e:
             raise HTTPException(409, str(e))
         return {"renamed": name, "new_name": body.new_name}
+
+    @router.post("/projects/{project_id}/milestones/{name}/archive")
+    def milestone_archive(project_id: str, name: str):
+        principal = _membership_authority("project_archive")
+        try:
+            svc.require_feature(project_id, "milestones")
+            return dy.milestone_archive(
+                project_id, name, actor=_actor(principal, "human")
+            )
+        except ValueError as exc:
+            raise HTTPException(404 if "not found" in str(exc) else 409, str(exc)) from None
+
+    @router.post("/projects/{project_id}/milestones/{name}/restore")
+    def milestone_restore(project_id: str, name: str):
+        principal = _membership_authority("project_archive")
+        try:
+            svc.require_feature(project_id, "milestones")
+            return dy.milestone_restore(
+                project_id, name, actor=_actor(principal, "human")
+            )
+        except ValueError as exc:
+            raise HTTPException(404 if "not found" in str(exc) else 409, str(exc)) from None
 
     @router.post("/projects/{project_id}/milestones/{name}/detach")
     def milestone_detach(project_id: str, name: str, body: MilestoneAttach):
@@ -1530,9 +1691,36 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from None
 
+    @router.post("/projects/{project_id}/workflows/{name}/versions")
+    def define_workflow_version(
+        project_id: str, name: str, body: WorkflowVersionDefine
+    ):
+        try:
+            return workflows.define(project_id, name, {"nodes": body.nodes})
+        except ValueError as exc:
+            raise HTTPException(409 if "archived" in str(exc) else 422, str(exc)) from None
+
     @router.get("/projects/{project_id}/workflows")
-    def list_workflows(project_id: str):
-        return {"workflows": workflows.list(project_id)}
+    def list_workflows(project_id: str, include_archived: bool = False):
+        return {"workflows": workflows.list(
+            project_id, include_archived=include_archived
+        )}
+
+    @router.post("/projects/{project_id}/workflows/{name}/archive")
+    def archive_workflow(project_id: str, name: str):
+        principal = _membership_authority("project_archive")
+        try:
+            return workflows.archive(project_id, name, actor=principal, interface="rpc")
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from None
+
+    @router.post("/projects/{project_id}/workflows/{name}/restore")
+    def restore_workflow(project_id: str, name: str):
+        principal = _membership_authority("project_archive")
+        try:
+            return workflows.restore(project_id, name, actor=principal, interface="rpc")
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from None
 
     @router.post("/projects/{project_id}/workflows/{name}/start")
     def start_workflow(project_id: str, name: str, body: WorkflowStart):
@@ -1547,7 +1735,7 @@ def create_app(
         except KanbanAdapterError as exc:
             _raise_work_error(exc)
         except ValueError as exc:
-            raise HTTPException(422, str(exc)) from None
+            raise HTTPException(409 if "archived" in str(exc) else 422, str(exc)) from None
 
     @router.get("/projects/{project_id}/workflows/{name}/runs")
     def list_workflow_runs(project_id: str, name: str):
