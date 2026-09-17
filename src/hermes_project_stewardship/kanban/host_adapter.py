@@ -708,30 +708,99 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
             raise self._mapped_error(exc) from None
 
 
+_HOST_CONTRACT_METHODS = (
+    "capabilities", "list_profiles", "list_existing_projects",
+    "validate_project", "provision_project", "list_tasks", "list_epics",
+    "get_task", "get_project", "get_board",
+)
+
+
+def _host_contract_complete(host_type: Any) -> bool:
+    """P1.10: a host class is usable only if it implements the full plugin
+    contract. Probing the class (not importing it into production) keeps an
+    incomplete fork module from silently replacing the vanilla host."""
+    import tempfile
+    try:
+        probe_root = Path(tempfile.mkdtemp(prefix="dockyard-host-probe-"))
+    except OSError:
+        return False
+    try:
+        probe = host_type(hermes_home=probe_root, board="__probe__")
+        caps = getattr(probe, "capabilities", None)
+        if callable(caps):
+            declared = caps()
+            methods = set(declared.get("methods") or []) if isinstance(declared, dict) else set()
+            return bool(methods) and all(m in methods for m in _HOST_CONTRACT_METHODS)
+        return all(callable(getattr(probe, m, None)) for m in _HOST_CONTRACT_METHODS)
+    except Exception:
+        return False
+    finally:
+        import shutil
+        shutil.rmtree(probe_root, ignore_errors=True)
+
+
 def create_project_kanban_adapter(
     *,
     hermes_home: str | Path | None = None,
     board: str | None = None,
 ) -> ProjectKanbanHostAdapter:
-    """Compose Dockyard against the active Hermes host implementation."""
+    """Compose Dockyard against the active Hermes host implementation.
+
+    P1.10 selection order: the plugin's own vanilla host is the canonical
+    implementation and always satisfies the contract. A host-tree module
+    (``hermes_cli.project_kanban_host``) is used only when it provably
+    implements the same contract; an incomplete module (e.g. a fork predating
+    ``list_existing_projects``) is recorded as rejected provenance and the
+    vanilla implementation is used instead. Without any host runtime the
+    factory still fails closed (``host_contract_unavailable``) — never a
+    silent fallback onto a missing tree.
+    """
+    from .vanilla_host import ProjectKanbanHost as vanilla_type
+    rejected_host_module: str | None = None
+    host_type: Any = None
     try:
-        host_module: Any = None
+        import_module("hermes_cli.kanban_db")
+    except Exception:
+        host_type = None
+    else:
         try:
             host_module = import_module("hermes_cli.project_kanban_host")
-            host_type = getattr(host_module, "ProjectKanbanHost")
+            fork_type = getattr(host_module, "ProjectKanbanHost")
         except (ImportError, AttributeError):
-            from .vanilla_host import ProjectKanbanHost as host_type
-        constants_module = import_module("hermes_constants")
+            host_type = vanilla_type
+        else:
+            if _host_contract_complete(fork_type):
+                host_type = fork_type
+            else:
+                rejected_host_module = getattr(
+                    fork_type, "__module__", "hermes_cli.project_kanban_host")
+                host_type = vanilla_type
+    if host_type is None:
+        try:
+            constants_module = import_module("hermes_constants")
+        except Exception:
+            raise KanbanAdapterError(
+                "host_contract_unavailable",
+                "canonical project and Kanban host is unavailable",
+            ) from None
         resolved_home = (
             Path(hermes_home)
             if hermes_home is not None
             else Path(constants_module.get_hermes_home())
         )
+        host_type = vanilla_type  # constructor below fails closed without runtime
+    try:
+        constants_module = import_module("hermes_constants")
     except Exception:
         raise KanbanAdapterError(
             "host_contract_unavailable",
             "canonical project and Kanban host is unavailable",
         ) from None
+    resolved_home = (
+        Path(hermes_home)
+        if hermes_home is not None
+        else Path(constants_module.get_hermes_home())
+    )
     host = host_type(hermes_home=resolved_home, board=board or "default")
     adapter = ProjectKanbanHostAdapter(host)
     # P1.7: record the actually imported host so unsupported trees are
@@ -739,6 +808,7 @@ def create_project_kanban_adapter(
     adapter.host_provenance = {
         "host_module": getattr(host_type, "__module__", None),
         "host_class": host_type.__name__,
+        "rejected_host_module": rejected_host_module,
         "imported_paths": [
             name for name in ("hermes_constants", "hermes_cli.project_kanban_host")
             if name in sys.modules

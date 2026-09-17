@@ -532,7 +532,13 @@ def test_vanilla_conditional_assignment_retains_competing_writer(tmp_path, monke
         idempotency_key="native-race", board="default",
     )
     initial_revision = task["revision"]
-    competitor = kb.connect(board="default")
+    # hermes_cli.kanban_db.connect moved to kanban_db_connect on current hosts
+    # (the old path is removed 2026-09-14); support both trees explicitly.
+    try:
+        from hermes_cli import kanban_db_connect as connect_module
+    except ImportError:
+        connect_module = kb
+    competitor = connect_module.connect(board="default")
     try:
         assert kb.assign_task(competitor, task["id"], "third-party") is True
     finally:

@@ -47,8 +47,11 @@ def test_real_host_migration_and_snapshot_rollback(tmp_path: Path, monkeypatch):
     home = tmp_path / "hermes"
     home.mkdir()
     token = hermes_constants.set_hermes_home_override(home)
-    previous_home = os.environ.get("HERMES_HOME")
-    os.environ["HERMES_HOME"] = str(home)
+    # Scope BOTH roots: hermes_cli.kanban_db resolves the board umbrella from
+    # HERMES_KANBAN_HOME first; leaving it on the shared conftest root makes
+    # the snapshot/restore below assert against the wrong directory.
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
     try:
         with pdb.connect_closing() as conn:
             project_id = pdb.create_project(
@@ -57,10 +60,6 @@ def test_real_host_migration_and_snapshot_rollback(tmp_path: Path, monkeypatch):
             kb.create_board("demo", name="Demo", project_id=project_id)
     finally:
         hermes_constants.reset_hermes_home_override(token)
-        if previous_home is None:
-            os.environ.pop("HERMES_HOME", None)
-        else:
-            os.environ["HERMES_HOME"] = previous_home
 
     snapshot = tmp_path / "rollback-snapshot"
     shutil.copytree(home, snapshot)

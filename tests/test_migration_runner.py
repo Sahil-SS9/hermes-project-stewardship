@@ -42,8 +42,11 @@ def _fixture(tmp_path: Path, *, status: str = "backlog"):
     (home / IsolatedMigrationRunner.TARGET_MARKER).write_text(
         "dockyard-isolated-v1\n", encoding="utf-8")
     token = hermes_constants.set_hermes_home_override(home)
-    previous_home = os.environ.get("HERMES_HOME")
+    # Scope BOTH roots: kanban_db resolves the board umbrella from
+    # HERMES_KANBAN_HOME before the default root; leaving it shared makes the
+    # migration write outside `home` and the restore assertions meaningless.
     os.environ["HERMES_HOME"] = str(home)
+    os.environ["HERMES_KANBAN_HOME"] = str(home)
     try:
         with pdb.connect_closing() as conn:
             project_id = pdb.create_project(
@@ -52,10 +55,8 @@ def _fixture(tmp_path: Path, *, status: str = "backlog"):
             kb.create_board("demo", name="Demo", project_id=project_id)
     finally:
         hermes_constants.reset_hermes_home_override(token)
-        if previous_home is None:
-            os.environ.pop("HERMES_HOME", None)
-        else:
-            os.environ["HERMES_HOME"] = previous_home
+        os.environ.pop("HERMES_HOME", None)
+        os.environ.pop("HERMES_KANBAN_HOME", None)
     return source_root / "legacy.db", home, tmp_path / "snapshot"
 
 

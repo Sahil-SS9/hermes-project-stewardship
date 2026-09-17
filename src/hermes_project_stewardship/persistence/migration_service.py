@@ -144,15 +144,26 @@ class IsolatedMigrationRunner:
 
     @contextmanager
     def _target_environment(self):
-        previous = os.environ.get("HERMES_HOME")
+        # Both host trees resolve the board umbrella root from
+        # HERMES_KANBAN_HOME before falling back to the default Hermes root,
+        # so scoping HERMES_HOME alone leaks writes to the caller's shared
+        # kanban root (and makes snapshot/restore assertions meaningless).
+        # Scope both, and restore both.
+        previous_home = os.environ.get("HERMES_HOME")
+        previous_kanban = os.environ.get("HERMES_KANBAN_HOME")
         os.environ["HERMES_HOME"] = str(self.target_home)
+        os.environ["HERMES_KANBAN_HOME"] = str(self.target_home)
         try:
             yield
         finally:
-            if previous is None:
+            if previous_home is None:
                 os.environ.pop("HERMES_HOME", None)
             else:
-                os.environ["HERMES_HOME"] = previous
+                os.environ["HERMES_HOME"] = previous_home
+            if previous_kanban is None:
+                os.environ.pop("HERMES_KANBAN_HOME", None)
+            else:
+                os.environ["HERMES_KANBAN_HOME"] = previous_kanban
 
     def _host_adapter(self):
         return create_project_kanban_adapter(
