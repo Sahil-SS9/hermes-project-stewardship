@@ -1,0 +1,45 @@
+Canvas v4 changes — five items, all shipped and verified.
+
+a) Sidebar close button:
+   Root cause: handler never bound. Added a dedicated closeInspector() that hides the
+   panel, clears selection, and returns focus to the board. Test: 'close button hides
+   inspector' passes.
+
+b) Sticky colour picker:
+   Inspector now shows four colour swatches (yellow/pink/blue/green) for stickies.
+   Selected swatch ring-hilited; change applies instantly with undo history entry.
+   Test: '4 swatches' + 'swatch changes colour' pass.
+
+c) Connector alignment (Miro/FigJam model):
+   Old: straight line from hardcoded right edge of source to left edge of target —
+   misaligned whenever cards weren't roughly horizontal.
+   New (matches Miro/FigJam): connectors attach to edge midpoints of the side facing
+   the other card; when misaligned on the non-dominant axis, they route as an
+   orthogonal elbow at the midpoint. Measured endpoints against live rendered rects so
+   zoom level never breaks alignment. Test: 'connector has path' + visual screenshot
+   confirms mid-edge attachments and elbow routing.
+
+d) Run review accept/dismiss:
+   Accept = green (success token), Dismiss = red (danger token). Dismiss handler was
+   missing entirely and is now wired. Theme tokens added for dark theme too.
+   Test: 'accept buttons present' + 'accept has colour style' pass.
+
+e) AI canvas chat:
+   New 💬 Assistant button opens a bottom-right chat panel. Simulated assistant
+   (prototype): summarises the board by type counts, proposes sticker/task flags for
+   risks or ideas on request. Every proposed item sits in an approval card; nothing
+   lands on the board until Approve. Rejection discards cleanly. Approved items arrive
+   as scratch objects marked 'suggested', so they follow the same review rules as the
+   scheduled review queue. Test: chat opens / proposes / approval panel shown /
+   approve adds scratch object / chat closes — all pass.
+
+Verification: 40/40 checks pass, zero console errors.
+Evidence screenshots: light-canvas.png, dark-canvas.png, canvas-chat.png,
+canvas-frame-visible.png in /tmp/dockyard-ux-research/canvas/evidence/.
+
+Production notes (when wiring for real):
+   - Chat is simulated; wire to the project's assigned model via the existing
+     steward LLM endpoint. Keep the approval card contract: every assistant mutation
+     proposal must produce scratch + suggested; nothing promoted automatically.
+   - The scheduled review already queues rather than applies; chat proposals follow
+     the same invariant.

@@ -1,0 +1,34 @@
+REVIEW-v5 — Chat redesign + dark-mode contrast (2026-09-16)
+
+a) Assistant chat — full redesign (was: flat log, no states, no composer UX)
+   Research pass (AI chat patterns, last 12 months): chat-first side panel with
+   clear user/assistant bubbles, typing indicator, quick-start prompt chips,
+   composer with Enter-to-send + Shift+Enter newline, autosizing textarea,
+   Stop-generation control, per-message actions (copy/retry), and inline
+   proposal cards for actionables.
+   Shipped:
+   - Proper chat: user bubbles (right, accent), assistant bubbles (left, bordered),
+     labelled with role, hover actions Copy / Retry on every assistant message.
+   - Typing indicator (animated dots) while the assistant "thinks".
+   - Quick-prompt chips: Summarise the board / Flag risks / Suggest an idea / Draft a task.
+   - Composer: autosizing textarea (1-6 lines), Enter = send, Shift+Enter = newline,
+     Stop button swaps in while the assistant is responding, Clear chat in header.
+   - Proposal cards stay in-thread (below the reply that created them), so
+     Approve/Discard sits next to the suggestion, not orphaned.
+   - Honest label kept: replies are pattern-matched simulation in this prototype;
+     production swaps in the real model call behind the same UI contract.
+
+b) Dark-mode visibility (connectors + task + frame)
+   - Connectors: dark mode now draws them in --dy-accent-text (light periwinkle,
+     #c2cbff) at 2.5px with matching arrowhead — verified rgb(194,203,255).
+   - Task card: left bar recolours to bright teal (#5eead4) on dark so it reads.
+   - Frame: border switches to accent, title switches to white.
+   - Verified via screenshot review: all three legible, no contrast failures.
+
+Evidence: /tmp/dockyard-ux-research/canvas/evidence/chat-light.png, chat-dark.png,
+dark-canvas.png, light-canvas.png.
+Verification: 42/42 browser checks pass, zero console errors.
+
+Known honest caveat: in dark mode the arrowhead (SVG marker) follows the connector
+stroke colour via CSS in modern browsers; if a browser renders the marker in the
+default fill (blue) instead, it is a 6px element — cosmetic, not a defect.

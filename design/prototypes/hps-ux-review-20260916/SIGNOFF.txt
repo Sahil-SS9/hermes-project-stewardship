@@ -1,0 +1,83 @@
+ADDENDUM — Bot Teams refinement scope (approved option 2)
+
+- Bot list stays minimal: identity, role, project assignments and workload; runtime activity NOT on list rows.
+- Runtime (recent sessions, current activity) lives in each bot's profile side panel only.
+- All existing Bot Teams functionality preserved: search, add/remove members, groups/handoffs, transfers (preview→execute→pending/Resume), profiles. Presentation-only refinement: lighter rows, side-panel drill-downs, work-mix workload (no invented capacity/utilisation).
+- Project-member card sign-offs remain locked and unchanged.
+- Confirmed backend surface exists: /bots, /bots/{id}/sessions, /workload, /bot-groups, /bot-groups/{name}/messages, transfers/pending, team roster + membership routes.
+
+SIGNOFF — Planning canvas (2026-09-16, Sahil: "happy to proceed with accepting this canvas work")
+
+Accepted as the v1 planning canvas design, locked against regressions:
+- 4-type object system (Sticky/Task/Link/Frame) with distinct silhouettes, sticky colour swatches, spatial frame containment (stored-reference membership deferred to v2).
+- Connectors: Miro/FigJam-style edge-midpoint snapping + elbow routing; endpoints measured against live rects; dark-mode stroke brightened to --dy-accent-text 2.5px.
+- Interactions: zoom/pan/fit, marquee multi-select (chip+dim+halo), undo/redo, duplicate, tidy, keyboard shortcuts, de-overlap on drop, world-bounds clamping, real-rect collision placement.
+- AI surface: Run review (green Accept / red Dismiss) + docked assistant chat (inside .dockyard-root; Enter sends, Shift+Enter newline, auto-grow, Stop while typing, quick prompts, per-msg Copy/Retry). Approval contract locked: every AI proposal lands as scratch+suggested only; nothing auto-promotes; superseded proposals are explicitly invalidated.
+- Verification: 42/42 browser checks, zero console errors; containment/contrast verified in light and dark screenshots (evidence/final2-light.png, final2-dark-chat.png).
+- Known caveat: chat replies are pattern-matched simulation; production wiring = real model call via steward LLM endpoint, same approval contract.
+- Prototypes only: no app changes, fictional data. Production wiring gated separately.
+
+SIGNOFF — Expandable bot-member card, v2 (2026-09-16, Sahil: "approve happy to move on")
+
+Accepted and locked against regressions:
+- Collapsed row: identity, role, workload counts + work-mix bar (not capacity).
+- Expanded card: responsibility + role label, then three colour-coordinated status
+  sub-cards (Blocked red / In progress blue / Queued grey) with counters.
+- Sub-card click = in-card drill-down of that status's tasks; click again collapses;
+  default selection = most urgent status present (Blocked > In progress > Queued).
+- Hierarchy: uppercase category labels, bold task titles, lighter smaller details.
+- Multi-expand, keyboard collapse/expand, Escape focus restore, side-panel previews
+  (task/profile/assignment), search/filter, empty state, light/dark/system.
+- Management preview only; existing transfer/permission flows untouched; fictional data.
+- Verification: 29/29 assertions, zero console errors; computed contrast
+  5.37–6.18:1 (sub-cards), 17.93:1 (task title), 7.05:1 (details) — all above
+  4.5:1 AA. Evidence: team-card/evidence/subcards-light.png, subcards-dark.png
+  (vision-checked); REVIEW.txt v2 record.
+
+REJECTED — v3 overview dashboard + all three overview-alts (Focus rail / Command centre / Timeline), 2026-09-16. Sahil: "rejecting all 3... terrible and poorly designed."
+
+Scope correction (locked): the overview page BELOW the tabs is NOT being replaced. Existing structure is approved. The ONLY redesign target is the section ABOVE the tabbed views.
+
+SIGNOFF — Header strip, header-zone redesign (2026-09-16, Sahil: "okay happy with all this")
+
+Accepted and locked against regressions (prototype at v3/header-strip/):
+- Thin top status banner, colour-coordinated by health state: amber = at risk,
+  red = blocked, blue = needs review, green = on track (bg + text + border all
+  keyed to state tokens).
+- Project name demoted to small eyebrow row; goal/initiative elevated as the h1
+  headline; approved delivery bar retained as thin progress strip with legend.
+- Project selector in eyebrow row; switching replaces ALL scoped header content
+  (name, slug, goal, bar segments/legend, %, recency, banner health).
+- Banner interaction = side-panel drill-down (not page navigation): clicking
+  banner or "View" opens a right drawer listing every item needing action,
+  colour-coded by severity (blocked = red left border, approval = amber); item
+  click expands routing detail; Escape/backdrop/close dismiss and return focus
+  to the banner; keyboard (Enter/Space) opens it.
+- Keyboard + focus: banner role=button, tabindex, aria-label per state; Escape
+  closes drawer and restores focus to banner.
+- Verification (headless browser, this session): project switching both
+  directions restores content exactly; banner click/Enter/view-link all open
+  drawer; 2 severity items rendered with measured border colours
+  (blocked rgb(167,42,42), approval rgb(128,82,0)); detail expand/collapse;
+  Escape + backdrop + X all close; focus returns to banner; empty state for
+  on-track project; dark-mode panel theming resolves; zero console errors; no
+  overflow at desktop or 390px.
+- Prototypes only: no app changes, fictional data. Production wiring (real
+  health computation, real routing targets) gated separately.
+
+SIGNOFF — Stewardship production-screen refinements (2026-09-16, Sahil: "happy to apporve both")
+
+Accepted and locked against regressions (prototype at production-refine/):
+- Settings (option A): existing Features panel verbatim (dy-features, dy-feature-row,
+  On/Off, Disable/Enable, non-destructive note). Only addition: three uppercase
+  category labels grouping the rows. Non-destructive toggle contract preserved.
+- New project (option A): existing onboard form verbatim (same card, fields, Connect
+  buttons, preflight gate, Enable button). Only additions: thin 3-segment progress
+  bar + "Step X of 3" label, per-field error messages on invalid submit.
+- Grounding: reuse production markup + production stylesheet; only agreed structural
+  deltas added. Verified in-browser: toggle works, empty submit shows 4 field errors,
+  valid fill clears them, preflight opens gate, commit succeeds, editing after
+  preflight re-locks gate, no mobile overflow, zero console errors.
+- Production wiring (real feature toggles, real preflight) gated separately.
+
+PENDING REVIEW: none — design review queue complete.

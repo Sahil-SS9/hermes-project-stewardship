@@ -1,0 +1,43 @@
+Expandable bot-member component — v2, awaiting Sahil's sign-off
+
+Scope: one isolated component study. No application changes. Fictional sample data
+only. Preserved original Dockyard CSS/theme variables.
+
+v2 change (feedback round 1 — Sahil): inside each expanded card, replaced the flat
+task list with colour-coordinated status sub-cards (Blocked / In progress / Queued),
+each carrying a counter. Clicking a sub-card opens an in-card drill-down listing that
+status's tasks. Directly addresses "text is all the same colour/style — hard to
+distinguish category, title, details."
+
+What changed
+- card.js: status sub-cards with counters; openStatus state per bot (defaults to the
+  most urgent status present: Blocked > In progress > Queued); drill-down section
+  re-renders on selection; clicking the active card again collapses the drill.
+- card.css: .status-cards grid; blocked = red family, in-progress = blue family,
+  queued = neutral family; selected card gets 2px border + focus-ring outline;
+  disabled state for zero-count cards; hierarchy hardening for #panel-content
+  dt/dd (uppercase category labels vs bold values).
+- verify.cjs: +6 new assertions (sub-cards present, blocked counter correct,
+  default drill selection, drill switch on click, drill content, blocked drill
+  restore). 29/29 pass, zero browser errors.
+
+Contrast evidence (light theme, computed fg vs first opaque ancestor bg, WCAG ratio)
+- blocked counter/label 6.18:1, in-progress label 5.78:1, queued label 5.37:1
+- task title 17.93:1, task detail 7.05:1, section label 7.05:1
+All above the 4.5:1 AA floor for normal text. Dark theme verified via vision pass:
+sub-cards stay colour-coded (red/blue/grey on dark), hierarchy clear, no contrast
+failures observed. This is targeted evidence, not complete accessibility certification.
+
+Preserved from v1
+- Collapsed row: identity, role, workload counts + work-mix bar (not capacity).
+- Multiple members expandable; keyboard collapse/expand; Escape restores focus.
+- Side panel for task/profile/assignment previews; management preview only —
+  existing transfer/permission flows untouched.
+- Search, filters, empty state, theme light/dark/system.
+
+Explicit limits: fictional data; no backend calls; runtime availability not shown;
+full task route described, not connected. This is not a replacement Team page.
+Sign-off applies to this component design only. No production changes from this study.
+
+Evidence: verify.cjs output (29 pass), evidence/subcards-light.png,
+evidence/subcards-dark.png (both vision-checked); v1 screenshots retained in evidence/.

@@ -1,0 +1,174 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Stewardship · Existing screens, minor improvements</title><link rel="stylesheet" href="production.css"><style>
+/* ONLY two structural additions. Everything else is the existing production markup + CSS. */
+/* 1. Feature group header inside the existing dy-features panel */
+.dy-feature-group{margin:6px 0 2px;padding:7px 12px 3px;border-top:1px solid var(--dy-line)}
+.dy-feature-group:first-child{border-top:0;padding-top:0}
+.dy-feature-group-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--dy-dim)}
+/* 2. Onboard step indicator above the existing form */
+.ob-progress{display:flex;gap:4px;margin:0 0 6px}
+.ob-progress .seg{flex:1;height:3px;border-radius:2px;background:var(--dy-line)}
+.ob-progress .seg.done{background:#3fb950}
+.ob-progress .seg.active{background:var(--dy-accent)}
+.ob-step-label{font-size:12px;color:var(--dy-dim);margin:0 0 14px}
+/* field-level error text (validation addition) */
+.ferr{color:var(--dy-bad);font-size:12px;margin:4px 0 0}
+.dy-form input.invalid,.dy-form select.invalid{border-color:var(--dy-bad)}
+</style></head><body>
+<div class="dy-root"><div class="dy-host">
+<div class="dy-header"><div class="dy-brand"><span class="dy-mark"></span><h1>Dockyard</h1></div>
+<nav class="dy-tabs" role="tablist" aria-label="Screens">
+<button class="active" data-tab="features" role="tab" aria-selected="true">Settings</button>
+<button data-tab="onboard" role="tab" aria-selected="false">Onboard</button>
+</nav></div>
+<main class="dy-main" id="main"></main>
+</div></div>
+<script>
+'use strict';
+const el=(t,c,txt)=>{const e=document.createElement(t);if(c)e.className=c;if(txt!==undefined)e.textContent=txt;return e};
+const main=document.getElementById('main');
+/* Production feature set (same keys/labels as app.ts FEATURE_LABELS) */
+const FEATURES={workflow_canvas:true,milestones:true,initiatives:true,inbox:true,notifications:false,saved_views:false};
+const FEATURE_LABELS={workflow_canvas:'Workflow canvas',milestones:'Milestones',initiatives:'Initiatives & delivery',inbox:'Approval inbox',notifications:'Notifications',saved_views:'Saved views'};
+/* The one addition: group the flat list */
+const GROUPS=[['Workflow & planning',['workflow_canvas','milestones','initiatives']],['Signals',['inbox','notifications']],['Views',['saved_views']]];
+const PROFILES=['octacon','quan','remii','kensei'];
+const EXISTING=[{slug:'hermes-core',repo:'/home/kensei/repos/hermes-agent'},{slug:'dockyard-plugin',repo:'/home/kensei/repos/hermes_dockyard_plugin'}];
+
+/* ================= SETTINGS =================
+   Existing buildFeaturesPanel markup: details.dy-features > summary + .dy-features-body
+   with .dy-feature-row rows (name, On/Off, Disable/Enable). Unchanged.
+   Addition: rows are wrapped under small group labels. */
+function renderFeatures(){
+ const box=el('details','dy-features');box.open=true;
+ box.appendChild(el('summary','','Features'));
+ const body=el('div','dy-features-body');
+ for(const[glabel,keys]of GROUPS){
+  const grp=el('div','dy-feature-group');
+  grp.appendChild(el('div','dy-feature-group-label',glabel));
+  for(const name of keys){
+   const on=FEATURES[name]!==false;
+   const row=el('div','dy-feature-row');
+   row.appendChild(el('span','dy-feature-name',FEATURE_LABELS[name]));
+   const stateTxt=el('span','dy-dim',on?'On':'Off');
+   row.appendChild(stateTxt);
+   const btn=el('button','dy-btn',on?'Disable':'Enable');
+   btn.addEventListener('click',()=>{
+    const nowOn=FEATURES[name]!==false;
+    FEATURES[name]=!nowOn;
+    stateTxt.textContent=!nowOn?'On':'Off';
+    btn.textContent=!nowOn?'Disable':'Enable';
+   });
+   row.appendChild(btn);
+   grp.appendChild(row);
+  }
+  body.appendChild(grp);
+ }
+ body.appendChild(el('p','dy-dim','Turning a feature off hides it and blocks its API. No data is ever deleted; re-enabling restores everything.'));
+ box.appendChild(body);
+ main.replaceChildren(box);
+}
+
+/* ================= ONBOARD =================
+   Existing renderOnboard markup: section.dy-card.dy-form with h2, discovery line,
+   connect buttons, the 4 labelled fields, preflight button + line, Enable button,
+   result line. All unchanged.
+   Addition: a 3-segment progress bar + step label above the form, and per-field
+   validation messages on attempted preflight. */
+function renderOnboard(){
+ let preflightOk=false,pKey='';
+ const card=el('section','dy-card dy-form');
+ card.appendChild(el('h2','','Onboard a project'));
+ /* addition: progress indicator */
+ const prog=el('div','ob-progress');
+ const segs=[el('div','seg active'),el('div','seg'),el('div','seg')];
+ segs.forEach(s=>prog.appendChild(s));
+ const stepLabel=el('p','ob-step-label','Step 1 of 3 — Enter details, then validate');
+ card.append(prog,stepLabel);
+ /* existing: discovery */
+ card.appendChild(el('p','dy-dim','Existing host projects: '+EXISTING.map(p=>p.slug).join(', ')+'. Connect one, or create new below.'));
+ /* existing: connect-existing buttons */
+ const cbox=el('div');
+ EXISTING.forEach(p=>{
+  const b=el('button','dy-btn','Connect '+p.slug);
+  b.addEventListener('click',()=>{idInp.value=p.slug;repoInp.value=p.repo;invalidate()});
+  cbox.appendChild(b);
+ });
+ card.appendChild(cbox);
+ /* existing: fields */
+ const mkField=(labelTxt,id,ph,isSel)=>{
+  const lab=el('label');lab.appendChild(document.createTextNode(labelTxt));
+  let inp;
+  if(isSel){inp=el('select');inp.id=id;
+   const o0=document.createElement('option');o0.value='';o0.textContent='';inp.appendChild(o0);
+   PROFILES.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;inp.appendChild(o)});
+  }else{inp=el('input');inp.id=id;inp.placeholder=ph}
+  lab.appendChild(inp);
+  const err=el('p','ferr');err.id=id+'-err';err.hidden=true;lab.appendChild(err);
+  inp.addEventListener('input',invalidate);
+  return lab;
+ };
+ card.append(
+  mkField('Project ID','ob-id','e.g. hermes-core'),
+  mkField('Repo path','ob-repo','/home/kensei/repos/…'),
+  mkField('Mission','ob-mission','What is this project for?'),
+  mkField('Lead profile','ob-lead','',true)
+ );
+ /* existing: preflight */
+ const pBtn=el('button','dy-btn','Validate before commit');
+ const pText=el('p','dy-dim');pText.id='ob-preflight';
+ card.append(pBtn,pText);
+ /* existing: enable gate */
+ const go=el('button','dy-btn primary','Enable project');go.disabled=true;
+ const result=el('p','dy-dim');result.id='ob-result';
+ card.append(go,result);
+ main.replaceChildren(card);
+ const idInp=card.querySelector('#ob-id'),repoInp=card.querySelector('#ob-repo'),
+       missInp=card.querySelector('#ob-mission'),leadSel=card.querySelector('#ob-lead');
+ function read(){return{id:idInp.value.trim(),repo:repoInp.value.trim(),mission:missInp.value.trim(),lead:leadSel.value}}
+ function invalidate(){
+  if(preflightOk){preflightOk=false;pKey='';go.disabled=true;
+   pText.className='dy-dim';pText.textContent='Details changed since validation — run preflight again.';
+   segs[0].className='seg active';segs[1].className='seg';segs[2].className='seg';
+   stepLabel.textContent='Step 1 of 3 — Enter details, then validate';}
+ }
+ function validate(){
+  const v=read();const errs={};let ok=true;
+  const set=(id,msg)=>{const e=card.querySelector('#'+id+'-err'),inp=card.querySelector('#'+id);
+   e.textContent=msg||'';e.hidden=!msg;inp.classList.toggle('invalid',!!msg);if(msg)ok=false};
+  set('ob-id',!v.id?'Enter a project ID.':'');
+  set('ob-repo',!v.repo?'Enter a repository path.':(!v.repo.startsWith('/')?'Enter an absolute path starting with /.':''));
+  set('ob-mission',!v.mission?'Describe what this project is for.':'');
+  set('ob-lead',!v.lead?'Choose a lead profile.':'');
+  return ok;
+ }
+ pBtn.addEventListener('click',()=>{
+  if(!validate()){result.textContent='';return}
+  const v=read();
+  preflightOk=true;pKey=[v.id,v.repo,v.mission,v.lead].join('|');
+  pText.className='dy-ok';
+  pText.textContent=EXISTING.some(p=>p.slug===v.id)
+   ?'Host validated the details — this project already exists and will be connected, not recreated.'
+   :'Host validated the details; nothing exists yet — create-new.';
+  go.disabled=false;
+  segs[0].className='seg done';segs[1].className='seg done';segs[2].className='seg active';
+  stepLabel.textContent='Step 3 of 3 — Review and enable';
+ });
+ go.addEventListener('click',()=>{
+  const v=read();
+  if(!preflightOk||pKey!==[v.id,v.repo,v.mission,v.lead].join('|')){
+   result.textContent='Validate the current details before enabling.';return}
+  result.textContent='Project "'+v.id+'" enabled.';result.className='dy-ok';
+  segs[2].className='seg done';
+  stepLabel.textContent='Complete';
+ });
+}
+
+/* router */
+document.querySelectorAll('.dy-tabs [data-tab]').forEach(b=>b.addEventListener('click',()=>{
+ document.querySelectorAll('.dy-tabs [data-tab]').forEach(x=>{x.classList.remove('active');x.setAttribute('aria-selected','false')});
+ b.classList.add('active');b.setAttribute('aria-selected','true');
+ (b.dataset.tab==='features'?renderFeatures:renderOnboard)();
+}));
+renderFeatures();
+</script>
+</div></body></html>

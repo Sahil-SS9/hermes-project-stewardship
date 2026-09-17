@@ -1,0 +1,44 @@
+REVIEW-v6 — chat re-analysis + containment fix (2026-09-16)
+
+a) Assistant chat — root cause found and fixed (not a cosmetic tweak):
+   THE BUG: the chat panel was a child of <body>, OUTSIDE .dockyard-root.
+   Every --dy-* CSS variable therefore failed to resolve inside it, so:
+     - border: 1px solid var(--dy-border)  → transparent, "no border"
+     - background: var(--dy-bg)            → transparent panel
+     - user bubble: var(--dy-action) + white text → blue blob, unreadable
+   Fix: chat moved inside .dockyard-root and laid out as a docked column
+   (flex row with the board, not a floating overlay). Board shrinks to
+   make room instead of being overlapped.
+
+   Functional defects found in the same pass (all fixed):
+   - Enter key did nothing in the input (no keydown handler existed)
+     → Enter sends, Shift+Enter for a new line, auto-growing textarea
+   - Stop button never appeared (chatBusy was never set)
+     → typing indicator shows Stop; clicking it kills the timer and
+       marks the reply "(stopped before it finished)"
+   - A pending proposal card was orphaned forever if the user sent a new
+     message first → it is now superseded with an explicit note
+   - Verified end-to-end: enter-send, risk reply, approve→adds object,
+     card removal, copy buttons, no console errors
+
+b) Dark-mode connectors / task / frame visibility:
+   - connectors: stroke switched to --dy-accent-text (rgb 194,203,255)
+     at 2.5px in dark; arrow marker follows
+   - task card left bar and frame title brighten to accent/white in dark
+   - measured in-browser, not by eye
+
+c) Overlap and containment (board):
+   - board was fixed 560px tall while the world was 2400x1500 — objects
+     could be dragged far outside the visible frame
+     → board now fills available height (min 480 / max 820, fluid)
+   - objects are clamped to a 2400x1500 world; de-overlap nudges on drop;
+     new objects are placed by real-rect collision scan (no more
+     "slot grid" assumption that failed on off-grid objects)
+   - default view verified: all 6 sample objects fully inside the frame,
+     zero overlaps (bounding-box audit + vision pass, light & dark)
+
+Evidence: /tmp/dockyard-ux-research/canvas/evidence/final2-light.png,
+final2-dark-chat.png (vision-verified: containment, containment,
+contrast, no overlaps)
+
+42/42 automated checks pass, zero console errors.
