@@ -43,7 +43,13 @@ def client():
     previous_app = plugin_api._app
     previous_client = plugin_api._client
     adapter = ReferenceKanbanAdapter(plugin_api._store)
-    plugin_api._app = create_app(plugin_api._store, kanban_adapter=adapter)
+    plugin_api._app = create_app(
+        plugin_api._store,
+        kanban_adapter=adapter,
+        auth_principal="test-human",
+        auth_principal_is_human=True,
+        capabilities={"project_archive", "membership_admin", "lead_transfer", "bulk_reassignment", "managed_file_removal"},
+    )
     test_client = plugin_api.httpx.AsyncClient(
         transport=plugin_api.httpx.ASGITransport(app=plugin_api._app),
         base_url="http://dockyard.test",
@@ -163,6 +169,7 @@ def test_default_plugin_database_is_durable_and_private(tmp_path, monkeypatch):
     hermes_home = tmp_path / "hermes-home"
     monkeypatch.setenv("HERMES_HOME", str(hermes_home))
     monkeypatch.delenv("DOCKYARD_PLUGIN_DB", raising=False)
+    monkeypatch.delenv("STEWARD_DB_PATH", raising=False)
 
     default_path = plugin_api._default_db_path()
 

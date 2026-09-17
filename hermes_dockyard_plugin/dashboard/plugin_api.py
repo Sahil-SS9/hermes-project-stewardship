@@ -11,12 +11,13 @@ import logging
 import os
 import re
 import sqlite3
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
 import httpx2 as httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,25 @@ from hermes_project_stewardship.runtime import (  # noqa: E402
     resolve_db_path,
 )
 
-plugin_api = APIRouter()
+_REQUEST_AUTHORIZATION: ContextVar[str | None] = ContextVar(
+    "dockyard_plugin_request_authorization", default=None
+)
+
+
+async def _capture_request(request: Request):
+    authorization = request.headers.get("authorization")
+    if authorization is None and os.environ.get("HERMES_DASHBOARD_SESSION_TOKEN"):
+        session_token = request.headers.get("x-hermes-session-token")
+        if session_token:
+            authorization = f"Bearer {session_token}"
+    token = _REQUEST_AUTHORIZATION.set(authorization)
+    try:
+        yield
+    finally:
+        _REQUEST_AUTHORIZATION.reset(token)
+
+
+plugin_api = APIRouter(dependencies=[Depends(_capture_request)])
 
 # The KenseiAgent host contract mounts the module-level `router` attribute
 # (web_server.py `_mount_plugin_api_routes`); `plugin_api` is the same object
@@ -60,7 +79,18 @@ try:
     if os.name == "posix":
         _DB.chmod(0o600)
     _dockyard = DockyardStore(_store)
-    _app = create_app(_store)
+    _rpc_token = os.environ.get("STEWARD_RPC_TOKEN") or os.environ.get("HERMES_DASHBOARD_SESSION_TOKEN")
+    _rpc_capabilities = frozenset(
+        value.strip() for value in os.environ.get("STEWARD_RPC_CAPABILITIES", "").split(",")
+        if value.strip()
+    )
+    _app = create_app(
+        _store,
+        auth_token=_rpc_token,
+        auth_principal=os.environ.get("STEWARD_RPC_PRINCIPAL", "dashboard-user"),
+        auth_principal_is_human=os.environ.get("STEWARD_RPC_PRINCIPAL_KIND") == "human",
+        capabilities=_rpc_capabilities,
+    )
 except StateSelectionError as exc:
     # Fail closed: no data moved, no alternate database chosen. The host
     # keeps loading; proxied routes return 503 until an operator selects
@@ -103,7 +133,13 @@ async def _proxy(method: str, path: str, json_body: dict | None = None,
         logger.error("Proxy %s %s rejected: plugin startup degraded", method, path)
         raise _degraded_503()
     logger.debug("Proxying %s %s", method, path)
-    response = await _client.request(method, path, json=json_body, params=params)
+    headers = {}
+    authorization = _REQUEST_AUTHORIZATION.get()
+    if authorization:
+        headers["authorization"] = authorization
+    response = await _client.request(
+        method, path, json=json_body, params=params, headers=headers
+    )
     logger.debug("Upstream %s %s -> %s", method, path, response.status_code)
     if response.status_code >= 400:
         try:
@@ -477,6 +513,11 @@ async def execute_project_transfer(project_id: str, body: TransferExecuteBody) -
 @plugin_api.post("/projects/{project_id}/reassignments")
 async def bulk_project_reassignment(project_id: str, body: TransferExecuteBody) -> dict:
     return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/reassignments", body.model_dump())
+
+
+@plugin_api.get("/projects/{project_id}/transfers/pending")
+async def pending_project_transfers(project_id: str) -> dict:
+    return await _proxy("GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/transfers/pending")
 
 
 @plugin_api.get("/operations/{op_id}")

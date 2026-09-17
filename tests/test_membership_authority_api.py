@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from hermes_project_stewardship.api.server import create_app
 from hermes_project_stewardship.domain.constants import Capability
 from hermes_project_stewardship.persistence.store import Store
+from hermes_project_stewardship.persistence.service import StewardshipService
 
 
 class _ProfileDiscoveryAdapter:
@@ -64,12 +65,7 @@ def test_pm0111_payload_actor_is_not_authorisation(tmp_path):
     """
     client, store = _client(tmp_path, is_human=False)
     try:
-        created = client.post(
-            "/stewardship/v1/projects/demo/enable",
-            json={"mission": "m", "lead_profile": "sahil"},
-            headers=AUTH,
-        )
-        assert created.status_code in (200, 201), created.text
+        StewardshipService(store).enable("demo", mission="m", lead_profile="sahil")
         # Attempt with NO verified principal (server composed without one)
         # but a spoofed payload actor.
         r = client.post(
@@ -87,12 +83,7 @@ def test_pm0111_human_without_lead_transfer_capability_exact_403(tmp_path):
     """Fix 6: a verified human lacking lead_transfer gets exactly 403."""
     client, store = _client(tmp_path, capabilities={"membership_admin"})
     try:
-        created = client.post(
-            "/stewardship/v1/projects/demo/enable",
-            json={"mission": "m", "lead_profile": "sahil"},
-            headers=AUTH,
-        )
-        assert created.status_code in (200, 201), created.text
+        StewardshipService(store).enable("demo", mission="m", lead_profile="sahil")
         r = client.post(
             "/stewardship/v1/projects/demo/members/octacon/lead",
             json={"profile_slug": "octacon", "actor": "sahil"},
@@ -116,11 +107,7 @@ def test_pm0111_human_without_bulk_reassignment_exact_403(tmp_path):
     Phase 4 on the same authority path)."""
     client, store = _client(tmp_path, capabilities=set())
     try:
-        client.post(
-            "/stewardship/v1/projects/demo/enable",
-            json={"mission": "m", "lead_profile": "sahil"},
-            headers=AUTH,
-        )
+        StewardshipService(store).enable("demo", mission="m", lead_profile="sahil")
         r = client.post(
             "/stewardship/v1/projects/demo/members/octacon/lead",
             json={"profile_slug": "octacon", "actor": "sahil"},
@@ -148,12 +135,7 @@ def test_pm0111_verified_human_can_administer_membership(tmp_path):
     """A verified human principal with membership-admin capability succeeds."""
     client, store = _client(tmp_path)
     try:
-        created = client.post(
-            "/stewardship/v1/projects/demo/enable",
-            json={"mission": "m", "lead_profile": "sahil"},
-            headers=AUTH,
-        )
-        assert created.status_code in (200, 201), created.text
+        StewardshipService(store).enable("demo", mission="m", lead_profile="sahil")
         r = client.post(
             "/stewardship/v1/projects/demo/members",
             json={"profile_slug": "octacon", "role": "member"},

@@ -206,17 +206,21 @@ def _transfer_host(hermes_home: Optional[str]):
             "pass --hermes-home <path>, or resume the operation from the "
             "Desktop backend, which binds the host process"
         )
+    from ..kanban.host_adapter import ProjectKanbanHostAdapter
     from ..kanban.vanilla_host import ProjectKanbanHost
 
-    host = ProjectKanbanHost(hermes_home=hermes_home)
+    raw_host = ProjectKanbanHost(hermes_home=hermes_home)
     try:
-        host._modules()  # force the lazy vanilla imports; fail closed if absent
+        raw_host._modules()  # force the lazy vanilla imports; fail closed if absent
+        host = ProjectKanbanHostAdapter(raw_host)
     except ImportError as exc:
         return None, (
             f"vanilla Hermes runtime is not importable ({exc}); "
             "the pending operation was left untouched"
         )
-    if not hasattr(host, "assign_task_if_unchanged"):
+    except Exception as exc:
+        return None, f"host adapter does not implement the transfer contract: {exc}"
+    if not hasattr(host, "list_work"):
         return None, "host adapter does not implement the transfer contract"
     return host, None
 
@@ -382,6 +386,10 @@ def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) 
             membership = MembershipService(svc.store, svc)
             tm = TeamManagementService(svc.store, svc, membership, host)
             try:
+                operation = store._conn.execute(
+                    "SELECT project_id FROM operation_journal WHERE op_id=?", (args.op_id,)
+                ).fetchone()
+                host.project_board(operation["project_id"])
                 result = tm.retry(args.op_id, actor="cli-user")
             except KeyError:
                 print(friendly_error("transfer operation not found: "
@@ -393,7 +401,7 @@ def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) 
             print(f"{args.op_id}: {result['state']} "
                   f"(completed={result['completed_items']}, "
                   f"failed={len(result['failed_items'])})")
-            return EXIT_OK if result["state"] in ("completed", "running") else EXIT_REFUSED
+            return EXIT_OK if result["state"] == "completed" else EXIT_REFUSED
 
     if g == "content":
         if args.action == "remove":

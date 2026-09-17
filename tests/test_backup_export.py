@@ -23,7 +23,7 @@ def test_export_and_restore_round_trip(tmp_path: Path):
     )
     archive = tmp_path / "export-v1"
     manifest = export_store(source, archive)
-    assert manifest["manifest_version"] == 1
+    assert manifest["manifest_version"] == 2
     assert manifest["schema_version"] == source.schema_version
     assert manifest["database"]["path"] == "dockyard.sqlite3"
     assert "source" not in manifest

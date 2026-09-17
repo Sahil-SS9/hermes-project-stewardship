@@ -304,6 +304,17 @@ def _api_payload(repo: Path) -> dict:
     }
 
 
+def _reviewed(client: TestClient, payload: dict) -> dict:
+    response = client.post("/stewardship/v1/onboard/preflight", json=payload)
+    assert response.status_code == 200, response.text
+    contract = response.json()["preflight"]
+    return {
+        **payload,
+        "expected_membership_revision": contract["membership_revision"],
+        "preflight_token": contract["token"],
+    }
+
+
 # test-phase6-file used _payload as the canonical name; keep the same name so
 # the API tests share the one fixture builder.
 _payload = _api_payload
@@ -345,7 +356,7 @@ def test_onboard_discover_and_preflight_endpoints(tmp_path, monkeypatch):
             assert pre.json()["validated"]["slug"] == "alpha"
 
             created = client.post("/stewardship/v1/onboard",
-                                  json=_payload(repo))
+                                  json=_reviewed(client, _payload(repo)))
             assert created.status_code == 200, created.text
 
             after = client.get("/stewardship/v1/onboard/discover")
@@ -417,7 +428,7 @@ def test_first_assessment_endpoint_after_onboarding(tmp_path, monkeypatch):
                 kanban_adapter=create_project_kanban_adapter(hermes_home=home),
             ))
             created = client.post("/stewardship/v1/onboard",
-                                  json=_payload(repo))
+                                  json=_reviewed(client, _payload(repo)))
             assert created.status_code == 200, created.text
             r = client.post("/stewardship/v1/projects/alpha/first-assessment")
             assert r.status_code == 200, r.text
@@ -512,7 +523,7 @@ def test_duplicate_identity_conflict_previews_cleanly(tmp_path, monkeypatch):
                 store,
                 kanban_adapter=create_project_kanban_adapter(hermes_home=home),
             ))
-            first = client.post("/stewardship/v1/onboard", json=_payload(repo))
+            first = client.post("/stewardship/v1/onboard", json=_reviewed(client, _payload(repo)))
             assert first.status_code == 200, first.text
             clash = _payload(other)
             clash["name"] = "Beta Project"
@@ -607,7 +618,7 @@ def test_onboard_to_first_assessment_journey(tmp_path, monkeypatch):
                 "/stewardship/v1/onboard/preflight", json=_api_payload(repo))
             assert pre.status_code == 200
             assert pre.json()["preview"]["schedules_enabled"] is False
-            on = client.post("/stewardship/v1/onboard", json=_payload(repo))
+            on = client.post("/stewardship/v1/onboard", json=_reviewed(client, _payload(repo)))
             assert on.status_code == 200, on.text
             assert on.json()["canonical"]["board"]["slug"] == "alpha"
             fa = client.post("/stewardship/v1/projects/alpha/first-assessment")

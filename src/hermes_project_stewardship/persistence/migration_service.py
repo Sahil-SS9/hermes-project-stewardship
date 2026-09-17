@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
+from contextlib import contextmanager
 from typing import Any
 
 from ..kanban import create_project_kanban_adapter
@@ -140,16 +142,31 @@ class IsolatedMigrationRunner:
         if marker_path.read_text(encoding="utf-8").strip() != "dockyard-isolated-v1":
             raise ValueError("migration ownership marker is invalid")
 
+    @contextmanager
+    def _target_environment(self):
+        previous = os.environ.get("HERMES_HOME")
+        os.environ["HERMES_HOME"] = str(self.target_home)
+        try:
+            yield
+        finally:
+            if previous is None:
+                os.environ.pop("HERMES_HOME", None)
+            else:
+                os.environ["HERMES_HOME"] = previous
+
+    def _host_adapter(self):
+        return create_project_kanban_adapter(
+            hermes_home=self.target_home, board=self.board,
+        )
+
     def dry_run(self, project_id: str) -> dict[str, Any]:
         store = Store(self.source_db)
         try:
-            return LegacyWorkMigrator(
-                store,
-                create_project_kanban_adapter(
-                    hermes_home=self.target_home,
-                    board=self.board,
-                ),
-            ).dry_run(project_id)
+            with self._target_environment():
+                return LegacyWorkMigrator(
+                    store,
+                    self._host_adapter(),
+                ).dry_run(project_id)
         finally:
             store.close()
 
@@ -162,13 +179,11 @@ class IsolatedMigrationRunner:
             raise ValueError("failed-target preservation path already exists")
         store = Store(self.source_db)
         try:
-            result = LegacyWorkMigrator(
-                store,
-                create_project_kanban_adapter(
-                    hermes_home=self.target_home,
-                    board=self.board,
-                ),
-            ).apply(project_id)
+            with self._target_environment():
+                result = LegacyWorkMigrator(
+                    store,
+                    self._host_adapter(),
+                ).apply(project_id)
             return {**result, "snapshot": str(self.snapshot), "rolled_back": False}
         except Exception:
             self.target_home.rename(failed)

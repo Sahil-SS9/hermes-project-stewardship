@@ -15,6 +15,23 @@ from hermes_project_stewardship.persistence.store import Store  # noqa: E402
 @pytest.fixture()
 def authed(tmp_path, request):
     store = Store(tmp_path / "api.db")
+    setup_app = create_app(
+        store, auth_token="sekrit", rate_limit_rpm=1000,
+        auth_principal="setup-human", auth_principal_is_human=True,
+        capabilities={"project_archive"},
+        kanban_adapter=ReferenceKanbanAdapter(store),
+    )
+    setup = TestClient(setup_app)
+    setup.headers.update({"Authorization": "Bearer sekrit"})
+    setup.post("/stewardship/v1/projects/p1/enable", json={
+        "project_id": "p1", "mission": "m", "lead_profile": "l",
+        "autonomy_level": 2,
+    })
+    r = setup.post("/stewardship/v1/projects/p1/objectives", json={
+        "name": "manual-check", "evaluator_type": "manual",
+        "target": ">=1", "severity": "high",
+    })
+    obj_id = r.json()["id"]
     app = create_app(
         store, auth_token="sekrit", rate_limit_rpm=1000,
         auth_principal_is_human=getattr(request, "param", False),
@@ -22,15 +39,6 @@ def authed(tmp_path, request):
     )
     c = TestClient(app)
     c.headers.update({"Authorization": "Bearer sekrit"})
-    c.post("/stewardship/v1/projects/p1/enable", json={
-        "project_id": "p1", "mission": "m", "lead_profile": "l",
-        "autonomy_level": 2,
-    })
-    r = c.post("/stewardship/v1/projects/p1/objectives", json={
-        "name": "manual-check", "evaluator_type": "manual",
-        "target": ">=1", "severity": "high",
-    })
-    obj_id = r.json()["id"]
     yield c, obj_id
     store.close()
 

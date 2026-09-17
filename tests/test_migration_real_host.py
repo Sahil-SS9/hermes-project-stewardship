@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
@@ -11,10 +12,14 @@ from hermes_project_stewardship.persistence.store import Store
 
 
 def test_real_host_migration_and_snapshot_rollback(tmp_path: Path, monkeypatch):
-    hermes_constants = pytest.importorskip("hermes_constants")
-    kb = pytest.importorskip("hermes_cli.kanban_db")
-    pdb = pytest.importorskip("hermes_cli.projects_db")
-    host_module = pytest.importorskip("hermes_cli.project_kanban_host")
+    try:
+        import hermes_constants
+        from hermes_cli import kanban_db as kb, projects_db as pdb
+    except ImportError:
+        if os.environ.get("STEWARD_REQUIRE_NATIVE_HOST") == "1":
+            pytest.fail("Native host lane requires a real pinned Hermes runtime")
+        pytest.skip("optional native Hermes runtime not installed")
+    from hermes_project_stewardship.kanban.vanilla_host import ProjectKanbanHost
     monkeypatch.delenv("HERMES_DELEGATED_CHILD_CONTEXT", raising=False)
 
     source = Store(tmp_path / "legacy.db")
@@ -42,18 +47,25 @@ def test_real_host_migration_and_snapshot_rollback(tmp_path: Path, monkeypatch):
     home = tmp_path / "hermes"
     home.mkdir()
     token = hermes_constants.set_hermes_home_override(home)
+    previous_home = os.environ.get("HERMES_HOME")
+    os.environ["HERMES_HOME"] = str(home)
     try:
         with pdb.connect_closing() as conn:
             project_id = pdb.create_project(
                 conn, name="Demo", slug="demo", board_slug="demo")
-        with kb.scoped_kanban_home(home):
+        with kb.scoped_current_board("demo"):
             kb.create_board("demo", name="Demo", project_id=project_id)
     finally:
         hermes_constants.reset_hermes_home_override(token)
+        if previous_home is None:
+            os.environ.pop("HERMES_HOME", None)
+        else:
+            os.environ["HERMES_HOME"] = previous_home
 
     snapshot = tmp_path / "rollback-snapshot"
     shutil.copytree(home, snapshot)
-    host = host_module.ProjectKanbanHost(hermes_home=home, board="demo")
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    host = ProjectKanbanHost(hermes_home=home, board="demo")
     migrator = LegacyWorkMigrator(source, ProjectKanbanHostAdapter(host))
     before = migrator.source_digest()
     result = migrator.apply("demo")
@@ -63,7 +75,7 @@ def test_real_host_migration_and_snapshot_rollback(tmp_path: Path, monkeypatch):
 
     shutil.rmtree(home)
     shutil.copytree(snapshot, home)
-    restored = host_module.ProjectKanbanHost(hermes_home=home, board="demo")
+    restored = ProjectKanbanHost(hermes_home=home, board="demo")
     assert restored.list_tasks(board="demo")["items"] == []
     assert migrator.source_digest() == before
     source.close()

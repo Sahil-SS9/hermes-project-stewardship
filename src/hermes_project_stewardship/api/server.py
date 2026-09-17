@@ -508,8 +508,19 @@ def create_app(
     def list_projects():
         return {"projects": svc.list_projects()}
 
+    def _lifecycle_authority() -> str:
+        if embedded and not token:
+            return "embedded-service"
+        if capabilities is not None or (token and not auth_principal_is_human):
+            return _membership_authority("project_archive")
+        principal = current_principal()
+        if principal:
+            return principal
+        raise HTTPException(503, "no trusted principal available")
+
     @router.post("/projects/{project_id}/enable")
     def enable(project_id: str, body: EnableRequest):
+        principal = _lifecycle_authority()
         return svc.enable(
             project_id,
             mission=body.mission,
@@ -519,11 +530,14 @@ def create_app(
             verification_policy=body.verification_policy,
             release_policy=body.release_policy,
             notification_policy=body.notification_policy,
+            actor=principal,
+            interface="rpc",
         )
 
     @router.post("/projects/{project_id}/disable")
     def disable(project_id: str):
-        return svc.disable(project_id)
+        principal = _lifecycle_authority()
+        return svc.disable(project_id, actor=principal, interface="rpc")
 
     # ------------------------------------------------------------------ #
     # Membership (Phase 1, PM-0102/0103/0104/0105/0111). Authority: a     #
@@ -548,6 +562,14 @@ def create_app(
 
     def _membership_authority(capability_name: str) -> str:
         principal = current_principal()
+        if (
+            not principal
+            and embedded
+            and kanban_adapter is not None
+            and auth_principal_is_human
+            and capabilities is not None
+        ):
+            principal = auth_principal
         if not principal:
             raise HTTPException(
                 503,
@@ -638,6 +660,11 @@ def create_app(
         except (ServiceError, PreviewConflict, ValueError) as exc:
             raise HTTPException(409, str(exc)) from None
 
+    @router.get("/projects/{project_id}/transfers/pending")
+    def pending_transfers(project_id: str):
+        _membership_authority("bulk_reassignment")
+        return {"operations": team_management.pending_operations(project_id)}
+
     @router.get("/operations/{op_id}")
     def transfer_operation(op_id: str):
         _membership_authority("bulk_reassignment")
@@ -674,7 +701,8 @@ def create_app(
 
     @router.post("/projects/{project_id}/re-enable")
     def re_enable(project_id: str):
-        return svc.re_enable(project_id)
+        principal = _lifecycle_authority()
+        return svc.re_enable(project_id, actor=principal, interface="rpc")
 
     @router.get("/projects/{project_id}/settings")
     def settings(project_id: str):
@@ -714,15 +742,18 @@ def create_app(
 
     @router.post("/projects/{project_id}/pause")
     def pause(project_id: str):
-        return svc.pause(project_id)
+        principal = _lifecycle_authority()
+        return svc.pause(project_id, actor=principal, interface="rpc")
 
     @router.post("/projects/{project_id}/resume")
     def resume(project_id: str):
-        return svc.resume(project_id)
+        principal = _lifecycle_authority()
+        return svc.resume(project_id, actor=principal, interface="rpc")
 
     @router.post("/projects/{project_id}/freeze")
     def freeze(project_id: str):
-        return svc.freeze(project_id)
+        principal = _lifecycle_authority()
+        return svc.freeze(project_id, actor=principal, interface="rpc")
 
     @router.post("/projects/{project_id}/archive")
     def archive_project(project_id: str):

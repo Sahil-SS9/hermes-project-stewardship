@@ -1,5 +1,19 @@
 # Migration, backup and recovery prerequisites
 
+## Content restore and inode rebinding
+
+The database export now uses manifest version 2 and includes active managed
+content under `content/`, with a per-file project/content ID, relative path,
+size and SHA-256. Restore validates the database and every content entry before
+rebinding the restored file's device/inode identity in the restored database.
+Only active records are restored; removed or quarantined records are not
+resurrected. The destination database and `project-content/` root must be fresh.
+Tampered, missing, substituted, symlinked, traversing or database-inconsistent
+entries fail closed before the restored content is activated.
+
+Manifest version 1 archives remain database-only legacy inputs. They restore
+metadata but do not claim complete managed-content lifecycle recovery.
+
 > **Status:** explanatory guide prepared for Phase 8 (PM-0806) plus the backup
 > and rollback prerequisites the deployment decision checklist consumes. Read
 > from the frozen integration commit

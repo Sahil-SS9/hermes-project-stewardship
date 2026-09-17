@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -11,9 +12,13 @@ from hermes_project_stewardship.persistence.store import Store
 
 
 def _fixture(tmp_path: Path, *, status: str = "backlog"):
-    hermes_constants = pytest.importorskip("hermes_constants")
-    kb = pytest.importorskip("hermes_cli.kanban_db")
-    pdb = pytest.importorskip("hermes_cli.projects_db")
+    try:
+        import hermes_constants
+        from hermes_cli import kanban_db as kb, projects_db as pdb
+    except ImportError:
+        if os.environ.get("STEWARD_REQUIRE_NATIVE_HOST") == "1":
+            pytest.fail("Native host lane requires a real pinned Hermes runtime")
+        pytest.skip("optional native Hermes runtime not installed")
     source_root = tmp_path / "source"
     source_root.mkdir()
     (source_root / IsolatedMigrationRunner.SOURCE_MARKER).write_text(
@@ -37,14 +42,20 @@ def _fixture(tmp_path: Path, *, status: str = "backlog"):
     (home / IsolatedMigrationRunner.TARGET_MARKER).write_text(
         "dockyard-isolated-v1\n", encoding="utf-8")
     token = hermes_constants.set_hermes_home_override(home)
+    previous_home = os.environ.get("HERMES_HOME")
+    os.environ["HERMES_HOME"] = str(home)
     try:
         with pdb.connect_closing() as conn:
             project_id = pdb.create_project(
                 conn, name="Demo", slug="demo", board_slug="demo")
-        with kb.scoped_kanban_home(home):
+        with kb.scoped_current_board("demo"):
             kb.create_board("demo", name="Demo", project_id=project_id)
     finally:
         hermes_constants.reset_hermes_home_override(token)
+        if previous_home is None:
+            os.environ.pop("HERMES_HOME", None)
+        else:
+            os.environ["HERMES_HOME"] = previous_home
     return source_root / "legacy.db", home, tmp_path / "snapshot"
 
 
@@ -63,6 +74,7 @@ def test_apply_failure_restores_snapshot_and_preserves_failed_target(
     tmp_path, monkeypatch,
 ):
     source_db, home, snapshot = _fixture(tmp_path, status="done")
+    monkeypatch.setenv("HERMES_HOME", str(home))
     original = ProjectKanbanHostAdapter.transition_work
 
     def fail_after_create(self, *args, **kwargs):
@@ -75,22 +87,24 @@ def test_apply_failure_restores_snapshot_and_preserves_failed_target(
         runner.apply("demo")
     monkeypatch.setattr(ProjectKanbanHostAdapter, "transition_work", original)
 
-    host_module = pytest.importorskip("hermes_cli.project_kanban_host")
-    restored = host_module.ProjectKanbanHost(hermes_home=home, board="demo")
-    assert restored.list_tasks(board="demo")["items"] == []
+    from hermes_project_stewardship.kanban.vanilla_host import ProjectKanbanHost
+    restored = ProjectKanbanHostAdapter(ProjectKanbanHost(hermes_home=home))
+    assert restored.list_work("demo") == []
     failed = snapshot.with_name(snapshot.name + "-failed")
-    failed_host = host_module.ProjectKanbanHost(hermes_home=failed, board="demo")
-    assert len(failed_host.list_tasks(board="demo")["items"]) == 1
+    monkeypatch.setenv("HERMES_HOME", str(failed))
+    failed_host = ProjectKanbanHostAdapter(ProjectKanbanHost(hermes_home=failed))
+    assert len(failed_host.list_work("demo")) == 1
 
 
-def test_successful_apply_can_be_explicitly_rolled_back(tmp_path):
+def test_successful_apply_can_be_explicitly_rolled_back(tmp_path, monkeypatch):
     source_db, home, snapshot = _fixture(tmp_path)
+    monkeypatch.setenv("HERMES_HOME", str(home))
     runner = IsolatedMigrationRunner(
         source_db=source_db, target_home=home, snapshot=snapshot, board="demo")
     result = runner.apply("demo")
     assert result["count"] == 1 and result["rolled_back"] is False
     rollback = runner.rollback()
     assert rollback["rolled_back"] is True
-    host_module = pytest.importorskip("hermes_cli.project_kanban_host")
-    restored = host_module.ProjectKanbanHost(hermes_home=home, board="demo")
-    assert restored.list_tasks(board="demo")["items"] == []
+    from hermes_project_stewardship.kanban.vanilla_host import ProjectKanbanHost
+    restored = ProjectKanbanHostAdapter(ProjectKanbanHost(hermes_home=home))
+    assert restored.list_work("demo") == []

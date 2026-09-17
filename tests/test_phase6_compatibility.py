@@ -71,14 +71,22 @@ def test_pm0607_all_hermes_imports_are_isolated_in_vanilla_host():
 
 
 def test_pm0607_importing_cli_never_imports_hermes_internals():
-    """The CLI surface must import cleanly with no Hermes runtime present
-    and must not pull hermes internals into sys.modules."""
-    import sys
+    """CLI import isolation is proven in a fresh interpreter."""
+    import os
+    import subprocess
 
-    import hermes_project_stewardship.cli.app  # noqa: F401
-
-    assert "hermes_cli" not in sys.modules
-    assert "hermes_constants" not in sys.modules
+    root = Path(__file__).resolve().parents[1]
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    code = (
+        "import sys; import hermes_project_stewardship.cli.app; "
+        "print('hermes_cli' in sys.modules, 'hermes_constants' in sys.modules)"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], cwd=str(root), env=env,
+        capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+    assert result.stdout.strip() == "False False"
 
 
 def test_pm0607_server_import_without_hermes_runtime_is_clean():

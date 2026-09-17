@@ -81,6 +81,8 @@ class StewardshipService:
         verification_policy: Optional[Dict[str, Any]] = None,
         release_policy: Optional[Dict[str, Any]] = None,
         notification_policy: Optional[Dict[str, Any]] = None,
+        actor: str = "system",
+        interface: str = "service",
     ) -> Dict[str, Any]:
         now = iso(self._clock())
         # PM-0102 (fix 1, atomic seeding): the project row is inserted with
@@ -129,8 +131,8 @@ class StewardshipService:
                 member_profiles=list(member_profiles or []),
             )
         self.store.audit(
-            actor=lead_profile or "system",
-            interface="service",
+            actor=actor,
+            interface=interface,
             action="stewardship.enabled",
             subject=project_id,
             detail={"autonomy_level": autonomy_level},
@@ -225,20 +227,20 @@ class StewardshipService:
             )
         return self.settings(project_id)
 
-    def disable(self, project_id: str) -> Dict[str, Any]:
+    def disable(self, project_id: str, *, actor: str = "system", interface: str = "service") -> Dict[str, Any]:
         self._require(project_id)
         with self.store.tx() as cx:
             cx.execute(
                 "UPDATE project_stewardship SET enabled=0, updated_at=? WHERE project_id=?",
                 (iso(self._clock()), project_id),
             )
-        self.store.audit(actor="system", interface="service", action="stewardship.disabled", subject=project_id)
+        self.store.audit(actor=actor, interface=interface, action="stewardship.disabled", subject=project_id)
         r = self.store._conn.execute(
             "SELECT * FROM project_stewardship WHERE project_id=?", (project_id,)
         ).fetchone()
         return self._row_settings(r)
 
-    def re_enable(self, project_id: str) -> Dict[str, Any]:
+    def re_enable(self, project_id: str, *, actor: str = "system", interface: str = "service") -> Dict[str, Any]:
         """Re-enable an existing project without replacing its configuration."""
         row = self.store._conn.execute(
             "SELECT * FROM project_stewardship WHERE project_id=?", (project_id,)
@@ -258,24 +260,24 @@ class StewardshipService:
                 (iso(self._clock()), project_id),
             )
         self.store.audit(
-            actor="system",
-            interface="service",
+            actor=actor,
+            interface=interface,
             action="stewardship.re_enabled",
             subject=project_id,
         )
         return self.settings(project_id)
 
-    def pause(self, project_id: str) -> Dict[str, Any]:
-        return self._set_phase(project_id, ProjectPhase.PAUSED)
+    def pause(self, project_id: str, *, actor: str = "system", interface: str = "service") -> Dict[str, Any]:
+        return self._set_phase(project_id, ProjectPhase.PAUSED, actor=actor, interface=interface)
 
-    def resume(self, project_id: str) -> Dict[str, Any]:
-        return self._set_phase(project_id, ProjectPhase.ACTIVE)
+    def resume(self, project_id: str, *, actor: str = "system", interface: str = "service") -> Dict[str, Any]:
+        return self._set_phase(project_id, ProjectPhase.ACTIVE, actor=actor, interface=interface)
 
-    def freeze(self, project_id: str) -> Dict[str, Any]:
+    def freeze(self, project_id: str, *, actor: str = "system", interface: str = "service") -> Dict[str, Any]:
         """Emergency freeze: no cycles, no mutations until explicit resume."""
-        return self._set_phase(project_id, ProjectPhase.FROZEN)
+        return self._set_phase(project_id, ProjectPhase.FROZEN, actor=actor, interface=interface)
 
-    def _set_phase(self, project_id: str, phase: ProjectPhase) -> Dict[str, Any]:
+    def _set_phase(self, project_id: str, phase: ProjectPhase, *, actor: str = "system", interface: str = "service") -> Dict[str, Any]:
         self._require(project_id)
         paused_at = iso(self._clock()) if phase in (ProjectPhase.PAUSED, ProjectPhase.FROZEN) else None
         with self.store.tx() as cx:
@@ -284,7 +286,7 @@ class StewardshipService:
                 " WHERE project_id=?",
                 (phase.value, paused_at, iso(self._clock()), project_id),
             )
-        self.store.audit(actor="system", interface="service", action=f"stewardship.{phase.value}", subject=project_id)
+        self.store.audit(actor=actor, interface=interface, action=f"stewardship.{phase.value}", subject=project_id)
         return self.settings(project_id)
 
     # ------------------------------------------------------------------ #

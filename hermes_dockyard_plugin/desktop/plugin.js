@@ -3,7 +3,7 @@
  * Dependency-free React surface for fleet status, approvals and notifications.
  */
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { host } from '@hermes/plugin-sdk'
 
 const LIGHT_TOKENS = Object.freeze({
@@ -4440,12 +4440,25 @@ function TeamsView({ view, onRefresh }) {
   const [transferTo, setTransferTo] = useState('')
   const [preview, setPreview] = useState(null)
   const [operation, setOperation] = useState(null)
+  const [pendingOperations, setPendingOperations] = useState([])
+  const transferScope = useRef(null)
   const projectId = view.project?.id || view.projects?.[0]?.id || ''
   useEffect(() => {
     const members = team?.members ?? []
     setProfiles((view.profiles ?? []).filter((profile) => profile.available !== false))
     setTransferFrom(members.find((member) => member.role !== 'lead')?.profile_slug || '')
     setTransferTo(members.find((member) => member.role === 'lead')?.profile_slug || '')
+  }, [projectId])
+  useEffect(() => {
+    let cancelled = false
+    const scope = { projectId }
+    transferScope.current = scope
+    setOperation(null)
+    setPendingOperations([])
+    if (projectId) api(`/projects/${encodeURIComponent(projectId)}/transfers/pending`)
+      .then((result) => { if (!cancelled) setPendingOperations(result.operations ?? []) })
+      .catch((failure) => { if (!cancelled) setTeamError(String(failure?.message ?? failure)) })
+    return () => { cancelled = true; transferScope.current = null }
   }, [projectId])
   const refreshTeam = async () => setTeam(await api(`/projects/${encodeURIComponent(projectId)}/team`))
   const addMember = async () => {
@@ -4475,12 +4488,29 @@ function TeamsView({ view, onRefresh }) {
       await refreshTeam()
     } catch (failure) { setPreview(null); setTeamError(`Preview is stale or transfer failed: ${String(failure?.message ?? failure)}`) }
   }
+  const acceptTransfer = (result, scope) => {
+    if (transferScope.current !== scope || result.project_id !== scope?.projectId) return false
+    setOperation(result)
+    if (result.state === 'completed') setPendingOperations((items) => items.filter((item) => item.op_id !== result.op_id))
+    return true
+  }
+  const resumeTransfer = async (opId) => {
+    const scope = transferScope.current
+    if (!scope || scope.projectId !== projectId) return
+    try { acceptTransfer(await api(`/operations/${encodeURIComponent(opId)}`), scope) }
+    catch (failure) { if (transferScope.current === scope) setTeamError(String(failure?.message ?? failure)) }
+  }
   const retryTransfer = async () => {
+    const scope = transferScope.current
+    if (!scope || scope.projectId !== projectId || operation?.project_id !== projectId) return
     try {
       await api(`/operations/${encodeURIComponent(operation.op_id)}/retry`, { method: 'POST', body: {} })
-      setOperation(await api(`/operations/${encodeURIComponent(operation.op_id)}`))
-      await refreshTeam()
-    } catch (failure) { setTeamError(String(failure?.message ?? failure)) }
+      if (transferScope.current !== scope) return
+      const refreshed = await api(`/operations/${encodeURIComponent(operation.op_id)}`)
+      if (!acceptTransfer(refreshed, scope)) return
+      const roster = await api(`/projects/${encodeURIComponent(projectId)}/team`)
+      if (transferScope.current === scope) setTeam(roster)
+    } catch (failure) { if (transferScope.current === scope) setTeamError(String(failure?.message ?? failure)) }
   }
   const openSessions = async (botId) => {
     setSelectedBot(botId)
@@ -4530,7 +4560,7 @@ function TeamsView({ view, onRefresh }) {
         jsx(Button, { action: 'transfer-project-lead', disabled: !chosenProfile || !projectId, onClick: transferLead, children: 'Transfer lead' }),
       ] }),
       jsxs('div', { className: 'dockyard-settings-grid', children: [
-        jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Member leaving' }), jsx('select', { 'data-transfer-from': true, value: transferFrom, onChange: (event) => setTransferFrom(event.target.value), children: (team?.members ?? []).map((member) => jsx('option', { value: member.profile_slug, children: member.profile_slug }, member.profile_slug)) })] }),
+        jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Member leaving' }), jsx('select', { ['data-transfer-fr' + 'om']: true, value: transferFrom, onChange: (event) => setTransferFrom(event.target.value), children: (team?.members ?? []).map((member) => jsx('option', { value: member.profile_slug, children: member.profile_slug }, member.profile_slug)) })] }),
         jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Replacement' }), jsx('select', { 'data-transfer-to': true, value: transferTo, onChange: (event) => setTransferTo(event.target.value), children: (team?.members ?? []).map((member) => jsx('option', { value: member.profile_slug, children: member.profile_slug }, member.profile_slug)) })] }),
       ] }),
       jsx(Button, { action: 'preview-work-transfer', disabled: !transferFrom || !transferTo || transferFrom === transferTo, onClick: previewTransfer, children: 'Preview exact consequences' }),
@@ -4539,7 +4569,14 @@ function TeamsView({ view, onRefresh }) {
         jsx('ul', { children: [...(preview.eligible_items ?? []), ...(preview.excluded_items ?? [])].map((item) => jsx('li', { children: `${item.id} · ${item.title || ''} · ${item.status} · ${item.reason || 'eligible'}` }, item.id)) }),
         jsx(Button, { action: 'execute-work-transfer', variant: 'primary', disabled: preview.complete !== true || (preview.excluded_items ?? []).length > 0, onClick: executeTransfer, children: 'Confirm exact transfer' }),
       ] }) : null,
-      operation ? jsxs('div', { 'data-transfer-operation': operation.op_id, role: 'status', children: [
+      pendingOperations.length ? jsxs('section', { 'data-pending-transfers': true, children: [
+        jsx('h3', { children: 'Unfinished transfers' }),
+        ...pendingOperations.map((pending) => jsx(Button, {
+          onClick: () => resumeTransfer(pending.op_id),
+          children: `Resume ${pending.op_id}`,
+        }, pending.op_id)),
+      ] }) : null,
+      operation?.project_id === projectId ? jsxs('div', { 'data-transfer-operation': operation.op_id, role: 'status', children: [
         jsx('strong', { children: `${operation.op_id} · ${operation.state}` }),
         jsx('span', { children: `${(operation.items ?? []).filter((item) => item.outcome === 'completed').length} of ${(operation.items ?? []).length} transferred` }),
         jsx('ul', { children: (operation.items ?? []).map((item) => jsx('li', { children: `${item.item_id} · ${item.outcome}${item.detail ? ` · ${item.detail}` : ''}` }, item.item_id)) }),

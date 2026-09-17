@@ -290,6 +290,14 @@ class TeamManagementService:
                 "new_item_ids": [], "changed_item_ids": [],
                 "outcome_incomplete": False, "missing_outcome_ids": []}
 
+    def pending_operations(self, project_id: str) -> list[dict[str, Any]]:
+        rows = self.store._conn.execute(
+            "SELECT op_id FROM operation_journal WHERE project_id=? "
+            "AND kind IN ('work_transfer', 'bulk_reassignment') AND state != 'completed' "
+            "ORDER BY created_at, op_id", (project_id,),
+        ).fetchall()
+        return [self.operation(row["op_id"]) for row in rows]
+
     def operation(self, op_id: str) -> dict[str, Any]:
         journal = self.store._conn.execute(
             "SELECT * FROM operation_journal WHERE op_id=?", (op_id,)

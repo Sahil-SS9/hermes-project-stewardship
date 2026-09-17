@@ -32,6 +32,9 @@ def authed_env(tmp_path):
     app = create_app(
         store,
         auth_token="sekrit",
+        auth_principal="trusted-user",
+        auth_principal_is_human=True,
+        capabilities={"project_archive"},
         rate_limit_rpm=1000,
         kanban_adapter=ReferenceKanbanAdapter(store),
     )
@@ -154,6 +157,8 @@ def test_gateway_sender_is_bound_to_authenticated_principal(tmp_path):
         store,
         auth_token="sekrit",
         auth_principal="trusted-user",
+        auth_principal_is_human=True,
+        capabilities={"project_archive"},
         kanban_adapter=ReferenceKanbanAdapter(store),
     )
     client = TestClient(app, headers={"Authorization": "Bearer sekrit"})
@@ -177,6 +182,8 @@ def test_authenticated_principal_overrides_body_actor(tmp_path):
         store,
         auth_token="sekrit",
         auth_principal="trusted-user",
+        auth_principal_is_human=True,
+        capabilities={"project_archive"},
         kanban_adapter=ReferenceKanbanAdapter(store),
     )
     client = TestClient(app, headers={"Authorization": "Bearer sekrit"})

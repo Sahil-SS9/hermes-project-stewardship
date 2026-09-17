@@ -8,10 +8,13 @@ restored database exactly the way the API does.
 from __future__ import annotations
 
 from pathlib import Path
+import json
 
 import pytest
 
-from hermes_project_stewardship.persistence.backup import export_store, restore_store
+from hermes_project_stewardship.persistence.backup import BackupError, export_store, restore_store
+import hermes_project_stewardship.persistence.backup as backup_module
+
 from hermes_project_stewardship.persistence.service import ServiceError, StewardshipService
 from hermes_project_stewardship.persistence.store import Store
 
@@ -38,7 +41,10 @@ def test_export_restore_managed_content_gap(tmp_path: Path):
     # Export (the documented operator recovery path) and restore elsewhere.
     archive = tmp_path / "export"
     manifest = export_store(store, archive)
-    assert manifest["database"]["integrity_check"] == "ok"
+    assert manifest["manifest_version"] == 2
+    assert manifest["content"][0]["content_id"] == content_id
+    archived = archive / "content" / row["stored_path"]
+    assert archived.is_file()
 
     restored_dir = tmp_path / "restored"
     restored_dir.mkdir()
@@ -56,30 +62,117 @@ def test_export_restore_managed_content_gap(tmp_path: Path):
     assert row is not None, "content row must survive export/restore"
     assert row["removal_state"] == "active"
 
-    # The restored database now references a managed file...
     expected_in_restored_home = restored_dir / "project-content" / row["stored_path"]
-    # ...which was never part of the archive:
-    assert not expected_in_restored_home.exists(), (
-        "precondition failed: archive unexpectedly carried the managed file"
-    )
-    assert not (restored_dir / "project-content").exists(), (
-        "no content root is created by restore"
-    )
+    assert expected_in_restored_home.is_file()
+    assert expected_in_restored_home.read_bytes() == b"# runbook\n"
 
-    # Behavioural consequence: identity verification fails closed exactly
-    # as documented ("project content file is unavailable").
-    with pytest.raises(ServiceError, match="unavailable"):
-        restored_service.remove_project_content(
-            "demo", content_id, actor="sahil", interface="test",
-        )
+    # The new inode is explicitly rebound only after archive/hash validation.
+    removed = restored_service.remove_project_content(
+        "demo", content_id, actor="sahil", interface="test",
+    )
+    assert removed["removal_state"] == "file_removed"
+    assert not expected_in_restored_home.exists()
 
-    # Readback still works (the row is truthful about the missing file):
-    # the failure is the FILE, not the database.
     listing = restored_service.project_content("demo")
-    assert any(item["content_id"] == content_id for item in listing)
+    assert all(item["content_id"] != content_id for item in listing)
 
     store.close()
     restored_store.close()
+
+
+
+def test_restore_rejects_tampered_managed_content(tmp_path: Path):
+    store = Store(tmp_path / "orig" / "dockyard.db")
+    service = StewardshipService(store)
+    service.enable("demo", mission="m", lead_profile="lead")
+    uploaded = service.upload_project_content(
+        "demo", filename="runbook.md", media_type="text/markdown",
+        content=b"trusted\n", actor="sahil", interface="test",
+    )
+    archive = tmp_path / "export"
+    export_store(store, archive)
+    row = store._conn.execute(
+        "SELECT stored_path FROM project_content WHERE content_id=?",
+        (uploaded["content_id"],),
+    ).fetchone()
+    (archive / "content" / row["stored_path"]).write_bytes(b"tampered\n")
+    restored_dir = tmp_path / "restored"
+    restored_dir.mkdir()
+    with pytest.raises(BackupError, match="integrity"):
+        restore_store(archive, restored_dir / "dockyard.db")
+    assert not (restored_dir / "project-content").exists()
+    store.close()
+
+
+
+def _archive_with_one_content(tmp_path: Path) -> tuple[Store, Path, Path, dict]:
+    store = Store(tmp_path / "orig" / "dockyard.db")
+    service = StewardshipService(store)
+    service.enable("demo", mission="m", lead_profile="lead")
+    uploaded = service.upload_project_content(
+        "demo", filename="proof.txt", media_type="text/plain",
+        content=b"proof", actor="sahil", interface="test",
+    )
+    archive = tmp_path / "export"
+    export_store(store, archive)
+    manifest_path = archive / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    return store, archive, manifest_path, manifest
+
+
+def test_restore_rejects_omitted_active_content_manifest_entry(tmp_path: Path):
+    store, archive, manifest_path, manifest = _archive_with_one_content(tmp_path)
+    manifest["content"] = []
+    manifest_path.write_text(json.dumps(manifest))
+    restored = tmp_path / "restored"
+    restored.mkdir()
+    with pytest.raises(BackupError, match="exactly one-to-one"):
+        restore_store(archive, restored / "dockyard.db")
+    store.close()
+
+
+def test_restore_rejects_duplicate_content_id_manifest_entry(tmp_path: Path):
+    store, archive, manifest_path, manifest = _archive_with_one_content(tmp_path)
+    manifest["content"].append(dict(manifest["content"][0]))
+    manifest_path.write_text(json.dumps(manifest))
+    restored = tmp_path / "restored"
+    restored.mkdir()
+    with pytest.raises(BackupError, match="duplicate"):
+        restore_store(archive, restored / "dockyard.db")
+    store.close()
+
+
+def test_restore_rejects_unexpected_content_manifest_entry(tmp_path: Path):
+    store, archive, manifest_path, manifest = _archive_with_one_content(tmp_path)
+    entry = dict(manifest["content"][0])
+    entry["content_id"] = "unexpected-content-id"
+    manifest["content"].append(entry)
+    manifest_path.write_text(json.dumps(manifest))
+    restored = tmp_path / "restored"
+    restored.mkdir()
+    with pytest.raises(BackupError, match="unexpected"):
+        restore_store(archive, restored / "dockyard.db")
+    store.close()
+
+
+
+def test_restore_cleans_owned_content_when_database_publish_is_interrupted(tmp_path: Path, monkeypatch):
+    store, archive, _manifest_path, _manifest = _archive_with_one_content(tmp_path)
+    restored = tmp_path / "restored"
+    restored.mkdir()
+    real_replace = backup_module.os.replace
+    def fail_publish(source, destination):
+        if Path(destination) == restored / "dockyard.db":
+            raise OSError("simulated publish interruption")
+        return real_replace(source, destination)
+    monkeypatch.setattr(backup_module.os, "replace", fail_publish)
+    with pytest.raises(OSError, match="publish interruption"):
+        restore_store(archive, restored / "dockyard.db")
+    assert not (restored / "dockyard.db").exists()
+    assert not (restored / "project-content").exists()
+    monkeypatch.setattr(backup_module.os, "replace", real_replace)
+    restore_store(archive, restored / "dockyard.db")
+    store.close()
 
 
 def test_export_restore_without_content_is_complete(tmp_path: Path):
