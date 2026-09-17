@@ -96,20 +96,27 @@ Commit `a318aff`. Source: /tmp/dockyard-ux-research (transient).
 
 ## P0.7 — Baseline evidence (exact runs, this session)
 
-All runs: disposable sandbox, HERMES_HOME/HERMES_KANBAN_HOME isolated, STEWARD_DB_PATH unset, PYTHONDONTWRITEBYTECODE=1, interpreter `/home/kensei/worktrees/stewardship-combined-r2/.venv/bin/python` (3.13.14).
+All runs: disposable sandbox under /tmp/hps-recount/, HERMES_HOME/HERMES_KANBAN_HOME isolated, STEWARD_DB_PATH unset (env -u), PYTHONDONTWRITEBYTECODE=1, `-rs -q --tb=line`. Interpreter = relocated `.venv` in the r3 worktree (Python 3.13.14; copied from combined-r2, editable pointer repointed to r3/src, import resolution verified). Counts derived from pytest progress characters over saved logs; EXIT= marker appended.
 
-Note: an early run (exit 1, "test_default_plugin_database_is_durable_and_private") was MY harness error — I exported STEWARD_DB_PATH globally, which leaked into a default-path-resolution test (it uses its own tmp HERMES_HOME). Not a candidate defect; re-ran with env -u STEWARD_DB_PATH. An earlier r3+vanilla run also showed 72 collection errors for the same class of reason: migration tests spawn `<candidate>/.venv/bin/python`, which did not exist for the fresh worktree. Fixed by relocating the combined-r2 venv into the r3 worktree (editable pointer repointed to r3/src; verified import resolution). Logs of those invalid runs retained at /tmp/hps-p0-baseline*/ and /tmp/hps-p0-native-r3/ (superseded, labelled, not evidence).
+Harness corrections (recorded so invalid numbers are not reused): (a) an early run failed `test_default_plugin_database_is_durable_and_private` because I exported STEWARD_DB_PATH globally — leaked into a default-path test; (b) a first r3+vanilla pass produced 72 collection ERRORS because migration tests spawn `<candidate>/.venv/bin/python`, absent in the fresh worktree. Fixed by the relocated venv. Old logs at /tmp/hps-p0-baseline*/ and /tmp/hps-p0-native-r3/ are SUPERSEDED, labelled, not evidence.
 
-Valid runs:
+Final lanes (candidate r3 = a318aff unless noted):
 
-1. Combined r2 (97e9918), no vanilla on path, relocated-venv method n/a (used its own venv):
-   785 passed, 1 failed (the harness-error test above), ~29 skipped-with-reason captured (-rs): native-host module absence + Windows branch. Exit 1. Superseded by run 2.
-2. Combined r2, STEWARD_DB_PATH unset: 739 passed, 34 skipped, exit 0 (progress-line count: 773 of 815 shown at 100% + 42 earlier-line; tail truncated). Log: /tmp/hps-p0-baseline2/baseline.log (EXIT=0 marker present; exact summary line lost to -q tail truncation, dots counted: 792 result chars, 29 's').
-3. Candidate r3 (a318aff), own relocated venv, KenseiAgent host on PYTHONPATH: 721 passed, 11 skipped, exit 0. (+23 passes vs r2 = new transfer/desktop regression tests.) Log: /tmp/hps-p0-baseline-r3-ka.log (to re-capture with counts if disputed — prior full output at proc capture; summary retained here).
-4. Candidate r3 + vanilla 8c098e9e, STEWARD_REQUIRE_NATIVE_HOST=1: 847 passed, 2 failed, 2 skipped, exit 1 (Counter over progress chars, log /tmp/hps-p0-r3-vanilla/vanilla-run.log). The 2 failures are REAL and identical: `test_migration_real_host.py:79` and `test_migration_runner.py:92` assert that restoring a copied-back HERMES_HOME snapshot yields an EMPTY task list; on vanilla 8c098e9e the pre-migration task is still listed (one extra item, correct id/title). Root-cause hypothesis for Phase 1 (NOT yet proven): the test creates the task via the kanban_db module while its env HERMES_HOME points at a DIFFERENT (outer) home, and on vanilla the module resolves the path differently than on KenseiAgent — i.e. isolation of the helper, possibly combined with the missing `scoped_kanban_home`. Phase 1 must decide whether this is plugin bug, helper bug, or unsupported host-API expectation. Not absorbed as "baseline noise".
-5. Skip on both host lanes: `test_project_kanban_host_adapter.py` skips on vanilla because `hermes_cli.project_kanban_host` is KenseiAgent-side, and Windows-branch skips are platform-conditional. With STEWARD_REQUIRE_NATIVE_HOST=1 the native cells did not skip (847 ran).
+| Lane | Host on PYTHONPATH | Result | Log |
+|---|---|---|---|
+| fallback | none | 807 passed, 37 skipped (with reasons), exit 0 — native-lane tests skip cleanly | /tmp/hps-recount/r3-nohost/nohost.log |
+| vanilla 8c098e9e | vanilla, REQUIRE_NATIVE=1 | 847 passed, 2 failed, 2 skipped, exit 1 | /tmp/hps-recount/r3-van/full.log |
+| KenseiAgent | KA, REQUIRE_NATIVE=1 | 842 passed, 8 failed, 1 skipped, exit 1 | /tmp/hps-recount/r3-ka/full.log |
+| attribution: r2 (97e9918) | KA, REQUIRE_NATIVE=1 | 822 passed, 6 failed, 1 skipped, exit 1 | /tmp/hps-recount/r2-ka-native/r2-ka.log |
 
-Known baseline state carried into Phase 1: r3 green on KenseiAgent (721 pass, 11 host-optional skips); near-green on stale vanilla 8c098e9e with 2 migration-restore failures requiring root cause; vanilla cdceca42 (current upstream) not yet exercised — Phase 1.2 prepares that checkout.
+Failure attribution (diff of the two native lanes):
+- Onboarding 503 + team 535 + phase6 80 (r2: 6 failures; r3: 5 of the same class): PRE-EXISTING on the KenseiAgent native host, present in the combined candidate before my correction commit. NOT introduced in Phase 0. They contradict the memory note "672/34 pass" only in that that evidence was produced with the fallback (no native host) configuration; on the fallback lane r3 is green (row 1). Flagged for Phase 1 root cause (candidate hypothesis: onboarding path goes through the real canonical host adapter, which surfaces `canonical board was not found` — host_adapter.py:249 — where r2-era tests used a synthetic in-process adapter; needs proof, not assumption).
+- Migration restore x2 (test_migration_real_host.py:79, test_migration_runner.py:86/92): r3-ONLY — r2's migration tests passed on both native hosts; the direct-corrections rewrote them and the new assertion (snapshot copied back to HERMES_HOME → task list empty) fails on vanilla AND KenseiAgent native, while the old expectation passed on both. Strong signal the NEW test helper's isolation is wrong (task written via module-cached home, not the tmp home) rather than a restore regression — the restore code itself (backup.py, migration_service.py) was also changed in the same unreviewed corrections, so BOTH hypotheses must be tested. Phase 1 task P1-fix-migration: root-cause, fix test or code, keep STEWARD_REQUIRE_NATIVE host lanes green on both.
+- test_allowlist_boundary Windows branch + test_project_kanban_host_adapter:370: platform/host-API conditional skips, expected. `hermes_cli.project_kanban_host` and `scoped_kanban_home` exist in NEITHER vanilla revision — KenseiAgent-side or newer-fork API; any candidate code path reaching them is a vanilla-compatibility violation to be proven and removed in Phase 1/2.
+
+D5 note: vanilla cdceca42 (current upstream) has no local checkout — `git ls-remote` read-only fetch only. Phase 1.2 must prepare it; nothing in this plan is certified against current upstream yet.
+
+Carried into Phase 1 (honest state): r3 green with host-optional skips on the fallback lane; 2 real failures on both native lanes concentrated in the corrected migration tests; 5 pre-existing native-host onboarding/team failures from the combined candidate; current-upstream untested. No lane is claimed "vanilla certified".
 
 ## Gate status
 
