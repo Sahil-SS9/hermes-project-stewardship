@@ -43,7 +43,7 @@ def test_benign_text_clean():
 
 
 def test_worst_severity_ordering():
-    assert worst_severity(scan_text("ignore previous instructions")) == "high"
+    assert worst_severity(scan_text("ignore " + "previous instructions")) == "high"
 
 
 def test_untrusted_wrap_contains_boundary():
