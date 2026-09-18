@@ -135,9 +135,21 @@ Candidate: hps/release-candidate-r3 (commits 2afa9e2, f1f7a51, + this phase's wo
 - The phase4/phase6 failures that only appeared in full-suite runs: order
   contamination from the migration leak above — gone with the scoping fix.
 
-## Lane results (final, post-fix, full suite)
+## Lane results (final, post-fix, full suite, candidate ba3b671)
 
-See phase-1-lanes.md for the exact counts appended by the final run.
+| Lane | Host | Result | Log |
+|---|---|---|---|
+| KA native (installed ref) | KenseiAgent c129a476 | 858 passed, 1 skipped (Windows branch), exit 0 | /tmp/hps-p1-v3-ka/final.log |
+| Vanilla minimum | 8c098e9e | 857 passed, 2 skipped, exit 0 | /tmp/hps-p1-v3-vanold/final.log |
+| Vanilla latest | cdceca42 | 857 passed, 2 skipped, exit 0 | /tmp/hps-p1-v3-vannew/final.log |
+| Fallback (no host) | none | 814 passed, 38 host-optional skips, exit 0 | /tmp/hps-p1-v3-nohost/final.log |
+
+JS gates on the same tree: dashboard 24/24; desktop chains milestone-chain +
+repro-live both pass (0/2 at r2 and r3 before this phase); tsc clean.
+Counts derived from pytest progress characters; EXIT markers present in logs.
+All lanes: env -u STEWARD_DB_PATH, isolated HERMES_HOME + HERMES_KANBAN_HOME,
+PYTHONDONTWRITEBYTECODE=1, candidate venv relocated (editable pointer
+verified resolving to r3/src).
 
 ## Harness findings (recorded honestly)
 
@@ -154,12 +166,29 @@ See phase-1-lanes.md for the exact counts appended by the final run.
   resolved with explicit PID kills; no lane results lost (all re-run on clean
   tree afterwards).
 
-## Gate status (to confirm at lane completion)
+## Gate status
 
-- Real vanilla plugin install/load + privileged proxy ops pass on both
-  supported targets: YES (composition proof + lanes).
-- Negative authority tests pass: YES (7 integration cases + existing matrix).
-- No KENSEI patch required: YES (vanilla untouched; KENSEI host module
-  rejected by contract probe, which is the plugin's own code).
-- Desktop UI journeys on the real chain: milestone-chain + repro-live green
-  (previously both failing at r2 — fixed in this phase).
+- Real vanilla plugin install/load + privileged proxy operations pass on
+  supported targets: YES — host-mount composition proof (P1.3 bullet) and
+  both vanilla revisions green on the full native lane.
+- Negative authority tests pass: YES — 7 integration cases
+  (test_plugin_authority_integration.py) plus the existing 401/403/409/503
+  matrix.
+- No KENSEI patch required: YES — vanilla trees untouched; the fork-module
+  preference was fixed inside the plugin's own factory.
+- Desktop real-HTTP journeys on the canonical chain: YES (2/2), from 0/2 at
+  baseline.
+- Green baseline ≠ vanilla certification: maintained — the fallback (no-host)
+  lane is explicitly NOT vanilla evidence.
+
+## Carried into Phase 2 (no absorption)
+
+- P2.1 is already known from Phase 0 (WorkflowService.start writes `complete`
+  after creating unassigned tasks) — Phase 2 starts with that regression.
+- scripts/phase6/run-latest-host-cell.sh pins a stale upstream sha
+  (a7254e2d, 2026-09-13); scripts/native-host-lane.sh supersedes it (takes
+  the SHA explicitly, verifies before running).
+- KENSEI's fork host class still lacks list_existing_projects; the plugin no
+  longer depends on it (contract probe) but records
+  rejected_host_module=hermes_cli.project_kanban_host until upstream catches
+  up.

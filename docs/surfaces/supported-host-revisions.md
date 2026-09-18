@@ -7,9 +7,10 @@ Verified on 2026-09-17 against candidate `hps/release-candidate-r3`:
 
 | Role | Revision | Verification |
 |---|---|---|
-| Installed reference host (KENSEI fleet) | `c129a476` (Hermes Agent v0.21.3, 2026.9.14) | full suite on native lane, see evidence dir |
-| Vanilla minimum supported | `8c098e9e819169879a7b2f74990e83b5d39696c8` (2026-08-28) | full suite, `STEWARD_REQUIRE_NATIVE_HOST=1`, no skips on native cells |
-| Vanilla latest upstream | `cdceca42e107f0e51ab9ff50e1cc881ad76b577e` | pending: checkout prepared at /tmp/hps-p1-vanilla-cdceca42; run in progress — record PASS/FAIL below only after evidence lands |
+| Installed reference host (KENSEI fleet) | `c129a476` (Hermes Agent v0.21.3, 2026.9.14) | full native lane 858 pass / 1 skip (Windows branch), exit 0 — /tmp/hps-p1-v3-ka/final.log (2026-09-18, candidate ba3b671) |
+| Vanilla minimum supported | `8c098e9e819169879a7b2f74990e83b5d39696c8` (2026-08-28) | full native lane 857 pass / 2 skips, exit 0 — /tmp/hps-p1-v3-vanold/final.log |
+| Vanilla latest upstream | `cdceca42e107f0e51ab9ff50e1cc881ad76b577e` | full native lane 857 pass / 2 skips, exit 0 — /tmp/hps-p1-v3-vannew/final.log (checkout /tmp/hps-p1-vanilla-cdceca42) |
+| Fallback (no host, documented) | none | 814 pass / 38 host-optional skips, exit 0 — /tmp/hps-p1-v3-nohost/final.log — NOT vanilla certification |
 
 Selection contract (P1.3 selection): the plugin's own vanilla host implementation is
 canonical. A host-tree `hermes_cli.project_kanban_host` is used only when it
