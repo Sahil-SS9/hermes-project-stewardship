@@ -125,10 +125,12 @@ def test_fleet_notifications_deep_link_and_ack(env):
 
 def test_onboarding_zero_setup(env):
     c, store = env
+    # Attribution explicit: the onboarding actor OWNS the auto-created default
+    # view, and the read must query as that same actor (owner-visibility).
     r = c.post("/stewardship/v1/onboard", json={
         "project_id": "newco", "repo_path": "/srv/newco",
         "mission": "keep newco healthy", "lead_profile": "octacon",
-        "autonomy_level": 2})
+        "autonomy_level": 2, "actor_id": "owner-a"})
     assert r.status_code == 200
     body = r.json()
     assert body["screen"] == "s2"
@@ -142,7 +144,7 @@ def test_onboarding_zero_setup(env):
 
     # default view saved
     views = c.get(
-        "/stewardship/v1/projects/newco/views?actor_id=sahil").json()
+        "/stewardship/v1/projects/newco/views?actor_id=owner-a").json()
     assert any(v["name"] == "Default board" for v in views["views"])
 
     # duplicate onboarding -> clean 409, not a crash
