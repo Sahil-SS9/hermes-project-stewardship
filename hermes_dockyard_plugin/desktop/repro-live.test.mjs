@@ -261,7 +261,7 @@ function evaluatePlugin(source, host) {
   stripped = stripped.replace(/^export default __plugin;?$/m, '');
   const stub = `
 const jsx = __rt.jsx, jsxs = __rt.jsxs, Fragment = __rt.Fragment;
-const { useEffect, useState } = React;
+const { useEffect, useRef, useState } = React;
 `;
   const factory = new Function(
     'React', '__rt', 'host',
@@ -633,6 +633,7 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
         { profile_slug: 'quan', role: 'member', state: 'active', hermes_available: true, workload: { total: 1 } },
       ],
     };
+    if (method === 'GET' && /^\/projects\/[^/]+\/transfers\/pending$/.test(path)) return { operations: [] };
     if (method === 'POST' && /^\/projects\/[^/]+\/transfers\/preview$/.test(path)) return {
       complete: true, enumerated_count: 2, membership_revision: 3, fingerprint: 'phase4-fingerprint',
       eligible_items: [
@@ -640,10 +641,10 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
         { id: 'HDY-13', title: 'Add payment idempotency keys', status: 'backlog', revision: 8 },
       ], excluded_items: [],
     };
-    if (method === 'POST' && /^\/projects\/[^/]+\/transfers\/execute$/.test(path)) return { op_id: 'OP-PHASE4', state: 'completed' };
-    if (method === 'POST' && /^\/projects\/[^/]+\/reassignments$/.test(path)) return { op_id: 'OP-BULK', state: 'completed', actor: 'sahil' };
-    if (method === 'GET' && path === '/operations/OP-PHASE4') return { op_id: 'OP-PHASE4', state: 'completed', actor: 'sahil', items: [{ item_id: 'HDY-12', outcome: 'completed', actor: 'sahil' }, { item_id: 'HDY-13', outcome: 'completed', actor: 'sahil' }] };
-    if (method === 'GET' && path === '/operations/OP-BULK') return { op_id: 'OP-BULK', state: 'completed', actor: 'sahil', operation_audit: { operation: 'OP-BULK', actor: 'sahil' }, items: [{ item_id: 'HDY-13', outcome: 'completed', audit: { actor: 'sahil', action: 'workitem.reassigned' } }] };
+    if (method === 'POST' && /^\/projects\/[^/]+\/transfers\/execute$/.test(path)) return { op_id: 'OP-PHASE4', state: 'completed', project_id: 'payments-relaunch' };
+    if (method === 'POST' && /^\/projects\/[^/]+\/reassignments$/.test(path)) return { op_id: 'OP-BULK', state: 'completed', project_id: 'payments-relaunch', actor: 'sahil' };
+    if (method === 'GET' && path === '/operations/OP-PHASE4') return { op_id: 'OP-PHASE4', state: 'completed', project_id: 'payments-relaunch', actor: 'sahil', items: [{ item_id: 'HDY-12', outcome: 'completed', actor: 'sahil' }, { item_id: 'HDY-13', outcome: 'completed', actor: 'sahil' }] };
+    if (method === 'GET' && path === '/operations/OP-BULK') return { op_id: 'OP-BULK', state: 'completed', project_id: 'payments-relaunch', actor: 'sahil', operation_audit: { operation: 'OP-BULK', actor: 'sahil' }, items: [{ item_id: 'HDY-13', outcome: 'completed', audit: { actor: 'sahil', action: 'workitem.reassigned' } }] };
     if (path === '/dashboard') return clone(data.dashboard);
     if (path === '/portfolio') return clone(data.portfolio ?? { projects: [], mix: {}, attention: {}, groups: { decisions: [], interventions: [], informational: [] } });
     if (path === '/onboard/discover') return clone(data.DISCOVER);

@@ -118,7 +118,7 @@ class SettingsPatch(BaseModel):
     verification_policy: Optional[Dict[str, Any]] = None
     release_policy: Optional[Dict[str, Any]] = None
     notification_policy: Optional[Dict[str, Any]] = None
-    actor: str = "sahil"
+    actor: str = "stewardship-api"
     interface: str = "dockyard:human"
 
 
@@ -222,12 +222,12 @@ class BindBoardRequest(BaseModel):
 class CompleteRequest(BaseModel):
     outcome: Dict[str, Any]
     regressed: bool = False
-    actor_id: str = "sahil"
+    actor_id: str = "stewardship-api"
     actor_kind: str = "human"
 
 
 class ReconcileRequest(BaseModel):
-    actor: str = "sahil"
+    actor: str = "stewardship-api"
     interface: str = "api"
     trigger_type: str = "manual"
 
@@ -379,7 +379,7 @@ class MilestoneRename(BaseModel):
 
 class FeaturePatch(BaseModel):
     features: Dict[str, bool]
-    actor: str = "sahil"
+    actor: str = "stewardship-api"
     interface: str = "dockyard:human"
 
 
@@ -395,7 +395,7 @@ class ViewSave(BaseModel):
 class ReportRequest(BaseModel):
     report_type: str = "executive"
     include_activity: bool = True
-    actor_id: str = "sahil"
+    actor_id: str = "stewardship-api"
     actor_kind: str = "human"
 
 
@@ -412,7 +412,7 @@ class OnboardingRequest(BaseModel):
     board_slug: Optional[str] = None
     idempotency_key: Optional[str] = None
     autonomy_level: int = 2
-    actor_id: str = "sahil"
+    actor_id: str = "stewardship-api"
     expected_membership_revision: Optional[int] = None
     preflight_token: Optional[str] = None
 
@@ -1847,11 +1847,45 @@ def create_app(
         """P7.1: host-driven discovery for onboarding — existing native
         projects (connect-existing candidates) and valid lead profiles.
         Read-only; no provisioning. The host itself is the source; no
-        hard-coded project or profile lists."""
+        hard-coded project or profile lists.
+
+        A genuinely missing canonical host fails closed with 503 (proven in
+        test_phase7_onboarding). A legacy IN-PROCESS adapter (one that never
+        overrides KanbanAdapter.list_existing_projects, e.g. the reference
+        adapter in test/embedded compositions) gets the same documented
+        fallback the preflight applies: its list_profiles is authoritative
+        and the project universe is the store's own enabled projects.
+        """
         try:
             return _onboarding_discovery()
         except KanbanAdapterError as exc:
             _raise_work_error(exc)
+        except NotImplementedError:
+            if type(adapter).list_existing_projects is not KanbanAdapter.list_existing_projects:
+                raise HTTPException(
+                    503,
+                    {"code": "host_unavailable",
+                     "message": "canonical project and Kanban host is unavailable"},
+                ) from None
+            try:
+                listed = {str(item.get("name")): dict(item) for item in adapter.list_profiles()}
+            except NotImplementedError:
+                listed = {}
+            profiles = [
+                {**item,
+                 "available": item.get("available", True),
+                 "selectable": item.get("selectable", True),
+                 "host_capabilities": item.get("host_capabilities", ["lead", "member"])}
+                for item in listed.values()
+            ]
+            rows = store._conn.execute(
+                "SELECT project_id FROM project_stewardship WHERE enabled=1"
+            ).fetchall()
+            return {
+                "projects": [{"slug": str(r["project_id"]), "id": str(r["project_id"])}
+                             for r in rows],
+                "profiles": profiles,
+            }
         except Exception:
             raise HTTPException(
                 503,

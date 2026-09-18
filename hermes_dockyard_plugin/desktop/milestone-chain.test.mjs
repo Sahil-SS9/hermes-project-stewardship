@@ -85,7 +85,7 @@ function waitReady(url, timeoutMs = 30000) {
 function evaluatePlugin(source, host) {
   let stripped = source.replace(/^import\s.*$/gm, '');
   stripped = stripped.replace(/^export default __plugin;?$/m, '');
-  const stub = `\nconst jsx = __rt.jsx, jsxs = __rt.jsxs, Fragment = __rt.Fragment;\nconst { useEffect, useState } = React;\n`;
+  const stub = `\nconst jsx = __rt.jsx, jsxs = __rt.jsxs, Fragment = __rt.Fragment;\nconst { useEffect, useRef, useState } = React;\n`;
   const factory = new Function(
     'React', '__rt', 'host',
     `${stub}${stripped}\nreturn { plugin: __plugin };`,
@@ -93,7 +93,7 @@ function evaluatePlugin(source, host) {
   return factory(React, rt, host);
 }
 
-const FALSE_EMPTY_MESSAGE = 'No milestones yet. Create one in the Dockyard dashboard; it appears here for review.';
+const FALSE_EMPTY_MESSAGE = 'No milestones yet. Create one here with the form above; it appears in this panel for review.'; // kept in sync with PlanningPanel copy (Desktop is the creation surface)
 
 test('milestone journey: real UI drives real HTTP through proxy to backend', async () => {
   // 1. spawn the real server (real backend + real proxy router + temp DB)

@@ -225,7 +225,7 @@ export function createApi(sdk: HermesPluginSDK) {
     updateFeatures: (projectId: string, features: Record<string, boolean>) =>
       patch<{ features: Record<string, boolean> }>(
         `/projects/${encodeURIComponent(projectId)}/features`,
-        { features, actor: 'sahil', interface: 'dockyard:human' },
+        { features },
       ),
     dashboard: () => get<DashboardView>('/dashboard'),
     portfolio: () => get<PortfolioView>('/portfolio'),
@@ -245,15 +245,10 @@ export function createApi(sdk: HermesPluginSDK) {
       ),
     // P8.4: canonical recovery transition (re-queue blocked -> backlog) —
     // same route/authority the work drawer uses.
-    transitionWorkItem: (
-      projectId: string,
-      ref: string,
-      status: string,
-      actorId = 'sahil',
-    ) =>
+    transitionWorkItem: (projectId: string, ref: string, status: string) =>
       post<{ ref: string; status: string }>(
         `/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(ref)}/transition`,
-        { status, actor_id: actorId, actor_kind: 'human' },
+        { status },
       ),
     updateWork: (projectId: string, ref: string, changes: Record<string, unknown>) =>
       patch<WorkItem>(
@@ -288,22 +283,22 @@ export function createApi(sdk: HermesPluginSDK) {
     milestoneRename: (projectId: string, name: string, newName: string) =>
       post<{ renamed: string; new_name: string }>(
         `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}/rename`,
-        { new_name: newName, actor_id: 'sahil', actor_kind: 'human' },
+        { new_name: newName },
       ),
     milestoneDetach: (projectId: string, name: string, ref: string) =>
       post<{ name: string; detached: string }>(
         `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}/detach`,
-        { ref, actor_id: 'sahil', actor_kind: 'human' },
+        { ref },
       ),
     milestoneSetClosed: (projectId: string, name: string, closed: boolean) =>
       patch<{ name: string; closed: boolean }>(
         `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}`,
-        { closed, actor_id: 'sahil', actor_kind: 'human' },
+        { closed },
       ),
     createMilestone: (projectId: string, name: string, due: string | null) =>
       post<{ id: number; name: string }>(
         `/projects/${encodeURIComponent(projectId)}/milestones`,
-        { name, due, actor_id: 'sahil', actor_kind: 'human' },
+        { name, due },
       ),
     updateMilestone: (
       projectId: string,
@@ -312,16 +307,16 @@ export function createApi(sdk: HermesPluginSDK) {
     ) =>
       patch<MilestoneSummary>(
         `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}`,
-        { ...changes, actor_id: 'sahil', actor_kind: 'human' },
+        { ...changes },
       ),
     attachMilestone: (projectId: string, name: string, ref: string) =>
       post(
         `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}/attach`,
-        { ref, actor_id: 'sahil', actor_kind: 'human' },
+        { ref },
       ),
     views: (projectId: string) =>
       get<{ views: Array<{ name: string; layout: string; filters?: Record<string, unknown> }> }>(
-        `/projects/${encodeURIComponent(projectId)}/views?actor_id=sahil`,
+        `/projects/${encodeURIComponent(projectId)}/views`,
       ),
     saveView: (projectId: string, name: string, layout: 'board' | 'table') =>
       put(`/projects/${encodeURIComponent(projectId)}/views`, {
@@ -357,11 +352,7 @@ export function createApi(sdk: HermesPluginSDK) {
         };
       }>('/onboard/preflight', b),
     addObjective: (projectId: string, body: { name: string; evaluator_type: string; target: string; severity: string; description: string }) =>
-      post(`/projects/${encodeURIComponent(projectId)}/objectives`, {
-        ...body,
-        actor: 'sahil',
-        interface: 'dockyard:human',
-      }),
+      post(`/projects/${encodeURIComponent(projectId)}/objectives`, body),
     // P7.6: onboarding completion action — the first read-only assessment.
     firstAssessment: (projectId: string) =>
       post<{

@@ -5,7 +5,7 @@ A view's ``filters`` payload is a QuerySchema:
     {
         "version": 1,
         "status": ["done", "in_progress"],      # optional, subset of statuses
-        "assignee": "sahil",                    # optional exact match
+        "assignee": "reviewer",                   # optional exact match
         "labels": ["urgent"],                   # optional, any-of
         "milestone": "v0.2",                    # optional
         "shared_with": ["qa-bot", "reviews"],   # optional users/groups

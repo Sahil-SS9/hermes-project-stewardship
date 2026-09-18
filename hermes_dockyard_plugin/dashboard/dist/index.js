@@ -28,7 +28,7 @@
       ),
       updateFeatures: (projectId, features) => patch(
         `/projects/${encodeURIComponent(projectId)}/features`,
-        { features, actor: "sahil", interface: "dockyard:human" }
+        { features }
       ),
       dashboard: () => get("/dashboard"),
       portfolio: () => get("/portfolio"),
@@ -45,9 +45,9 @@
       ),
       // P8.4: canonical recovery transition (re-queue blocked -> backlog) —
       // same route/authority the work drawer uses.
-      transitionWorkItem: (projectId, ref, status, actorId = "sahil") => post(
+      transitionWorkItem: (projectId, ref, status) => post(
         `/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(ref)}/transition`,
-        { status, actor_id: actorId, actor_kind: "human" }
+        { status }
       ),
       updateWork: (projectId, ref, changes) => patch(
         `/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(ref)}`,
@@ -75,30 +75,30 @@
       ),
       milestoneRename: (projectId, name, newName) => post(
         `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}/rename`,
-        { new_name: newName, actor_id: "sahil", actor_kind: "human" }
+        { new_name: newName }
       ),
       milestoneDetach: (projectId, name, ref) => post(
         `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}/detach`,
-        { ref, actor_id: "sahil", actor_kind: "human" }
+        { ref }
       ),
       milestoneSetClosed: (projectId, name, closed) => patch(
         `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}`,
-        { closed, actor_id: "sahil", actor_kind: "human" }
+        { closed }
       ),
       createMilestone: (projectId, name, due) => post(
         `/projects/${encodeURIComponent(projectId)}/milestones`,
-        { name, due, actor_id: "sahil", actor_kind: "human" }
+        { name, due }
       ),
       updateMilestone: (projectId, name, changes) => patch(
         `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}`,
-        { ...changes, actor_id: "sahil", actor_kind: "human" }
+        { ...changes }
       ),
       attachMilestone: (projectId, name, ref) => post(
         `/projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(name)}/attach`,
-        { ref, actor_id: "sahil", actor_kind: "human" }
+        { ref }
       ),
       views: (projectId) => get(
-        `/projects/${encodeURIComponent(projectId)}/views?actor_id=sahil`
+        `/projects/${encodeURIComponent(projectId)}/views`
       ),
       saveView: (projectId, name, layout) => put(`/projects/${encodeURIComponent(projectId)}/views`, {
         name,
@@ -110,11 +110,7 @@
       // P7.1/P7.2: host-driven discovery + host-validated preflight.
       discover: () => get("/onboard/discover"),
       preflight: (b) => post("/onboard/preflight", b),
-      addObjective: (projectId, body) => post(`/projects/${encodeURIComponent(projectId)}/objectives`, {
-        ...body,
-        actor: "sahil",
-        interface: "dockyard:human"
-      }),
+      addObjective: (projectId, body) => post(`/projects/${encodeURIComponent(projectId)}/objectives`, body),
       // P7.6: onboarding completion action — the first read-only assessment.
       firstAssessment: (projectId) => post(`/projects/${encodeURIComponent(projectId)}/first-assessment`, {}),
       decision: (ref) => get(`/initiatives/${encodeURIComponent(ref)}/decision`),
@@ -2251,7 +2247,7 @@
     const idLabel = label("Project ID");
     idLabel.appendChild(inputEl("dy-ob-id", "e.g. hermes-core"));
     const repoLabel = label("Repo path");
-    repoLabel.appendChild(inputEl("dy-ob-repo", "/home/kensei/repos/\u2026"));
+    repoLabel.appendChild(inputEl("dy-ob-repo", "/path/to/repos/\u2026"));
     const missionLabel = label("Mission");
     missionLabel.appendChild(inputEl("dy-ob-mission", "What is this project for?"));
     const leadLabel = label("Lead profile");

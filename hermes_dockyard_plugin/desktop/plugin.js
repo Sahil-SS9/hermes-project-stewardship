@@ -2006,7 +2006,7 @@ function OnboardingWizard({ onClose, onComplete }) {
             jsx('input', { id: 'dockyard-project-id', 'data-field': 'project-id', value: projectId, placeholder: 'payments-relaunch', autoComplete: 'off', onInput: (event) => setProjectId(event.target.value) }),
             jsx('small', { children: 'Lowercase letters, numbers and hyphens.' }),
             jsx('label', { htmlFor: 'dockyard-repo-path', children: 'Repository path' }),
-            jsx('input', { id: 'dockyard-repo-path', 'data-field': 'repo-path', value: repoPath, placeholder: '/home/sahil/repos/project', autoComplete: 'off', onInput: (event) => setRepoPath(event.target.value) }),
+            jsx('input', { id: 'dockyard-repo-path', 'data-field': 'repo-path', value: repoPath, placeholder: '/path/to/repos/project', autoComplete: 'off', onInput: (event) => setRepoPath(event.target.value) }),
           ]}),
           jsxs('div', { className: step === 2 ? 'dockyard-wizard-step active' : 'dockyard-wizard-step', hidden: step !== 2, 'data-wizard-step': '2', children: [
             jsx('h3', { children: 'Mission and outcome' }),
@@ -2925,7 +2925,7 @@ function ProjectSettingsPanel({ project, settings, onRefresh }) {
       ]}),
       jsxs('label', { className: 'dockyard-field', children: [
         jsx('span', { children: 'Member profiles' }),
-        jsx('input', { 'data-setting-field': 'members', value: form.members, placeholder: 'quan, wesker', onChange: (event) => update('members', event.target.value) }),
+        jsx('input', { 'data-setting-field': 'members', value: form.members, placeholder: 'bot-a, bot-b', onChange: (event) => update('members', event.target.value) }),
       ]}),
       jsxs('label', { className: 'dockyard-field', children: [
         jsx('span', { children: 'Autonomy level' }),
@@ -3896,7 +3896,7 @@ function PlanningPanel({ project, milestones, workItems, onRefresh }) {
     const target = detail?.renameValue?.trim()
     if (!target || target === name) return
     act(`/projects/${encodeURIComponent(project.id)}/milestones/${encodeURIComponent(name)}/rename`,
-      { new_name: target, actor_id: 'sahil', actor_kind: 'human' })
+      { new_name: target })
   }
   const closeReopen = (m) => act(
     `/projects/${encodeURIComponent(project.id)}/milestones/${encodeURIComponent(m.name)}`,
@@ -3924,7 +3924,7 @@ function PlanningPanel({ project, milestones, workItems, onRefresh }) {
       jsxs('label', { children: [jsx('span', { children: 'Due date' }), jsx('input', { 'data-milestone-due': true, type: 'date', value: newDue, onChange: (event) => setNewDue(event.target.value) })] }),
       jsx(Button, { action: 'create-milestone', variant: 'primary', disabled: !newName.trim(), onClick: create, children: 'Create milestone' }),
     ]}),
-    milestones.length === 0 ? jsx('p', { className: 'dockyard-meta', children: 'No milestones yet.' }) : null,
+    milestones.length === 0 ? jsx('p', { className: 'dockyard-meta', children: 'No milestones yet. Create one here with the form above; it appears in this panel for review.' }) : null,
     jsx('div', { className: 'dockyard-planning-table', role: 'table', 'aria-label': 'Milestones and delivery risk', children:
       milestones.map((m, index) => {
         const overdue = !m.closed && m.due && m.due < today
@@ -3935,8 +3935,7 @@ function PlanningPanel({ project, milestones, workItems, onRefresh }) {
             jsx('span', { className: 'dockyard-planning-name', children: m.closed ? `${m.name} (closed)` : m.name }, 'name'),
             jsx('span', { children: m.due ? `Due ${m.due}` : 'No due date' }, 'due'),
             jsx('span', { children: `${m.done}/${m.total} done` }, 'count'),
-          ]}),
-          d && jsx('div', { className: 'dockyard-planning-detail', children: [
+          ]}),          d && jsx('div', { className: 'dockyard-planning-detail', children: [
             jsx('p', { className: 'dockyard-meta', children: `Scope: ${d.committed ?? d.total} committed, ${d.done} done, ${d.blocked ?? 0} blocked (${d.units || 'items'}, not hours).` }, 'scope'),
             (d.assignee_wip && Object.keys(d.assignee_wip).length > 0)
               ? jsx('p', { className: 'dockyard-meta', children: `Assignee WIP: ${Object.entries(d.assignee_wip).map(([who, n]) => `${who}: ${n}`).join(', ')} (item counts).` }, 'wip')
@@ -3950,22 +3949,22 @@ function PlanningPanel({ project, milestones, workItems, onRefresh }) {
                       : risk.kind === 'milestone_overdue'
                         ? `Milestone past its due date with ${risk.remaining} item(s) remaining.`
                         : risk.kind,
-                ] }, `${risk.kind}:${risk.item ?? 'risk'}:${index}`)) })
+                ] }, `${risk.kind}:${risk.item ?? 'risk'}:${index}`)) }, 'risks')
               : jsx('p', { className: 'dockyard-meta', children: 'No blocking risks recorded.' }, 'no-risks'),
             jsx('p', { className: 'dockyard-planning-forecast', children: forecastLine(d.forecast) }, 'forecast'),
             jsxs('div', { className: 'dockyard-inline-editor', children: [
-              jsxs('label', { children: [jsx('span', { children: 'Rename' }), jsx('input', { 'data-milestone-rename': m.name, defaultValue: m.name, onChange: (event) => setDetail((current) => ({ ...current, renameValue: event.target.value })) })] }),
-              jsx(Button, { action: 'rename-milestone', onClick: () => rename(m.name), children: 'Rename' }),
-              jsxs('label', { children: [jsx('span', { children: 'Due date' }), jsx('input', { type: 'date', 'data-milestone-edit-due': m.name, defaultValue: m.due || '', onChange: (event) => setDetail((current) => ({ ...current, dueValue: event.target.value })) })] }),
-              jsx(Button, { action: 'update-milestone-due', onClick: () => updateDue(m), children: 'Update due date' }),
-              jsx(Button, { action: m.closed ? 'reopen-milestone' : 'close-milestone', onClick: () => closeReopen(m), children: m.closed ? 'Reopen' : 'Close' }),
+              jsxs('label', { children: [jsx('span', { children: 'Rename' }), jsx('input', { 'data-milestone-rename': m.name, defaultValue: m.name, onChange: (event) => setDetail((current) => ({ ...current, renameValue: event.target.value })) })] }, 'rename-field'),
+              jsx(Button, { action: 'rename-milestone', onClick: () => rename(m.name), children: 'Rename' }, 'rename'),
+              jsxs('label', { children: [jsx('span', { children: 'Due date' }), jsx('input', { type: 'date', 'data-milestone-edit-due': m.name, defaultValue: m.due || '', onChange: (event) => setDetail((current) => ({ ...current, dueValue: event.target.value })) })] }, 'due-field'),
+              jsx(Button, { action: 'update-milestone-due', onClick: () => updateDue(m), children: 'Update due date' }, 'due'),
+              jsx(Button, { action: m.closed ? 'reopen-milestone' : 'close-milestone', onClick: () => closeReopen(m), children: m.closed ? 'Reopen' : 'Close' }, 'close'),
               m.archived_at
-                ? jsx(Button, { action: 'restore-milestone', onClick: () => act(`/projects/${encodeURIComponent(project.id)}/milestones/${encodeURIComponent(m.name)}/restore`), children: 'Restore' })
-                : jsx(Button, { action: 'archive-milestone', variant: 'danger', onClick: () => act(`/projects/${encodeURIComponent(project.id)}/milestones/${encodeURIComponent(m.name)}/archive`), children: 'Archive' }),
-              jsxs('label', { children: [jsx('span', { children: 'Scope item' }), jsx('select', { 'data-milestone-scope': m.name, defaultValue: '', onChange: (event) => setDetail((current) => ({ ...current, scopeRef: event.target.value })), children: [jsx('option', { value: '', children: 'Select work item' }, 'empty'), ...workItems.map((item) => jsx('option', { value: item.ref, children: `${item.ref} — ${item.title}` }, item.ref))] })] }),
-              jsx(Button, { action: 'attach-milestone-scope', disabled: !d.scopeRef, onClick: () => act(`/projects/${encodeURIComponent(project.id)}/milestones/${encodeURIComponent(m.name)}/attach`, { ref: d.scopeRef }), children: 'Attach' }),
+                ? jsx(Button, { action: 'restore-milestone', onClick: () => act(`/projects/${encodeURIComponent(project.id)}/milestones/${encodeURIComponent(m.name)}/restore`), children: 'Restore' }, 'restore')
+                : jsx(Button, { action: 'archive-milestone', variant: 'danger', onClick: () => act(`/projects/${encodeURIComponent(project.id)}/milestones/${encodeURIComponent(m.name)}/archive`), children: 'Archive' }, 'archive'),
+              jsxs('label', { children: [jsx('span', { children: 'Scope item' }), jsx('select', { 'data-milestone-scope': m.name, defaultValue: '', onChange: (event) => setDetail((current) => ({ ...current, scopeRef: event.target.value })), children: [jsx('option', { value: '', children: 'Select work item' }, 'empty'), ...workItems.map((item) => jsx('option', { value: item.ref, children: `${item.ref} — ${item.title}` }, item.ref))] })] }, 'scope-field'),
+              jsx(Button, { action: 'attach-milestone-scope', disabled: !d.scopeRef, onClick: () => act(`/projects/${encodeURIComponent(project.id)}/milestones/${encodeURIComponent(m.name)}/attach`, { ref: d.scopeRef }), children: 'Attach' }, 'attach'),
               (d.item_refs ?? []).map((ref) => jsx(Button, { action: 'detach-milestone-scope', onClick: () => act(`/projects/${encodeURIComponent(project.id)}/milestones/${encodeURIComponent(m.name)}/detach`, { ref }), children: `Detach ${ref}` }, ref)),
-            ]}),
+            ]}, 'editor'),
             jsx('p', { className: 'dockyard-meta', children: 'Open a work item ref in the Board tab to drill into a blocker. Nothing is auto-reassigned or replanned.' }, 'note'),
           ] }),
         ]}, `${m.name}:item:${index}`)

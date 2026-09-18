@@ -1410,7 +1410,7 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
   idLabel.appendChild(inputEl('dy-ob-id', 'e.g. hermes-core'));
 
   const repoLabel = label('Repo path');
-  repoLabel.appendChild(inputEl('dy-ob-repo', '/home/kensei/repos/…'));
+  repoLabel.appendChild(inputEl('dy-ob-repo', '/path/to/repos/…'));
 
   const missionLabel = label('Mission');
   missionLabel.appendChild(inputEl('dy-ob-mission', 'What is this project for?'));
