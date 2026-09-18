@@ -151,6 +151,15 @@ All lanes: env -u STEWARD_DB_PATH, isolated HERMES_HOME + HERMES_KANBAN_HOME,
 PYTHONDONTWRITEBYTECODE=1, candidate venv relocated (editable pointer
 verified resolving to r3/src).
 
+
+## Post-commit full verification (hermes verify --json, workspace, HEAD 532ce0f)
+
+`hermes verify --json` → ok=true, exit 0. Phases:
+- bootstrap: `uv venv .venv --allow-existing` + `uv sync --locked --extra dev --extra plugin` (exit 0; restored the lockfile-clean venv, removing the two ad-hoc host-only packages used by the P1.3 composition probe — historical logs retain that evidence; rerun host-mount composition via a dedicated env)
+- test: `.venv/bin/python -m pytest` → 814 passed, 39 skipped, 0 failed, 122.5s
+- start + readiness: uvicorn on 127.0.0.1:9310, GET /healthz -> 200 in 1.25s, clean shutdown
+Raw JSON: /tmp/hps-p1-hermes-verify.json
+
 ## Harness findings (recorded honestly)
 
 - The relocated .venv needed python-multipart + psutil added to import the
