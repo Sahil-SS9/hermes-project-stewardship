@@ -183,3 +183,15 @@ Initiative, Approvals, Notifications.
 - Initiative keeps its top slot; Approvals + Notifications unchanged.
 - 'New project' button stays in header chrome (Q4 switcher lands with the
   header-strip port).
+
+
+## Project screen (Desktop) — approved 2026-09-18
+
+- Signed-off header strip REPLACES PageHead + notice bar, mounted in that
+  slot at the top of every project sub-view (eyebrow project name, goal/
+  milestone headline, health pill, inline action signal, thin delivery bar;
+  banner/View opens the severity-coded attention drawer).
+- Project picker + sub-view tab row stay immediately below the strip.
+- Sub-view order after Workflows promotion: Overview, Board, Planning,
+  Objectives, Content, Activity, Reports, Settings.
+  (Only shuffle vs today: Reports above Settings; Workflows removed.)
