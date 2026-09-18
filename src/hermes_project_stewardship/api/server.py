@@ -1198,6 +1198,16 @@ def create_app(
         return _Actor(id=bound_id, display_name=bound_id,
                       kind=_ActorKind(bound_kind))
 
+    def _target_actor(actor_id: str, actor_kind: str) -> Actor:
+        """An action TARGET (e.g. a new item's assignee) is named by the
+        caller, not the authenticated principal. Binding targets to the
+        principal made human-authed backlog creation impossible (creator and
+        assignee collapsed to the same id -> 422). Only the ACTOR is bound."""
+        from ..dockyard import Actor as _Actor, ActorKind as _ActorKind
+
+        return _Actor(id=actor_id, display_name=actor_id,
+                      kind=_ActorKind(actor_kind))
+
     def _raise_work_error(exc: Exception) -> NoReturn:
         if isinstance(exc, CanonicalWorkPartialError):
             raise HTTPException(
@@ -1364,7 +1374,7 @@ def create_app(
                 title=body.title,
                 item_type=body.type,
                 creator=_actor(body.creator_id, body.creator_kind),
-                assignee=_actor(body.assignee_id, body.assignee_kind),
+                assignee=_target_actor(body.assignee_id, body.assignee_kind),
                 rank=body.rank,
                 reason=body.reason,
                 initiative_ref=body.initiative_ref,

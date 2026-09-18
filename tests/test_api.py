@@ -272,3 +272,22 @@ def test_gateway_command_via_rpc(env):
     })
     body = r.json()
     assert body["ok"] is True and "gw:" in body["text"]
+
+
+def test_authed_backlog_item_keeps_named_assignee(authed_env):
+    """P1 regression: under a trusted-human bearer, the ACTOR is bound to the
+    principal, but an item's ASSIGNEE is a caller-named target. Collapsing
+    both made human backlog creation impossible (422 distinct-creator)."""
+    c, _ = authed_env
+    enable(c, "bt")
+    r = c.post("/stewardship/v1/projects/bt/backlog/items", json={
+        "type": "task", "title": "Needs QA review",
+        "creator_id": "ignored", "creator_kind": "bot",
+        "assignee_id": "qa-bot", "assignee_kind": "bot",
+        "rank": 1, "reason": "customer reported latency",
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["assignee"] == "qa-bot"
+    # creator stays bound to the authenticated principal (spoofed id ignored)
+    assert body["created_by"] == "trusted-user"
