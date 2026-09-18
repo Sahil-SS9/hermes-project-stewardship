@@ -163,3 +163,23 @@ Desktop's two-level navigation (top tabs + project sub-views). To be
 confirmed during the one-by-one Desktop walkthrough.
 
 Phase 3+ UI gate: PASSED (this approval).
+
+
+## Desktop navigation — approved 2026-09-18 (Option 2)
+
+Top-level tabs (order): Fleet, Project, Backlog, Workflows, Bot teams,
+Initiative, Approvals, Notifications.
+
+- New top-level WORKFLOWS tab = executable workflows (definitions list +
+  PORTED workflow canvas with live run visualisation + gate approve/reject).
+- Naming collision resolved in code terms: today's top tab with internal id
+  'workflows' actually renders SavedViewsView (verified plugin.js:5379); it
+  is RENAMED to its true identity 'saved-views' and SAVED VIEWS FOLDS into
+  the Workflows tab as a clearly separated "display preferences" section
+  (distinct from executable workflows; copy already says so at plugin.js
+  4834).
+- Project sub-view 'Workflows' (ExecutableWorkflowsPanel, plugin.js 3784)
+  moves into the new top-level tab; per-project scoping retained.
+- Initiative keeps its top slot; Approvals + Notifications unchanged.
+- 'New project' button stays in header chrome (Q4 switcher lands with the
+  header-strip port).
