@@ -474,6 +474,43 @@ def test_factory_falls_back_to_vanilla_host_without_fork_module(
     assert provenance["host_module"] == vanilla_host.ProjectKanbanHost.__module__
     assert "ProjectKanbanHost(" in provenance["host_signature"]
 
+
+def test_incomplete_host_module_is_rejected_and_recorded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """P1.3 selection: a host-tree ProjectKanbanHost that predates the plugin contract
+    (e.g. a fork without list_existing_projects) must never be selected; the
+    plugin's vanilla host is used and the rejection is recorded in provenance.
+    Regression for the onboarding-503 failure class on the KenseiAgent lane."""
+    import sys
+    import types
+
+    from hermes_project_stewardship.kanban.host_adapter import (
+        create_project_kanban_adapter,
+    )
+    from hermes_project_stewardship.kanban import vanilla_host
+
+    pytest.importorskip("hermes_cli.kanban_db")
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "native-root"))
+
+    class IncompleteHost:
+        def __init__(self, *, hermes_home=None, board=None, **_kw):
+            pass
+
+        def capabilities(self):
+            return {"contract_version": "0", "methods": ["list_tasks"]}
+
+    fake = types.ModuleType("hermes_cli.project_kanban_host")
+    setattr(fake, "ProjectKanbanHost", IncompleteHost)
+    monkeypatch.setitem(sys.modules, "hermes_cli.project_kanban_host", fake)
+
+    adapter = create_project_kanban_adapter(
+        hermes_home=tmp_path / "hermes", board="demo")
+    prov = adapter.host_provenance or {}
+    assert type(adapter.host).__module__ == vanilla_host.ProjectKanbanHost.__module__
+    assert prov["rejected_host_module"] == IncompleteHost.__module__
+
     board_id = adapter.ensure_board(
         adapter.host.provision_project(
             idempotency_key="vanilla-fallback",

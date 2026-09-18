@@ -11,7 +11,7 @@ Verified on 2026-09-17 against candidate `hps/release-candidate-r3`:
 | Vanilla minimum supported | `8c098e9e819169879a7b2f74990e83b5d39696c8` (2026-08-28) | full suite, `STEWARD_REQUIRE_NATIVE_HOST=1`, no skips on native cells |
 | Vanilla latest upstream | `cdceca42e107f0e51ab9ff50e1cc881ad76b577e` | pending: checkout prepared at /tmp/hps-p1-vanilla-cdceca42; run in progress — record PASS/FAIL below only after evidence lands |
 
-Selection contract (P1.10): the plugin's own vanilla host implementation is
+Selection contract (P1.3 selection): the plugin's own vanilla host implementation is
 canonical. A host-tree `hermes_cli.project_kanban_host` is used only when it
 provably declares the full plugin contract via `capabilities()`; otherwise it
 is recorded as `rejected_host_module` provenance and the plugin implementation

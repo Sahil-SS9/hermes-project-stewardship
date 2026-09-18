@@ -716,7 +716,7 @@ _HOST_CONTRACT_METHODS = (
 
 
 def _host_contract_complete(host_type: Any) -> bool:
-    """P1.10: a host class is usable only if it implements the full plugin
+    """P1.3 selection: a host class is usable only if it implements the full plugin
     contract. Probing the class (not importing it into production) keeps an
     incomplete fork module from silently replacing the vanilla host."""
     import tempfile
@@ -746,7 +746,7 @@ def create_project_kanban_adapter(
 ) -> ProjectKanbanHostAdapter:
     """Compose Dockyard against the active Hermes host implementation.
 
-    P1.10 selection order: the plugin's own vanilla host is the canonical
+    P1.3 selection order: the plugin's own vanilla host is the canonical
     implementation and always satisfies the contract. A host-tree module
     (``hermes_cli.project_kanban_host``) is used only when it provably
     implements the same contract; an incomplete module (e.g. a fork predating
