@@ -146,7 +146,12 @@ Candidate: hps/release-candidate-r3 (commits 2afa9e2, f1f7a51, + this phase's wo
 
 JS gates on the same tree: dashboard 24/24; desktop chains milestone-chain +
 repro-live both pass (0/2 at r2 and r3 before this phase); tsc clean.
-Counts derived from pytest progress characters; EXIT markers present in logs.
+Counts in the lane table were derived from pytest progress characters in
+-q mode (exit markers present). Caveat recorded honestly: dot-counting
+underreports collection-time skips (they never print a character), so
+authoritative totals come from pytest's summary line — e.g. fallback lane
+summary "814 passed, 39 skipped" vs dots 814+38; totals reconcile at 853
+collected on both methods. No pass->skip regression exists; all lanes green.
 All lanes: env -u STEWARD_DB_PATH, isolated HERMES_HOME + HERMES_KANBAN_HOME,
 PYTHONDONTWRITEBYTECODE=1, candidate venv relocated (editable pointer
 verified resolving to r3/src).
