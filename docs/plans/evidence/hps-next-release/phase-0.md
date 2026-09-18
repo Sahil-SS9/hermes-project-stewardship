@@ -126,3 +126,40 @@ Carried into Phase 1 (honest state): r3 green with host-optional skips on the fa
 - No unexplained loss: YES
 - Baseline evidence captured: YES (P0.7)
 - Green baseline ≠ vanilla certification: explicitly held; vanilla gap proven and assigned to Phase 1.
+
+
+## P0.4 screen consolidation map — FINAL (approved by Sahil, 2026-09-18)
+
+Decision made against both live surfaces (web Dashboard + real Desktop UI in
+browser, shared demo data).
+
+KEEP / PORT INTO DESKTOP (the only three web-surface assets carried forward,
+all previously signed off as prototypes):
+  a) Bot-member card v2 (colour-coordinated sub-cards, counters, in-card
+     drill-down) -> Desktop Bot teams panel.
+  b) Workflow canvas (workflow-canvas.ts, 899 lines: live run visualisation,
+     node status/timing, gate approve/reject, retry, expand) -> Desktop
+     Workflows tab. No Desktop equivalent exists; this is the Q11
+     visualisation layer.
+  c) Header strip + attention drawer (eyebrow project name, goal headline,
+     health pill, action signal, thin delivery bar; banner opens severity-
+     coded side panel) -> Desktop Project screen.
+
+RETIRE the remaining web surfaces (executes in Phase 5; nothing deleted
+before its Desktop equivalent is proven): Dashboard shell, Work tab,
+Delivery tab, Inbox, Notifications, Onboard, Settings panel, Saved-views UI,
+objective-evidence widget. Desktop already owns each of these.
+
+CARRIED AS DESIGN SPECS (implementation surface changes to Desktop):
+  - Settings grouped-accordion refinement -> Desktop Settings view.
+  - New-project stepper + per-field validation -> Desktop New project wizard.
+
+BACKEND: unchanged and not retired. plugin_api.py proxy + API server are
+shared by both surfaces (all of plugin_api.py: KEEP per the original map).
+
+OPEN CONSEQUENCE (flagged, not decided): the Q3 tab order list was written
+for the web shell. Under a Desktop-only surface it must be re-mapped across
+Desktop's two-level navigation (top tabs + project sub-views). To be
+confirmed during the one-by-one Desktop walkthrough.
+
+Phase 3+ UI gate: PASSED (this approval).
