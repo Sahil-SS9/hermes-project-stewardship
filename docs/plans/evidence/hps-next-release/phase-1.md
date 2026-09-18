@@ -160,7 +160,14 @@ verified resolving to r3/src).
 ## Post-commit full verification (hermes verify --json, workspace, HEAD 532ce0f)
 
 `hermes verify --json` → ok=true, exit 0. Phases:
-- bootstrap: `uv venv .venv --allow-existing` + `uv sync --locked --extra dev --extra plugin` (exit 0; restored the lockfile-clean venv, removing the two ad-hoc host-only packages used by the P1.3 composition probe — historical logs retain that evidence; rerun host-mount composition via a dedicated env)
+- bootstrap: `uv venv .venv --allow-existing` + `uv sync --locked --extra dev --extra plugin` (exit 0; restored the lockfile-clean venv, removing the two ad-hoc host-only packages used by the P1.3 composition probe). Consequence found by real run: native lanes then failed on missing host runtime deps (yaml) — documented as a lane prerequisite in scripts/native-host-lane.sh and re-verified by re-running both native lanes on the managed venv with lane-env deps installed:
+  re-run COMPLETED on the managed venv (progress-character counts over the logs;
+  exit markers present):
+  KA native (c129a476): 858 pass, 1 skip, EXIT=0 — /tmp/hps-p1-managed2-KenseiAgent/managed.log
+  vanilla-min (8c098e9e): 857 pass, 2 skips, EXIT=0 — /tmp/hps-p1-managed2-hermes-agent-vanilla/managed.log
+  Identical to the hand-built-venv lane counts. (One process did kill its own
+  summary line via an early tail pipeline; the .log files carry the full
+  progress output used for these counts.)
 - test: `.venv/bin/python -m pytest` → 814 passed, 39 skipped, 0 failed, 122.5s
 - start + readiness: uvicorn on 127.0.0.1:9310, GET /healthz -> 200 in 1.25s, clean shutdown
 Raw JSON: /tmp/hps-p1-hermes-verify.json
