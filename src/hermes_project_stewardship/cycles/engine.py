@@ -160,7 +160,7 @@ class CycleEngine:
         if verdict.ok:
             ctx = EvaluationContext(
                 project_path=self._project_path(specs),
-                allowlist=self._allowlist_from(policies),
+                allowlist=self._allowlist_from(settings),
             )
             for obj in self.svc.objectives(project_id):
                 try:
@@ -382,9 +382,26 @@ class CycleEngine:
         return None
 
     @staticmethod
-    def _allowlist_from(policies: Dict[str, Any]) -> frozenset:
+    def _allowlist_from(settings: Dict[str, Any]) -> frozenset:
+        """Executables command evaluators may run for this project, this cycle.
+
+        Autonomy is checked FIRST. ``run_command_evaluator`` is a level-3
+        capability, but nothing used to consult it, so an observe-only level-0
+        project still executed subprocesses: the security allowlist constrains
+        *which* executable may run and never *whether* running is permitted.
+
+        An empty allowlist is the fail-closed expression of "no command may
+        run", and ``run_allowlisted`` already refuses every executable against
+        it, so the gate needs no new failure path downstream.
+        """
+        from ..domain.policy import AutonomyPolicy
         from ..security.allowlist import DEFAULT_ALLOWLIST
 
+        decision = AutonomyPolicy.from_settings(settings).command_evaluator_allowed()
+        if not decision.allowed:
+            return frozenset()
+
+        policies = settings.get("policies", {}) or {}
         configured = (policies.get("verification", {}) or {}).get("command_allowlist")
         if configured is None:
             return DEFAULT_ALLOWLIST
