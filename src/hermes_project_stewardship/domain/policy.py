@@ -60,6 +60,14 @@ def _build_level_capabilities() -> Dict[int, FrozenSet[str]]:
 LEVEL_CAPABILITIES: Dict[int, FrozenSet[str]] = _build_level_capabilities()
 
 
+# The capability set a host runtime is assumed to grant before project policy
+# restricts it. Policy is restriction-only (``base ∩ level ∩ ¬denied``), so the
+# widest sane base is every known capability; narrowing happens via level and
+# ``denied_capabilities``. Callers with a genuinely narrower host may pass their
+# own base to any method that takes ``runtime_base``.
+DEFAULT_RUNTIME_BASE: FrozenSet[str] = KNOWN_CAPABILITIES
+
+
 @dataclass(frozen=True)
 class PolicyDecision:
     allowed: bool
@@ -86,6 +94,30 @@ class AutonomyPolicy:
         self.denied_capabilities: FrozenSet[str] = frozenset(denied_capabilities or ())
         self.release_policy: Dict[str, Any] = dict(release_policy or {})
         self.verification_policy: Dict[str, Any] = dict(verification_policy or {})
+
+    @classmethod
+    def from_settings(cls, settings: Dict[str, Any]) -> "AutonomyPolicy":
+        """Build the policy for one project from a ``svc.settings()`` mapping.
+
+        ``settings`` carries the level as a sibling of ``policies`` (mirroring
+        the stewardship row), so the level and the stored policy JSON are read
+        from their respective homes here rather than by every caller.
+
+        Unknown ``denied_capabilities`` entries are dropped rather than raising:
+        a project persisted under an older capability vocabulary must still
+        produce a usable policy, and dropping a name can only ever *widen* back
+        to the level default, never past it, because ``permits`` re-intersects
+        with ``LEVEL_CAPABILITIES``.
+        """
+        policies = settings.get("policies", {}) or {}
+        autonomy = policies.get("autonomy", {}) or {}
+        denied = frozenset(autonomy.get("denied_capabilities", ()) or ()) & KNOWN_CAPABILITIES
+        return cls(
+            level=int(settings.get("autonomy_level", 0) or 0),
+            denied_capabilities=denied,
+            release_policy=policies.get("release", {}) or {},
+            verification_policy=policies.get("verification", {}) or {},
+        )
 
     # ------------------------------------------------------------------ #
     # Core gate                                                          #
@@ -149,6 +181,21 @@ class AutonomyPolicy:
                 "write_code",
             )
         return self.permits("write_code", runtime_base)
+
+    def command_evaluator_allowed(
+        self, runtime_base: Optional[FrozenSet[str]] = None
+    ) -> PolicyDecision:
+        """Whether this project may execute command-type objective evaluators.
+
+        Command evaluators run real subprocesses, so they are gated on the
+        ``run_command_evaluator`` capability (level >= 3) exactly like any other
+        mutating action. Without this gate a level-0 observe-only project would
+        still execute shell commands, because the security allowlist constrains
+        *which* executables may run but never *whether* running is permitted at
+        all.
+        """
+        base = DEFAULT_RUNTIME_BASE if runtime_base is None else runtime_base
+        return self.permits("run_command_evaluator", base)
 
     def can_create_initiative(self, runtime_base: FrozenSet[str]) -> bool:
         return self.permits("create_initiative", runtime_base).allowed
