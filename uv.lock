@@ -466,6 +466,10 @@ wheels = [
 name = "hermes-project-stewardship"
 version = "0.3.0"
 source = { editable = "." }
+dependencies = [
+    { name = "fastapi" },
+    { name = "httpx2" },
+]
 
 [package.optional-dependencies]
 desktop-panel = [
@@ -490,8 +494,10 @@ plugin = [
 
 [package.metadata]
 requires-dist = [
+    { name = "fastapi", specifier = ">=0.104,<1" },
     { name = "fastapi", marker = "extra == 'desktop-panel'" },
     { name = "fastapi", marker = "extra == 'plugin'" },
+    { name = "httpx2", specifier = ">=2.7,<3" },
     { name = "httpx2", marker = "extra == 'dev'" },
     { name = "httpx2", marker = "extra == 'plugin'" },
     { name = "pip-audit", marker = "extra == 'dev'", specifier = ">=2.9" },

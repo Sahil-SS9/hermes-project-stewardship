@@ -22,7 +22,7 @@ classifiers = [
   "Environment :: Console",
   "Topic :: Software Development :: Build Tools",
 ]
-dependencies = []
+dependencies = ["fastapi>=0.104,<1", "httpx2>=2.7,<3"]
 
 [project.optional-dependencies]
 desktop-panel = ["fastapi", "uvicorn"]
