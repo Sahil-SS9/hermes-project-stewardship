@@ -470,12 +470,16 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
                 )
             epic_status = "done" if status == "done" else "active"
             try:
-                raw = self.host.update_epic(
+                self.host.update_epic(
                     item_id,
                     status=epic_status,
                     board=board,
                 )
-                return self._work_record(raw, project_id=project_id, kind="epic")
+                # Host mutation responses are not the readback contract: some
+                # hosts return the pre-transition card.  Re-read canonically so
+                # callers (notably WorkflowService.advance) observe the state
+                # that was actually persisted.
+                return self.get_work(project_id, kind, item_id)
             except Exception as exc:
                 raise self._mapped_error(exc) from None
         target = {
@@ -494,20 +498,22 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
         try:
             current_status = current["status"]
             if target == "blocked":
-                raw = self.host.block_task(
+                self.host.block_task(
                     item_id,
                     reason="Dockyard work item blocked",
                     kind="dependency",
                     board=board,
                 )
-                return self._work_record(raw, project_id=project_id, kind=kind)
+                return self.get_work(project_id, kind, item_id)
             if target == "done" and current_status in {"backlog", "triage", "todo"}:
                 self.host.transition_task(item_id, "ready", board=board)
             options: dict[str, Any] = {"board": board}
             if target == "review":
                 options["force_review"] = True
-            raw = self.host.transition_task(item_id, target, **options)
-            return self._work_record(raw, project_id=project_id, kind=kind)
+            self.host.transition_task(item_id, target, **options)
+            # Always use canonical post-write readback.  Mutation payloads can
+            # be stale on hosts that return the pre-transition card.
+            return self.get_work(project_id, kind, item_id)
         except Exception as exc:
             raise self._mapped_error(exc) from None
 

@@ -91,19 +91,19 @@ class DockyardStore:
         cur = cx.execute(
             """
             INSERT INTO dockyard_work_items(
-                project_id, ref, type, title, status,
+                project_id, ref, type, title, parent_id, status,
                 assignee_id, assignee_kind, created_by_id, created_by_kind,
                 priority_rank, labels_json, blocked_by_json,
                 estimate_days, due, evidence_refs_json, initiative_ref,
                 created_at, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 item.project_id,
                 item.ref or ("tmp-" + cx.execute(
                     "SELECT hex(randomblob(12))").fetchone()[0]),
                 item.type.value,
-                item.title, item.status.value,
+                item.title, item.parent_id, item.status.value,
                 item.assignee.id if item.assignee else None,
                 item.assignee.kind.value if item.assignee else None,
                 item.created_by.id if item.created_by else None,

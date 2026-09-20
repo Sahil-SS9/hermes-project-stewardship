@@ -185,6 +185,48 @@ class ContentUploadRequest(BaseModel):
     interface: str = "rpc"
 
 
+class CanvasObjectRequest(BaseModel):
+    id: str
+    kind: str
+    content: Dict[str, Any] = Field(default_factory=dict)
+    x: float = 0
+    y: float = 0
+    width: float = 240
+    height: float = 140
+    tags: List[str] = Field(default_factory=list)
+    evidence_ref: Optional[str] = None
+    work_ref: Optional[str] = None
+
+
+class CanvasConnectorRequest(BaseModel):
+    id: str
+    source: str
+    target: str
+    meaning: str
+
+
+class CanvasSaveRequest(BaseModel):
+    expected_revision: int
+    objects: List[CanvasObjectRequest] = Field(default_factory=list)
+    connectors: List[CanvasConnectorRequest] = Field(default_factory=list)
+    actor: str = "system"
+
+
+class CanvasSessionStartRequest(BaseModel):
+    actor: str = "system"
+
+
+class CanvasSessionAnswerRequest(BaseModel):
+    outcome: str
+    answer: str = ""
+    actor: str = "system"
+
+
+class CanvasProposalDecisionRequest(BaseModel):
+    approve: bool
+    actor: str = "system"
+
+
 class InitiativeProposal(BaseModel):
     title: str
     rationale: str
@@ -245,6 +287,14 @@ class WorkItemCreate(BaseModel):
     estimate_days: Optional[float] = None
     due: Optional[str] = None
     idempotency_key: Optional[str] = None
+
+
+class BacklogCsvImport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    csv_text: str
+    apply: bool = False
+    actor_id: str = "stewardship-api"
+    actor_kind: str = "human"
 
 
 class WorkItemTransition(BaseModel):
@@ -432,6 +482,46 @@ class WorkflowStart(BaseModel):
     model_config = ConfigDict(extra="forbid")
     run_key: str
     version: Optional[int] = None
+
+
+class WorkflowTemplateDefine(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    nodes: List[Dict[str, Any]]
+
+
+class WorkflowInstantiate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    template: str
+    name: Optional[str] = None
+    version: Optional[int] = None
+
+
+class WorkflowBindingBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    group_id: Optional[int] = None
+    overrides: Dict[str, str] = Field(default_factory=dict)
+
+
+class WorkflowRevisionProposal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    proposed_by: str = "agent"
+    rationale: str
+    add_nodes: List[Dict[str, Any]]
+    add_edges: List[Dict[str, str]] = Field(default_factory=list)
+
+
+class WorkflowRevisionDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    approve: bool
+    actor_id: str = "stewardship-api"
+
+
+class WorkflowImportBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    apply: bool = False
+    as_name: Optional[str] = None
+    document: Dict[str, Any]
 
 
 def create_app(
@@ -970,6 +1060,79 @@ def create_app(
             project_id, actor=_principal_id(body.actor), interface=body.interface
         )
 
+    @router.get("/projects/{project_id}/canvas")
+    def project_canvas(project_id: str):
+        from ..persistence.canvas_service import CanvasService
+        return CanvasService(store).get(project_id)
+
+    @router.put("/projects/{project_id}/canvas")
+    def save_project_canvas(project_id: str, body: CanvasSaveRequest):
+        from ..persistence.canvas_service import CanvasConflictError, CanvasService
+        try:
+            return CanvasService(store).save(
+                project_id,
+                expected_revision=body.expected_revision,
+                objects=[item.model_dump() for item in body.objects],
+                connectors=[item.model_dump() for item in body.connectors],
+                actor=_principal_id(body.actor),
+            )
+        except CanvasConflictError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @router.delete("/projects/{project_id}/canvas/objects/{object_id}")
+    def remove_canvas_object(project_id: str, object_id: str, expected_revision: int, actor: str = "system"):
+        from ..persistence.canvas_service import CanvasConflictError, CanvasService
+        try:
+            return CanvasService(store).remove_object(
+                project_id, object_id, expected_revision=expected_revision,
+                actor=_principal_id(actor),
+            )
+        except CanvasConflictError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @router.post("/projects/{project_id}/canvas/curate")
+    def curate_project_canvas(project_id: str):
+        from ..persistence.canvas_curation import CanvasCurationService
+        from ..persistence.canvas_service import CanvasService
+        canvas = CanvasService(store).get(project_id)
+        return CanvasCurationService().curate(canvas)
+
+    @router.post("/projects/{project_id}/canvas/sessions")
+    def start_canvas_session(project_id: str, body: CanvasSessionStartRequest):
+        from ..persistence.canvas_planning import CanvasPlanningService
+        try:
+            return CanvasPlanningService(store).start(project_id, actor=_principal_id(body.actor))
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @router.get("/canvas/sessions/{session_id}")
+    def get_canvas_session(session_id: str):
+        from ..persistence.canvas_planning import CanvasPlanningService
+        try:
+            return CanvasPlanningService(store).get(session_id)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+    @router.post("/canvas/sessions/{session_id}/answer")
+    def answer_canvas_session(session_id: str, body: CanvasSessionAnswerRequest):
+        from ..persistence.canvas_planning import CanvasPlanningService
+        try:
+            return CanvasPlanningService(store).answer(session_id, outcome=body.outcome, answer=body.answer, actor=_principal_id(body.actor))
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @router.post("/canvas/proposals/{proposal_id}/decision")
+    def decide_canvas_proposal(proposal_id: str, body: CanvasProposalDecisionRequest):
+        from ..persistence.canvas_planning import CanvasPlanningService
+        try:
+            return CanvasPlanningService(store).decide(proposal_id, approve=body.approve, actor=_principal_id(body.actor))
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
     @router.get("/projects/{project_id}/content")
     def project_content(
         project_id: str, include_archived: bool = False,
@@ -1391,6 +1554,21 @@ def create_app(
             _raise_work_error(exc)
         return {"backlog": entries}
 
+    @router.get("/projects/{project_id}/backlog/import-template")
+    def backlog_import_template(project_id: str):
+        return {"csv": dy.backlog_csv_template(), "columns": list(dy.CSV_COLUMNS)}
+
+    @router.post("/projects/{project_id}/backlog/import")
+    def backlog_import(project_id: str, body: BacklogCsvImport):
+        try:
+            actor = _actor(body.actor_id, body.actor_kind)
+            if body.apply:
+                return dy.import_csv(project_id, body.csv_text, actor=actor)
+            return {"imported": 0, "failed": 0,
+                    "preview": dy.preview_csv_import(project_id, body.csv_text)}
+        except Exception as exc:
+            _raise_work_error(exc)
+
     @router.post("/projects/{project_id}/backlog/items")
     def create_queued_work_item(project_id: str,
                                 body: QueuedWorkItemCreate):
@@ -1761,6 +1939,57 @@ def create_app(
             raise HTTPException(404, str(e))
         return {"acked": notification_id}
 
+    def _workflow_audience(
+        project_id: str,
+    ) -> tuple[Optional[list[str]], Optional[list[str]]]:
+        """Discovered host profiles + project members for assignment validation.
+
+        Returns ``(None, None)`` when the host cannot enumerate profiles, in
+        which case workflow assignment validation falls back to shape checks.
+        """
+        listed = getattr(adapter, "list_profiles", None)
+        known: list[str] = []
+        if callable(listed):
+            try:
+                items = listed()
+                if isinstance(items, (list, tuple)):
+                    known = [str(item.get("name")) for item in items
+                             if isinstance(item, dict) and item.get("name")]
+            except Exception:
+                known = []
+        members: list[str] = []
+        try:
+            owner = (svc.settings(project_id, include_disabled=True) or {}).get("owner") or {}
+            if owner.get("lead_profile"):
+                members.append(str(owner["lead_profile"]))
+            members.extend(str(profile) for profile in owner.get("member_profiles") or [])
+        except Exception:
+            members = []
+        return (known or None), (members or None)
+
+    @router.post("/workflow-templates")
+    def define_workflow_template(body: WorkflowTemplateDefine):
+        try:
+            return workflows.define_template(
+                body.name, {"nodes": body.nodes}, actor="stewardship-api",
+                interface="rpc")
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @router.get("/workflow-templates")
+    def list_workflow_templates():
+        return {"templates": workflows.list_templates()}
+
+    @router.post("/projects/{project_id}/workflows/from-template")
+    def instantiate_workflow(project_id: str, body: WorkflowInstantiate):
+        svc.require_feature(project_id, "workflow_canvas")
+        try:
+            return workflows.instantiate(
+                project_id, body.template, workflow_name=body.name,
+                version=body.version, actor="stewardship-api", interface="rpc")
+        except ValueError as exc:
+            raise HTTPException(404 if "not found" in str(exc) else 422, str(exc)) from None
+
     @router.post("/projects/{project_id}/workflows")
     def define_workflow(project_id: str, body: WorkflowDefine):
         try:
@@ -1807,11 +2036,14 @@ def create_app(
     def start_workflow(project_id: str, name: str, body: WorkflowStart):
         try:
             svc.require_feature(project_id, "workflow_canvas")
+            known, members = _workflow_audience(project_id)
             return workflows.start(
                 project_id,
                 name,
                 body.run_key,
                 body.version,
+                known_profiles=known,
+                project_members=members,
             )
         except KanbanAdapterError as exc:
             _raise_work_error(exc)
@@ -1826,6 +2058,98 @@ def create_app(
             return {"runs": workflows.runs(project_id, name)}
         except ValueError as exc:
             raise HTTPException(404, str(exc)) from None
+
+    @router.get("/projects/{project_id}/workflows/{name}/binding")
+    def get_workflow_binding(project_id: str, name: str):
+        svc.require_feature(project_id, "workflow_canvas")
+        try:
+            return workflows.get_binding(project_id, name)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from None
+
+    @router.put("/projects/{project_id}/workflows/{name}/binding")
+    def set_workflow_binding(project_id: str, name: str, body: WorkflowBindingBody):
+        svc.require_feature(project_id, "workflow_canvas")
+        known, members = _workflow_audience(project_id)
+        try:
+            return workflows.set_binding(
+                project_id, name,
+                group_id=body.group_id, overrides=body.overrides,
+                actor=current_principal() or "stewardship-api", interface="rpc",
+                known_profiles=known, project_members=members)
+        except ValueError as exc:
+            raise HTTPException(404 if "not found" in str(exc) else 422, str(exc)) from None
+
+    @router.post("/projects/{project_id}/workflows/{name}/runs/{run_key}/advance")
+    def advance_workflow_run(project_id: str, name: str, run_key: str):
+        """Materialise conditional branches / progress bounded loops."""
+        svc.require_feature(project_id, "workflow_canvas")
+        try:
+            return workflows.advance(project_id, name, run_key)
+        except ValueError as exc:
+            raise HTTPException(404 if "not found" in str(exc) else 422, str(exc)) from None
+
+    @router.post("/projects/{project_id}/workflows/{name}/runs/{run_key}/proposals")
+    def propose_workflow_revision(
+        project_id: str, name: str, run_key: str, body: WorkflowRevisionProposal
+    ):
+        svc.require_feature(project_id, "workflow_canvas")
+        known, members = _workflow_audience(project_id)
+        try:
+            return workflows.propose_revision(
+                project_id, name, run_key,
+                {"rationale": body.rationale, "add_nodes": body.add_nodes,
+                 "add_edges": body.add_edges},
+                proposed_by=body.proposed_by,
+                known_profiles=known, project_members=members)
+        except ValueError as exc:
+            raise HTTPException(404 if "not found" in str(exc) else 422, str(exc)) from None
+
+    @router.get("/projects/{project_id}/workflows/{name}/runs/{run_key}/revisions")
+    def list_workflow_revisions(project_id: str, name: str, run_key: str):
+        svc.require_feature(project_id, "workflow_canvas")
+        return {"revisions": workflows.revisions(project_id, name, run_key)}
+
+    @router.post(
+        "/projects/{project_id}/workflows/{name}/runs/{run_key}/revisions/"
+        "{revision_key}/decide"
+    )
+    def decide_workflow_revision(
+        project_id: str, name: str, run_key: str, revision_key: str,
+        body: WorkflowRevisionDecision,
+    ):
+        svc.require_feature(project_id, "workflow_canvas")
+        # Revision decisions are privileged graph mutations.  The request's
+        # actor_id is attribution only; authority must come from the bound
+        # trusted human principal and its server-composed capability set.
+        principal = _membership_authority("workflow_revision_approval")
+        try:
+            return workflows.decide_revision(
+                project_id, name, run_key, revision_key,
+                approve=body.approve, actor=principal,
+                interface="rpc")
+        except ValueError as exc:
+            message = str(exc)
+            code = 404 if "not found" in message else (409 if "stale" in message else 422)
+            raise HTTPException(code, message) from None
+
+    @router.get("/projects/{project_id}/workflows/{name}/export")
+    def export_workflow(project_id: str, name: str):
+        svc.require_feature(project_id, "workflow_canvas")
+        try:
+            return workflows.export_definition(project_id, name)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from None
+
+    @router.post("/projects/{project_id}/workflows/import")
+    def import_workflow(project_id: str, body: WorkflowImportBody):
+        svc.require_feature(project_id, "workflow_canvas")
+        try:
+            return workflows.import_definition(
+                project_id, body.document, apply=body.apply, as_name=body.as_name,
+                actor=current_principal() or "stewardship-api", interface="rpc")
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
 
     def _onboarding_discovery() -> dict[str, Any]:
         """Merge host discovery with explicitly non-selectable historical refs."""

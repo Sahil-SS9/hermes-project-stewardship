@@ -1,11 +1,101 @@
-"""Versioned, manually-started canonical Hermes workflow graphs."""
+"""Versioned, manually-started canonical Hermes workflow graphs.
+
+Phase 5 (team-bound workflows) extends the Phase 2 execution foundation:
+
+- reusable **templates** versus **project instances**: an instance is a copy
+  of a template version; later template edits never touch existing
+  instances (ownership boundary), and every run records where it came from;
+- per-instance **team binding** with **per-phase (per-node) overrides**,
+  validated against discovered host profiles and project/group membership;
+- **effective-definition snapshots**: each run stores the resolved
+  definition + assignments it materialised, so ordinary template/team edits
+  cannot silently alter a running or historical instance;
+- bounded **conditional branches** (`when`) and **loops** (`loop`) with
+  explicit iteration identity, exit conditions and human escalation;
+  malformed references and unsafe/unbounded cycles are rejected, and string
+  booleans (for example ``"false"``) are rejected rather than coerced;
+- **agent-proposed graph revisions**: within the approved policy they are
+  applied immediately and recorded; outside it they wait for human
+  approval while independent, already-authorised work continues; pending
+  proposals are never applied by a restart, and decided/stale proposals can
+  only be decided once;
+- versioned plugin-native **JSON import/export** with validation preview,
+  size limits and semantic round-trip fidelity.
+
+Deliberate scope limits (see evidence file phase-5.md, P5.12):
+  ``IMPORT_MAX_BYTES``, ``MAX_LOOP_ITERATIONS``, ``MAX_PROPOSAL_NODES`` and
+  ``MAX_REVISIONS_PER_RUN`` — the minimum plugin-specific bounds; no cost
+  dashboard is built on top of them.
+"""
 from __future__ import annotations
 
 import json
-from typing import Any
+import re
+from typing import Any, Mapping, Sequence
 
 from .canonical_work_service import CanonicalWorkPort
 from .store import Store, iso
+
+# ---- approved policy limits (P5.12) ---------------------------------------
+IMPORT_MAX_BYTES = 262_144          # plugin-native JSON import limit (256 KiB)
+MAX_LOOP_ITERATIONS = 10            # bounded repeat of a single node
+MAX_PROPOSAL_NODES = 5              # agent-proposed nodes applied without human approval
+MAX_REVISIONS_PER_RUN = 10          # total revisions (auto or approved) per run
+BRANCH_STATUSES = frozenset({"done", "blocked"})
+CANONICAL_STATUSES = frozenset({"backlog", "in_progress", "in_review", "blocked", "done"})
+_PROFILE_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
+
+WORKFLOW_SCHEMA = "stewardship.workflow/v2"
+
+POLICY_DOC = {
+    "import_max_bytes": IMPORT_MAX_BYTES,
+    "max_loop_iterations": MAX_LOOP_ITERATIONS,
+    "max_proposal_nodes": MAX_PROPOSAL_NODES,
+    "max_revisions_per_run": MAX_REVISIONS_PER_RUN,
+}
+
+
+def _strict_bool(value: Any, field: str) -> bool:
+    """JSON booleans only. A string ``"false"`` (or any string) is rejected."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    raise ValueError(f"{field} must be a JSON boolean, got {type(value).__name__} {value!r}")
+
+
+def _finite_number(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    if number != number or number in (float("inf"), float("-inf")):
+        return None
+    return number
+
+
+def _clean_position(raw: Any) -> dict[str, float] | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError("canvas_position must be an object with x/y")
+    x = _finite_number(raw.get("x"))
+    y = _finite_number(raw.get("y"))
+    if x is None or y is None:
+        raise ValueError("canvas_position x/y must be finite numbers")
+    if abs(x) > 100000 or abs(y) > 100000:
+        raise ValueError("canvas_position is out of the supported range")
+    return {"x": x, "y": y}
+
+
+def _clean_profile(raw: Any, field: str) -> str | None:
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    if not value:
+        return None
+    if not _PROFILE_RE.match(value):
+        raise ValueError(f"{field} must be a host profile id (got {value!r})")
+    return value
 
 
 class WorkflowService:
@@ -13,31 +103,87 @@ class WorkflowService:
         self.store = store
         self.port = port
 
+    # ---- validation ---------------------------------------------------
+
     @staticmethod
-    def _validated(definition: dict[str, Any]) -> dict[str, Any]:
+    def _clean_node(raw: Mapping[str, Any]) -> dict[str, Any]:
+        if not isinstance(raw, Mapping):
+            raise ValueError("workflow nodes must be objects")
+        node_id = str(raw.get("id") or "").strip()
+        title = str(raw.get("title") or "").strip()
+        if not node_id or not title:
+            raise ValueError("workflow node ids and titles must be unique")
+        deps = [str(value).strip() for value in raw.get("depends_on") or []]
+        if any(not dep for dep in deps):
+            raise ValueError("workflow dependencies must be node ids")
+        human_gate = _strict_bool(raw.get("human_gate", False), f"node {node_id} human_gate")
+        kind = str(raw.get("kind") or ("gate" if human_gate else "task")).strip()
+        if kind not in {"task", "gate"}:
+            raise ValueError(f"node {node_id} kind must be task or gate")
+        if kind == "gate":
+            human_gate = True
+        node: dict[str, Any] = {
+            "id": node_id,
+            "title": title,
+            "depends_on": deps,
+            "human_gate": human_gate,
+            "kind": kind,
+            "body": str(raw.get("body") or "") or None,
+            "phase_team": _clean_profile(raw.get("phase_team"), f"node {node_id} phase_team"),
+            "canvas_position": _clean_position(raw.get("canvas_position")),
+            "when": None,
+            "loop": None,
+        }
+        when = raw.get("when")
+        if when is not None:
+            if not isinstance(when, Mapping):
+                raise ValueError(f"node {node_id} when must be an object")
+            target = str(when.get("node") or "").strip()
+            status = str(when.get("status") or "").strip()
+            if not target:
+                raise ValueError(f"node {node_id} when.node is required")
+            if status not in BRANCH_STATUSES:
+                raise ValueError(
+                    f"node {node_id} when.status must be one of {sorted(BRANCH_STATUSES)}")
+            node["when"] = {"node": target, "status": status}
+        loop = raw.get("loop")
+        if loop is not None:
+            if not isinstance(loop, Mapping):
+                raise ValueError(f"node {node_id} loop must be an object")
+            raw_max = loop.get("max_iterations")
+            if isinstance(raw_max, bool) or not isinstance(raw_max, int):
+                raise ValueError(
+                    f"node {node_id} loop.max_iterations must be an integer")
+            if raw_max < 1 or raw_max > MAX_LOOP_ITERATIONS:
+                raise ValueError(
+                    f"node {node_id} loop.max_iterations must be 1..{MAX_LOOP_ITERATIONS}")
+            until = loop.get("until")
+            if not isinstance(until, Mapping):
+                raise ValueError(f"node {node_id} loop.until is required")
+            status = str(until.get("status") or "").strip()
+            if status not in BRANCH_STATUSES:
+                raise ValueError(
+                    f"node {node_id} loop.until.status must be one of {sorted(BRANCH_STATUSES)}")
+            node["loop"] = {"max_iterations": raw_max, "until": {"status": status}}
+        if node["when"] and node["loop"]:
+            raise ValueError(
+                f"node {node_id} cannot be both conditional and looping")
+        return node
+
+    @classmethod
+    def _validated(cls, definition: Mapping[str, Any]) -> dict[str, Any]:
         nodes = definition.get("nodes")
         if not isinstance(nodes, list) or not nodes:
             raise ValueError("workflow nodes are required")
         ids: set[str] = set()
-        graph: dict[str, list[str]] = {}
-        cleaned = []
+        cleaned: list[dict[str, Any]] = []
         for raw in nodes:
-            if not isinstance(raw, dict):
-                raise ValueError("workflow nodes must be objects")
-            node_id = str(raw.get("id") or "").strip()
-            title = str(raw.get("title") or "").strip()
-            deps = [str(value) for value in raw.get("depends_on") or []]
-            if not node_id or not title or node_id in ids:
+            node = cls._clean_node(raw)
+            if node["id"] in ids:
                 raise ValueError("workflow node ids and titles must be unique")
-            ids.add(node_id)
-            graph[node_id] = deps
-            cleaned.append({
-                "id": node_id,
-                "title": title,
-                "depends_on": deps,
-                "human_gate": bool(raw.get("human_gate", False)),
-                "body": str(raw.get("body") or "") or None,
-            })
+            ids.add(node["id"])
+            cleaned.append(node)
+        graph = {node["id"]: list(node["depends_on"]) for node in cleaned}
         if any(dep not in ids for deps in graph.values() for dep in deps):
             raise ValueError("workflow dependencies must reference existing nodes")
         visiting: set[str] = set()
@@ -56,9 +202,123 @@ class WorkflowService:
 
         for node in graph:
             visit(node)
-        return {"nodes": cleaned}
 
-    def define(self, project_id: str, name: str, definition: dict[str, Any]) -> dict[str, Any]:
+        def ancestors(node_id: str) -> set[str]:
+            found: set[str] = set()
+            stack = list(graph[node_id])
+            while stack:
+                current = stack.pop()
+                if current in found:
+                    continue
+                found.add(current)
+                stack.extend(graph[current])
+            return found
+
+        for node in cleaned:
+            if node["when"]:
+                target = node["when"]["node"]
+                if target not in ids:
+                    raise ValueError(
+                        f"node {node['id']} when.node must reference an existing node")
+                if target == node["id"]:
+                    raise ValueError(
+                        f"node {node['id']} cannot branch on itself")
+                if target not in ancestors(node["id"]):
+                    raise ValueError(
+                        f"node {node['id']} when.node must be an upstream dependency")
+            if node["loop"]:
+                if not node["depends_on"]:
+                    raise ValueError(
+                        f"loop node {node['id']} needs at least one dependency "
+                        "so its iterations have a native gate")
+        result: dict[str, Any] = {"nodes": cleaned}
+        template = definition.get("template")
+        if template is not None:
+            if not isinstance(template, Mapping):
+                raise ValueError("template provenance must be an object")
+            name = str(template.get("name") or "").strip()
+            version = template.get("version")
+            if not name or isinstance(version, bool) or not isinstance(version, int):
+                raise ValueError("template provenance requires name and version")
+            result["template"] = {"name": name, "version": version}
+        return result
+
+    # ---- templates ----------------------------------------------------
+
+    def define_template(self, name: str, definition: Mapping[str, Any], *,
+                        actor: str, interface: str = "rpc") -> dict[str, Any]:
+        clean_name = str(name or "").strip()
+        if not clean_name:
+            raise ValueError("template name is required")
+        clean = self._validated(definition)
+        clean.pop("template", None)  # templates are the origin, not derived
+        with self.store.tx() as cx:
+            row = cx.execute(
+                "SELECT COALESCE(MAX(version), 0) AS version FROM dockyard_workflow_templates "
+                "WHERE name=?", (clean_name,),
+            ).fetchone()
+            version = int(row["version"]) + 1
+            cx.execute(
+                "INSERT INTO dockyard_workflow_templates("
+                "name,version,definition_json,created_at,created_by) VALUES(?,?,?,?,?)",
+                (clean_name, version, json.dumps(clean, sort_keys=True),
+                 iso(self.store._clock()), actor),
+            )
+        self.store.audit(actor=actor, interface=interface,
+                         action="workflow.template_defined",
+                         subject=f"template:{clean_name}:v{version}")
+        return {"name": clean_name, "version": version, "definition": clean}
+
+    def list_templates(self) -> list[dict[str, Any]]:
+        rows = self.store._conn.execute(
+            "SELECT name,version,definition_json,created_at,created_by "
+            "FROM dockyard_workflow_templates ORDER BY name, version",
+        ).fetchall()
+        latest: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            latest[row["name"]] = {
+                "name": row["name"], "version": row["version"],
+                "definition": json.loads(row["definition_json"]),
+                "created_at": row["created_at"], "created_by": row["created_by"],
+            }
+        return list(latest.values())
+
+    def get_template(self, name: str, version: int | None = None) -> dict[str, Any]:
+        clean_name = str(name or "").strip()
+        if version is None:
+            row = self.store._conn.execute(
+                "SELECT * FROM dockyard_workflow_templates WHERE name=? "
+                "ORDER BY version DESC LIMIT 1", (clean_name,)).fetchone()
+        else:
+            row = self.store._conn.execute(
+                "SELECT * FROM dockyard_workflow_templates WHERE name=? AND version=?",
+                (clean_name, version)).fetchone()
+        if row is None:
+            raise ValueError("template was not found")
+        return {"name": row["name"], "version": row["version"],
+                "definition": json.loads(row["definition_json"]),
+                "created_at": row["created_at"], "created_by": row["created_by"]}
+
+    def instantiate(self, project_id: str, template_name: str, *,
+                    workflow_name: str | None = None, version: int | None = None,
+                    actor: str, interface: str = "rpc") -> dict[str, Any]:
+        """Create a project instance as an independent copy of a template."""
+        template = self.get_template(template_name, version)
+        name = str(workflow_name or template["name"]).strip()
+        definition = dict(template["definition"])
+        definition["template"] = {"name": template["name"], "version": template["version"]}
+        created = self.define(project_id, name, definition)
+        self.store.audit(actor=actor, interface=interface,
+                         action="workflow.instantiated",
+                         subject=f"{project_id}:{name}",
+                         detail={"template": template["name"],
+                                 "template_version": template["version"]})
+        return {**created, "template": {"name": template["name"],
+                                        "version": template["version"]}}
+
+    # ---- definition versions -----------------------------------------
+
+    def define(self, project_id: str, name: str, definition: Mapping[str, Any]) -> dict[str, Any]:
         clean_name = str(name or "").strip()
         if not clean_name:
             raise ValueError("workflow name is required")
@@ -143,6 +403,131 @@ class WorkflowService:
                 "versions": [row for row in self.list(project_id, include_archived=True)
                              if row["name"] == name]}
 
+    # ---- team binding (P5.2) ------------------------------------------
+
+    def _group_profiles(self, group_id: int) -> set[str]:
+        rows = self.store._conn.execute(
+            "SELECT b.profile FROM dockyard_group_members m "
+            "JOIN dockyard_bots b ON b.id = m.bot_id WHERE m.group_id=?",
+            (group_id,),
+        ).fetchall()
+        return {str(row["profile"]) for row in rows if row["profile"]}
+
+    def group_exists(self, group_id: int) -> bool:
+        row = self.store._conn.execute(
+            "SELECT 1 FROM dockyard_bot_groups WHERE id=?", (group_id,)).fetchone()
+        return row is not None
+
+    def _latest_definition(self, project_id: str, name: str) -> dict[str, Any]:
+        row = self.store._conn.execute(
+            "SELECT definition_json FROM dockyard_workflows "
+            "WHERE project_id=? AND name=? ORDER BY version DESC LIMIT 1",
+            (project_id, name)).fetchone()
+        if row is None:
+            raise ValueError("workflow was not found")
+        return json.loads(row["definition_json"])
+
+    def set_binding(self, project_id: str, name: str, *,
+                    group_id: int | None, overrides: Mapping[str, str] | None,
+                    actor: str, interface: str = "rpc",
+                    known_profiles: Sequence[str] | None = None,
+                    project_members: Sequence[str] | None = None) -> dict[str, Any]:
+        definition = self._latest_definition(project_id, name)
+        by_id = {node["id"]: node for node in definition["nodes"]}
+        clean_overrides: dict[str, str] = {}
+        if overrides:
+            for node_id, profile in overrides.items():
+                node_key = str(node_id).strip()
+                if node_key not in by_id:
+                    raise ValueError(f"override references unknown node {node_key!r}")
+                profile_value = _clean_profile(profile, f"override {node_key}")
+                if not profile_value:
+                    continue
+                clean_overrides[node_key] = profile_value
+        membership: set[str] = set()
+        if group_id is not None:
+            if isinstance(group_id, bool) or not isinstance(group_id, int):
+                raise ValueError("group_id must be an integer or null")
+            if not self.group_exists(group_id):
+                raise ValueError("bot group was not found")
+            membership = self._group_profiles(group_id)
+        if known_profiles is not None:
+            discovered = set(known_profiles)
+            allowed = membership | set(project_members or [])
+            for node_id, profile in clean_overrides.items():
+                if profile not in discovered:
+                    raise ValueError(
+                        f"override for {node_id} names undiscovered profile {profile!r}")
+                if allowed and profile not in allowed:
+                    raise ValueError(
+                        f"override for {node_id} names {profile!r} which is not a member "
+                        "of the bound team or the project")
+        stamp = iso(self.store._clock())
+        with self.store.tx() as cx:
+            cx.execute(
+                "INSERT INTO dockyard_workflow_bindings("
+                "project_id,name,group_id,overrides_json,updated_at,updated_by) "
+                "VALUES(?,?,?,?,?,?) ON CONFLICT(project_id,name) DO UPDATE SET "
+                "group_id=excluded.group_id, overrides_json=excluded.overrides_json, "
+                "updated_at=excluded.updated_at, updated_by=excluded.updated_by",
+                (project_id, name, group_id, json.dumps(clean_overrides, sort_keys=True),
+                 stamp, actor),
+            )
+        self.store.audit(actor=actor, interface=interface,
+                         action="workflow.binding_updated",
+                         subject=f"{project_id}:{name}",
+                         detail={"group_id": group_id, "overrides": clean_overrides})
+        return self.get_binding(project_id, name)
+
+    def get_binding(self, project_id: str, name: str) -> dict[str, Any]:
+        self._latest_definition(project_id, name)
+        row = self.store._conn.execute(
+            "SELECT group_id, overrides_json, updated_at, updated_by "
+            "FROM dockyard_workflow_bindings WHERE project_id=? AND name=?",
+            (project_id, name)).fetchone()
+        if row is None:
+            return {"project_id": project_id, "name": name, "group_id": None,
+                    "overrides": {}, "updated_at": None, "updated_by": None}
+        return {"project_id": project_id, "name": name,
+                "group_id": row["group_id"],
+                "overrides": json.loads(row["overrides_json"]),
+                "updated_at": row["updated_at"], "updated_by": row["updated_by"]}
+
+    def effective_assignments(self, project_id: str, name: str) -> dict[str, dict[str, Any]]:
+        """Resolve per-node assignee + team for the latest version.
+
+        Precedence: explicit binding override → node ``phase_team`` → unassigned.
+        """
+        definition = self._latest_definition(project_id, name)
+        binding = self.get_binding(project_id, name)
+        group = binding.get("group_id")
+        team_label = None
+        if group is not None:
+            row = self.store._conn.execute(
+                "SELECT name FROM dockyard_bot_groups WHERE id=?", (group,)).fetchone()
+            team_label = row["name"] if row else None
+        resolved: dict[str, dict[str, Any]] = {}
+        for node in definition["nodes"]:
+            override = binding["overrides"].get(node["id"])
+            assignee = override or node.get("phase_team")
+            resolved[node["id"]] = {
+                "assignee": assignee,
+                "team": team_label,
+                "source": "override" if override else ("node" if node.get("phase_team") else None),
+            }
+        return resolved
+
+    # ---- runs (P5.3/P5.5) ---------------------------------------------
+
+    def _run_row(self, project_id: str, name: str, run_key: str):
+        row = self.store._conn.execute(
+            "SELECT * FROM dockyard_workflow_runs WHERE project_id=? AND name=? AND run_key=?"
+            " ORDER BY version DESC LIMIT 1",
+            (project_id, name, run_key)).fetchone()
+        if row is None:
+            raise ValueError("workflow run was not found")
+        return row
+
     def runs(self, project_id: str, name: str) -> list[dict[str, Any]]:
         """Read-only run ledger with per-node canonical status for the canvas."""
         known = self.store._conn.execute(
@@ -152,24 +537,23 @@ class WorkflowService:
         if known is None:
             raise ValueError("workflow was not found")
         rows = self.store._conn.execute(
-            "SELECT r.version, r.run_key, r.status, r.started_at, r.updated_at, "
-            "r.result_json, w.definition_json "
-            "FROM dockyard_workflow_runs r "
-            "JOIN dockyard_workflows w ON w.project_id=r.project_id "
-            "AND w.name=r.name AND w.version=r.version "
-            "WHERE r.project_id=? AND r.name=? "
-            "ORDER BY r.version DESC, r.started_at DESC, r.run_key DESC",
+            "SELECT version, run_key, status, started_at, updated_at, "
+            "result_json, effective_json, template_origin "
+            "FROM dockyard_workflow_runs WHERE project_id=? AND name=? "
+            "ORDER BY version DESC, started_at DESC, run_key DESC",
             (project_id, name),
         ).fetchall()
-        work_index = {
-            item["id"]: item for item in self.port.list_work(project_id)
-        }
+        work_index = {item["id"]: item for item in self.port.list_work(project_id)}
         runs: list[dict[str, Any]] = []
         for row in rows:
             result = json.loads(row["result_json"]) or {}
+            snapshot = json.loads(row["effective_json"]) if row["effective_json"] else None
+            source_def = snapshot or {"nodes": []}
             refs: dict[str, str] = result.get("tasks") or {}
+            iterations: dict[str, int] = result.get("iterations") or {}
+            states: dict[str, str] = result.get("node_states") or {}
             nodes = []
-            for node in json.loads(row["definition_json"])["nodes"]:
+            for node in source_def.get("nodes", []):
                 ref = refs.get(node["id"])
                 item = work_index.get(ref) if ref else None
                 nodes.append({
@@ -178,12 +562,19 @@ class WorkflowService:
                     "depends_on": node["depends_on"],
                     "human_gate": bool(node["human_gate"]),
                     "task_ref": ref,
-                    "kind": item["kind"] if item else
-                            ("gate" if node["human_gate"] else "task"),
+                    "kind": (item["kind"] if item else
+                             ("gate" if node["human_gate"] else "task")),
                     "status": item["status"] if item else None,
-                    "assignee": item.get("assignee") if item else None,
-                    "evidence_refs": item.get("evidence_refs") or []
-                    if item else [],
+                    "assignee": (item.get("assignee") if item
+                                 else node.get("assignee")),
+                    "phase_team": node.get("phase_team"),
+                    "team": node.get("team"),
+                    "evidence_refs": (item.get("evidence_refs") or []) if item else [],
+                    "when": node.get("when"),
+                    "loop": node.get("loop"),
+                    "iteration": iterations.get(node["id"]),
+                    "state": states.get(node["id"]),
+                    "canvas_position": node.get("canvas_position"),
                 })
             runs.append({
                 "run_key": row["run_key"],
@@ -191,12 +582,22 @@ class WorkflowService:
                 "status": row["status"],
                 "started_at": row["started_at"],
                 "updated_at": row["updated_at"],
+                "template_origin": (json.loads(row["template_origin"])
+                                    if row["template_origin"] else None),
                 "nodes": nodes,
             })
         return runs
 
+    def _load_bounds(self, project_id: str, name: str) -> dict[str, Any]:
+        return {
+            "assignments": self.effective_assignments(project_id, name),
+            "binding": self.get_binding(project_id, name),
+        }
+
     def start(self, project_id: str, name: str, run_key: str,
-              version: int | None = None) -> dict[str, Any]:
+              version: int | None = None, *,
+              known_profiles: Sequence[str] | None = None,
+              project_members: Sequence[str] | None = None) -> dict[str, Any]:
         key = str(run_key or "").strip()
         if not key:
             raise ValueError("run_key is required")
@@ -217,8 +618,40 @@ class WorkflowService:
             "AND version=? AND run_key=?",
             (project_id, name, row["version"], key),
         ).fetchone()
-        if existing is not None and existing["status"] == "complete":
+        if existing is not None and existing["result_json"] not in (None, "{}"):
             return {**json.loads(existing["result_json"]), "replayed": True}
+        definition = json.loads(row["definition_json"])
+
+        # P5.2: validate effective assignments at start against discovered
+        # profiles and project/group membership (fail before any write).
+        resolved = self.effective_assignments(project_id, name)
+        if known_profiles is not None:
+            discovered = set(known_profiles)
+            allowed = set(project_members or [])
+            group_id = self.get_binding(project_id, name).get("group_id")
+            if group_id is not None:
+                allowed |= self._group_profiles(group_id)
+            problems: list[str] = []
+            for node_id, info in resolved.items():
+                assignee = info["assignee"]
+                if not assignee:
+                    continue
+                if assignee not in discovered:
+                    problems.append(f"{node_id}:{assignee} (undiscovered profile)")
+                elif not allowed or assignee not in allowed:
+                    problems.append(f"{node_id}:{assignee} (not a project or team member)")
+            if problems:
+                raise ValueError(
+                    "workflow assignments failed validation: " + ", ".join(problems))
+
+        effective = {
+            "schema": WORKFLOW_SCHEMA,
+            "nodes": [{**node,
+                       "assignee": resolved[node["id"]]["assignee"],
+                       "team": resolved[node["id"]]["team"]}
+                      for node in definition["nodes"]],
+        }
+        template_origin = definition.get("template")
         now = iso(self.store._clock())
         with self.store.tx() as cx:
             cx.execute(
@@ -228,28 +661,35 @@ class WorkflowService:
                 (project_id, name, row["version"], key, "{}", now, "pending", now),
             )
             cx.execute(
-                "UPDATE dockyard_workflow_runs SET status='pending', updated_at=? "
+                "UPDATE dockyard_workflow_runs SET status='pending', updated_at=?, "
+                "effective_json=?, template_origin=? "
                 "WHERE project_id=? AND name=? AND version=? AND run_key=? "
                 "AND status!='complete'",
-                (now, project_id, name, row["version"], key),
+                (now, json.dumps(effective, sort_keys=True),
+                 json.dumps(template_origin) if template_origin else None,
+                 project_id, name, row["version"], key),
             )
-        definition = json.loads(row["definition_json"])
         tasks: dict[str, dict[str, Any]] = {}
-        for node in definition["nodes"]:
-            tasks[node["id"]] = self.port.create_work(
-                project_id,
-                kind="gate" if node["human_gate"] else "task",
-                title=node["title"],
-                body=node["body"],
-                assignee=None,
-                created_by="dockyard-workflow",
-                idempotency_key=(
-                    f"dockyard-workflow:{project_id}:{name}:v{row['version']}:{key}:{node['id']}"
-                ),
-            )
-        for node in definition["nodes"]:
+        states: dict[str, str] = {}
+        iterations: dict[str, int] = {}
+        # Root nodes (no when/loop gate at materialisation time) are created
+        # now; conditional and looping nodes are created by advance().
+        for node in effective["nodes"]:
+            if node.get("when"):
+                states[node["id"]] = "waiting"
+                continue
+            iteration = 1 if node.get("loop") else None
+            tasks[node["id"]] = self._materialise_node(
+                project_id, name, row["version"], key, node, iteration=iteration)
+            if node.get("loop"):
+                iterations[node["id"]] = 1
+        for node in effective["nodes"]:
+            node_id = node["id"]
+            if node_id not in tasks:
+                continue
             for dependency in node["depends_on"]:
-                self.port.link_work(project_id, tasks[dependency]["id"], tasks[node["id"]]["id"])
+                if dependency in tasks:
+                    self.port.link_work(project_id, tasks[dependency]["id"], tasks[node_id]["id"])
         result = {
             "project_id": project_id,
             "name": name,
@@ -257,12 +697,462 @@ class WorkflowService:
             "run_key": key,
             "replayed": False,
             "tasks": {node_id: task["id"] for node_id, task in tasks.items()},
+            "node_states": states,
+            "iterations": iterations,
         }
+        return self._finish_run(project_id, name, row["version"], key, result,
+                                status="pending")
+
+    def _materialise_node(self, project_id: str, name: str, version: int, run_key: str,
+                          node: Mapping[str, Any], *, iteration: int | None) -> dict[str, Any]:
+        suffix = f":iter{iteration}" if iteration else ""
+        return self.port.create_work(
+            project_id,
+            kind="gate" if node["human_gate"] else "task",
+            title=node["title"] if iteration in (None, 1)
+            else f"{node['title']} (iteration {iteration})",
+            body=node.get("body"),
+            assignee=node.get("assignee"),
+            created_by="dockyard-workflow",
+            idempotency_key=(
+                f"dockyard-workflow:{project_id}:{name}:v{version}:{run_key}:"
+                f"{node['id']}{suffix}"
+            ),
+        )
+
+    def _finish_run(self, project_id: str, name: str, version: int, key: str,
+                    result: dict[str, Any], *, status: str = "complete") -> dict[str, Any]:
         with self.store.tx() as cx:
             cx.execute(
-                "UPDATE dockyard_workflow_runs SET result_json=?, status='complete', "
+                "UPDATE dockyard_workflow_runs SET result_json=?, status=?, "
                 "updated_at=? WHERE project_id=? AND name=? AND version=? AND run_key=?",
-                (json.dumps(result, sort_keys=True), iso(self.store._clock()),
-                 project_id, name, row["version"], key),
+                (json.dumps(result, sort_keys=True), status, iso(self.store._clock()),
+                 project_id, name, version, key),
             )
         return result
+
+    def _snapshot(self, project_id: str, name: str, run_key: str) -> dict[str, Any]:
+        row = self._run_row(project_id, name, run_key)
+        snapshot = json.loads(row["effective_json"]) if row["effective_json"] else {"nodes": []}
+        return snapshot
+
+    def advance(self, project_id: str, name: str, run_key: str, *,
+                statuses: Mapping[str, str] | None = None) -> dict[str, Any]:
+        """Materialise conditional branches and progress bounded loops.
+
+        Called by the polling caller (cron/swarm/agent or the UI). Native
+        dependency links remain the source of truth for readiness; this
+        method only orchestrates graph-level branching and iteration.
+        """
+        row = self._run_row(project_id, name, run_key)
+        result = json.loads(row["result_json"]) or {}
+        snapshot = self._snapshot(project_id, name, run_key)
+        work_index = {item["id"]: item for item in self.port.list_work(project_id)}
+
+        def node_status(node_id: str) -> str | None:
+            ref = (result.get("tasks") or {}).get(node_id)
+            if ref is None:
+                return None
+            item = work_index.get(ref)
+            try:
+                # Gates and tasks share the canonical work store but some
+                # adapters require the concrete kind on readback.  Using
+                # ``task`` unconditionally made completed human gates appear
+                # unresolved, so branch/loop progression and run completion
+                # could never observe their canonical terminal state.
+                kind = str((item or {}).get("kind") or "task")
+                live = self.port.get_work(project_id, kind, ref)
+                status = live.get("status")
+                # Canonical adapters may expose host-native columns on reads;
+                # workflow decisions use the Dockyard vocabulary.
+                return {
+                    "triage": "backlog", "todo": "backlog",
+                    "ready": "in_progress", "doing": "in_progress",
+                    "review": "in_review",
+                }.get(status, status)
+            except Exception:
+                pass
+            if item is not None:
+                return item.get("status")
+            if statuses and ref in statuses:
+                return statuses[ref]
+            return None
+
+        states: dict[str, str] = dict(result.get("node_states") or {})
+        iterations: dict[str, int] = dict(result.get("iterations") or {})
+        tasks: dict[str, str] = dict(result.get("tasks") or {})
+        escalations: list[dict[str, Any]] = list(result.get("escalations") or [])
+        changed = False
+        for node in snapshot.get("nodes", []):
+            node_id = node["id"]
+            when = node.get("when")
+            if when and states.get(node_id) == "waiting":
+                upstream = node_status(when["node"])
+                if upstream is None or upstream not in BRANCH_STATUSES:
+                    continue  # not decidable yet
+                if upstream == when["status"]:
+                    created = self._materialise_node(
+                        project_id, name, row["version"], run_key, node, iteration=None)
+                    tasks[node_id] = created["id"]
+                    ref = created["id"]
+                    for dependency in node["depends_on"]:
+                        dep_ref = tasks.get(dependency)
+                        if dep_ref:
+                            self.port.link_work(project_id, dep_ref, ref)
+                    states[node_id] = "taken"
+                else:
+                    states[node_id] = "skipped"
+                changed = True
+            loop = node.get("loop")
+            if loop and states.get(node_id) != "escalated":
+                current = node_status(node_id)
+                target = loop["until"]["status"]
+                if current is None:
+                    continue
+                if current in {"done", "blocked"}:
+                    iteration = int(iterations.get(node_id) or 1)
+                    if current == target or current == "done":
+                        # exit condition met (or the work finished naturally)
+                        states[node_id] = "done"
+                        changed = True
+                    elif iteration < loop["max_iterations"]:
+                        created = self._materialise_node(
+                            project_id, name, row["version"], run_key, node,
+                            iteration=iteration + 1)
+                        previous = tasks.get(node_id)
+                        if previous:
+                            self.port.link_work(project_id, previous, created["id"])
+                        tasks[node_id] = created["id"]
+                        iterations[node_id] = iteration + 1
+                        states[node_id] = "repeating"
+                        changed = True
+                    else:
+                        states[node_id] = "escalated"
+                        escalations.append({
+                            "node_id": node_id,
+                            "reason": "loop limit reached",
+                            "iterations": iteration,
+                            "max_iterations": loop["max_iterations"],
+                        })
+                        changed = True
+        # Refresh orchestration states from canonical task/gate outcomes before
+        # deciding completion.  A node may have been materialised earlier with
+        # state ``taken`` and completed by the worker afterwards; leaving that
+        # orchestration marker stale would keep an otherwise finished run
+        # pending forever.
+        terminal = {"done", "skipped"}
+        for node_id in list(tasks):
+            live_status = node_status(node_id)
+            if live_status == "done" and states.get(node_id) not in {"skipped", "escalated"}:
+                states[node_id] = "done"
+                changed = True
+
+        # Completion is derived from canonical task/gate states, never from
+        # materialisation.  A run with unresolved conditional/loop nodes stays
+        # pending until a later advance observes their terminal state.
+        terminal = {"done", "skipped"}
+        if tasks and all(node_status(node_id) in terminal
+                         for node_id in tasks) and all(
+                             state in terminal for state in states.values()):
+            result.update({"tasks": tasks, "node_states": states,
+                           "iterations": iterations, "escalations": escalations})
+            return self._finish_run(project_id, name, row["version"], run_key,
+                                    result, status="complete")
+        if changed:
+            result.update({"tasks": tasks, "node_states": states,
+                           "iterations": iterations, "escalations": escalations})
+            status = "escalated" if any(
+                state == "escalated" for state in states.values()) else row["status"]
+            return self._finish_run(project_id, name, row["version"], run_key, result,
+                                    status=status)
+        return result
+
+    # ---- agent-proposed revisions (P5.3/P5.11) ------------------------
+
+    def proposals_policy(self) -> dict[str, Any]:
+        return dict(POLICY_DOC)
+
+    def _within_policy(self, proposal: Mapping[str, Any]) -> str | None:
+        """Return None when within policy, else the reason it needs approval."""
+        add_nodes = proposal.get("add_nodes") or []
+        if not isinstance(add_nodes, list) or not add_nodes:
+            return "proposal must add at least one node"
+        if len(add_nodes) > MAX_PROPOSAL_NODES:
+            return f"proposal adds {len(add_nodes)} nodes (limit {MAX_PROPOSAL_NODES})"
+        if not str(proposal.get("rationale") or "").strip():
+            return "proposal requires a rationale"
+        edges = proposal.get("add_edges") or []
+        if not isinstance(edges, list):
+            return "add_edges must be a list"
+        for edge in edges:
+            if not isinstance(edge, Mapping) or not edge.get("from") or not edge.get("to"):
+                return "add_edges entries require from/to"
+        return None
+
+    def propose_revision(self, project_id: str, name: str, run_key: str,
+                         proposal: Mapping[str, Any], *, proposed_by: str,
+                         known_profiles: Sequence[str] | None = None,
+                         project_members: Sequence[str] | None = None) -> dict[str, Any]:
+        run = self._run_row(project_id, name, run_key)
+        snapshot = self._snapshot(project_id, name, run_key)
+        result = json.loads(run["result_json"]) or {}
+        revisions = self.store._conn.execute(
+            "SELECT COUNT(*) AS n FROM dockyard_workflow_revisions "
+            "WHERE project_id=? AND name=? AND run_key=?",
+            (project_id, name, run_key)).fetchone()
+        if int(revisions["n"]) >= MAX_REVISIONS_PER_RUN:
+            raise ValueError(
+                f"revision limit reached for this run ({MAX_REVISIONS_PER_RUN})")
+        existing_ids = {node["id"] for node in snapshot.get("nodes", [])}
+        # Validate the full candidate graph before any write.
+        candidate_nodes = [dict(node) for node in snapshot.get("nodes", [])]
+        for raw in proposal.get("add_nodes") or []:
+            node = self._clean_node(raw)
+            if node["id"] in existing_ids:
+                raise ValueError(f"proposal reuses existing node id {node['id']!r}")
+            candidate_nodes.append(node)
+        for edge in proposal.get("add_edges") or []:
+            target = next((n for n in candidate_nodes if n["id"] == str(edge.get("to"))), None)
+            source = next((n for n in candidate_nodes if n["id"] == str(edge.get("from"))), None)
+            if target is None or source is None:
+                raise ValueError("proposal edges must reference existing or added nodes")
+            if str(edge["from"]) not in target["depends_on"]:
+                target["depends_on"] = [*target["depends_on"], str(edge["from"])]
+        try:
+            self._validated({"nodes": candidate_nodes})
+        except ValueError as error:
+            raise ValueError(f"proposal produces an invalid graph: {error}") from None
+        revision_key = f"rev-{int(revisions['n']) + 1}"
+        policy_reason = self._within_policy(proposal)
+        stamp = iso(self.store._clock())
+        with self.store.tx() as cx:
+            cx.execute(
+                "INSERT INTO dockyard_workflow_revisions("
+                "project_id,name,run_key,revision_key,proposal_json,status,proposed_by,"
+                "detail,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                (project_id, name, run_key, revision_key,
+                 json.dumps({**proposal}, sort_keys=True),
+                 "pending" if policy_reason else "auto_applied",
+                 proposed_by, policy_reason or "within policy", stamp),
+            )
+        if policy_reason:
+            self._finish_run(project_id, name, run["version"], run_key, result,
+                             status="awaiting_approval")
+            self.store.audit(actor=proposed_by, interface="agent",
+                             action="workflow.revision_proposed",
+                             subject=f"{project_id}:{name}:{run_key}:{revision_key}",
+                             detail={"policy": policy_reason})
+            return {"revision_key": revision_key, "status": "pending",
+                    "reason": policy_reason,
+                    "awaiting_approval": True}
+        applied = self._apply_revision(project_id, name, run, revision_key,
+                                       {**proposal}, actor=proposed_by)
+        return {"revision_key": revision_key, "status": "auto_applied",
+                "reason": "within policy", "awaiting_approval": False,
+                **applied}
+
+    def _apply_revision(self, project_id: str, name: str, run, revision_key: str,
+                        proposal: Mapping[str, Any], *, actor: str) -> dict[str, Any]:
+        run_key = run["run_key"]
+        result = json.loads(run["result_json"]) or {}
+        snapshot = self._snapshot(project_id, name, run_key)
+        tasks: dict[str, str] = dict(result.get("tasks") or {})
+        states: dict[str, str] = dict(result.get("node_states") or {})
+        added: dict[str, str] = {}
+        for raw in proposal.get("add_nodes") or []:
+            node = self._clean_node(raw)
+            assignee = node.get("phase_team")
+            if assignee is None and not node.get("when"):
+                # reuse the binding's single default override when unambiguous
+                overrides = set(self.get_binding(project_id, name)["overrides"].values())
+                if len(overrides) == 1:
+                    assignee = next(iter(overrides))
+            node["assignee"] = assignee
+            node["team"] = None
+            snapshot["nodes"].append(node)
+            if node.get("when"):
+                states[node["id"]] = "waiting"
+                continue
+            created = self.port.create_work(
+                project_id,
+                kind="gate" if node["human_gate"] else "task",
+                title=node["title"],
+                body=node.get("body"),
+                assignee=assignee,
+                created_by=f"dockyard-workflow:{revision_key}",
+                idempotency_key=(
+                    f"dockyard-workflow:{project_id}:{name}:v{run['version']}:{run_key}:"
+                    f"{revision_key}:{node['id']}"
+                ),
+            )
+            added[node["id"]] = created["id"]
+            tasks[node["id"]] = created["id"]
+        for edge in proposal.get("add_edges") or []:
+            target_id = str(edge.get("to"))
+            source_id = str(edge.get("from"))
+            target_ref = tasks.get(target_id)
+            source_ref = tasks.get(source_id)
+            if target_ref and source_ref:
+                self.port.link_work(project_id, source_ref, target_ref)
+        for node_id, ref in added.items():
+            for dep in next((n["depends_on"] for n in snapshot["nodes"]
+                             if n["id"] == node_id), []):
+                dep_ref = tasks.get(dep)
+                if dep_ref:
+                    self.port.link_work(project_id, dep_ref, ref)
+        result.update({"tasks": tasks, "node_states": states,
+                       "revisions": [*(result.get("revisions") or []), {
+                           "revision_key": revision_key, "status": "applied",
+                           "nodes": list(added.keys()), "by": actor}]})
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE dockyard_workflow_runs SET effective_json=? "
+                "WHERE project_id=? AND name=? AND run_key=?",
+                (json.dumps(snapshot, sort_keys=True), project_id, name, run_key))
+        self._finish_run(project_id, name, run["version"], run_key, result)
+        self.store.audit(actor=actor, interface="agent",
+                         action="workflow.revision_applied",
+                         subject=f"{project_id}:{name}:{run_key}:{revision_key}",
+                         detail={"nodes": list(added.keys())})
+        return {"applied_nodes": list(added.keys()), "tasks": added}
+
+    def decide_revision(self, project_id: str, name: str, run_key: str,
+                        revision_key: str, *, approve: bool, actor: str,
+                        interface: str = "rpc") -> dict[str, Any]:
+        row = self.store._conn.execute(
+            "SELECT * FROM dockyard_workflow_revisions "
+            "WHERE project_id=? AND name=? AND run_key=? AND revision_key=?",
+            (project_id, name, run_key, revision_key)).fetchone()
+        if row is None:
+            raise ValueError("revision was not found")
+        if row["status"] != "pending":
+            with self.store.tx() as cx:
+                cx.execute(
+                    "UPDATE dockyard_workflow_revisions SET status='stale' "
+                    "WHERE id=?", (row["id"],))
+            raise ValueError("revision is no longer pending (stale)")
+        run = self._run_row(project_id, name, run_key)
+        proposal = json.loads(row["proposal_json"])
+        if approve:
+            applied = self._apply_revision(project_id, name, run, revision_key,
+                                           proposal, actor=actor)
+            new_status, detail = "approved", "approved by human"
+            payload = {"revision_key": revision_key, "status": "approved", **applied}
+        else:
+            new_status, detail = "rejected", "rejected by human"
+            payload = {"revision_key": revision_key, "status": "rejected",
+                       "applied_nodes": []}
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE dockyard_workflow_revisions SET status=?, decided_by=?, "
+                "decided_at=?, detail=? WHERE id=?",
+                (new_status, actor, iso(self.store._clock()), detail, row["id"]),
+            )
+        remaining = self.store._conn.execute(
+            "SELECT COUNT(*) AS n FROM dockyard_workflow_revisions WHERE project_id=? "
+            "AND name=? AND run_key=? AND status='pending'",
+            (project_id, name, run_key)).fetchone()
+        if not int(remaining["n"]):
+            result = json.loads(self._run_row(project_id, name, run_key)["result_json"]) or {}
+            result.setdefault("decisions", []).append(
+                {"revision_key": revision_key, "approve": approve, "by": actor})
+            self._finish_run(project_id, name, run["version"], run_key, result)
+        self.store.audit(actor=actor, interface=interface,
+                         action="workflow.revision_decided",
+                         subject=f"{project_id}:{name}:{run_key}:{revision_key}",
+                         detail={"approve": approve})
+        return payload
+
+    def revisions(self, project_id: str, name: str, run_key: str) -> list[dict[str, Any]]:
+        rows = self.store._conn.execute(
+            "SELECT revision_key, proposal_json, status, proposed_by, decided_by, "
+            "detail, created_at, decided_at FROM dockyard_workflow_revisions "
+            "WHERE project_id=? AND name=? AND run_key=? ORDER BY id",
+            (project_id, name, run_key)).fetchall()
+        return [{"revision_key": row["revision_key"],
+                 "proposal": json.loads(row["proposal_json"]),
+                 "status": row["status"],
+                 "proposed_by": row["proposed_by"],
+                 "decided_by": row["decided_by"],
+                 "detail": row["detail"],
+                 "created_at": row["created_at"],
+                 "decided_at": row["decided_at"]} for row in rows]
+
+    # ---- export / import (P5.8) ---------------------------------------
+
+    def export_definition(self, project_id: str, name: str) -> dict[str, Any]:
+        """Plugin-native export: definition + binding only.
+
+        Deliberately excludes credentials, run history and work-item state.
+        """
+        row = self.store._conn.execute(
+            "SELECT version, definition_json FROM dockyard_workflows "
+            "WHERE project_id=? AND name=? ORDER BY version DESC LIMIT 1",
+            (project_id, name)).fetchone()
+        if row is None:
+            raise ValueError("workflow was not found")
+        binding = self.get_binding(project_id, name)
+        return {
+            "schema": WORKFLOW_SCHEMA,
+            "name": name,
+            "version": int(row["version"]),
+            "exported_at": iso(self.store._clock()),
+            "definition": json.loads(row["definition_json"]),
+            "binding": {"group_id": binding["group_id"],
+                        "overrides": binding["overrides"]},
+            "policy": self.proposals_policy(),
+        }
+
+    def import_definition(self, project_id: str, payload: Mapping[str, Any], *,
+                          apply: bool = False, as_name: str | None = None,
+                          actor: str = "system", interface: str = "rpc") -> dict[str, Any]:
+        encoded = json.dumps(payload, sort_keys=True)
+        if len(encoded.encode("utf-8")) > IMPORT_MAX_BYTES:
+            raise ValueError(
+                f"import exceeds the {IMPORT_MAX_BYTES} byte limit")
+        if not isinstance(payload, Mapping):
+            raise ValueError("import payload must be an object")
+        definition = payload.get("definition") if "definition" in payload else payload
+        if not isinstance(definition, Mapping):
+            raise ValueError("import payload must contain a workflow definition")
+        clean = self._validated(definition)
+        warnings: list[str] = []
+        if "schema" in payload and payload.get("schema") != WORKFLOW_SCHEMA:
+            warnings.append(
+                f"schema {payload.get('schema')!r} is not {WORKFLOW_SCHEMA!r}; "
+                "validated against the native schema")
+        source_name = str(as_name or payload.get("name") or "").strip()
+        preview = {
+            "valid": True,
+            "name": source_name or None,
+            "report_version": payload.get("version"),
+            "node_count": len(clean["nodes"]),
+            "nodes": [{"id": node["id"], "title": node["title"],
+                       "kind": node["kind"],
+                       "conditional": bool(node["when"]),
+                       "loop": node["loop"]} for node in clean["nodes"]],
+            "warnings": warnings,
+            "exported_at": payload.get("exported_at"),
+        }
+        if not apply:
+            return {"applied": False, "preview": preview, "definition": clean}
+        if not source_name:
+            raise ValueError("import requires a workflow name when applying")
+        created = self.define(project_id, source_name, clean)
+        binding = payload.get("binding")
+        if isinstance(binding, Mapping):
+            overrides = binding.get("overrides")
+            if isinstance(overrides, Mapping) and overrides:
+                group_id = binding.get("group_id")
+                if isinstance(group_id, bool) or not isinstance(group_id, int):
+                    group_id = None
+                self.set_binding(
+                    project_id, source_name,
+                    group_id=group_id, overrides=overrides, actor=actor,
+                    interface=interface)
+        self.store.audit(actor=actor, interface=interface,
+                         action="workflow.imported",
+                         subject=f"{project_id}:{source_name}",
+                         detail={"node_count": preview["node_count"]})
+        return {"applied": True, "preview": preview, "version": created["version"],
+                "workflow": created}

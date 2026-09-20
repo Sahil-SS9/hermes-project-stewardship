@@ -10,6 +10,8 @@ Enforces PRD rules that span domain + persistence:
 from __future__ import annotations
 
 import json
+import csv
+import io
 from datetime import date, datetime, timezone
 
 from typing import Dict, List, Optional
@@ -65,7 +67,10 @@ class DockyardService:
                     parent_ref: Optional[str] = None,
                     labels: Optional[List[str]] = None,
                     evidence_refs: Optional[List[str]] = None,
-                    estimate_days: Optional[float] = None) -> WorkItem:
+                    estimate_days: Optional[float] = None,
+                    body: Optional[str] = None,
+                    due: Optional[str] = None,
+                    idempotency_key: Optional[str] = None) -> WorkItem:
         if not title or len(title.strip()) < 3:
             raise ValueError("title must be at least 3 characters")
         item = WorkItem(
@@ -232,8 +237,106 @@ class DockyardService:
         return self.dy.list_backlog(project_id)
 
     # ------------------------------------------------------------------ #
-    # Audit — into the SAME stewardship audit log (one trail, TE-01)      #
+    # CSV hierarchy import (Phase 6)                                    #
     # ------------------------------------------------------------------ #
+
+    CSV_COLUMNS = ("row_key", "type", "title", "parent_key", "labels",
+                   "estimate_days", "due", "initiative_ref")
+
+    def backlog_csv_template(self) -> str:
+        return ",".join(self.CSV_COLUMNS) + "\n"
+
+    def preview_csv_import(self, project_id: str, content: str) -> dict:
+        if len(content.encode("utf-8")) > 1_048_576:
+            raise ValueError("CSV import exceeds the 1048576 byte limit")
+        reader = csv.DictReader(io.StringIO(content))
+        missing = [column for column in ("row_key", "type", "title")
+                   if column not in (reader.fieldnames or [])]
+        if missing:
+            raise ValueError("CSV is missing required columns: " + ", ".join(missing))
+        rows = list(reader)
+        seen: set[str] = set()
+        errors: list[dict] = []
+        for index, row in enumerate(rows, 2):
+            key = str(row.get("row_key") or "").strip()
+            item_type = str(row.get("type") or "").strip().lower()
+            title = str(row.get("title") or "").strip()
+            if not key or key in seen:
+                errors.append({"row": index, "field": "row_key", "error": "missing or duplicate row_key"})
+            seen.add(key)
+            if item_type not in {value.value for value in WorkItemType}:
+                errors.append({"row": index, "field": "type", "error": "unsupported work type"})
+            if len(title) < 3:
+                errors.append({"row": index, "field": "title", "error": "title must be at least 3 characters"})
+            parent = str(row.get("parent_key") or "").strip()
+            if parent and parent not in {str(item.get("row_key") or "").strip() for item in rows}:
+                errors.append({"row": index, "field": "parent_key", "error": "parent_key is not in this import"})
+        # Validate hierarchy in memory, including cycles, before writing.
+        parent_map = {str(row.get("row_key") or "").strip(): str(row.get("parent_key") or "").strip()
+                      for row in rows}
+        for key in parent_map:
+            path: set[str] = set()
+            cursor = key
+            while cursor:
+                if cursor in path:
+                    errors.append({"row": key, "field": "parent_key", "error": "hierarchy cycle"})
+                    break
+                path.add(cursor)
+                cursor = parent_map.get(cursor, "")
+        return {"valid": not errors, "row_count": len(rows), "errors": errors,
+                "rows": rows, "columns": list(reader.fieldnames or [])}
+
+    def import_csv(self, project_id: str, content: str, *, actor: Actor) -> dict:
+        preview = self.preview_csv_import(project_id, content)
+        if not preview["valid"]:
+            return {"imported": 0, "failed": preview["row_count"], "preview": preview}
+        # Parent-first deterministic order guarantees all containment links exist.
+        rows = preview["rows"]
+        pending = list(rows)
+        created: dict[str, str] = {}
+        imported: list[dict] = []
+        while pending:
+            progressed = False
+            for row in pending[:]:
+                parent_key = str(row.get("parent_key") or "").strip()
+                if parent_key and parent_key not in created:
+                    continue
+                parent_ref = created.get(parent_key) if parent_key else None
+                if self.canonical_work is not None:
+                    # Canonical lane: materialise into the Kanban-backed work
+                    # list so imported hierarchy appears in the Backlog tree
+                    # and obeys the same containment/bridge contracts as
+                    # manually created items.
+                    due = str(row.get("due") or "").strip() or None
+                    view = self.canonical_work.create_item(
+                        project_id, WorkItemType(str(row["type"]).strip().lower()),
+                        str(row["title"]).strip(), actor=actor,
+                        parent_ref=parent_ref,
+                        labels=[value.strip() for value in str(row.get("labels") or "").split(";") if value.strip()],
+                        estimate_days=float(row["estimate_days"]) if row.get("estimate_days") else None,
+                        due=due,
+                        idempotency_key=(
+                            f"backlog-import:{project_id}:"
+                            f"{str(row['row_key']).strip()}"),
+                    )
+                    ref = view["ref"]
+                else:
+                    item = self.create_item(
+                        project_id, WorkItemType(str(row["type"]).strip().lower()),
+                        str(row["title"]).strip(), actor=actor,
+                        parent_ref=parent_ref,
+                        labels=[value.strip() for value in str(row.get("labels") or "").split(";") if value.strip()],
+                        estimate_days=float(row["estimate_days"]) if row.get("estimate_days") else None,
+                    )
+                    ref = item.ref
+                created[str(row["row_key"]).strip()] = ref
+                imported.append({"row_key": str(row["row_key"]).strip(), "ref": ref})
+                pending.remove(row)
+                progressed = True
+            if not progressed:
+                raise ValueError("CSV hierarchy could not be ordered safely")
+        return {"imported": len(imported), "failed": 0, "preview": preview, "items": imported}
+
 
     def _audit(self, *, actor, action: str, subject: str,
                detail: Optional[dict] = None) -> None:

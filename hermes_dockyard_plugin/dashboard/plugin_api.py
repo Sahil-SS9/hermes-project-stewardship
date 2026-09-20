@@ -728,6 +728,52 @@ async def remove_project_mission(project_id: str) -> dict:
     )
 
 
+@plugin_api.get("/projects/{project_id}/canvas")
+async def project_canvas(project_id: str) -> dict:
+    return await _proxy("GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvas")
+
+
+@plugin_api.put("/projects/{project_id}/canvas")
+async def save_project_canvas(project_id: str, body: dict) -> dict:
+    return await _proxy(
+        "PUT", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvas", body
+    )
+
+
+@plugin_api.delete("/projects/{project_id}/canvas/objects/{object_id}")
+async def remove_canvas_object(project_id: str, object_id: str, expected_revision: int, actor: str = "system") -> dict:
+    return await _proxy(
+        "DELETE",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvas/objects/{quote(object_id, safe='')}",
+        params={"expected_revision": expected_revision, "actor": actor},
+    )
+
+
+@plugin_api.post("/projects/{project_id}/canvas/curate")
+async def curate_project_canvas(project_id: str) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvas/curate", {})
+
+
+@plugin_api.post("/projects/{project_id}/canvas/sessions")
+async def start_canvas_session(project_id: str, body: dict) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvas/sessions", body)
+
+
+@plugin_api.get("/canvas/sessions/{session_id}")
+async def get_canvas_session(session_id: str) -> dict:
+    return await _proxy("GET", f"/stewardship/v1/canvas/sessions/{quote(session_id, safe='')}")
+
+
+@plugin_api.post("/canvas/sessions/{session_id}/answer")
+async def answer_canvas_session(session_id: str, body: dict) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/canvas/sessions/{quote(session_id, safe='')}/answer", body)
+
+
+@plugin_api.post("/canvas/proposals/{proposal_id}/decision")
+async def decide_canvas_proposal(proposal_id: str, body: dict) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/canvas/proposals/{quote(proposal_id, safe='')}/decision", body)
+
+
 @plugin_api.get("/projects/{project_id}/content")
 async def project_content(
     project_id: str, include_archived: bool = True,
@@ -852,6 +898,15 @@ async def bots(status: str | None = None) -> dict:
     return await _proxy("GET", "/stewardship/v1/bots", params=params)
 
 
+@plugin_api.post("/projects/{project_id}/bots")
+async def register_project_bot(project_id: str, body: dict) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/bots",
+        body,
+    )
+
+
 @plugin_api.get("/bots/{bot_id}/sessions")
 def bot_sessions(bot_id: str, limit: int = 25) -> dict:
     if _dockyard is None:
@@ -874,6 +929,11 @@ async def workload() -> dict:
 @plugin_api.get("/bot-groups")
 async def bot_groups() -> dict:
     return await _proxy("GET", "/stewardship/v1/bot-groups")
+
+
+@plugin_api.post("/bot-groups")
+async def create_bot_group(body: dict) -> dict:
+    return await _proxy("POST", "/stewardship/v1/bot-groups", body)
 
 
 @plugin_api.get("/bot-groups/{name}/messages")
@@ -978,6 +1038,11 @@ class QueuedItemBody(BaseModel):
 class BacklogRerankBody(BaseModel):
     new_rank: int
     reason: str
+
+
+class BacklogImportBody(BaseModel):
+    csv_text: str
+    apply: bool = False
 
 
 class ViewSaveBody(BaseModel):
@@ -1156,6 +1221,30 @@ async def rerank_backlog(project_id: str, ref: str,
     return await _proxy(
         "POST", f"/stewardship/v1/projects/{pid}/backlog/{item}/rerank",
         {**body.model_dump(), "actor_id": _ACTOR_ID, "actor_kind": "human"})
+
+
+@plugin_api.post("/projects/{project_id}/backlog/import")
+async def import_backlog_csv(project_id: str, body: BacklogImportBody) -> dict:
+    """Shared-validator CSV import: preview (apply=false) or commit (apply=true)."""
+    pid = quote(project_id, safe="")
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{pid}/backlog/import",
+        {**body.model_dump(), "actor_id": _ACTOR_ID, "actor_kind": "human"})
+
+
+@plugin_api.get("/projects/{project_id}/backlog/import-template")
+async def backlog_import_template(project_id: str) -> dict:
+    pid = quote(project_id, safe="")
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{pid}/backlog/import-template")
+
+
+@plugin_api.get("/projects/{project_id}/backlog/{ref}/links")
+async def backlog_item_links(project_id: str, ref: str) -> dict:
+    pid = quote(project_id, safe="")
+    item = quote(ref, safe="")
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{pid}/backlog/{item}/links")
 
 
 @plugin_api.get("/projects/{project_id}/views")
@@ -1386,6 +1475,58 @@ async def archive_workflow(project_id: str, name: str) -> dict:
         "POST",
         f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{quote(name, safe='')}/archive",
         {},
+    )
+
+
+@plugin_api.get("/projects/{project_id}/workflows/{name}/binding")
+async def get_workflow_binding(project_id: str, name: str) -> dict:
+    return await _proxy(
+        "GET",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{quote(name, safe='')}/binding",
+    )
+
+
+@plugin_api.put("/projects/{project_id}/workflows/{name}/binding")
+async def set_workflow_binding(project_id: str, name: str, body: dict) -> dict:
+    return await _proxy(
+        "PUT",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{quote(name, safe='')}/binding",
+        body,
+    )
+
+
+@plugin_api.post("/projects/{project_id}/workflows/{name}/runs/{run_key}/advance")
+async def advance_workflow_run(project_id: str, name: str, run_key: str) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{quote(name, safe='')}/runs/{quote(run_key, safe='')}/advance",
+        {},
+    )
+
+
+@plugin_api.post("/projects/{project_id}/workflows/{name}/runs/{run_key}/proposals")
+async def propose_workflow_revision(project_id: str, name: str, run_key: str, body: dict) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{quote(name, safe='')}/runs/{quote(run_key, safe='')}/proposals",
+        body,
+    )
+
+
+@plugin_api.get("/projects/{project_id}/workflows/{name}/runs/{run_key}/revisions")
+async def list_workflow_revisions_ui(project_id: str, name: str, run_key: str) -> dict:
+    return await _proxy(
+        "GET",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{quote(name, safe='')}/runs/{quote(run_key, safe='')}/revisions",
+    )
+
+
+@plugin_api.post("/projects/{project_id}/workflows/{name}/runs/{run_key}/revisions/{revision_key}/decide")
+async def decide_workflow_revision_ui(project_id: str, name: str, run_key: str, revision_key: str, body: dict) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{quote(name, safe='')}/runs/{quote(run_key, safe='')}/revisions/{quote(revision_key, safe='')}/decide",
+        body,
     )
 
 

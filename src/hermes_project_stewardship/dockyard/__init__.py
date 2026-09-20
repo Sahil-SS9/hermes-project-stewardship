@@ -16,6 +16,7 @@ from typing import Optional
 class WorkItemType(str, enum.Enum):
     EPIC = "epic"
     TASK = "task"
+    FEATURE = "feature"
     SUBTASK = "subtask"
     BUG = "bug"
     SPIKE = "spike"
@@ -79,9 +80,10 @@ class WorkItem:
     updated_at: datetime = field(default_factory=utcnow)
 
     ALLOWED_CHILDREN = {
-        WorkItemType.EPIC: {WorkItemType.TASK, WorkItemType.SUBTASK,
+        WorkItemType.EPIC: {WorkItemType.FEATURE, WorkItemType.TASK, WorkItemType.SUBTASK,
                             WorkItemType.BUG, WorkItemType.SPIKE,
                             WorkItemType.INITIATIVE},
+        WorkItemType.FEATURE: {WorkItemType.TASK, WorkItemType.SUBTASK},
         WorkItemType.TASK: {WorkItemType.SUBTASK},
         WorkItemType.BUG: {WorkItemType.SUBTASK},
         WorkItemType.SPIKE: set(),

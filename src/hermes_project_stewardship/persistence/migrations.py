@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 25
+SCHEMA_VERSION = 29
 
 
 @dataclass(frozen=True)
@@ -268,7 +268,7 @@ MIGRATIONS: List[Migration] = [
             project_id     TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
             ref            TEXT NOT NULL UNIQUE,
             type           TEXT NOT NULL CHECK (type IN
-                           ('epic','task','subtask','bug','spike','initiative')),
+                           ('epic','feature','task','subtask','bug','spike','initiative')),
             title          TEXT NOT NULL,
             parent_id      INTEGER REFERENCES dockyard_work_items(id) ON DELETE SET NULL,
             status         TEXT NOT NULL DEFAULT 'backlog' CHECK (status IN
@@ -988,5 +988,139 @@ MIGRATIONS: List[Migration] = [
             ON project_objective_evaluations(objective_id, recorded_at DESC);
         """,
         downgrade_sql="DROP TABLE IF EXISTS project_objective_evaluations;",
+    ),
+    Migration(
+        version=26,
+        name="team-bound workflow templates, bindings, run snapshots and revisions",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS dockyard_workflow_templates (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            name            TEXT NOT NULL,
+            version         INTEGER NOT NULL,
+            definition_json TEXT NOT NULL,
+            created_at      TEXT NOT NULL,
+            created_by      TEXT NOT NULL DEFAULT 'system',
+            UNIQUE (name, version)
+        );
+        CREATE TABLE IF NOT EXISTS dockyard_workflow_bindings (
+            project_id     TEXT NOT NULL,
+            name           TEXT NOT NULL,
+            group_id       INTEGER,
+            overrides_json TEXT NOT NULL DEFAULT '{}',
+            updated_at     TEXT NOT NULL,
+            updated_by     TEXT NOT NULL,
+            PRIMARY KEY (project_id, name)
+        );
+        CREATE TABLE IF NOT EXISTS dockyard_workflow_revisions (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id    TEXT NOT NULL,
+            name          TEXT NOT NULL,
+            run_key       TEXT NOT NULL,
+            revision_key  TEXT NOT NULL,
+            proposal_json TEXT NOT NULL,
+            status        TEXT NOT NULL CHECK (status IN
+                ('auto_applied','pending','approved','rejected','stale')),
+            proposed_by   TEXT NOT NULL,
+            decided_by    TEXT,
+            detail        TEXT NOT NULL DEFAULT '',
+            created_at    TEXT NOT NULL,
+            decided_at    TEXT,
+            UNIQUE (project_id, name, run_key, revision_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_workflow_revisions_run
+            ON dockyard_workflow_revisions(project_id, name, run_key, id);
+        ALTER TABLE dockyard_workflow_runs ADD COLUMN effective_json TEXT;
+        ALTER TABLE dockyard_workflow_runs ADD COLUMN template_origin TEXT;
+        UPDATE dockyard_workflow_runs SET effective_json = (
+            SELECT definition_json FROM dockyard_workflows w
+            WHERE w.project_id = dockyard_workflow_runs.project_id
+              AND w.name = dockyard_workflow_runs.name
+              AND w.version = dockyard_workflow_runs.version
+        ) WHERE effective_json IS NULL;
+        CREATE TABLE dockyard_workflow_runs_new (
+            project_id      TEXT NOT NULL,
+            name            TEXT NOT NULL,
+            version         INTEGER NOT NULL,
+            run_key         TEXT NOT NULL,
+            result_json     TEXT NOT NULL,
+            started_at      TEXT NOT NULL,
+            status          TEXT NOT NULL DEFAULT 'complete'
+                            CHECK (status IN
+                                ('pending','complete','failed',
+                                 'awaiting_approval','escalated')),
+            updated_at      TEXT,
+            effective_json  TEXT,
+            template_origin TEXT,
+            PRIMARY KEY(project_id, name, version, run_key),
+            FOREIGN KEY(project_id, name, version)
+                REFERENCES dockyard_workflows(project_id, name, version)
+                ON DELETE CASCADE
+        );
+        INSERT INTO dockyard_workflow_runs_new
+            SELECT project_id, name, version, run_key, result_json, started_at,
+                   status, updated_at, effective_json, template_origin
+            FROM dockyard_workflow_runs;
+        DROP TABLE dockyard_workflow_runs;
+        ALTER TABLE dockyard_workflow_runs_new RENAME TO dockyard_workflow_runs;
+        """,
+        downgrade_sql="DROP TABLE IF EXISTS dockyard_workflow_revisions; "
+                      "DROP TABLE IF EXISTS dockyard_workflow_bindings; "
+                      "DROP TABLE IF EXISTS dockyard_workflow_templates;",
+    ),
+    Migration(
+        version=27,
+        name="epic feature task hierarchy type",
+        upgrade_sql="",
+        downgrade_sql="",
+    ),
+    Migration(
+        version=28,
+        name="phase 8 persisted planning canvas",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS project_canvases (
+            canvas_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL UNIQUE REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            objects_json TEXT NOT NULL DEFAULT '[]',
+            connectors_json TEXT NOT NULL DEFAULT '[]',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            updated_by TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_canvases_project
+            ON project_canvases(project_id);
+        """,
+        downgrade_sql="DROP INDEX IF EXISTS idx_project_canvases_project; DROP TABLE IF EXISTS project_canvases;",
+    ),
+    Migration(
+        version=29,
+        name="phase 8 clarification ledger and plan proposals",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS canvas_sessions (
+            session_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            canvas_revision INTEGER NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('active','complete','stopped')),
+            current_question_json TEXT,
+            answers_json TEXT NOT NULL DEFAULT '[]',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(project_id, canvas_revision)
+        );
+        CREATE TABLE IF NOT EXISTS canvas_proposals (
+            proposal_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            session_id TEXT REFERENCES canvas_sessions(session_id) ON DELETE SET NULL,
+            canvas_revision INTEGER NOT NULL,
+            proposal_json TEXT NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('pending','approved','rejected','promoted','stale')),
+            created_at TEXT NOT NULL,
+            decided_at TEXT,
+            decided_by TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_canvas_sessions_project ON canvas_sessions(project_id);
+        CREATE INDEX IF NOT EXISTS idx_canvas_proposals_project ON canvas_proposals(project_id);
+        """,
+        downgrade_sql="DROP INDEX IF EXISTS idx_canvas_proposals_project; DROP INDEX IF EXISTS idx_canvas_sessions_project; DROP TABLE IF EXISTS canvas_proposals; DROP TABLE IF EXISTS canvas_sessions;",
     ),
 ]

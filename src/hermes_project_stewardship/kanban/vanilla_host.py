@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from dataclasses import asdict
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import time
@@ -52,6 +53,7 @@ class ProjectKanbanHost:
 
     def __init__(self, *, hermes_home: str | Path, board: str = "default", **_kwargs) -> None:
         self.hermes_home = Path(hermes_home)
+        self.kanban_home = Path(os.environ.get("HERMES_KANBAN_HOME", self.hermes_home))
         self.board = (board or "default").strip()
 
     @staticmethod
@@ -65,11 +67,17 @@ class ProjectKanbanHost:
         hermes_constants, kanban_db, _ = self._modules()
         selected = (board or self.board or "default").strip()
         token = hermes_constants.set_hermes_home_override(self.hermes_home)
+        previous_kanban_home = os.environ.get("HERMES_KANBAN_HOME")
+        os.environ["HERMES_KANBAN_HOME"] = str(self.kanban_home)
         try:
             with kanban_db.scoped_current_board(selected):
                 yield selected
         finally:
             hermes_constants.reset_hermes_home_override(token)
+            if previous_kanban_home is None:
+                os.environ.pop("HERMES_KANBAN_HOME", None)
+            else:
+                os.environ["HERMES_KANBAN_HOME"] = previous_kanban_home
 
     def capabilities(self) -> dict[str, Any]:
         return {"contract_version": CONTRACT_VERSION, "methods": sorted(_METHODS)}
