@@ -14,7 +14,6 @@ All runs use disposable stores under tmp_path; no live services.
 """
 from __future__ import annotations
 
-import json
 
 import pytest
 
@@ -25,8 +24,6 @@ from hermes_project_stewardship.api.server import create_app  # noqa: E402
 from hermes_project_stewardship.dockyard import (  # noqa: E402
     Actor,
     ActorKind,
-    WorkItemStatus,
-    WorkItemType,
 )
 from hermes_project_stewardship.kanban import ReferenceKanbanAdapter  # noqa: E402
 from hermes_project_stewardship.persistence.dockyard_service import (  # noqa: E402

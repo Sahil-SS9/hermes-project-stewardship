@@ -344,6 +344,26 @@ def test_adapter_exposes_project_scoped_canonical_work_service_operations():
     assert moved["status"] == "done"
 
 
+def test_transition_work_uses_canonical_post_write_readback(monkeypatch):
+    host = FakeProjectKanbanHost()
+    adapter = _adapter_type()(host)
+    task = adapter.create_work(
+        "project-1", kind="task", title="Readback", body=None,
+        assignee=None, created_by="sahil",
+    )
+    original = host.transition_task
+
+    def stale_response(task_id, status, **payload):
+        before = dict(host.tasks[task_id])
+        original(task_id, status, **payload)
+        return before
+
+    monkeypatch.setattr(host, "transition_task", stale_response)
+    moved = adapter.transition_work("project-1", "task", task["id"], "done")
+    assert moved["status"] == "done"
+    assert adapter.get_work("project-1", "task", task["id"])["status"] == "done"
+
+
 def test_adapter_fails_closed_and_redacts_host_errors():
     adapter = _adapter_type()(FakeProjectKanbanHost())
     error_type = _adapter_error_type()

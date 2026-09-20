@@ -97,16 +97,25 @@ def test_pm0607_server_import_without_hermes_runtime_is_clean():
     import os
     import subprocess
 
+    import tempfile
+
     env = {k: v for k, v in os.environ.items() if "PYTHONPATH" not in k}
-    root = Path(__file__).resolve().parents[1]
-    code = (
-        "import sys; import hermes_project_stewardship.api.server; "
-        "print('hermes_cli' in sys.modules, 'hermes_constants' in sys.modules)"
-    )
-    result = subprocess.run(
-        [sys.executable, "-c", code],
-        capture_output=True, text=True, env=env, cwd=str(root), timeout=60,
-    )
+    # The server creates its module-level app on import.  Keep this clean-host
+    # probe away from inherited Hermes/Kanban roots and any user database so a
+    # newer live schema cannot mask the import-isolation assertion.
+    for key in ("HERMES_HOME", "HERMES_KANBAN_HOME", "HERMES_KANBAN_BOARD", "STEWARD_DB_PATH"):
+        env.pop(key, None)
+    with tempfile.TemporaryDirectory(prefix="hps-pm0607-import-") as state:
+        env["STEWARD_DB_PATH"] = str(Path(state) / "stewardship.db")
+        root = Path(__file__).resolve().parents[1]
+        code = (
+            "import sys; import hermes_project_stewardship.api.server; "
+            "print('hermes_cli' in sys.modules, 'hermes_constants' in sys.modules)"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True, text=True, env=env, cwd=str(root), timeout=60,
+        )
     assert result.returncode == 0, result.stderr[-2000:]
     assert result.stdout.strip() == "False False"
 

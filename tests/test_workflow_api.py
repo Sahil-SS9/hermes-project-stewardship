@@ -84,7 +84,10 @@ def test_workflow_runs_read_endpoint_returns_node_status(store, enabled):
     run = runs[0]
     assert run["run_key"] == "run-1"
     assert run["version"] == 1
-    assert run["status"] == "complete"
+    # Starting a run materialises canonical work; execution completion is
+    # reported only after the worker/result polling boundary observes terminal
+    # canonical states.
+    assert run["status"] == "pending"
     by_id = {node["node_id"]: node for node in run["nodes"]}
     assert by_id["build"]["status"] == "backlog"
     assert by_id["build"]["kind"] == "task"

@@ -68,4 +68,6 @@ def test_workflow_retry_recovers_pending_run_without_duplicate_tasks(store, enab
     row = store._conn.execute(
         "SELECT status FROM dockyard_workflow_runs WHERE run_key='run-1'"
     ).fetchone()
-    assert row["status"] == "complete"
+    # Retry restores materialisation without claiming execution completion;
+    # a worker/result poll must still observe terminal canonical states.
+    assert row["status"] == "pending"
