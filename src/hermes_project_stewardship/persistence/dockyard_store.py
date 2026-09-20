@@ -671,6 +671,18 @@ class DockyardStore:
             for r in rows
         ]
 
+    def view_delete(self, project_id: str, name: str, *, owner_id: str) -> bool:
+        """Delete a saved view owned by the caller. Returns False when the
+        view is absent or owned by someone else (sharing preserves the
+        owner's record; a shared view is still only deletable by its owner)."""
+        with self.store.tx() as cx:
+            cur = cx.execute(
+                "DELETE FROM dockyard_saved_views"
+                " WHERE project_id=? AND name=? AND owner_id=?",
+                (project_id, name, owner_id),
+            )
+        return bool(cur.rowcount)
+
     # ------------------------------------------------------------------ #
     # Generated reports                                                  #
     # ------------------------------------------------------------------ #

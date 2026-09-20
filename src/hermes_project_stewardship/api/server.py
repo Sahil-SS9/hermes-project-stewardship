@@ -924,6 +924,32 @@ def create_app(
         except ServiceError as e:
             raise HTTPException(409, str(e)) from None
 
+    @router.post("/projects/{project_id}/objectives/{objective_id}/evaluate")
+    def evaluate_objective_now(project_id: str, objective_id: int):
+        """D6 'Evaluate now': evaluate ONLY the selected objective.
+
+        Not the full stewardship cycle: no other objective, no collectors and
+        no health snapshot are involved. Human-authority action — fail closed
+        (503) without a trusted principal, and agent/shared tokens keep the
+        default denial (403)."""
+        principal = current_principal()
+        if not principal:
+            raise HTTPException(
+                503,
+                "no trusted principal available: objective evaluation requires"
+                " an authenticated caller; the payload cannot name the actor",
+            )
+        if not auth_principal_is_human:
+            raise HTTPException(
+                403, "objective evaluation requires a dedicated human principal"
+            )
+        try:
+            return svc.evaluate_objective_now(
+                project_id, objective_id, actor=principal, interface="desktop"
+            )
+        except ServiceError as e:
+            raise HTTPException(409, str(e)) from None
+
     @router.get("/projects/{project_id}/objectives/{objective_id}/assessments")
     def list_assessments(project_id: str, objective_id: int):
         return {"assessments": svc.assessments(project_id, objective_id)}
@@ -1560,6 +1586,20 @@ def create_app(
         svc.require_feature(project_id, "saved_views")
         return {"items": dy.view_items(
             project_id, name, actor=_actor(actor_id, actor_kind))}
+
+    @router.delete("/projects/{project_id}/views/{name}")
+    def view_delete(project_id: str, name: str, actor_id: str,
+                    actor_kind: str = "human"):
+        """Delete a saved view; only its owner may delete it.
+
+        Error envelope: unknown/not-visible views map to 404 via the app
+        ServiceError handler; views owned by another actor map to 409."""
+        svc.require_feature(project_id, "saved_views")
+        try:
+            actor = _actor(actor_id, actor_kind)
+        except ValueError:
+            raise HTTPException(422, f"invalid actor_kind {actor_kind!r}")
+        return dy.view_delete(project_id, name, actor=actor)
 
     @router.post("/projects/{project_id}/reports")
     def report_generate(project_id: str, body: ReportRequest):

@@ -510,6 +510,22 @@ class DockyardService:
                 visible.append(v)
         return visible
 
+    def view_delete(self, project_id: str, name: str, *, actor: Actor) -> Dict:
+        """Delete a saved view by name; only its owner may delete it."""
+        visible = self.views_list(project_id, actor=actor)
+        if not any(v["name"] == name for v in visible):
+            raise ServiceError(f"no such view '{name}' in {project_id}")
+        all_views = self.dy.views_list(project_id, include_private_of=None)
+        owned = next((v for v in all_views if v["name"] == name), None)
+        if owned is None or owned.get("owner") != actor.id:
+            raise ServiceError(
+                f"saved view '{name}' is owned by another actor; only its owner can delete it"
+            )
+        deleted = self.dy.view_delete(project_id, name, owner_id=actor.id)
+        if not deleted:
+            raise ServiceError(f"no such view '{name}' in {project_id}")
+        return {"name": name, "deleted": True}
+
     def view_items(self, project_id: str, name: str, *,
                    actor: Actor) -> List[Dict]:
         """Run a saved view's query and return the matching work items."""

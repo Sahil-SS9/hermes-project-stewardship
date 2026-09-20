@@ -308,6 +308,21 @@
   }
 
   // src/workflow-canvas.ts
+  function validateConnection(nodes, from, to) {
+    if (!from || !to) return "Both source and target are required";
+    if (from === to) return "A node cannot depend on itself";
+    const ids = new Set(nodes.map((n) => n.node_id));
+    if (!ids.has(from) || !ids.has(to)) return "Unknown node";
+    const deps = new Map(nodes.map((n) => [n.node_id, [...n.depends_on]]));
+    const seen = /* @__PURE__ */ new Set();
+    const visit = (id) => {
+      if (id === to) return true;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return (deps.get(id) ?? []).some(visit);
+    };
+    return visit(from) ? "Connection would create a cycle" : null;
+  }
   var NODE_W = 190;
   var NODE_H = 64;
   var COL_GAP = 95;
@@ -460,6 +475,10 @@
     let fullW = 0;
     let fullH = 0;
     let currentNodes = [];
+    let nodePositions = {};
+    let dragNode = null;
+    let dragStart = { x: 0, y: 0, ox: 0, oy: 0 };
+    let connectFrom = null;
     let disposers = [];
     const apply = () => {
       viewport.setAttribute("transform", `translate(${panX} ${panY}) scale(${zoom})`);
@@ -557,10 +576,14 @@
         return;
       }
       currentNodes = run.nodes;
-      const { positions, width, height } = buildLayout(run.nodes);
-      fullW = width;
-      fullH = height;
-      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+      const layout = buildLayout(run.nodes);
+      const positions = nodePositions = Object.keys(nodePositions).length ? { ...layout.positions, ...nodePositions } : run.nodes.reduce((acc, item) => {
+        if (item.canvas_position) acc[item.node_id] = { ...layout.positions[item.node_id], ...item.canvas_position };
+        return acc;
+      }, { ...layout.positions });
+      fullW = layout.width;
+      fullH = layout.height;
+      svg.setAttribute("viewBox", `0 0 ${layout.width} ${layout.height}`);
       for (const n of run.nodes) {
         const from = positions[n.node_id];
         for (const dep of n.depends_on) {
@@ -591,6 +614,12 @@
           "aria-label",
           `${n.kind === "gate" ? "Gate" : "Task"}: ${n.title} (${n.status ?? "pending"})`
         );
+        g.dataset.wfEditable = "true";
+        g.setAttribute("aria-describedby", `wf-help-${n.node_id}`);
+        const port = sEl("circle", { cx: NODE_W, cy: NODE_H / 2, r: 7, class: "dy-wf-port" });
+        port.setAttribute("data-connect-from", n.node_id);
+        port.setAttribute("tabindex", "0");
+        port.setAttribute("aria-label", `Connect from ${n.title}`);
         const rect = sEl("rect", { width: NODE_W, height: NODE_H, rx: 9, class: "dy-wf-rect" });
         const label2 = sEl("text", { x: 12, y: 25, class: "dy-wf-label" });
         label2.textContent = n.title.slice(0, 24);
@@ -607,10 +636,83 @@
           timer2.textContent = `Workflow: ${elapsedLabel(run.started_at)}`;
           timer2.dataset.for = n.node_id;
         }
-        if (timer2) g.append(rect, label2, sub, timer2);
-        else g.append(rect, label2, sub);
+        if (timer2) g.append(rect, label2, sub, timer2, port);
+        else g.append(rect, label2, sub, port);
         const dash = () => rect.setAttribute("stroke-dasharray", "4 3");
         const undash = () => rect.removeAttribute("stroke-dasharray");
+        port.addEventListener("pointerdown", (ev) => {
+          const e = ev;
+          e.stopPropagation();
+          connectFrom = n.node_id;
+          g.classList.add("dy-wf-connecting");
+        });
+        g.addEventListener("pointerdown", (ev) => {
+          const e = ev;
+          if (e.button !== 0) return;
+          e.stopPropagation();
+          const p0 = positions[n.node_id] ?? { x: 0, y: 0, depth: 0 };
+          if (e.shiftKey) {
+            connectFrom = n.node_id;
+            g.classList.add("dy-wf-connecting");
+          } else {
+            dragNode = n.node_id;
+            dragStart = { x: e.clientX, y: e.clientY, ox: p0.x, oy: p0.y };
+          }
+          if (!connectFrom) {
+            try {
+              g.setPointerCapture(e.pointerId);
+            } catch {
+            }
+          }
+        });
+        g.addEventListener("pointermove", (ev) => {
+          if (!dragNode || dragNode !== n.node_id) return;
+          const e = ev;
+          nodePositions[n.node_id] = { ...positions[n.node_id], x: dragStart.ox + (e.clientX - dragStart.x) / zoom, y: dragStart.oy + (e.clientY - dragStart.y) / zoom };
+          g.setAttribute("transform", `translate(${nodePositions[n.node_id].x} ${nodePositions[n.node_id].y})`);
+        });
+        g.addEventListener("pointerup", async (ev) => {
+          const e = ev;
+          if (dragNode === n.node_id) {
+            dragNode = null;
+            const nextNodes = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, canvas_position: { x: nodePositions[n.node_id].x, y: nodePositions[n.node_id].y } } : item);
+            currentNodes = nextNodes;
+            await handlers.onEdit?.(nextNodes);
+          }
+          if (connectFrom) {
+            const from = connectFrom;
+            connectFrom = null;
+            g.classList.remove("dy-wf-connecting");
+            const error = validateConnection(currentNodes, from, n.node_id);
+            if (!error) {
+              const nextNodes = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, depends_on: [.../* @__PURE__ */ new Set([...item.depends_on, from])] } : item);
+              currentNodes = nextNodes;
+              await handlers.onEdit?.(nextNodes);
+            } else feedLog(error);
+          }
+          try {
+            g.releasePointerCapture(e.pointerId);
+          } catch {
+          }
+        });
+        g.addEventListener("keydown", async (ev) => {
+          const e = ev;
+          if (e.key === " " || e.key === "c") {
+            e.preventDefault();
+            connectFrom = connectFrom === n.node_id ? null : n.node_id;
+            g.classList.toggle("dy-wf-connecting", !!connectFrom);
+          } else if (e.key === "Enter" && connectFrom && connectFrom !== n.node_id) {
+            e.preventDefault();
+            const from = connectFrom;
+            connectFrom = null;
+            const error = validateConnection(currentNodes, from, n.node_id);
+            if (!error) {
+              const nextNodes = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, depends_on: [.../* @__PURE__ */ new Set([...item.depends_on, from])] } : item);
+              currentNodes = nextNodes;
+              await handlers.onEdit?.(nextNodes);
+            } else feedLog(error);
+          }
+        });
         g.addEventListener("pointerenter", dash);
         g.addEventListener("pointerleave", () => {
           if (!g.classList.contains("dy-wf-selected")) undash();
@@ -684,6 +786,37 @@
       if (selectedEl) selectedEl.classList.add("dy-wf-selected");
       passport.replaceChildren();
       passport.appendChild(elu("h3", "", n.title));
+      if (handlers.onEdit) {
+        const edit = elu("div", "dy-wf-edit");
+        const title = elu("input", "dy-wf-edit-title");
+        title.value = n.title;
+        title.setAttribute("aria-label", "Node title");
+        const deps = elu("input", "dy-wf-edit-deps");
+        deps.value = n.depends_on.join(", ");
+        deps.setAttribute("aria-label", "Dependencies");
+        const team = elu("input", "dy-wf-edit-team");
+        team.value = n.phase_team ?? "";
+        team.placeholder = "phase team override";
+        team.setAttribute("aria-label", "Phase team override");
+        const save = elu("button", "dy-btn primary", "Save graph version");
+        save.type = "button";
+        save.addEventListener("click", async () => {
+          const ids = new Set(deps.value.split(",").map((v) => v.trim()).filter(Boolean));
+          ids.delete(n.node_id);
+          const edited = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, title: title.value.trim() || item.title, depends_on: [...ids], phase_team: team.value.trim() || null } : item);
+          save.disabled = true;
+          save.textContent = "Saving\u2026";
+          try {
+            await handlers.onEdit(edited);
+            save.textContent = "Saved \u2713";
+          } catch {
+            save.disabled = false;
+            save.textContent = "Save failed \u2014 retry";
+          }
+        });
+        edit.append(elu("label", "", "Title"), title, elu("label", "", "Dependencies (node IDs)"), deps, elu("label", "", "Phase team"), team, save);
+        passport.appendChild(edit);
+      }
       passport.appendChild(elu("span", `badge ${n.status ?? "pending"}`, n.status ?? "pending"));
       const lastConfirmed = elu("p", "dy-wf-last-confirmed");
       const updated = lastRun?.updated_at ?? null;
@@ -836,10 +969,26 @@
     };
     const buildThread = (items) => buildActivityThread(items, { decay: true });
     const buildTasks = (tasks, onOpen) => buildTaskListMini(tasks, onOpen);
+    svg.addEventListener("pointerup", async (ev) => {
+      if (!connectFrom) return;
+      const target = ev.target?.closest?.(".dy-wf-node");
+      const to = target?.getAttribute("data-node-id");
+      if (!to) return;
+      const from = connectFrom;
+      connectFrom = null;
+      target?.classList.remove("dy-wf-connecting");
+      const error = validateConnection(currentNodes, from, to);
+      if (!error) {
+        const nextNodes = currentNodes.map((item) => item.node_id === to ? { ...item, depends_on: [.../* @__PURE__ */ new Set([...item.depends_on, from])] } : item);
+        currentNodes = nextNodes;
+        await handlers.onEdit?.(nextNodes);
+      } else feedLog(error);
+    });
     let dragging = false;
     let lastX = 0;
     let lastY = 0;
     svg.addEventListener("pointerdown", (e) => {
+      if (e.target?.closest?.(".dy-wf-node")) return;
       dragging = true;
       lastX = e.clientX;
       lastY = e.clientY;
@@ -862,6 +1011,17 @@
       updateMinimap();
     });
     svg.addEventListener("pointerup", (e) => {
+      if (connectFrom) {
+        const target = e.target?.closest?.("[data-node-id]");
+        const to = target?.getAttribute("data-node-id");
+        if (to) {
+          const from = connectFrom;
+          connectFrom = null;
+          const error = validateConnection(currentNodes, from, to);
+          if (!error) void handlers.onEdit?.(currentNodes.map((item) => item.node_id === to ? { ...item, depends_on: [.../* @__PURE__ */ new Set([...item.depends_on, from])] } : item));
+          else feedLog(error);
+        }
+      }
       dragging = false;
       try {
         svg.releasePointerCapture(e.pointerId);

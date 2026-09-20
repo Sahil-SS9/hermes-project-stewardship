@@ -1296,6 +1296,154 @@ class StewardshipService:
             "expires_at": row["expires_at"],
         }
 
+    def evaluate_objective_now(
+        self,
+        project_id: str,
+        objective_id: int,
+        *,
+        actor: str,
+        interface: str = "desktop",
+    ) -> Dict[str, Any]:
+        """D6 'Evaluate now': evaluate ONLY the selected objective.
+
+        This is deliberately not a stewardship cycle: no other objective is
+        touched, no health snapshot is recorded and no initiatives/collectors
+        run. Command and integration evaluators execute through the same
+        allowlisted evaluator the cycle uses. Manual objectives are re-derived
+        from the latest recorded human assessment and are never auto-passed;
+        evaluating one records no new manual evidence by itself.
+        """
+        from ..domain.models import Objective as _Objective
+        from ..objectives.evaluators import DEFAULT_EVALUATOR, EvaluationContext
+
+        self._require_known(project_id)
+        row = self._objective_row(project_id, objective_id)
+        obj = self._objective_dict(row)
+        evaluated_at = iso(self._clock())
+        if not obj["enabled"]:
+            return {
+                "objective_id": objective_id,
+                "evaluated_at": evaluated_at,
+                "actor": actor,
+                "recorded": False,
+                "result": {
+                    "objective_id": objective_id,
+                    "name": obj["name"],
+                    "passed": False,
+                    "measured": None,
+                    "target_met": False,
+                    "state": "not_applicable",
+                    "detail": "objective archived; evaluation skipped and no command was executed",
+                },
+                "evidence": self.objective_evidence(project_id, objective_id),
+            }
+        settings = self.settings(project_id)
+        policies = settings.get("policies", {}) or {}
+        verification = policies.get("verification", {}) or {}
+        repo_path = verification.get("repo_path")
+        command_allowlist = verification.get("command_allowlist")
+        from ..security.allowlist import DEFAULT_ALLOWLIST
+
+        ctx = EvaluationContext(
+            project_path=Path(repo_path) if repo_path else None,
+            allowlist=(DEFAULT_ALLOWLIST if command_allowlist is None
+                       else frozenset(command_allowlist)),
+            clock=self._clock,
+        )
+        objective = _Objective(**obj)
+        if obj["evaluator_type"] == "manual" and objective.id is not None:
+            latest = self.latest_assessment(project_id, objective.id)
+            if latest is not None:
+                objective._manual_status = {
+                    "passed": latest["passed"],
+                    "evidence": latest["evidence"],
+                    "detail": latest.get("detail", ""),
+                    "expires_at": latest.get("expires_at"),
+                    "recorded_at": latest["recorded_at"],
+                }
+        github_evidence_used = False
+        if obj["evaluator_type"] == "integration" and obj.get("integration") == "github":
+            config = verification.get("github", {}) or {}
+            if config:
+                from ..objectives.github import collect_github_evidence
+
+                try:
+                    ctx.github_evidence = collect_github_evidence(
+                        config["repository"], config["sha"], config["required_checks"],
+                        ref=config.get("ref"), release_tag=config.get("release_tag"),
+                    )
+                    github_evidence_used = True
+                except (KeyError, ValueError, TypeError):
+                    ctx.github_evidence = {
+                        "state": "unknown",
+                        "detail": "invalid GitHub evidence configuration",
+                    }
+        try:
+            res = DEFAULT_EVALUATOR.evaluate(objective, ctx)
+        except ValueError as e:
+            res_dict = {
+                "objective_id": objective.id, "name": objective.name,
+                "passed": False, "measured": None, "target_met": False,
+                "state": "unknown", "detail": f"evaluator error: {e}",
+            }
+        else:
+            res_dict = {
+                "objective_id": res.objective_id,
+                "name": res.name,
+                "passed": res.passed,
+                "measured": res.measured,
+                "target_met": res.target_met,
+                "state": res.state,
+                "detail": res.detail,
+            }
+        # Sample persistence: command evaluations always record the attempt
+        # (blocked/failed attempts stay visible but never count as passes).
+        # Integration evaluations record only when real evidence was fetched;
+        # manual evaluations record nothing (assessments own that history).
+        should_record = (
+            obj["evaluator_type"] == "command"
+            or (obj["evaluator_type"] == "integration" and github_evidence_used)
+        )
+        if should_record:
+            source_evidence = ctx.github_evidence if github_evidence_used else None
+            with self.store.tx() as cx:
+                cx.execute(
+                    """
+                    INSERT INTO project_objective_evaluations(
+                        project_id, objective_id, passed, measured, target_met,
+                        state, detail, source, actor, recorded_at)
+                    VALUES(?,?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        project_id, objective_id, int(bool(res_dict["passed"])),
+                        res_dict["measured"], int(bool(res_dict["target_met"])),
+                        res_dict["state"], str(res_dict["detail"] or ""),
+                        "evaluate-now", str(actor), evaluated_at,
+                    ),
+                )
+            self.store.audit(
+                actor=str(actor),
+                interface=interface,
+                action="objective.evaluated",
+                subject=f"{project_id}:{objective_id}",
+                detail={
+                    "state": res_dict["state"],
+                    "measured": res_dict["measured"],
+                    "recorded": True,
+                    "source": "evaluate-now",
+                },
+            )
+            if source_evidence:
+                res_dict["source_evidence"] = source_evidence
+        return {
+            "objective_id": objective_id,
+            "evaluated_at": evaluated_at,
+            "actor": actor,
+            "recorded": should_record,
+            "result": res_dict,
+            "evidence": self.objective_evidence(project_id, objective_id),
+        }
+
     def objective_evidence(self, project_id: str, objective_id: int) -> Dict[str, Any]:
         """Read recorded samples only; never execute commands or fetch providers on GET."""
         import re
@@ -1333,6 +1481,26 @@ class StewardshipService:
                     payload = item.get("payload_json", {})
                     if item.get("kind") == "objective" and payload.get("objective_id") == objective_id:
                         samples.append({**payload, "recorded_at": row["created_at"]})
+            # D6 single-objective evaluations ("Evaluate now") are recorded
+            # separately from full-cycle health snapshots; both feed the
+            # same evidence history.
+            for r in self.store._conn.execute(
+                "SELECT passed, measured, target_met, state, detail, source, actor, recorded_at"
+                " FROM project_objective_evaluations"
+                " WHERE project_id=? AND objective_id=? ORDER BY id DESC LIMIT 200",
+                (project_id, objective_id),
+            ).fetchall():
+                samples.append({
+                    "objective_id": objective_id,
+                    "passed": bool(r["passed"]),
+                    "measured": r["measured"],
+                    "target_met": bool(r["target_met"]),
+                    "state": r["state"],
+                    "detail": r["detail"],
+                    "source": r["source"],
+                    "actor": r["actor"],
+                    "recorded_at": r["recorded_at"],
+                })
         from ..objectives.evaluators import DEFAULT_EVALUATOR, EvaluationContext
         history = []
         for sample in samples:

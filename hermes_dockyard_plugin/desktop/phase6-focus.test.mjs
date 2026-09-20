@@ -25,6 +25,10 @@ const React = require('react');
 const { act } = React;
 const { createRoot } = require('react-dom/client');
 const rt = require('react/jsx-runtime');
+import { reportDownloadFilename } from './download.js';
+// The plugin stub resolves reportDownloadFilename through __rt so the REAL
+// sanitiser is exercised in these jsdom journeys (no duplicated logic).
+rt.reportDownloadFilename = reportDownloadFilename;
 
 const wait = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 const clone = (value) => JSON.parse(JSON.stringify(value));
@@ -37,14 +41,17 @@ function evaluatePlugin(source, host) {
   const imports = sourceImports(source);
   assert.deepEqual(
     [...new Set(imports)].sort(),
-    ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime'].sort(),
+    ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime', './workflow-canvas-mount.js', './download.js'].sort(),
     `unsupported or missing imports: ${imports.join(', ')}`,
   );
   let stripped = source.replace(/^import\s.*$/gm, '');
   stripped = stripped.replace(/^export default __plugin;?$/m, '');
   const stub = `
 const jsx = __rt.jsx, jsxs = __rt.jsxs, Fragment = __rt.Fragment;
-const { useEffect, useState } = React;
+const { useEffect, useRef, useState } = React;
+const mountDesktopWorkflowCanvas = () => () => {};
+const downloadTextFile = (content, filename) => { __rt.downloads = __rt.downloads || []; __rt.downloads.push({ content, filename }); return true; };
+const reportDownloadFilename = __rt.reportDownloadFilename;
 `;
   const factory = new Function(
     'React', '__rt', 'host',

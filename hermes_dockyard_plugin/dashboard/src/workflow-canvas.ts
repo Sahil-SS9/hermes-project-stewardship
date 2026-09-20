@@ -6,7 +6,7 @@
 //   - hover intent preview (dashed) before click-focus         [archify]
 //   - just-touched decay accents on activity                   [agenttrail]
 //   - Semantic Passport with expandable live thread + sub-tasks [agenttrail expansion]
-// No node editing, no palette, no drag-repositioning (roadmap: presentation-only).
+// Nodes are editable in-place; edits are persisted by the host through the canonical version API.
 // Locked constraint: no innerHTML / eval / storage; createElement + textContent only.
 
 export interface CanvasNode {
@@ -18,7 +18,9 @@ export interface CanvasNode {
   kind: 'task' | 'gate';
   status: string | null;
   assignee: string | null;
+  phase_team?: string | null;
   evidence_refs: string[];
+  canvas_position?: { x: number; y: number };
 }
 
 export interface CanvasRun {
@@ -40,6 +42,24 @@ export interface ExpansionData {
   history: Array<{ ts?: string | number | null; text: string }>;
 }
 
+export interface CanvasPosition { x: number; y: number; depth: number }
+
+export function validateConnection(nodes: CanvasNode[], from: string, to: string): string | null {
+  if (!from || !to) return 'Both source and target are required';
+  if (from === to) return 'A node cannot depend on itself';
+  const ids = new Set(nodes.map((n) => n.node_id));
+  if (!ids.has(from) || !ids.has(to)) return 'Unknown node';
+  const deps = new Map(nodes.map((n) => [n.node_id, [...n.depends_on]]));
+  const seen = new Set<string>();
+  const visit = (id: string): boolean => {
+    if (id === to) return true;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return (deps.get(id) ?? []).some(visit);
+  };
+  return visit(from) ? 'Connection would create a cycle' : null;
+}
+
 export interface CanvasHandlers {
   onApprove: (taskRef: string) => Promise<unknown> | void;
   onReject: (taskRef: string) => Promise<unknown> | void;
@@ -50,6 +70,8 @@ export interface CanvasHandlers {
   // (children -> TaskListMini, history -> ActivityThread). May return null
   // for nodes without a task_ref; the passport degrades to factuals only.
   onExpand?: (taskRef: string) => Promise<ExpansionData | null>;
+  // Persist the edited graph as a new workflow version through the host seam.
+  onEdit?: (nodes: CanvasNode[]) => Promise<unknown> | void;
 }
 
 const NODE_W = 190;
@@ -254,6 +276,10 @@ export function mountWorkflowCanvas(
   let fullW = 0;
   let fullH = 0;
   let currentNodes: CanvasNode[] = [];
+  let nodePositions: Record<string, CanvasPosition> = {};
+  let dragNode: string | null = null;
+  let dragStart = { x: 0, y: 0, ox: 0, oy: 0 };
+  let connectFrom: string | null = null;
   let disposers: Array<() => void> = [];
 
   const apply = () => {
@@ -352,10 +378,11 @@ export function mountWorkflowCanvas(
       return;
     }
     currentNodes = run.nodes;
-    const { positions, width, height } = buildLayout(run.nodes);
-    fullW = width;
-    fullH = height;
-    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    const layout = buildLayout(run.nodes);
+    const positions = nodePositions = Object.keys(nodePositions).length ? { ...layout.positions, ...nodePositions } : run.nodes.reduce((acc, item) => { if (item.canvas_position) acc[item.node_id] = { ...layout.positions[item.node_id], ...item.canvas_position }; return acc; }, { ...layout.positions } as Record<string, CanvasPosition>);
+    fullW = layout.width;
+    fullH = layout.height;
+    svg.setAttribute('viewBox', `0 0 ${layout.width} ${layout.height}`);
 
     // edges first (under nodes)
     for (const n of run.nodes) {
@@ -388,6 +415,12 @@ export function mountWorkflowCanvas(
         'aria-label',
         `${n.kind === 'gate' ? 'Gate' : 'Task'}: ${n.title} (${n.status ?? 'pending'})`,
       );
+      g.dataset.wfEditable = 'true';
+      g.setAttribute('aria-describedby', `wf-help-${n.node_id}`);
+      const port = sEl('circle', { cx: NODE_W, cy: NODE_H / 2, r: 7, class: 'dy-wf-port' });
+      port.setAttribute('data-connect-from', n.node_id);
+      port.setAttribute('tabindex', '0');
+      port.setAttribute('aria-label', `Connect from ${n.title}`);
       const rect = sEl('rect', { width: NODE_W, height: NODE_H, rx: 9, class: 'dy-wf-rect' });
       const label = sEl('text', { x: 12, y: 25, class: 'dy-wf-label' }) as SVGTextElement;
       label.textContent = n.title.slice(0, 24);
@@ -406,10 +439,45 @@ export function mountWorkflowCanvas(
         timer.textContent = `Workflow: ${elapsedLabel(run.started_at)}`;
         timer.dataset.for = n.node_id;
       }
-      if (timer) g.append(rect, label, sub, timer);
-      else g.append(rect, label, sub);
+      if (timer) g.append(rect, label, sub, timer, port);
+      else g.append(rect, label, sub, port);
       const dash = () => rect.setAttribute('stroke-dasharray', '4 3');
       const undash = () => rect.removeAttribute('stroke-dasharray');
+      // Bind the port directly rather than relying on bubbling hit-testing from
+      // the node group. Synthetic pointer events and SVG hit-testing can expose
+      // the group as the target even when the pointer is on the port, which
+      // incorrectly starts a node drag and loses the connection source.
+      port.addEventListener('pointerdown', (ev) => {
+        const e = ev as PointerEvent;
+        e.stopPropagation();
+        connectFrom = n.node_id;
+        g.classList.add('dy-wf-connecting');
+      });
+      g.addEventListener('pointerdown', (ev) => {
+        const e = ev as PointerEvent;
+        if (e.button !== 0) return;
+        e.stopPropagation();
+        const p0 = positions[n.node_id] ?? { x: 0, y: 0, depth: 0 };
+        if (e.shiftKey) { connectFrom = n.node_id; g.classList.add('dy-wf-connecting'); }
+        else { dragNode = n.node_id; dragStart = { x: e.clientX, y: e.clientY, ox: p0.x, oy: p0.y }; }
+        if (!connectFrom) { try { g.setPointerCapture(e.pointerId); } catch {} }
+      });
+      g.addEventListener('pointermove', (ev) => {
+        if (!dragNode || dragNode !== n.node_id) return;
+        const e = ev as PointerEvent; nodePositions[n.node_id] = { ...positions[n.node_id], x: dragStart.ox + (e.clientX - dragStart.x) / zoom, y: dragStart.oy + (e.clientY - dragStart.y) / zoom };
+        g.setAttribute('transform', `translate(${nodePositions[n.node_id].x} ${nodePositions[n.node_id].y})`);
+      });
+      g.addEventListener('pointerup', async (ev) => {
+        const e = ev as PointerEvent;
+        if (dragNode === n.node_id) { dragNode = null; const nextNodes = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, canvas_position: { x: nodePositions[n.node_id].x, y: nodePositions[n.node_id].y } } as CanvasNode : item); currentNodes = nextNodes; await handlers.onEdit?.(nextNodes); }
+        if (connectFrom) { const from = connectFrom; connectFrom = null; g.classList.remove('dy-wf-connecting'); const error = validateConnection(currentNodes, from, n.node_id); if (!error) { const nextNodes = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, depends_on: [...new Set([...item.depends_on, from])] } : item); currentNodes = nextNodes; await handlers.onEdit?.(nextNodes); } else feedLog(error); }
+        try { g.releasePointerCapture(e.pointerId); } catch {}
+      });
+      g.addEventListener('keydown', async (ev) => {
+        const e = ev as KeyboardEvent;
+        if (e.key === ' ' || e.key === 'c') { e.preventDefault(); connectFrom = connectFrom === n.node_id ? null : n.node_id; g.classList.toggle('dy-wf-connecting', !!connectFrom); }
+        else if (e.key === 'Enter' && connectFrom && connectFrom !== n.node_id) { e.preventDefault(); const from = connectFrom; connectFrom = null; const error = validateConnection(currentNodes, from, n.node_id); if (!error) { const nextNodes = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, depends_on: [...new Set([...item.depends_on, from])] } : item); currentNodes = nextNodes; await handlers.onEdit?.(nextNodes); } else feedLog(error); }
+      });
       g.addEventListener('pointerenter', dash); // intent preview [archify]
       g.addEventListener('pointerleave', () => {
         if (!g.classList.contains('dy-wf-selected')) undash();
@@ -490,6 +558,21 @@ export function mountWorkflowCanvas(
     if (selectedEl) selectedEl.classList.add('dy-wf-selected');
     passport.replaceChildren();
     passport.appendChild(elu('h3', '', n.title));
+    if (handlers.onEdit) {
+      const edit = elu<HTMLDivElement>('div', 'dy-wf-edit');
+      const title = elu<HTMLInputElement>('input', 'dy-wf-edit-title'); title.value = n.title; title.setAttribute('aria-label', 'Node title');
+      const deps = elu<HTMLInputElement>('input', 'dy-wf-edit-deps'); deps.value = n.depends_on.join(', '); deps.setAttribute('aria-label', 'Dependencies');
+      const team = elu<HTMLInputElement>('input', 'dy-wf-edit-team'); team.value = n.phase_team ?? ''; team.placeholder = 'phase team override'; team.setAttribute('aria-label', 'Phase team override');
+      const save = elu<HTMLButtonElement>('button', 'dy-btn primary', 'Save graph version'); save.type = 'button';
+      save.addEventListener('click', async () => {
+        const ids = new Set(deps.value.split(',').map((v) => v.trim()).filter(Boolean)); ids.delete(n.node_id);
+        const edited = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, title: title.value.trim() || item.title, depends_on: [...ids], phase_team: team.value.trim() || null } : item);
+        save.disabled = true; save.textContent = 'Saving…';
+        try { await handlers.onEdit!(edited); save.textContent = 'Saved ✓'; } catch { save.disabled = false; save.textContent = 'Save failed — retry'; }
+      });
+      edit.append(elu('label', '', 'Title'), title, elu('label', '', 'Dependencies (node IDs)'), deps, elu('label', '', 'Phase team'), team, save);
+      passport.appendChild(edit);
+    }
     passport.appendChild(elu('span', `badge ${n.status ?? 'pending'}`, n.status ?? 'pending'));
     // P8.3: last-confirmed update for the run (not a node-level claim).
     const lastConfirmed = elu<HTMLParagraphElement>('p', 'dy-wf-last-confirmed');
@@ -676,6 +759,19 @@ export function mountWorkflowCanvas(
   ) => buildTaskListMini(tasks, onOpen);
 
   // ---- interactions: pan / zoom / minimap ----
+  svg.addEventListener('pointerup', async (ev) => {
+    if (!connectFrom) return;
+    const target = (ev.target as Element)?.closest?.('.dy-wf-node');
+    const to = target?.getAttribute('data-node-id');
+    if (!to) return;
+    const from = connectFrom;
+    connectFrom = null;
+    target?.classList.remove('dy-wf-connecting');
+    const error = validateConnection(currentNodes, from, to);
+    if (!error) { const nextNodes = currentNodes.map((item) => item.node_id === to ? { ...item, depends_on: [...new Set([...item.depends_on, from])] } : item); currentNodes = nextNodes; await handlers.onEdit?.(nextNodes); }
+    else feedLog(error);
+  });
+
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
@@ -685,6 +781,7 @@ export function mountWorkflowCanvas(
     // the svg swallowed node clicks entirely (real-browser verified: pointer
     // capture on the svg retargets pointerup away from the node, so the
     // browser never synthesises a click on the node).
+    if ((e.target as Element)?.closest?.('.dy-wf-node')) return;
     dragging = true;
     lastX = (e as PointerEvent).clientX;
     lastY = (e as PointerEvent).clientY;
@@ -708,6 +805,17 @@ export function mountWorkflowCanvas(
     updateMinimap();
   });
   svg.addEventListener('pointerup', (e) => {
+    if (connectFrom) {
+      const target = (e.target as Element)?.closest?.('[data-node-id]') as Element | null;
+      const to = target?.getAttribute('data-node-id');
+      if (to) {
+        const from = connectFrom;
+        connectFrom = null;
+        const error = validateConnection(currentNodes, from, to);
+        if (!error) void handlers.onEdit?.(currentNodes.map((item) => item.node_id === to ? { ...item, depends_on: [...new Set([...item.depends_on, from])] } : item));
+        else feedLog(error);
+      }
+    }
     dragging = false;
     try {
       svg.releasePointerCapture((e as PointerEvent).pointerId);

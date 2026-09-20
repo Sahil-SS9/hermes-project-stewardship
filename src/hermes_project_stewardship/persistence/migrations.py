@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 24
+SCHEMA_VERSION = 25
 
 
 @dataclass(frozen=True)
@@ -966,5 +966,27 @@ MIGRATIONS: List[Migration] = [
             ON project_content(project_id, uploaded_at DESC);
         """,
         downgrade_sql="""SELECT 1;""",
+    ),
+    Migration(
+        version=25,
+        name="single-objective evaluations (evaluate now)",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS project_objective_evaluations (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id    TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            objective_id  INTEGER NOT NULL REFERENCES project_objectives(id) ON DELETE CASCADE,
+            passed        INTEGER NOT NULL CHECK (passed IN (0,1)),
+            measured      REAL,
+            target_met    INTEGER NOT NULL CHECK (target_met IN (0,1)),
+            state         TEXT NOT NULL,
+            detail        TEXT NOT NULL DEFAULT '',
+            source        TEXT NOT NULL DEFAULT 'evaluate-now',
+            actor         TEXT NOT NULL,
+            recorded_at   TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_objective_evaluation_time
+            ON project_objective_evaluations(objective_id, recorded_at DESC);
+        """,
+        downgrade_sql="DROP TABLE IF EXISTS project_objective_evaluations;",
     ),
 ]

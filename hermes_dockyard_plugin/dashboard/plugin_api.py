@@ -635,6 +635,19 @@ async def record_project_assessment(project_id: str, objective_id: int, body: As
                         {**body.model_dump(), "interface": "desktop"})
 
 
+@plugin_api.post("/projects/{project_id}/objectives/{objective_id}/evaluate")
+async def evaluate_project_objective(project_id: str, objective_id: int) -> dict:
+    """D6 Evaluate-now: evaluate ONLY the selected objective.
+
+    No body: the downstream composition decides authority (human principal
+    required); the caller cannot name the actor."""
+    pid = quote(project_id, safe="")
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{pid}/objectives/{objective_id}/evaluate",
+    )
+
+
 @plugin_api.post("/projects/{project_id}/objectives")
 async def create_project_objective(
     project_id: str, body: ObjectiveBody
@@ -1159,6 +1172,26 @@ async def save_project_view(project_id: str, body: ViewSaveBody) -> dict:
     return await _proxy(
         "PUT", f"/stewardship/v1/projects/{pid}/views",
         {**body.model_dump(), "actor_id": _ACTOR_ID, "actor_kind": "human"})
+
+
+@plugin_api.get("/projects/{project_id}/views/{name}/items")
+async def run_project_view(project_id: str, name: str) -> dict:
+    """Recall a saved view: run its stored query with the caller's identity."""
+    pid = quote(project_id, safe="")
+    vname = quote(name, safe="")
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{pid}/views/{vname}/items",
+        params={"actor_id": _ACTOR_ID, "actor_kind": "human"})
+
+
+@plugin_api.delete("/projects/{project_id}/views/{name}")
+async def delete_project_view(project_id: str, name: str) -> dict:
+    """Delete a saved view (owner-only downstream)."""
+    pid = quote(project_id, safe="")
+    vname = quote(name, safe="")
+    return await _proxy(
+        "DELETE", f"/stewardship/v1/projects/{pid}/views/{vname}",
+        params={"actor_id": _ACTOR_ID, "actor_kind": "human"})
 
 
 @plugin_api.get("/projects/{project_id}/features")

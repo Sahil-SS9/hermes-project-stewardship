@@ -18,6 +18,18 @@ const React = require('react');
 const { act } = React;
 const { createRoot } = require('react-dom/client');
 const rt = require('react/jsx-runtime');
+import { downloadTextFile, reportDownloadFilename } from './download.js';
+// The plugin resolves local modules through __rt so jsdom journeys exercise
+// the REAL download helpers. The workflow canvas module is TS source (not
+// loadable here) — stub it and record mounts so journeys can still assert
+// the mount contract; the browser bundle test covers the real canvas.
+rt.downloadTextFile = downloadTextFile;
+rt.reportDownloadFilename = reportDownloadFilename;
+rt.canvasMounts = [];
+rt.mountDesktopWorkflowCanvas = function mountDesktopWorkflowCanvasStub(hostEl, projectId, workflowName) {
+  rt.canvasMounts.push({ projectId, workflowName });
+  return () => {};
+};
 
 const POPULATED = {
   // Phase 4 receipts backing store: ambiguous desktop outcomes read these.
@@ -254,7 +266,7 @@ function evaluatePlugin(source, host) {
   const imports = sourceImports(source);
   assert.deepEqual(
     [...new Set(imports)].sort(),
-    ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime'].sort(),
+    ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime', './workflow-canvas-mount.js', './download.js'].sort(),
     `unsupported or missing imports: ${imports.join(', ')}`,
   );
   let stripped = source.replace(/^import\s.*$/gm, '');
@@ -262,6 +274,9 @@ function evaluatePlugin(source, host) {
   const stub = `
 const jsx = __rt.jsx, jsxs = __rt.jsxs, Fragment = __rt.Fragment;
 const { useEffect, useRef, useState } = React;
+const mountDesktopWorkflowCanvas = __rt.mountDesktopWorkflowCanvas;
+const downloadTextFile = __rt.downloadTextFile;
+const reportDownloadFilename = __rt.reportDownloadFilename;
 `;
   const factory = new Function(
     'React', '__rt', 'host',
@@ -1013,6 +1028,10 @@ async function testProjectDashboardScreen() {
   assert(doc.querySelector('[data-project-dashboard]'), 'project dashboard screen is missing');
   assert.match(doc.body.textContent, /Checkout reliability rebuild/);
   assert.equal(doc.querySelectorAll('[data-project-view]').length, 9, 'project dashboard must expose nine supported views (including planning and executable workflows)');
+  // Phase 4: the Objectives tab opens the project screen focused on the
+  // objectives sub-view; the sub-view bar still reaches the overview.
+  assert(doc.querySelector('[data-project-view="objectives"].active, [data-project-view="objectives"][aria-current]') || doc.body.textContent.includes('OBJECTIVES'), 'Objectives tab did not focus the objectives sub-view');
+  await runtime.click('[data-project-view="overview"]', 60);
   assert(doc.querySelector('[data-project-visual]'), 'project overview is missing work visualisation');
   assert(doc.querySelector('[data-overview-work]'), 'project overview is missing current work context');
   assert(doc.querySelector('[data-overview-initiatives]'), 'project overview is missing initiative context');
@@ -1315,8 +1334,14 @@ async function testPhase5ManagementJourneys() {
   assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/workflows/release/start' && call.body.version === 1 && call.body.run_key === 'browser-run-1'), 'explicit workflow version start did not reach proxy');
   await runtime.click('[data-project-view="workflows"]');
   await runtime.click('[data-action="inspect-workflow"]', 80);
+  // Phase 5 canvas port: the stored definition is inspectable through the
+  // production canvas mount plus the raw stored-version details.
+  assert(doc.querySelector('[data-workflow-canvas="release"]'), 'workflow planning canvas host is missing');
+  assert(rt.canvasMounts.some((mount) => mount.projectId === 'payments-relaunch' && mount.workflowName === 'release'), 'stored workflow definition did not reach the canvas mount');
   assert(doc.querySelector('[data-workflow-definition-version="1"]'), 'stored workflow definition is not inspectable');
-  assert.match(doc.querySelector('[data-workflow-run-history]')?.textContent ?? '', /browser-run-1 — v1 — complete/, 'workflow run history did not render the real run_key contract');
+  const liveRun = doc.querySelector('[data-workflow-live-run="browser-run-1"]');
+  assert(liveRun && /browser-run-1/.test(liveRun.textContent), 'workflow run history did not render the real run_key contract');
+  assert(/v1/.test(liveRun.textContent), 'workflow run history did not render the executed version');
   await runtime.click('[data-action="archive-workflow"]', 80);
   assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/workflows/release/archive'), 'workflow archive did not reach proxy');
   await runtime.click('[data-project-view="workflows"]');
@@ -1366,8 +1391,14 @@ async function testBacklogBoardAndReasonGate() {
   const doc = runtime.dom.window.document;
   assert(doc.querySelector('[data-backlog-board]'), 'prioritised backlog screen is missing');
   assert.equal(doc.querySelectorAll('[data-backlog-item]').length, 2, 'backlog items did not render');
-  assert([...doc.querySelectorAll('[data-backlog-item]')].every((item) => item.draggable), 'backlog rows must be draggable');
-  await runtime.click('[data-rerank-ref="HDY-13"][data-direction="down"]');
+  // Signed-off backlog tree: drag reordering rides the per-row grip on
+  // depth-0 rows (whole-row drag targets would fight the row links).
+  const grips = [...doc.querySelectorAll('[data-backlog-item][data-tree-depth="0"] .drag-grip')];
+  assert(grips.length >= 1 && grips.every((grip) => grip.draggable), 'depth-0 backlog rows must expose a draggable grip');
+  // Signed-off backlog tree: reordering moves through the row menu, which
+  // still funnels into the mandatory reason dialog before any rerank call.
+  await runtime.click('[data-menu-ref="HDY-13"]');
+  await runtime.click('[data-menu-action="down"]');
   const modal = doc.querySelector('[data-reason-modal]');
   assert(modal && !modal.hidden, 'rank change did not open the mandatory reason-capture modal');
   assert(modal.querySelector('textarea'), 'reason modal is missing its reason field');
@@ -1428,7 +1459,13 @@ async function testBacklogCreateFormValidationAndReadback() {
     .find((entry) => entry.textContent.includes('Verify retry idempotency'));
   assert(created, 'created backlog item was not read back after refresh');
   assert.match(created.textContent, /quan-bot/);
-  assert.match(created.textContent, /INI-DEMO-2/);
+  // The signed-off tree row shows title/assignee/status only; the initiative
+  // linkage is inspected through the item's details drawer.
+  const createdRef = created.getAttribute('data-backlog-item');
+  await runtime.click(`[data-backlog-item="${createdRef}"]`, 40);
+  const drawer = doc.querySelector(`[data-work-item-detail="${createdRef}"]`);
+  assert(drawer, 'created backlog item did not open its details drawer');
+  assert.match(drawer.textContent, /INI-DEMO-2/, 'initiative linkage was not readable in the details drawer');
   await runtime.dispose();
 }
 
@@ -1439,26 +1476,21 @@ async function testBacklogBulkReassignment() {
   const doc = runtime.dom.window.document;
   const first = doc.querySelector('[data-bulk-select="HDY-13"]');
   assert(first, 'canonical backlog item has no bulk-selection control');
-  first.focus();
-  doc.defaultView.dispatchEvent(new doc.defaultView.KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
   first.click();
   await runtime.flush(20);
-  const picker = doc.querySelector('[data-profile-picker="bulk-replacement"]');
-  assert(picker, 'bulk action does not reuse the shared discovered-profile picker');
-  await runtime.setValue('[data-profile-picker="bulk-replacement"] [data-profile-search]', 'quan');
-  assert.equal(picker.querySelectorAll('option').length, 3, 'profile search did not narrow choices');
-  assert(picker.querySelector('option[value="retired"]') === null, 'search unexpectedly retained unrelated unavailable profile');
-  await runtime.setValue('[data-profile-picker="bulk-replacement"] [data-profile-search]', 'retired');
-  assert(picker.querySelector('option[value="retired"]')?.disabled, 'unavailable discovered profile is selectable');
-  await runtime.setValue('[data-profile-picker="bulk-replacement"] [data-profile-search]', '');
-  await runtime.setValue('[data-profile-picker="bulk-replacement"] select', 'quan');
-  await runtime.click('[data-action="preview-bulk-reassignment"]', 30);
+  // Signed-off v4 flow: selecting rows raises the selection popover, whose
+  // reassignment target drives the same exact preview → execute pipeline
+  // (and the same durable-operation readback) as before.
+  const popover = doc.querySelector('[data-selection-popover]');
+  assert(popover, 'bulk selection did not surface the selection popover');
+  await runtime.setValue('[data-selection-popover] [data-pop-target]', 'assign:quan-bot', 80);
+  await runtime.flush(120);
   assert(doc.querySelector('[data-bulk-preview="phase4-fingerprint"]'), 'exact bulk preview/fingerprint did not render');
   assert.match(doc.body.textContent, /HDY-13.*eligible/s);
-  await runtime.click('[data-action="execute-bulk-reassignment"]', 50);
+  await runtime.click('[data-pop-action="execute"]', 60);
   const post = runtime.calls.find((call) => call.method === 'POST' && /\/reassignments$/.test(call.path));
   assert.deepEqual(post?.body?.selected_ids, ['HDY-13'], 'selected canonical item ids were not preserved');
-  assert.equal(post?.body?.to_profile, 'quan', 'selected profile id was not preserved');
+  assert.equal(post?.body?.to_profile, 'quan-bot', 'selected profile id was not preserved');
   assert(doc.querySelector('[data-bulk-operation="OP-BULK"]'), 'durable bulk operation readback did not render');
   assert.match(doc.body.textContent, /sahil.*workitem\.reassigned/s, 'verified actor/per-item audit outcome was not rendered');
   assert(!runtime.calls.some((call) => /\/transfers\/execute$/.test(call.path)), 'bulk subset incorrectly used departure execution');
@@ -1468,7 +1500,10 @@ async function testBacklogBulkReassignment() {
 async function testBotTeamsScreen() {
   const runtime = await createRuntime();
   await runtime.mount();
-  await runtime.click('[data-tab="teams"]', 80);
+  // Fleet-level Bot teams is reached from the Dashboard (P7.1 refines the
+  // bot-member cards on this surface).
+  await runtime.click('[data-tab="dashboard"]', 60);
+  await runtime.click('[data-action="open-bot-teams"]', 80);
   const doc = runtime.dom.window.document;
   assert(doc.querySelector('[data-bot-teams]'), 'bot teams screen is missing');
   assert(doc.querySelector('[data-team-management]'), 'project team management surface is missing');
@@ -1511,7 +1546,8 @@ async function testBotTeamsScreen() {
 async function testInitiativeLoopScreen() {
   const runtime = await createRuntime();
   await runtime.mount();
-  await runtime.click('[data-tab="initiative"]', 80);
+  // Initiative planning lives in the Delivery tab (map: "Initiative → Delivery").
+  await runtime.click('[data-tab="delivery"]', 120);
   const doc = runtime.dom.window.document;
   assert(doc.querySelector('[data-initiative-loop]'), 'initiative loop screen is missing');
   assert(doc.querySelector('svg[data-loop-visual]'), 'initiative loop visualisation is missing');
@@ -1529,11 +1565,11 @@ async function testInitiativeLoopScreen() {
 async function testSavedViewsScreenAndCreator() {
   const runtime = await createRuntime();
   await runtime.mount();
-  await runtime.click('[data-tab="workflows"]', 80);
+  // Phase 4: saved views are display preferences inside the Work tab.
+  await runtime.click('[data-tab="work"]', 120);
   const doc = runtime.dom.window.document;
-  assert.equal(doc.querySelector('[data-tab="workflows"]')?.textContent.trim(), 'Saved views');
-  assert(doc.querySelector('[data-saved-views-screen]'), 'saved views screen is missing');
-  assert.match(doc.body.textContent, /renamed from Workflows/i);
+  assert(doc.querySelector('[data-saved-views-screen]'), 'saved views section is missing from Work');
+  assert.match(doc.body.textContent, /display preferences/i);
   assert.match(doc.body.textContent, /do not run automations/i);
   assert.match(doc.body.textContent, /displayed/i);
   assert(!doc.querySelector('[data-workflow-visual]'), 'a fabricated executable workflow is still rendered');
@@ -1545,7 +1581,8 @@ async function testSavedViewsScreenAndCreator() {
   assert.equal(doc.querySelector('#dockyard-view-name')?.value, 'Release focus', 'saved view did not populate the editor');
   assert(doc.querySelector('[data-saved-view-editor]'), 'saved view editor is missing');
   assert(!/Saved workflows|Create workflow|LIVE DELIVERY PATH/.test(doc.body.textContent), 'misleading workflow copy remains visible');
-  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/views'), 'saved views screen did not load backend views');
+  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/views'), 'saved views section did not load backend views');
+  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/views/Release%20focus/items'), 'recall did not run the stored view query');
   await runtime.dispose();
 }
 
@@ -1876,6 +1913,9 @@ async function testFirstAssessmentCompletionAction() {
   await runtime.flush(60);
   await runtime.click('[data-tab="project"]', 100);
   const doc = runtime.dom.window.document;
+  // The Objectives tab opens the project screen focused on objectives; the
+  // first-assessment card lives on the project overview.
+  await runtime.click('[data-project-view="overview"]', 60);
   const card = doc.querySelector('[data-first-assessment]');
   assert(card, 'project dashboard lacks the first read-only assessment card');
   await runtime.click('[data-action="run-first-assessment"]', 80);
@@ -1955,7 +1995,7 @@ async function testChromiumLayouts() {
     onboarding: '/tmp/dockyard-onboarding.html',
   };
   await writeSnapshot('dashboard', snapshots.dashboard);
-  await writeSnapshot('project', snapshots.project);
+  await writeSnapshot('project', snapshots.project, { prepare: (runtime) => runtime.click('[data-project-view="overview"]') });
   await writeSnapshot('project', snapshots.projectSettings, { prepare: (runtime) => runtime.click('[data-project-view="settings"]') });
   await writeSnapshot('project', snapshots.projectObjectives, { prepare: (runtime) => runtime.click('[data-project-view="objectives"]') });
   await writeSnapshot('project', snapshots.projectContent, { prepare: async (runtime) => {
@@ -1972,13 +2012,14 @@ async function testChromiumLayouts() {
   } });
   await writeSnapshot('backlog', snapshots.backlog);
   await writeSnapshot('backlog', snapshots.backlogCreate, { prepare: (runtime) => runtime.click('[data-action="open-create-backlog-item"]') });
-  await writeSnapshot('teams', snapshots.teams);
-  await writeSnapshot('teams', snapshots.teamsTranscript, { prepare: async (runtime) => {
+  await writeSnapshot('dashboard', snapshots.teams, { prepare: (runtime) => runtime.click('[data-action="open-bot-teams"]', 80) });
+  await writeSnapshot('dashboard', snapshots.teamsTranscript, { prepare: async (runtime) => {
+    await runtime.click('[data-action="open-bot-teams"]', 80);
     await runtime.click('[data-action="open-bot-sessions"][data-bot-id="octacon-bot"]', 50);
     await runtime.click('[data-bot-session="sess-octacon-1"]', 50);
   } });
-  await writeSnapshot('initiative', snapshots.initiative);
-  await writeSnapshot('initiative', snapshots.initiativeFreeze, { prepare: (runtime) => runtime.click('[data-action="freeze-project"]') });
+  await writeSnapshot('delivery', snapshots.initiative);
+  await writeSnapshot('delivery', snapshots.initiativeFreeze, { prepare: (runtime) => runtime.click('[data-action="freeze-project"]') });
   await writeSnapshot('workflows', snapshots.workflows);
   await writeSnapshot('inbox', snapshots.inbox);
   await writeSnapshot('inbox', snapshots.inboxReject, { prepare: (runtime) => runtime.click('[data-approval-ref="INI-DEMO-2"] [data-action="reject"]') });
@@ -2088,7 +2129,10 @@ async function testChromiumLayouts() {
       }
       if (measure.projectRows > 0) assert.deepEqual(measure.projectIconDisplays, ['grid'], `${spec.name} project icons lost their centring layout`);
       assert(!measure.rootFont.includes('Times New Roman'), `${spec.name} inherited Times New Roman`);
-      const expectedTab = spec.name.startsWith('onboarding-') ? 'dashboard' : spec.name.split('-')[0];
+      // Phase 4 nav reconciliation: Bot teams is a Dashboard surface and the
+      // initiative snapshot lives on the Delivery tab.
+      const surfaceTab = { initiative: 'delivery', initiativeFreeze: 'delivery' };
+      const expectedTab = spec.name.startsWith('onboarding-') ? 'dashboard' : (surfaceTab[spec.name.split('-')[0]] ?? spec.name.split('-')[0]);
       assert.equal(measure.activeScreen, `dockyard-tab-${expectedTab}`, `${spec.name} captured the wrong active screen`);
       const expectedDialogs = ['onboarding-', 'backlog-create-', 'project-board-detail-', 'initiative-freeze-', 'inbox-reject-'].some((prefix) => spec.name.startsWith(prefix)) ? 1 : 0;
       assert.equal(measure.dialogCount, expectedDialogs, `${spec.name} has the wrong modal-dialog state`);
