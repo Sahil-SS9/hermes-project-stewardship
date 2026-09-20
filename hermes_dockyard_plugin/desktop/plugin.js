@@ -2147,10 +2147,10 @@ function OnboardingWizard({ onClose, onComplete }) {
           jsx('button', { type: 'button', className: 'dockyard-modal-close', 'aria-label': 'Close onboarding', disabled: submitting, onClick: onClose, children: '×' }),
         ]}),
         jsx('div', { className: 'dockyard-wizard-progress', role: 'progressbar', 'aria-label': 'Onboarding progress', 'aria-valuemin': 1, 'aria-valuemax': 4, 'aria-valuenow': step, children:
-          steps.map(([label, detail], index) => jsxs('div', { className: index + 1 <= step ? 'complete' : '', children: [
+          steps.map(([label, detail], index) => jsxs('div', { key: `step-${index}`, className: index + 1 <= step ? 'complete' : '', children: [
             jsx('span', { children: number(index + 1) }),
             jsxs('span', { children: [jsx('strong', { children: label }), jsx('small', { children: detail })] }),
-          ]}, label)),
+          ]})),
         }),
         jsxs('div', { className: 'dockyard-wizard-body', children: [
           jsxs('div', { className: step === 1 ? 'dockyard-wizard-step active' : 'dockyard-wizard-step', hidden: step !== 1, 'data-wizard-step': '1', children: [
@@ -2516,7 +2516,7 @@ async function loadProjectData(projectId) {
   }
   if (!project) return { ...dashboard, project: null, projects }
   const encoded = encodeURIComponent(project.id)
-  const [settings, workItems, initiatives, objectives, goals, missionArchive, content, events, reports, milestones, workflows, views, discovery] = await Promise.all([
+  const [settings, workItems, initiatives, objectives, goals, missionArchive, content, events, reports, milestones, workflows, views, canvas, discovery] = await Promise.all([
     api(`/projects/${encoded}/settings`),
     api(`/projects/${encoded}/work-items`),
     api(`/projects/${encoded}/initiatives`),
@@ -2529,6 +2529,7 @@ async function loadProjectData(projectId) {
     api(`/projects/${encoded}/milestones`),
     api(`/projects/${encoded}/workflows`),
     api(`/projects/${encoded}/views`),
+    api(`/projects/${encoded}/canvas`),
     api('/onboard/discover'),
   ])
   return {
@@ -2547,6 +2548,7 @@ async function loadProjectData(projectId) {
     milestones: milestones.milestones ?? [],
     workflows: workflows.workflows ?? [],
     views: views.views ?? [],
+    canvas: canvas ?? { revision: 1, objects: [], connectors: [] },
     profiles: discovery.profiles ?? [],
   }
 }
@@ -3595,7 +3597,7 @@ function ObjectiveEvidence({ objective, projectId, onSaved }) {
     jsx('summary', { children: `Result: ${readableLabel(state)} · Evidence/history` }),
     jsx('p', { children: evidence.detail || 'Insufficient data: no recorded evidence.' }),
     jsx('p', { children: `Evidence age: ${evidence.evidence_age_seconds == null ? 'unavailable' : Math.floor(evidence.evidence_age_seconds) + ' seconds'} · Window: ${objective.window || '30d'} · Samples: ${evidence.sample_count || 0} · Pass rate: ${evidence.pass_rate == null ? 'insufficient data' : Math.round(evidence.pass_rate * 100) + '%'}` }),
-    jsx('ul', { children: (evidence.history || []).map((sample, index) => jsx('li', { children: `${sample.recorded_at} · ${sample.state} · ${sample.verified_actor || sample.source_evidence?.source || 'objective evaluator'} · ${sample.detail || ''} · ${JSON.stringify(sample.evidence || sample.source_evidence || {})}` }, index)) }),
+    jsx('ul', { children: (evidence.history || []).map((sample, index) => jsx('li', { children: `${sample.recorded_at} · ${sample.state} · ${sample.verified_actor || sample.actor || sample.source_evidence?.source || 'objective evaluator'}${sample.source === 'evaluate-now' ? ' (Evaluate now)' : ''} · ${sample.detail || ''} · ${JSON.stringify(sample.evidence || sample.source_evidence || {})}` }, index)) }),
     objective.evaluator_type === 'manual' && objective.enabled !== false ? jsxs('form', { onSubmit: save, children: [
       jsxs('label', { children: ['Result ', jsx('select', { name: 'result', children: ['passed', 'failed'].map(value => jsx('option', { value, children: value }, value)) })] }),
       jsxs('label', { children: ['Evidence reference ', jsx('input', { name: 'evidence', required: true, maxLength: 500 })] }),
@@ -4238,6 +4240,94 @@ function PlanningPanel({ project, milestones, workItems, onRefresh }) {
   ]})
 }
 
+function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onRefresh }) {
+  const [canvas, setCanvas] = useState(initialCanvas ?? { revision: 1, objects: [], connectors: [] })
+  const [objects, setObjects] = useState(initialCanvas?.objects ?? [])
+  const [connectors, setConnectors] = useState(initialCanvas?.connectors ?? [])
+  const [draft, setDraft] = useState('')
+  const [kind, setKind] = useState('note')
+  const [linkSource, setLinkSource] = useState('')
+  const [linkTarget, setLinkTarget] = useState('')
+  const [linkMeaning, setLinkMeaning] = useState('supports')
+  const [dragging, setDragging] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState(null)
+  const encoded = encodeURIComponent(project.id)
+  useEffect(() => {
+    const next = initialCanvas ?? { revision: 1, objects: [], connectors: [] }
+    setCanvas(next); setObjects(next.objects ?? []); setConnectors(next.connectors ?? [])
+  }, [initialCanvas])
+  const addObject = () => {
+    const text = draft.trim()
+    if (!text) return
+    setObjects((current) => [...current, { id: `canvas-${Date.now()}`, kind, content: { text }, x: current.length * 24, y: current.length * 24, tags: [] }])
+    setDraft('')
+  }
+  const save = async () => {
+    setBusy(true); setNotice(null)
+    try {
+      const saved = await api(`/projects/${encoded}/canvas`, { method: 'PUT', body: { expected_revision: canvas.revision, objects, connectors, actor: 'desktop-user' } })
+      setCanvas(saved); setObjects(saved.objects ?? []); setConnectors(saved.connectors ?? []); setNotice('Canvas saved'); onRefresh?.()
+    } catch (failure) { setNotice(`Canvas save failed: ${String(failure?.message ?? failure)}`) }
+    setBusy(false)
+  }
+  const reload = async () => {
+    setBusy(true); setNotice(null)
+    try { const next = await api(`/projects/${encoded}/canvas`); setCanvas(next); setObjects(next.objects ?? []); setConnectors(next.connectors ?? []); setNotice('Canvas reloaded') }
+    catch (failure) { setNotice(`Canvas reload failed: ${String(failure?.message ?? failure)}`) }
+    setBusy(false)
+  }
+  const remove = (id) => {
+    setObjects((current) => current.filter((item) => item.id !== id))
+    setConnectors((current) => current.filter((edge) => edge.source !== id && edge.target !== id))
+  }
+  const connect = () => {
+    if (!linkSource || !linkTarget || linkSource === linkTarget) return
+    setConnectors((current) => [...current, { id: `edge-${Date.now()}`, source: linkSource, target: linkTarget, meaning: linkMeaning }])
+  }
+  const dropOn = (targetId) => {
+    if (!dragging || dragging === targetId) return
+    setObjects((current) => {
+      const source = current.find((item) => item.id === dragging)
+      const target = current.find((item) => item.id === targetId)
+      if (!source || !target) return current
+      return current.map((item) => item.id === dragging ? { ...item, x: Number(target.x || 0) + 32, y: Number(target.y || 0) + 32 } : item)
+    })
+    setDragging(null)
+  }
+  const [session, setSession] = useState(null)
+  const [answer, setAnswer] = useState('')
+  const curate = async () => {
+    setBusy(true); setNotice(null)
+    try {
+      const result = await api(`/projects/${encoded}/canvas/sessions`, { method: 'POST', body: { actor: 'desktop-user' } })
+      setSession(result)
+      setNotice(result.status === 'active' ? `Question: ${result.current_question?.question ?? 'more context needed'}` : `${result.proposals?.length ?? 0} proposal(s) ready for review`)
+    } catch (failure) { setNotice(`Curation failed: ${String(failure?.message ?? failure)}`) }
+    setBusy(false)
+  }
+  const answerQuestion = async (outcome) => {
+    if (!session) return
+    setBusy(true); setNotice(null)
+    try {
+      const result = await api(`/canvas/sessions/${encodeURIComponent(session.session_id)}/answer`, { method: 'POST', body: { outcome, answer, actor: 'desktop-user' } })
+      setSession(result); setAnswer(''); setNotice(result.status === 'complete' ? `${result.proposals?.length ?? 0} proposal(s) ready for review` : 'Question recorded')
+    } catch (failure) { setNotice(`Answer failed: ${String(failure?.message ?? failure)}`) }
+    setBusy(false)
+  }
+  return jsxs('section', { className: 'dockyard-feature-card', 'data-planning-canvas': project.id, children: [
+    jsxs('div', { className: 'dockyard-section-head', children: [jsxs('div', { children: [jsx('span', { className: 'dockyard-card-label', children: 'PLANNING CANVAS' }), jsx('h2', { children: 'Evidence to plan' }), jsx('p', { children: 'Capture scattered notes and links, then curate them into an approved planning proposal.' })] }), jsxs('div', { className: 'dockyard-form-actions', children: [jsx(Button, { small: true, disabled: busy, onClick: reload, children: 'Reload' }), jsx(Button, { small: true, disabled: busy, onClick: curate, children: 'Curate' }), jsx(Button, { variant: 'primary', small: true, disabled: busy, onClick: save, children: busy ? 'Working...' : 'Save canvas' })] })] }),
+    jsxs('div', { className: 'dockyard-inline-editor', children: [jsx('label', { children: [jsx('span', { children: 'Capture type' }), jsx('select', { value: kind, onChange: (event) => setKind(event.target.value), children: ['note', 'evidence', 'claim', 'question', 'plan_block', 'link', 'media'].map((value) => jsx('option', { value, children: value }, value)) })] }), jsx('label', { children: [jsx('span', { children: 'Add to canvas' }), jsx('textarea', { 'data-canvas-draft': true, rows: 2, value: draft, onChange: (event) => setDraft(event.target.value), placeholder: 'Paste a note, URL, observation or question...' })] }), jsx(Button, { action: 'add-canvas-object', disabled: !draft.trim(), onClick: addObject, children: 'Add object' })] }),
+    jsx('div', { className: 'dockyard-objective-list', role: 'list', 'aria-label': 'Planning canvas objects', children: objects.length ? objects.map((item) => jsxs('article', { draggable: true, onDragStart: () => setDragging(item.id), onDragOver: (event) => event.preventDefault(), onDrop: () => dropOn(item.id), 'data-canvas-object': item.id, 'data-canvas-x': item.x, 'data-canvas-y': item.y, children: [jsxs('div', { className: 'dockyard-objective-copy', children: [jsx('strong', { children: item.kind }), jsx('small', { children: item.content?.text ?? item.content?.title ?? item.content?.url ?? 'Untitled object' })] }), jsx(Button, { small: true, action: 'remove-canvas-object', onClick: () => remove(item.id), children: 'Remove reference' })] }, item.id)) : jsx('p', { className: 'dockyard-meta', children: 'No canvas objects yet. Start by capturing a note, link or evidence.' }) }),
+    objects.length >= 2 ? jsxs('div', { className: 'dockyard-inline-editor', 'data-canvas-connector-editor': true, children: [jsx('label', { children: [jsx('span', { children: 'From' }), jsx('select', { value: linkSource, onChange: (event) => setLinkSource(event.target.value), children: [jsx('option', { value: '', children: 'Choose source' }, 'none'), ...objects.map((item) => jsx('option', { value: item.id, children: item.content?.text ?? item.content?.title ?? item.id }, item.id))] })] }), jsx('label', { children: [jsx('span', { children: 'Relationship' }), jsx('select', { value: linkMeaning, onChange: (event) => setLinkMeaning(event.target.value), children: ['supports', 'contradicts', 'derived_from', 'clarifies', 'depends_on', 'implements', 'raises_question'].map((value) => jsx('option', { value, children: value }, value)) })] }), jsx('label', { children: [jsx('span', { children: 'To' }), jsx('select', { value: linkTarget, onChange: (event) => setLinkTarget(event.target.value), children: [jsx('option', { value: '', children: 'Choose target' }, 'none'), ...objects.map((item) => jsx('option', { value: item.id, children: item.content?.text ?? item.content?.title ?? item.id }, item.id))] })] }), jsx(Button, { action: 'connect-canvas-objects', disabled: !linkSource || !linkTarget || linkSource === linkTarget, onClick: connect, children: 'Connect objects' })] }) : null,
+    connectors.length ? jsx('ul', { 'data-canvas-connectors': true, children: connectors.map((edge) => jsx('li', { 'data-canvas-connector': edge.id, children: `${edge.source} ${edge.meaning} ${edge.target}` }, edge.id)) }) : null,
+    session?.current_question ? jsxs('div', { className: 'dockyard-inline-editor', 'data-canvas-question': true, children: [jsx('strong', { children: session.current_question.question }), jsx('textarea', { value: answer, onChange: (event) => setAnswer(event.target.value), placeholder: 'Answer, or skip this question...', rows: 2 }), jsxs('div', { className: 'dockyard-form-actions', children: [jsx(Button, { small: true, disabled: busy, onClick: () => answerQuestion('skip'), children: 'Skip' }), jsx(Button, { small: true, disabled: busy, onClick: () => answerQuestion('defer'), children: 'Defer' }), jsx(Button, { small: true, disabled: busy, onClick: () => answerQuestion('stop'), children: 'Stop' }), jsx(Button, { small: true, variant: 'primary', disabled: busy || !answer.trim(), onClick: () => answerQuestion('answer'), children: 'Answer' })] })] }) : null,
+    session?.proposals?.length ? jsx('div', { 'data-canvas-proposals': true, children: session.proposals.map((proposal) => jsxs('article', { children: [jsx('strong', { children: proposal.title ?? proposal.kind }), jsx('small', { children: `${proposal.source_object_ids?.length ?? 0} source object(s); approval required.` }), jsxs('div', { className: 'dockyard-form-actions', children: [jsx(Button, { small: true, onClick: async () => { const result = await api(`/canvas/proposals/${encodeURIComponent(proposal.proposal_id)}/decision`, { method: 'POST', body: { approve: false, actor: 'desktop-user' } }); setNotice(`Proposal ${result.status}`) }, children: 'Reject' }), jsx(Button, { small: true, variant: 'primary', onClick: async () => { const result = await api(`/canvas/proposals/${encodeURIComponent(proposal.proposal_id)}/decision`, { method: 'POST', body: { approve: true, actor: 'desktop-user' } }); setNotice(`Proposal ${result.status}`) }, children: 'Approve' })] })] }, proposal.proposal_id)) }) : null,
+    content.length ? jsx('p', { className: 'dockyard-meta', children: `${content.length} project content item(s) available to reference.` }) : null,
+    notice ? jsx('p', { role: 'status', className: 'dockyard-meta', children: notice }) : null,
+  ] })
+}
+
 function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, savedViewsMode }) {
   const [projectView, setProjectView] = useState(initialView || 'overview')
   const [selectedWorkItem, setSelectedWorkItem] = useState(null)
@@ -4346,9 +4436,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   } else if (projectView === 'objectives') {
     panel = jsx(ObjectivesPanel, { project, settings: view.settings ?? {}, objectives: view.objectives ?? [], goals: view.goals ?? [], missionArchive: view.missionArchive ?? [], onRefresh }, project.id)
   } else if (projectView === 'planning') {
-    // P9.2: milestone planning — table/summary first (no Gantt, no new
-    // scheduling engine). Same actions/contracts the Dashboard exposes.
-    panel = jsx(PlanningPanel, { project, view, milestones: view.milestones ?? [], workItems: view.workItems ?? [], onRefresh }, project.id)
+    panel = jsx(PlanningCanvasPanel, { project, canvas: view.canvas, content: view.content ?? [], onRefresh }, project.id)
   } else if (projectView === 'workflows') {
     panel = jsx(ExecutableWorkflowsPanel, { project, workflows: view.workflows ?? [], onRefresh }, project.id)
   } else if (projectView === 'content') {
@@ -4682,58 +4770,103 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
     setImportError(null)
     const text = importText.trim()
     if (!text) { setImportError('Paste CSV lines or a JSON array first.'); setImportRows(null); return }
-    let rows
-    try {
-      if (importMode === 'json') {
-        rows = JSON.parse(text)
-        if (!Array.isArray(rows)) throw new Error('JSON must be an array')
-      } else {
-        const lines = text.split(/\r?\n/).filter((line) => line.trim())
-        const header = lines.shift().split(',').map((h) => h.trim().toLowerCase())
-        if (!header.includes('title')) throw new Error('CSV must have a title column')
-        rows = lines.map((line) => Object.fromEntries(header.map((key, idx) => [key, (line.split(',')[idx] ?? '').trim()])))
+    // P6.7/P6.8: the shared backend validator is the single source of truth.
+    // JSON paste is normalised to CSV rows here, then validated server-side;
+    // the UI must not invent a second validation vocabulary.
+    let csvText = text
+    if (importMode === 'json') {
+      let rowsJson
+      try {
+        rowsJson = JSON.parse(text)
+        if (!Array.isArray(rowsJson)) throw new Error('JSON must be an array')
+      } catch (bad) { setImportError(`Could not read that: ${bad?.message || bad}`); setImportRows(null); return }
+      const header = 'row_key,type,title,parent_key,labels,estimate_days'
+      const toCsvCell = (value) => String(value ?? '').replace(/[\r\n,]/g, ' ').trim()
+      csvText = [header].concat(rowsJson.map((row, idx) => [
+        toCsvCell(row.row_key ?? `json-${idx + 1}`),
+        toCsvCell(row.type ?? 'task'),
+        toCsvCell(row.title),
+        toCsvCell(row.parent ?? row.parent_key ?? ''),
+        toCsvCell(row.labels ?? ''),
+        toCsvCell(row.estimate_days ?? ''),
+      ].join(','))).join('\n')
+    } else {
+      // CSV paste: translate the friendly legacy header (type,title,
+      // assignee,due,parent) into the shared validator vocabulary
+      // (row_key,type,title,parent_key,...) so one validation contract backs
+      // both entry paths. row_key defaults to csv-<n> in file order.
+      const lines = text.split(/\r?\n/).filter((line) => line.trim().length)
+      const headerLine = (lines[0] ?? '').toLowerCase()
+      const legacy = headerLine.includes('type') && headerLine.includes('title')
+        && !headerLine.includes('row_key')
+      if (legacy) {
+        // row keys must be unique per file instance: the shared validator
+        // derives durable idempotency keys from them, so re-importing the
+        // same-named rows must not silently collide with an earlier file.
+        const fileKey = `csv-${Date.now().toString(36)}`
+        const body = lines.slice(1).map((line, idx) => {
+          const cells = line.split(',')
+          // type,title,assignee,due,parent
+          const [type, title, , due, parent] = cells
+          return [`${fileKey}-${idx + 1}`, type ?? '', title ?? '', parent ?? '', '', due ?? '']
+            .map((cell) => String(cell ?? '').replace(/[\r\n]/g, ' ').trim()).join(',')
+        })
+        csvText = ['row_key,type,title,parent_key,labels,estimate_days,due,initiative_ref']
+          .concat(body).join('\n')
       }
-    } catch (bad) { setImportError(`Could not read that: ${bad?.message || bad}`); setImportRows(null); return }
-    const parsed = rows.map((row, idx) => {
-      const problems = []
-      const type = String(row.type ?? 'task').toLowerCase()
-      if (!TYPE_NAMES.includes(type)) problems.push(`type “${row.type || '—'}” not supported`)
-      const title = String(row.title ?? '').trim()
-      if (title.length < 3) problems.push('title must be at least 3 characters')
-      const assignee = String(row.assignee ?? '').trim()
-      if (!assignee) problems.push('assignee is required')
-      else if (!(view.bots ?? []).some((bot) => bot.id === assignee)) problems.push(`“${assignee}” is not a known bot`)
-      const parent = String(row.parent ?? '').trim()
-      if (parent && !entrySet.has(parent)) problems.push(`parent ${parent} is not in this backlog`)
-      if (parent && type === 'epic') problems.push('epics are top level — parent must be empty')
-      return { idx, type, title, parent, assignee, due: String(row.due ?? '').trim(), problems }
+    }
+    setImportBusy(true)
+    api(`/projects/${encodeURIComponent(project.id)}/backlog/import`, {
+      method: 'POST', body: { csv_text: csvText, apply: false },
+    }).then((previewResult) => {
+      setImportBusy(false)
+      const preview = previewResult?.preview
+      if (!preview) { setImportError('The import service returned no preview.'); setImportRows(null); return }
+      const errorByRow = {}
+      for (const problem of preview.errors ?? []) {
+        const key = String(problem.row ?? '')
+        ;(errorByRow[key] = errorByRow[key] ?? []).push(problem.error)
+      }
+      const parsed = (preview.rows ?? []).map((row, idx) => {
+        const type = String(row.type ?? 'task').toLowerCase()
+        const title = String(row.title ?? '').trim()
+        const parent = String(row.parent_key ?? '').trim()
+        const problems = [...(errorByRow[String(idx + 2)] ?? [])]
+        if (parent && type === 'epic') problems.push('epics are top level — parent must be empty')
+        return { idx, type, title, parent, assignee: String(row.owner ?? row.assignee ?? '').trim(), due: String(row.due ?? '').trim(), problems, csv_text: csvText }
+      })
+      if (!parsed.length) { setImportError('No rows found in that input.'); setImportRows(null); return }
+      setImportRows(parsed)
+      if (advance) setImportStep(2)
+    }).catch((bad) => {
+      setImportBusy(false)
+      setImportError(`Could not validate: ${String(bad?.message ?? bad).slice(0, 140)}`)
+      setImportRows(null)
     })
-    if (!parsed.length) { setImportError('No rows found in that input.'); setImportRows(null); return }
-    setImportRows(parsed)
-    if (advance) setImportStep(2)
   }
   const runImport = async () => {
     const good = (importRows ?? []).filter((row) => !row.problems.length)
     if (!good.length) return
     setImportBusy(true)
-    let rank = entries.length
-    const written = []
-    const failed = []
-    for (const row of good) {
-      rank += 1
-      try {
-        const created = await api(`/projects/${encodeURIComponent(project.id)}/backlog/items`, {
-          method: 'POST', body: { type: row.type, title: row.title, assignee_id: row.assignee, assignee_kind: 'bot', rank, reason: 'bulk import (prototype)' },
-        })
-        if (row.due) await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(created.ref)}`, { method: 'PATCH', body: { due: row.due } })
-        if (row.parent) await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(created.ref)}`, { method: 'PATCH', body: { parent_ref: row.parent } })
-        written.push(created.ref)
-      } catch (bad) { failed.push(`${row.title}: ${String(bad?.message ?? bad).slice(0, 70)}`) }
+    try {
+      // One shared-validator commit for the whole file: parent-first order,
+      // cycle protection and idempotent row keys are enforced server-side.
+      const result = await api(`/projects/${encodeURIComponent(project.id)}/backlog/import`, {
+        method: 'POST', body: { csv_text: good[0].csv_text, apply: true },
+      })
+      setImportBusy(false)
+      setImportResult({
+        written: Number(result?.imported ?? good.length),
+        failed: (result?.preview?.errors ?? []).map((problem) => `row ${problem.row}: ${problem.error}`),
+      })
+      setImportStep(3)
+      onRefresh()
+    } catch (bad) {
+      setImportBusy(false)
+      // P6.9: partial failure stays visible; nothing is lost — preview state
+      // is kept so the operator can fix rows and retry the same file.
+      setImportError(`Import failed before commit: ${String(bad?.message ?? bad).slice(0, 140)}`)
     }
-    setImportBusy(false)
-    setImportResult({ written: written.length, failed })
-    setImportStep(3)
-    if (written.length) onRefresh()
   }
   const saveMove = async () => {
     if (!pendingMove || !reason.trim()) return
@@ -5100,13 +5233,26 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
                   jsx('div', { children: 'or paste rows below · columns: type, title, assignee, due, parent' }),
                 ] }) : jsx('div', { className: 'create-help', children: 'JSON is paste-only: copy an array of { type, title, assignee, due, parent } objects below.' }),
               jsx(Button, { action: 'import-download-template', small: true, onClick: () => {
-                const csv = ['type,title,assignee,due,parent','epic,Partner API v3,bot-worker,','feature,Usage dashboard,bot-worker,','task,Rotation cron,bot-worker,2026-10-01,','bug,Login 500 on expired token,bot-worker,,'].join(String.fromCharCode(10))
-                const blob = new Blob([csv], { type: 'text/csv' })
-                const a = document.createElement('a')
-                a.href = URL.createObjectURL(blob)
-                a.download = 'backlog-import-template.csv'
-                document.body.appendChild(a); a.click(); a.remove()
-                setTimeout(() => URL.revokeObjectURL(a.href), 4000)
+                // P6.10: the downloadable template must match the shared
+                // validator exactly; prefer the backend template and fall
+                // back to the same columns locally if the host is offline.
+                const fallback = ['row_key,type,title,parent_key,labels,estimate_days,due,initiative_ref','epic-1,epic,Partner API v3,,,','','feature-1,feature,Usage dashboard,,,','task-1,task,Rotation cron,feature-1,,3,2026-10-01,','bug-1,bug,Login 500 on expired token,,,'].join(String.fromCharCode(10))
+                api(`/projects/${encodeURIComponent(project.id)}/backlog/import-template`).then((template) => {
+                  const csv = String(template?.csv ?? fallback)
+                  const blob = new Blob([csv], { type: 'text/csv' })
+                  const a = document.createElement('a')
+                  a.href = URL.createObjectURL(blob)
+                  a.download = 'backlog-import-template.csv'
+                  document.body.appendChild(a); a.click(); a.remove()
+                  setTimeout(() => URL.revokeObjectURL(a.href), 4000)
+                }).catch(() => {
+                  const blob = new Blob([fallback], { type: 'text/csv' })
+                  const a = document.createElement('a')
+                  a.href = URL.createObjectURL(blob)
+                  a.download = 'backlog-import-template.csv'
+                  document.body.appendChild(a); a.click(); a.remove()
+                  setTimeout(() => URL.revokeObjectURL(a.href), 4000)
+                })
               }, children: 'Download CSV template' }),
             ] }),
             importError ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: importError }) : null,
@@ -5738,8 +5884,8 @@ function SavedViewsSection({ project, views, onApply, onClear, appliedName, onRe
         recallNotice ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', 'data-recall-notice': true, children: recallNotice }) : null,
         error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
         jsxs('div', { className: 'dockyard-form-actions', children: [
-          jsx(Button, { variant: 'primary', 'data-action': 'save-view', disabled: saving || deleting || !name.trim(), onClick: save, children: saving ? 'Saving...' : selectedView ? 'Save view' : 'Create view' }),
-          selectedView ? jsx(Button, { 'data-action': 'delete-view', disabled: saving || deleting, onClick: () => setDeleteConfirm(true), children: deleting ? 'Deleting...' : 'Delete view' }) : null,
+          jsx(Button, { action: 'save-view', variant: 'primary', disabled: saving || deleting || !name.trim(), onClick: save, children: saving ? 'Saving...' : selectedView ? 'Save view' : 'Create view' }),
+          selectedView ? jsx(Button, { action: 'delete-view', disabled: saving || deleting, onClick: () => setDeleteConfirm(true), children: deleting ? 'Deleting...' : 'Delete view' }) : null,
           selectedView ? jsx(Button, { onClick: () => { setSelectedView(null); setName(''); setLayout('board'); setStatusFilter('in_progress'); setError(null); setRecallNotice(null) }, children: 'Clear' }) : null,
         ]}),
       ]}),
