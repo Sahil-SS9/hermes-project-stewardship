@@ -1,0 +1,17 @@
+✔ keyboard: Escape/arrows/roving tabindex + dialog semantics (0.946525ms)
+✔ naming + live regions + dialog semantics (0.597553ms)
+✔ non-colour status + touch targets (0.16482ms)
+✔ contrast metadata + reduced motion + visible focus (0.148481ms)
+✔ tokens match approved contract (light + dark) (6.159495ms)
+✔ pairwise widths 1440/768/390 + 200% zoom invariants (0.294811ms)
+✔ empty/large/offline/destructive states implemented (1.219247ms)
+✔ critical journeys onboarding/departure/lead/archive present (0.517853ms)
+✔ key contrast pairs meet WCAG AA (4.5 text / 3 UI) (0.307112ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 64.086906
