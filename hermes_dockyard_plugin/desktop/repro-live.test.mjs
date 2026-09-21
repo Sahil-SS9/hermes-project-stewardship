@@ -791,6 +791,28 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       const projectId = decodeURIComponent(milestonesRead[1]);
       return clone(data.milestones?.[projectId] ?? { milestones: [] });
     }
+    const canvasRead = path.match(/^\/projects\/([^/]+)\/canvas$/);
+    if (canvasRead) {
+      const projectId = decodeURIComponent(canvasRead[1]);
+      if (method === 'PUT') {
+        data.canvas ??= {};
+        const rev = (data.canvas[projectId]?.revision ?? 0) + 1;
+        data.canvas[projectId] = { project_id: projectId, revision: rev, objects: init.body?.objects ?? [], connectors: init.body?.connectors ?? [] };
+        return clone(data.canvas[projectId]);
+      }
+      return clone(data.canvas?.[projectId] ?? { project_id: projectId, revision: 0, objects: [], connectors: [] });
+    }
+    const canvasSession = path.match(/^\/projects\/([^/]+)\/canvas\/sessions$/);
+    if (method === 'POST' && canvasSession) {
+      data.canvasSessions ??= [];
+      const session = { session_id: `cs-${data.canvasSessions.length + 1}`, status: 'active', questions: [], proposals: [] };
+      data.canvasSessions.push(session);
+      return session;
+    }
+    const sessionAnswer = path.match(/^\/canvas\/sessions\/([^/]+)\/answer$/);
+    if (method === 'POST' && sessionAnswer) return { session_id: decodeURIComponent(sessionAnswer[1]), status: 'answered', proposals: [] };
+    const proposalDecision = path.match(/^\/canvas\/proposals\/([^/]+)\/decision$/);
+    if (method === 'POST' && proposalDecision) return { proposal_id: decodeURIComponent(proposalDecision[1]), status: init.body?.approve ? 'approved' : 'rejected' };
     const projectRead = path.match(/^\/projects\/([^/]+)\/(settings|work-items|initiatives|objectives|goals|workflows|events|backlog|views|reports|content)$/);
     if (projectRead) {
       const projectId = decodeURIComponent(projectRead[1]);
@@ -1282,10 +1304,9 @@ async function testProjectLifecycleStateAndConfirmedActions() {
 async function testPhase5ManagementJourneys() {
   const runtime = await createRuntime();
   await runtime.mount();
-  await runtime.click('[data-tab="project"]', 80);
+  await runtime.click('[data-tab="delivery"]', 80);
   const doc = runtime.dom.window.document;
 
-  await runtime.click('[data-project-view="planning"]');
   assert(doc.querySelector('[data-action="create-milestone"]'), 'milestone create control is missing');
   await runtime.setValue('[data-milestone-name]', 'Verification');
   await runtime.click('[data-action="create-milestone"]', 80);
@@ -1322,6 +1343,7 @@ async function testPhase5ManagementJourneys() {
     assert(milestoneCalls.some((call) => call.path.endsWith(suffix)), `milestone ${suffix.slice(1)} did not execute`);
   }
 
+  await runtime.click('[data-tab="project"]', 80);
   await runtime.click('[data-project-view="workflows"]');
   assert(doc.querySelector('[data-executable-workflows]'), 'executable workflow surface is missing');
   await runtime.setValue('[data-workflow-name]', 'release');
