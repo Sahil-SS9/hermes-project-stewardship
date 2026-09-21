@@ -68,6 +68,9 @@ def test_cycle_records_snapshot_and_audit(engine, enabled, svc):
 
 
 def test_objective_failure_drives_proposals(engine, enabled, svc, tmp_path):
+    # Command evaluators require the run_command_evaluator capability (level 3).
+    svc.enable(enabled, mission="keep CI green and deps fresh", lead_profile="lead",
+               member_profiles=["coder", "qa"], autonomy_level=3)
     repo = make_repo(tmp_path / "r")
     wire_repo(svc, enabled, repo)
     # failing high-severity objective

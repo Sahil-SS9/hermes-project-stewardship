@@ -263,6 +263,9 @@ def test_out_of_order_events_do_not_duplicate_execution(store):
 def test_reasoning_failure_records_error_not_proposal(svc, enabled, clock, tmp_path):
     from hermes_project_stewardship.cycles.engine import CycleEngine
 
+    # Command evaluators require the run_command_evaluator capability (level 3).
+    svc.enable(enabled, mission="keep CI green and deps fresh", lead_profile="lead",
+               member_profiles=["coder", "qa"], autonomy_level=3)
     repo = make_repo(tmp_path / "r")
     wire_repo(svc, enabled, repo)
     bus = EventBus(svc.store)
@@ -294,6 +297,9 @@ def test_reasoning_failure_records_error_not_proposal(svc, enabled, clock, tmp_p
 def test_reasoning_budget_caps_proposals(svc, enabled, clock, tmp_path):
     from hermes_project_stewardship.cycles.engine import CycleEngine
 
+    # Command evaluators require the run_command_evaluator capability (level 3).
+    svc.enable(enabled, mission="keep CI green and deps fresh", lead_profile="lead",
+               member_profiles=["coder", "qa"], autonomy_level=3)
     repo = make_repo(tmp_path / "r2")
     wire_repo(svc, enabled, repo)
     engine = CycleEngine(svc, clock=clock, max_initiatives_per_cycle=1)
