@@ -3,7 +3,8 @@
   "kind": "python-package",
   "bootstrap": [
     "uv venv .venv --allow-existing",
-    "uv sync --locked --extra dev --extra plugin"
+    "uv sync --locked --extra dev --extra plugin",
+    "uv pip install --python .venv/bin/python pyyaml"
   ],
   "build": [],
   "test": [

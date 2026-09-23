@@ -1,6 +1,10 @@
 // Shared Desktop seam for the production Dashboard canvas.
 // Keep this adapter data-only: Desktop does not invent or persist graph state.
-import { mountWorkflowCanvas } from '../dashboard/src/workflow-canvas.ts'
+import { mountWorkflowCanvas, validateConnection } from '../dashboard/src/workflow-canvas.ts'
+// Re-export the canonical connection validator so plugin.js toolbar actions
+// (Validate) answer with the SAME cycle/self-dependency rules the canvas
+// enforces on a drag — one implementation, not a second copy in the plugin.
+export { validateConnection }
 
 const toCanvasNode = (node) => ({
   node_id: node.node_id ?? node.id,
@@ -11,9 +15,19 @@ const toCanvasNode = (node) => ({
   kind: node.kind ?? (node.human_gate ? 'gate' : 'task'),
   status: node.status ?? null,
   assignee: node.assignee ?? null,
+  // The run projection's resolved assignment. Dropping it collapsed every
+  // lane band to 'unassigned' on the Desktop surface, so the canvas could
+  // never group by the real roster (the Dashboard half reads it directly).
+  team: node.team ?? null,
   phase_team: node.phase_team ?? null,
   evidence_refs: node.evidence_refs ?? [],
   canvas_position: node.canvas_position ?? undefined,
+  // Graph-shape modifiers the run projection already returns. Dropping them
+  // collapsed a conditional branch and a bounded loop onto the plain-task
+  // silhouette, so two of the four node purposes could never appear on the
+  // Desktop surface. Data only — this adapter still invents no graph state.
+  when: node.when ?? null,
+  loop: node.loop ?? null,
 })
 
 const toCanvasRun = (run) => ({

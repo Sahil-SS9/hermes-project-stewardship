@@ -5,7 +5,8 @@
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime'
 import { useEffect, useRef, useState } from 'react'
 import { host } from '@hermes/plugin-sdk'
-import { mountDesktopWorkflowCanvas } from './workflow-canvas-mount.js'
+import { mountDesktopWorkflowCanvas, validateConnection } from './workflow-canvas-mount.js'
+import workflowCanvasCss from './workflow-canvas-css.js'
 import { downloadTextFile, reportDownloadFilename } from './download.js'
 
 const LIGHT_TOKENS = Object.freeze({
@@ -1640,6 +1641,43 @@ const DOCKYARD_CSS = `
   .dockyard-root *::before,
   .dockyard-root *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+/* ==== Workflows: v6 composition (canvas-first, three zones) ====
+   Left = workflow library + the create/define editor; centre = toolbar above
+   the production canvas; right = run inspector (canonical runs + stored
+   versions + lifecycle). The canvas draws its own styling; these rules only
+   place it and the zones around it. Tokens: the shared dockyard palette. */
+.dockyard-root .dockyard-workflows-v6 { display: grid; gap: 0; }
+.dockyard-root .dockyard-wf3 { display: grid; grid-template-columns: 250px minmax(0, 1fr) 320px; gap: 0; margin-top: 16px; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); }
+.dockyard-root .dockyard-wf3-lib { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--dy-border); background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-wf3-lib-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--dy-border); }
+.dockyard-root .dockyard-wf3-lib-head strong { font-size: 12.5px; }
+.dockyard-root .dockyard-wf3-lib-head span { color: var(--dy-text-3); font-size: 11px; }
+.dockyard-root .dockyard-wf3-lib-list { display: grid; gap: 4px; align-content: start; padding: 8px; }
+.dockyard-root .dockyard-wf3-lib-list button { display: block; width: 100%; min-width: 0; padding: 9px 11px; text-align: left; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--dy-text); font: inherit; cursor: pointer; }
+.dockyard-root .dockyard-wf3-lib-list button:hover { border-color: var(--dy-border); background: var(--dy-surface); }
+.dockyard-root .dockyard-wf3-lib-list button.active { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); color: var(--dy-accent-text); }
+.dockyard-root .dockyard-wf3-lib-list strong { display: block; overflow: hidden; font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+.dockyard-root .dockyard-wf3-lib-list small { display: block; margin-top: 2px; color: var(--dy-text-3); font-size: 11px; }
+.dockyard-root .dockyard-wf3-lib .dockyard-inline-editor { margin: 8px; }
+.dockyard-root .dockyard-wf3-stage { display: flex; flex-direction: column; min-width: 0; }
+.dockyard-root .dockyard-wf3-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-wf3-sep { width: 1px; height: 18px; background: var(--dy-border); margin: 0 4px; }
+.dockyard-root .dockyard-wf3-validation { margin: 0; padding: 8px 14px; border-bottom: 1px solid var(--dy-border); background: var(--dy-warning-bg); color: var(--dy-warning); font-size: 12px; }
+.dockyard-root .dockyard-wf3-stage .dockyard-workflow-graph { min-width: 0; }
+.dockyard-root .dockyard-wf3-stage .dockyard-workflow-graph .dy-wf { height: 62vh; border: 0; border-radius: 0; }
+.dockyard-root .dockyard-wf3-insp { display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: auto; padding: 14px; border-left: 1px solid var(--dy-border); background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-wf3-insp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--dy-border); }
+.dockyard-root .dockyard-wf3-insp-head strong { font-size: 12.5px; }
+.dockyard-root .dockyard-wf3-insp-head span { color: var(--dy-text-3); font-size: 11px; }
+.dockyard-root .dockyard-wf3-runkey { margin: 6px 0 2px; color: var(--dy-text); font-size: 12.5px; font-weight: 600; }
+.dockyard-root .dockyard-wf3-counts { margin: 0 0 6px; color: var(--dy-text-3); font-size: 11px; }
+.dockyard-root .dockyard-wf3-insp ul { margin: 6px 0 0; padding: 0 0 0 16px; display: grid; gap: 3px; }
+.dockyard-root .dockyard-wf3-insp li { color: var(--dy-text-2); font-size: 12px; }
+@media (max-width: 1250px) {
+  .dockyard-root .dockyard-wf3 { grid-template-columns: 220px minmax(0, 1fr); }
+  .dockyard-root .dockyard-wf3-insp { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--dy-border); }
+}
+
 `
 
 let _rest = null
@@ -1692,16 +1730,28 @@ async function api(path, init) {
   }
 }
 
-function useDockyardStyles() {
+function useStylesheet(datasetKey, datasetValue, css) {
   useEffect(() => {
-    const existing = document.querySelector('style[data-dockyard-style="true"]')
+    const selector = `style[data-${datasetKey}="true"]`
+    const existing = document.querySelector(selector)
     if (existing) return undefined
     const style = document.createElement('style')
-    style.dataset.dockyardStyle = 'true'
-    style.textContent = DOCKYARD_CSS
+    style.dataset[datasetValue] = 'true'
+    style.textContent = css
     document.head.appendChild(style)
     return () => style.remove()
   }, [])
+}
+
+function useDockyardStyles() {
+  useStylesheet('dockyard-style', 'dockyardStyle', DOCKYARD_CSS)
+  // The workflow canvas owns a stylesheet of its own (the palette has exactly
+  // one home: dashboard/src/workflow-canvas-css.ts). Its rules are scoped to
+  // `.dy-wf-scope`, a class the canvas mount host carries itself, so this file
+  // only has to make the text present — it does not scope or wrap the canvas.
+  // Without it every `var(--dy-wf-*)` fill resolves to nothing and the nodes
+  // paint solid black (measured regression, 2026-09-22).
+  useStylesheet('dy-wf-stylesheet', 'dyWfStylesheet', workflowCanvasCss)
 }
 
 function Icon({ name }) {
@@ -4058,6 +4108,12 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh }) {
   const [selected, setSelected] = useState(workflows?.[0]?.name ?? '')
   const [runs, setRuns] = useState([])
   const [error, setError] = useState(null)
+  // v6 composition: the canvas is the surface. 'live' draws the latest
+  // canonical run (the shipped default — statuses are read from the real run
+  // projection); 'definition' draws the stored plan with no run overlay.
+  // Both read the same mount; neither invents graph state.
+  const [mode, setMode] = useState('live')
+  const [validation, setValidation] = useState(null)
   const encoded = encodeURIComponent(project.id)
   const grouped = Object.values((workflows ?? []).reduce((all, row) => {
     const item = all[row.name] ?? { name: row.name, versions: [], archived_at: row.archived_at }
@@ -4066,6 +4122,18 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh }) {
   const current = grouped.find((item) => item.name === selected) ?? grouped[0]
   const definition = current?.versions?.[current.versions.length - 1]?.definition ?? { nodes: [] }
   const nodes = definition.nodes ?? []
+  // The persisted definition's nodes in the canvas's own vocabulary, so toolbar
+  // actions persist through the exact mapping the canvas edits use.
+  const currentCanvasNodes = () => nodes.map((n) => ({
+    node_id: n.node_id ?? n.id,
+    title: n.title ?? n.name ?? n.id,
+    depends_on: n.depends_on ?? [],
+    human_gate: Boolean(n.human_gate),
+    task_ref: n.task_ref ?? null,
+    kind: n.kind ?? (n.human_gate ? 'gate' : 'task'),
+    phase_team: n.phase_team ?? null,
+    canvas_position: n.canvas_position ?? undefined,
+  }))
   const loadRuns = async (workflow = current?.name) => {
     if (!workflow) return
     try { const result = await api(`/projects/${encoded}/workflows/${encodeURIComponent(workflow)}/runs`); setRuns(result.runs ?? []) }
@@ -4074,12 +4142,35 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh }) {
   useEffect(() => { loadRuns() }, [selected, workflows?.length])
   useEffect(() => {
     if (!canvasRef.current || !current) return undefined
-    return mountDesktopWorkflowCanvas(canvasRef.current, project.id, current.name, definition, runs, {
+    // Live mode renders the real canonical run (the mount falls back to the
+    // definition frame when no run exists); definition mode renders the stored
+    // plan with no run overlay. Same mount, same data source — a display
+    // choice only.
+    const visibleRuns = mode === 'live' ? runs : []
+    return mountDesktopWorkflowCanvas(canvasRef.current, project.id, current.name, definition, visibleRuns, {
       onEdit: async (editedNodes) => {
-        await api(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/versions`, { method: 'POST', body: { nodes: editedNodes.map(({ node_id, title, depends_on, human_gate, task_ref, kind, phase_team }) => ({ id: node_id, title, depends_on, human_gate, task_ref, kind, phase_team, canvas_position })) } })
+        await api(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/versions`, { method: 'POST', body: { nodes: editedNodes.map(({ node_id, title, depends_on, human_gate, task_ref, kind, phase_team, canvas_position }) => ({ id: node_id, title, depends_on, human_gate, task_ref, kind, phase_team, canvas_position })) } })
         onRefresh?.()
       },
-    })  }, [project.id, current?.name, current?.versions?.length, runs])
+      // Gate decisions use the same canonical authority as the dashboard: the
+      // reviewed decision fingerprint is submitted with the action, so a stale
+      // review can never approve something else. Retry re-queues via the
+      // canonical work-item transition — never an optimistic local flip.
+      onApprove: async (ref) => {
+        const decision = await api(`/initiatives/${encodeURIComponent(ref)}/decision`)
+        await api(`/initiatives/${encodeURIComponent(ref)}/approve`, { method: 'POST', body: { expected_fingerprint: decision.fingerprint } })
+        await loadRuns(current.name)
+      },
+      onReject: async (ref) => {
+        const decision = await api(`/initiatives/${encodeURIComponent(ref)}/decision`)
+        await api(`/initiatives/${encodeURIComponent(ref)}/reject`, { method: 'POST', body: { expected_fingerprint: decision.fingerprint, reason: 'Rejected from workflow gate review' } })
+        await loadRuns(current.name)
+      },
+      onRetry: async (ref) => {
+        await api(`/projects/${encoded}/work-items/${encodeURIComponent(ref)}/transition`, { method: 'POST', body: { status: 'backlog' } })
+        await loadRuns(current.name)
+      },
+    })  }, [project.id, current?.name, current?.versions?.length, runs, mode])
   const mutate = async (path, body = {}) => {
     setError(null)
     try { await api(path, { method: 'POST', body }); onRefresh?.() }
@@ -4092,38 +4183,109 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh }) {
     mutate(path, { ...(existing ? {} : { name: name.trim() }), nodes: [{ id: 'step-1', title: title.trim(), depends_on: [], human_gate: false, team: team || null, phase_team: phaseTeams['step-1'] || null }] })
     setSelected(name.trim()); setTitle('')
   }
+  // Toolbar actions persist through the SAME version contract the canvas uses.
+  const persistNodes = (nextNodes) => {
+    if (!current) return
+    void mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/versions`, {
+      nodes: nextNodes.map(({ node_id, title: nodeTitle, depends_on, human_gate, task_ref, kind, phase_team, canvas_position }) => ({ id: node_id, title: nodeTitle, depends_on, human_gate, task_ref, kind, phase_team, canvas_position })),
+    })
+  }
+  const addNode = (gate) => {
+    const existingIds = new Set(currentCanvasNodes().map((n) => n.node_id))
+    let index = nodes.length + 1
+    while (existingIds.has(gate ? `gate-${index}` : `step-${index}`)) index += 1
+    const id = gate ? `gate-${index}` : `step-${index}`
+    persistNodes([...currentCanvasNodes(), {
+      node_id: id, title: gate ? `Gate ${index}` : `Step ${index}`, depends_on: [],
+      human_gate: gate, task_ref: null, kind: gate ? 'gate' : 'task', phase_team: null,
+    }])
+  }
+  // Auto layout: dropping canvas_position lets the layout engine place every
+  // node by topology again. It writes the version, like any other edit.
+  const autoLayout = () => persistNodes(currentCanvasNodes())
+  const validateGraph = () => {
+    const nodesNow = currentCanvasNodes()
+    const issues = []
+    for (const n of nodesNow) {
+      for (const dep of n.depends_on) {
+        const problem = validateConnection(nodesNow, dep, n.node_id)
+        if (problem) issues.push(`${n.title} ← ${dep}: ${problem}`)
+      }
+    }
+    if (!nodesNow.some((n) => n.human_gate)) issues.push('no human gate on this graph')
+    // Both outcomes are stated: an empty result is a finding too, and it must
+    // not read as "the button did nothing".
+    setValidation(issues.length ? { ok: false, text: `Validation: ${issues.join('; ')}` } : { ok: true, text: 'Validation: no issues found' })
+  }
   const statusFor = (run, node) => run?.nodes?.find((item) => item.node_id === (node.id || node.node_id))?.status ?? 'pending'
   const latest = runs[0]
-  return jsxs('section', { className: 'dockyard-feature-card dockyard-workflows-prototype', 'data-workflows-prototype': project.id, 'data-executable-workflows': project.id, children: [
-    jsxs('header', { className: 'dockyard-section-head', children: [jsxs('div', { children: [jsx('h2', { children: 'Workflows' }), jsx('p', { children: 'Templates become project instances. Planning is saved as a version; execution is shown only from canonical runs.' })] }), jsx(StatusTag, { tone: latest?.status === 'running' ? 'info' : 'neutral', label: latest ? `Live: ${latest.status}` : `${number(grouped.length)} instances` })] }),
-    jsxs('div', { className: 'dockyard-inline-editor', children: [
-      jsxs('label', { children: [jsx('span', { children: 'Template / instance' }), jsx('input', { 'data-workflow-name': true, value: name, onChange: (event) => setName(event.target.value) })] }),
-      jsxs('label', { children: [jsx('span', { children: 'Phase title' }), jsx('input', { 'data-workflow-title': true, value: title, onChange: (event) => setTitle(event.target.value) })] }),
-      jsxs('label', { children: [jsx('span', { children: 'Default bot team' }), jsx('input', { 'data-workflow-team': true, value: team, placeholder: 'team slug', onChange: (event) => setTeam(event.target.value) })] }),
-      jsxs('label', { children: [jsx('span', { children: 'Run key' }), jsx('input', { 'data-workflow-run-key': current?.name ?? name, value: runKey, onChange: (event) => setRunKey(event.target.value), placeholder: 'execution key' })] }),
-      jsx(Button, { action: 'define-workflow', variant: 'primary', disabled: !name.trim() || !title.trim(), onClick: define, children: current ? 'Save planning version' : 'Create instance' }),
-    ] }),
+  const liveCounts = latest ? (latest.nodes ?? []).reduce((acc, node) => { const key = node.status ?? 'pending'; acc[key] = (acc[key] ?? 0) + 1; return acc }, {}) : null
+  return jsxs('section', { className: 'dockyard-feature-card dockyard-workflows-v6', 'data-workflows-prototype': project.id, 'data-executable-workflows': project.id, children: [
+    jsxs('header', { className: 'dockyard-section-head', children: [jsxs('div', { children: [jsx('h2', { children: 'Workflows' }), jsx('p', { children: 'Planning is saved as a version; execution is shown only from canonical runs.' })] }), jsx(StatusTag, { tone: latest?.status === 'running' ? 'info' : 'neutral', label: latest ? `Live: ${latest.status}` : `${number(grouped.length)} instances` })] }),
     error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
-    grouped.length ? jsx('div', { className: 'dockyard-workflow-instance-tabs', children: grouped.map((item) => jsxs('span', { children: [jsx(Button, { action: 'select-workflow', variant: item.name === current?.name ? 'primary' : 'secondary', onClick: () => { setSelected(item.name); loadRuns(item.name) }, children: `${item.name} · v${item.versions[item.versions.length - 1].version}` }), jsx(Button, { action: 'inspect-workflow', onClick: () => { setSelected(item.name); loadRuns(item.name) }, children: 'Inspect definitions & runs' })] }, item.name)) }) : jsx('p', { className: 'dockyard-meta', children: 'No workflow instances yet. Create one from a template above.' }),
-    current ? jsxs('div', { className: 'dockyard-workflow-planning', children: [
-      jsxs('div', { children: [jsx('h3', { children: 'Persisted planning canvas' }), jsx('p', { className: 'dockyard-meta', children: 'Read-only production canvas backed by the canonical workflow definition and runs.' }),
-        jsx('div', { ref: canvasRef, className: 'dockyard-workflow-graph', 'data-workflow-canvas': current.name, role: 'img', 'aria-label': 'Workflow planning graph' }),
-        jsxs('details', { className: 'dockyard-workflow-definitions', 'data-workflow-definitions': current.name, children: [
+    jsxs('div', { className: 'dockyard-wf3', children: [
+      // ---- Zone 1: workflow library + create/define editor ---------------
+      jsxs('aside', { className: 'dockyard-wf3-lib', 'data-workflow-library': project.id, children: [
+        jsxs('div', { className: 'dockyard-wf3-lib-head', children: [jsx('strong', { children: 'Library' }), jsx('span', { children: number(grouped.length) })] }),
+        grouped.length ? jsx('div', { className: 'dockyard-wf3-lib-list', children: grouped.map((item) => jsxs('button', {
+          type: 'button',
+          className: item.name === current?.name ? 'active' : '',
+          'data-workflow-library-item': item.name,
+          'data-action': 'select-workflow',
+          onClick: () => { setSelected(item.name); loadRuns(item.name) },
+          children: [
+            jsx('strong', { children: item.name }),
+            jsx('small', { children: `v${item.versions[item.versions.length - 1].version}${item.archived_at ? ' · archived' : ''}` }),
+          ],
+        }, item.name)) }) : jsx('p', { className: 'dockyard-meta', children: 'No workflow instances yet.' }),
+        jsxs('div', { className: 'dockyard-inline-editor', children: [
+          jsxs('label', { children: [jsx('span', { children: 'Template / instance' }), jsx('input', { 'data-workflow-name': true, value: name, onChange: (event) => setName(event.target.value) })] }),
+          jsxs('label', { children: [jsx('span', { children: 'Phase title' }), jsx('input', { 'data-workflow-title': true, value: title, onChange: (event) => setTitle(event.target.value) })] }),
+          jsxs('label', { children: [jsx('span', { children: 'Default bot team' }), jsx('input', { 'data-workflow-team': true, value: team, placeholder: 'team slug', onChange: (event) => setTeam(event.target.value) })] }),
+          jsxs('label', { children: [jsx('span', { children: 'Run key' }), jsx('input', { 'data-workflow-run-key': current?.name ?? name, value: runKey, onChange: (event) => setRunKey(event.target.value), placeholder: 'execution key' })] }),
+          jsx(Button, { action: 'define-workflow', variant: 'primary', disabled: !name.trim() || !title.trim(), onClick: define, children: current ? 'Save planning version' : 'Create instance' }),
+        ] }),
+      ]}),
+      // ---- Zone 2: toolbar + canvas (the surface) -------------------------
+      jsxs('div', { className: 'dockyard-wf3-stage', children: [
+        jsxs('div', { className: 'dockyard-wf3-toolbar', role: 'toolbar', 'aria-label': 'Workflow canvas tools', children: [
+          jsx(Button, { small: true, action: 'wf-view-definition', variant: mode === 'definition' ? 'primary' : '', onClick: () => setMode('definition'), children: 'Definition' }),
+          jsx(Button, { small: true, action: 'wf-view-live', variant: mode === 'live' ? 'primary' : '', disabled: !latest, onClick: () => setMode('live'), children: 'Live run' }),
+          jsx('span', { className: 'dockyard-wf3-sep', 'aria-hidden': true }),
+          jsx(Button, { small: true, action: 'wf-add-step', disabled: !current, onClick: () => addNode(false), children: '＋ Step' }),
+          jsx(Button, { small: true, action: 'wf-add-gate', disabled: !current, onClick: () => addNode(true), children: '＋ Gate' }),
+          jsx(Button, { small: true, action: 'wf-auto-layout', disabled: !current, onClick: autoLayout, children: 'Auto layout' }),
+          jsx(Button, { small: true, action: 'wf-validate', disabled: !current, onClick: validateGraph, children: 'Validate' }),
+          jsx('span', { className: 'dockyard-wf3-sep', 'aria-hidden': true }),
+          jsx(Button, { small: true, action: 'inspect-workflow', disabled: !current, onClick: () => { setSelected(current.name); loadRuns(current.name) }, children: 'Refresh canvas' }),
+        ]}),
+        validation ? jsx('p', { className: 'dockyard-wf3-validation', role: 'status', 'data-wf-validate-result': validation.ok ? 'ok' : 'issues', children: validation.text }) : null,
+        current ? jsx('div', { ref: canvasRef, className: 'dockyard-workflow-graph', 'data-workflow-canvas': current.name, role: 'img', 'aria-label': 'Workflow planning graph' }) : jsx('p', { className: 'dockyard-meta', children: 'No workflow selected.' }),
+      ]}),
+      // ---- Zone 3: run inspector (canonical runs + versions + lifecycle) --
+      jsxs('aside', { className: 'dockyard-wf3-insp', children: [
+        jsxs('div', { className: 'dockyard-wf3-insp-head', children: [jsx('strong', { children: 'Run inspector' }), current ? jsx('span', { children: `v${current.versions[current.versions.length - 1].version}` }) : null] }),
+        latest ? jsxs('div', { 'data-workflow-live-run': latest.run_key, children: [
+          jsx(StatusTag, { tone: latest.status === 'completed' ? 'success' : latest.status === 'failed' ? 'danger' : 'info', label: latest.status }),
+          jsx('p', { className: 'dockyard-wf3-runkey', children: `${latest.run_key} · v${latest.version}` }),
+          liveCounts ? jsx('p', { className: 'dockyard-wf3-counts', children: ['done', 'working', 'blocked', 'pending'].filter((k) => liveCounts[k]).map((k) => `${liveCounts[k]} ${k}`).join(' · ') }) : null,
+          jsx('ul', { children: (latest.nodes ?? []).map((node) => jsx('li', { children: `${node.title} — ${node.status ?? 'pending'}${node.assignee ? ` · ${node.assignee}` : ''}` }, node.node_id)) }),
+        ] }) : jsx('p', { className: 'dockyard-meta', children: 'No canonical run recorded. Start a run to see truthful state.' }),
+        jsxs('div', { className: 'dockyard-form-actions', children: current ? current.versions.map((version) => jsx(Button, { action: 'start-workflow', disabled: Boolean(current.archived_at), onClick: async () => { await mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/start`, { version: version.version, run_key: runKey || `${current.name}-${Date.now()}` }); await loadRuns(current.name) }, children: `Start v${version.version}` }, String(version.version))) : null }),
+        current ? jsxs('details', { className: 'dockyard-workflow-definitions', 'data-workflow-definitions': current.name, children: [
           jsx('summary', { children: 'Stored definition versions' }),
           ...current.versions.map((version) => jsxs('section', { 'data-workflow-definition-version': version.version, children: [
             jsx('strong', { children: `Version ${version.version}` }),
             jsx('pre', { children: JSON.stringify(version.definition?.nodes ?? [], null, 2) }),
           ]}, `definition-${version.version}`)),
-        ]})] }),
-      jsxs('aside', { className: 'dockyard-workflow-live', children: [jsx('h3', { children: 'Live execution' }), latest ? jsxs('div', { 'data-workflow-live-run': latest.run_key, children: [jsx(StatusTag, { tone: latest.status === 'completed' ? 'success' : latest.status === 'failed' ? 'danger' : 'info', label: latest.status }), jsx('p', { children: `${latest.run_key} · v${latest.version}` }), jsx('ul', { children: (latest.nodes ?? []).map((node) => jsx('li', { children: `${node.title} — ${node.status ?? 'pending'}${node.assignee ? ` · ${node.assignee}` : ''}` }, node.node_id)) })] }) : jsx('p', { className: 'dockyard-meta', children: 'No canonical run recorded. Start a run to see truthful state.' }),
-        jsxs('div', { className: 'dockyard-form-actions', children: current.versions.map((version) => jsx(Button, { action: 'start-workflow', disabled: Boolean(current.archived_at), onClick: async () => { await mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/start`, { version: version.version, run_key: runKey || `${current.name}-${Date.now()}` }); await loadRuns(current.name) }, children: `Start v${version.version}` }, String(version.version))) }),
-        jsxs('div', { className: 'dockyard-form-actions', children: [
+        ]}) : null,
+        jsxs('div', { className: 'dockyard-form-actions', children: current ? [
           current.archived_at
             ? jsx(Button, { action: 'restore-workflow', onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/restore`), children: 'Restore workflow' })
             : jsx(Button, { action: 'archive-workflow', variant: 'danger', onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/archive`), children: 'Archive workflow' }),
-        ]}),
-      ] })
-    ] }) : null,
+        ] : null }),
+      ]}),
+    ]}),
   ]})
 }
 
@@ -4240,92 +4402,562 @@ function PlanningPanel({ project, milestones, workItems, onRefresh }) {
   ]})
 }
 
+
+// ---- Planning canvas (v6 composition) --------------------------------------
+// The planning surface is SPATIAL: a toolbar over a pannable/zoomable world,
+// one absolutely-positioned card per persisted canvas object, SVG connectors
+// drawn through their live rects, a collapsible curation assistant panel and a
+// selection drawer. The backend is the only source of truth: nothing on this
+// surface invents graph state, and every mutation is a real canvas revision
+// (PUT .../canvas with expected_revision) or a real curation decision.
+//
+// Vocabulary is the REAL persisted one and is used verbatim:
+//   object kinds      canvas_service.OBJECT_KINDS
+//   connector meaning  canvas_service.CONNECTOR_MEANINGS
+// v6's five card visuals map onto those real kinds as:
+//   note -> note, evidence -> evidence, question -> question,
+//   decision -> decision (a real kind, kept), plan -> plan_block.
+// The remaining real kinds (claim, link, media) are reachable too, so the
+// whole persisted vocabulary is drawable and nothing unreal is offered.
+const CANVAS_OBJECT_KINDS = Object.freeze(['evidence', 'claim', 'question', 'decision', 'plan_block', 'note', 'link', 'media'])
+const CANVAS_CONNECTOR_MEANINGS = Object.freeze(['supports', 'contradicts', 'derived_from', 'clarifies', 'depends_on', 'implements', 'raises_question'])
+const CANVAS_KIND_LABELS = Object.freeze({ evidence: 'Evidence', claim: 'Claim', question: 'Question', decision: 'Decision', plan_block: 'Plan block', note: 'Note', link: 'Link', media: 'Media' })
+const CANVAS_MEANING_LABELS = Object.freeze({ supports: 'supports', contradicts: 'contradicts', derived_from: 'derived from', clarifies: 'clarifies', depends_on: 'depends on', implements: 'implements', raises_question: 'raises a question' })
+const CANVAS_WORLD = Object.freeze({ width: 2000, height: 1400 })
+const CANVAS_CARD = Object.freeze({ width: 240, height: 140 })
+const CANVAS_ZOOM = Object.freeze({ min: 0.5, max: 1.5, step: 0.1 })
+let canvasObjectSeq = 0
+let canvasEdgeSeq = 0
+
+const canvasText = (item) => String(item?.content?.text ?? item?.content?.title ?? item?.content?.url ?? '')
+const canvasNumber = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0)
+const canvasClamp = (value, min, max) => Math.min(Math.max(value, min), max)
+const canvasRect = (item) => ({
+  x: canvasNumber(item?.x), y: canvasNumber(item?.y),
+  width: canvasNumber(item?.width) || CANVAS_CARD.width,
+  height: canvasNumber(item?.height) || CANVAS_CARD.height,
+})
+// Deterministic free-slot placement: the first grid cell that does not overlap
+// an existing card. No randomness, so the same canvas always places the same.
+const canvasPlaced = (objects) => {
+  const cols = 5
+  for (let slot = 0; slot < cols * 12; slot += 1) {
+    const x = 60 + (slot % cols) * 280
+    const y = 60 + Math.floor(slot / cols) * 190
+    const overlaps = objects.some((item) => {
+      const rect = canvasRect(item)
+      return x < rect.x + rect.width && x + CANVAS_CARD.width > rect.x && y < rect.y + rect.height && y + CANVAS_CARD.height > rect.y
+    })
+    if (!overlaps) return { x, y }
+  }
+  return { x: 60, y: 60 }
+}
+
 function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onRefresh }) {
-  const [canvas, setCanvas] = useState(initialCanvas ?? { revision: 1, objects: [], connectors: [] })
+  const [canvas, setCanvas] = useState(initialCanvas ?? null)
   const [objects, setObjects] = useState(initialCanvas?.objects ?? [])
   const [connectors, setConnectors] = useState(initialCanvas?.connectors ?? [])
-  const [draft, setDraft] = useState('')
+  const [dirty, setDirty] = useState(false)
   const [kind, setKind] = useState('note')
+  const [draft, setDraft] = useState('')
+  const [mode, setMode] = useState('select')
+  const [pendingConnect, setPendingConnect] = useState(null)
+  const [selectedId, setSelectedId] = useState(null)
+  const [drawerText, setDrawerText] = useState('')
+  const [drawerKind, setDrawerKind] = useState('note')
   const [linkSource, setLinkSource] = useState('')
   const [linkTarget, setLinkTarget] = useState('')
   const [linkMeaning, setLinkMeaning] = useState('supports')
-  const [dragging, setDragging] = useState(null)
-  const [busy, setBusy] = useState(false)
-  const [notice, setNotice] = useState(null)
-  const encoded = encodeURIComponent(project.id)
-  useEffect(() => {
-    const next = initialCanvas ?? { revision: 1, objects: [], connectors: [] }
-    setCanvas(next); setObjects(next.objects ?? []); setConnectors(next.connectors ?? [])
-  }, [initialCanvas])
-  const addObject = () => {
-    const text = draft.trim()
-    if (!text) return
-    setObjects((current) => [...current, { id: `canvas-${Date.now()}`, kind, content: { text }, x: current.length * 24, y: current.length * 24, tags: [] }])
-    setDraft('')
-  }
-  const save = async () => {
-    setBusy(true); setNotice(null)
-    try {
-      const saved = await api(`/projects/${encoded}/canvas`, { method: 'PUT', body: { expected_revision: canvas.revision, objects, connectors, actor: 'desktop-user' } })
-      setCanvas(saved); setObjects(saved.objects ?? []); setConnectors(saved.connectors ?? []); setNotice('Canvas saved'); onRefresh?.()
-    } catch (failure) { setNotice(`Canvas save failed: ${String(failure?.message ?? failure)}`) }
-    setBusy(false)
-  }
-  const reload = async () => {
-    setBusy(true); setNotice(null)
-    try { const next = await api(`/projects/${encoded}/canvas`); setCanvas(next); setObjects(next.objects ?? []); setConnectors(next.connectors ?? []); setNotice('Canvas reloaded') }
-    catch (failure) { setNotice(`Canvas reload failed: ${String(failure?.message ?? failure)}`) }
-    setBusy(false)
-  }
-  const remove = (id) => {
-    setObjects((current) => current.filter((item) => item.id !== id))
-    setConnectors((current) => current.filter((edge) => edge.source !== id && edge.target !== id))
-  }
-  const connect = () => {
-    if (!linkSource || !linkTarget || linkSource === linkTarget) return
-    setConnectors((current) => [...current, { id: `edge-${Date.now()}`, source: linkSource, target: linkTarget, meaning: linkMeaning }])
-  }
-  const dropOn = (targetId) => {
-    if (!dragging || dragging === targetId) return
-    setObjects((current) => {
-      const source = current.find((item) => item.id === dragging)
-      const target = current.find((item) => item.id === targetId)
-      if (!source || !target) return current
-      return current.map((item) => item.id === dragging ? { ...item, x: Number(target.x || 0) + 32, y: Number(target.y || 0) + 32 } : item)
-    })
-    setDragging(null)
-  }
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [chatOpen, setChatOpen] = useState(false)
   const [session, setSession] = useState(null)
   const [answer, setAnswer] = useState('')
+  const [review, setReview] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState(null)
+  const stageRef = useRef(null)
+  const encoded = encodeURIComponent(project.id)
+  const revision = Number(canvas?.revision ?? 0)
+  useEffect(() => {
+    const next = initialCanvas ?? { revision: 0, objects: [], connectors: [] }
+    setCanvas(next); setObjects(next.objects ?? []); setConnectors(next.connectors ?? []); setDirty(false)
+  }, [initialCanvas])
+  const selected = objects.find((item) => item.id === selectedId) ?? null
+  const persistableObjects = () => objects.map((item) => ({
+    id: item.id, kind: item.kind, content: item.content ?? { text: canvasText(item) },
+    x: canvasNumber(item.x), y: canvasNumber(item.y),
+    width: canvasNumber(item.width) || CANVAS_CARD.width, height: canvasNumber(item.height) || CANVAS_CARD.height,
+    tags: Array.isArray(item.tags) ? item.tags : [],
+    evidence_ref: item.evidence_ref ?? null, work_ref: item.work_ref ?? null,
+  }))
+  const persistableConnectors = (rows) => {
+    const ids = new Set(rows.map((item) => item.id))
+    return connectors
+      .filter((edge) => ids.has(edge.source) && ids.has(edge.target))
+      .map((edge) => ({ id: edge.id, source: edge.source, target: edge.target, meaning: edge.meaning }))
+  }
+  const reload = async () => {
+    setBusy(true)
+    try {
+      const fresh = await api(`/projects/${encoded}/canvas`)
+      const discarded = dirty
+      setCanvas(fresh); setObjects(fresh.objects ?? []); setConnectors(fresh.connectors ?? [])
+      setDirty(false); setSelectedId(null)
+      setNotice(discarded
+        ? { tone: 'danger', text: `Canvas reloaded at revision ${fresh.revision} — unsaved edits were discarded, not applied.` }
+        : { tone: 'ok', text: `Canvas reloaded at revision ${fresh.revision}.` })
+    } catch (failure) { setNotice({ tone: 'danger', text: `Reload failed: ${String(failure?.message ?? failure)}` }) }
+    setBusy(false)
+  }
+  const save = async () => {
+    setBusy(true)
+    try {
+      const rows = persistableObjects()
+      const edges = persistableConnectors(rows)
+      const saved = await api(`/projects/${encoded}/canvas`, { method: 'PUT', body: { expected_revision: revision, objects: rows, connectors: edges, actor: 'desktop-user' } })
+      setCanvas(saved); setObjects(saved.objects ?? []); setConnectors(saved.connectors ?? []); setDirty(false)
+      setNotice({ tone: 'ok', text: `Canvas saved — revision ${saved.revision} with ${(saved.objects ?? []).length} object(s) and ${(saved.connectors ?? []).length} connector(s).` })
+      onRefresh?.()
+    } catch (failure) {
+      const message = String(failure?.message ?? failure)
+      if (/\b409\b|conflict/i.test(message)) {
+        // Stale revision: never overwrite silently. Re-read the canonical
+        // canvas, state the conflict, and keep the unsaved edit out of it.
+        try {
+          const fresh = await api(`/projects/${encoded}/canvas`)
+          setCanvas(fresh); setObjects(fresh.objects ?? []); setConnectors(fresh.connectors ?? []); setDirty(false)
+          setNotice({ tone: 'danger', text: `Revision conflict — this canvas changed elsewhere and was reloaded at revision ${fresh.revision}. Your unsaved edit was not applied.` })
+        } catch (reloadFailure) { setNotice({ tone: 'danger', text: `Canvas save failed: ${message}` }) }
+      } else {
+        setNotice({ tone: 'danger', text: `Canvas save failed: ${message}` })
+      }
+    }
+    setBusy(false)
+  }
+  const addObject = (objectKind, text) => {
+    const body = String(text ?? '').trim()
+    if (!body) return null
+    const position = canvasPlaced(objects)
+    canvasObjectSeq += 1
+    const item = {
+      id: `canvas-obj-${Date.now()}-${canvasObjectSeq}`, kind: objectKind, content: { text: body },
+      x: position.x, y: position.y, width: CANVAS_CARD.width, height: CANVAS_CARD.height,
+      tags: [], evidence_ref: null, work_ref: null,
+    }
+    setObjects((current) => [...current, item])
+    setDirty(true)
+    setNotice({ tone: 'ok', text: `${CANVAS_KIND_LABELS[objectKind] ?? objectKind} added as scratch — Save canvas to persist it.` })
+    return item
+  }
+  const addFromDraft = () => {
+    if (!addObject(kind, draft)) return
+    setDraft('')
+  }
+  const openDrawer = (item) => {
+    setSelectedId(item.id)
+    setDrawerText(canvasText(item))
+    setDrawerKind(item.kind)
+  }
+  const applyDrawer = () => {
+    if (!selected) return
+    const text = drawerText.trim()
+    if (!text) return
+    setObjects((current) => current.map((item) => item.id === selected.id ? { ...item, kind: drawerKind, content: { ...(item.content ?? {}), text } } : item))
+    setDirty(true)
+    setNotice({ tone: 'ok', text: 'Object updated — Save canvas to persist the change.' })
+  }
+  const removeSelected = async () => {
+    if (!selected) return
+    const persistable = new Set((canvas?.objects ?? []).map((row) => row.id))
+    // A persisted object with no other unsaved work goes through the real
+    // DELETE route (revision bumped server-side). Anything else is removed
+    // locally and persisted by the next save — never two half-writes.
+    if (!persistable.has(selected.id) || dirty) {
+      const wasPersisted = persistable.has(selected.id)
+      const removedId = selected.id
+      setObjects((current) => current.filter((row) => row.id !== removedId))
+      setConnectors((current) => current.filter((edge) => edge.source !== removedId && edge.target !== removedId))
+      setDirty(true); setSelectedId(null)
+      setNotice({ tone: 'ok', text: wasPersisted ? 'Removed locally — Save canvas to persist the removal.' : 'Scratch object removed — it was never saved.' })
+      return
+    }
+    setBusy(true)
+    try {
+      const saved = await api(`/projects/${encoded}/canvas/objects/${encodeURIComponent(selected.id)}?expected_revision=${revision}`, { method: 'DELETE' })
+      setCanvas(saved); setObjects(saved.objects ?? []); setConnectors(saved.connectors ?? []); setDirty(false); setSelectedId(null)
+      setNotice({ tone: 'ok', text: `Object removed — revision ${saved.revision} with ${(saved.objects ?? []).length} object(s).` })
+      onRefresh?.()
+    } catch (failure) { setNotice({ tone: 'danger', text: `Remove failed: ${String(failure?.message ?? failure)}` }) }
+    setBusy(false)
+  }
+  const addConnector = (source, target, meaning) => {
+    if (!source || !target || source === target) {
+      setNotice({ tone: 'danger', text: 'A connector needs two different objects.' })
+      return
+    }
+    if (connectors.some((edge) => edge.source === source && edge.target === target && edge.meaning === meaning)) {
+      setNotice({ tone: 'danger', text: `Already linked: these two objects already carry a "${meaning}" connector.` })
+      return
+    }
+    canvasEdgeSeq += 1
+    setConnectors((current) => [...current, { id: `canvas-edge-${Date.now()}-${canvasEdgeSeq}`, source, target, meaning }])
+    setDirty(true)
+    setNotice({ tone: 'ok', text: `Connector added (${CANVAS_MEANING_LABELS[meaning] ?? meaning}) — Save canvas to persist it.` })
+  }
+  const connectFromEditor = () => addConnector(linkSource, linkTarget, linkMeaning)
+  const beginObjectDrag = (event, item) => {
+    if (event.button !== 0) return
+    event.preventDefault()
+    if (mode === 'connect') {
+      if (!pendingConnect) { setPendingConnect(item.id); setNotice({ tone: 'ok', text: 'Connect mode: pick the second object to link.' }); return }
+      if (pendingConnect === item.id) { setPendingConnect(null); setNotice({ tone: 'ok', text: 'Connect cancelled — the same object was picked twice (no self-connector).' }); return }
+      addConnector(pendingConnect, item.id, linkMeaning)
+      setPendingConnect(null)
+      return
+    }
+    const startX = event.clientX
+    const startY = event.clientY
+    const origin = canvasRect(item)
+    let moved = false
+    const move = (moveEvent) => {
+      const dx = moveEvent.clientX - startX
+      const dy = moveEvent.clientY - startY
+      if (!moved && Math.abs(dx) <= 3 && Math.abs(dy) <= 3) return
+      moved = true
+      setObjects((current) => current.map((row) => row.id === item.id ? {
+        ...row,
+        x: canvasClamp(origin.x + dx / zoom, 0, CANVAS_WORLD.width - CANVAS_CARD.width),
+        y: canvasClamp(origin.y + dy / zoom, 0, CANVAS_WORLD.height - CANVAS_CARD.height),
+      } : row))
+      setDirty(true)
+    }
+    const finish = () => {
+      document.removeEventListener('pointermove', move)
+      document.removeEventListener('pointerup', finish)
+      // Drag moves the card; a click (no travel) opens the drawer instead, so
+      // the drawer can never cover the drop target mid-gesture.
+      if (moved) setNotice({ tone: 'ok', text: 'Moved — Save canvas to persist the new position.' })
+      else openDrawer(item)
+    }
+    document.addEventListener('pointermove', move)
+    document.addEventListener('pointerup', finish)
+  }
+  const beginPan = (event) => {
+    if (event.button !== 0) return
+    const target = event.target
+    if (target?.closest?.('.dy-pc-obj') || target?.closest?.('.dy-pc-drawer') || target?.closest?.('.dy-pc-chat')) return
+    const startX = event.clientX
+    const startY = event.clientY
+    const origin = { x: pan.x, y: pan.y }
+    let moved = false
+    const move = (moveEvent) => {
+      const dx = moveEvent.clientX - startX
+      const dy = moveEvent.clientY - startY
+      if (!moved && Math.abs(dx) <= 3 && Math.abs(dy) <= 3) return
+      moved = true
+      setPan({ x: origin.x + dx, y: origin.y + dy })
+    }
+    const finish = () => {
+      document.removeEventListener('pointermove', move)
+      document.removeEventListener('pointerup', finish)
+      if (!moved) { setSelectedId(null); setPendingConnect(null) }
+    }
+    document.addEventListener('pointermove', move)
+    document.addEventListener('pointerup', finish)
+  }
+  const zoomBy = (delta) => setZoom((current) => canvasClamp(Number((current + delta).toFixed(2)), CANVAS_ZOOM.min, CANVAS_ZOOM.max))
+  const fit = () => {
+    const stage = stageRef.current
+    if (!stage || objects.length === 0) { setZoom(1); setPan({ x: 0, y: 0 }); return }
+    const box = stage.getBoundingClientRect()
+    const rects = objects.map(canvasRect)
+    const minX = Math.min(...rects.map((rect) => rect.x))
+    const minY = Math.min(...rects.map((rect) => rect.y))
+    const maxX = Math.max(...rects.map((rect) => rect.x + rect.width))
+    const maxY = Math.max(...rects.map((rect) => rect.y + rect.height))
+    const next = Number(canvasClamp(Math.min((box.width - 80) / Math.max(1, maxX - minX), (box.height - 80) / Math.max(1, maxY - minY)), CANVAS_ZOOM.min, CANVAS_ZOOM.max).toFixed(2))
+    setZoom(next)
+    setPan({ x: 40 - minX * next, y: 40 - minY * next })
+  }
+  // Tidy is a deterministic grid, not a layout engine: it only rewrites
+  // positions and still needs the save that follows any other edit.
+  const tidy = () => {
+    setObjects((current) => current.map((item, index) => ({ ...item, x: 60 + (index % 3) * 280, y: 60 + Math.floor(index / 3) * 190 })))
+    setDirty(true)
+    setNotice({ tone: 'ok', text: 'Tidied into a grid — Save canvas to persist the new positions.' })
+  }
   const curate = async () => {
-    setBusy(true); setNotice(null)
+    setBusy(true); setChatOpen(true)
     try {
       const result = await api(`/projects/${encoded}/canvas/sessions`, { method: 'POST', body: { actor: 'desktop-user' } })
       setSession(result)
-      setNotice(result.status === 'active' ? `Question: ${result.current_question?.question ?? 'more context needed'}` : `${result.proposals?.length ?? 0} proposal(s) ready for review`)
-    } catch (failure) { setNotice(`Curation failed: ${String(failure?.message ?? failure)}`) }
+      const proposals = (result.proposals ?? []).length
+      setNotice(result.status === 'active' && result.current_question
+        ? { tone: 'ok', text: `Question: ${result.current_question.question}` }
+        : { tone: 'ok', text: `${number(proposals)} proposal(s) ready for review — nothing is applied automatically.` })
+    } catch (failure) { setNotice({ tone: 'danger', text: `Curation failed: ${String(failure?.message ?? failure)}` }) }
+    setBusy(false)
+  }
+  const reviewCanvas = async () => {
+    setBusy(true); setChatOpen(true)
+    try {
+      const result = await api(`/projects/${encoded}/canvas/curate`, { method: 'POST', body: {} })
+      setReview(result)
+      const summary = result.summary ?? {}
+      const questions = (result.clarifying_questions ?? []).length
+      setNotice({ tone: 'ok', text: `Review: ${number(summary.evidence_count)} evidence, ${number(summary.claim_count)} claim, ${number(summary.question_count)} question, ${number(summary.plan_block_count)} plan block — ${questions ? `${number(questions)} question(s) outstanding` : 'no questions outstanding'}.` })
+    } catch (failure) { setNotice({ tone: 'danger', text: `Review failed: ${String(failure?.message ?? failure)}` }) }
     setBusy(false)
   }
   const answerQuestion = async (outcome) => {
-    if (!session) return
-    setBusy(true); setNotice(null)
+    if (!session?.session_id) return
+    setBusy(true)
     try {
       const result = await api(`/canvas/sessions/${encodeURIComponent(session.session_id)}/answer`, { method: 'POST', body: { outcome, answer, actor: 'desktop-user' } })
-      setSession(result); setAnswer(''); setNotice(result.status === 'complete' ? `${result.proposals?.length ?? 0} proposal(s) ready for review` : 'Question recorded')
-    } catch (failure) { setNotice(`Answer failed: ${String(failure?.message ?? failure)}`) }
+      setSession(result); setAnswer('')
+      const proposals = (result.proposals ?? []).length
+      if (result.status === 'active' && result.current_question) setNotice({ tone: 'ok', text: `Question: ${result.current_question.question}` })
+      else if (outcome === 'stop') setNotice({ tone: 'ok', text: `Session stopped — ${number(proposals)} proposal(s) kept as scratch.` })
+      else setNotice({ tone: 'ok', text: `${number(proposals)} proposal(s) ready for review — approve or reject each one.` })
+    } catch (failure) { setNotice({ tone: 'danger', text: `Answer failed: ${String(failure?.message ?? failure)}` }) }
     setBusy(false)
   }
-  return jsxs('section', { className: 'dockyard-feature-card', 'data-planning-canvas': project.id, children: [
-    jsxs('div', { className: 'dockyard-section-head', children: [jsxs('div', { children: [jsx('span', { className: 'dockyard-card-label', children: 'PLANNING CANVAS' }), jsx('h2', { children: 'Evidence to plan' }), jsx('p', { children: 'Capture scattered notes and links, then curate them into an approved planning proposal.' })] }), jsxs('div', { className: 'dockyard-form-actions', children: [jsx(Button, { small: true, disabled: busy, onClick: reload, children: 'Reload' }), jsx(Button, { small: true, disabled: busy, onClick: curate, children: 'Curate' }), jsx(Button, { variant: 'primary', small: true, disabled: busy, onClick: save, children: busy ? 'Working...' : 'Save canvas' })] })] }),
-    jsxs('div', { className: 'dockyard-inline-editor', children: [jsx('label', { children: [jsx('span', { children: 'Capture type' }), jsx('select', { value: kind, onChange: (event) => setKind(event.target.value), children: ['note', 'evidence', 'claim', 'question', 'plan_block', 'link', 'media'].map((value) => jsx('option', { value, children: value }, value)) })] }), jsx('label', { children: [jsx('span', { children: 'Add to canvas' }), jsx('textarea', { 'data-canvas-draft': true, rows: 2, value: draft, onChange: (event) => setDraft(event.target.value), placeholder: 'Paste a note, URL, observation or question...' })] }), jsx(Button, { action: 'add-canvas-object', disabled: !draft.trim(), onClick: addObject, children: 'Add object' })] }),
-    jsx('div', { className: 'dockyard-objective-list', role: 'list', 'aria-label': 'Planning canvas objects', children: objects.length ? objects.map((item) => jsxs('article', { draggable: true, onDragStart: () => setDragging(item.id), onDragOver: (event) => event.preventDefault(), onDrop: () => dropOn(item.id), 'data-canvas-object': item.id, 'data-canvas-x': item.x, 'data-canvas-y': item.y, children: [jsxs('div', { className: 'dockyard-objective-copy', children: [jsx('strong', { children: item.kind }), jsx('small', { children: item.content?.text ?? item.content?.title ?? item.content?.url ?? 'Untitled object' })] }), jsx(Button, { small: true, action: 'remove-canvas-object', onClick: () => remove(item.id), children: 'Remove reference' })] }, item.id)) : jsx('p', { className: 'dockyard-meta', children: 'No canvas objects yet. Start by capturing a note, link or evidence.' }) }),
-    objects.length >= 2 ? jsxs('div', { className: 'dockyard-inline-editor', 'data-canvas-connector-editor': true, children: [jsx('label', { children: [jsx('span', { children: 'From' }), jsx('select', { value: linkSource, onChange: (event) => setLinkSource(event.target.value), children: [jsx('option', { value: '', children: 'Choose source' }, 'none'), ...objects.map((item) => jsx('option', { value: item.id, children: item.content?.text ?? item.content?.title ?? item.id }, item.id))] })] }), jsx('label', { children: [jsx('span', { children: 'Relationship' }), jsx('select', { value: linkMeaning, onChange: (event) => setLinkMeaning(event.target.value), children: ['supports', 'contradicts', 'derived_from', 'clarifies', 'depends_on', 'implements', 'raises_question'].map((value) => jsx('option', { value, children: value }, value)) })] }), jsx('label', { children: [jsx('span', { children: 'To' }), jsx('select', { value: linkTarget, onChange: (event) => setLinkTarget(event.target.value), children: [jsx('option', { value: '', children: 'Choose target' }, 'none'), ...objects.map((item) => jsx('option', { value: item.id, children: item.content?.text ?? item.content?.title ?? item.id }, item.id))] })] }), jsx(Button, { action: 'connect-canvas-objects', disabled: !linkSource || !linkTarget || linkSource === linkTarget, onClick: connect, children: 'Connect objects' })] }) : null,
-    connectors.length ? jsx('ul', { 'data-canvas-connectors': true, children: connectors.map((edge) => jsx('li', { 'data-canvas-connector': edge.id, children: `${edge.source} ${edge.meaning} ${edge.target}` }, edge.id)) }) : null,
-    session?.current_question ? jsxs('div', { className: 'dockyard-inline-editor', 'data-canvas-question': true, children: [jsx('strong', { children: session.current_question.question }), jsx('textarea', { value: answer, onChange: (event) => setAnswer(event.target.value), placeholder: 'Answer, or skip this question...', rows: 2 }), jsxs('div', { className: 'dockyard-form-actions', children: [jsx(Button, { small: true, disabled: busy, onClick: () => answerQuestion('skip'), children: 'Skip' }), jsx(Button, { small: true, disabled: busy, onClick: () => answerQuestion('defer'), children: 'Defer' }), jsx(Button, { small: true, disabled: busy, onClick: () => answerQuestion('stop'), children: 'Stop' }), jsx(Button, { small: true, variant: 'primary', disabled: busy || !answer.trim(), onClick: () => answerQuestion('answer'), children: 'Answer' })] })] }) : null,
-    session?.proposals?.length ? jsx('div', { 'data-canvas-proposals': true, children: session.proposals.map((proposal) => jsxs('article', { children: [jsx('strong', { children: proposal.title ?? proposal.kind }), jsx('small', { children: `${proposal.source_object_ids?.length ?? 0} source object(s); approval required.` }), jsxs('div', { className: 'dockyard-form-actions', children: [jsx(Button, { small: true, onClick: async () => { const result = await api(`/canvas/proposals/${encodeURIComponent(proposal.proposal_id)}/decision`, { method: 'POST', body: { approve: false, actor: 'desktop-user' } }); setNotice(`Proposal ${result.status}`) }, children: 'Reject' }), jsx(Button, { small: true, variant: 'primary', onClick: async () => { const result = await api(`/canvas/proposals/${encodeURIComponent(proposal.proposal_id)}/decision`, { method: 'POST', body: { approve: true, actor: 'desktop-user' } }); setNotice(`Proposal ${result.status}`) }, children: 'Approve' })] })] }, proposal.proposal_id)) }) : null,
-    content.length ? jsx('p', { className: 'dockyard-meta', children: `${content.length} project content item(s) available to reference.` }) : null,
-    notice ? jsx('p', { role: 'status', className: 'dockyard-meta', children: notice }) : null,
-  ] })
+  const decideProposal = async (proposal, approve) => {
+    setBusy(true)
+    try {
+      const result = await api(`/canvas/proposals/${encodeURIComponent(proposal.proposal_id)}/decision`, { method: 'POST', body: { approve, actor: 'desktop-user' } })
+      // Read the decision back from the session rather than trusting the local
+      // optimistic flip; the recorded status is the one that counts.
+      if (session?.session_id) {
+        try {
+          const fresh = await api(`/canvas/sessions/${encodeURIComponent(session.session_id)}`)
+          setSession(fresh)
+        } catch (readFailure) {
+          setSession((current) => current ? { ...current, proposals: (current.proposals ?? []).map((row) => row.proposal_id === result.proposal_id ? { ...row, status: result.status } : row) } : current)
+        }
+      }
+      setNotice({ tone: 'ok', text: `Proposal ${result.status} — recorded only; the canvas is unchanged until you save an edit.` })
+    } catch (failure) { setNotice({ tone: 'danger', text: `Decision failed: ${String(failure?.message ?? failure)}` }) }
+    setBusy(false)
+  }
+  const renderConnectors = () => {
+    const byId = new Map(objects.map((item) => [item.id, item]))
+    const lines = connectors.flatMap((edge) => {
+      const source = byId.get(edge.source)
+      const target = byId.get(edge.target)
+      if (!source || !target) return []
+      const from = canvasRect(source)
+      const to = canvasRect(target)
+      const x1 = from.x + from.width / 2
+      const y1 = from.y + from.height / 2
+      const x2 = to.x + to.width / 2
+      const y2 = to.y + to.height / 2
+      return [
+        jsx('line', { 'data-canvas-connector': edge.id, 'data-canvas-meaning': edge.meaning, x1, y1, x2, y2 }, edge.id),
+        jsx('text', { className: 'dy-pc-edge-label', 'data-canvas-edge-label': edge.id, x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 6, textAnchor: 'middle', children: CANVAS_MEANING_LABELS[edge.meaning] ?? edge.meaning }, `${edge.id}:label`),
+      ]
+    })
+    if (pendingConnect) {
+      const pending = byId.get(pendingConnect)
+      if (pending) {
+        const rect = canvasRect(pending)
+        lines.push(jsx('circle', { 'data-canvas-pending': pendingConnect, cx: rect.x + rect.width / 2, cy: rect.y + rect.height / 2, r: 7 }, 'pending'))
+      }
+    }
+    return lines
+  }
+  const renderFrames = () => {
+    const groups = new Map()
+    objects.forEach((item) => {
+      ;(Array.isArray(item.tags) ? item.tags : []).forEach((tag) => {
+        const list = groups.get(tag) ?? []
+        list.push(item)
+        groups.set(tag, list)
+      })
+    })
+    return [...groups.entries()].filter(([, list]) => list.length >= 2).map(([tag, list]) => {
+      const rects = list.map(canvasRect)
+      const minX = Math.min(...rects.map((rect) => rect.x)) - 18
+      const minY = Math.min(...rects.map((rect) => rect.y)) - 30
+      const width = Math.max(...rects.map((rect) => rect.x + rect.width)) - minX + 18
+      const height = Math.max(...rects.map((rect) => rect.y + rect.height)) - minY + 18
+      return jsx('div', { className: 'dy-pc-frame', 'data-canvas-frame': tag, style: { left: `${minX}px`, top: `${minY}px`, width: `${width}px`, height: `${height}px` }, children: tag }, tag)
+    })
+  }
+  const renderObject = (item) => {
+    const rect = canvasRect(item)
+    const tag = (Array.isArray(item.tags) ? item.tags : [])[0]
+    const label = CANVAS_KIND_LABELS[item.kind] ?? item.kind
+    return jsxs('button', {
+      type: 'button',
+      className: `dy-pc-obj${selectedId === item.id ? ' selected' : ''}${pendingConnect === item.id ? ' pending' : ''}`,
+      'data-canvas-object': item.id,
+      'data-canvas-kind': item.kind,
+      'data-canvas-x': String(Math.round(rect.x)),
+      'data-canvas-y': String(Math.round(rect.y)),
+      style: { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px` },
+      'aria-label': `${label}: ${canvasText(item) || 'untitled'}`,
+      onPointerDown: (event) => beginObjectDrag(event, item),
+      children: [
+        jsx('small', { children: tag ? `${label} · ${tag}` : label }),
+        jsx('strong', { children: canvasText(item) || 'Untitled object' }),
+        jsx('span', { className: 'dy-pc-obj-meta', children: `${item.evidence_ref ? `evidence ${item.evidence_ref}` : 'no evidence reference'}${item.work_ref ? ` · work ${item.work_ref}` : ''}` }),
+      ],
+    }, item.id)
+  }
+  const pendingProposals = (session?.proposals ?? []).filter((proposal) => (proposal.status ?? 'pending') === 'pending').length
+  const assistantSummary = session?.current_question
+    ? 'Before I can propose anything I need one clarification. Nothing is applied automatically.'
+    : (session?.proposals ?? []).length
+      ? `${number((session.proposals ?? []).length)} proposal(s) drafted as scratch — approve or dismiss each one. Nothing is applied to the canvas.`
+      : 'No curation session yet. Run Curate to review this canvas; every proposal lands as scratch and needs your decision.'
+  const questionBlock = session?.current_question ? jsxs('div', { className: 'dy-pc-proposal', 'data-canvas-question': session.current_question.id ?? 'question', children: [
+    jsx('strong', { children: `Question: ${session.current_question.question}` }),
+    jsx('textarea', { 'data-canvas-answer': true, rows: 2, value: answer, placeholder: 'Answer, or skip, defer or stop this clarification...', onChange: (event) => setAnswer(event.target.value) }),
+    jsxs('div', { className: 'dockyard-form-actions', children: [
+      jsx(Button, { small: true, action: 'skip-canvas-question', disabled: busy, onClick: () => answerQuestion('skip'), children: 'Skip' }),
+      jsx(Button, { small: true, action: 'defer-canvas-question', disabled: busy, onClick: () => answerQuestion('defer'), children: 'Defer' }),
+      jsx(Button, { small: true, action: 'stop-canvas-session', disabled: busy, onClick: () => answerQuestion('stop'), children: 'Stop' }),
+      jsx(Button, { small: true, variant: 'primary', action: 'answer-canvas-question', disabled: busy || !answer.trim(), onClick: () => answerQuestion('answer'), children: 'Answer' }),
+    ]}),
+  ]}) : null
+  const proposalCards = (session?.proposals ?? []).map((proposal) => {
+    const status = proposal.status ?? 'pending'
+    return jsxs('article', { className: 'dy-pc-proposal', 'data-canvas-proposal': proposal.proposal_id, 'data-canvas-proposal-status': status, children: [
+      jsx('strong', { children: proposal.title ?? CANVAS_KIND_LABELS[proposal.kind] ?? proposal.kind ?? 'Proposal' }),
+      jsx('small', { children: `${proposal.kind ?? 'proposal'} · ${status} · scratch + suggested · ${number((proposal.source_object_ids ?? []).length)} source object(s)` }),
+      status === 'pending'
+        ? jsxs('div', { className: 'dockyard-form-actions', children: [
+            jsx(Button, { small: true, action: 'dismiss-canvas-proposal', disabled: busy, onClick: () => decideProposal(proposal, false), children: 'Dismiss' }),
+            jsx(Button, { small: true, variant: 'primary', action: 'approve-canvas-proposal', disabled: busy, onClick: () => decideProposal(proposal, true), children: 'Approve' }),
+          ]})
+        : jsx('small', { children: 'Decision recorded — this proposal can no longer be decided again.' }),
+    ]}, proposal.proposal_id)
+  })
+  return jsxs('section', {
+    className: 'dockyard-feature-card dy-pc-scope',
+    'data-planning-canvas': project.id,
+    'data-canvas-revision': String(revision),
+    'data-canvas-dirty': dirty ? 'true' : 'false',
+    children: [
+      jsxs('div', { className: 'dockyard-section-head', children: [
+        jsxs('div', { children: [
+          jsx('span', { className: 'dockyard-card-label', children: 'PLANNING CANVAS' }),
+          jsx('h2', { children: 'Evidence to plan' }),
+          jsx('p', { children: `One canvas per project: ${number(objects.length)} object(s), ${number(connectors.length)} connector(s), revision ${number(revision)}${dirty ? ' · unsaved edits' : ' · saved'}. Curation only proposes — every proposal lands as scratch and nothing is applied automatically.` }),
+          content.length ? jsx('p', { className: 'dockyard-meta', children: `${number(content.length)} project content item(s) available to reference.` }) : null,
+        ]}),
+      ]}),
+      jsxs('div', { className: 'dy-pc', children: [
+        jsxs('div', { className: 'dy-pc-toolbar', role: 'toolbar', 'aria-label': 'Planning canvas tools', children: [
+          jsxs('div', { className: 'dy-pc-seg', role: 'group', 'aria-label': 'Canvas mode', children: [
+            jsx(Button, { small: true, variant: mode === 'select' ? 'primary' : '', action: 'pc-mode-select', onClick: () => { setMode('select'); setPendingConnect(null) }, children: 'Select' }),
+            jsx(Button, { small: true, variant: mode === 'connect' ? 'primary' : '', action: 'pc-mode-connect', onClick: () => { setMode('connect'); setPendingConnect(null) }, children: 'Connect' }),
+          ]}),
+          jsx('span', { className: 'dy-pc-sep', 'aria-hidden': true }),
+          jsxs('div', { className: 'dy-pc-add', children: [
+            jsx('select', { 'data-canvas-kind-picker': true, 'aria-label': 'Object kind', value: kind, onChange: (event) => setKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx('option', { value, children: CANVAS_KIND_LABELS[value] }, value)) }),
+            jsx('input', { 'data-canvas-draft': true, 'aria-label': 'New object text', value: draft, placeholder: 'Capture a note, observation, question or link...', onChange: (event) => setDraft(event.target.value) }),
+            jsx(Button, { small: true, variant: 'primary', action: 'add-canvas-object', disabled: !draft.trim(), onClick: addFromDraft, children: 'Add object' }),
+          ]}),
+          jsx('span', { className: 'dy-pc-sep', 'aria-hidden': true }),
+          ...CANVAS_OBJECT_KINDS.map((value) => jsx(Button, {
+            small: true,
+            action: `add-canvas-${value}`,
+            data: { 'data-canvas-add-kind': value },
+            onClick: () => addObject(value, `New ${CANVAS_KIND_LABELS[value]}`),
+            children: `＋ ${CANVAS_KIND_LABELS[value]}`,
+          }, `add-${value}`)),
+          jsx('span', { className: 'dy-pc-spacer' }),
+          jsx(Button, { small: true, action: 'pc-tidy', disabled: !objects.length, onClick: tidy, children: 'Tidy' }),
+          jsx(Button, { small: true, action: 'pc-review', disabled: busy, onClick: reviewCanvas, children: 'Review' }),
+          jsx('span', { className: 'dy-pc-sep', 'aria-hidden': true }),
+          jsxs('div', { className: 'dy-pc-seg', role: 'group', 'aria-label': 'Zoom', children: [
+            jsx(Button, { small: true, action: 'pc-zoom-out', ariaLabel: 'Zoom out', onClick: () => zoomBy(-CANVAS_ZOOM.step), children: '−' }),
+            jsx('span', { className: 'dy-pc-readout', 'data-canvas-zoom-readout': String(Math.round(zoom * 100)), children: `${Math.round(zoom * 100)}%` }),
+            jsx(Button, { small: true, action: 'pc-zoom-in', ariaLabel: 'Zoom in', onClick: () => zoomBy(CANVAS_ZOOM.step), children: '＋' }),
+            jsx(Button, { small: true, action: 'pc-fit', onClick: fit, children: 'Fit' }),
+          ]}),
+          jsx('span', { className: 'dy-pc-sep', 'aria-hidden': true }),
+          jsx(Button, { small: true, action: 'pc-reload', disabled: busy, onClick: reload, children: 'Reload' }),
+          jsx(Button, { small: true, action: 'pc-curate', disabled: busy, onClick: curate, children: 'Curate' }),
+          jsx(Button, { small: true, variant: 'primary', action: 'pc-save', disabled: busy, onClick: save, children: busy ? 'Working...' : 'Save canvas' }),
+        ]}),
+        objects.length >= 2 ? jsxs('div', { className: 'dy-pc-linkbar', 'data-canvas-connector-editor': true, children: [
+          jsxs('label', { children: [jsx('span', { children: 'From' }), jsx('select', { value: linkSource, onChange: (event) => setLinkSource(event.target.value), children: [jsx('option', { value: '', children: 'Choose source' }, 'none'), ...objects.map((item) => jsx('option', { value: item.id, children: canvasText(item) || item.id }, item.id))] })] }),
+          jsxs('label', { children: [jsx('span', { children: 'Relationship' }), jsx('select', { value: linkMeaning, onChange: (event) => setLinkMeaning(event.target.value), children: CANVAS_CONNECTOR_MEANINGS.map((value) => jsx('option', { value, children: value }, value)) })] }),
+          jsxs('label', { children: [jsx('span', { children: 'To' }), jsx('select', { value: linkTarget, onChange: (event) => setLinkTarget(event.target.value), children: [jsx('option', { value: '', children: 'Choose target' }, 'none'), ...objects.map((item) => jsx('option', { value: item.id, children: canvasText(item) || item.id }, item.id))] })] }),
+          jsx(Button, { small: true, action: 'connect-canvas-objects', disabled: !linkSource || !linkTarget || linkSource === linkTarget, onClick: connectFromEditor, children: 'Connect objects' }),
+        ]}) : null,
+        jsxs('div', {
+          ref: stageRef,
+          className: 'dy-pc-stage',
+          'data-pc-stage': true,
+          'data-pc-mode': mode,
+          role: 'group',
+          'aria-label': 'Planning canvas stage',
+          onPointerDown: beginPan,
+          children: [
+            jsxs('div', {
+              className: 'dy-pc-world',
+              'data-pc-world': true,
+              'data-canvas-pan': `${Math.round(pan.x)},${Math.round(pan.y)}`,
+              'data-canvas-zoom': String(Math.round(zoom * 100)),
+              style: { transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` },
+              children: [
+                jsx('svg', { className: 'dy-pc-svg', viewBox: `0 0 ${CANVAS_WORLD.width} ${CANVAS_WORLD.height}`, width: CANVAS_WORLD.width, height: CANVAS_WORLD.height, 'aria-hidden': true, children: renderConnectors() }),
+                ...renderFrames(),
+                ...objects.map(renderObject),
+                objects.length === 0 ? jsx('p', { className: 'dy-pc-empty', children: 'No canvas objects yet. Capture a note or evidence above, then drag it into place.' }) : null,
+              ],
+            }),
+            jsxs('aside', { className: `dy-pc-chat ${chatOpen ? 'open' : 'closed'}`, 'data-canvas-assistant': true, children: [
+              jsxs('button', { type: 'button', className: 'dy-pc-chat-h', 'data-action': 'pc-chat-toggle', onClick: () => setChatOpen((current) => !current), children: [
+                jsx('span', { className: 'av', 'aria-hidden': true, children: 'AI' }),
+                jsxs('span', { style: { flex: '1 1 auto' }, children: [
+                  jsx('strong', { children: 'Steward' }),
+                  jsx('span', { className: 'sub', children: session?.current_question ? 'clarification in progress · nothing applied' : `${number(pendingProposals)} proposal(s) waiting · nothing applied` }),
+                ]}),
+                jsx('span', { className: 'tog', 'aria-hidden': true, children: chatOpen ? '▼' : '▲' }),
+              ]}),
+              jsxs('div', { className: 'dy-pc-chat-b', children: [
+                jsx('div', { className: 'dy-pc-msg bot', children: assistantSummary }),
+                questionBlock,
+                review ? jsx('p', { className: 'dy-pc-drawer-meta', 'data-canvas-review': true, children: `Review: ${number(review.summary?.evidence_count)} evidence, ${number(review.summary?.claim_count)} claim, ${number(review.summary?.question_count)} question, ${number(review.summary?.plan_block_count)} plan block block(s).` }) : null,
+                proposalCards.length ? jsx('div', { 'data-canvas-proposals': true, children: proposalCards }) : null,
+                session?.answers?.length ? jsx('div', { className: 'dy-pc-msg me', children: `${number(session.answers.length)} clarification answer(s) recorded.` }) : null,
+              ]}),
+              jsxs('div', { className: 'dy-pc-chat-f', children: [
+                jsx('span', { className: 'dy-pc-readout', children: 'Approval contract: scratch + suggested only.' }),
+                jsx(Button, { small: true, action: 'pc-start-curation', disabled: busy, onClick: curate, children: 'Start curation' }),
+              ]}),
+            ]}),
+            jsxs('aside', { className: `dy-pc-drawer${selected ? ' open' : ''}`, 'data-canvas-drawer': selected?.id ?? 'none', children: [
+              jsxs('div', { className: 'dy-pc-drawer-h', children: [
+                jsxs('div', { children: [
+                  jsx('strong', { children: selected ? `${CANVAS_KIND_LABELS[selected.kind] ?? selected.kind} · selected` : 'Selected object' }),
+                  jsx('span', { className: 'dy-pc-drawer-meta', children: selected ? `x ${Math.round(canvasNumber(selected.x))} · y ${Math.round(canvasNumber(selected.y))}` : 'Nothing selected' }),
+                ]}),
+                jsx(Button, { small: true, action: 'pc-close-drawer', ariaLabel: 'Close selection drawer', onClick: () => setSelectedId(null), children: '✕' }),
+              ]}),
+              selected ? jsxs('div', { className: 'dy-pc-drawer-b', children: [
+                jsxs('label', { children: [jsx('span', { children: 'Title' }), jsx('input', { 'data-canvas-object-title': true, value: drawerText, onChange: (event) => setDrawerText(event.target.value) })] }),
+                jsxs('label', { children: [jsx('span', { children: 'Kind' }), jsx('select', { 'data-canvas-object-kind': true, value: drawerKind, onChange: (event) => setDrawerKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx('option', { value, children: CANVAS_KIND_LABELS[value] }, value)) })] }),
+                jsx('p', { className: 'dy-pc-drawer-meta', children: selected.evidence_ref ? `Evidence reference: ${selected.evidence_ref}` : 'No evidence reference on this object.' }),
+                jsxs('div', { className: 'dockyard-form-actions', children: [
+                  jsx(Button, { small: true, variant: 'danger', action: 'remove-canvas-object', disabled: busy, onClick: removeSelected, children: 'Remove object' }),
+                  jsx(Button, { small: true, variant: 'primary', action: 'apply-canvas-object', disabled: busy || !drawerText.trim(), onClick: applyDrawer, children: 'Apply' }),
+                ]}),
+              ]}) : jsx('p', { className: 'dy-pc-drawer-meta', children: 'Select an object on the canvas to edit its title, kind or removal.' }),
+            ]}),
+            jsx('div', { className: `dy-pc-backdrop${selected ? ' open' : ''}`, 'data-pc-backdrop': true, onClick: () => setSelectedId(null) }),
+          ],
+        }),
+        notice ? jsx('p', { className: 'dy-pc-notice', role: 'status', 'data-pc-tone': notice.tone, 'data-canvas-notice': true, children: notice.text }) : null,
+      ]}),
+    ],
+  })
 }
 
 function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, savedViewsMode }) {

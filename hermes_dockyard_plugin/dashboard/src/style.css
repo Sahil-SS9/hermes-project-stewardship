@@ -110,79 +110,13 @@ td.bad, .bad { color: var(--dy-bad); }
   .dy-root .dy-board { grid-template-columns: repeat(5, minmax(220px, 1fr)); }
 }
 
-/* ---- Workflow canvas ---- */
-.dy-root .dy-wf-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
-/* The mount root IS the canvas frame: sized, bordered, positioned.
-   (.dy-wf-host was removed - no element ever carried it; styles move to .dy-wf) */
-.dy-root .dy-wf { position: relative; height: 72vh; border: 1px solid var(--dy-border, #2a2f3a); border-radius: 10px; overflow: hidden; background: var(--dy-bg-deep, #0f1218); }
-.dy-root .dy-wf-wrap { position: relative; width: 100%; height: 100%; }
-.dy-root .dy-wf-svg { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
-.dy-root .dy-wf-svg:active { cursor: grabbing; }
-/* LOD tiers (archify): map < 75% / read / full > 140% */
-.dy-root .dy-wf-svg[data-lod="map"] .dy-wf-sub,
-.dy-root .dy-wf-svg[data-lod="map"] .dy-wf-timer { opacity: 0; }
-.dy-root .dy-wf-svg .dy-wf-sub, .dy-root .dy-wf-svg .dy-wf-timer { transition: opacity .3s; }
-.dy-root .dy-wf-node { cursor: pointer; outline: none; }
-.dy-root .dy-wf-node .dy-wf-rect { fill: #1b2230; stroke: #6e7681; stroke-width: 1.5; transition: stroke .5s, fill .3s, stroke-width .2s; }
-/* unmistakable selection: accent ring + tint (stronger than hover dash) */
-.dy-root .dy-wf-node.dy-wf-selected .dy-wf-rect {
-  stroke: #58a6ff; stroke-width: 3; fill: #16283f;
-  filter: drop-shadow(0 0 6px rgba(88,166,255,.65));
-}
-@keyframes dySelPulse { 0%,100% { stroke-width: 3; } 50% { stroke-width: 3.8; } }
-.dy-root .dy-wf-svg .dy-wf-node.dy-wf-selected .dy-wf-rect { animation: dySelPulse 1.6s ease-in-out infinite; }
-.dy-root .dy-wf-node.done .dy-wf-rect { stroke: #3fb950; }
-.dy-root .dy-wf-node.working .dy-wf-rect { stroke: #d29922; animation: dyPulseNode 1.5s ease-in-out infinite; }
-@keyframes dyPulseNode { 0%,100% { stroke-width: 1.5; } 50% { stroke-width: 2.6; filter: drop-shadow(0 0 7px rgba(210,153,34,.5)); } }
-.dy-root .dy-wf-node.blocked .dy-wf-rect { stroke: #f85149; }
-.dy-root .dy-wf-node.pending .dy-wf-rect { stroke: #6e7681; }
-.dy-root .dy-wf-label { fill: var(--dy-text, #e6edf3); font: 600 13px system-ui, sans-serif; pointer-events: none; }
-.dy-root .dy-wf-sub { fill: #8b949e; font: 11px system-ui, sans-serif; pointer-events: none; }
-.dy-root .dy-wf-timer { fill: #d29922; font: 11px ui-monospace, monospace; }
-.dy-root .dy-wf-edge { stroke: #3d4657; stroke-width: 1.5; fill: none; transition: stroke .4s; }
-.dy-root .dy-wf-edge.active { stroke: #58a6ff; }
-.dy-root .dy-wf-flowdot { fill: #58a6ff; }
-.dy-root .dy-wf-minimap { position: absolute; right: 10px; bottom: 10px; background: rgba(15,18,24,.88); border: 1px solid #2a2f3a; border-radius: 6px; }
-/* live activity strip: top-left, collapsible (position deliberate, not carried over from demo) */
-.dy-root .dy-wf-feed { position: absolute; top: 10px; left: 10px; width: 300px; background: rgba(15,18,24,.88); border: 1px solid #2a2f3a; border-radius: 6px; overflow: hidden; }
-.dy-root .dy-wf-feed-head { display: block; width: 100%; text-align: left; background: transparent; border: none; border-radius: 0; padding: 5px 10px; font-size: 11.5px; color: #8b949e; cursor: pointer; letter-spacing: .3px; }
-.dy-root .dy-wf-feed-body { max-height: 160px; overflow: hidden; padding: 0 10px 6px; }
-.dy-root .dy-wf-feed-item { display: flex; gap: 6px; font-size: 11px; color: var(--dy-text, #e6edf3); padding: 2px 0; border-bottom: 1px dashed #23293a; transition: opacity 1.2s; }
-.dy-root .dy-wf-feed-time { font: 10px ui-monospace, monospace; color: #59626f; flex: none; padding-top: 1px; }
-.dy-root .dy-wf-mini-view { fill: none; stroke: #58a6ff; stroke-width: 2; }
-.dy-root .dy-wf-passport { position: absolute; top: 10px; right: 10px; width: 280px; max-height: calc(100% - 20px); overflow-y: auto; background: #161b22; border: 1px solid #2a2f3a; border-radius: 8px; padding: 12px; color: var(--dy-text, #e6edf3); }
-/* P8.2: zoom controls + keyboard focus ring + equivalent list view. */
-.dy-root .dy-wf-zoombar { display: flex; gap: 6px; margin: 6px 0; }
-.dy-root .dy-wf-zoombtn { background: #0d1117; color: var(--dy-text, #e6edf3); border: 1px solid #2a2f3a; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
-.dy-root .dy-wf-zoombtn:hover { border-color: #58a6ff; }
-.dy-root .dy-wf-node:focus { outline: 2px solid #58a6ff; outline-offset: 2px; }
-.dy-root .dy-wf-list { margin: 8px 0; }
-.dy-root .dy-wf-list-head { background: none; border: none; color: var(--dy-text, #e6edf3); font-weight: 600; cursor: pointer; padding: 4px 0; font-size: 13px; }
-.dy-root .dy-wf-list-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #21262d; flex-wrap: wrap; }
-.dy-root .dy-wf-list-row:last-child { border-bottom: none; }
-.dy-root .dy-wf-list-title { min-width: 140px; color: var(--dy-text, #e6edf3); font-weight: 600; }
-.dy-root .dy-wf-list-kind { font-size: 11px; text-transform: uppercase; color: #8b949e; border: 1px solid #2a3140; border-radius: 4px; padding: 1px 6px; }
-.dy-root .dy-wf-list-deps { color: #8b949e; font-size: 12px; flex: 1; }
-.dy-root .dy-wf-list-status { font-weight: 600; }
-.dy-root .dy-wf-list-status.done { color: #3fb950; }
-.dy-root .dy-wf-list-status.blocked { color: var(--dy-warn, #f0883e); }
-.dy-root .dy-wf-list-status.working { color: #58a6ff; }
-.dy-root .dy-wf-list-open { background: #0d1117; color: var(--dy-text, #e6edf3); border: 1px solid #2a2f3a; border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
-/* P8.3/P8.4: decision state + unsupported-control truth. */
-.dy-root .dy-wf-decision-state { display: inline-block; margin: 6px 0; padding: 2px 8px; border-radius: 6px; border: 1px solid #2a3140; font-size: 12px; color: #e3b341; }
-.dy-root .dy-wf-recovery { margin-top: 8px; }
-.dy-root .dy-wf-unsupported { color: #8b949e; font-size: 12px; margin: 6px 0 0; }
-.dy-root .dy-wf-passport h3 { margin: 0 0 4px; font-size: 14px; }
-.dy-root .dy-wf-passport .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; border: 1px solid #8fa3b8; color: #c9d4de; }
-.dy-root .dy-wf-passport .badge.done { border-color: #3fb950; color: #3fb950; }
-.dy-root .dy-wf-passport .badge.working { border-color: #d29922; color: #d29922; }
-.dy-root .dy-wf-passport .badge.blocked { border-color: #f85149; color: #f85149; }
-.dy-root .dy-wf-passport h4 { margin: 10px 0 4px; font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: .4px; }
-.dy-root .dy-wf-actions { display: flex; gap: 8px; margin-top: 10px; }
-.dy-root .dy-wf-expand { margin-top: 10px; }
-.dy-root .dy-wf-expand-head { width: 100%; text-align: left; background: #21262d; border: 1px solid #2a2f3a; border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; color: var(--dy-text, #e6edf3); }
-.dy-root .dy-wf-expand-body { padding: 8px 2px; }
-.dy-root .dy-wf-empty { fill: #8b949e; font: 13px system-ui, sans-serif; }
+/* ---- Workflow canvas: MOVED. -----------------------------------------------
+   The canvas stylesheet and its purpose/status/connector token set now live in
+   src/workflow-canvas-css.ts — the single home both surfaces are fed from. The
+   Dashboard bundle receives it through `npm run build` (appended to
+   dist/style.css); the Desktop plugin receives it as the generated sibling
+   desktop/workflow-canvas-css.js. Do not re-add canvas rules here: a second
+   copy is exactly the drift this move removes. */
 
 /* ---- shared live-detail components ---- */
 .dy-root .dy-activity-thread { display: grid; gap: 2px; }
@@ -198,9 +132,9 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-root .dy-taskmark.blocked { color: #f85149; }
 .dy-root .dy-taskmark.pending { color: #8fa3b8; }
 /* progress bar in the selected-node expansion */
-.dy-root .dy-wf-progress { height: 8px; background: #21262d; border-radius: 5px; overflow: hidden; margin: 4px 0 4px; }
-.dy-root .dy-wf-progress-fill { height: 100%; background: linear-gradient(90deg, #2ea043, #3fb950); border-radius: 5px; transition: width .6s cubic-bezier(.2,.8,.3,1); }
-.dy-root .dy-wf-progress-label { margin: 2px 0 0; font-size: 11px; color: #c9d4de; }
+.dy-root .dy-wf-progress, .dy-wf-scope .dy-wf-progress { height: 8px; background: #21262d; border-radius: 5px; overflow: hidden; margin: 4px 0 4px; }
+.dy-root .dy-wf-progress-fill, .dy-wf-scope .dy-wf-progress-fill { height: 100%; background: linear-gradient(90deg, #2ea043, #3fb950); border-radius: 5px; transition: width .6s cubic-bezier(.2,.8,.3,1); }
+.dy-root .dy-wf-progress-label, .dy-wf-scope .dy-wf-progress-label { margin: 2px 0 0; font-size: 11px; color: #c9d4de; }
 .dy-root .dy-milestones { margin: 10px 0; border: 1px solid #2a3140; border-radius: 8px; background: #161b22; }
 .dy-root .dy-milestones summary { cursor: pointer; padding: 8px 12px; font-weight: 600; color: #e6edf3; }
 .dy-root .dy-milestones-body { padding: 4px 12px 10px; }
@@ -239,8 +173,4 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-root .dy-feature-row:last-of-type { border-bottom: none; }
 .dy-root .dy-feature-name { flex: 1 1 auto; color: #e6edf3; }
 .dy-root .dy-feature-row .dy-btn { min-width: 84px; }
-@media (prefers-reduced-motion: reduce) {
-  .dy-root .dy-wf-node.working .dy-wf-rect { animation: none; }
-  .dy-root .dy-wf-svg .dy-wf-sub, .dy-root .dy-wf-svg .dy-wf-timer { transition: none; }
-}
 

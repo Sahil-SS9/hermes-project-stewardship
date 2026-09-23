@@ -18,9 +18,21 @@ export interface CanvasNode {
   kind: 'task' | 'gate';
   status: string | null;
   assignee: string | null;
+  // `team` is the assignment the canonical run projection resolves (binding
+  // override -> node.phase_team); `phase_team` is the node's own stored
+  // override. Both are real fields — workflow_service.py returns them on
+  // every run node. The canvas groups lanes on them rather than inventing a
+  // lane/phase collection the model does not have.
+  team?: string | null;
   phase_team?: string | null;
   evidence_refs: string[];
   canvas_position?: { x: number; y: number };
+  // Graph-shape modifiers carried by the run projection. A node with an
+  // upstream condition is a conditional branch; a loop bound makes it a
+  // bounded loop. (workflow_service.py validates `kind` as task|gate only —
+  // these are its documented `when`/`loop` node modifiers, not new kinds.)
+  when?: { node: string; status: string } | null;
+  loop?: { max_iterations: number; until: { status: string } } | null;
 }
 
 export interface CanvasRun {
@@ -74,19 +86,191 @@ export interface CanvasHandlers {
   onEdit?: (nodes: CanvasNode[]) => Promise<unknown> | void;
 }
 
-const NODE_W = 190;
-const NODE_H = 64;
-const COL_GAP = 95;
-const ROW_GAP = 26;
-const PAD = 60;
+const NODE_W = 208;
+const NODE_H = 72;
+const COL_GAP = 116;
+const ROW_GAP = 30;
+const PAD = 64;
+// Horizontal band the nodes of one lane sit in (v6 composition): the lanes are
+// the canvas's reading order, so they carry real top/bottom padding rather
+// than being a background stripe the nodes ignore.
+const LANE_PAD = 30;
 const ZOOM_MIN = 0.45;
 const ZOOM_MAX = 1.8;
 const LOD_FULL = 1.4;
 const ZOOM_IN = 1.1;
 const ZOOM_OUT = 0.9;
 
-const statusColor = (s: string | null): string =>
-  s === 'done' ? '#3fb950' : s === 'working' ? '#d29922' : s === 'blocked' ? '#f85149' : '#6e7681';
+// ---- S1: node purpose / status visual tokens ------------------------------
+// PURPOSE (what a node is) and STATUS (where a node is) are two independent
+// visual dimensions, and they are kept apart on every node:
+//   purpose -> silhouette + fill + symbol + purpose text colour
+//   status  -> outline stroke + status mark + status word
+// Purpose colours live on a violet/cyan/magenta/blue axis and status colours on
+// a green/amber/red/grey axis, so they can never collide (no green-on-green,
+// blue-on-blue). Every value is a CSS custom property declared in style.css, so
+// the palette has exactly one home; the literals below are only the
+// stylesheet-less fallback for the SVG presentation attributes.
+export type CanvasNodePurpose = 'task' | 'gate' | 'branch' | 'loop';
+
+export const STATUS_ORDER = ['done', 'working', 'blocked', 'pending'] as const;
+export type CanvasNodeStatusToken = (typeof STATUS_ORDER)[number];
+
+// Canonical statuses are the only ones the canvas colours; anything else is
+// shown as pending (the raw word is still what the node prints).
+export function statusToken(status: string | null | undefined): CanvasNodeStatusToken {
+  return status === 'done' || status === 'working' || status === 'blocked' ? status : 'pending';
+}
+
+// Status is the second visual dimension: it is carried by the node OUTLINE, a
+// tinted status chip and the status word — never by the node fill, which is
+// purpose. Same custom-property discipline as purpose.
+export const STATUS_TOKENS: Record<CanvasNodeStatusToken, string> = {
+  done: '--dy-wf-status-done',
+  working: '--dy-wf-status-working',
+  blocked: '--dy-wf-status-blocked',
+  pending: '--dy-wf-status-pending',
+};
+
+export interface PurposeVisuals {
+  fill: string;
+  line: string;
+  text: string;
+  glyph: string;
+  label: string;
+  glyphX: number;
+  textX: number;
+}
+
+export const PURPOSE_VISUALS: Record<CanvasNodePurpose, PurposeVisuals> = {
+  task: {
+    fill: '--dy-wf-purpose-task-fill', line: '--dy-wf-purpose-task-line',
+    text: '--dy-wf-purpose-task-text', glyph: '□', label: 'Task',
+    glyphX: 20, textX: 36,
+  },
+  gate: {
+    fill: '--dy-wf-purpose-gate-fill', line: '--dy-wf-purpose-gate-line',
+    text: '--dy-wf-purpose-gate-text', glyph: '◆', label: 'Human gate',
+    glyphX: 24, textX: 42,
+  },
+  branch: {
+    fill: '--dy-wf-purpose-branch-fill', line: '--dy-wf-purpose-branch-line',
+    text: '--dy-wf-purpose-branch-text', glyph: '⋔', label: 'Conditional branch',
+    glyphX: 22, textX: 40,
+  },
+  loop: {
+    fill: '--dy-wf-purpose-loop-fill', line: '--dy-wf-purpose-loop-line',
+    text: '--dy-wf-purpose-loop-text', glyph: '↻', label: 'Bounded loop',
+    glyphX: 20, textX: 36,
+  },
+};
+
+// A node's purpose is read from the canonical graph shape it takes part in:
+// a human gate is a decision; a node carrying a `when` condition is a
+// conditional branch; a node carrying a `loop` bound is a bounded loop;
+// everything else is an ordinary unit of work.
+export function nodePurpose(n: CanvasNode): CanvasNodePurpose {
+  if (n.human_gate || n.kind === 'gate') return 'gate';
+  if (n.loop) return 'loop';
+  if (n.when) return 'branch';
+  return 'task';
+}
+
+// Purpose is shape-led. Silhouettes are drawn inside the fixed node box so the
+// layout grid, ports and edges keep their geometry: an ordinary task is a
+// rounded rect (null -> the caller emits a <rect>), a human gate is a hexagon
+// with pointed sides, a conditional branch is a cut-corner octagon and a
+// bounded loop is a rounded rect with a return notch on its upstream edge.
+// No node carries a coloured side stripe.
+export function nodeShapePath(
+  purpose: CanvasNodePurpose,
+  w: number = NODE_W,
+  h: number = NODE_H,
+): string | null {
+  switch (purpose) {
+    case 'gate': {
+      const i = Math.round(h * 0.22); // 14 at h=64
+      return `M ${i} 0 H ${w - i} L ${w} ${h / 2} L ${w - i} ${h} H ${i} L 0 ${h / 2} Z`;
+    }
+    case 'branch': {
+      const i = Math.round(h * 0.19); // 12 at h=64
+      return `M ${i} 0 H ${w - i} L ${w} ${i} V ${h - i} L ${w - i} ${h} H ${i} L 0 ${h - i} V ${i} Z`;
+    }
+    case 'loop': {
+      const r = 9;
+      const notch = 13;
+      return `M ${r} 0 H ${w - r} A ${r} ${r} 0 0 1 ${w} ${r} V ${h - r}`
+        + ` A ${r} ${r} 0 0 1 ${w - r} ${h} H ${r} A ${r} ${r} 0 0 1 0 ${h - r}`
+        + ` V ${h / 2 + 10} L ${notch} ${h / 2} L 0 ${h / 2 - 10} V ${r}`
+        + ` A ${r} ${r} 0 0 1 ${r} 0 Z`;
+    }
+    default:
+      return null; // 'task' -> rounded rect
+  }
+}
+
+// ---- S2: edge meaning token system ---------------------------------------
+// Every connector carries one MEANING. The workflow canvas draws `depends_on`
+// (a plain workflow dependency); the planning-canvas meanings are defined here
+// as colour/marker tokens only, so the later canvas slice renders from this
+// vocabulary instead of inventing a second one. Only the meanings this canvas
+// actually draws get marker elements — markers for unrendered meanings would be
+// dead DOM.
+export interface EdgeMeaning {
+  meaning: string;
+  color: string;
+  activeColor: string;
+  marker: string;
+  activeMarker: string;
+  label: string;
+  rendered: boolean;
+}
+
+export const EDGE_MEANINGS: Record<string, EdgeMeaning> = {
+  depends_on: {
+    meaning: 'depends_on', color: '--dy-edge-dep', activeColor: '--dy-edge-dep-active',
+    marker: 'dyArrowDep', activeMarker: 'dyArrowDepActive',
+    label: 'depends on', rendered: true,
+  },
+  supports: {
+    meaning: 'supports', color: '--dy-edge-plan-supports', activeColor: '--dy-edge-plan-supports-active',
+    marker: 'dyArrowPlanSupports', activeMarker: 'dyArrowPlanSupportsActive',
+    label: 'supports', rendered: false,
+  },
+  contradicts: {
+    meaning: 'contradicts', color: '--dy-edge-plan-contradicts', activeColor: '--dy-edge-plan-contradicts-active',
+    marker: 'dyArrowPlanContradicts', activeMarker: 'dyArrowPlanContradictsActive',
+    label: 'contradicts', rendered: false,
+  },
+  derived_from: {
+    meaning: 'derived_from', color: '--dy-edge-plan-derived_from', activeColor: '--dy-edge-plan-derived_from-active',
+    marker: 'dyArrowPlanDerivedFrom', activeMarker: 'dyArrowPlanDerivedFromActive',
+    label: 'derived from', rendered: false,
+  },
+  clarifies: {
+    meaning: 'clarifies', color: '--dy-edge-plan-clarifies', activeColor: '--dy-edge-plan-clarifies-active',
+    marker: 'dyArrowPlanClarifies', activeMarker: 'dyArrowPlanClarifiesActive',
+    label: 'clarifies', rendered: false,
+  },
+  implements: {
+    meaning: 'implements', color: '--dy-edge-plan-implements', activeColor: '--dy-edge-plan-implements-active',
+    marker: 'dyArrowPlanImplements', activeMarker: 'dyArrowPlanImplementsActive',
+    label: 'implements', rendered: false,
+  },
+  raises_question: {
+    meaning: 'raises_question', color: '--dy-edge-plan-raises_question', activeColor: '--dy-edge-plan-raises_question-active',
+    marker: 'dyArrowPlanRaisesQuestion', activeMarker: 'dyArrowPlanRaisesQuestionActive',
+    label: 'raises question', rendered: false,
+  },
+};
+
+// The meaning every workflow dependency edge is drawn with, and the planning
+// meanings the later canvas slice draws from.
+export const DEFAULT_EDGE_MEANING = 'depends_on';
+export const PLANNING_EDGE_MEANINGS = [
+  'supports', 'contradicts', 'derived_from', 'clarifies',
+  'depends_on', 'implements', 'raises_question',
+] as const;
 
 // Truthful elapsed label from a canonical timestamp. Absent timestamp ->
 // 'unavailable' (never a fabricated clock). Valid timestamps -> mm:ss elapsed.
@@ -126,9 +310,52 @@ function sEl(tag: string, attrs: Record<string, string | number>): SVGElement {
   return el;
 }
 
+// ---- lanes ---------------------------------------------------------------
+// The v6 composition reads top-to-bottom in horizontal bands. There is no
+// phase/lane COLLECTION in the canonical model — the only real grouping is the
+// assignment the run projection resolves (`team`) and the node's own stored
+// override (`phase_team`), so bands are derived from those and labelled with
+// the real value. Nothing here invents a phase taxonomy.
+//
+// When NO node carries an assignment, the bands fall back to the one other
+// partition the graph itself states: the exception path (conditional branches,
+// bounded loops, blocked nodes) versus the main path. Both facts come from the
+// node's own shape/status — the same inputs the purpose and status cues use —
+// so a lane band never claims something the definition does not say. A single
+// resulting band is not a band: the grid layout is used instead.
+export interface LaneMeta {
+  key: string;
+  label: string;
+  y: number;
+  height: number;
+  // Exception emphasis is meaning-carrying: a band that contains a conditional
+  // branch, a bounded loop or a blocked node is the exception path of this run.
+  exception: boolean;
+}
+
+export function laneKeyOf(n: CanvasNode): string {
+  return ((n.team ?? n.phase_team) ?? '').trim() || 'unassigned';
+}
+
+export function laneLabelOf(key: string): string {
+  if (key === 'unassigned') return 'Unassigned';
+  if (key === 'main-path') return 'Main path';
+  if (key === EXCEPTION_LANE_KEY) return 'Exception path';
+  return key;
+}
+
+// The shape-derived partition used when no node carries an assignment.
+export const EXCEPTION_LANE_KEY = 'exception-path';
+
+export function isExceptionNode(n: CanvasNode): boolean {
+  const purpose = nodePurpose(n);
+  return purpose === 'branch' || purpose === 'loop' || n.status === 'blocked';
+}
+
 // ---- buildLayout: pure, exported for tests ----
-export function buildLayout(nodes: CanvasNode[]): {
+export function buildLayout(nodes: CanvasNode[], opts?: { laneOf?: (n: CanvasNode) => string }): {
   positions: Record<string, { x: number; y: number; depth: number }>;
+  lanes: LaneMeta[];
   width: number;
   height: number;
 } {
@@ -158,10 +385,57 @@ export function buildLayout(nodes: CanvasNode[]): {
   });
   const maxDepth = Math.max(0, ...nodes.map((n) => depthCache.get(n.node_id) ?? 0));
   const rows = Math.max(1, ...Object.values(perDepth));
-  return {
+  const grid = {
     positions,
+    lanes: [] as LaneMeta[],
     width: PAD * 2 + (maxDepth + 1) * (NODE_W + COL_GAP) - COL_GAP,
     height: PAD * 2 + rows * (NODE_H + ROW_GAP) - ROW_GAP,
+  };
+  const laneOf = opts?.laneOf;
+  if (!laneOf) return grid; // default (column) layout — unchanged for callers that pass no grouping
+
+  // Lane layout: one horizontal band per real grouping key, nodes ordered
+  // left-to-right by topology depth (then by their original order), so the
+  // reading order inside a band is still the dependency order.
+  const order: string[] = [];
+  const members = new Map<string, CanvasNode[]>();
+  for (const n of nodes) {
+    const key = laneOf(n);
+    if (!members.has(key)) { members.set(key, []); order.push(key); }
+    members.get(key)!.push(n);
+  }
+  const laneH = LANE_PAD * 2 + NODE_H;
+  const positionsLane: Record<string, { x: number; y: number; depth: number }> = {};
+  const lanes: LaneMeta[] = [];
+  let widest = 0;
+  order.forEach((key, li) => {
+    const band = members.get(key)!;
+    const sorted = [...band].sort((a, b) => {
+      const da = depthCache.get(a.node_id) ?? 0;
+      const db = depthCache.get(b.node_id) ?? 0;
+      return da - db || nodes.indexOf(a) - nodes.indexOf(b);
+    });
+    const y = PAD + li * laneH;
+    sorted.forEach((n, i) => {
+      positionsLane[n.node_id] = { x: PAD + i * (NODE_W + COL_GAP), y: y + LANE_PAD, depth: i };
+    });
+    widest = Math.max(widest, sorted.length);
+    lanes.push({
+      key,
+      label: laneLabelOf(key),
+      y,
+      height: laneH,
+      exception: band.some((n) => {
+        const purpose = nodePurpose(n);
+        return purpose === 'branch' || purpose === 'loop' || n.status === 'blocked';
+      }),
+    });
+  });
+  return {
+    positions: positionsLane,
+    lanes,
+    width: PAD * 2 + Math.max(1, widest) * (NODE_W + COL_GAP) - COL_GAP,
+    height: PAD * 2 + Math.max(1, lanes.length) * laneH - (LANE_PAD - PAD > 0 ? 0 : 0) - PAD + PAD,
   };
 }
 
@@ -175,13 +449,23 @@ export function mountWorkflowCanvas(
   pollMs = 8000,
 ): () => void {
   host.replaceChildren();
-  host.className = 'dy-wf';
+  // The scope class is carried by the mount host ITSELF: the canvas stylesheet
+  // is scoped to `.dy-wf-scope`, so the canvas owns its own styling carrier
+  // instead of depending on a host-provided `.dy-root` ancestor that the
+  // Desktop surface never provided (that missing ancestor is what made every
+  // fill resolve to nothing and render black).
+  host.className = 'dy-wf dy-wf-scope';
 
   const wrap = elu<HTMLDivElement>('div', 'dy-wf-wrap');
   const svg = sEl('svg', { class: 'dy-wf-svg' }) as SVGSVGElement;
   svg.setAttribute('data-lod', 'read');
   const viewport = sEl('g', { class: 'dy-wf-viewport' }) as SVGGElement;
   svg.appendChild(viewport);
+
+  // Purpose legend: the visual set is only useful if it is readable without
+  // opening a node, so the canvas states its own vocabulary. Built from the
+  // same token tables the nodes and edges are drawn from (no second copy).
+  const SVG_INDEX = sEl('svg', { class: 'dy-wf-index' }) as SVGSVGElement;
 
   // minimap: authored bounds + live camera (archify radar principle)
   const minimap = sEl('svg', { class: 'dy-wf-minimap', width: 170, height: 104 }) as SVGSVGElement;
@@ -246,6 +530,8 @@ export function mountWorkflowCanvas(
   // P8.2: equivalent list/table view — same nodes, dependencies, gates and
   // statuses as the graph, derived from the SAME frame (no extra fetch).
   // Stays usable if the canvas fails; rows are keyboard-activatable.
+  // Collapsed by default (v6 composition is canvas-first): the list is the
+  // on-demand equivalent view, not a second copy of the workflow on screen.
   const listView = elu<HTMLDivElement>('div', 'dy-wf-list');
   listView.dataset.wfList = '';
   const listHead = elu<HTMLButtonElement>('button', 'dy-wf-list-head', '▸ List view');
@@ -261,12 +547,9 @@ export function mountWorkflowCanvas(
     listHead.textContent = open ? '▸ List view' : '▾ List view';
     listBody.style.display = open ? 'none' : 'block';
   });
-  listHead.setAttribute('aria-expanded', 'true');
-  listHead.textContent = '▾ List view';
-  listBody.style.display = 'block';
   listView.append(listHead, listBody);
 
-  wrap.append(svg, feed, minimap, passport, zoomBar, listView);
+  wrap.append(svg, SVG_INDEX, feed, minimap, passport, zoomBar, listView);
   host.appendChild(wrap);
 
   // camera state
@@ -275,12 +558,170 @@ export function mountWorkflowCanvas(
   let zoom = 1;
   let fullW = 0;
   let fullH = 0;
+  // The world origin can be negative once a persisted position sits above or
+  // left of the computed layout; the minimap needs the same origin the main
+  // svg viewBox uses, or its dots would be offset.
+  let originX = 0;
+  let originY = 0;
   let currentNodes: CanvasNode[] = [];
   let nodePositions: Record<string, CanvasPosition> = {};
   let dragNode: string | null = null;
   let dragStart = { x: 0, y: 0, ox: 0, oy: 0 };
   let connectFrom: string | null = null;
   let disposers: Array<() => void> = [];
+
+  // ---- drag / connect gesture core (single source of truth) ---------------
+  // Before S1 this file had two independent node-drag write paths and two
+  // independent connection-completion paths: the node handler and the
+  // canvas-level handler each committed the graph, and neither reset the other's
+  // state. A single release could therefore commit twice, and a release that the
+  // canvas path consumed left the node-level drag marker set with the node left
+  // visually mid-drag. Every pointer gesture now runs through the functions
+  // below, so there is exactly one writer per outcome and one reset per release.
+  //
+  // Coordinates: pointer deltas are in SCREEN pixels, the graph is in WORLD
+  // units. The viewport applies translate(pan) scale(zoom), so a world delta is
+  // a screen delta divided by zoom. The element-local pointer position is read
+  // through the viewport matrix as well, so a drag is anchored to where the
+  // pointer actually grabbed the node instead of snapping it to the pointer.
+  let dragSession: { nodeId: string; pointerId: number; offsetX: number; offsetY: number; moved: boolean } | null = null;
+
+  const matrixNumbers = (transform: string | null): number[] =>
+    (transform ?? '').match(/-?\d+(?:\.\d+)?(?:e[-+]?\d+)?/g)?.map(Number) ?? [];
+
+  // A node's own transform is always translate(x y) — set by this module — so
+  // this is a local read and not a general DOMMatrix substitute.
+  const readNodeTransform = (g: SVGGElement): { x: number; y: number } | null => {
+    const nums = matrixNumbers(g.getAttribute('transform'));
+    if (nums.length < 2 || !isFinite(nums[0]) || !isFinite(nums[1])) return null;
+    return { x: nums[0], y: nums[1] };
+  };
+
+  const worldPoint = (clientX: number, clientY: number): { x: number; y: number } => {
+    let ox = 0;
+    let oy = 0;
+    try {
+      const ctm = svg.getScreenCTM();
+      if (ctm && isFinite(ctm.a) && isFinite(ctm.e) && isFinite(ctm.f)) {
+        ox = ctm.e;
+        oy = ctm.f;
+      }
+    } catch {
+      ox = 0;
+      oy = 0;
+    }
+    return { x: (clientX - ox - panX) / zoom, y: (clientY - oy - panY) / zoom };
+  };
+
+  const writeNodePosition = (nodeId: string, g: SVGGElement, x: number, y: number) => {
+    nodePositions[nodeId] = { x, y, depth: nodePositions[nodeId]?.depth ?? 0 };
+    g.setAttribute('transform', `translate(${x} ${y})`);
+  };
+
+  const startDrag = (nodeId: string, g: SVGGElement, e: PointerEvent, depth: number) => {
+    // A shift-click or port press is a connect gesture, never a drag.
+    if (connectFrom) return;
+    const current = nodePositions[nodeId] ?? { x: 0, y: 0, depth };
+    const world = worldPoint(e.clientX, e.clientY);
+    dragNode = nodeId;
+    dragSession = {
+      nodeId,
+      pointerId: e.pointerId,
+      offsetX: world.x - current.x,
+      offsetY: world.y - current.y,
+      moved: false,
+    };
+    dragStart = { x: e.clientX, y: e.clientY, ox: current.x, oy: current.y };
+    // Capture the pointer on the node so the drag survives the pointer leaving
+    // the node's own hit area.
+    try { g.setPointerCapture(e.pointerId); } catch { /* older engines */ }
+  };
+
+  const dragMove = (e: PointerEvent) => {
+    const session = dragSession;
+    if (!session || e.pointerId !== session.pointerId) return;
+    const g = viewport.querySelector<SVGGElement>(`[data-node-id="${session.nodeId}"]`);
+    if (!g) return;
+    // Track real movement: a click (press and release without motion) must not
+    // be treated as a drag commit, or the resulting version-save + refresh
+    // re-mounts the canvas and discards the passport the click just opened.
+    const movedBy = Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y);
+    if (movedBy > 3) session.moved = true;
+    const world = worldPoint(e.clientX, e.clientY);
+    writeNodePosition(session.nodeId, g, world.x - session.offsetX, world.y - session.offsetY);
+  };
+
+  const commitNodePosition = async (nodeId: string) => {
+    const committed = nodePositions[nodeId];
+    if (!committed) return;
+    const nextNodes = currentNodes.map((item) => item.node_id === nodeId
+      ? { ...item, canvas_position: { x: committed.x, y: committed.y } } as CanvasNode
+      : item);
+    currentNodes = nextNodes;
+    await handlers.onEdit?.(nextNodes);
+  };
+
+  // One release path for a node drag. commit=false (pointercancel) leaves the
+  // last rendered position in place and writes nothing, so an interrupted
+  // gesture can never persist a half-state.
+  const endDragSession = (e: PointerEvent, commit: boolean) => {
+    const session = dragSession;
+    if (!session) return;
+    const g = viewport.querySelector<SVGGElement>(`[data-node-id="${session.nodeId}"]`);
+    if (g) {
+      try { g.releasePointerCapture(session.pointerId); } catch { /* not captured */ }
+    }
+    dragSession = null;
+    dragNode = null;
+    dragStart = { x: 0, y: 0, ox: 0, oy: 0 };
+    // A click with no measurable movement is a selection, not an edit: opening
+    // the passport must not trigger a version save.
+    if (commit && session.moved) void commitNodePosition(session.nodeId);
+  };
+
+  const startConnect = (nodeId: string, g: SVGGElement) => {
+    if (connectFrom && connectFrom !== nodeId) {
+      const previous = viewport.querySelector<SVGGElement>(`[data-node-id="${connectFrom}"]`);
+      previous?.classList.remove('dy-wf-connecting');
+    }
+    if (dragNode) endDragSession({ pointerId: -1 } as PointerEvent, false);
+    connectFrom = nodeId;
+    g.classList.add('dy-wf-connecting');
+  };
+
+  const cancelConnect = () => {
+    if (connectFrom) {
+      const g = viewport.querySelector<SVGGElement>(`[data-node-id="${connectFrom}"]`);
+      g?.classList.remove('dy-wf-connecting');
+    }
+    connectFrom = null;
+  };
+
+  // One completion path for a connection gesture, reached from the node
+  // release, the canvas release and the keyboard paths alike.
+  const endConnectGesture = (to: string | null) => {
+    const from = connectFrom;
+    if (!from) return;
+    connectFrom = null;
+    for (const g of viewport.querySelectorAll<SVGGElement>('.dy-wf-node.dy-wf-connecting')) {
+      g.classList.remove('dy-wf-connecting');
+    }
+    if (!to) return; // released on empty canvas: nothing to complete, nothing to report
+    // Cycle rules are unchanged: client-side validateConnection, and the server
+    // rejects what it rejects. This only decides what to even ask for.
+    // A release on the source node itself is a real (rejected) request and must
+    // keep reporting its reason — validateConnection answers that first.
+    const error = validateConnection(currentNodes, from, to);
+    if (error) {
+      feedLog(error);
+      return;
+    }
+    const nextNodes = currentNodes.map((item) => item.node_id === to
+      ? { ...item, depends_on: [...new Set([...item.depends_on, from])] }
+      : item);
+    currentNodes = nextNodes;
+    void handlers.onEdit?.(nextNodes);
+  };
 
   const apply = () => {
     viewport.setAttribute('transform', `translate(${panX} ${panY}) scale(${zoom})`);
@@ -316,22 +757,36 @@ export function mountWorkflowCanvas(
   });
 
   // ---- defs: arrow markers (inert) ----
+  // Marker ids and colours come from the edge meaning token table, so a
+  // connector's meaning is expressed once and reused by both the edge and its
+  // arrowhead. Only meanings this canvas draws get marker elements.
   const defs = sEl('defs', {});
-  const mkMarker = (id: string, fill: string) => {
+  const mkMarker = (id: string, fillToken: string, fallback: string) => {
     const m = sEl('marker', {
       id,
       viewBox: '0 0 10 10',
       refX: '9',
       refY: '5',
-      markerWidth: '7',
-      markerHeight: '7',
+      // Larger than the 1.5px stroke and in userSpaceOnUse so the head keeps a
+      // constant, legible size instead of thinning with the stroke width.
+      markerWidth: '6',
+      markerHeight: '6',
+      markerUnits: 'userSpaceOnUse',
       orient: 'auto-start-reverse',
     });
-    m.appendChild(sEl('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill }));
+    const head = sEl('path', {
+      d: 'M 0 0 L 10 5 L 0 10 z',
+      class: 'dy-wf-arrow',
+      fill: `var(${fillToken}, ${fallback})`,
+    });
+    m.appendChild(head);
     return m;
   };
-  defs.appendChild(mkMarker('dyArrowActive', '#58a6ff'));
-  defs.appendChild(mkMarker('dyArrowDim', '#3d4657'));
+  for (const meaning of Object.values(EDGE_MEANINGS)) {
+    if (!meaning.rendered) continue;
+    defs.appendChild(mkMarker(meaning.marker, meaning.color, '#8fa3c8'));
+    defs.appendChild(mkMarker(meaning.activeMarker, meaning.activeColor, '#9cc4ff'));
+  }
   svg.appendChild(defs);
 
   // ---- render frame (event-driven: called on poll arrival / state delta) ----
@@ -348,8 +803,9 @@ export function mountWorkflowCanvas(
       row.dataset.wfListRow = n.node_id;
       row.setAttribute('role', 'row');
       const name = elu<HTMLSpanElement>('span', 'dy-wf-list-title', n.title);
-      const kind = elu<HTMLSpanElement>('span', 'dy-wf-list-kind',
-        n.kind === 'gate' ? 'gate' : 'task');
+      const kindText = nodePurpose(n);
+      const kind = elu<HTMLSpanElement>('span', `dy-wf-list-kind ${kindText}`,
+        PURPOSE_VISUALS[kindText].label);
       const deps = elu<HTMLSpanElement>('span', 'dy-wf-list-deps',
         n.depends_on.length
           ? `depends on: ${n.depends_on.map((d) => titleOf.get(d) ?? d).join(', ')}`
@@ -365,6 +821,180 @@ export function mountWorkflowCanvas(
       listBody.appendChild(row);
     }
   };
+  // ---- S1: per-purpose node component -------------------------------------
+  // One component per node, differentiated on three independent cues so that
+  // purpose is immediately readable without relying on colour alone:
+  //   silhouette (hexagon gate / cut-corner branch / notched loop / round rect task)
+  //   purpose tint + symbol + purpose name
+  //   the purpose fill, with status carried by the OUTLINE + status chip
+  // No node carries a coloured side stripe.
+  const buildNode = (
+    n: CanvasNode,
+    p: CanvasPosition,
+    run: CanvasRun,
+    editable: boolean,
+  ): SVGGElement => {
+    const purpose = nodePurpose(n);
+    const status = statusToken(n.status);
+    const visuals = PURPOSE_VISUALS[purpose];
+    const g = sEl('g', {
+      class: `dy-wf-node ${purpose} ${status}`,
+      transform: `translate(${p.x} ${p.y})`,
+    }) as SVGGElement;
+    g.dataset.wfPurpose = purpose;
+    g.dataset.wfStatus = status;
+    g.setAttribute('tabindex', '0');
+    g.setAttribute('role', 'button');
+    g.setAttribute('data-node-id', n.node_id);
+    g.setAttribute('aria-label', `${visuals.label}: ${n.title} (${n.status ?? 'pending'})`);
+    // The editable flag states whether a persistence seam is actually wired.
+    g.dataset.wfEditable = String(editable);
+    g.setAttribute('aria-describedby', `wf-help-${n.node_id}`);
+
+    // Purpose silhouette, drawn inside the fixed node box so ports, edges and
+    // the layout grid keep their geometry.
+    const outline = nodeShapePath(purpose);
+    const shape = outline === null
+      ? sEl('rect', { width: NODE_W, height: NODE_H, rx: 9, class: 'dy-wf-shape dy-wf-rect' })
+      : sEl('path', { d: outline, class: 'dy-wf-shape dy-wf-rect' });
+    shape.setAttribute('fill', `var(${visuals.fill})`);
+
+    // Purpose cues: symbol + name in the purpose text colour (row 1 / row 2 left).
+    const glyph = sEl('text', { x: visuals.glyphX, y: 26, class: 'dy-wf-glyph' }) as SVGTextElement;
+    glyph.textContent = visuals.glyph;
+    const label = sEl('text', { x: visuals.textX, y: 25, class: 'dy-wf-label' }) as SVGTextElement;
+    label.textContent = n.title.slice(0, 18);
+    const sub = sEl('text', { x: 12, y: 45, class: 'dy-wf-sub' }) as SVGTextElement;
+    sub.textContent = visuals.label;
+
+    // Status cues: outline stroke + tinted chip + the status word itself.
+    // Status never re-colours the fill, so purpose and status cannot collide.
+    const chip = sEl('rect', {
+      x: NODE_W - 66, y: 34, width: 54, height: 16, rx: 8,
+      class: `dy-wf-statuschip ${status}`,
+    });
+    const statusText = sEl('text', {
+      x: NODE_W - 39, y: 45.5, 'text-anchor': 'middle',
+      class: `dy-wf-statustext ${status}`,
+    }) as SVGTextElement;
+    statusText.textContent = n.status ?? 'pending';
+    g.append(shape, glyph, label, sub, chip, statusText);
+
+    // Workflow elapsed time, not this node's execution duration.
+    // A refresh timestamp must never reset the clock; missing start is unavailable.
+    if (n.status === 'working') {
+      const timer = sEl('text', {
+        x: 12, y: 60, class: 'dy-wf-timer full',
+      }) as SVGTextElement;
+      timer.textContent = `Workflow: ${elapsedLabel(run.started_at)}`;
+      timer.dataset.for = n.node_id;
+      g.appendChild(timer);
+    }
+    // Assignee stays on the node face (row 3, opposite the clock) — who owns
+    // the node is factual, not decorative, so it is never dropped for styling.
+    if (n.assignee) {
+      g.appendChild((() => {
+        const who = sEl('text', {
+          x: NODE_W - 12, y: 60, 'text-anchor': 'end', class: 'dy-wf-assignee',
+        }) as SVGTextElement;
+        who.textContent = n.assignee;
+        return who;
+      })());
+    }
+
+    // Connect port: single, right side, hit area larger than the visual mark.
+    const port = sEl('circle', { cx: NODE_W, cy: NODE_H / 2, r: 11, class: 'dy-wf-port' });
+    port.setAttribute('data-connect-from', n.node_id);
+    port.setAttribute('tabindex', '0');
+    port.setAttribute('aria-label', `Connect from ${n.title}`);
+    g.appendChild(port);
+
+    const dash = () => shape.setAttribute('stroke-dasharray', '4 3');
+    const undash = () => shape.removeAttribute('stroke-dasharray');
+    // Bind the port directly rather than relying on bubbling hit-testing from
+    // the node group. Synthetic pointer events and SVG hit-testing can expose
+    // the group as the target even when the pointer is on the port, which
+    // incorrectly starts a node drag and loses the connection source.
+    port.addEventListener('pointerdown', (ev) => {
+      const e = ev as PointerEvent;
+      if (e.button !== 0 || !editable) return;
+      e.stopPropagation();
+      startConnect(n.node_id, g);
+    });
+    g.addEventListener('pointerdown', (ev) => {
+      const e = ev as PointerEvent;
+      if (e.button !== 0 || !editable) return;
+      e.stopPropagation();
+      if (e.shiftKey) {
+        // Shift-click is the pointer-only connect gesture.
+        startConnect(n.node_id, g);
+        return;
+      }
+      startDrag(n.node_id, g, e, p.depth ?? 0);
+    });
+    g.addEventListener('pointermove', (ev) => dragMove(ev as PointerEvent));
+    g.addEventListener('pointerup', (ev) => {
+      const e = ev as PointerEvent;
+      if (dragSession && dragSession.nodeId === n.node_id) {
+        e.stopPropagation();
+        endDragSession(e, true);
+        return;
+      }
+      if (connectFrom) {
+        // The node claims the release so the canvas-level completion path
+        // cannot commit the same connection a second time.
+        e.stopPropagation();
+        endConnectGesture(n.node_id);
+      }
+    });
+    // pointercancel: an interrupted pointer (system gesture, lost capture)
+    // must drop the drag without writing a half-state or an edit.
+    g.addEventListener('pointercancel', (ev) => {
+      const e = ev as PointerEvent;
+      if (dragSession && dragSession.nodeId === n.node_id) {
+        e.stopPropagation();
+        endDragSession(e, false);
+      }
+    });
+    g.addEventListener('keydown', (ev) => {
+      const e = ev as KeyboardEvent;
+      if (!editable) return;
+      if (e.key === ' ' || e.key === 'c') {
+        e.preventDefault();
+        if (connectFrom === n.node_id) cancelConnect();
+        else startConnect(n.node_id, g);
+      } else if (e.key === 'Enter' && connectFrom && connectFrom !== n.node_id) {
+        e.preventDefault();
+        endConnectGesture(n.node_id);
+      }
+    });
+    g.addEventListener('pointerenter', dash); // intent preview [archify]
+    g.addEventListener('pointerleave', () => {
+      if (!g.classList.contains('dy-wf-selected')) undash();
+    });
+    const open = () => openPassport(n, g);
+    g.addEventListener('click', open);
+    g.addEventListener('keydown', (e) => {
+      const ev = e as KeyboardEvent;
+      if (ev.key === 'Enter') {
+        open();
+        return;
+      }
+      // P8.2: arrow-key focus movement between nodes (graph roving focus).
+      if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown'
+        || ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        const all = [...viewport.querySelectorAll<SVGGElement>('.dy-wf-node')];
+        const idx = all.indexOf(g);
+        if (idx === -1) return;
+        const step = (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') ? 1 : -1;
+        const next = all[(idx + step + all.length) % all.length];
+        if (next) next.focus();
+      }
+    });
+    return g;
+  };
+
   const render = (run: CanvasRun | null) => {
     lastRun = run;
     renderList(run);
@@ -378,22 +1008,81 @@ export function mountWorkflowCanvas(
       return;
     }
     currentNodes = run.nodes;
-    const layout = buildLayout(run.nodes);
+    // Lane grouping: the resolved assignment when the run states one, else the
+    // shape-derived exception partition (both real — see laneKeyOf). A single
+    // band is not a band: bands only render when there are two or more.
+    const assignments = run.nodes.some((n) => ((n.team ?? n.phase_team) ?? '').trim());
+    const laneOf = assignments
+      ? laneKeyOf
+      : (n: CanvasNode) => (isExceptionNode(n) ? EXCEPTION_LANE_KEY : 'main-path');
+    let layout = buildLayout(run.nodes, { laneOf });
+    if (layout.lanes.length < 2) layout = buildLayout(run.nodes);
     const positions = nodePositions = Object.keys(nodePositions).length ? { ...layout.positions, ...nodePositions } : run.nodes.reduce((acc, item) => { if (item.canvas_position) acc[item.node_id] = { ...layout.positions[item.node_id], ...item.canvas_position }; return acc; }, { ...layout.positions } as Record<string, CanvasPosition>);
-    fullW = layout.width;
-    fullH = layout.height;
-    svg.setAttribute('viewBox', `0 0 ${layout.width} ${layout.height}`);
+    // The world must contain every node it renders. Persisted canvas_position
+    // values survive layout changes, so a stale drag can sit outside the
+    // computed layout box — the old code sized the viewBox from the layout
+    // alone and such a node was clipped by the frame (measured 2026-09-22).
+    let worldW = layout.width;
+    let worldH = layout.height;
+    let minX = 0;
+    let minY = 0;
+    for (const p of Object.values(positions)) {
+      worldW = Math.max(worldW, p.x + NODE_W + PAD);
+      worldH = Math.max(worldH, p.y + NODE_H + PAD);
+      minX = Math.min(minX, p.x - PAD);
+      minY = Math.min(minY, p.y - PAD);
+    }
+    worldW -= minX;
+    worldH -= minY;
+    fullW = worldW;
+    fullH = worldH;
+    originX = minX;
+    originY = minY;
+    svg.setAttribute('viewBox', `${minX} ${minY} ${worldW} ${worldH}`);
 
-    // edges first (under nodes)
+    // Lane bands first (background of the whole world), so nodes and edges sit
+    // on top. Every band is derived from the same layout the nodes use.
+    for (const lane of layout.lanes) {
+      const band = sEl('rect', {
+        x: minX, y: lane.y, width: worldW, height: lane.height,
+        class: lane.exception ? 'dy-wf-lane exception' : 'dy-wf-lane',
+      });
+      band.setAttribute('data-lane', lane.key);
+      const lbl = sEl('text', { x: minX + 14, y: lane.y + 16, class: 'dy-wf-lane-label' }) as SVGTextElement;
+      lbl.textContent = lane.label;
+      viewport.append(band, lbl);
+    }
+
+    // edges first (under nodes). Every dependency edge carries the default
+    // workflow meaning; its colour and arrowhead come from the meaning table.
+    const depMeaning = EDGE_MEANINGS[DEFAULT_EDGE_MEANING];
     for (const n of run.nodes) {
       const from = positions[n.node_id];
       for (const dep of n.depends_on) {
         const to = positions[dep];
         if (!from || !to) continue;
         const path = sEl('path', {
-          class: `dy-wf-edge`,
-          d: `M ${to.x + NODE_W} ${to.y + NODE_H / 2} C ${to.x + NODE_W + COL_GAP / 2} ${to.y + NODE_H / 2}, ${from.x - COL_GAP / 2} ${from.y + NODE_H / 2}, ${from.x - 6} ${from.y + NODE_H / 2}`,
-          'marker-end': 'url(#dyArrowDim)',
+          class: 'dy-wf-edge',
+          'data-meaning': depMeaning.meaning,
+          // Curved connector. Same-band edges bow gently so the curve is
+          // visible; cross-band edges take a wider S-curve between the two
+          // lane anchors, so a dependency that crosses lanes reads as one
+          // flow instead of a ruler line.
+          d: (() => {
+            const x1 = to.x + NODE_W, y1 = to.y + NODE_H / 2;
+            const x2 = from.x - 6, y2 = from.y + NODE_H / 2;
+            const sameBand = Math.abs(y1 - y2) < NODE_H / 2;
+            const dx = Math.max(COL_GAP / 2, Math.abs(x2 - x1) * 0.55);
+            if (sameBand) {
+              // Bow: lift the two control points symmetrically off the line.
+              const bow = Math.min(46, Math.max(18, dx * 0.35));
+              return `M ${x1} ${y1} C ${x1 + dx} ${y1 - bow}, ${x2 - dx} ${y2 - bow}, ${x2} ${y2}`;
+            }
+            return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+          })(),
+          // Leaves the marker 6px of room before the shape, so the head is
+          // never tucked under the node it points at.
+          'marker-end': `url(#${depMeaning.marker})`,
         });
         path.dataset.from = dep;
         path.dataset.to = n.node_id;
@@ -404,108 +1093,66 @@ export function mountWorkflowCanvas(
     }
     for (const n of run.nodes) {
       const p = positions[n.node_id];
-      const g = sEl('g', {
-        class: `dy-wf-node ${n.status ?? 'pending'}`,
-        transform: `translate(${p.x} ${p.y})`,
-      }) as SVGGElement;
-      g.setAttribute('tabindex', '0');
-      g.setAttribute('role', 'button');
-      g.setAttribute('data-node-id', n.node_id);
-      g.setAttribute(
-        'aria-label',
-        `${n.kind === 'gate' ? 'Gate' : 'Task'}: ${n.title} (${n.status ?? 'pending'})`,
-      );
-      g.dataset.wfEditable = 'true';
-      g.setAttribute('aria-describedby', `wf-help-${n.node_id}`);
-      const port = sEl('circle', { cx: NODE_W, cy: NODE_H / 2, r: 7, class: 'dy-wf-port' });
-      port.setAttribute('data-connect-from', n.node_id);
-      port.setAttribute('tabindex', '0');
-      port.setAttribute('aria-label', `Connect from ${n.title}`);
-      const rect = sEl('rect', { width: NODE_W, height: NODE_H, rx: 9, class: 'dy-wf-rect' });
-      const label = sEl('text', { x: 12, y: 25, class: 'dy-wf-label' }) as SVGTextElement;
-      label.textContent = n.title.slice(0, 24);
-      const sub = sEl('text', { x: 12, y: 44, class: 'dy-wf-sub' }) as SVGTextElement;
-      sub.textContent = (n.kind === 'gate' ? 'GATE · ' : '') + (n.status ?? 'pending') + (n.assignee ? ' · ' + n.assignee : '');
-      // Workflow elapsed time, not this node's execution duration.
-      // A refresh timestamp must never reset the clock; missing start is unavailable.
-      let timer: SVGTextElement | null = null;
-      if (n.status === 'working') {
-        timer = sEl('text', {
-          x: NODE_W - 12,
-          y: 25,
-          'text-anchor': 'end',
-          class: 'dy-wf-timer full',
-        }) as SVGTextElement;
-        timer.textContent = `Workflow: ${elapsedLabel(run.started_at)}`;
-        timer.dataset.for = n.node_id;
-      }
-      if (timer) g.append(rect, label, sub, timer, port);
-      else g.append(rect, label, sub, port);
-      const dash = () => rect.setAttribute('stroke-dasharray', '4 3');
-      const undash = () => rect.removeAttribute('stroke-dasharray');
-      // Bind the port directly rather than relying on bubbling hit-testing from
-      // the node group. Synthetic pointer events and SVG hit-testing can expose
-      // the group as the target even when the pointer is on the port, which
-      // incorrectly starts a node drag and loses the connection source.
-      port.addEventListener('pointerdown', (ev) => {
-        const e = ev as PointerEvent;
-        e.stopPropagation();
-        connectFrom = n.node_id;
-        g.classList.add('dy-wf-connecting');
-      });
-      g.addEventListener('pointerdown', (ev) => {
-        const e = ev as PointerEvent;
-        if (e.button !== 0) return;
-        e.stopPropagation();
-        const p0 = positions[n.node_id] ?? { x: 0, y: 0, depth: 0 };
-        if (e.shiftKey) { connectFrom = n.node_id; g.classList.add('dy-wf-connecting'); }
-        else { dragNode = n.node_id; dragStart = { x: e.clientX, y: e.clientY, ox: p0.x, oy: p0.y }; }
-        if (!connectFrom) { try { g.setPointerCapture(e.pointerId); } catch {} }
-      });
-      g.addEventListener('pointermove', (ev) => {
-        if (!dragNode || dragNode !== n.node_id) return;
-        const e = ev as PointerEvent; nodePositions[n.node_id] = { ...positions[n.node_id], x: dragStart.ox + (e.clientX - dragStart.x) / zoom, y: dragStart.oy + (e.clientY - dragStart.y) / zoom };
-        g.setAttribute('transform', `translate(${nodePositions[n.node_id].x} ${nodePositions[n.node_id].y})`);
-      });
-      g.addEventListener('pointerup', async (ev) => {
-        const e = ev as PointerEvent;
-        if (dragNode === n.node_id) { dragNode = null; const nextNodes = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, canvas_position: { x: nodePositions[n.node_id].x, y: nodePositions[n.node_id].y } } as CanvasNode : item); currentNodes = nextNodes; await handlers.onEdit?.(nextNodes); }
-        if (connectFrom) { const from = connectFrom; connectFrom = null; g.classList.remove('dy-wf-connecting'); const error = validateConnection(currentNodes, from, n.node_id); if (!error) { const nextNodes = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, depends_on: [...new Set([...item.depends_on, from])] } : item); currentNodes = nextNodes; await handlers.onEdit?.(nextNodes); } else feedLog(error); }
-        try { g.releasePointerCapture(e.pointerId); } catch {}
-      });
-      g.addEventListener('keydown', async (ev) => {
-        const e = ev as KeyboardEvent;
-        if (e.key === ' ' || e.key === 'c') { e.preventDefault(); connectFrom = connectFrom === n.node_id ? null : n.node_id; g.classList.toggle('dy-wf-connecting', !!connectFrom); }
-        else if (e.key === 'Enter' && connectFrom && connectFrom !== n.node_id) { e.preventDefault(); const from = connectFrom; connectFrom = null; const error = validateConnection(currentNodes, from, n.node_id); if (!error) { const nextNodes = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, depends_on: [...new Set([...item.depends_on, from])] } : item); currentNodes = nextNodes; await handlers.onEdit?.(nextNodes); } else feedLog(error); }
-      });
-      g.addEventListener('pointerenter', dash); // intent preview [archify]
-      g.addEventListener('pointerleave', () => {
-        if (!g.classList.contains('dy-wf-selected')) undash();
-      });
-      const open = () => openPassport(n, g);
-      g.addEventListener('click', open);
-      g.addEventListener('keydown', (e) => {
-        const ev = e as KeyboardEvent;
-        if (ev.key === 'Enter') {
-          open();
-          return;
-        }
-        // P8.2: arrow-key focus movement between nodes (graph roving focus).
-        if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown'
-          || ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') {
-          ev.preventDefault();
-          const all = [...viewport.querySelectorAll<SVGGElement>('.dy-wf-node')];
-          const idx = all.indexOf(g);
-          if (idx === -1) return;
-          const step = (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') ? 1 : -1;
-          const next = all[(idx + step + all.length) % all.length];
-          if (next) next.focus();
-        }
-      });
-      viewport.appendChild(g);
+      viewport.appendChild(buildNode(n, p, run, Boolean(handlers.onEdit)));
     }
+    renderLegend(run);
     apply();
     updateMinimap();
+  };
+
+  // ---- purpose legend (rendered from the token tables) ----
+  const renderLegend = (run: CanvasRun | null) => {
+    SVG_INDEX.replaceChildren();
+    SVG_INDEX.setAttribute('aria-label', 'Node purposes on this canvas');
+    if (!run || run.nodes.length === 0) return;
+    // Only purposes this run actually contains are listed, so the legend
+    // describes the picture instead of a hypothetical vocabulary.
+    const present = new Set(run.nodes.map((n) => nodePurpose(n)));
+    const purposes = (Object.keys(PURPOSE_VISUALS) as CanvasNodePurpose[])
+      .filter((p) => present.has(p));
+    const rowH = 26;
+    const padX = 12;
+    const width = 214;
+    const height = 22 + purposes.length * rowH;
+    SVG_INDEX.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    SVG_INDEX.setAttribute('width', String(width));
+    SVG_INDEX.setAttribute('height', String(height));
+    const frame = sEl('rect', {
+      x: 0.5, y: 0.5, width: width - 1, height: height - 1, rx: 7, class: 'dy-wf-index-bg',
+    });
+    const heading = sEl('text', { x: padX, y: 15, class: 'dy-wf-index-title' }) as SVGTextElement;
+    heading.textContent = 'NODE PURPOSE';
+    SVG_INDEX.append(frame, heading);
+    purposes.forEach((p, i) => {
+      const v = PURPOSE_VISUALS[p];
+      const cy = 22 + i * rowH + 8;
+      const outline = nodeShapePath(p, 20, 16);
+      const swatch = outline === null
+        ? sEl('rect', { x: 0, y: 0, width: 20, height: 16, rx: 3, class: 'dy-wf-index-shape' })
+        : sEl('path', { d: outline, class: 'dy-wf-index-shape' });
+      swatch.setAttribute('fill', `var(${v.fill})`);
+      swatch.setAttribute('stroke', `var(${v.line})`);
+      // The swatch states the purpose, so it carries the purpose identity.
+      swatch.setAttribute('data-wf-purpose', p);
+      // One transform per swatch: the group moves it into the legend row.
+      const row = sEl('g', { transform: `translate(${padX} ${cy - 8})` });
+      row.appendChild(swatch);
+      const glyph = sEl('text', { x: 30, y: 13, class: 'dy-wf-index-glyph' }) as SVGTextElement;
+      glyph.textContent = v.glyph;
+      row.appendChild(glyph);
+      const name = sEl('text', { x: 48, y: 13, class: 'dy-wf-index-label' }) as SVGTextElement;
+      name.textContent = v.label;
+      row.appendChild(name);
+      SVG_INDEX.appendChild(row);
+    });
+    const dep = EDGE_MEANINGS[DEFAULT_EDGE_MEANING];
+    const edgeRow = sEl('g', { transform: `translate(${padX} ${height - 4})` });
+    const line = sEl('path', { d: 'M 0 -5 L 20 -5', class: 'dy-wf-index-edge' });
+    edgeRow.appendChild(line);
+    const edgeLabel = sEl('text', { x: 30, y: -1, class: 'dy-wf-index-edge-label' }) as SVGTextElement;
+    edgeLabel.textContent = `${dep.label} → (workflow edges)`;
+    edgeRow.appendChild(edgeLabel);
+    SVG_INDEX.appendChild(edgeRow);
   };
 
   // ---- minimap ----
@@ -522,14 +1169,18 @@ export function mountWorkflowCanvas(
     miniViewport.setAttribute('width', String(Math.max(10, vw * s)));
     miniViewport.setAttribute('height', String(Math.max(7, vh * s)));
     for (const n of currentNodes) {
-      const { positions } = buildLayout(currentNodes);
-      const p = positions[n.node_id];
+      // The minimap shows what is RENDERED: read the persisted/live positions
+      // the nodes actually carry, not a fresh grid, or a dragged node would
+      // sit somewhere the map does not show. Coordinates are shifted into the
+      // same (originX, originY) frame the main viewBox uses.
+      const p = nodePositions[n.node_id];
+      if (!p) continue;
       const dot = sEl('rect', {
-        x: p.x * s,
-        y: p.y * s,
+        x: (p.x - originX) * s,
+        y: (p.y - originY) * s,
         width: Math.max(3, NODE_W * s),
         height: Math.max(2, NODE_H * s),
-        fill: statusColor(n.status),
+        fill: `var(${STATUS_TOKENS[statusToken(n.status)]}, #6e7681)`,
         opacity: 0.8,
       });
       minimap.appendChild(dot);
@@ -759,28 +1410,15 @@ export function mountWorkflowCanvas(
   ) => buildTaskListMini(tasks, onOpen);
 
   // ---- interactions: pan / zoom / minimap ----
-  svg.addEventListener('pointerup', async (ev) => {
-    if (!connectFrom) return;
-    const target = (ev.target as Element)?.closest?.('.dy-wf-node');
-    const to = target?.getAttribute('data-node-id');
-    if (!to) return;
-    const from = connectFrom;
-    connectFrom = null;
-    target?.classList.remove('dy-wf-connecting');
-    const error = validateConnection(currentNodes, from, to);
-    if (!error) { const nextNodes = currentNodes.map((item) => item.node_id === to ? { ...item, depends_on: [...new Set([...item.depends_on, from])] } : item); currentNodes = nextNodes; await handlers.onEdit?.(nextNodes); }
-    else feedLog(error);
-  });
-
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
   svg.addEventListener('pointerdown', (e) => {
-    // Click-vs-drag disambiguation: capture on the pressed element itself, so
-    // the click event still retargets to the node on release. Capturing on
-    // the svg swallowed node clicks entirely (real-browser verified: pointer
-    // capture on the svg retargets pointerup away from the node, so the
-    // browser never synthesises a click on the node).
+    // Canvas-background pan. Node presses return before this: the node handler
+    // stops propagation and owns the pointer for its gesture. Click-vs-drag
+    // disambiguation keeps the capture on the pressed element itself, so the
+    // click event still retargets to the node on release (capturing on the svg
+    // swallowed node clicks entirely — real-browser verified).
     if ((e.target as Element)?.closest?.('.dy-wf-node')) return;
     dragging = true;
     lastX = (e as PointerEvent).clientX;
@@ -796,6 +1434,8 @@ export function mountWorkflowCanvas(
   });
   svg.addEventListener('pointermove', (e) => {
     if (!dragging) return;
+    // While a node drag owns the pointer, panning must not also consume it.
+    if (dragSession) return;
     const ev = e as PointerEvent;
     panX += ev.clientX - lastX;
     panY += ev.clientY - lastY;
@@ -805,17 +1445,32 @@ export function mountWorkflowCanvas(
     updateMinimap();
   });
   svg.addEventListener('pointerup', (e) => {
-    if (connectFrom) {
-      const target = (e.target as Element)?.closest?.('[data-node-id]') as Element | null;
-      const to = target?.getAttribute('data-node-id');
-      if (to) {
-        const from = connectFrom;
-        connectFrom = null;
-        const error = validateConnection(currentNodes, from, to);
-        if (!error) void handlers.onEdit?.(currentNodes.map((item) => item.node_id === to ? { ...item, depends_on: [...new Set([...item.depends_on, from])] } : item));
-        else feedLog(error);
-      }
+    // Drag release: one path, same function the node handler calls, so a
+    // release can never be handled twice or leave the drag half-finished.
+    if (dragSession) {
+      endDragSession(e as PointerEvent, true);
+      dragging = false;
+      return;
     }
+    if (connectFrom) {
+      // Connection completion lives in the same single path the node-level
+      // handlers use (endConnectGesture); this branch only supplies the target
+      // for a release that lands on the canvas background.
+      const target = (e.target as Element)?.closest?.('[data-node-id]') as Element | null;
+      endConnectGesture(target?.getAttribute('data-node-id') ?? null);
+    }
+    dragging = false;
+    try {
+      svg.releasePointerCapture((e as PointerEvent).pointerId);
+    } catch {
+      /* noop */
+    }
+  });
+  // pointercancel at the canvas level: an interrupted pan or connection gesture
+  // must also leave no half-state (a pan that never released kept panning).
+  svg.addEventListener('pointercancel', (e) => {
+    if (dragSession) endDragSession(e as PointerEvent, false);
+    cancelConnect();
     dragging = false;
     try {
       svg.releasePointerCapture((e as PointerEvent).pointerId);
@@ -878,7 +1533,14 @@ export function mountWorkflowCanvas(
     viewport.querySelectorAll<SVGPathElement>('path.dy-wf-edge').forEach((p) => {
       const to = currentNodes.find((n) => n.node_id === p.dataset.to);
       const fromDone = doneIds.has(p.dataset.from ?? '');
-      p.classList.toggle('active', !!to && to.status !== 'pending' && fromDone);
+      const meaning = EDGE_MEANINGS[p.dataset.meaning ?? DEFAULT_EDGE_MEANING];
+      const active = !!to && to.status !== 'pending' && fromDone;
+      p.classList.toggle('active', active);
+      // A live connector switches to its meaning's active colour, so the
+      // arrowhead keeps stating the same meaning while it animates.
+      if (meaning) {
+        p.setAttribute('marker-end', `url(#${active ? meaning.activeMarker : meaning.marker})`);
+      }
     });
     edgeMap.forEach(({ path, dot }) => {
       if (!path.classList.contains('active')) {

@@ -19,12 +19,17 @@ const { act } = React;
 const { createRoot } = require('react-dom/client');
 const rt = require('react/jsx-runtime');
 import { downloadTextFile, reportDownloadFilename } from './download.js';
+import workflowCanvasCss from './workflow-canvas-css.js';
 // The plugin resolves local modules through __rt so jsdom journeys exercise
 // the REAL download helpers. The workflow canvas module is TS source (not
 // loadable here) — stub it and record mounts so journeys can still assert
 // the mount contract; the browser bundle test covers the real canvas.
+// The canvas stylesheet IS loadable (a generated plain-ESM string), so it is
+// resolved for real — a stub would hide exactly the delivery regression this
+// harness exists to catch.
 rt.downloadTextFile = downloadTextFile;
 rt.reportDownloadFilename = reportDownloadFilename;
+rt.workflowCanvasCss = workflowCanvasCss;
 rt.canvasMounts = [];
 rt.mountDesktopWorkflowCanvas = function mountDesktopWorkflowCanvasStub(hostEl, projectId, workflowName) {
   rt.canvasMounts.push({ projectId, workflowName });
@@ -266,7 +271,7 @@ function evaluatePlugin(source, host) {
   const imports = sourceImports(source);
   assert.deepEqual(
     [...new Set(imports)].sort(),
-    ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime', './workflow-canvas-mount.js', './download.js'].sort(),
+    ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime', './workflow-canvas-mount.js', './workflow-canvas-css.js', './download.js'].sort(),
     `unsupported or missing imports: ${imports.join(', ')}`,
   );
   let stripped = source.replace(/^import\s.*$/gm, '');
@@ -277,6 +282,7 @@ const { useEffect, useRef, useState } = React;
 const mountDesktopWorkflowCanvas = __rt.mountDesktopWorkflowCanvas;
 const downloadTextFile = __rt.downloadTextFile;
 const reportDownloadFilename = __rt.reportDownloadFilename;
+const workflowCanvasCss = __rt.workflowCanvasCss;
 `;
   const factory = new Function(
     'React', '__rt', 'host',
@@ -805,14 +811,38 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
     const canvasSession = path.match(/^\/projects\/([^/]+)\/canvas\/sessions$/);
     if (method === 'POST' && canvasSession) {
       data.canvasSessions ??= [];
-      const session = { session_id: `cs-${data.canvasSessions.length + 1}`, status: 'active', questions: [], proposals: [] };
+      // Real shape: a session carries either a clarification question (status
+      // active) or the proposals it drafted (status complete).
+      const session = { session_id: `cs-${data.canvasSessions.length + 1}`, status: 'active', current_question: { id: 'missing-claim', question: 'What problem or user need are we solving?' }, answers: [], proposals: [] };
       data.canvasSessions.push(session);
-      return session;
+      return clone(session);
     }
     const sessionAnswer = path.match(/^\/canvas\/sessions\/([^/]+)\/answer$/);
-    if (method === 'POST' && sessionAnswer) return { session_id: decodeURIComponent(sessionAnswer[1]), status: 'answered', proposals: [] };
+    if (method === 'POST' && sessionAnswer) {
+      const sessionId = decodeURIComponent(sessionAnswer[1]);
+      const session = (data.canvasSessions ?? []).find((row) => row.session_id === sessionId) ?? { session_id: sessionId, answers: [] };
+      session.answers = [...(session.answers ?? []), { outcome: init.body?.outcome, answer: init.body?.answer ?? '' }];
+      session.current_question = null;
+      session.status = init.body?.outcome === 'stop' ? 'stopped' : 'complete';
+      session.proposals = session.status === 'complete'
+        ? [{ proposal_id: `canvas-proposal-${sessionId}`, status: 'pending', kind: 'technical_plan', title: 'Technical implementation plan', source_object_ids: ((data.canvas?.[session.project_id] ?? data.canvas?.['payments-relaunch'])?.objects ?? []).map((item) => item.id), requires_approval: true }]
+        : [];
+      return clone(session);
+    }
+    const sessionRead = path.match(/^\/canvas\/sessions\/([^/]+)$/);
+    if (method === 'GET' && sessionRead) {
+      const sessionId = decodeURIComponent(sessionRead[1]);
+      return clone((data.canvasSessions ?? []).find((row) => row.session_id === sessionId) ?? { session_id: sessionId, status: 'unknown', proposals: [] });
+    }
     const proposalDecision = path.match(/^\/canvas\/proposals\/([^/]+)\/decision$/);
-    if (method === 'POST' && proposalDecision) return { proposal_id: decodeURIComponent(proposalDecision[1]), status: init.body?.approve ? 'approved' : 'rejected' };
+    if (method === 'POST' && proposalDecision) {
+      const proposalId = decodeURIComponent(proposalDecision[1]);
+      for (const session of data.canvasSessions ?? []) {
+        const proposal = (session.proposals ?? []).find((row) => row.proposal_id === proposalId);
+        if (proposal) proposal.status = init.body?.approve ? 'approved' : 'rejected';
+      }
+      return { proposal_id: proposalId, status: init.body?.approve ? 'approved' : 'rejected' };
+    }
     const projectRead = path.match(/^\/projects\/([^/]+)\/(settings|work-items|initiatives|objectives|goals|workflows|events|backlog|views|reports|content)$/);
     if (projectRead) {
       const projectId = decodeURIComponent(projectRead[1]);

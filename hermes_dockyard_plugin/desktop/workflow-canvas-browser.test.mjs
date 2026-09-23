@@ -47,13 +47,22 @@ test('browser canvas interactions persist positions, edges, validation feedback,
 
     const a = page.locator('[data-node-id="a"]')
     const box = await a.boundingBox(); assert.ok(box)
+    // The node's authored position is the grid's first cell. With the S1
+    // constants (PAD 64, NODE_W 208, COL_GAP 116) that is x=64, y=64; the test
+    // drives a +60/+50 screen-pixel drag at 100% zoom and asserts the world
+    // delta plus the authored origin, so it stays correct if the constants
+    // move again (the old hardcoded 120/110 silently depended on PAD 60).
+    const origin = await page.evaluate(() => {
+      const nums = (document.querySelector('[data-node-id="a"]').getAttribute('transform') || '').match(/-?\d+(?:\.\d+)?/g) || []
+      return { x: Number(nums[0]), y: Number(nums[1]) }
+    })
     await page.mouse.move(box.x + 50, box.y + 30)
     await page.mouse.down()
     await page.mouse.move(box.x + 110, box.y + 80)
     await page.mouse.up()
     const moved = await page.evaluate(() => globalThis.__edits.at(-1).find((n) => n.node_id === 'a'))
-    assert.equal(moved.canvas_position.x, 120)
-    assert.equal(moved.canvas_position.y, 110)
+    assert.equal(moved.canvas_position.x, origin.x + 60)
+    assert.equal(moved.canvas_position.y, origin.y + 50)
 
     const portA = page.locator('[data-connect-from="a"]')
     const b = page.locator('[data-node-id="b"]')
@@ -78,7 +87,7 @@ test('browser canvas interactions persist positions, edges, validation feedback,
     await b.click(); await page.getByLabel('Node title').fill('Build and ship'); await page.getByLabel('Dependencies').fill('a'); await page.getByLabel('Phase team override').fill('release-bots'); await page.getByRole('button', { name: 'Save graph version' }).click()
     await page.getByRole('button', { name: 'Saved ✓' }).waitFor()
     const saved = await page.evaluate(() => globalThis.__edits.at(-1))
-    assert.equal(saved.find((n) => n.node_id === 'a').canvas_position.x, 120)
+    assert.equal(saved.find((n) => n.node_id === 'a').canvas_position.x, origin.x + 60)
     assert.equal(saved.find((n) => n.node_id === 'b').title, 'Build and ship')
     assert.deepEqual(saved.find((n) => n.node_id === 'b').depends_on, ['a'])
     assert.equal(saved.find((n) => n.node_id === 'b').phase_team, 'release-bots')

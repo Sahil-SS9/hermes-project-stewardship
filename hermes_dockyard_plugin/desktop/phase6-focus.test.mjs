@@ -41,7 +41,7 @@ function evaluatePlugin(source, host) {
   const imports = sourceImports(source);
   assert.deepEqual(
     [...new Set(imports)].sort(),
-    ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime', './workflow-canvas-mount.js', './download.js'].sort(),
+    ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime', './workflow-canvas-mount.js', './workflow-canvas-css.js', './download.js'].sort(),
     `unsupported or missing imports: ${imports.join(', ')}`,
   );
   let stripped = source.replace(/^import\s.*$/gm, '');
@@ -50,6 +50,7 @@ function evaluatePlugin(source, host) {
 const jsx = __rt.jsx, jsxs = __rt.jsxs, Fragment = __rt.Fragment;
 const { useEffect, useRef, useState } = React;
 const mountDesktopWorkflowCanvas = () => () => {};
+const workflowCanvasCss = '';
 const downloadTextFile = (content, filename) => { __rt.downloads = __rt.downloads || []; __rt.downloads.push({ content, filename }); return true; };
 const reportDownloadFilename = __rt.reportDownloadFilename;
 `;

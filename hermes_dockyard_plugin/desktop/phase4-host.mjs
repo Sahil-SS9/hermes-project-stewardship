@@ -189,6 +189,39 @@ function route(method, path, query, body) {
     data.canvas[pid] = { ...current, revision: current.revision + 1, objects: body?.objects ?? [], connectors: body?.connectors ?? [], updated_by: 'sahil' };
     return data.canvas[pid];
   }
+  const canvasObjectMatch = path.match(/^\/projects\/([^/]+)\/canvas\/objects\/([^/]+)$/);
+  if (canvasObjectMatch && method === 'DELETE') {
+    const current = data.canvas[pid] ?? { revision: 1, objects: [], connectors: [] };
+    const objectId = decodeURIComponent(canvasObjectMatch[2]);
+    if (!(current.objects ?? []).some((item) => item.id === objectId)) throw Object.assign(new Error('unknown canvas object'), { status: 404 });
+    const expected = Number(url.searchParams.get('expected_revision'));
+    if (expected !== Number(current.revision)) throw Object.assign(new Error('canvas revision conflict'), { status: 409 });
+    data.canvas[pid] = {
+      ...current,
+      revision: current.revision + 1,
+      objects: (current.objects ?? []).filter((item) => item.id !== objectId),
+      connectors: (current.connectors ?? []).filter((edge) => edge.source !== objectId && edge.target !== objectId),
+    };
+    return data.canvas[pid];
+  }
+  const canvasCurateMatch = path.match(/^\/projects\/([^/]+)\/canvas\/curate$/);
+  if (canvasCurateMatch && method === 'POST') {
+    const current = data.canvas[pid] ?? { revision: 1, objects: [], connectors: [] };
+    const kinds = (current.objects ?? []).map((item) => item.kind);
+    const count = (values) => kinds.filter((kind) => values.includes(kind)).length;
+    return {
+      canvas_revision: current.revision,
+      status: count(['claim']) ? 'ready_for_review' : 'needs_clarification',
+      summary: {
+        evidence_count: count(['evidence', 'note', 'media', 'link']),
+        claim_count: count(['claim']),
+        question_count: count(['question']),
+        plan_block_count: count(['plan_block']),
+      },
+      clarifying_questions: count(['claim']) ? [] : [{ id: 'missing-claim', question: 'What problem or user need are we solving?' }],
+      proposals: [],
+    };
+  }
   const sessionMatch = path.match(/^\/projects\/([^/]+)\/canvas\/sessions$/);
   if (sessionMatch && method === 'POST') {
     const current = data.canvas[pid] ?? { revision: 1, objects: [], connectors: [] };
@@ -196,6 +229,13 @@ function route(method, path, query, body) {
     const missing = current.objects.some((item) => item.kind === 'claim') ? [] : [{ id: 'missing-claim', question: 'What problem or user need are we solving?' }];
     const session = { session_id: id, project_id: pid, canvas_revision: current.revision, status: missing.length ? 'active' : 'complete', current_question: missing[0] ?? null, answers: [], proposals: [] };
     data.sessions[id] = session; return session;
+  }
+  const sessionReadMatch = path.match(/^\/canvas\/sessions\/([^/]+)$/);
+  if (sessionReadMatch && method === 'GET') {
+    const sid = decodeURIComponent(sessionReadMatch[1]);
+    const session = data.sessions[sid];
+    if (!session) throw Object.assign(new Error('unknown canvas session'), { status: 404 });
+    return session;
   }
   const answerMatch = path.match(/^\/canvas\/sessions\/([^/]+)\/answer$/);
   if (answerMatch && method === 'POST') {

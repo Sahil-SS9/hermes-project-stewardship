@@ -323,15 +323,153 @@
     };
     return visit(from) ? "Connection would create a cycle" : null;
   }
-  var NODE_W = 190;
-  var NODE_H = 64;
-  var COL_GAP = 95;
-  var ROW_GAP = 26;
-  var PAD = 60;
+  var NODE_W = 208;
+  var NODE_H = 72;
+  var COL_GAP = 116;
+  var ROW_GAP = 30;
+  var PAD = 64;
+  var LANE_PAD = 30;
   var LOD_FULL = 1.4;
   var ZOOM_IN = 1.1;
   var ZOOM_OUT = 0.9;
-  var statusColor = (s) => s === "done" ? "#3fb950" : s === "working" ? "#d29922" : s === "blocked" ? "#f85149" : "#6e7681";
+  function statusToken(status) {
+    return status === "done" || status === "working" || status === "blocked" ? status : "pending";
+  }
+  var STATUS_TOKENS = {
+    done: "--dy-wf-status-done",
+    working: "--dy-wf-status-working",
+    blocked: "--dy-wf-status-blocked",
+    pending: "--dy-wf-status-pending"
+  };
+  var PURPOSE_VISUALS = {
+    task: {
+      fill: "--dy-wf-purpose-task-fill",
+      line: "--dy-wf-purpose-task-line",
+      text: "--dy-wf-purpose-task-text",
+      glyph: "\u25A1",
+      label: "Task",
+      glyphX: 20,
+      textX: 36
+    },
+    gate: {
+      fill: "--dy-wf-purpose-gate-fill",
+      line: "--dy-wf-purpose-gate-line",
+      text: "--dy-wf-purpose-gate-text",
+      glyph: "\u25C6",
+      label: "Human gate",
+      glyphX: 24,
+      textX: 42
+    },
+    branch: {
+      fill: "--dy-wf-purpose-branch-fill",
+      line: "--dy-wf-purpose-branch-line",
+      text: "--dy-wf-purpose-branch-text",
+      glyph: "\u22D4",
+      label: "Conditional branch",
+      glyphX: 22,
+      textX: 40
+    },
+    loop: {
+      fill: "--dy-wf-purpose-loop-fill",
+      line: "--dy-wf-purpose-loop-line",
+      text: "--dy-wf-purpose-loop-text",
+      glyph: "\u21BB",
+      label: "Bounded loop",
+      glyphX: 20,
+      textX: 36
+    }
+  };
+  function nodePurpose(n) {
+    if (n.human_gate || n.kind === "gate") return "gate";
+    if (n.loop) return "loop";
+    if (n.when) return "branch";
+    return "task";
+  }
+  function nodeShapePath(purpose, w = NODE_W, h = NODE_H) {
+    switch (purpose) {
+      case "gate": {
+        const i = Math.round(h * 0.22);
+        return `M ${i} 0 H ${w - i} L ${w} ${h / 2} L ${w - i} ${h} H ${i} L 0 ${h / 2} Z`;
+      }
+      case "branch": {
+        const i = Math.round(h * 0.19);
+        return `M ${i} 0 H ${w - i} L ${w} ${i} V ${h - i} L ${w - i} ${h} H ${i} L 0 ${h - i} V ${i} Z`;
+      }
+      case "loop": {
+        const r = 9;
+        const notch = 13;
+        return `M ${r} 0 H ${w - r} A ${r} ${r} 0 0 1 ${w} ${r} V ${h - r} A ${r} ${r} 0 0 1 ${w - r} ${h} H ${r} A ${r} ${r} 0 0 1 0 ${h - r} V ${h / 2 + 10} L ${notch} ${h / 2} L 0 ${h / 2 - 10} V ${r} A ${r} ${r} 0 0 1 ${r} 0 Z`;
+      }
+      default:
+        return null;
+    }
+  }
+  var EDGE_MEANINGS = {
+    depends_on: {
+      meaning: "depends_on",
+      color: "--dy-edge-dep",
+      activeColor: "--dy-edge-dep-active",
+      marker: "dyArrowDep",
+      activeMarker: "dyArrowDepActive",
+      label: "depends on",
+      rendered: true
+    },
+    supports: {
+      meaning: "supports",
+      color: "--dy-edge-plan-supports",
+      activeColor: "--dy-edge-plan-supports-active",
+      marker: "dyArrowPlanSupports",
+      activeMarker: "dyArrowPlanSupportsActive",
+      label: "supports",
+      rendered: false
+    },
+    contradicts: {
+      meaning: "contradicts",
+      color: "--dy-edge-plan-contradicts",
+      activeColor: "--dy-edge-plan-contradicts-active",
+      marker: "dyArrowPlanContradicts",
+      activeMarker: "dyArrowPlanContradictsActive",
+      label: "contradicts",
+      rendered: false
+    },
+    derived_from: {
+      meaning: "derived_from",
+      color: "--dy-edge-plan-derived_from",
+      activeColor: "--dy-edge-plan-derived_from-active",
+      marker: "dyArrowPlanDerivedFrom",
+      activeMarker: "dyArrowPlanDerivedFromActive",
+      label: "derived from",
+      rendered: false
+    },
+    clarifies: {
+      meaning: "clarifies",
+      color: "--dy-edge-plan-clarifies",
+      activeColor: "--dy-edge-plan-clarifies-active",
+      marker: "dyArrowPlanClarifies",
+      activeMarker: "dyArrowPlanClarifiesActive",
+      label: "clarifies",
+      rendered: false
+    },
+    implements: {
+      meaning: "implements",
+      color: "--dy-edge-plan-implements",
+      activeColor: "--dy-edge-plan-implements-active",
+      marker: "dyArrowPlanImplements",
+      activeMarker: "dyArrowPlanImplementsActive",
+      label: "implements",
+      rendered: false
+    },
+    raises_question: {
+      meaning: "raises_question",
+      color: "--dy-edge-plan-raises_question",
+      activeColor: "--dy-edge-plan-raises_question-active",
+      marker: "dyArrowPlanRaisesQuestion",
+      activeMarker: "dyArrowPlanRaisesQuestionActive",
+      label: "raises question",
+      rendered: false
+    }
+  };
+  var DEFAULT_EDGE_MEANING = "depends_on";
   function elapsedLabel(updatedAt) {
     if (!updatedAt) return "unavailable";
     const base = Date.parse(updatedAt);
@@ -358,7 +496,21 @@
     for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
     return el;
   }
-  function buildLayout(nodes) {
+  function laneKeyOf(n) {
+    return (n.team ?? n.phase_team ?? "").trim() || "unassigned";
+  }
+  function laneLabelOf(key) {
+    if (key === "unassigned") return "Unassigned";
+    if (key === "main-path") return "Main path";
+    if (key === EXCEPTION_LANE_KEY) return "Exception path";
+    return key;
+  }
+  var EXCEPTION_LANE_KEY = "exception-path";
+  function isExceptionNode(n) {
+    const purpose = nodePurpose(n);
+    return purpose === "branch" || purpose === "loop" || n.status === "blocked";
+  }
+  function buildLayout(nodes, opts) {
     const byId = new Map(nodes.map((n) => [n.node_id, n]));
     const depthCache = /* @__PURE__ */ new Map();
     const computeDepth = (id) => {
@@ -385,20 +537,67 @@
     });
     const maxDepth = Math.max(0, ...nodes.map((n) => depthCache.get(n.node_id) ?? 0));
     const rows = Math.max(1, ...Object.values(perDepth));
-    return {
+    const grid = {
       positions,
+      lanes: [],
       width: PAD * 2 + (maxDepth + 1) * (NODE_W + COL_GAP) - COL_GAP,
       height: PAD * 2 + rows * (NODE_H + ROW_GAP) - ROW_GAP
+    };
+    const laneOf = opts?.laneOf;
+    if (!laneOf) return grid;
+    const order = [];
+    const members = /* @__PURE__ */ new Map();
+    for (const n of nodes) {
+      const key = laneOf(n);
+      if (!members.has(key)) {
+        members.set(key, []);
+        order.push(key);
+      }
+      members.get(key).push(n);
+    }
+    const laneH = LANE_PAD * 2 + NODE_H;
+    const positionsLane = {};
+    const lanes = [];
+    let widest = 0;
+    order.forEach((key, li) => {
+      const band = members.get(key);
+      const sorted = [...band].sort((a, b) => {
+        const da = depthCache.get(a.node_id) ?? 0;
+        const db = depthCache.get(b.node_id) ?? 0;
+        return da - db || nodes.indexOf(a) - nodes.indexOf(b);
+      });
+      const y = PAD + li * laneH;
+      sorted.forEach((n, i) => {
+        positionsLane[n.node_id] = { x: PAD + i * (NODE_W + COL_GAP), y: y + LANE_PAD, depth: i };
+      });
+      widest = Math.max(widest, sorted.length);
+      lanes.push({
+        key,
+        label: laneLabelOf(key),
+        y,
+        height: laneH,
+        exception: band.some((n) => {
+          const purpose = nodePurpose(n);
+          return purpose === "branch" || purpose === "loop" || n.status === "blocked";
+        })
+      });
+    });
+    return {
+      positions: positionsLane,
+      lanes,
+      width: PAD * 2 + Math.max(1, widest) * (NODE_W + COL_GAP) - COL_GAP,
+      height: PAD * 2 + Math.max(1, lanes.length) * laneH - (LANE_PAD - PAD > 0 ? 0 : 0) - PAD + PAD
     };
   }
   function mountWorkflowCanvas(host, projectId, runName, fetchRuns, handlers, pollMs = 8e3) {
     host.replaceChildren();
-    host.className = "dy-wf";
+    host.className = "dy-wf dy-wf-scope";
     const wrap = elu("div", "dy-wf-wrap");
     const svg = sEl("svg", { class: "dy-wf-svg" });
     svg.setAttribute("data-lod", "read");
     const viewport = sEl("g", { class: "dy-wf-viewport" });
     svg.appendChild(viewport);
+    const SVG_INDEX = sEl("svg", { class: "dy-wf-index" });
     const minimap = sEl("svg", { class: "dy-wf-minimap", width: 170, height: 104 });
     const miniViewport = sEl("rect", { class: "dy-wf-mini-view" });
     minimap.appendChild(miniViewport);
@@ -463,23 +662,131 @@
       listHead.textContent = open ? "\u25B8 List view" : "\u25BE List view";
       listBody.style.display = open ? "none" : "block";
     });
-    listHead.setAttribute("aria-expanded", "true");
-    listHead.textContent = "\u25BE List view";
-    listBody.style.display = "block";
     listView.append(listHead, listBody);
-    wrap.append(svg, feed, minimap, passport, zoomBar, listView);
+    wrap.append(svg, SVG_INDEX, feed, minimap, passport, zoomBar, listView);
     host.appendChild(wrap);
     let panX = 0;
     let panY = 0;
     let zoom = 1;
     let fullW = 0;
     let fullH = 0;
+    let originX = 0;
+    let originY = 0;
     let currentNodes = [];
     let nodePositions = {};
     let dragNode = null;
     let dragStart = { x: 0, y: 0, ox: 0, oy: 0 };
     let connectFrom = null;
     let disposers = [];
+    let dragSession = null;
+    const matrixNumbers = (transform) => (transform ?? "").match(/-?\d+(?:\.\d+)?(?:e[-+]?\d+)?/g)?.map(Number) ?? [];
+    const readNodeTransform = (g) => {
+      const nums = matrixNumbers(g.getAttribute("transform"));
+      if (nums.length < 2 || !isFinite(nums[0]) || !isFinite(nums[1])) return null;
+      return { x: nums[0], y: nums[1] };
+    };
+    const worldPoint = (clientX, clientY) => {
+      let ox = 0;
+      let oy = 0;
+      try {
+        const ctm = svg.getScreenCTM();
+        if (ctm && isFinite(ctm.a) && isFinite(ctm.e) && isFinite(ctm.f)) {
+          ox = ctm.e;
+          oy = ctm.f;
+        }
+      } catch {
+        ox = 0;
+        oy = 0;
+      }
+      return { x: (clientX - ox - panX) / zoom, y: (clientY - oy - panY) / zoom };
+    };
+    const writeNodePosition = (nodeId, g, x, y) => {
+      nodePositions[nodeId] = { x, y, depth: nodePositions[nodeId]?.depth ?? 0 };
+      g.setAttribute("transform", `translate(${x} ${y})`);
+    };
+    const startDrag = (nodeId, g, e, depth) => {
+      if (connectFrom) return;
+      const current = nodePositions[nodeId] ?? { x: 0, y: 0, depth };
+      const world = worldPoint(e.clientX, e.clientY);
+      dragNode = nodeId;
+      dragSession = {
+        nodeId,
+        pointerId: e.pointerId,
+        offsetX: world.x - current.x,
+        offsetY: world.y - current.y,
+        moved: false
+      };
+      dragStart = { x: e.clientX, y: e.clientY, ox: current.x, oy: current.y };
+      try {
+        g.setPointerCapture(e.pointerId);
+      } catch {
+      }
+    };
+    const dragMove = (e) => {
+      const session = dragSession;
+      if (!session || e.pointerId !== session.pointerId) return;
+      const g = viewport.querySelector(`[data-node-id="${session.nodeId}"]`);
+      if (!g) return;
+      const movedBy = Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y);
+      if (movedBy > 3) session.moved = true;
+      const world = worldPoint(e.clientX, e.clientY);
+      writeNodePosition(session.nodeId, g, world.x - session.offsetX, world.y - session.offsetY);
+    };
+    const commitNodePosition = async (nodeId) => {
+      const committed = nodePositions[nodeId];
+      if (!committed) return;
+      const nextNodes = currentNodes.map((item) => item.node_id === nodeId ? { ...item, canvas_position: { x: committed.x, y: committed.y } } : item);
+      currentNodes = nextNodes;
+      await handlers.onEdit?.(nextNodes);
+    };
+    const endDragSession = (e, commit) => {
+      const session = dragSession;
+      if (!session) return;
+      const g = viewport.querySelector(`[data-node-id="${session.nodeId}"]`);
+      if (g) {
+        try {
+          g.releasePointerCapture(session.pointerId);
+        } catch {
+        }
+      }
+      dragSession = null;
+      dragNode = null;
+      dragStart = { x: 0, y: 0, ox: 0, oy: 0 };
+      if (commit && session.moved) void commitNodePosition(session.nodeId);
+    };
+    const startConnect = (nodeId, g) => {
+      if (connectFrom && connectFrom !== nodeId) {
+        const previous = viewport.querySelector(`[data-node-id="${connectFrom}"]`);
+        previous?.classList.remove("dy-wf-connecting");
+      }
+      if (dragNode) endDragSession({ pointerId: -1 }, false);
+      connectFrom = nodeId;
+      g.classList.add("dy-wf-connecting");
+    };
+    const cancelConnect = () => {
+      if (connectFrom) {
+        const g = viewport.querySelector(`[data-node-id="${connectFrom}"]`);
+        g?.classList.remove("dy-wf-connecting");
+      }
+      connectFrom = null;
+    };
+    const endConnectGesture = (to) => {
+      const from = connectFrom;
+      if (!from) return;
+      connectFrom = null;
+      for (const g of viewport.querySelectorAll(".dy-wf-node.dy-wf-connecting")) {
+        g.classList.remove("dy-wf-connecting");
+      }
+      if (!to) return;
+      const error = validateConnection(currentNodes, from, to);
+      if (error) {
+        feedLog(error);
+        return;
+      }
+      const nextNodes = currentNodes.map((item) => item.node_id === to ? { ...item, depends_on: [.../* @__PURE__ */ new Set([...item.depends_on, from])] } : item);
+      currentNodes = nextNodes;
+      void handlers.onEdit?.(nextNodes);
+    };
     const apply = () => {
       viewport.setAttribute("transform", `translate(${panX} ${panY}) scale(${zoom})`);
       svg.setAttribute("data-lod", zoom > LOD_FULL ? "full" : zoom < 0.75 ? "map" : "read");
@@ -510,21 +817,32 @@
       apply();
     });
     const defs = sEl("defs", {});
-    const mkMarker = (id, fill) => {
+    const mkMarker = (id, fillToken, fallback) => {
       const m = sEl("marker", {
         id,
         viewBox: "0 0 10 10",
         refX: "9",
         refY: "5",
-        markerWidth: "7",
-        markerHeight: "7",
+        // Larger than the 1.5px stroke and in userSpaceOnUse so the head keeps a
+        // constant, legible size instead of thinning with the stroke width.
+        markerWidth: "6",
+        markerHeight: "6",
+        markerUnits: "userSpaceOnUse",
         orient: "auto-start-reverse"
       });
-      m.appendChild(sEl("path", { d: "M 0 0 L 10 5 L 0 10 z", fill }));
+      const head = sEl("path", {
+        d: "M 0 0 L 10 5 L 0 10 z",
+        class: "dy-wf-arrow",
+        fill: `var(${fillToken}, ${fallback})`
+      });
+      m.appendChild(head);
       return m;
     };
-    defs.appendChild(mkMarker("dyArrowActive", "#58a6ff"));
-    defs.appendChild(mkMarker("dyArrowDim", "#3d4657"));
+    for (const meaning of Object.values(EDGE_MEANINGS)) {
+      if (!meaning.rendered) continue;
+      defs.appendChild(mkMarker(meaning.marker, meaning.color, "#8fa3c8"));
+      defs.appendChild(mkMarker(meaning.activeMarker, meaning.activeColor, "#9cc4ff"));
+    }
     svg.appendChild(defs);
     let lastRun = null;
     const renderList = (run) => {
@@ -539,10 +857,11 @@
         row.dataset.wfListRow = n.node_id;
         row.setAttribute("role", "row");
         const name = elu("span", "dy-wf-list-title", n.title);
+        const kindText = nodePurpose(n);
         const kind = elu(
           "span",
-          "dy-wf-list-kind",
-          n.kind === "gate" ? "gate" : "task"
+          `dy-wf-list-kind ${kindText}`,
+          PURPOSE_VISUALS[kindText].label
         );
         const deps = elu(
           "span",
@@ -563,6 +882,148 @@
         listBody.appendChild(row);
       }
     };
+    const buildNode = (n, p, run, editable) => {
+      const purpose = nodePurpose(n);
+      const status = statusToken(n.status);
+      const visuals = PURPOSE_VISUALS[purpose];
+      const g = sEl("g", {
+        class: `dy-wf-node ${purpose} ${status}`,
+        transform: `translate(${p.x} ${p.y})`
+      });
+      g.dataset.wfPurpose = purpose;
+      g.dataset.wfStatus = status;
+      g.setAttribute("tabindex", "0");
+      g.setAttribute("role", "button");
+      g.setAttribute("data-node-id", n.node_id);
+      g.setAttribute("aria-label", `${visuals.label}: ${n.title} (${n.status ?? "pending"})`);
+      g.dataset.wfEditable = String(editable);
+      g.setAttribute("aria-describedby", `wf-help-${n.node_id}`);
+      const outline = nodeShapePath(purpose);
+      const shape = outline === null ? sEl("rect", { width: NODE_W, height: NODE_H, rx: 9, class: "dy-wf-shape dy-wf-rect" }) : sEl("path", { d: outline, class: "dy-wf-shape dy-wf-rect" });
+      shape.setAttribute("fill", `var(${visuals.fill})`);
+      const glyph = sEl("text", { x: visuals.glyphX, y: 26, class: "dy-wf-glyph" });
+      glyph.textContent = visuals.glyph;
+      const label2 = sEl("text", { x: visuals.textX, y: 25, class: "dy-wf-label" });
+      label2.textContent = n.title.slice(0, 18);
+      const sub = sEl("text", { x: 12, y: 45, class: "dy-wf-sub" });
+      sub.textContent = visuals.label;
+      const chip = sEl("rect", {
+        x: NODE_W - 66,
+        y: 34,
+        width: 54,
+        height: 16,
+        rx: 8,
+        class: `dy-wf-statuschip ${status}`
+      });
+      const statusText = sEl("text", {
+        x: NODE_W - 39,
+        y: 45.5,
+        "text-anchor": "middle",
+        class: `dy-wf-statustext ${status}`
+      });
+      statusText.textContent = n.status ?? "pending";
+      g.append(shape, glyph, label2, sub, chip, statusText);
+      if (n.status === "working") {
+        const timer2 = sEl("text", {
+          x: 12,
+          y: 60,
+          class: "dy-wf-timer full"
+        });
+        timer2.textContent = `Workflow: ${elapsedLabel(run.started_at)}`;
+        timer2.dataset.for = n.node_id;
+        g.appendChild(timer2);
+      }
+      if (n.assignee) {
+        g.appendChild((() => {
+          const who = sEl("text", {
+            x: NODE_W - 12,
+            y: 60,
+            "text-anchor": "end",
+            class: "dy-wf-assignee"
+          });
+          who.textContent = n.assignee;
+          return who;
+        })());
+      }
+      const port = sEl("circle", { cx: NODE_W, cy: NODE_H / 2, r: 11, class: "dy-wf-port" });
+      port.setAttribute("data-connect-from", n.node_id);
+      port.setAttribute("tabindex", "0");
+      port.setAttribute("aria-label", `Connect from ${n.title}`);
+      g.appendChild(port);
+      const dash = () => shape.setAttribute("stroke-dasharray", "4 3");
+      const undash = () => shape.removeAttribute("stroke-dasharray");
+      port.addEventListener("pointerdown", (ev) => {
+        const e = ev;
+        if (e.button !== 0 || !editable) return;
+        e.stopPropagation();
+        startConnect(n.node_id, g);
+      });
+      g.addEventListener("pointerdown", (ev) => {
+        const e = ev;
+        if (e.button !== 0 || !editable) return;
+        e.stopPropagation();
+        if (e.shiftKey) {
+          startConnect(n.node_id, g);
+          return;
+        }
+        startDrag(n.node_id, g, e, p.depth ?? 0);
+      });
+      g.addEventListener("pointermove", (ev) => dragMove(ev));
+      g.addEventListener("pointerup", (ev) => {
+        const e = ev;
+        if (dragSession && dragSession.nodeId === n.node_id) {
+          e.stopPropagation();
+          endDragSession(e, true);
+          return;
+        }
+        if (connectFrom) {
+          e.stopPropagation();
+          endConnectGesture(n.node_id);
+        }
+      });
+      g.addEventListener("pointercancel", (ev) => {
+        const e = ev;
+        if (dragSession && dragSession.nodeId === n.node_id) {
+          e.stopPropagation();
+          endDragSession(e, false);
+        }
+      });
+      g.addEventListener("keydown", (ev) => {
+        const e = ev;
+        if (!editable) return;
+        if (e.key === " " || e.key === "c") {
+          e.preventDefault();
+          if (connectFrom === n.node_id) cancelConnect();
+          else startConnect(n.node_id, g);
+        } else if (e.key === "Enter" && connectFrom && connectFrom !== n.node_id) {
+          e.preventDefault();
+          endConnectGesture(n.node_id);
+        }
+      });
+      g.addEventListener("pointerenter", dash);
+      g.addEventListener("pointerleave", () => {
+        if (!g.classList.contains("dy-wf-selected")) undash();
+      });
+      const open = () => openPassport(n, g);
+      g.addEventListener("click", open);
+      g.addEventListener("keydown", (e) => {
+        const ev = e;
+        if (ev.key === "Enter") {
+          open();
+          return;
+        }
+        if (ev.key === "ArrowRight" || ev.key === "ArrowDown" || ev.key === "ArrowLeft" || ev.key === "ArrowUp") {
+          ev.preventDefault();
+          const all = [...viewport.querySelectorAll(".dy-wf-node")];
+          const idx = all.indexOf(g);
+          if (idx === -1) return;
+          const step = ev.key === "ArrowRight" || ev.key === "ArrowDown" ? 1 : -1;
+          const next = all[(idx + step + all.length) % all.length];
+          if (next) next.focus();
+        }
+      });
+      return g;
+    };
     const render = (run) => {
       lastRun = run;
       renderList(run);
@@ -576,23 +1037,71 @@
         return;
       }
       currentNodes = run.nodes;
-      const layout = buildLayout(run.nodes);
+      const assignments = run.nodes.some((n) => (n.team ?? n.phase_team ?? "").trim());
+      const laneOf = assignments ? laneKeyOf : (n) => isExceptionNode(n) ? EXCEPTION_LANE_KEY : "main-path";
+      let layout = buildLayout(run.nodes, { laneOf });
+      if (layout.lanes.length < 2) layout = buildLayout(run.nodes);
       const positions = nodePositions = Object.keys(nodePositions).length ? { ...layout.positions, ...nodePositions } : run.nodes.reduce((acc, item) => {
         if (item.canvas_position) acc[item.node_id] = { ...layout.positions[item.node_id], ...item.canvas_position };
         return acc;
       }, { ...layout.positions });
-      fullW = layout.width;
-      fullH = layout.height;
-      svg.setAttribute("viewBox", `0 0 ${layout.width} ${layout.height}`);
+      let worldW = layout.width;
+      let worldH = layout.height;
+      let minX = 0;
+      let minY = 0;
+      for (const p of Object.values(positions)) {
+        worldW = Math.max(worldW, p.x + NODE_W + PAD);
+        worldH = Math.max(worldH, p.y + NODE_H + PAD);
+        minX = Math.min(minX, p.x - PAD);
+        minY = Math.min(minY, p.y - PAD);
+      }
+      worldW -= minX;
+      worldH -= minY;
+      fullW = worldW;
+      fullH = worldH;
+      originX = minX;
+      originY = minY;
+      svg.setAttribute("viewBox", `${minX} ${minY} ${worldW} ${worldH}`);
+      for (const lane of layout.lanes) {
+        const band = sEl("rect", {
+          x: minX,
+          y: lane.y,
+          width: worldW,
+          height: lane.height,
+          class: lane.exception ? "dy-wf-lane exception" : "dy-wf-lane"
+        });
+        band.setAttribute("data-lane", lane.key);
+        const lbl = sEl("text", { x: minX + 14, y: lane.y + 16, class: "dy-wf-lane-label" });
+        lbl.textContent = lane.label;
+        viewport.append(band, lbl);
+      }
+      const depMeaning = EDGE_MEANINGS[DEFAULT_EDGE_MEANING];
       for (const n of run.nodes) {
         const from = positions[n.node_id];
         for (const dep of n.depends_on) {
           const to = positions[dep];
           if (!from || !to) continue;
           const path = sEl("path", {
-            class: `dy-wf-edge`,
-            d: `M ${to.x + NODE_W} ${to.y + NODE_H / 2} C ${to.x + NODE_W + COL_GAP / 2} ${to.y + NODE_H / 2}, ${from.x - COL_GAP / 2} ${from.y + NODE_H / 2}, ${from.x - 6} ${from.y + NODE_H / 2}`,
-            "marker-end": "url(#dyArrowDim)"
+            class: "dy-wf-edge",
+            "data-meaning": depMeaning.meaning,
+            // Curved connector. Same-band edges bow gently so the curve is
+            // visible; cross-band edges take a wider S-curve between the two
+            // lane anchors, so a dependency that crosses lanes reads as one
+            // flow instead of a ruler line.
+            d: (() => {
+              const x1 = to.x + NODE_W, y1 = to.y + NODE_H / 2;
+              const x2 = from.x - 6, y2 = from.y + NODE_H / 2;
+              const sameBand = Math.abs(y1 - y2) < NODE_H / 2;
+              const dx = Math.max(COL_GAP / 2, Math.abs(x2 - x1) * 0.55);
+              if (sameBand) {
+                const bow = Math.min(46, Math.max(18, dx * 0.35));
+                return `M ${x1} ${y1} C ${x1 + dx} ${y1 - bow}, ${x2 - dx} ${y2 - bow}, ${x2} ${y2}`;
+              }
+              return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+            })(),
+            // Leaves the marker 6px of room before the shape, so the head is
+            // never tucked under the node it points at.
+            "marker-end": `url(#${depMeaning.marker})`
           });
           path.dataset.from = dep;
           path.dataset.to = n.node_id;
@@ -603,142 +1112,62 @@
       }
       for (const n of run.nodes) {
         const p = positions[n.node_id];
-        const g = sEl("g", {
-          class: `dy-wf-node ${n.status ?? "pending"}`,
-          transform: `translate(${p.x} ${p.y})`
-        });
-        g.setAttribute("tabindex", "0");
-        g.setAttribute("role", "button");
-        g.setAttribute("data-node-id", n.node_id);
-        g.setAttribute(
-          "aria-label",
-          `${n.kind === "gate" ? "Gate" : "Task"}: ${n.title} (${n.status ?? "pending"})`
-        );
-        g.dataset.wfEditable = "true";
-        g.setAttribute("aria-describedby", `wf-help-${n.node_id}`);
-        const port = sEl("circle", { cx: NODE_W, cy: NODE_H / 2, r: 7, class: "dy-wf-port" });
-        port.setAttribute("data-connect-from", n.node_id);
-        port.setAttribute("tabindex", "0");
-        port.setAttribute("aria-label", `Connect from ${n.title}`);
-        const rect = sEl("rect", { width: NODE_W, height: NODE_H, rx: 9, class: "dy-wf-rect" });
-        const label2 = sEl("text", { x: 12, y: 25, class: "dy-wf-label" });
-        label2.textContent = n.title.slice(0, 24);
-        const sub = sEl("text", { x: 12, y: 44, class: "dy-wf-sub" });
-        sub.textContent = (n.kind === "gate" ? "GATE \xB7 " : "") + (n.status ?? "pending") + (n.assignee ? " \xB7 " + n.assignee : "");
-        let timer2 = null;
-        if (n.status === "working") {
-          timer2 = sEl("text", {
-            x: NODE_W - 12,
-            y: 25,
-            "text-anchor": "end",
-            class: "dy-wf-timer full"
-          });
-          timer2.textContent = `Workflow: ${elapsedLabel(run.started_at)}`;
-          timer2.dataset.for = n.node_id;
-        }
-        if (timer2) g.append(rect, label2, sub, timer2, port);
-        else g.append(rect, label2, sub, port);
-        const dash = () => rect.setAttribute("stroke-dasharray", "4 3");
-        const undash = () => rect.removeAttribute("stroke-dasharray");
-        port.addEventListener("pointerdown", (ev) => {
-          const e = ev;
-          e.stopPropagation();
-          connectFrom = n.node_id;
-          g.classList.add("dy-wf-connecting");
-        });
-        g.addEventListener("pointerdown", (ev) => {
-          const e = ev;
-          if (e.button !== 0) return;
-          e.stopPropagation();
-          const p0 = positions[n.node_id] ?? { x: 0, y: 0, depth: 0 };
-          if (e.shiftKey) {
-            connectFrom = n.node_id;
-            g.classList.add("dy-wf-connecting");
-          } else {
-            dragNode = n.node_id;
-            dragStart = { x: e.clientX, y: e.clientY, ox: p0.x, oy: p0.y };
-          }
-          if (!connectFrom) {
-            try {
-              g.setPointerCapture(e.pointerId);
-            } catch {
-            }
-          }
-        });
-        g.addEventListener("pointermove", (ev) => {
-          if (!dragNode || dragNode !== n.node_id) return;
-          const e = ev;
-          nodePositions[n.node_id] = { ...positions[n.node_id], x: dragStart.ox + (e.clientX - dragStart.x) / zoom, y: dragStart.oy + (e.clientY - dragStart.y) / zoom };
-          g.setAttribute("transform", `translate(${nodePositions[n.node_id].x} ${nodePositions[n.node_id].y})`);
-        });
-        g.addEventListener("pointerup", async (ev) => {
-          const e = ev;
-          if (dragNode === n.node_id) {
-            dragNode = null;
-            const nextNodes = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, canvas_position: { x: nodePositions[n.node_id].x, y: nodePositions[n.node_id].y } } : item);
-            currentNodes = nextNodes;
-            await handlers.onEdit?.(nextNodes);
-          }
-          if (connectFrom) {
-            const from = connectFrom;
-            connectFrom = null;
-            g.classList.remove("dy-wf-connecting");
-            const error = validateConnection(currentNodes, from, n.node_id);
-            if (!error) {
-              const nextNodes = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, depends_on: [.../* @__PURE__ */ new Set([...item.depends_on, from])] } : item);
-              currentNodes = nextNodes;
-              await handlers.onEdit?.(nextNodes);
-            } else feedLog(error);
-          }
-          try {
-            g.releasePointerCapture(e.pointerId);
-          } catch {
-          }
-        });
-        g.addEventListener("keydown", async (ev) => {
-          const e = ev;
-          if (e.key === " " || e.key === "c") {
-            e.preventDefault();
-            connectFrom = connectFrom === n.node_id ? null : n.node_id;
-            g.classList.toggle("dy-wf-connecting", !!connectFrom);
-          } else if (e.key === "Enter" && connectFrom && connectFrom !== n.node_id) {
-            e.preventDefault();
-            const from = connectFrom;
-            connectFrom = null;
-            const error = validateConnection(currentNodes, from, n.node_id);
-            if (!error) {
-              const nextNodes = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, depends_on: [.../* @__PURE__ */ new Set([...item.depends_on, from])] } : item);
-              currentNodes = nextNodes;
-              await handlers.onEdit?.(nextNodes);
-            } else feedLog(error);
-          }
-        });
-        g.addEventListener("pointerenter", dash);
-        g.addEventListener("pointerleave", () => {
-          if (!g.classList.contains("dy-wf-selected")) undash();
-        });
-        const open = () => openPassport(n, g);
-        g.addEventListener("click", open);
-        g.addEventListener("keydown", (e) => {
-          const ev = e;
-          if (ev.key === "Enter") {
-            open();
-            return;
-          }
-          if (ev.key === "ArrowRight" || ev.key === "ArrowDown" || ev.key === "ArrowLeft" || ev.key === "ArrowUp") {
-            ev.preventDefault();
-            const all = [...viewport.querySelectorAll(".dy-wf-node")];
-            const idx = all.indexOf(g);
-            if (idx === -1) return;
-            const step = ev.key === "ArrowRight" || ev.key === "ArrowDown" ? 1 : -1;
-            const next = all[(idx + step + all.length) % all.length];
-            if (next) next.focus();
-          }
-        });
-        viewport.appendChild(g);
+        viewport.appendChild(buildNode(n, p, run, Boolean(handlers.onEdit)));
       }
+      renderLegend(run);
       apply();
       updateMinimap();
+    };
+    const renderLegend = (run) => {
+      SVG_INDEX.replaceChildren();
+      SVG_INDEX.setAttribute("aria-label", "Node purposes on this canvas");
+      if (!run || run.nodes.length === 0) return;
+      const present = new Set(run.nodes.map((n) => nodePurpose(n)));
+      const purposes = Object.keys(PURPOSE_VISUALS).filter((p) => present.has(p));
+      const rowH = 26;
+      const padX = 12;
+      const width = 214;
+      const height = 22 + purposes.length * rowH;
+      SVG_INDEX.setAttribute("viewBox", `0 0 ${width} ${height}`);
+      SVG_INDEX.setAttribute("width", String(width));
+      SVG_INDEX.setAttribute("height", String(height));
+      const frame = sEl("rect", {
+        x: 0.5,
+        y: 0.5,
+        width: width - 1,
+        height: height - 1,
+        rx: 7,
+        class: "dy-wf-index-bg"
+      });
+      const heading = sEl("text", { x: padX, y: 15, class: "dy-wf-index-title" });
+      heading.textContent = "NODE PURPOSE";
+      SVG_INDEX.append(frame, heading);
+      purposes.forEach((p, i) => {
+        const v = PURPOSE_VISUALS[p];
+        const cy = 22 + i * rowH + 8;
+        const outline = nodeShapePath(p, 20, 16);
+        const swatch = outline === null ? sEl("rect", { x: 0, y: 0, width: 20, height: 16, rx: 3, class: "dy-wf-index-shape" }) : sEl("path", { d: outline, class: "dy-wf-index-shape" });
+        swatch.setAttribute("fill", `var(${v.fill})`);
+        swatch.setAttribute("stroke", `var(${v.line})`);
+        swatch.setAttribute("data-wf-purpose", p);
+        const row = sEl("g", { transform: `translate(${padX} ${cy - 8})` });
+        row.appendChild(swatch);
+        const glyph = sEl("text", { x: 30, y: 13, class: "dy-wf-index-glyph" });
+        glyph.textContent = v.glyph;
+        row.appendChild(glyph);
+        const name = sEl("text", { x: 48, y: 13, class: "dy-wf-index-label" });
+        name.textContent = v.label;
+        row.appendChild(name);
+        SVG_INDEX.appendChild(row);
+      });
+      const dep = EDGE_MEANINGS[DEFAULT_EDGE_MEANING];
+      const edgeRow = sEl("g", { transform: `translate(${padX} ${height - 4})` });
+      const line = sEl("path", { d: "M 0 -5 L 20 -5", class: "dy-wf-index-edge" });
+      edgeRow.appendChild(line);
+      const edgeLabel = sEl("text", { x: 30, y: -1, class: "dy-wf-index-edge-label" });
+      edgeLabel.textContent = `${dep.label} \u2192 (workflow edges)`;
+      edgeRow.appendChild(edgeLabel);
+      SVG_INDEX.appendChild(edgeRow);
     };
     const updateMinimap = () => {
       minimap.replaceChildren(miniViewport);
@@ -753,14 +1182,14 @@
       miniViewport.setAttribute("width", String(Math.max(10, vw * s)));
       miniViewport.setAttribute("height", String(Math.max(7, vh * s)));
       for (const n of currentNodes) {
-        const { positions } = buildLayout(currentNodes);
-        const p = positions[n.node_id];
+        const p = nodePositions[n.node_id];
+        if (!p) continue;
         const dot = sEl("rect", {
-          x: p.x * s,
-          y: p.y * s,
+          x: (p.x - originX) * s,
+          y: (p.y - originY) * s,
           width: Math.max(3, NODE_W * s),
           height: Math.max(2, NODE_H * s),
-          fill: statusColor(n.status),
+          fill: `var(${STATUS_TOKENS[statusToken(n.status)]}, #6e7681)`,
           opacity: 0.8
         });
         minimap.appendChild(dot);
@@ -969,21 +1398,6 @@
     };
     const buildThread = (items) => buildActivityThread(items, { decay: true });
     const buildTasks = (tasks, onOpen) => buildTaskListMini(tasks, onOpen);
-    svg.addEventListener("pointerup", async (ev) => {
-      if (!connectFrom) return;
-      const target = ev.target?.closest?.(".dy-wf-node");
-      const to = target?.getAttribute("data-node-id");
-      if (!to) return;
-      const from = connectFrom;
-      connectFrom = null;
-      target?.classList.remove("dy-wf-connecting");
-      const error = validateConnection(currentNodes, from, to);
-      if (!error) {
-        const nextNodes = currentNodes.map((item) => item.node_id === to ? { ...item, depends_on: [.../* @__PURE__ */ new Set([...item.depends_on, from])] } : item);
-        currentNodes = nextNodes;
-        await handlers.onEdit?.(nextNodes);
-      } else feedLog(error);
-    });
     let dragging = false;
     let lastX = 0;
     let lastY = 0;
@@ -1002,6 +1416,7 @@
     });
     svg.addEventListener("pointermove", (e) => {
       if (!dragging) return;
+      if (dragSession) return;
       const ev = e;
       panX += ev.clientX - lastX;
       panY += ev.clientY - lastY;
@@ -1011,17 +1426,24 @@
       updateMinimap();
     });
     svg.addEventListener("pointerup", (e) => {
+      if (dragSession) {
+        endDragSession(e, true);
+        dragging = false;
+        return;
+      }
       if (connectFrom) {
         const target = e.target?.closest?.("[data-node-id]");
-        const to = target?.getAttribute("data-node-id");
-        if (to) {
-          const from = connectFrom;
-          connectFrom = null;
-          const error = validateConnection(currentNodes, from, to);
-          if (!error) void handlers.onEdit?.(currentNodes.map((item) => item.node_id === to ? { ...item, depends_on: [.../* @__PURE__ */ new Set([...item.depends_on, from])] } : item));
-          else feedLog(error);
-        }
+        endConnectGesture(target?.getAttribute("data-node-id") ?? null);
       }
+      dragging = false;
+      try {
+        svg.releasePointerCapture(e.pointerId);
+      } catch {
+      }
+    });
+    svg.addEventListener("pointercancel", (e) => {
+      if (dragSession) endDragSession(e, false);
+      cancelConnect();
       dragging = false;
       try {
         svg.releasePointerCapture(e.pointerId);
@@ -1075,7 +1497,12 @@
       viewport.querySelectorAll("path.dy-wf-edge").forEach((p) => {
         const to = currentNodes.find((n) => n.node_id === p.dataset.to);
         const fromDone = doneIds.has(p.dataset.from ?? "");
-        p.classList.toggle("active", !!to && to.status !== "pending" && fromDone);
+        const meaning = EDGE_MEANINGS[p.dataset.meaning ?? DEFAULT_EDGE_MEANING];
+        const active = !!to && to.status !== "pending" && fromDone;
+        p.classList.toggle("active", active);
+        if (meaning) {
+          p.setAttribute("marker-end", `url(#${active ? meaning.activeMarker : meaning.marker})`);
+        }
       });
       edgeMap.forEach(({ path, dot }) => {
         if (!path.classList.contains("active")) {
@@ -1277,7 +1704,7 @@
       }
     };
     root.replaceChildren();
-    root.className = "dy-root";
+    root.className = "dy-root dy-wf-scope";
     const header = document.createElement("header");
     header.className = "dy-header";
     const brand = document.createElement("div");

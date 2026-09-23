@@ -140,7 +140,7 @@ export function initApp(
   };
 
   root.replaceChildren();
-  root.className = 'dy-root';
+  root.className = 'dy-root dy-wf-scope';
 
   // ---- header ----
   const header = document.createElement('header');
