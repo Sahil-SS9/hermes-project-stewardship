@@ -433,6 +433,9 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-pc-scope .dy-pc-svg line[data-canvas-meaning="implements"] { stroke: var(--dy-edge-plan-implements); }
 .dy-pc-scope .dy-pc-svg line[data-canvas-meaning="raises_question"] { stroke: var(--dy-edge-plan-raises_question); }
 .dy-pc-scope .dy-pc-svg line[data-pc-pending="true"] { stroke-dasharray: 6 5; opacity: .75; }
+.dy-pc-scope .dy-pc-svg line.dy-pc-leader { stroke: var(--dy-text-3); stroke-width: 1; stroke-dasharray: 3 3; opacity: .55; }
+.dy-pc-scope .dy-pc-svg .dy-pc-edge-chip { fill: var(--dy-pc-surface); stroke: var(--dy-border); stroke-width: 1; opacity: .96; }
+.dy-pc-scope .dy-pc-svg .dy-pc-arrowhead { fill: var(--dy-text-3); }
 .dy-pc-scope .dy-pc-svg circle { fill: var(--dy-surface); }
 /* Objects: one real kind each, kind carried by an edge stripe (v6's cue). */
 .dy-pc-scope .dy-pc-obj { position: absolute; z-index: 2; min-width: 180px; max-width: 260px; padding: 11px 13px; border: 1px solid var(--dy-border); border-left: 3px solid var(--dy-pc-kind-note); border-radius: 10px; background: var(--dy-pc-surface); box-shadow: var(--dy-shadow); color: var(--dy-text); text-align: left; cursor: grab; user-select: none; touch-action: none; }

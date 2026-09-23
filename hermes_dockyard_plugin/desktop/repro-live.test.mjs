@@ -271,7 +271,7 @@ function evaluatePlugin(source, host) {
   const imports = sourceImports(source);
   assert.deepEqual(
     [...new Set(imports)].sort(),
-    ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime', './workflow-canvas-mount.js', './workflow-canvas-css.js', './download.js'].sort(),
+    ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime', './workflow-canvas-mount.js', './workflow-canvas-css.js', './planning-canvas-geometry.js', './download.js'].sort(),
     `unsupported or missing imports: ${imports.join(', ')}`,
   );
   let stripped = source.replace(/^import\s.*$/gm, '');
@@ -283,6 +283,7 @@ const mountDesktopWorkflowCanvas = __rt.mountDesktopWorkflowCanvas;
 const downloadTextFile = __rt.downloadTextFile;
 const reportDownloadFilename = __rt.reportDownloadFilename;
 const workflowCanvasCss = __rt.workflowCanvasCss;
+const layoutConnectors = () => []; const layoutFrames = () => []; const gridSlot = (i) => ({ x: 60 + (i % 3) * 340, y: 60 + Math.floor(i / 3) * 220 }); const CANVAS_MIN_POS = { x: 18, y: 30 };
 `;
   const factory = new Function(
     'React', '__rt', 'host',

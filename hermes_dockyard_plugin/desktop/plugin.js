@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { host } from '@hermes/plugin-sdk'
 import { mountDesktopWorkflowCanvas, validateConnection } from './workflow-canvas-mount.js'
 import workflowCanvasCss from './workflow-canvas-css.js'
+import { layoutConnectors, layoutFrames, gridSlot, CANVAS_MIN_POS } from './planning-canvas-geometry.js'
 import { downloadTextFile, reportDownloadFilename } from './download.js'
 
 const LIGHT_TOKENS = Object.freeze({
@@ -4440,10 +4441,9 @@ const canvasRect = (item) => ({
 // Deterministic free-slot placement: the first grid cell that does not overlap
 // an existing card. No randomness, so the same canvas always places the same.
 const canvasPlaced = (objects) => {
-  const cols = 5
+  const cols = 4
   for (let slot = 0; slot < cols * 12; slot += 1) {
-    const x = 60 + (slot % cols) * 280
-    const y = 60 + Math.floor(slot / cols) * 190
+    const { x, y } = gridSlot(slot, cols)
     const overlaps = objects.some((item) => {
       const rect = canvasRect(item)
       return x < rect.x + rect.width && x + CANVAS_CARD.width > rect.x && y < rect.y + rect.height && y + CANVAS_CARD.height > rect.y
@@ -4627,8 +4627,8 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       moved = true
       setObjects((current) => current.map((row) => row.id === item.id ? {
         ...row,
-        x: canvasClamp(origin.x + dx / zoom, 0, CANVAS_WORLD.width - CANVAS_CARD.width),
-        y: canvasClamp(origin.y + dy / zoom, 0, CANVAS_WORLD.height - CANVAS_CARD.height),
+        x: canvasClamp(origin.x + dx / zoom, CANVAS_MIN_POS.x, CANVAS_WORLD.width - CANVAS_CARD.width - CANVAS_MIN_POS.x),
+        y: canvasClamp(origin.y + dy / zoom, CANVAS_MIN_POS.y, CANVAS_WORLD.height - CANVAS_CARD.height - CANVAS_MIN_POS.x),
       } : row))
       setDirty(true)
     }
@@ -4683,7 +4683,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   // Tidy is a deterministic grid, not a layout engine: it only rewrites
   // positions and still needs the save that follows any other edit.
   const tidy = () => {
-    setObjects((current) => current.map((item, index) => ({ ...item, x: 60 + (index % 3) * 280, y: 60 + Math.floor(index / 3) * 190 })))
+    setObjects((current) => current.map((item, index) => ({ ...item, ...gridSlot(index, 3) })))
     setDirty(true)
     setNotice({ tone: 'ok', text: 'Tidied into a grid — Save canvas to persist the new positions.' })
   }
@@ -4743,20 +4743,16 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   }
   const renderConnectors = () => {
     const byId = new Map(objects.map((item) => [item.id, item]))
-    const lines = connectors.flatMap((edge) => {
-      const source = byId.get(edge.source)
-      const target = byId.get(edge.target)
-      if (!source || !target) return []
-      const from = canvasRect(source)
-      const to = canvasRect(target)
-      const x1 = from.x + from.width / 2
-      const y1 = from.y + from.height / 2
-      const x2 = to.x + to.width / 2
-      const y2 = to.y + to.height / 2
-      return [
-        jsx('line', { 'data-canvas-connector': edge.id, 'data-canvas-meaning': edge.meaning, x1, y1, x2, y2 }, edge.id),
-        jsx('text', { className: 'dy-pc-edge-label', 'data-canvas-edge-label': edge.id, x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 6, textAnchor: 'middle', children: CANVAS_MEANING_LABELS[edge.meaning] ?? edge.meaning }, `${edge.id}:label`),
-      ]
+    const laid = layoutConnectors(objects.map((item) => ({ ...item, ...canvasRect(item) })), connectors, (meaning) => CANVAS_MEANING_LABELS[meaning] ?? meaning, CANVAS_WORLD)
+    const lines = [
+      jsx('defs', { children: jsx('marker', { id: 'dy-pc-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse', children: jsx('path', { className: 'dy-pc-arrowhead', d: 'M0,0 L10,5 L0,10 z' }) }) }, 'defs'),
+    ]
+    laid.forEach((edge) => {
+      const box = edge.labelBox
+      lines.push(jsx('line', { 'data-canvas-connector': edge.id, 'data-canvas-meaning': edge.meaning, x1: edge.x1, y1: edge.y1, x2: edge.x2, y2: edge.y2, markerEnd: 'url(#dy-pc-arrow)' }, edge.id))
+      if (edge.leader) lines.push(jsx('line', { className: 'dy-pc-leader', x1: edge.anchor.x, y1: edge.anchor.y, x2: box.x + box.width / 2, y2: box.y + box.height / 2 }, `${edge.id}:leader`))
+      lines.push(jsx('rect', { className: 'dy-pc-edge-chip', 'data-canvas-meaning': edge.meaning, x: box.x, y: box.y, width: box.width, height: box.height, rx: box.height / 2 }, `${edge.id}:chip`))
+      lines.push(jsx('text', { className: 'dy-pc-edge-label', 'data-canvas-edge-label': edge.id, x: box.x + box.width / 2, y: box.y + box.height / 2, textAnchor: 'middle', dominantBaseline: 'central', children: edge.label }, `${edge.id}:label`))
     })
     if (pendingConnect) {
       const pending = byId.get(pendingConnect)
@@ -4767,24 +4763,8 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     }
     return lines
   }
-  const renderFrames = () => {
-    const groups = new Map()
-    objects.forEach((item) => {
-      ;(Array.isArray(item.tags) ? item.tags : []).forEach((tag) => {
-        const list = groups.get(tag) ?? []
-        list.push(item)
-        groups.set(tag, list)
-      })
-    })
-    return [...groups.entries()].filter(([, list]) => list.length >= 2).map(([tag, list]) => {
-      const rects = list.map(canvasRect)
-      const minX = Math.min(...rects.map((rect) => rect.x)) - 18
-      const minY = Math.min(...rects.map((rect) => rect.y)) - 30
-      const width = Math.max(...rects.map((rect) => rect.x + rect.width)) - minX + 18
-      const height = Math.max(...rects.map((rect) => rect.y + rect.height)) - minY + 18
-      return jsx('div', { className: 'dy-pc-frame', 'data-canvas-frame': tag, style: { left: `${minX}px`, top: `${minY}px`, width: `${width}px`, height: `${height}px` }, children: tag }, tag)
-    })
-  }
+  const renderFrames = () => layoutFrames(objects.map((item) => ({ ...item, ...canvasRect(item) })), CANVAS_WORLD).map((frame) =>
+    jsx('div', { className: 'dy-pc-frame', 'data-canvas-frame': frame.tag, style: { left: `${frame.x}px`, top: `${frame.y}px`, width: `${frame.width}px`, height: `${frame.height}px` }, children: frame.tag }, frame.tag))
   const renderObject = (item) => {
     const rect = canvasRect(item)
     const tag = (Array.isArray(item.tags) ? item.tags : [])[0]
