@@ -9,6 +9,7 @@
   "devDependencies": {
     "esbuild": "0.25.12",
     "jsdom": "^30.0.1",
+    "lucide-static": "1.47.0",
     "playwright": "^1.62.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

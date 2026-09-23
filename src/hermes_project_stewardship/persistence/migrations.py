@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 29
+SCHEMA_VERSION = 30
 
 
 @dataclass(frozen=True)
@@ -1091,6 +1091,140 @@ MIGRATIONS: List[Migration] = [
             ON project_canvases(project_id);
         """,
         downgrade_sql="DROP INDEX IF EXISTS idx_project_canvases_project; DROP TABLE IF EXISTS project_canvases;",
+    ),
+    Migration(
+        version=30,
+        name="audited request-changes and initiative comments",
+        upgrade_sql="""
+        -- Reviewer 'request changes' lifecycle: a distinct return-to-proposer
+        -- state, never folded into approved/rejected. decision='changes_requested'
+        -- widens the receipts ledger; comments are an independent audit thread.
+        -- SQLite cannot ALTER a CHECK: rebuild project_initiatives with the
+        -- widened status/approval_state domains, preserving every column.
+        -- The receipts ledger CHECK also widens: 'changes_requested' is a
+        -- recorded decision class in its own right.
+        ALTER TABLE project_initiatives ADD COLUMN updated_at TEXT;
+        ALTER TABLE stewardship_decision_receipts RENAME TO stewardship_decision_receipts_v29;
+        CREATE TABLE stewardship_decision_receipts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            initiative_ref TEXT NOT NULL REFERENCES project_initiatives(ref) ON DELETE CASCADE,
+            decision TEXT NOT NULL CHECK (decision IN ('approved','rejected','changes_requested')),
+            actor TEXT NOT NULL,
+            interface TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            note TEXT NOT NULL DEFAULT '',
+            fingerprint TEXT NOT NULL,
+            revision INTEGER NOT NULL,
+            decided_at TEXT NOT NULL,
+            UNIQUE(initiative_ref, revision)
+        );
+        INSERT INTO stewardship_decision_receipts
+            SELECT id, initiative_ref, decision, actor, interface, reason, note,
+                   fingerprint, revision, decided_at
+            FROM stewardship_decision_receipts_v29;
+        DROP TABLE stewardship_decision_receipts_v29;
+        CREATE TABLE initiative_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            initiative_ref TEXT NOT NULL REFERENCES project_initiatives(ref) ON DELETE CASCADE,
+            actor TEXT NOT NULL,
+            body TEXT NOT NULL CHECK (length(trim(body)) > 0),
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_initiative_comments_ref
+            ON initiative_comments(initiative_ref, created_at);
+        CREATE TABLE project_initiatives_v30 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ref TEXT NOT NULL UNIQUE,
+            project_id TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            title TEXT NOT NULL,
+            rationale TEXT NOT NULL,
+            expected_outcome TEXT NOT NULL DEFAULT '',
+            risk TEXT NOT NULL DEFAULT 'low'
+                          CHECK (risk IN ('low','medium','high','critical')),
+            status TEXT NOT NULL DEFAULT 'proposed'
+                          CHECK (status IN ('proposed','pending_approval','approved',
+                                            'executing','completed','regressed',
+                                            'rejected','cancelled','changes_requested')),
+            approval_state TEXT NOT NULL DEFAULT 'not_required'
+                            CHECK (approval_state IN ('not_required','pending','approved','rejected','changes_requested')),
+            priority INTEGER NOT NULL DEFAULT 0,
+            dedupe_key TEXT,
+            source_cycle_id INTEGER,
+            board_slug TEXT,
+            validation_contract_json TEXT NOT NULL DEFAULT '{}',
+            outcome_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            completed_at TEXT,
+            decision_revision INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT
+        );
+        INSERT INTO project_initiatives_v30
+            SELECT id, ref, project_id, title, rationale, expected_outcome, risk,
+                   status, approval_state, priority, dedupe_key, source_cycle_id,
+                   board_slug, validation_contract_json, outcome_json,
+                   created_at, completed_at, decision_revision, updated_at
+            FROM project_initiatives;
+        DROP TABLE project_initiatives;
+        ALTER TABLE project_initiatives_v30 RENAME TO project_initiatives;
+        """,
+        downgrade_sql="""
+        DROP TABLE IF EXISTS initiative_comments;
+        ALTER TABLE stewardship_decision_receipts RENAME TO stewardship_decision_receipts_v30;
+        CREATE TABLE stewardship_decision_receipts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            initiative_ref TEXT NOT NULL,
+            decision TEXT NOT NULL CHECK (decision IN ('approved','rejected')),
+            actor TEXT NOT NULL,
+            interface TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            note TEXT NOT NULL DEFAULT '',
+            fingerprint TEXT NOT NULL,
+            revision INTEGER NOT NULL,
+            decided_at TEXT NOT NULL,
+            UNIQUE(initiative_ref, revision)
+        );
+        INSERT INTO stewardship_decision_receipts
+            SELECT id, initiative_ref, decision, actor, interface, reason, note,
+                   fingerprint, revision, decided_at
+            FROM stewardship_decision_receipts_v30
+            WHERE decision != 'changes_requested';
+        DROP TABLE stewardship_decision_receipts_v30;
+        ALTER TABLE project_initiatives DROP COLUMN updated_at;
+        CREATE TABLE project_initiatives_v29_down (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ref TEXT NOT NULL UNIQUE,
+            project_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            rationale TEXT NOT NULL,
+            expected_outcome TEXT NOT NULL DEFAULT '',
+            risk TEXT NOT NULL DEFAULT 'low'
+                          CHECK (risk IN ('low','medium','high','critical')),
+            status TEXT NOT NULL DEFAULT 'proposed'
+                          CHECK (status IN ('proposed','pending_approval','approved',
+                                            'executing','completed','regressed',
+                                            'rejected','cancelled')),
+            approval_state TEXT NOT NULL DEFAULT 'not_required'
+                            CHECK (approval_state IN ('not_required','pending','approved','rejected')),
+            priority INTEGER NOT NULL DEFAULT 0,
+            dedupe_key TEXT,
+            source_cycle_id INTEGER,
+            board_slug TEXT,
+            validation_contract_json TEXT NOT NULL DEFAULT '{}',
+            outcome_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            completed_at TEXT,
+            decision_revision INTEGER NOT NULL DEFAULT 0
+        );
+        INSERT INTO project_initiatives_v29_down
+            SELECT id, ref, project_id, title, rationale, expected_outcome, risk,
+                   status, approval_state, priority, dedupe_key, source_cycle_id,
+                   board_slug, validation_contract_json, outcome_json,
+                   created_at, completed_at, decision_revision
+            FROM project_initiatives
+            WHERE status NOT IN ('changes_requested');
+        DROP TABLE project_initiatives;
+        ALTER TABLE project_initiatives_v29_down RENAME TO project_initiatives;
+        """,
     ),
     Migration(
         version=29,

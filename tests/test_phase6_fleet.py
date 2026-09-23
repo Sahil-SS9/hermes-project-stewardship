@@ -106,6 +106,43 @@ def _health(store, pid, status, *, days_ago=0):
 
 
 # ------------------------------------------------------------------ #
+# Dashboard search — exact-context, bounded, no mutation             #
+# ------------------------------------------------------------------ #
+
+def test_fleet_search_finds_project_and_canonical_work_titles(store, client):
+    _enable(store, "atlas-mobile")
+    created = client.post("/stewardship/v1/projects/atlas-mobile/work-items",
+        json={"type": "task", "title": "Accessibility review",
+              "actor_id": "sahil", "actor_kind": "human"})
+    assert created.status_code == 200, created.text
+    ref = created.json()["ref"]
+    response = client.get("/stewardship/v1/search", params={"q": "accessibility"})
+    assert response.status_code == 200
+    rows = response.json()["results"]
+    assert any(r["ref"] == ref and r["deep_link"] == f"s2:work/{ref}" for r in rows)
+    assert "SECRET INTERNAL NOTES" not in str(response.json())
+    assert client.get("/stewardship/v1/search", params={"q": "atlas"}).json()["results"][0]["deep_link"] == "s1:project/atlas-mobile"
+
+
+def test_fleet_search_validates_query_and_caps_results(store, client):
+    _enable(store, "atlas-mobile")
+    for i in range(4):
+        _work(store, "atlas-mobile", "backlog", ref=f"ATL-{i}")
+    assert client.get("/stewardship/v1/search", params={"q": "a"}).status_code == 422
+    result = client.get("/stewardship/v1/search", params={"q": "atlas", "limit": 2}).json()
+    assert len(result["results"]) <= 2
+    assert isinstance(result["has_more"], bool)
+
+def test_portfolio_evidence_count_is_active_files_not_derived_score(store, client):
+    _enable(store, "atlas-mobile")
+    result = client.get("/stewardship/v1/portfolio")
+    assert result.status_code == 200
+    body = result.json()
+    assert body["evidence_files"] == 0
+    assert body["projects"][0]["owner"] == "octacon"
+    assert body["projects"][0]["items"] == {"done": 0, "total": 0, "blocked": 0, "overdue": 0}
+
+# ------------------------------------------------------------------ #
 # P6.1 — groups                                                       #
 # ------------------------------------------------------------------ #
 

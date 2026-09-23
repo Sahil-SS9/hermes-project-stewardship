@@ -244,6 +244,32 @@ class ApprovalAction(BaseModel):
     reason: str = ""
 
 
+class RequestChangesAction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    actor: str = ""
+    interface: str = "desktop"
+    expected_fingerprint: Optional[str] = None
+    feedback: str = ""
+    note: str = ""
+
+
+class ResubmitAction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    actor: str = "proposer"
+    interface: str = "desktop"
+    rationale: Optional[str] = None
+    expected_outcome: Optional[str] = None
+    risk: Optional[str] = None
+    note: str = ""
+
+
+class InitiativeCommentAction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    actor: str = ""
+    interface: str = "desktop"
+    body: str = ""
+
+
 class CycleRequest(BaseModel):
     trigger_type: str = "manual"
     idempotency_key: Optional[str] = None
@@ -1265,6 +1291,46 @@ def create_app(
         except ServiceError as exc:
             raise HTTPException(409, str(exc)) from None
 
+    @router.post("/initiatives/{ref}/request-changes")
+    def request_changes(ref: str, body: RequestChangesAction):
+        actor_id = current_principal() or body.actor
+        if not actor_id:
+            raise HTTPException(409, "trusted actor attribution is required")
+        try:
+            return svc.request_changes_initiative(
+                ref, actor=actor_id, interface=body.interface,
+                expected_fingerprint=body.expected_fingerprint,
+                feedback=body.feedback, note=body.note,
+            )
+        except ServiceError as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @router.post("/initiatives/{ref}/resubmit")
+    def resubmit(ref: str, body: ResubmitAction):
+        try:
+            return svc.resubmit_initiative(
+                ref, actor=_principal_id(body.actor), interface=body.interface,
+                rationale=body.rationale, expected_outcome=body.expected_outcome,
+                risk=body.risk, note=body.note,
+            )
+        except ServiceError as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @router.get("/initiatives/{ref}/comments")
+    def comments(ref: str):
+        return {"comments": svc.initiative_comments(ref)}
+
+    @router.post("/initiatives/{ref}/comments")
+    def add_comment(ref: str, body: InitiativeCommentAction):
+        actor_id = current_principal() or body.actor
+        if not actor_id:
+            raise HTTPException(409, "trusted actor attribution is required")
+        try:
+            return svc.add_initiative_comment(
+                ref, actor=actor_id, interface=body.interface, body=body.body)
+        except ServiceError as exc:
+            raise HTTPException(409, str(exc)) from None
+
     @router.post("/initiatives/{ref}/bind-board")
     def bind_board(ref: str, body: BindBoardRequest):
         try:
@@ -1926,6 +1992,14 @@ def create_app(
     def portfolio():
         """Cross-project rollup: attention, per-project standing, mix."""
         return dy.portfolio()
+
+    @router.get("/search")
+    def fleet_search(q: str, limit: int = 30):
+        """Search project, work and initiative titles across the fleet."""
+        try:
+            return dy.fleet_search(q, limit=limit)
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(422, str(exc)) from None
 
     @router.get("/notifications")
     def fleet_notifications():

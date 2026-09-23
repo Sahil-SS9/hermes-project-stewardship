@@ -1156,6 +1156,55 @@ class DockyardService:
             out["totals"]["unacked_notifications"] += unacked
         return out
 
+    def fleet_search(self, query: str, *, limit: int = 30) -> Dict:
+        """Bounded cross-project title search. Never search private content bodies.
+
+        Uses the canonical Work projection when configured, as the Work tab
+        does; avoids stale duplicate work-item tables. Each result has an
+        existing exact-context deep link that the Desktop router understands.
+        """
+        term = str(query or "").strip().casefold()
+        if len(term) < 2 or len(term) > 100:
+            raise ValueError("search query must contain 2–100 characters")
+        limit = max(1, min(int(limit), 50))
+        projects = self.store._conn.execute(
+            "SELECT project_id FROM project_stewardship ORDER BY project_id"
+        ).fetchall()
+        results: List[Dict] = []
+        for row in projects:
+            pid = row["project_id"]
+            if term in pid.casefold():
+                results.append({"kind": "project", "project": pid,
+                                "title": pid, "ref": pid,
+                                "deep_link": f"s1:project/{pid}"})
+            if self.canonical_work is not None:
+                work = self.canonical_work.list(pid)
+            else:
+                work = [dict(row) for row in self.store._conn.execute(
+                    "SELECT ref, title FROM dockyard_work_items"
+                    " WHERE project_id=? ORDER BY id DESC", (pid,)
+                ).fetchall()]
+            for item in work:
+                ref, title = str(item.get("ref") or ""), str(item.get("title") or "")
+                if term in title.casefold() or term in ref.casefold():
+                    results.append({"kind": "work", "project": pid,
+                                    "title": title, "ref": ref,
+                                    "deep_link": f"s2:work/{ref}"})
+            initiatives = self.store._conn.execute(
+                "SELECT ref, title FROM project_initiatives"
+                " WHERE project_id=? ORDER BY id DESC", (pid,)
+            ).fetchall()
+            for item in initiatives:
+                ref, title = item["ref"], item["title"]
+                if term in title.casefold() or term in ref.casefold():
+                    results.append({"kind": "initiative", "project": pid,
+                                    "title": title, "ref": ref,
+                                    "deep_link": f"s6:initiative/{ref}"})
+            if len(results) > limit:
+                break
+        return {"query": query.strip(), "results": results[:limit],
+                "has_more": len(results) > limit}
+
     # ------------------------------------------------------------------ #
     # Notification deep-links (UX-07) — G4 P3                            #
     # ------------------------------------------------------------------ #
@@ -1286,8 +1335,13 @@ class DockyardService:
         # P6.1: evidence health stays separate from delivery status; freshness
         # is surfaced per project as its own field, never a composite score.
         health_freshness: Dict[str, Optional[int]] = {}
+        evidence_files = self.store._conn.execute(
+            "SELECT COUNT(*) AS n FROM project_content"
+            " WHERE removal_state='active' AND archived_at IS NULL"
+        ).fetchone()["n"]
         for p in self.store._conn.execute(
-                "SELECT project_id, enabled, phase FROM project_stewardship"
+                "SELECT project_id, enabled, phase, owner_lead_profile"
+                " FROM project_stewardship"
                 " ORDER BY project_id").fetchall():
             pid = p["project_id"]
             health_row = self.store._conn.execute(
@@ -1363,6 +1417,7 @@ class DockyardService:
                      if next_milestone else None)
             projects.append({
                 "project_id": pid,
+                "owner": p["owner_lead_profile"],
                 "enabled": bool(p["enabled"]),
                 "phase": p["phase"],
                 "status": status,
@@ -1380,6 +1435,7 @@ class DockyardService:
             })
 
         return {"projects": projects, "mix": mix, "attention": attention,
+                "evidence_files": evidence_files,
                 "groups": self._fleet_groups()}
 
     # ------------------------------------------------------------------ #

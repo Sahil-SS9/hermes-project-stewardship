@@ -11,6 +11,10 @@ const DESKTOP_SIBLING = join(PLUGIN_DIR, 'desktop', 'workflow-canvas-css.js');
 
 mkdirSync(join(dir, 'dist'), { recursive: true });
 
+// Desktop runtime cannot resolve npm imports. Curate Lucide SVGs into an
+// official-source, dependency-free sibling module before publishing the plugin.
+await import('./scripts/generate-lucide-icons.mjs');
+
 await build({
   entryPoints: [join(dir, 'src/index.ts')],
   bundle: true,

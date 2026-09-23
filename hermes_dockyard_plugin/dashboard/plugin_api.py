@@ -442,6 +442,12 @@ async def portfolio() -> dict:
     return await _proxy("GET", "/stewardship/v1/portfolio")
 
 
+@plugin_api.get("/search")
+async def fleet_search(q: str, limit: int = 30) -> dict:
+    return await _proxy("GET", "/stewardship/v1/search",
+                        params={"q": q, "limit": limit})
+
+
 @plugin_api.get("/inbox")
 async def inbox() -> dict:
     return await _proxy("GET", "/stewardship/v1/inbox")

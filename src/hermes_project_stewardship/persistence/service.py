@@ -2404,6 +2404,7 @@ class StewardshipService:
             InitiativeStatus.PENDING_APPROVAL.value,
             InitiativeStatus.APPROVED.value,
             InitiativeStatus.EXECUTING.value,
+            "changes_requested",
         )
         approval_state = (
             ApprovalState.PENDING.value if requires_approval else ApprovalState.NOT_REQUIRED.value
@@ -2748,6 +2749,133 @@ class StewardshipService:
                                  "note": note, "fingerprint": decision["fingerprint"],
                                  "revision": revision})
         return self.initiative_by_ref(ref)
+
+    def request_changes_initiative(
+        self,
+        ref: str,
+        *,
+        actor: str,
+        interface: str,
+        expected_fingerprint: Optional[str] = None,
+        feedback: str = "",
+        note: str = "",
+    ) -> Dict[str, Any]:
+        """Reviewer 'request changes': audited return-to-proposer path.
+
+        Never silently rejects or approves. Feedback is required, the
+        fingerprint guard matches approve/reject, and the initiative stays
+        revisable: no suppression window is created.
+        """
+        ini = self.initiative_by_ref(ref)
+        if not feedback.strip():
+            raise ServiceError("request-changes feedback is required")
+        decision = self._check_decision_fingerprint(ref, expected_fingerprint)
+        if ini["status"] not in (InitiativeStatus.PENDING_APPROVAL.value,
+                                 InitiativeStatus.PROPOSED.value):
+            raise ServiceError(
+                f"initiative {ref} cannot be returned for changes from status={ini['status']}")
+        now = iso(self._clock())
+        revision = decision["revision"] + 1
+        with self.store.tx() as cx:
+            res = cx.execute(
+                "UPDATE project_initiatives SET status='changes_requested',"
+                " approval_state='changes_requested', decision_revision=decision_revision+1,"
+                " updated_at=?"
+                " WHERE ref=? AND status IN ('pending_approval','proposed')",
+                (now, ref),
+            )
+            if res.rowcount != 1:
+                current = cx.execute(
+                    "SELECT status FROM project_initiatives WHERE ref=?", (ref,)).fetchone()
+                current_status = current["status"] if current is not None else "missing"
+                if current_status == "changes_requested":
+                    return self.initiative_by_ref(ref)
+                raise ServiceError(f"initiative {ref} changed state concurrently")
+            cx.execute(
+                "INSERT INTO stewardship_decision_receipts(initiative_ref,decision,"
+                "actor,interface,reason,note,fingerprint,revision,decided_at)"
+                " VALUES(?,?,?,?,?,?,?,?,?)",
+                (ref, "changes_requested", actor, interface, feedback.strip(), note,
+                 decision["fingerprint"], revision, now),
+            )
+        self.store.audit(actor=actor, interface=interface,
+                         action="initiative.changes_requested", subject=ref,
+                         detail={"feedback": feedback.strip(), "note": note,
+                                 "fingerprint": decision["fingerprint"],
+                                 "revision": revision})
+        return self.initiative_by_ref(ref)
+
+    def resubmit_initiative(
+        self,
+        ref: str,
+        *,
+        actor: str,
+        interface: str = "desktop",
+        rationale: Optional[str] = None,
+        expected_outcome: Optional[str] = None,
+        risk: Optional[str] = None,
+        note: str = "",
+    ) -> Dict[str, Any]:
+        """Proposer revision after changes_requested: back to pending approval.
+
+        Bumps decision_revision so the decision fingerprint changes; the old
+        receipts ledger is untouched (full audit trail).
+        """
+        ini = self.initiative_by_ref(ref)
+        if ini["status"] != "changes_requested":
+            raise ServiceError(
+                f"initiative {ref} is not awaiting revision (status={ini['status']})")
+        new_rationale = (rationale or ini["rationale"]).strip()
+        if not new_rationale:
+            raise ServiceError("resubmission requires a rationale (anti-busywork rule)")
+        now = iso(self._clock())
+        with self.store.tx() as cx:
+            res = cx.execute(
+                "UPDATE project_initiatives SET status='pending_approval',"
+                " approval_state='pending', decision_revision=decision_revision+1,"
+                " rationale=?, expected_outcome=COALESCE(?, expected_outcome),"
+                " risk=COALESCE(?, risk), updated_at=?"
+                " WHERE ref=? AND status='changes_requested'",
+                (new_rationale, expected_outcome, risk, now, ref),
+            )
+            if res.rowcount != 1:
+                raise ServiceError(f"initiative {ref} changed state concurrently")
+        self.store.audit(actor=actor, interface=interface,
+                         action="initiative.resubmitted", subject=ref,
+                         detail={"note": note, "revised_fields": [
+                             k for k, v in (("rationale", rationale),
+                                            ("expected_outcome", expected_outcome),
+                                            ("risk", risk)) if v is not None]})
+        return self.initiative_by_ref(ref)
+
+    def add_initiative_comment(
+        self, ref: str, *, actor: str, interface: str = "desktop", body: str = "",
+    ) -> Dict[str, Any]:
+        """Independent comment thread: never mutates decision state/fingerprint."""
+        self.initiative_by_ref(ref)
+        if not body.strip():
+            raise ServiceError("comment body is required")
+        now = iso(self._clock())
+        with self.store.tx() as cx:
+            cursor = cx.execute(
+                "INSERT INTO initiative_comments(initiative_ref,actor,body,created_at)"
+                " VALUES(?,?,?,?)",
+                (ref, actor, body.strip(), now),
+            )
+            comment_id = cursor.lastrowid
+        self.store.audit(actor=actor, interface=interface,
+                         action="initiative.commented", subject=ref,
+                         detail={"comment_id": comment_id})
+        return {"id": comment_id, "initiative_ref": ref, "actor": actor,
+                "body": body.strip(), "created_at": now}
+
+    def initiative_comments(self, ref: str) -> List[Dict[str, Any]]:
+        self.initiative_by_ref(ref)
+        rows = self.store._conn.execute(
+            "SELECT id, actor, body, created_at FROM initiative_comments"
+            " WHERE initiative_ref=? ORDER BY created_at, id", (ref,)
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def start_execution(self, ref: str) -> Dict[str, Any]:
         ini = self.initiative_by_ref(ref)
