@@ -2043,6 +2043,45 @@ const DOCKYARD_CSS = `
 .dockyard-root .dockyard-history-list strong { display: block; color: var(--dy-text); font-size: 11px; }
 .dockyard-root .dockyard-history-list span { display: block; margin-top: 2px; color: var(--dy-text-2); }
 @media (max-width: 720px) { .dockyard-root .dockyard-detail-modal .dockyard-detail-columns { grid-template-columns: 1fr; } }
+
+/* LANE-DETAIL */
+.dockyard-root .dockyard-detail-modal { position: relative;
+  width: min(960px, calc(100vw - 32px)); max-height: min(900px, calc(100vh - 32px));
+  display: flex; flex-direction: column; padding: 0; overflow: hidden;
+  border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); box-shadow: 0 24px 80px rgb(0 0 0 / .22);
+}
+.dockyard-root .dockyard-detail-modal > .dockyard-modal-head { padding: 20px 28px 18px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface); }
+.dockyard-root .dockyard-detail-modal > .dockyard-modal-head h2 { margin: 7px 0 8px; font-size: 22px; line-height: 1.18; letter-spacing: -.02em; font-weight: 700; }
+.dockyard-root .dockyard-detail-modal > .dockyard-modal-head > button { width: 34px; height: 34px; padding: 0; font-size: 0; border-radius: 8px; }
+.dockyard-root .dockyard-detail-modal > .dockyard-modal-head > button::after { content: '×'; font-size: 24px; font-weight: 400; line-height: 1; }
+.dockyard-root .dockyard-detail-status-pill { display: inline-flex; align-items: center; gap: 7px; width: max-content; padding: 4px 9px; border: 1px solid var(--dy-border); border-radius: 999px; color: var(--dy-text-2); font-size: 11px; font-weight: 650; }
+.dockyard-root .dockyard-detail-status-pill.status-done { color: var(--dy-success); }
+.dockyard-root .dockyard-detail-status-pill.status-blocked { color: var(--dy-danger); }
+.dockyard-root .dockyard-detail-modal .dockyard-detail-columns { flex: 0 1 auto; min-height: 0; overflow-y: auto; grid-template-columns: minmax(0, 1.6fr) minmax(270px, 1fr); gap: 24px; padding: 24px 28px 18px; margin: 0; }
+.dockyard-root .dockyard-detail-modal .dockyard-work-editor { gap: 14px; align-content: start; }
+.dockyard-root .dockyard-detail-modal .dockyard-work-editor > label, .dockyard-root .dockyard-detail-modal .dockyard-field-iconed, .dockyard-root .dockyard-detail-modal .dockyard-profile-picker { gap: 6px; color: var(--dy-text-2); font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+.dockyard-root .dockyard-detail-modal .dockyard-work-editor > label > input, .dockyard-root .dockyard-detail-modal .dockyard-work-editor > textarea { margin-top: 0; }
+.dockyard-root .dockyard-detail-modal .dockyard-field-pair { gap: 12px; }
+.dockyard-root .dockyard-detail-modal .dockyard-work-editor input, .dockyard-root .dockyard-detail-modal .dockyard-work-editor select, .dockyard-root .dockyard-detail-modal .dockyard-work-editor textarea, .dockyard-root .dockyard-detail-modal .dockyard-profile-picker input, .dockyard-root .dockyard-detail-modal .dockyard-profile-picker select { min-height: 36px; border-radius: 7px; border-color: var(--dy-control-border); background: var(--dy-surface-subtle); color: var(--dy-text); }
+.dockyard-root .dockyard-detail-modal .dockyard-work-editor textarea { min-height: 104px; resize: vertical; line-height: 1.45; }
+.dockyard-root .dockyard-detail-modal .dockyard-field-shell { min-height: 36px; border-radius: 7px; background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-detail-modal .dockyard-detail-side { gap: 14px; padding: 16px; border-radius: 10px; background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-detail-modal .dockyard-detail-side h3 { margin: 0 0 2px; color: var(--dy-text); font-size: 13px; font-weight: 700; }
+.dockyard-root .dockyard-detail-modal .dockyard-detail-grid { margin: 0; gap: 1px; border-radius: 8px; }
+.dockyard-root .dockyard-detail-modal .dockyard-detail-grid > div { padding: 11px; }
+.dockyard-root .dockyard-detail-modal .dockyard-dependency-editor { padding-top: 2px; }
+.dockyard-root .dockyard-detail-modal .dockyard-dependency-editor h3 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--dy-text-2); }
+.dockyard-root .dockyard-detail-modal .dockyard-detail-activity { padding: 12px 28px 18px; border-top: 1px solid var(--dy-border); }
+.dockyard-root .dockyard-detail-modal .dockyard-detail-activity-head h3 { margin: 0; color: var(--dy-text); font-size: 13px; }
+.dockyard-root .dockyard-detail-modal .dockyard-detail-activity-head h3::before { content: '◷'; margin-right: 7px; color: var(--dy-accent-text); }
+.dockyard-root .dockyard-detail-modal .dockyard-history-list { max-height: 190px; margin-top: 9px; padding-left: 17px; border-left: 1px solid var(--dy-accent-border); }
+.dockyard-root .dockyard-detail-modal .dockyard-history-list li { position: relative; padding: 8px 8px 8px 12px; border-top: 0; }
+.dockyard-root .dockyard-detail-modal .dockyard-history-list li::before { content: ''; position: absolute; left: -22px; top: 13px; width: 7px; height: 7px; border: 2px solid var(--dy-surface); border-radius: 50%; background: var(--dy-accent-text); box-shadow: 0 0 0 1px var(--dy-accent-border); }
+.dockyard-root .dockyard-detail-modal .dockyard-dirty-confirm { position: absolute; z-index: 5; top: 92px; left: 28px; right: 28px; margin: 0; box-shadow: var(--dy-shadow); pointer-events: none; }
+.dockyard-root .dockyard-detail-modal .dockyard-dirty-confirm button { pointer-events: auto; }
+.dockyard-root .dockyard-detail-modal .dockyard-dirty-banner { position: relative; z-index: 2; margin: 0; border-radius: 0; border-width: 0 0 1px; }
+.dockyard-root .dockyard-detail-modal .dockyard-detail-footer-right { margin-left: auto; }
+@media (max-width: 720px) { .dockyard-root .dockyard-detail-modal { width: calc(100vw - 20px); max-height: calc(100vh - 20px); } .dockyard-root .dockyard-detail-modal .dockyard-detail-columns { grid-template-columns: 1fr; padding: 18px; } .dockyard-root .dockyard-detail-modal .dockyard-detail-activity, .dockyard-root .dockyard-detail-modal .dockyard-detail-footer, .dockyard-root .dockyard-detail-modal > .dockyard-modal-head { padding-left: 18px; padding-right: 18px; } }
 `
 
 let _rest = null
@@ -4014,6 +4053,8 @@ function WorkItemDetail({ item, projectId, profiles, onClose, onRefresh }) {
     if (draft.title !== base.title) changes.title = draft.title
     if (draft.type !== base.type) changes.type = draft.type
     if (draft.body !== base.body) changes.body = draft.body || null
+    changes.actor_id = 'sahil'
+    changes.actor_kind = 'human'
     if (draft.labels !== base.labels) {
       changes.labels = draft.labels.split(',').map((v) => v.trim()).filter(Boolean)
     }
@@ -4036,13 +4077,13 @@ function WorkItemDetail({ item, projectId, profiles, onClose, onRefresh }) {
       if ((draft.assignee ?? '') !== (base.assignee ?? '')) {
         await api(`/projects/${encodeURIComponent(projectIdResolved)}/work-items/${encodeURIComponent(item.ref)}/assign`, {
           method: 'POST',
-          body: { assignee_id: draft.assignee.trim() || null },
+          body: { assignee_id: draft.assignee.trim() || null, actor_id: 'sahil', actor_kind: 'human' },
         })
       }
       if (draft.status !== base.status) {
         await api(`/projects/${encodeURIComponent(projectIdResolved)}/work-items/${encodeURIComponent(item.ref)}/transition`, {
           method: 'POST',
-          body: { status: draft.status },
+          body: { status: draft.status, actor_id: 'sahil', actor_kind: 'human' },
         })
       }
       // Rebase onto canonical state so the NEXT edit diffs against reality
@@ -4062,7 +4103,7 @@ function WorkItemDetail({ item, projectId, profiles, onClose, onRefresh }) {
     setError(null)
     try {
       await api(`/projects/${encodeURIComponent(projectId || item.project_id)}/work-items/${encodeURIComponent(item.ref)}/dependencies`, {
-        method: 'POST', body: { dependency_ref: depRef.trim() },
+        method: 'POST', body: { dependency_ref: depRef.trim(), actor_id: 'sahil', actor_kind: 'human' },
       })
       setDepRef('')
       await loadDetail(item.ref)
@@ -4118,6 +4159,7 @@ function WorkItemDetail({ item, projectId, profiles, onClose, onRefresh }) {
               jsx('span', { children: readableLabel(item.type || 'task') }),
             ]}),
             jsx('h2', { id: 'dockyard-work-item-title', children: draft?.title || item.title || item.ref }),
+            draft ? jsxs('span', { className: `dockyard-detail-status-pill status-${draft.status}`, children: [jsx('span', { className: 'dockyard-status-dot', 'aria-hidden': true }), readableLabel(draft.status)] }) : null,
           ]}),
           jsx(Button, { action: 'close-work-item-detail', ariaLabel: 'Close work item details', onClick: () => { if (isDirty) { setConfirmDiscard(true) } else { onClose() } }, children: 'Close' }),
         ]}),
@@ -4213,7 +4255,7 @@ function WorkItemDetail({ item, projectId, profiles, onClose, onRefresh }) {
           ]}),
         ]}),
         jsxs('aside', { className: 'dockyard-detail-side', children: [
-          jsxs('label', { className: 'dockyard-field-iconed', children: ['Parent ', jsxs('span', { className: 'dockyard-field-shell', children: [
+          jsx('h3', { children: 'Details' }), jsxs('label', { className: 'dockyard-field-iconed', children: ['Parent ', jsxs('span', { className: 'dockyard-field-shell', children: [
             jsx(Icon, { name: 'layers' }),
             jsx('select', {
               value: draft?.parent_ref ?? '', onChange: (event) => setDraft({ ...draft, parent_ref: event.target.value }), children: [
