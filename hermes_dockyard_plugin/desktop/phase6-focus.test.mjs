@@ -26,9 +26,11 @@ const { act } = React;
 const { createRoot } = require('react-dom/client');
 const rt = require('react/jsx-runtime');
 import { reportDownloadFilename } from './download.js';
+import { LUCIDE_ICON_NODES } from './lucide-icons.js';
 // The plugin stub resolves reportDownloadFilename through __rt so the REAL
 // sanitiser is exercised in these jsdom journeys (no duplicated logic).
 rt.reportDownloadFilename = reportDownloadFilename;
+rt.LUCIDE_ICON_NODES = LUCIDE_ICON_NODES;
 
 const wait = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 const clone = (value) => JSON.parse(JSON.stringify(value));
@@ -41,7 +43,7 @@ function evaluatePlugin(source, host) {
   const imports = sourceImports(source);
   assert.deepEqual(
     [...new Set(imports)].sort(),
-    ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime', './workflow-canvas-mount.js', './workflow-canvas-css.js', './planning-canvas-geometry.js', './download.js'].sort(),
+    ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime', './workflow-canvas-mount.js', './workflow-canvas-css.js', './planning-canvas-geometry.js', './download.js', './lucide-icons.js'].sort(),
     `unsupported or missing imports: ${imports.join(', ')}`,
   );
   let stripped = source.replace(/^import\s.*$/gm, '');
@@ -54,6 +56,7 @@ const workflowCanvasCss = '';
 const layoutConnectors = () => []; const layoutFrames = () => []; const gridSlot = (i) => ({ x: 60 + (i % 3) * 340, y: 60 + Math.floor(i / 3) * 220 }); const CANVAS_MIN_POS = { x: 18, y: 30 };
 const downloadTextFile = (content, filename) => { __rt.downloads = __rt.downloads || []; __rt.downloads.push({ content, filename }); return true; };
 const reportDownloadFilename = __rt.reportDownloadFilename;
+const LUCIDE_ICON_NODES = __rt.LUCIDE_ICON_NODES;
 `;
   const factory = new Function(
     'React', '__rt', 'host',

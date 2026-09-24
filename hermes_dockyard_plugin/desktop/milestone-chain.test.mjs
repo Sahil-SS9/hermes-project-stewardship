@@ -24,6 +24,7 @@ import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { LUCIDE_ICON_NODES } from './lucide-icons.js';
 
 const DASH_PKG = fileURLToPath(new URL('../dashboard/package.json', import.meta.url));
 const require = createRequire(DASH_PKG);
@@ -91,12 +92,14 @@ function evaluatePlugin(source, host) {
     // in its root effect, so the module value must exist. Empty string keeps
     // the stub honest: nothing here pretends to assert canvas styling (the
     // real computed-style contract lives in workflow-canvas-styles.test.mjs).
-    + `const workflowCanvasCss = '';\n`;
+    + `const workflowCanvasCss = '';\n`
+    // Icons render on every screen; supply the real generated table.
+    + `const LUCIDE_ICON_NODES = __icons;\n`;
   const factory = new Function(
-    'React', '__rt', 'host',
+    'React', '__rt', 'host', '__icons',
     `${stub}${stripped}\nreturn { plugin: __plugin };`,
   );
-  return factory(React, rt, host);
+  return factory(React, rt, host, LUCIDE_ICON_NODES);
 }
 
 const FALSE_EMPTY_MESSAGE = 'No milestones yet. Create one here with the form above; it appears in this panel for review.'; // kept in sync with PlanningPanel copy (Desktop is the creation surface)

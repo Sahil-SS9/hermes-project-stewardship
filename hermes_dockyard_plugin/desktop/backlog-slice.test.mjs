@@ -32,7 +32,7 @@ test('approved backlog slice is present in the production plugin surface', () =>
 })
 
 test('detail modal exposes the canonical task ID separately from the display reference', () => {
-  assert.match(source, /const taskId = detail\?\.work_item\?\.id \?\? item\.id \?\? null/)
+  assert.match(source, /const taskId = detail\?\.work_item\?\.id \?\? item\?\.id \?\? null/)
   assert.ok(source.includes("className: 'dockyard-detail-task-id'"))
   assert.ok(source.includes("children: 'Task ID'"))
   assert.ok(source.includes("children: taskIdText ?? 'Unavailable'"))

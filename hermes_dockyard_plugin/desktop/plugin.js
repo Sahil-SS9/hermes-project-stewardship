@@ -2035,7 +2035,7 @@ const DOCKYARD_CSS = `
 .dockyard-root [data-bulk-import-layer] .import-as p { margin: 0; font-weight: 700; }
 .dockyard-root [data-bulk-import-layer] .dockyard-wizard-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .dockyard-root [data-bulk-import-layer] .dockyard-wizard-actions-left, .dockyard-root [data-bulk-import-layer] .dockyard-wizard-actions-right { display: inline-flex; gap: 9px; }
-+@media (max-width: 760px) { .dockyard-root [data-bulk-import-layer] .import-split { grid-template-columns: 1fr; } .dockyard-root [data-bulk-import-layer] .import-summary { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 760px) { .dockyard-root [data-bulk-import-layer] .import-split { grid-template-columns: 1fr; } .dockyard-root [data-bulk-import-layer] .import-summary { grid-template-columns: 1fr 1fr; } }
 /* LANE-IMPORT */
 .dockyard-root [data-bulk-import-layer] .import-drop svg { width: 28px; height: 28px; }
 .dockyard-root [data-bulk-import-layer] .import-drop { min-height: 72px; display: grid; grid-template-columns: 32px 1fr; gap: 4px 10px; align-items: center; }
@@ -2298,7 +2298,9 @@ function Icon({ name }) {
     viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
     strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round',
     'aria-hidden': true,
-    children: nodes.map(([tag, attributes], index) => jsx(tag, attributes, `${iconName}-${index}`)),
+    // Copy: React 19 reuses the config object as props and tags it with a key getter,
+    // which would mutate the shared icon table and warn on the next render.
+    children: nodes.map(([tag, attributes], index) => jsx(tag, { ...attributes }, `${iconName}-${index}`)),
   })
 }
 
@@ -3474,6 +3476,7 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
     const done = Number(project.items?.done ?? 0)
     const status = statusName[project.status] ?? readableLabel(project.status, 'Unknown')
     return jsxs('button', { type: 'button', className: 'dockyard-command-row dockyard-command-project-row',
+      'data-project-row': project.project_id,
       onClick: () => onOpen?.(`s1:project/${project.project_id}`), children: [
         jsx('strong', { children: project.project_id }),
         jsx('span', { children: project.owner || 'Not assigned' }),
@@ -4044,7 +4047,8 @@ function ProjectReportsPanel({ project, reports, onRefresh }) {
 function WorkItemDetail({ item, projectId, profiles, initiatives = [], onClose, onRefresh }) {
   const [draft, setDraft] = useState(null)
   const [detail, setDetail] = useState(null)
-  const taskId = detail?.work_item?.id ?? item.id ?? null
+  // The project dashboard mounts this drawer with no selection; `item` is null until one is opened.
+  const taskId = detail?.work_item?.id ?? item?.id ?? null
   const taskIdText = taskId === null || taskId === '' ? null : String(taskId)
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState(null)

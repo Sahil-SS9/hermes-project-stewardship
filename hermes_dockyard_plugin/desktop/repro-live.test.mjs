@@ -19,6 +19,7 @@ const { act } = React;
 const { createRoot } = require('react-dom/client');
 const rt = require('react/jsx-runtime');
 import { downloadTextFile, reportDownloadFilename } from './download.js';
+import { LUCIDE_ICON_NODES } from './lucide-icons.js';
 import workflowCanvasCss from './workflow-canvas-css.js';
 // The plugin resolves local modules through __rt so jsdom journeys exercise
 // the REAL download helpers. The workflow canvas module is TS source (not
@@ -29,6 +30,7 @@ import workflowCanvasCss from './workflow-canvas-css.js';
 // harness exists to catch.
 rt.downloadTextFile = downloadTextFile;
 rt.reportDownloadFilename = reportDownloadFilename;
+rt.LUCIDE_ICON_NODES = LUCIDE_ICON_NODES;
 rt.workflowCanvasCss = workflowCanvasCss;
 rt.canvasMounts = [];
 rt.mountDesktopWorkflowCanvas = function mountDesktopWorkflowCanvasStub(hostEl, projectId, workflowName) {
@@ -94,6 +96,22 @@ const POPULATED = {
     ],
     owed_decisions: 2,
     totals: { active_work: 5, blocked: 1, stuck_bots: 0, unacked_notifications: 1 },
+  },
+  // Shape mirrors DockyardService.portfolio(); the v6 Dashboard reads this, not /dashboard.
+  portfolio: {
+    projects: [
+      { project_id: 'demo-project', owner: 'octacon', enabled: true, phase: 'active', status: 'on_track',
+        items: { done: 3, total: 11, blocked: 0, overdue: 0 },
+        next_milestone: { name: 'Beta', due: '2026-10-08', overdue: false },
+        last_activity: '2026-08-24T18:10:07+00:00', evidence_freshness_days: 1 },
+      { project_id: 'payments-relaunch', owner: 'octacon', enabled: true, phase: 'active', status: 'at_risk',
+        items: { done: 1, total: 5, blocked: 1, overdue: 0 },
+        next_milestone: null, last_activity: '2026-08-24T18:10:07+00:00', evidence_freshness_days: null },
+    ],
+    mix: { todo: 6, in_progress: 5, blocked: 1, done: 4 },
+    attention: { overdue_items: 0, blocked_items: 1, overdue_milestones: 0 },
+    evidence_files: 0,
+    groups: { decisions: [], interventions: [], informational: [] },
   },
   inbox: {
     count: 2,
@@ -271,7 +289,7 @@ function evaluatePlugin(source, host) {
   const imports = sourceImports(source);
   assert.deepEqual(
     [...new Set(imports)].sort(),
-    ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime', './workflow-canvas-mount.js', './workflow-canvas-css.js', './planning-canvas-geometry.js', './download.js'].sort(),
+    ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime', './workflow-canvas-mount.js', './workflow-canvas-css.js', './planning-canvas-geometry.js', './download.js', './lucide-icons.js'].sort(),
     `unsupported or missing imports: ${imports.join(', ')}`,
   );
   let stripped = source.replace(/^import\s.*$/gm, '');
@@ -282,6 +300,7 @@ const { useEffect, useRef, useState } = React;
 const mountDesktopWorkflowCanvas = __rt.mountDesktopWorkflowCanvas;
 const downloadTextFile = __rt.downloadTextFile;
 const reportDownloadFilename = __rt.reportDownloadFilename;
+const LUCIDE_ICON_NODES = __rt.LUCIDE_ICON_NODES;
 const workflowCanvasCss = __rt.workflowCanvasCss;
 const layoutConnectors = () => []; const layoutFrames = () => []; const gridSlot = (i) => ({ x: 60 + (i % 3) * 340, y: 60 + Math.floor(i / 3) * 220 }); const CANVAS_MIN_POS = { x: 18, y: 30 };
 `;
