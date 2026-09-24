@@ -2868,12 +2868,9 @@ function ConsoleBar({ tab, counts, onTab, onNewProject, projects = [], selectedP
   // P3: the project context is persistent in the shell, not repeated in each panel.
   const tabs = [
     ['dashboard', 'Dashboard', null],
-    ['project', 'Objectives', null],
-    ['delivery', 'Delivery', null],
-    ['work', 'Work', null],
+    ['project', 'Projects', null],
     ['backlog', 'Backlog', null],
     ['workflows', 'Workflows', null],
-    ['reports', 'Reports', null],
     ['inbox', 'Approval Inbox', counts.approvals],
     ['notifications', 'Notifications', counts.notifications],
     ['onboard', 'Onboard', null],
@@ -5758,6 +5755,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   // layout until it is cleared. Recall never invents rows client-side: the
   // item list comes from the stored query run through the backend.
   const [appliedView, setAppliedView] = useState(null)
+  const [draggedRef, setDraggedRef] = useState(null)
   const project = view.project
   // Tab-driven entry points (Objectives/Delivery/Work/Reports/Settings/
   // Workflows) focus the matching sub-view; manual sub-view clicks are free
@@ -5786,7 +5784,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Connect a project before opening the project dashboard.', icon: 'project' })
   const [healthTone, healthLabel] = healthDetails(project.health)
   const views = [
-    ['overview', 'Overview'], ['board', 'Board'], ['objectives', 'Objectives'], ['planning', 'Planning'], ['workflows', 'Workflows'], ['content', 'Content'], ['activity', 'Activity'], ['settings', 'Settings'], ['reports', 'Reports'],
+    ['overview', 'Overview'], ['board', 'Kanban'], ['objectives', 'Objectives'], ['planning', 'Planning'], ['workflows', 'Workflows'], ['content', 'Content'], ['activity', 'Activity'], ['reports', 'Reports'], ['settings', 'Settings'],
   ]
   const columns = [
     ['backlog', 'Backlog', ['backlog']],
@@ -5797,6 +5795,19 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
     ['other', 'Other states', null],
   ]
   const projectOptions = view.projects ?? []
+  const transitionStatus = async (ref, status) => {
+    if (!project || !ref || !status) return
+    try {
+      await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}/transition`, {
+        method: 'POST', body: { status, actor_id: 'sahil', actor_kind: 'human' },
+      })
+      setDraggedRef(null)
+      emitToast('success', `Work item moved to ${STATUS_LABELS[status] || status}.`)
+      onRefresh?.()
+    } catch (failure) {
+      emitToast('error', String(failure?.message ?? failure))
+    }
+  }
   let panel
   if (projectView === 'board') {
     const boardItems = appliedView ? (appliedView.items ?? []) : (view.workItems ?? [])
@@ -5832,11 +5843,14 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
                 ? boardItems.filter((item) => item.status !== 'archived' &&
                     !['backlog', 'in_progress', 'executing', 'active', 'in_review', 'review', 'blocked', 'done', 'complete', 'completed'].includes(item.status))
                 : boardItems.filter((item) => item.status !== 'archived' && statuses.includes(item.status))
-              return jsxs('section', { className: 'dockyard-board-column', 'data-board-column': key, children: [
+              return jsxs('section', { className: 'dockyard-board-column', 'data-board-column': key,
+                onDragOver: (event) => event.preventDefault(),
+                onDrop: () => { if (draggedRef && statuses?.[0]) transitionStatus(draggedRef, statuses[0]) }, children: [
                 jsxs('header', { children: [jsx('h3', { children: label }), jsx('span', { children: number(items.length) })] }),
                 jsx('div', { className: 'dockyard-board-cards', children:
                   items.length > 0
-                    ? items.map((item) => jsxs('button', { type: 'button', className: 'dockyard-work-card', 'data-work-card': item.ref, onClick: () => setSelectedWorkItem(item), children: [
+                    ? items.map((item) => jsxs('button', { type: 'button', className: 'dockyard-work-card', draggable: true, 'data-work-card': item.ref,
+                      onDragStart: () => setDraggedRef(item.ref), onClick: () => setSelectedWorkItem(item), children: [
                         jsx('span', { className: 'dockyard-work-type', children: item.type || 'task' }),
                         jsx('h4', { children: item.title }),
                         jsxs('footer', { children: [jsx('span', { children: item.ref }), jsx('span', { children: item.assignee || 'Unassigned' })] }),
@@ -8117,7 +8131,7 @@ function DashboardPage() {
   useDockyardStyles()
   const [tab, setTab] = useState('dashboard')
   const [selectedProject, setSelectedProject] = useState(null)
-  const [projectEntryView, setProjectEntryView] = useState('objectives')
+  const [projectEntryView, setProjectEntryView] = useState('overview')
   const [dashboardHomeVersion, setDashboardHomeVersion] = useState(0)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [toasts, setToasts] = useState([])
@@ -8374,7 +8388,7 @@ function DashboardPage() {
   return jsxs('div', { className: 'dockyard-root', children: [
     jsxs('div', { className: 'dockyard-shell', children: [
       jsx(ConsoleBar, { tab, counts, projects: payload?.projects ?? [], selectedProject, onProjectChange: selectProject,
-        onTab: (next) => { if (next === 'project') setProjectEntryView('objectives'); if (next === 'dashboard') setDashboardHomeVersion((value) => value + 1); setTab(next) },
+        onTab: (next) => { if (next === 'project') setProjectEntryView('overview'); if (next === 'dashboard') setDashboardHomeVersion((value) => value + 1); setTab(next) },
         onNewProject: () => setOnboardingOpen(true), onOpen: openDeepLink }),
       jsx('main', {
         id: 'dockyard-panel',
