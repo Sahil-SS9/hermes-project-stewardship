@@ -9,9 +9,10 @@ Enforces PRD rules that span domain + persistence:
 """
 from __future__ import annotations
 
-import json
-import csv
 import io
+import csv
+import json
+import math
 from datetime import date, datetime, timezone
 
 from typing import Dict, List, Optional
@@ -242,6 +243,16 @@ class DockyardService:
 
     CSV_COLUMNS = ("row_key", "type", "title", "parent_key", "labels",
                    "estimate_days", "due", "initiative_ref")
+    CSV_COLUMN_METADATA = (
+        {"name": "row_key", "required": True, "description": "Stable unique key for this import row.", "format": "text", "example": "release-1"},
+        {"name": "type", "required": True, "description": "Work item type.", "format": "epic|feature|task|bug|subtask|spike", "example": "task"},
+        {"name": "title", "required": True, "description": "Item title (at least 3 characters).", "format": "text", "example": "Verify release checklist"},
+        {"name": "parent_key", "required": False, "description": "row_key of a parent in this file.", "format": "text", "example": "release-epic"},
+        {"name": "labels", "required": False, "description": "Semicolon-separated labels.", "format": "label;label", "example": "release;qa"},
+        {"name": "estimate_days", "required": False, "description": "Non-negative delivery estimate.", "format": "number >= 0", "example": "2"},
+        {"name": "due", "required": False, "description": "Due date.", "format": "YYYY-MM-DD", "example": "2026-10-08"},
+        {"name": "initiative_ref", "required": False, "description": "Existing initiative ref; persisted on the canonical binding.", "format": "initiative ref", "example": "INIT-1"},
+    )
 
     def backlog_csv_template(self) -> str:
         return ",".join(self.CSV_COLUMNS) + "\n"
@@ -268,6 +279,20 @@ class DockyardService:
                 errors.append({"row": index, "field": "type", "error": "unsupported work type"})
             if len(title) < 3:
                 errors.append({"row": index, "field": "title", "error": "title must be at least 3 characters"})
+            estimate = str(row.get("estimate_days") or "").strip()
+            if estimate:
+                try:
+                    value = float(estimate)
+                    if not math.isfinite(value) or value < 0:
+                        raise ValueError
+                except (TypeError, ValueError):
+                    errors.append({"row": index, "field": "estimate_days", "error": "estimate_days must be a finite non-negative number"})
+            due = str(row.get("due") or "").strip()
+            if due:
+                try:
+                    date.fromisoformat(due)
+                except ValueError:
+                    errors.append({"row": index, "field": "due", "error": "due must be an ISO date (YYYY-MM-DD)"})
             parent = str(row.get("parent_key") or "").strip()
             if parent and parent not in {str(item.get("row_key") or "").strip() for item in rows}:
                 errors.append({"row": index, "field": "parent_key", "error": "parent_key is not in this import"})

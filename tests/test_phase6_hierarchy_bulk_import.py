@@ -56,6 +56,18 @@ def test_csv_preview_apply_retry_and_no_data_loss(store, enabled):
     assert len(dy.list(enabled)) == 3
 
 
+
+
+def test_csv_preview_rejects_values_that_would_fail_apply(store, enabled):
+    dy = DockyardService(store)
+    csv_text = ("row_key,type,title,estimate_days,due\n"
+                "bad-1,task,Valid title,nope,2026-99-99\n")
+    preview = dy.preview_csv_import(enabled, csv_text)
+    assert preview["valid"] is False
+    assert {error["field"] for error in preview["errors"]} == {"estimate_days", "due"}
+    assert dy.list(enabled) == []
+
+
 def test_csv_cycle_and_oversize_refused_before_write(store, enabled):
     dy = DockyardService(store)
     cycle = ("row_key,type,title,parent_key\n"

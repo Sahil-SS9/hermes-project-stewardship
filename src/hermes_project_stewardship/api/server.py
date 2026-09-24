@@ -1626,7 +1626,8 @@ def create_app(
 
     @router.get("/projects/{project_id}/backlog/import-template")
     def backlog_import_template(project_id: str):
-        return {"csv": dy.backlog_csv_template(), "columns": list(dy.CSV_COLUMNS)}
+        return {"csv": dy.backlog_csv_template(), "columns": list(dy.CSV_COLUMNS),
+                "column_metadata": list(dy.CSV_COLUMN_METADATA)}
 
     @router.post("/projects/{project_id}/backlog/import")
     def backlog_import(project_id: str, body: BacklogCsvImport):

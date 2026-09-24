@@ -2028,7 +2028,18 @@ const DOCKYARD_CSS = `
 .dockyard-root [data-bulk-import-layer] .dockyard-wizard-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .dockyard-root [data-bulk-import-layer] .dockyard-wizard-actions-left, .dockyard-root [data-bulk-import-layer] .dockyard-wizard-actions-right { display: inline-flex; gap: 9px; }
 +@media (max-width: 760px) { .dockyard-root [data-bulk-import-layer] .import-split { grid-template-columns: 1fr; } .dockyard-root [data-bulk-import-layer] .import-summary { grid-template-columns: 1fr 1fr; } }
-.dockyard-root [data-bulk-import-layer] :is(button,input,textarea,select):focus-visible,
+/* LANE-IMPORT */
+.dockyard-root [data-bulk-import-layer] .import-drop svg { width: 28px; height: 28px; }
+.dockyard-root [data-bulk-import-layer] .import-drop { min-height: 72px; display: grid; grid-template-columns: 32px 1fr; gap: 4px 10px; align-items: center; }
+.dockyard-root [data-bulk-import-layer] .import-drop small, .dockyard-root [data-bulk-import-layer] .import-drop input { grid-column: 2; }
+.dockyard-root [data-bulk-import-layer] .import-column-reference { margin: 12px 0; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface-subtle); }
+.dockyard-root [data-bulk-import-layer] .import-column-reference summary { cursor: pointer; padding: 10px 12px; font-weight: 700; }
+.dockyard-root [data-bulk-import-layer] .import-column-reference table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.dockyard-root [data-bulk-import-layer] .import-column-reference th, .dockyard-root [data-bulk-import-layer] .import-column-reference td { padding: 7px 9px; text-align: left; border-top: 1px solid var(--dy-border); vertical-align: top; }
+.dockyard-root [data-bulk-import-layer] .import-required, .dockyard-root [data-bulk-import-layer] .import-optional { display: inline-block; padding: 2px 6px; border-radius: 999px; font-weight: 700; white-space: nowrap; }
+.dockyard-root [data-bulk-import-layer] .import-required { color: var(--dy-accent); background: var(--dy-accent-bg); }
+.dockyard-root [data-bulk-import-layer] .import-optional { color: var(--dy-text-2); background: var(--dy-surface); }
+
 .dockyard-root [data-backlog-board] :is(button,input,select):focus-visible { outline: 2px solid var(--dy-accent-text); outline-offset: 2px; }
 .dockyard-root .dockyard-detail-modal { width: min(870px, 100%); padding: 0; }
 .dockyard-root .dockyard-detail-modal > .dockyard-modal-head { padding: 20px 24px 15px; border-bottom: 1px solid var(--dy-border); }
@@ -5947,6 +5958,7 @@ function BacklogView({ view, onRefresh }) {
   // warnings-only filter toggle.
   const [importSelected, setImportSelected] = useState(null)
   const [importWarningsOnly, setImportWarningsOnly] = useState(false)
+  const [importColumnMetadata, setImportColumnMetadata] = useState([])
   const [detailItem, setDetailItem] = useState(null)
   useEffect(() => {
     if (!importOpen) return undefined
@@ -5963,6 +5975,14 @@ function BacklogView({ view, onRefresh }) {
     document.addEventListener('keydown', onEscape)
     return () => document.removeEventListener('keydown', onEscape)
   }, [importOpen, importBusy])
+
+  useEffect(() => {
+    if (!importOpen) return undefined
+    api(`/projects/${encodeURIComponent(project.id)}/backlog/import-template`).then((template) => {
+      setImportColumnMetadata(Array.isArray(template?.column_metadata) ? template.column_metadata : [])
+    }).catch(() => setImportColumnMetadata([]))
+    return undefined
+  }, [importOpen, project.id])
 
   useEffect(() => {
     const onKey = (event) => {
@@ -6790,7 +6810,13 @@ function BacklogView({ view, onRefresh }) {
         jsxs('div', { className: 'dockyard-wizard-body', children: [
           jsxs('div', { className: importStep === 1 ? 'dockyard-wizard-step active' : 'dockyard-wizard-step', hidden: importStep !== 1, 'data-import-step': '1', children: [
             jsx('h3', { children: 'Add your source' }),
-            jsx('p', { children: 'Use the CSV template for supported columns: row_key, type, title, parent_key, labels, estimate_days, due and initiative_ref. Assignee is not imported.' }),
+            jsx('p', { children: 'Use the CSV template; required fields are marked below. Preview validates the same contract used by import.' }),
+            importColumnMetadata.length ? jsxs('details', { className: 'import-column-reference', open: true, children: [
+              jsx('summary', { children: 'Column reference' }),
+              jsxs('table', { children: [jsx('thead', { children: jsx('tr', { children: ['Column', 'Required', 'Description', 'Format / example'].map((heading) => jsx('th', { children: heading }, heading)) }) }),
+                jsx('tbody', { children: importColumnMetadata.map((column) => jsx('tr', { children: [jsx('td', { children: column.name }), jsx('td', { children: jsx('span', { className: column.required ? 'import-required' : 'import-optional', children: column.required ? 'Required' : 'Optional' }) }), jsx('td', { children: column.description }), jsx('td', { children: `${column.format} · ${column.example}` })] }, column.name)) }),
+              ] }),
+            ] }) : null,
             jsxs('div', { className: 'dockyard-tabs', role: 'tablist', children: [
               jsx('button', { type: 'button', role: 'tab', 'aria-selected': String(importMode === 'csv'), className: importMode === 'csv' ? 'active' : '', onClick: () => { setImportMode('csv'); setImportRows(null) }, children: 'CSV' }),
               jsx('button', { type: 'button', role: 'tab', 'aria-selected': String(importMode === 'json'), className: importMode === 'json' ? 'active' : '', onClick: () => { setImportMode('json'); setImportRows(null) }, children: 'JSON' }),
