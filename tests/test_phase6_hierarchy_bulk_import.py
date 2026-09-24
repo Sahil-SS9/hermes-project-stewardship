@@ -68,6 +68,24 @@ def test_csv_preview_rejects_values_that_would_fail_apply(store, enabled):
     assert dy.list(enabled) == []
 
 
+def test_csv_rejects_legacy_ignored_initiative_and_unknown_columns(store, enabled):
+    dy = DockyardService(store)
+    assert "initiative_ref" not in dy.CSV_COLUMNS
+    csv_text = ("row_key,type,title,initiative_ref\n"
+                "new,task,Valid title,INIT-1\n")
+    preview = dy.preview_csv_import(enabled, csv_text)
+    assert not preview["valid"]
+    assert any(error["field"] == "initiative_ref" for error in preview["errors"])
+    assert dy.import_csv(enabled, csv_text, actor=ACTOR)["imported"] == 0
+    assert dy.list(enabled) == []
+    try:
+        dy.preview_csv_import(enabled, "row_key,type,title,assignee\nnew,task,Valid title,quan\n")
+    except ValueError as error:
+        assert "unsupported columns: assignee" in str(error)
+    else:
+        raise AssertionError("silently ignored an unsupported column")
+
+
 def test_csv_cycle_and_oversize_refused_before_write(store, enabled):
     dy = DockyardService(store)
     cycle = ("row_key,type,title,parent_key\n"

@@ -423,6 +423,7 @@ class CanonicalWorkService:
         item_type: Any = _UNSET,
         body: Any = _UNSET,
         parent_ref: Any = _UNSET,
+        initiative_ref: Any = _UNSET,
         labels: Any = _UNSET,
         evidence_refs: Any = _UNSET,
         estimate_days: Any = _UNSET,
@@ -545,6 +546,45 @@ class CanonicalWorkService:
         if due is not _UNSET:
             planning["due"] = self._validate_due(due)
             changed_fields.append("due")
+        if initiative_ref is not _UNSET:
+            if initiative_ref is not None and not isinstance(initiative_ref, str):
+                raise ValueError("initiative_ref must be text or null")
+            initiative_ref = initiative_ref.strip() if initiative_ref else None
+            if initiative_ref:
+                try:
+                    initiative = self.stewardship.initiative_by_ref(initiative_ref)
+                except ServiceError as exc:
+                    raise ValueError(str(exc)) from exc
+                if initiative["project_id"] != project_id:
+                    raise ValueError("initiative belongs to another project")
+            changed_fields.append("initiative_ref")
+        audit_before = {
+            "title": current.get("title"),
+            "type": current.get("kind") or current.get("type"),
+            "body": current.get("body"),
+            "parent_ref": current.get("parent_ref") or current.get("parent_task_id") or current.get("parent_id"),
+            "initiative_ref": current.get("initiative_ref"),
+            "labels": list(current.get("labels") or []),
+            "evidence_refs": list(current.get("evidence_refs") or []),
+            "estimate_days": current.get("estimate_days"),
+            "due": current.get("due"),
+        }
+        audit_after = {
+            "title": changes.get("title", audit_before["title"]),
+            "type": new_kind,
+            "body": changes.get("body", audit_before["body"]),
+            "parent_ref": effective_parent,
+            "initiative_ref": audit_before["initiative_ref"] if initiative_ref is _UNSET else initiative_ref,
+            "labels": planning["labels"],
+            "evidence_refs": planning["evidence_refs"],
+            "estimate_days": planning["estimate_days"],
+            "due": planning["due"],
+        }
+        audit_changes = [
+            {"field": field, "from": audit_before[field], "to": audit_after[field]}
+            for field in dict.fromkeys(changed_fields)
+            if audit_before[field] != audit_after[field]
+        ]
         if not changed_fields:
             raise ValueError("at least one work-item field is required")
 
@@ -556,6 +596,8 @@ class CanonicalWorkService:
         )
         if new_kind != current["kind"]:
             self.metadata.rekey_kind(project_id, ref, current["kind"], new_kind)
+        if initiative_ref is not _UNSET:
+            self.metadata.set_initiative(project_id, new_kind, ref, initiative_ref)
         self.metadata.upsert_details(
             project_id,
             ref,
@@ -566,16 +608,20 @@ class CanonicalWorkService:
             actor=actor,
         )
         view = self._overlay_items(project_id, [self._view(updated)])[0]
-        audit_detail: dict[str, Any] = {"fields": changed_fields}
-        if audit_reason:
-            audit_detail["reason"] = audit_reason
-        self._audit(
-            project_id=project_id,
-            actor=actor,
-            action="workitem.updated",
-            subject=ref,
-            detail=audit_detail,
-        )
+        if audit_changes:
+            audit_detail: dict[str, Any] = {
+                "fields": [change["field"] for change in audit_changes],
+                "changes": audit_changes,
+            }
+            if audit_reason:
+                audit_detail["reason"] = audit_reason
+            self._audit(
+                project_id=project_id,
+                actor=actor,
+                action="workitem.updated",
+                subject=ref,
+                detail=audit_detail,
+            )
         return view
 
     def assign_item(
@@ -691,6 +737,9 @@ class CanonicalWorkService:
         project_id: str,
         *,
         title: str,
+        body: str | None = None,
+        labels: list[str] | None = None,
+        evidence_refs: list[str] | None = None,
         item_type: WorkItemType | str,
         creator: Actor,
         assignee: Actor,
@@ -709,6 +758,14 @@ class CanonicalWorkService:
             )
         if not title or len(title.strip()) < 3:
             raise ValueError("title must be at least 3 characters")
+        if body is not None and not isinstance(body, str):
+            raise ValueError("body must be text or null")
+        if labels is not None and (not isinstance(labels, list) or any(not isinstance(value, str) for value in labels)):
+            raise ValueError("labels must be a list of text values")
+        if evidence_refs is not None and (not isinstance(evidence_refs, list) or any(not isinstance(value, str) for value in evidence_refs)):
+            raise ValueError("evidence_refs must be a list of text values")
+        normalized_labels = [value.strip() for value in (labels or []) if value.strip()]
+        normalized_evidence = [value.strip() for value in (evidence_refs or []) if value.strip()]
         if rank < 1:
             raise ValueError("backlog rank must be at least 1")
         if len(reason.strip()) < 4:
@@ -749,7 +806,7 @@ class CanonicalWorkService:
             project_id,
             kind=kind,
             title=title.strip(),
-            body=None,
+            body=body.strip() if body else None,
             assignee=assignee.id,
             created_by=creator.id,
             parent_id=parent_ref,
@@ -772,8 +829,8 @@ class CanonicalWorkService:
             self.metadata.upsert_details(
                 project_id,
                 view["ref"],
-                labels=[],
-                evidence_refs=[],
+                labels=normalized_labels,
+                evidence_refs=normalized_evidence,
                 estimate_days=estimate_days,
                 due=due_value,
                 actor=creator,

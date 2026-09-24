@@ -98,6 +98,13 @@ class FakeCanonicalAdapter(KanbanAdapter):
             return dict(updated)
         raise ValueError("canonical work was not found")
 
+    def assign_work(self, project_id: str, kind: str, item_id: str, assignee: str | None):
+        for key, item in self.items.items():
+            if key[0] == project_id and key[2] == item_id:
+                item["assignee"] = assignee
+                return dict(item)
+        raise ValueError("canonical work was not found")
+
     def transition_work(
         self,
         project_id: str,
@@ -199,11 +206,19 @@ def test_api_work_and_backlog_routes_use_canonical_service_only(store, enabled):
             "assignee_kind": "bot",
             "rank": 1,
             "reason": "highest customer impact",
+            "body": "Collect receipts before review",
+            "labels": ["release", " qa "],
+            "evidence_refs": ["run-42"],
             "idempotency_key": "api:queue:1",
         },
     )
     assert queued.status_code == 200, queued.text
     assert queued.json()["ref"] == "t_2"
+    queued_detail = client.get(f"/stewardship/v1/projects/{enabled}/work-items/t_2")
+    assert queued_detail.status_code == 200, queued_detail.text
+    assert queued_detail.json()["work_item"]["body"] == "Collect receipts before review"
+    assert queued_detail.json()["work_item"]["labels"] == ["release", "qa"]
+    assert queued_detail.json()["work_item"]["evidence_refs"] == ["run-42"]
 
     backlog = client.get(f"/stewardship/v1/projects/{enabled}/backlog")
     assert backlog.status_code == 200
@@ -330,6 +345,51 @@ def test_create_queued_item_persists_parent_and_planning_fields(store, enabled):
     assert any(choice["ref"] == parent.json()["ref"] for choice in detail.json()["parent_choices"])
 
 
+def test_work_item_update_audit_records_from_to_values(store, enabled):
+    adapter = FakeCanonicalAdapter()
+    client = TestClient(create_app(store, kanban_adapter=adapter))
+    base = f"/stewardship/v1/projects/{enabled}"
+    created = client.post(
+        f"{base}/work-items",
+        json={"type": "task", "title": "Original title", "actor_id": "sahil", "actor_kind": "human"},
+    )
+    assert created.status_code == 200, created.text
+    ref = created.json()["ref"]
+    updated = client.patch(
+        f"{base}/work-items/{ref}",
+        json={
+            "title": "Revised title",
+            "body": "New acceptance criteria",
+            "labels": ["release", "verified"],
+            "actor_id": "sahil",
+            "actor_kind": "human",
+        },
+    )
+    assert updated.status_code == 200, updated.text
+    assigned = client.post(
+        f"{base}/work-items/{ref}/assign",
+        json={"assignee_id": "quan-bot", "actor_id": "sahil", "actor_kind": "human"},
+    )
+    assert assigned.status_code == 200, assigned.text
+    transitioned = client.post(
+        f"{base}/work-items/{ref}/transition",
+        json={"status": "in_progress", "actor_id": "sahil", "actor_kind": "human"},
+    )
+    assert transitioned.status_code == 200, transitioned.text
+    history = client.get(f"{base}/work-items/{ref}").json()["history"]
+    event = next(row for row in history if row["action"] == "workitem.updated")
+    assert event["detail"]["changes"] == [
+        {"field": "title", "from": "Original title", "to": "Revised title"},
+        {"field": "body", "from": None, "to": "New acceptance criteria"},
+        {"field": "labels", "from": [], "to": ["release", "verified"]},
+    ]
+    assigned_event = next(row for row in history if row["action"] == "workitem.assigned")
+    assert assigned_event["detail"] == {"from": "sahil", "to": "quan-bot", "project_id": enabled}
+    status_event = next(row for row in history if row["action"] == "workitem.transition")
+    assert status_event["detail"]["from"] == "backlog"
+    assert status_event["detail"]["to"] == "in_progress"
+
+
 def test_reparent_requires_and_records_reason(store, enabled):
     adapter = FakeCanonicalAdapter()
     client = TestClient(create_app(store, kanban_adapter=adapter))
@@ -360,3 +420,56 @@ def test_reparent_requires_and_records_reason(store, enabled):
     changed = next(row for row in history if row["action"] == "workitem.updated")
     assert changed["detail"]["reason"] == "grouped for release"
     assert changed["detail"]["fields"] == ["parent_ref"]
+
+
+def test_edit_initiative_link_validates_project_and_can_unlink(store, enabled):
+    adapter = FakeCanonicalAdapter()
+    app = create_app(store, kanban_adapter=adapter)
+    client = TestClient(app)
+    initiative = app.state.canonical_work_service.stewardship.propose_initiative(
+        enabled, title="Release evidence", rationale="Track verified release receipts",
+    )
+    base = f"/stewardship/v1/projects/{enabled}"
+    created = client.post(f"{base}/backlog/items", json={
+        "type": "task", "title": "Collect evidence", "creator_id": "sahil",
+        "assignee_id": "quan-bot", "rank": 1, "reason": "Release gate",
+    })
+    assert created.status_code == 200, created.text
+    ref = created.json()["ref"]
+    route = f"{base}/work-items/{ref}"
+    linked = client.patch(route, json={"initiative_ref": initiative["ref"], "actor_id": "sahil"})
+    assert linked.status_code == 200, linked.text
+    assert client.get(route).json()["work_item"]["initiative_ref"] == initiative["ref"]
+    bad = client.patch(route, json={"initiative_ref": "UNKNOWN-REF", "actor_id": "sahil"})
+    assert bad.status_code in (400, 404, 409, 422)
+    assert client.get(route).json()["work_item"]["initiative_ref"] == initiative["ref"]
+    unlinked = client.patch(route, json={"initiative_ref": None, "actor_id": "sahil"})
+    assert unlinked.status_code == 200, unlinked.text
+    assert client.get(route).json()["work_item"]["initiative_ref"] is None
+
+
+def test_backlog_import_api_previews_then_writes_to_canonical_store(store, enabled):
+    adapter = FakeCanonicalAdapter()
+    client = TestClient(create_app(store, kanban_adapter=adapter))
+    base = f"/stewardship/v1/projects/{enabled}"
+    template = client.get(f"{base}/backlog/import-template")
+    assert template.status_code == 200, template.text
+    assert template.json()["columns"] == ["row_key", "type", "title", "parent_key", "labels", "estimate_days", "due"]
+    assert [entry["name"] for entry in template.json()["column_metadata"]] == template.json()["columns"]
+    csv_text = "row_key,type,title,estimate_days,due\nrelease-1,task,Verify release checklist,2,2026-10-08\n"
+    preview = client.post(f"{base}/backlog/import", json={"csv_text": csv_text, "apply": False})
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["preview"]["valid"] is True
+    assert adapter.items == {}
+    applied = client.post(f"{base}/backlog/import", json={"csv_text": csv_text, "apply": True, "actor_id": "sahil", "actor_kind": "human"})
+    assert applied.status_code == 200, applied.text
+    assert applied.json()["imported"] == 1
+    ref = applied.json()["items"][0]["ref"]
+    detail = client.get(f"{base}/work-items/{ref}")
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["work_item"]["estimate_days"] == 2
+    assert detail.json()["work_item"]["due"] == "2026-10-08"
+    invalid = client.post(f"{base}/backlog/import", json={"csv_text": "row_key,type,title,estimate_days\nbad,task,Valid name,abc\n", "apply": True, "actor_id": "sahil", "actor_kind": "human"})
+    assert invalid.status_code == 200, invalid.text
+    assert invalid.json()["imported"] == 0
+    assert len(adapter.items) == 1

@@ -66,6 +66,17 @@ class CanonicalWorkMetadataStore:
                 actor=actor,
             )
 
+    def set_initiative(self, project_id: str, item_kind: str, item_id: str, initiative_ref: str | None) -> None:
+        """Update only an existing, project-scoped binding (including unlink)."""
+        with self.store.tx() as cx:
+            changed = cx.execute(
+                "UPDATE dockyard_canonical_work_bindings SET initiative_ref=? "
+                "WHERE project_id=? AND item_kind=? AND item_id=?",
+                (initiative_ref, project_id, item_kind, item_id),
+            )
+            if changed.rowcount != 1:
+                raise ValueError("no canonical work binding for this project and item")
+
     @staticmethod
     def _temporary_offset(cx, project_id: str) -> int:
         row = cx.execute(

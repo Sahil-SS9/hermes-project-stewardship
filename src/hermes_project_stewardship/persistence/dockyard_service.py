@@ -242,7 +242,7 @@ class DockyardService:
     # ------------------------------------------------------------------ #
 
     CSV_COLUMNS = ("row_key", "type", "title", "parent_key", "labels",
-                   "estimate_days", "due", "initiative_ref")
+                   "estimate_days", "due")
     CSV_COLUMN_METADATA = (
         {"name": "row_key", "required": True, "description": "Stable unique key for this import row.", "format": "text", "example": "release-1"},
         {"name": "type", "required": True, "description": "Work item type.", "format": "epic|feature|task|bug|subtask|spike", "example": "task"},
@@ -251,7 +251,6 @@ class DockyardService:
         {"name": "labels", "required": False, "description": "Semicolon-separated labels.", "format": "label;label", "example": "release;qa"},
         {"name": "estimate_days", "required": False, "description": "Non-negative delivery estimate.", "format": "number >= 0", "example": "2"},
         {"name": "due", "required": False, "description": "Due date.", "format": "YYYY-MM-DD", "example": "2026-10-08"},
-        {"name": "initiative_ref", "required": False, "description": "Existing initiative ref; persisted on the canonical binding.", "format": "initiative ref", "example": "INIT-1"},
     )
 
     def backlog_csv_template(self) -> str:
@@ -265,6 +264,10 @@ class DockyardService:
                    if column not in (reader.fieldnames or [])]
         if missing:
             raise ValueError("CSV is missing required columns: " + ", ".join(missing))
+        unknown = [column for column in (reader.fieldnames or [])
+                   if column not in self.CSV_COLUMNS and column != "initiative_ref"]
+        if unknown:
+            raise ValueError("CSV has unsupported columns: " + ", ".join(unknown))
         rows = list(reader)
         seen: set[str] = set()
         errors: list[dict] = []
@@ -279,6 +282,10 @@ class DockyardService:
                 errors.append({"row": index, "field": "type", "error": "unsupported work type"})
             if len(title) < 3:
                 errors.append({"row": index, "field": "title", "error": "title must be at least 3 characters"})
+            # Older templates offered initiative_ref but the canonical importer
+            # never persisted it. Reject rather than silently dropping data.
+            if str(row.get("initiative_ref") or "").strip():
+                errors.append({"row": index, "field": "initiative_ref", "error": "initiative_ref is not supported by bulk import; link the item after import"})
             estimate = str(row.get("estimate_days") or "").strip()
             if estimate:
                 try:

@@ -335,6 +335,7 @@ class WorkItemUpdate(BaseModel):
     type: Optional[str] = None
     body: Optional[str] = None
     parent_ref: Optional[str] = None
+    initiative_ref: Optional[str] = None
     labels: Optional[List[str]] = None
     evidence_refs: Optional[List[str]] = None
     estimate_days: Optional[float] = None
@@ -375,6 +376,9 @@ class BacklogAdd(BaseModel):
 class QueuedWorkItemCreate(BaseModel):
     type: str
     title: str
+    body: Optional[str] = None
+    labels: List[str] = []
+    evidence_refs: List[str] = []
     creator_id: str
     creator_kind: str = "human"
     assignee_id: str
@@ -1647,6 +1651,9 @@ def create_app(
             item, entry = work.create_queued_item(
                 project_id,
                 title=body.title,
+                body=body.body,
+                labels=body.labels,
+                evidence_refs=body.evidence_refs,
                 item_type=body.type,
                 creator=_actor(body.creator_id, body.creator_kind),
                 assignee=_target_actor(body.assignee_id, body.assignee_kind),
