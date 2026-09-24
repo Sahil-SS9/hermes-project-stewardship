@@ -13,7 +13,7 @@ import { mkdirSync } from 'node:fs'
 const require = createRequire(fileURLToPath(new URL('../dashboard/package.json', import.meta.url)))
 const { chromium } = require('playwright')
 const BASE = process.env.STEWARD_DESKTOP_URL || 'http://127.0.0.1:19500/desktop'
-const SHOTS = '/tmp/hps-phase7'
+const SHOTS = `${process.env.TMPDIR}/hps-phase7`
 mkdirSync(SHOTS, { recursive: true })
 
 test('Phase 7 rendered settings + onboarding journeys with real data', { timeout: 180000 }, async () => {
@@ -24,7 +24,9 @@ test('Phase 7 rendered settings + onboarding journeys with real data', { timeout
   const project = 'payments-relaunch'
   try {
     await page.goto(BASE, { waitUntil: 'networkidle' })
-    await page.locator('select[aria-label="Project context"]').selectOption(project)
+    await page.getByRole('button', {name: 'Project context', exact: true}).click()
+    await page.getByRole('combobox', {name: 'Find project'}).fill(project)
+    await page.getByRole('listbox', {name: 'Projects'}).getByRole('option', {name: project, exact: true}).click()
     await page.waitForTimeout(1200)
 
     // --- Settings: grouped sections with real membership/work data.

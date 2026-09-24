@@ -267,7 +267,7 @@ const DOCKYARD_CSS = `
   letter-spacing: -0.01em;
 }
 .dockyard-root .dockyard-brand-copy span { color: var(--dy-text-3); font-size: 11px; }
-.dockyard-root .dockyard-tabs {
+.dockyard-root .dockyard-tabs { flex-wrap: wrap;
   display: flex;
   flex: 1 1 auto;
   flex-wrap: wrap;
@@ -675,7 +675,7 @@ const DOCKYARD_CSS = `
 }
 @container dockyard (max-width: 640px) {
   .dockyard-root .dockyard-consolebar { flex-direction: column; }
-  .dockyard-root .dockyard-tabs { width: 100%; }
+  .dockyard-root .dockyard-tabs { flex-wrap: wrap; width: 100%; }
   .dockyard-root .dockyard-page-head { flex-direction: column; }
 }
 /* Reference-benchmark composition: action card, metric strip, split content and evidence cards. */
@@ -796,7 +796,7 @@ const DOCKYARD_CSS = `
 .dockyard-root .dockyard-work-legend .active i { background: var(--dy-action); }
 .dockyard-root .dockyard-work-legend .done i { background: var(--dy-success); }
 .dockyard-root .dockyard-project-toolbar {
-  display: flex;
+  display: flex; flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   margin-bottom: 18px;
@@ -1012,6 +1012,10 @@ const DOCKYARD_CSS = `
 .dockyard-root .tree-menu-static { display: flex; justify-content: space-between; padding: 7px 9px; color: var(--dy-text-3); font-size: 11px; }
 .dockyard-root .tree-menu-static strong { color: var(--dy-text-2); font-weight: 650; }
 .dockyard-root .tree-menu-rank-actions, .dockyard-root .tree-menu-status-actions { margin-top: 4px; padding-top: 3px; border-top: 1px solid var(--dy-border); }
+@media (max-width: 760px) {
+  .dockyard-root .th-who, .dockyard-root .tree-who { display: none !important; }
+  .dockyard-root .th-title, .dockyard-root .tree-title { min-width: 220px; }
+}
 @media (max-width: 1180px) {
   .dockyard-root .th-rank, .dockyard-root .tree-rank,
   .dockyard-root .th-estimate, .dockyard-root .tree-estimate,
@@ -1665,7 +1669,7 @@ const DOCKYARD_CSS = `
     padding: 10px 16px;
   }
   .dockyard-root .dockyard-brand { grid-column: 1; grid-row: 1; }
-  .dockyard-root .dockyard-tabs { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+  .dockyard-root .dockyard-tabs { flex-wrap: wrap; grid-column: 1 / -1; grid-row: 2; width: 100%; }
   .dockyard-root .dockyard-tab { padding-right: 8px; padding-left: 8px; }
   .dockyard-root .dockyard-console-action { grid-column: 3; grid-row: 1; width: 38px; padding: 6px; justify-content: center; }
   .dockyard-root .dockyard-brand-copy { display: none; }
@@ -1861,7 +1865,7 @@ const DOCKYARD_CSS = `
 .dockyard-root .dockyard-fleet-search { grid-area: search; position: relative; min-width: 0; max-width: 440px; justify-self: center; width: 100%; }
 .dockyard-root .dockyard-project-switcher { grid-area: project; }
 .dockyard-root .dockyard-console-action { grid-area: action; }
-.dockyard-root .dockyard-tabs { grid-area: tabs; flex-wrap: nowrap; overflow-x: auto; width: 100%; background: transparent; border-top: 1px solid var(--dy-border); border-radius: 0; padding: 7px 0 0; }
+.dockyard-root .dockyard-tabs { flex-wrap: wrap; grid-area: tabs; overflow-x: auto; width: 100%; background: transparent; border-top: 1px solid var(--dy-border); border-radius: 0; padding: 7px 0 0; }
 .dockyard-root .dockyard-tab[aria-selected='true'] { background: transparent; box-shadow: none; color: var(--dy-accent-text); }
 .dockyard-root .dockyard-fleet-search input { width: 100%; min-height: 38px; padding: 7px 48px 7px 13px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text); font: inherit; font-size: 12px; }
 .dockyard-root .dockyard-fleet-search input:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
@@ -2864,6 +2868,30 @@ function FleetSearch({ onOpen }) {
   ]})
 }
 
+function ProjectPicker({ projects, selectedProject, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [active, setActive] = useState(0)
+  const trigger = useRef(null)
+  const results = projects.filter((p) => `${p.name || ''} ${p.id}`.toLowerCase().includes(query.toLowerCase()))
+  const selected = projects.find((p) => p.id === selectedProject)
+  const close = () => { setOpen(false); trigger.current?.focus() }
+  const choose = (p) => { if (p) onChange(p.id); close() }
+  return jsxs('div', { className: 'dockyard-project-switcher', style: { position: 'relative' }, onBlur: (e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false) }, children: [
+    jsx('button', { ref: trigger, type: 'button', className: 'dockyard-button', 'aria-label': 'Project context', 'aria-haspopup': 'listbox', 'aria-expanded': open, onClick: () => { setOpen(!open); setQuery(''); setActive(0) }, children: selected?.name || selectedProject || 'Choose project' }),
+    open ? jsxs('div', { className: 'dockyard-feature-card', style: { position: 'absolute', zIndex: 100, top: '100%', right: 0, width: 'min(320px, 85vw)' }, children: [
+      jsx('input', { autoFocus: true, role: 'combobox', 'aria-label': 'Find project', 'aria-expanded': true, 'aria-controls': 'dockyard-project-options', 'aria-autocomplete': 'list', 'aria-activedescendant': results[active] ? `dockyard-project-option-${active}` : undefined, value: query,
+        onChange: (e) => { setQuery(e.target.value); setActive(0) }, onKeyDown: (e) => {
+          if (e.key === 'Escape') { e.preventDefault(); close() }
+          if (e.key === 'Enter') { e.preventDefault(); choose(results[active]) }
+          if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) { e.preventDefault(); setActive(e.key === 'Home' ? 0 : e.key === 'End' ? Math.max(0, results.length - 1) : Math.max(0, Math.min(results.length - 1, active + (e.key === 'ArrowDown' ? 1 : -1)))) }
+        } }),
+      jsx('div', { role: 'listbox', id: 'dockyard-project-options', 'aria-label': 'Projects', style: { maxHeight: 260, overflowY: 'auto' }, children: results.map((p, i) => jsx('button', { type: 'button', role: 'option', id: `dockyard-project-option-${i}`, 'aria-selected': p.id === selectedProject, className: `dockyard-button ${i === active ? 'primary' : ''}`, style: { display: 'block', width: '100%' }, onMouseDown: (e) => e.preventDefault(), onClick: () => choose(p), children: p.name || p.id }, p.id)) }),
+      results.length ? null : jsx('p', { role: 'status', children: 'No matching projects' }),
+    ]}) : null,
+  ]})
+}
+
 function ConsoleBar({ tab, counts, onTab, onNewProject, projects = [], selectedProject, onProjectChange, onOpen }) {
   // P3: the project context is persistent in the shell, not repeated in each panel.
   const tabs = [
@@ -2897,15 +2925,7 @@ function ConsoleBar({ tab, counts, onTab, onNewProject, projects = [], selectedP
       ]}),
     ]}),
     jsx(FleetSearch, { onOpen }),
-    projects.length > 0 ? jsxs('label', { className: 'dockyard-project-switcher', children: [
-      jsx('span', { className: 'dockyard-sr-only', children: 'Project context' }),
-      jsx('select', {
-        'aria-label': 'Project context',
-        value: selectedProject ?? '',
-        onChange: (event) => onProjectChange?.(event.target.value || null),
-        children: projects.map((project) => jsx('option', { value: project.id, children: project.name || project.id }, project.id)),
-      }),
-    ]}) : null,
+    projects.length > 0 ? jsx(ProjectPicker, { projects, selectedProject, onChange: onProjectChange }) : null,
     jsx('nav', { className: 'dockyard-tabs', role: 'tablist', 'aria-label': 'Dockyard sections', children:
       tabs.map(([key, label, count], index) => jsxs('button', {
         id: `dockyard-tab-${key}`,
@@ -3436,7 +3456,10 @@ function FleetGroups({ groups, onOpen }) {
 }
 
 function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
-  const projects = view.portfolio?.projects ?? []
+  // Attention-first ordering: at-risk/stalled projects outrank healthy ones.
+  const STATUS_PRIORITY = { at_risk: 0, stalled: 1, on_track: 2, idle: 3 }
+  const projects = [...(view.portfolio?.projects ?? [])].sort((left, right) =>
+    (STATUS_PRIORITY[left.status] ?? 2) - (STATUS_PRIORITY[right.status] ?? 2))
   const decisions = view.groups?.decisions ?? []
   const interventions = view.groups?.interventions ?? []
   const rows = [...decisions, ...interventions].sort((a, b) => (b.age_days ?? 0) - (a.age_days ?? 0))
@@ -3472,18 +3495,17 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
     const total = Number(project.items?.total ?? 0)
     const done = Number(project.items?.done ?? 0)
     const status = statusName[project.status] ?? readableLabel(project.status, 'Unknown')
-    return jsxs('button', { type: 'button', className: 'dockyard-command-row dockyard-command-project-row',
-      'data-project-row': project.project_id,
-      onClick: () => onOpen?.(`s1:project/${project.project_id}`), children: [
-        jsx('strong', { children: project.project_id }),
-        jsx('span', { children: project.owner || 'Not assigned' }),
-        jsx('span', { className: `dockyard-command-health ${project.status}`, children: status }),
-        jsxs('span', { className: 'dockyard-command-progress', children: [
+    return jsxs('div', { role: 'row', className: 'dockyard-command-row dockyard-command-project-row',
+      'data-project-row': project.project_id, children: [
+        jsx('span', { role: 'cell', children: jsx('button', { type: 'button', className: 'dockyard-button small', onClick: () => onOpen?.(`s1:project/${project.project_id}`), children: project.project_id }) }),
+        jsx('span', { role: 'cell', children: project.owner || 'Not assigned' }),
+        jsx('span', { role: 'cell', className: `dockyard-command-health ${project.status}`, children: status }),
+        jsxs('span', { role: 'cell', className: 'dockyard-command-progress', children: [
           jsx('span', { children: total ? `${number(done)} / ${number(total)} work items` : 'No work items' }),
           jsx('span', { className: 'dockyard-command-progress-track', children: jsx('span', { style: { width: `${total ? Math.round((done / total) * 100) : 0}%` } }) }),
         ] }),
-        jsx('span', { children: project.next_milestone ? `${project.next_milestone.name} · ${project.next_milestone.due || 'No due date'}` : 'Not scheduled' }),
-        jsx('span', { children: (project.items?.blocked || project.items?.overdue) ? `${number(project.items.blocked || 0)} blocked · ${number(project.items.overdue || 0)} overdue` : 'No open blockers' }),
+        jsx('span', { role: 'cell', children: project.next_milestone ? `${project.next_milestone.name} · ${project.next_milestone.due || 'No due date'}` : 'Not scheduled' }),
+        jsx('span', { role: 'cell', children: (project.items?.blocked || project.items?.overdue) ? `${number(project.items.blocked || 0)} blocked · ${number(project.items.overdue || 0)} overdue` : 'No open blockers' }),
       ]}, project.project_id)
   }
   const empty = projects.length === 0
@@ -3501,9 +3523,9 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
           value: directoryQuery, onChange: (event) => setDirectoryQuery(event.target.value),
           placeholder: 'Filter by project, owner or status', 'aria-label': 'Filter projects' }),
       ] }),
-      jsxs('section', { className: 'dockyard-command-section dockyard-command-directory-list', children: [
-        jsx('div', { className: 'dockyard-command-row dockyard-command-project-head', children:
-          ['Project', 'Owner', 'Health', 'Progress', 'Next milestone', 'Delivery risk'].map((label) => jsx('span', { children: label }, label)) }),
+      jsxs('section', { className: 'dockyard-command-section dockyard-command-directory-list', role: 'table', 'aria-label': 'Project fleet', children: [
+        jsx('div', { className: 'dockyard-command-row dockyard-command-project-head', role: 'row', children:
+          ['Project', 'Owner', 'Health', 'Progress', 'Next milestone', 'Delivery risk'].map((label) => jsx('span', { role: 'columnheader', children: label }, label)) }),
         filtered.length ? filtered.map(renderProjectRow) : jsx('p', { className: 'dockyard-command-empty', children: 'No projects match this filter.' }),
       ] }),
     ] })
@@ -3551,6 +3573,7 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
         jsx('p', { children: 'Stewardship at a glance. Evidence over assumptions.' })] }),
       jsxs('div', { className: 'dockyard-command-head-actions', children: [
         jsx(Button, { action: 'refresh', onClick: onRefresh, children: 'Refresh' }),
+        jsx(Button, { action: 'open-bot-teams', onClick: () => onOpen?.('s5:teams'), children: 'Bot teams' }),
         waiting > 0 ? jsx(Button, { variant: 'primary', onClick: onInbox, children: `Review ${number(waiting)} ${plural(waiting, 'decision')}` }) : null,
       ]}),
     ]}),
@@ -3603,9 +3626,9 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
               jsxs('div', { children: [jsxs('h2', { children: [jsx(Icon, { name: 'folder-kanban' }), 'Project health'] }), jsx('p', { children: `Portfolio status across ${number(projects.length)} ${plural(projects.length, 'project')}.` })] }),
               jsx(Button, { small: true, onClick: () => setSubview('projects'), children: 'View all projects' }),
             ]}),
-            jsxs('div', { className: 'dockyard-command-table-wrap', children: [
+            jsxs('div', { className: 'dockyard-command-table-wrap', role: 'table', 'aria-label': 'Project fleet', children: [
               jsxs('div', { className: 'dockyard-command-row dockyard-command-project-head', role: 'row', children: [
-                jsx('span', { children: 'Project' }), jsx('span', { children: 'Owner' }), jsx('span', { children: 'Health' }), jsx('span', { children: 'Progress' }), jsx('span', { children: 'Next milestone' }), jsx('span', { children: 'Delivery risk' }),
+                ...['Project', 'Owner', 'Health', 'Progress', 'Next milestone', 'Delivery risk'].map(label => jsx('span', { role: 'columnheader', children: label }, label)),
               ]}),
               projects.map(renderProjectRow),
             ]}),
@@ -4181,8 +4204,10 @@ function WorkItemDetail({ item, projectId, profiles, initiatives = [], onClose, 
     if (draft.title !== base.title) changes.title = draft.title
     if (draft.type !== base.type) changes.type = draft.type
     if (draft.body !== base.body) changes.body = draft.body || null
-    changes.actor_id = 'sahil'
-    changes.actor_kind = 'human'
+    // Actor identity rides only with a real field change: adding actor fields
+    // unconditionally made the PATCH fire even for assign-only edits, which
+    // aborts the save sequence before the /assign branch runs.
+    const hasFieldChanges = () => Object.keys(changes).length > 0
     if (draft.labels !== base.labels) {
       changes.labels = draft.labels.split(',').map((v) => v.trim()).filter(Boolean)
     }
@@ -4201,10 +4226,10 @@ function WorkItemDetail({ item, projectId, profiles, initiatives = [], onClose, 
       changes.evidence_refs = draft.evidence_refs.split(',').map((v) => v.trim()).filter(Boolean)
     }
     try {
-      if (Object.keys(changes).length > 0) {
+      if (hasFieldChanges()) {
         await api(`/projects/${encodeURIComponent(projectIdResolved)}/work-items/${encodeURIComponent(item.ref)}`, {
           method: 'PATCH',
-          body: changes,
+          body: { ...changes, actor_id: 'sahil', actor_kind: 'human' },
         })
       }
       if ((draft.assignee ?? '') !== (base.assignee ?? '')) {
@@ -5756,6 +5781,8 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   // item list comes from the stored query run through the backend.
   const [appliedView, setAppliedView] = useState(null)
   const [draggedRef, setDraggedRef] = useState(null)
+  const [moving, setMoving] = useState(false)
+  const moveLock = useRef(false)
   const project = view.project
   // Tab-driven entry points (Objectives/Delivery/Work/Reports/Settings/
   // Workflows) focus the matching sub-view; manual sub-view clicks are free
@@ -5784,7 +5811,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Connect a project before opening the project dashboard.', icon: 'project' })
   const [healthTone, healthLabel] = healthDetails(project.health)
   const views = [
-    ['overview', 'Overview'], ['board', 'Kanban'], ['objectives', 'Objectives'], ['planning', 'Planning'], ['workflows', 'Workflows'], ['content', 'Content'], ['activity', 'Activity'], ['reports', 'Reports'], ['settings', 'Settings'],
+    ['overview', 'Overview'], ['board', 'Kanban'], ['objectives', 'Objectives'], ['planning', 'Planning'], ['workflows', 'Workflows'], ['content', 'Content'], ['activity', 'Activity'], ['initiative', 'Initiatives'], ['reports', 'Reports'], ['settings', 'Settings'],
   ]
   const columns = [
     ['backlog', 'Backlog', ['backlog']],
@@ -5796,16 +5823,30 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   ]
   const projectOptions = view.projects ?? []
   const transitionStatus = async (ref, status) => {
-    if (!project || !ref || !status) return
+    if (!project || !ref || !status || moveLock.current || !(view.workItems ?? []).some(item => item.ref === ref)) return
+    moveLock.current = true
+    setMoving(true)
+    setDraggedRef(null)
+    setWorkNotice(null)
     try {
+      // The plugin proxy supplies configured DOCKYARD_ACTOR_ID attribution.
       await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}/transition`, {
-        method: 'POST', body: { status, actor_id: 'sahil', actor_kind: 'human' },
+        method: 'POST', body: { status },
       })
-      setDraggedRef(null)
-      emitToast('success', `Work item moved to ${STATUS_LABELS[status] || status}.`)
+      const readback = await api(`/projects/${encodeURIComponent(project.id)}/work-items`)
+      if (!(readback.work_items ?? []).some(item => item.ref === ref && item.status === status)) throw new Error('Canonical readback did not confirm the requested status')
+      if (appliedView) {
+        const result = await api(`/projects/${encodeURIComponent(project.id)}/views/${encodeURIComponent(appliedView.name)}/items`)
+        setAppliedView(current => current?.name === appliedView.name ? { ...current, items: result.items ?? [] } : current)
+      }
       onRefresh?.()
+      emitToast('success', `Work item moved to ${status.replaceAll('_', ' ')}.`)
     } catch (failure) {
-      emitToast('error', String(failure?.message ?? failure))
+      setWorkNotice(`Could not complete move or refresh: ${String(failure?.message ?? failure)}. Refresh to confirm the canonical state before retrying.`)
+      onRefresh?.()
+    } finally {
+      moveLock.current = false
+      setMoving(false)
     }
   }
   let panel
@@ -5817,9 +5858,9 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
         jsx(Icon, { name: 'eye' }),
         jsx('span', { children: `Showing saved view "${appliedView.name}" (${readableLabel(layout, 'Board')} layout${layout === 'timeline' ? ' — timeline is not available on Desktop, showing board' : ''}). ${number(boardItems.length)} matching ${plural(boardItems.length, 'item')}.` }),
         jsx('button', { type: 'button', className: 'dockyard-button small', 'data-action': 'clear-applied-view', onClick: () => setAppliedView(null), children: 'Clear view' }),
-      ]}) : jsxs('div', { className: 'dockyard-view-only-note', 'data-view-only': 'board', children: [
+      ]}) : jsxs('div', { className: 'dockyard-view-only-note', 'data-kanban-help': true, children: [
         jsx(Icon, { name: 'eye' }),
-        jsx('span', { children: 'View only. Open an item to inspect its details; changes are made in the canonical work system.' }),
+        jsx('span', { children: 'Drag an item to move it, or use its Move menu. The canonical work system validates every transition.' }),
       ]}),
       layout === 'table'
         ? jsxs('section', { className: 'dockyard-feature-card', children: [
@@ -5844,13 +5885,15 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
                     !['backlog', 'in_progress', 'executing', 'active', 'in_review', 'review', 'blocked', 'done', 'complete', 'completed'].includes(item.status))
                 : boardItems.filter((item) => item.status !== 'archived' && statuses.includes(item.status))
               return jsxs('section', { className: 'dockyard-board-column', 'data-board-column': key,
-                onDragOver: (event) => event.preventDefault(),
-                onDrop: () => { if (draggedRef && statuses?.[0]) transitionStatus(draggedRef, statuses[0]) }, children: [
+                onDragOver: (event) => { if (draggedRef?.project === project.id && !moving && statuses) event.preventDefault() },
+                onDrop: (event) => { event.preventDefault(); if (draggedRef?.project === project.id && statuses?.[0]) transitionStatus(draggedRef.ref, statuses[0]); setDraggedRef(null) }, children: [
                 jsxs('header', { children: [jsx('h3', { children: label }), jsx('span', { children: number(items.length) })] }),
                 jsx('div', { className: 'dockyard-board-cards', children:
                   items.length > 0
-                    ? items.map((item) => jsxs('button', { type: 'button', className: 'dockyard-work-card', draggable: true, 'data-work-card': item.ref,
-                      onDragStart: () => setDraggedRef(item.ref), onClick: () => setSelectedWorkItem(item), children: [
+                    ? items.map((item) => jsxs('article', { className: 'dockyard-work-card', draggable: !moving, 'data-work-card': item.ref,
+                      onDragStart: (event) => { event.dataTransfer.setData('text/plain', item.ref); setDraggedRef({ ref: item.ref, project: project.id }) }, onDragEnd: () => setDraggedRef(null), children: [
+                        jsx('button', { type: 'button', className: 'dockyard-button small', onClick: () => setSelectedWorkItem(item), children: 'Open details' }),
+                        jsx('select', { 'aria-label': `Move ${item.ref}`, disabled: moving, value: '', onChange: (event) => transitionStatus(item.ref, event.target.value), children: [jsx('option', { value: '', children: 'Move to…' }), ...columns.filter(([, , states]) => states).map(([, label, states]) => jsx('option', { value: states[0], children: label }, states[0]))] }),
                         jsx('span', { className: 'dockyard-work-type', children: item.type || 'task' }),
                         jsx('h4', { children: item.title }),
                         jsxs('footer', { children: [jsx('span', { children: item.ref }), jsx('span', { children: item.assignee || 'Unassigned' })] }),
@@ -5860,15 +5903,18 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
               ]}, key)
             }),
           }),
-      savedViewsMode ? jsx(SavedViewsSection, {
+      jsx(PlanningPanel, { project, milestones: view.milestones ?? [], workItems: view.workItems ?? [], onRefresh }),
+      jsx(SavedViewsSection, {
         project,
         views: view.views ?? [],
         onApply: setAppliedView,
         onClear: () => setAppliedView(null),
         appliedName: appliedView?.name ?? null,
         onRefresh,
-      }, `${project.id}:saved-views`) : null,
+      }, `${project.id}:saved-views`),
     ]})
+  } else if (projectView === 'initiative') {
+    panel = jsx(InitiativeView, { view, onRefresh })
   } else if (projectView === 'objectives') {
     panel = jsx(ObjectivesPanel, { project, settings: view.settings ?? {}, objectives: view.objectives ?? [], goals: view.goals ?? [], missionArchive: view.missionArchive ?? [], onRefresh }, project.id)
   } else if (projectView === 'planning') {
@@ -7075,7 +7121,7 @@ function BacklogView({ view, onRefresh }) {
           ] }),
           jsxs('span', { className: 'dockyard-wizard-actions-right', children: [
             importStep === 1 ? jsx(Button, { action: 'import-next', variant: 'primary', disabled: importBusy, onClick: () => parseImport(true), children: importBusy ? 'Validating…' : 'Validate and preview →' }) : null,
-importStep === 2 ? (importValid ? jsx(Button, { action: 'confirm-bulk-import', variant: 'primary', disabled: importBusy, onClick: runImport, children: importBusy ? 'Importing...' : `Import ${importRows.length} item${importRows.length === 1 ? '' : 's'} →` }) : jsx(Button, { variant: 'primary', disabled: true, 'data-import-blocked': true, children: 'Import blocked — fix row errors first' })) : null,
+importStep === 2 ? (importValid ? jsx(Button, { action: 'confirm-bulk-import', variant: 'primary', disabled: importBusy, onClick: runImport, children: importBusy ? 'Importing...' : `Import ${importRows.length} item${importRows.length === 1 ? '' : 's'} →` }) : jsx('button', { type: 'button', className: 'dockyard-button primary', disabled: true, 'data-import-blocked': true, children: 'Import blocked — fix row errors first' })) : null,
             importStep === 3 && importResult ? jsx(Button, { variant: 'primary', onClick: closeImport, children: 'Done' }) : null,
           ] }),
         ] }),
@@ -8131,6 +8177,7 @@ function DashboardPage() {
   useDockyardStyles()
   const [tab, setTab] = useState('dashboard')
   const [selectedProject, setSelectedProject] = useState(null)
+  const [projectOptions, setProjectOptions] = useState([])
   const [projectEntryView, setProjectEntryView] = useState('overview')
   const [dashboardHomeVersion, setDashboardHomeVersion] = useState(0)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
@@ -8191,7 +8238,12 @@ function DashboardPage() {
     loader().then(
       (result) => {
         if (!current || serial !== loadSerial.current) return
-        setData({ tab, payload: result })
+        setData({ tab, projectId: selectedProject, payload: result })
+        if (result.projects) {
+          const options = sortProjects(result.projects)
+          setProjectOptions(options)
+          if (!selectedProject && options.length) setSelectedProject(result.project?.id || options[0].id)
+        }
         if (tab === 'dashboard') {
           setCounts({
             approvals: Number(result.inbox?.count ?? result.owed_decisions ?? 0),
@@ -8221,10 +8273,9 @@ function DashboardPage() {
   }
   const discardProjectChange = () => {
     const pending = pendingProject
-    const projectToRestore = dirtyProject
     setPendingProject(null)
     setDirtyProject(null)
-    if (projectToRestore && projectToRestore !== pending) setSelectedProject(projectToRestore)
+    setSelectedProject(pending)
     if (tab === 'dashboard' || tab === 'notifications' || tab === 'inbox' || tab === 'onboard') setTab('project')
   }
   const dismissToast = (id) => setToasts((current) => current.filter((toast) => toast.id !== id))
@@ -8307,7 +8358,7 @@ function DashboardPage() {
     setTab('dashboard')
   }
 
-  const payload = data?.tab === tab ? data.payload : null
+  const payload = data?.tab === tab && data.projectId === selectedProject ? data.payload : null
   const activeError = error?.tab === tab ? error.error : null
   let content
   if (activeError) {
@@ -8320,8 +8371,8 @@ function DashboardPage() {
     content = jsx(ProjectDashboard, {
       view: payload,
       initialView: projectEntryView,
-      onSelectProject: setSelectedProject,
-      onProjectDirty: (dirty) => setDirtyProject(dirty ? selectedProject : null),
+      onSelectProject: selectProject,
+      onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
       onRefresh: refresh,
       pendingWorkRef,
       onPendingWorkConsumed: () => setPendingWorkRef(null),
@@ -8337,8 +8388,8 @@ function DashboardPage() {
       view: payload,
       initialView: 'board',
       savedViewsMode: true,
-      onSelectProject: setSelectedProject,
-      onProjectDirty: (dirty) => setDirtyProject(dirty ? selectedProject : null),
+      onSelectProject: selectProject,
+      onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
       onRefresh: refresh,
       pendingWorkRef,
       onPendingWorkConsumed: () => setPendingWorkRef(null),
@@ -8348,8 +8399,8 @@ function DashboardPage() {
     content = jsx(ProjectDashboard, {
       view: payload,
       initialView: 'reports',
-      onSelectProject: setSelectedProject,
-      onProjectDirty: (dirty) => setDirtyProject(dirty ? selectedProject : null),
+      onSelectProject: selectProject,
+      onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
       onRefresh: refresh,
       notice: deepLinkNotice,
     }, `reports:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
@@ -8357,8 +8408,8 @@ function DashboardPage() {
     content = jsx(ProjectDashboard, {
       view: payload,
       initialView: 'settings',
-      onSelectProject: setSelectedProject,
-      onProjectDirty: (dirty) => setDirtyProject(dirty ? selectedProject : null),
+      onSelectProject: selectProject,
+      onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
       onRefresh: refresh,
       notice: deepLinkNotice,
     }, `settings:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
@@ -8366,8 +8417,8 @@ function DashboardPage() {
     content = jsx(ProjectDashboard, {
       view: payload,
       initialView: 'workflows',
-      onSelectProject: setSelectedProject,
-      onProjectDirty: (dirty) => setDirtyProject(dirty ? selectedProject : null),
+      onSelectProject: selectProject,
+      onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
       onRefresh: refresh,
       notice: deepLinkNotice,
     }, `workflows:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
@@ -8387,7 +8438,7 @@ function DashboardPage() {
 
   return jsxs('div', { className: 'dockyard-root', children: [
     jsxs('div', { className: 'dockyard-shell', children: [
-      jsx(ConsoleBar, { tab, counts, projects: payload?.projects ?? [], selectedProject, onProjectChange: selectProject,
+      jsx(ConsoleBar, { tab, counts, projects: projectOptions, selectedProject, onProjectChange: selectProject,
         onTab: (next) => { if (next === 'project') setProjectEntryView('overview'); if (next === 'dashboard') setDashboardHomeVersion((value) => value + 1); setTab(next) },
         onNewProject: () => setOnboardingOpen(true), onOpen: openDeepLink }),
       jsx('main', {

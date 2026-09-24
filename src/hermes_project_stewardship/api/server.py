@@ -1954,7 +1954,7 @@ def create_app(
     @router.get("/bot-groups")
     def list_groups():
         return {"groups": [
-            {"name": g.name, "purpose": g.purpose,
+            {"id": g.id, "name": g.name, "purpose": g.purpose,
              "channel_ref": g.channel_ref, "lead": g.lead_id(),
              "members": list(g.members.keys())}
             for g in dy.groups_list()

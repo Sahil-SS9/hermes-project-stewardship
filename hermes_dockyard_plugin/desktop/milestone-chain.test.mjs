@@ -212,8 +212,10 @@ test('milestone journey: real UI drives real HTTP through proxy to backend', asy
     //    project, so the tab's first-project default selects it and
     //    loadProjectData runs the full nine-fetch fan-out (including
     //    GET /projects/:id/milestones) through the real proxy -> backend chain.
-    await click('[data-tab="delivery"]');
-    await waitFor('[data-delivery-view]');
+    await click('[data-tab="project"]');
+    await waitFor('[data-project-view="board"]');
+    await click('[data-project-view="board"]');
+    await waitFor('[data-project-dashboard]');
     await waitFor('[data-planning-panel]');
 
     // Before any milestone exists the panel must show the honest empty state.
@@ -233,7 +235,9 @@ test('milestone journey: real UI drives real HTTP through proxy to backend', asy
     //    force loadProjectData to re-run its milestone fetch through the
     //    proxy. This is the frontend loading path under test.
     await click('[data-tab="dashboard"]');
-    await click('[data-tab="delivery"]');
+    await click('[data-tab="project"]');
+    await waitFor('[data-project-view="board"]');
+    await click('[data-project-view="board"]');
     const milestoneRow = await waitFor('[data-milestone-row="Chain Release"]', 12000);
     assert(
       milestoneRow,
@@ -266,7 +270,9 @@ test('milestone journey: real UI drives real HTTP through proxy to backend', asy
       body: JSON.stringify({ new_name: 'Chain Shipped', actor_id: 'sahil', actor_kind: 'human' }),
     });
     await click('[data-tab="dashboard"]');
-    await click('[data-tab="delivery"]');
+    await click('[data-tab="project"]');
+    await waitFor('[data-project-view="board"]');
+    await click('[data-project-view="board"]');
     const renamedRow = await waitFor('[data-milestone-row="Chain Shipped"]', 12000);
     assert(
       renamedRow,

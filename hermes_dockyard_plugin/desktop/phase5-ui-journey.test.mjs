@@ -13,7 +13,7 @@ import { test } from 'node:test'
 const require = createRequire(fileURLToPath(new URL('../dashboard/package.json', import.meta.url)))
 const { chromium } = require('playwright')
 const BASE = process.env.STEWARD_DESKTOP_URL || 'http://127.0.0.1:19500/desktop'
-const API = 'http://127.0.0.1:19500/api/plugins/hermes-dockyard'
+const API = process.env.STEWARD_API_URL || 'http://127.0.0.1:19500/api/plugins/hermes-dockyard'
 const TOKEN = 'demo-session-token'
 
 const api = async (path, method = 'GET', body) => {
@@ -22,7 +22,9 @@ const api = async (path, method = 'GET', body) => {
     headers: { 'x-hermes-session-token': TOKEN, 'content-type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   })
-  return res.json()
+  const result = await res.json()
+  assert.ok(res.ok, `${method} ${path}: ${res.status} ${JSON.stringify(result)}`)
+  return result
 }
 
 test('Phase 5 rendered UI journey: bind team, start run, live status, revision approval through the plugin surface', { timeout: 180000 }, async () => {
@@ -68,16 +70,15 @@ test('Phase 5 rendered UI journey: bind team, start run, live status, revision a
     // binding read-back is the authority on the id: if the id were wrong the
     // PUT itself fails (bot group was not found), so try each plausible id
     // until the canonical read-back confirms the name + membership.
-    let bind = null
-    let bindingId = null
-    for (const candidate of [created.id, 4, 3, 2, 1].filter((v) => v != null)) {
-      const attempt = await api(
-        `/projects/${project}/workflows/${encodeURIComponent(wf)}/binding`, 'PUT',
-        { group_id: candidate, overrides: { build: 'bot-worker' } })
-      if (attempt && attempt.group_id === candidate && !attempt.detail) {
-        bind = attempt; bindingId = candidate; break
-      }
-    }
+    const groupsListing = await api('/bot-groups')
+    const namedGroup = (groupsListing.groups ?? []).find((g) => g.name === groupName)
+    assert.ok(namedGroup, 'group listing carries the created group')
+    const bind = await api(
+      `/projects/${project}/workflows/${encodeURIComponent(wf)}/binding`, 'PUT',
+      // Overrides name host PROFILES (P5.2), not bot ids; the bot's profile
+      // is 'worker' and it is a discovered member of the bound group.
+      { group_id: namedGroup.id, overrides: { build: 'worker' } })
+    const bindingId = namedGroup.id
     assert.ok(bind, 'binding accepted a real group id')
     const readBack = await api(`/projects/${project}/workflows/${encodeURIComponent(wf)}/binding`)
     assert.equal(readBack.group_id, bindingId)
@@ -93,14 +94,18 @@ test('Phase 5 rendered UI journey: bind team, start run, live status, revision a
     await page.goto(BASE, { waitUntil: 'networkidle' })
     await page.locator('[data-tab="project"]').click()
     await page.waitForTimeout(800)
-    await page.locator('select[aria-label="Project context"]').selectOption(project)
+    await page.getByRole('button', {name: 'Project context', exact: true}).click()
+    await page.getByRole('combobox', {name: 'Find project'}).fill(project)
+    await page.getByRole('listbox', {name: 'Projects'}).getByRole('option', {name: project, exact: true}).click()
     await page.waitForTimeout(1500)
     await page.locator('[data-tab="workflows"]').click()
     await page.waitForTimeout(2000)
     // Instance list shows the workflow created through the plugin API; open
     // its definitions/runs (the canvas defaults to the first instance).
     await page.getByText(wf, { exact: false }).first().waitFor({ timeout: 15000 })
-    await page.locator('button:has-text("Inspect definitions & runs")').last().click()
+    // Batch B shell: the library list (Zone 1) selects the workflow; the run
+    // inspector (Zone 3) is always visible, so the old inspect button is gone.
+    await page.locator('[data-workflow-library-item]').first().click()
     await page.waitForTimeout(1500)
     // Live execution panel shows truthful pending state
     await page.getByText('pending', { exact: false }).first().waitFor({ timeout: 10000 })

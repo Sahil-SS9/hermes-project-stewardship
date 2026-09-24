@@ -19,7 +19,9 @@ const api = async (path, method = 'GET', body) => {
     headers: { 'x-hermes-session-token': TOKEN, 'content-type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   })
-  return res.json()
+  const result = await res.json()
+  assert.ok(res.ok, `${method} ${path}: ${res.status} ${JSON.stringify(result)}`)
+  return result
 }
 
 test('Phase 6 rendered import journey: invalid preview writes nothing, valid commit lands in the tree', { timeout: 180000 }, async () => {
@@ -37,7 +39,9 @@ test('Phase 6 rendered import journey: invalid preview writes nothing, valid com
     const beforeCount = (before.backlog ?? []).length
 
     await page.goto(BASE, { waitUntil: 'networkidle' })
-    await page.locator('select[aria-label="Project context"]').selectOption(project)
+    await page.getByRole('button', {name: 'Project context', exact: true}).click()
+    await page.getByRole('combobox', {name: 'Find project'}).fill(project)
+    await page.getByRole('listbox', {name: 'Projects'}).getByRole('option', {name: project, exact: true}).click()
     await page.waitForTimeout(1200)
     await page.locator('[data-tab="backlog"]').click()
     await page.waitForTimeout(1500)
@@ -49,10 +53,12 @@ test('Phase 6 rendered import journey: invalid preview writes nothing, valid com
     await layer.waitFor({ timeout: 5000 })
 
     // --- 1. INVALID csv: unknown type + unknown parent -> preview errors.
+    // CSV columns must match the canonical validator (assignee/due/parent
+    // are not importable columns; parent_key + labels + estimate_days are).
     const badCsv = [
-      'row_key,type,title,assignee,due,parent',
-      `epic-key-early,${epicTitle},bot-worker,,`,
-      `task-key-early,${taskTitle.replace('P6 e2e','nonsense')},bot-worker,,`,
+      'row_key,type,title,parent_key',
+      `epic-key-early,${epicTitle},`,
+      `task-key-early,${taskTitle.replace('P6 e2e', 'nonsense')},`,
     ].join('\n')
     await page.locator('[data-import-input]').fill(badCsv)
     await page.locator('[data-action="import-next"]').click()
@@ -99,7 +105,7 @@ test('Phase 6 rendered import journey: invalid preview writes nothing, valid com
     const rows = after.work_items ?? []
     const epic = rows.find((r) => r.title === epicTitle)
     const task = rows.find((r) => r.title === taskTitle)
-    assert.equal(task.parent_ref, epic.ref, 'child task is linked under the imported epic')
+    assert.equal(task.parent_task_id, epic.ref, 'child task is linked under the imported epic')
     assert.ok(epic, 'epic persisted')
     assert.ok(task, 'task persisted')
 

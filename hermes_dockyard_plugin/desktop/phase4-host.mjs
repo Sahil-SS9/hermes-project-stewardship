@@ -324,6 +324,13 @@ function route(method, path, query, body) {
     if (index >= 0) list[index] = next; else list.push(next);
     return { view: next };
   }
+  const transition = path.match(/^\/projects\/([^/]+)\/work-items\/([^/]+)\/transition$/);
+  if (transition && method === 'POST') {
+    const item = data.workItems[pid]?.work_items.find(item => item.ref === decodeURIComponent(transition[2]));
+    if (!item) throw Object.assign(new Error('missing scoped item'), {status: 404});
+    item.status = body.status;
+    return {ref: item.ref, status: item.status};
+  }
   const viewItemsMatch = path.match(/^\/projects\/([^/]+)\/views\/([^/]+)\/items$/);
   if (method === 'GET' && viewItemsMatch) {
     const name = decodeURIComponent(viewItemsMatch[2]);

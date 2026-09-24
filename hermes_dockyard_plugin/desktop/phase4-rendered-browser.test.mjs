@@ -99,8 +99,10 @@ test('phase 4 real Desktop journeys: objectives, reports, saved views', { timeou
     page.on('pageerror', (error) => pageErrors.push(String(error)));
 
     const selectProject = async (projectId) => {
-      const select = page.locator('.dockyard-project-switcher select, select[aria-label="Project context"]').first();
-      await select.selectOption(projectId);
+      await page.getByRole('button', {name: 'Project context', exact: true}).click();
+      await page.getByRole('combobox', {name: 'Find project'}).fill(projectId);
+      await page.getByRole('listbox', {name: 'Projects'}).getByRole('option', {name: projectId, exact: true}).click();
+      await page.locator('[data-project-view="board"]').click();
       await page.waitForTimeout(400);
     };
 
@@ -109,6 +111,7 @@ test('phase 4 real Desktop journeys: objectives, reports, saved views', { timeou
       await page.goto(`${BASE}/desktop`, { waitUntil: 'load' });
       await page.waitForSelector('[data-tab="dashboard"]', { timeout: 20000 });
       await page.click('[data-tab="project"]');
+      await page.click('[data-project-view="objectives"]');
       await page.waitForSelector('[data-objective-row="1"]', { timeout: 20000 });
 
       // Evaluate now: only the selected objective runs.
@@ -164,7 +167,7 @@ test('phase 4 real Desktop journeys: objectives, reports, saved views', { timeou
 
     // ------------------------------------------------------------------ reports
     await t.test('reports: open + Download Markdown byte equality', async () => {
-      await page.click('[data-tab="reports"]');
+      await page.click('[data-project-view="reports"]');
       await page.waitForSelector('[data-report-history="RPT-1"]', { timeout: 20000 });
       await page.click('[data-report-history="RPT-1"]');
       await page.waitForSelector('[data-action="download-report"]', { timeout: 10000 });
@@ -187,7 +190,8 @@ test('phase 4 real Desktop journeys: objectives, reports, saved views', { timeou
 
     // -------------------------------------------------------------- saved views
     await t.test('saved views: save → recall → overwrite → delete → reload → isolation', async () => {
-      await page.click('[data-tab="work"]');
+      await page.click('[data-tab="project"]');
+      await page.click('[data-project-view="board"]');
       await page.waitForSelector('[data-saved-views-screen]', { timeout: 20000 });
       await page.waitForSelector('[data-saved-view="Release focus"]', { timeout: 10000 });
 
@@ -235,8 +239,9 @@ test('phase 4 real Desktop journeys: objectives, reports, saved views', { timeou
 
       // Reload persistence: the view survives a full page reload.
       await page.reload({ waitUntil: 'load' });
-      await page.waitForSelector('[data-tab="work"]', { timeout: 20000 });
-      await page.click('[data-tab="work"]');
+      await page.waitForSelector('[data-tab="project"]', { timeout: 20000 });
+      await page.click('[data-tab="project"]');
+      await page.click('[data-project-view="board"]');
       await page.waitForSelector('[data-saved-view="Done audit"]', { timeout: 20000 });
 
       // Project isolation: the view never leaks into the other project.
