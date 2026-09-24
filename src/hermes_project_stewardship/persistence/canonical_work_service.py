@@ -6,10 +6,11 @@ own governance metadata around those canonical records.
 """
 from __future__ import annotations
 from datetime import date
+import math
 
 from typing import Any, Protocol
 
-from ..dockyard import Actor, WorkItemStatus, WorkItemType
+from ..dockyard import Actor, WorkItem, WorkItemStatus, WorkItemType
 from .canonical_work_store import CanonicalWorkMetadataStore
 from .service import ServiceError, StewardshipService
 from .store import Store
@@ -276,6 +277,7 @@ class CanonicalWorkService:
         )
         view = self._overlay_items(project_id, [view])[0]
         self._audit(
+            project_id=project_id,
             actor=actor,
             action="workitem.created",
             subject=view["ref"],
@@ -332,7 +334,63 @@ class CanonicalWorkService:
             for row in items
             if (row.get("parent_task_id") or row.get("parent_id")) == ref
         ]
-        history = item.get("history") or item.get("events") or []
+        children_by_parent: dict[str, list[str]] = {}
+        for row in items:
+            linked_parent = row.get("parent_task_id") or row.get("parent_id")
+            if linked_parent:
+                children_by_parent.setdefault(str(linked_parent), []).append(str(row["ref"]))
+        descendants: set[str] = set()
+        pending = list(children_by_parent.get(ref, []))
+        while pending:
+            child_ref = pending.pop()
+            if child_ref in descendants or child_ref == ref:
+                continue
+            descendants.add(child_ref)
+            pending.extend(children_by_parent.get(child_ref, []))
+        try:
+            current_type = WorkItemType(item.get("kind") or item.get("type"))
+        except ValueError:
+            allowed_parent_types = set()
+        else:
+            allowed_parent_types = {
+                parent_type.value
+                for parent_type, allowed_children in WorkItem.ALLOWED_CHILDREN.items()
+                if current_type in allowed_children
+            }
+        parent_choices = [
+            {"ref": candidate["ref"], "title": candidate.get("title") or candidate["ref"], "type": candidate.get("kind") or candidate.get("type")}
+            for candidate in items
+            if candidate["ref"] != ref
+            and candidate["ref"] not in descendants
+            and (candidate.get("kind") or candidate.get("type")) in allowed_parent_types
+        ]
+        parent_choices.sort(key=lambda choice: (str(choice["type"]), str(choice["title"]).casefold()))
+        native_history = item.get("history") or item.get("events") or []
+        history = list(native_history) if isinstance(native_history, list) else []
+        audit_rows = self.store._conn.execute(
+            "SELECT * FROM stewardship_audit_log WHERE subject=? ORDER BY id DESC LIMIT 100",
+            (ref,),
+        ).fetchall()
+        for audit_row in audit_rows:
+            record = self.store._audit_row(audit_row)
+            detail = record.get("detail")
+            if (
+                str(record.get("action", "")).startswith(("workitem.", "backlog."))
+                and isinstance(detail, dict)
+                and detail.get("project_id") == project_id
+            ):
+                history.append(record)
+        # Audit IDs deduplicate native adapters that already expose their own
+        # history entries. Newest-first makes the timeline useful on open.
+        deduped: dict[tuple[str, str], dict[str, Any]] = {}
+        for record in history:
+            identity = (str(record.get("id", "")), str(record.get("action", "")))
+            deduped[identity] = record
+        history = sorted(
+            deduped.values(),
+            key=lambda row: str(row.get("ts") or row.get("created_at") or row.get("at") or ""),
+            reverse=True,
+        )
         by_ref = {row["ref"]: row for row in items}
         links = self.port.list_work_links(project_id, ref)
         dependencies = [
@@ -349,6 +407,7 @@ class CanonicalWorkService:
             "work_item": item,
             "parent": parent,
             "children": children,
+            "parent_choices": parent_choices,
             "dependencies": dependencies,
             "dependents": dependents,
             "history": history if isinstance(history, list) else [],
@@ -368,6 +427,7 @@ class CanonicalWorkService:
         evidence_refs: Any = _UNSET,
         estimate_days: Any = _UNSET,
         due: Any = _UNSET,
+        reason: Any = _UNSET,
     ) -> dict[str, Any]:
         self._require_project(project_id)
         current = self.get(project_id, ref)
@@ -375,6 +435,7 @@ class CanonicalWorkService:
             raise ValueError(f"no such canonical work item {ref}")
         changes: dict[str, Any] = {}
         changed_fields: list[str] = []
+        audit_reason: str | None = None
         if title is not _UNSET:
             if not isinstance(title, str) or len(title.strip()) < 3:
                 raise ValueError("title must be at least 3 characters")
@@ -392,13 +453,67 @@ class CanonicalWorkService:
                 raise ValueError("body must be text or null")
             changes["body"] = body.strip() if isinstance(body, str) else None
             changed_fields.append("body")
+        normalized_parent: str | None = None
         if parent_ref is not _UNSET:
-            if parent_ref == ref:
+            normalized_parent = (
+                str(parent_ref).strip()
+                if isinstance(parent_ref, str) and parent_ref.strip()
+                else None
+            )
+            current_parent = (
+                current.get("parent_ref")
+                or current.get("parent_task_id")
+                or current.get("parent_id")
+            )
+            if normalized_parent == ref:
                 raise ValueError("a task cannot be its own parent")
-            if parent_ref is not None and self.get(project_id, str(parent_ref)) is None:
+            parent_item = self.get(project_id, normalized_parent) if normalized_parent else None
+            if normalized_parent and parent_item is None:
                 raise ValueError("parent task belongs to another project or is missing")
-            changes["parent_id"] = parent_ref
-            changed_fields.append("parent_ref")
+            if normalized_parent != current_parent:
+                if not isinstance(reason, str) or len(reason.strip()) < 4:
+                    raise ValueError("re-parenting requires a reason of at least 4 characters")
+                audit_reason = reason.strip()
+                if parent_item is not None:
+                    parent_type = WorkItemType(parent_item["kind"])
+                    child_type = WorkItemType(new_kind)
+                    if child_type not in WorkItem.ALLOWED_CHILDREN.get(parent_type, set()):
+                        raise ValueError(f"{parent_type.value} cannot parent {child_type.value}")
+                    cursor = normalized_parent
+                    visited: set[str] = set()
+                    while cursor and cursor not in visited:
+                        if cursor == ref:
+                            raise ValueError("a work item cannot be moved under its own descendant")
+                        visited.add(cursor)
+                        ancestor = self.get(project_id, cursor)
+                        cursor = str(
+                            ancestor.get("parent_ref") or ancestor.get("parent_task_id") or ancestor.get("parent_id") or ""
+                        ) if ancestor else ""
+                changes["parent_id"] = normalized_parent
+                changed_fields.append("parent_ref")
+        effective_parent = normalized_parent if parent_ref is not _UNSET else (
+            current.get("parent_ref") or current.get("parent_task_id") or current.get("parent_id")
+        )
+        if new_kind == WorkItemType.SUBTASK.value and not effective_parent:
+            raise ValueError("a sub-task needs a valid parent")
+        if new_kind != current["kind"]:
+            parent_ref_current = (
+                current.get("parent_ref")
+                or current.get("parent_task_id")
+                or current.get("parent_id")
+            )
+            if parent_ref_current:
+                parent_item = self.get(project_id, str(parent_ref_current))
+                if parent_item and WorkItemType(new_kind) not in WorkItem.ALLOWED_CHILDREN.get(
+                    WorkItemType(parent_item["kind"]), set()
+                ):
+                    raise ValueError(f"{parent_item['kind']} cannot parent {new_kind}")
+            for child in self.list(project_id):
+                child_parent = child.get("parent_ref") or child.get("parent_task_id") or child.get("parent_id")
+                if child_parent == ref and WorkItemType(child["kind"]) not in WorkItem.ALLOWED_CHILDREN.get(
+                    WorkItemType(new_kind), set()
+                ):
+                    raise ValueError(f"{new_kind} cannot parent {child['kind']}")
 
         planning = {
             "labels": list(current.get("labels") or []),
@@ -451,11 +566,15 @@ class CanonicalWorkService:
             actor=actor,
         )
         view = self._overlay_items(project_id, [self._view(updated)])[0]
+        audit_detail: dict[str, Any] = {"fields": changed_fields}
+        if audit_reason:
+            audit_detail["reason"] = audit_reason
         self._audit(
+            project_id=project_id,
             actor=actor,
             action="workitem.updated",
             subject=ref,
-            detail={"fields": changed_fields},
+            detail=audit_detail,
         )
         return view
 
@@ -480,6 +599,7 @@ class CanonicalWorkService:
         )
         view = self._overlay_items(project_id, [self._view(updated)])[0]
         self._audit(
+            project_id=project_id,
             actor=actor,
             action="workitem.assigned",
             subject=ref,
@@ -504,6 +624,7 @@ class CanonicalWorkService:
             raise ValueError("task dependencies cannot target epics")
         result = self.port.link_work(project_id, dependency_ref, ref)
         self._audit(
+            project_id=project_id,
             actor=actor,
             action="workitem.dependency_added",
             subject=ref,
@@ -524,6 +645,7 @@ class CanonicalWorkService:
             raise ValueError("dependency task belongs to another project or is missing")
         result = self.port.unlink_work(project_id, dependency_ref, ref)
         self._audit(
+            project_id=project_id,
             actor=actor,
             action="workitem.dependency_removed",
             subject=ref,
@@ -556,6 +678,7 @@ class CanonicalWorkService:
         )
         view = self._overlay_items(project_id, [self._view(updated)])[0]
         self._audit(
+            project_id=project_id,
             actor=actor,
             action="workitem.transition",
             subject=ref,
@@ -574,6 +697,9 @@ class CanonicalWorkService:
         rank: int,
         reason: str,
         initiative_ref: str | None = None,
+        parent_ref: str | None = None,
+        estimate_days: float | None = None,
+        due: str | None = None,
         idempotency_key: str | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         settings = self._require_project(project_id)
@@ -590,6 +716,25 @@ class CanonicalWorkService:
         if creator.id == assignee.id:
             raise ValueError("assignee must be distinct from the creator")
         kind = self._kind(item_type)
+        if estimate_days is not None:
+            estimate_days = float(estimate_days)
+            if not math.isfinite(estimate_days) or estimate_days < 0:
+                raise ValueError("estimate_days must be a finite non-negative number")
+        due_value = self._validate_due(due)
+        parent_ref = parent_ref.strip() if isinstance(parent_ref, str) and parent_ref.strip() else None
+        if kind == WorkItemType.SUBTASK.value and parent_ref is None:
+            raise ValueError("a sub-task needs a valid parent")
+        if parent_ref:
+            parent = self.get(project_id, parent_ref)
+            if parent is None:
+                raise ValueError("parent task belongs to another project or is missing")
+            try:
+                parent_type = WorkItemType(parent.get("kind") or parent.get("type"))
+                child_type = WorkItemType(kind)
+            except ValueError:
+                raise ValueError("parent task has an unsupported type") from None
+            if child_type not in WorkItem.ALLOWED_CHILDREN.get(parent_type, set()):
+                raise ValueError(f"{parent_type.value} cannot parent {child_type.value}")
         relation = initiative_ref.strip() if initiative_ref else None
         if relation:
             try:
@@ -607,7 +752,7 @@ class CanonicalWorkService:
             body=None,
             assignee=assignee.id,
             created_by=creator.id,
-            parent_id=None,
+            parent_id=parent_ref,
             idempotency_key=idempotency_key,
         )
         view = self._view(created)
@@ -623,14 +768,30 @@ class CanonicalWorkService:
             )
         except Exception:
             raise CanonicalWorkPartialError(view) from None
+        try:
+            self.metadata.upsert_details(
+                project_id,
+                view["ref"],
+                labels=[],
+                evidence_refs=[],
+                estimate_days=estimate_days,
+                due=due_value,
+                actor=creator,
+            )
+        except Exception:
+            raise CanonicalWorkPartialError(view) from None
         view = self._overlay_items(project_id, [view])[0]
         self._audit(
+            project_id=project_id,
             actor=creator,
             action="backlog.item_created",
             subject=view["ref"],
             detail={
                 "assignee": assignee.id,
                 "initiative_ref": relation,
+                "parent_ref": parent_ref,
+                "estimate_days": estimate_days,
+                "due": due_value,
                 "rank": entry["rank"],
                 "reason": entry["priority_reason"],
                 "canonical": True,
@@ -661,6 +822,7 @@ class CanonicalWorkService:
             actor=actor,
         )
         self._audit(
+            project_id=project_id,
             actor=actor,
             action="backlog.added",
             subject=ref,
@@ -690,6 +852,7 @@ class CanonicalWorkService:
             actor=actor,
         )
         self._audit(
+            project_id=project_id,
             actor=actor,
             action="backlog.rerank",
             subject=ref,
@@ -704,6 +867,7 @@ class CanonicalWorkService:
     def _audit(
         self,
         *,
+        project_id: str,
         actor: Actor,
         action: str,
         subject: str,
@@ -714,5 +878,5 @@ class CanonicalWorkService:
             interface=f"dockyard:{actor.kind.value}",
             action=action,
             subject=subject,
-            detail=detail,
+            detail={**(detail or {}), "project_id": project_id},
         )

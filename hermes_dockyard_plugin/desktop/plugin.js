@@ -982,6 +982,48 @@ const DOCKYARD_CSS = `
 .dockyard-root .cm-count { font-size: 11px; color: var(--dy-text-3); white-space: nowrap; }
 .dockyard-root .cm-anchor { position: relative; display: inline-flex; }
 .dockyard-root .cm-anchor .cm-menu { top: calc(100% + 6px); left: 0; }
+.dockyard-root .dockyard-filterbar { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 8px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface); }
+.dockyard-root .filterbar-title { color: var(--dy-text-3); font-size: 10px; font-weight: 760; letter-spacing: .06em; text-transform: uppercase; margin-right: 2px; }
+.dockyard-root .cm-filter { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--dy-text-2); font-size: 10px; font-weight: 650; }
+.dockyard-root .cm-filter select { max-width: 180px; min-width: 110px; height: 29px; padding: 4px 22px 4px 8px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface-subtle); color: var(--dy-text); font: 550 11px/1.2 inherit; }
+.dockyard-root .cm-reset-filters { border: 0; border-radius: 6px; background: transparent; color: var(--dy-accent-text); font: 650 10px/1.2 inherit; padding: 6px 7px; cursor: pointer; }
+.dockyard-root .cm-reset-filters:hover { background: var(--dy-accent-soft); }
+.dockyard-root .backlog-create-toolbar { align-items: center; gap: 10px; }
+.dockyard-root .backlog-create-toolbar .dockyard-meta { margin-right: auto; color: var(--dy-text-3); font-size: 11px; }
+.dockyard-root button.th-sort { border: 0; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; display: inline-flex; gap: 3px; align-items: center; padding: 0; }
+.dockyard-root .th-cell { flex: none; }
+.dockyard-root .th-type, .dockyard-root .tree-type-cell { width: 82px; flex: none; }
+.dockyard-root .th-title { flex: 1; min-width: 200px; }
+.dockyard-root .th-initiative, .dockyard-root .tree-initiative { width: 140px; flex: none; }
+.dockyard-root .th-estimate { width: 70px; text-align: right; justify-content: flex-end; }
+.dockyard-root .tree-estimate { width: 70px; flex: none; text-align: right; color: var(--dy-text-2); font-size: 11px; font-variant-numeric: tabular-nums; }
+.dockyard-root .tree-estimate.is-empty { color: var(--dy-text-3); }
+.dockyard-root .tree-type-cell { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--dy-text-2); font-size: 10.5px; white-space: nowrap; }
+.dockyard-root .tree-type-cell > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.dockyard-root .tree-type-cell .tree-type { width: 14px; }
+.dockyard-root .tree-title { flex: 1; min-width: 200px; }
+.dockyard-root .tree-initiative { min-width: 0; overflow: hidden; }
+.dockyard-root .initiative-cell-value { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.dockyard-root .initiative-cell-value strong { overflow: hidden; color: var(--dy-text-2); font-size: 10.5px; font-weight: 640; text-overflow: ellipsis; white-space: nowrap; }
+.dockyard-root .initiative-cell-value small { overflow: hidden; color: var(--dy-text-3); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.dockyard-root .initiative-cell-empty { color: var(--dy-text-3); font-size: 11px; }
+.dockyard-root .tree-menu-field { display: grid; grid-template-columns: 46px minmax(0, 1fr); align-items: center; gap: 8px; margin: 2px 0; padding: 5px 8px; color: var(--dy-text-2); font-size: 11px; font-weight: 620; }
+.dockyard-root .tree-menu-field select { width: 100%; min-width: 0; margin: 0; }
+.dockyard-root .tree-menu-static { display: flex; justify-content: space-between; padding: 7px 9px; color: var(--dy-text-3); font-size: 11px; }
+.dockyard-root .tree-menu-static strong { color: var(--dy-text-2); font-weight: 650; }
+.dockyard-root .tree-menu-rank-actions, .dockyard-root .tree-menu-status-actions { margin-top: 4px; padding-top: 3px; border-top: 1px solid var(--dy-border); }
+@media (max-width: 1180px) {
+  .dockyard-root .th-rank, .dockyard-root .tree-rank,
+  .dockyard-root .th-estimate, .dockyard-root .tree-estimate,
+  .dockyard-root .th-due, .dockyard-root .tree-due { display: none !important; }
+  .dockyard-root .th-gutter, .dockyard-root .tree-gutter { width: 52px; }
+  .dockyard-root .th-type, .dockyard-root .tree-type-cell { width: 76px; }
+  .dockyard-root .th-status, .dockyard-root .tree-status { width: 88px; }
+  .dockyard-root .th-initiative, .dockyard-root .tree-initiative { width: 120px; }
+  .dockyard-root .th-who, .dockyard-root .tree-who { width: 104px; }
+  .dockyard-root .th-title, .dockyard-root .tree-title { min-width: 150px; }
+}
+
 .dockyard-root .cm-menu { position: absolute; top: 44px; z-index: 40; min-width: 200px; max-height: 62vh; overflow: auto; padding: 5px; display: grid; gap: 1px; border: 1px solid var(--dy-border); border-radius: 11px; background: var(--dy-surface-strong); box-shadow: var(--dy-shadow); }
 .dockyard-root .cm-menu button { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border: 0; border-radius: 7px; background: transparent; color: var(--dy-text); font: 560 12px/1.2 inherit; cursor: pointer; text-align: left; }
 .dockyard-root .cm-menu button:hover { background: var(--dy-accent-soft); color: var(--dy-accent-text); }
@@ -1023,16 +1065,22 @@ const DOCKYARD_CSS = `
 .dockyard-root .tree-type svg { width: 13px; height: 13px; }
 .dockyard-root .tree-type.epic { color: var(--dy-info); }
 .dockyard-root .tree-type.feature { color: var(--dy-accent-text); }
+.dockyard-root .tree-type.initiative { color: var(--dy-info); }
 .dockyard-root .tree-type.bug { color: var(--dy-danger); }
 .dockyard-root .tree-type.spike { color: var(--dy-warning); }
 .dockyard-root .tree-check { flex: none; width: 13px; height: 13px; accent-color: var(--dy-action); opacity: 0; margin: 0 4px 0 0; }
 .dockyard-root .dockyard-tree-row:hover .tree-check, .dockyard-root .tree-check:checked { opacity: 1; }
 .dockyard-root .tree-title { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.dockyard-root .tree-title-stack { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; flex: 1; gap: 1px; }
+.dockyard-root .tree-title-line { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; max-width: 100%; }
+.dockyard-root .tree-title .tree-desc { align-self: flex-start; padding-left: 2px; }
 .dockyard-root .cell-edit { border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 3px 5px; font: inherit; color: var(--dy-text); min-width: 0; cursor: text; text-align: left; }
 .dockyard-root .cell-edit:hover { border-color: var(--dy-control-border); background: var(--dy-surface); }
 .dockyard-root .cell-edit:focus-within, .dockyard-root .cell-edit.is-input { border-color: var(--dy-accent-border); background: var(--dy-surface); outline: none; }
 .dockyard-root .cell-edit:disabled { cursor: not-allowed; opacity: .6; }
 .dockyard-root .cell-title { display: block; font-size: 12.5px; font-weight: 560; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.dockyard-root .tree-ref-chip { flex: none; padding: 1px 6px; border: 1px solid var(--dy-border); border-radius: 5px; background: var(--dy-surface-subtle); color: var(--dy-text-3); font-size: 9.5px; font-weight: 700; letter-spacing: .03em; }
+.dockyard-root .tree-desc { color: var(--dy-text-3); font-size: 11px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .dockyard-root .cell-title-input { border: 0; outline: 0; background: transparent; font: inherit; font-weight: 600; color: var(--dy-text); width: 100%; min-width: 0; }
 .dockyard-root .cell-reason { font-size: 10.5px; color: var(--dy-text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; max-width: 30%; }
 .dockyard-root .cell-reason:hover { color: var(--dy-text-2); }
@@ -1126,7 +1174,20 @@ const DOCKYARD_CSS = `
 .dockyard-root .dockyard-modal { width: min(540px, 100%); max-height: calc(100vh - 40px); padding: 22px; overflow-y: auto; border: 1px solid var(--dy-border); border-radius: 16px; background: var(--dy-surface); box-shadow: var(--dy-shadow); }
 .dockyard-root .dockyard-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .dockyard-root .dockyard-modal-head > div { min-width: 0; }
-.dockyard-root .dockyard-detail-modal { width: min(680px, 100%); }
+.dockyard-root .dockyard-detail-modal { width: min(920px, 100%); }
+.dockyard-root .dockyard-detail-columns { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; align-items: start; margin-top: 14px; }
+.dockyard-root .dockyard-detail-side { display: grid; gap: 2px; align-content: start; padding: 14px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-detail-side h3 { margin: 6px 0 2px; font-size: 12px; }
+.dockyard-root .dockyard-field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dockyard-root .dockyard-field-pair label { min-width: 0; }
+.dockyard-root .dockyard-field-pair input, .dockyard-root .dockyard-field-pair select { width: 100%; min-width: 0; }
+.dockyard-root .dockyard-dirty-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; padding: 8px 12px; border: 1px solid var(--dy-warning); border-radius: 9px; background: var(--dy-warning-bg); color: var(--dy-warning); font-size: 12px; font-weight: 700; }
+.dockyard-root .dockyard-dirty-actions { display: flex; gap: 8px; }
+.dockyard-root .dockyard-dirty-note { color: var(--dy-warning); font-size: 12px; font-weight: 700; }
+.dockyard-root .dockyard-dirty-confirm { margin-top: 12px; padding: 14px; border: 1px solid var(--dy-warning); border-radius: 10px; background: var(--dy-warning-bg); }
+.dockyard-root .dockyard-dirty-confirm p { margin: 6px 0 10px; font-size: 12px; color: var(--dy-text-2); }
+.dockyard-root .dockyard-dirty-confirm .dockyard-modal-actions { margin: 0; }
+.dockyard-root .dockyard-detail-footer { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--dy-border); }
 .dockyard-root .dockyard-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 18px 0 0; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-border); }
 .dockyard-root .dockyard-detail-grid > div { min-width: 0; padding: 12px; background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-detail-grid dt { color: var(--dy-text-3); font-size: 9px; font-weight: 760; letter-spacing: .05em; text-transform: uppercase; }
@@ -1185,7 +1246,7 @@ const DOCKYARD_CSS = `
   backdrop-filter: blur(4px);
 }
 .dockyard-root .dockyard-onboarding {
-  width: min(780px, 100%);
+  width: min(860px, 100%);
   max-height: min(820px, calc(100vh - 40px));
   overflow-y: auto;
   border: 1px solid var(--dy-border);
@@ -1207,6 +1268,12 @@ const DOCKYARD_CSS = `
 .dockyard-root .dockyard-wizard-progress strong { font-size: 10px; }
 .dockyard-root .dockyard-wizard-progress small { margin-top: 1px; font-size: 8px; }
 .dockyard-root .dockyard-wizard-body { min-height: 330px; padding: 24px; }
+.dockyard-root [data-bulk-import-layer] .dockyard-wizard-body textarea { width: 100%; min-height: 220px; padding: 12px 14px; border: 1px solid var(--dy-control-border); border-radius: 10px; background: var(--dy-surface-subtle); color: var(--dy-text); font: 11.5px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; box-sizing: border-box; resize: vertical; }
+.dockyard-root [data-bulk-import-layer] .dockyard-wizard-step h3 { margin-bottom: 4px; }
+.dockyard-root [data-bulk-import-layer] .dockyard-import-actions-row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.dockyard-root [data-bulk-import-layer] .import-drop { flex: 1 1 260px; margin: 0; padding: 13px 12px; }
+.dockyard-root [data-bulk-import-layer] [data-import-preview] { max-height: 300px; margin: 12px 0 0; padding: 0; overflow-y: auto; display: grid; gap: 6px; list-style: none; }
+.dockyard-root [data-bulk-import-layer] [data-import-preview] li { padding: 8px 11px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); font-size: 12px; }
 .dockyard-root .dockyard-wizard-step[hidden] { display: none; }
 .dockyard-root .dockyard-wizard-step h3 { margin: 0; font-size: 18px; }
 .dockyard-root .dockyard-wizard-step > p { max-width: 620px; margin: 6px 0 20px; color: var(--dy-text-2); font-size: 12px; }
@@ -1815,6 +1882,143 @@ const DOCKYARD_CSS = `
 @container dockyard (max-width: 560px) {
   .dockyard-root .dockyard-consolebar { grid-template-areas: 'brand action' 'search search' 'project project' 'tabs tabs'; }
 }
+/* Backlog queue: one aligned, legible two-line row at working density. */
+.dockyard-root [data-backlog-board] .backlog-create-toolbar { margin: 0 0 12px; padding: 0; background: transparent; border: 0; }
+.dockyard-root [data-backlog-board] .backlog-create-toolbar .dockyard-meta { color: var(--dy-text-2); font-size: 12px; font-weight: 650; }
+.dockyard-root [data-backlog-board] .dockyard-cmdbar { padding: 11px 14px 5px; border: 0; }
+.dockyard-root [data-backlog-board] .dockyard-filterbar { padding: 6px 14px 12px; gap: 10px; }
+/* Approved design: single-line toolbar — search and every control on one
+   row; the filter row folds into the same line at desktop width. */
+.dockyard-root [data-backlog-board] .dockyard-cmdbar { flex-wrap: nowrap; overflow-x: auto; }
+.dockyard-root [data-backlog-board] .dockyard-cmdbar .cm-count { margin-left: auto; white-space: nowrap; }
+.dockyard-root [data-backlog-board] .cm-search { max-width: 440px; background: var(--dy-surface); }
+.dockyard-root [data-backlog-board] .tree-head { min-height: 37px; }
+.dockyard-root [data-backlog-board] .dockyard-tree-row { min-height: 55px; }
+.dockyard-root [data-backlog-board] .th-gutter, .dockyard-root [data-backlog-board] .tree-gutter { width: 34px; }
+.dockyard-root [data-backlog-board] .tree-check { opacity: .55; }
+.dockyard-root [data-backlog-board] .th-rank, .dockyard-root [data-backlog-board] .tree-rank { width: 48px; text-align: left; justify-content: flex-start; }
+.dockyard-root [data-backlog-board] .tree-rank .cell-rank { color: var(--dy-text); font-weight: 750; font-variant-numeric: tabular-nums; }
+.dockyard-root [data-backlog-board] .th-type, .dockyard-root [data-backlog-board] .tree-type-cell { width: 84px; }
+.dockyard-root [data-backlog-board] .th-title, .dockyard-root [data-backlog-board] .tree-title { min-width: 210px; flex: 2.6; }
+.dockyard-root [data-backlog-board] .th-status, .dockyard-root [data-backlog-board] .tree-status { width: 95px; }
+.dockyard-root [data-backlog-board] .th-initiative, .dockyard-root [data-backlog-board] .tree-initiative { width: 125px; }
+.dockyard-root [data-backlog-board] .th-who, .dockyard-root [data-backlog-board] .tree-who { width: 110px; }
+.dockyard-root [data-backlog-board] .th-age, .dockyard-root [data-backlog-board] .tree-age { width: 42px; flex: none; font-size: 11px; color: var(--dy-text-2); font-variant-numeric: tabular-nums; }
+.dockyard-root [data-backlog-board] .th-reason, .dockyard-root [data-backlog-board] .tree-priority-reason { min-width: 110px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--dy-text-2); }
+.dockyard-root [data-backlog-board] .tree-title-stack { gap: 3px; }
+.dockyard-root [data-backlog-board] .cell-title { font-size: 12.5px; font-weight: 650; }
+.dockyard-root [data-backlog-board] .tree-desc { font-size: 10.5px; }
+.dockyard-root [data-backlog-board] .tree-ref-chip { background: transparent; border: 0; padding: 0; font-size: 10.5px; color: var(--dy-accent-text); }
+.dockyard-root [data-backlog-board] .initiative-cell-value small { display: none; }
+.dockyard-root [data-backlog-board] .tree-menu-btn { opacity: .75; }
+@media (max-width: 1190px) {
+  .dockyard-root [data-backlog-board] .th-rank, .dockyard-root [data-backlog-board] .tree-rank { display: inline-flex !important; }
+  .dockyard-root [data-backlog-board] .th-reason, .dockyard-root [data-backlog-board] .tree-priority-reason { display: none; }
+  .dockyard-root [data-backlog-board] .th-title, .dockyard-root [data-backlog-board] .tree-title { min-width: 160px; }
+}
+@media (max-width: 850px) {
+  .dockyard-root [data-backlog-board] .th-age, .dockyard-root [data-backlog-board] .tree-age,
+  .dockyard-root [data-backlog-board] .th-initiative, .dockyard-root [data-backlog-board] .tree-initiative { display: none; }
+}
+/* Import: explicit source, validation and result stages. */
+.dockyard-root [data-bulk-import-layer] .dockyard-onboarding { width: min(780px, 100%); padding: 0; }
+.dockyard-root [data-bulk-import-layer] .dockyard-wizard-progress { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dockyard-root [data-bulk-import-layer] .dockyard-wizard-progress strong { font-size: 12px; }
+.dockyard-root [data-bulk-import-layer] .dockyard-wizard-progress small { font-size: 10.5px; color: var(--dy-text-2); }
+.dockyard-root [data-bulk-import-layer] .dockyard-wizard-body { min-height: 300px; padding: 20px 24px; }
+.dockyard-root [data-bulk-import-layer] .dockyard-wizard-body textarea { min-height: 125px; max-height: 210px; background: var(--dy-surface); }
+.dockyard-root [data-bulk-import-layer] .import-drop { text-align: left; padding: 12px 14px; }
+.dockyard-root [data-bulk-import-layer] .import-drop strong { display: block; font-size: 12px; }
+.dockyard-root [data-bulk-import-layer] .import-drop small { color: var(--dy-text-2); font-size: 11px; }
+.dockyard-root [data-bulk-import-layer] .import-drop input { max-width: 100%; margin-top: 8px; }
+.dockyard-root [data-bulk-import-layer] .dockyard-import-actions-row { align-items: stretch; }
+.dockyard-root [data-bulk-import-layer] [data-import-preview] { max-height: 360px; }
+.dockyard-root [data-bulk-import-layer] [data-import-preview] li { display: grid; grid-template-columns: 72px minmax(0,1fr) 98px; align-items: start; gap: 10px; background: var(--dy-surface); }
+.dockyard-root .dockyard-detail-modal .dockyard-detail-footer { margin: 0; padding: 13px 24px 18px; justify-content: space-between; }
+.dockyard-root .dockyard-detail-footer-right { display: inline-flex; align-items: center; gap: 10px; }
++/* Approved dark reference: breadcrumb, iconed fields, status dots, X clears,
++   full-width activity timeline. */
+.dockyard-root .dockyard-detail-breadcrumb { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--dy-text-2); }
+.dockyard-root .dockyard-detail-breadcrumb svg { width: 12px; height: 12px; opacity: 0.7; }
+.dockyard-root .dockyard-detail-breadcrumb span:last-child { color: var(--dy-text); font-weight: 600; }
+.dockyard-root .dockyard-field-iconed { display: grid; gap: 4px; min-width: 0; }
+.dockyard-root .dockyard-field-shell { display: inline-flex; align-items: center; gap: 7px; padding: 0 9px; border: 1px solid var(--dy-control-border); border-radius: 9px; background: var(--dy-surface-subtle); min-width: 0; }
+.dockyard-root .dockyard-field-shell svg { width: 13px; height: 13px; flex: none; color: var(--dy-text-2); }
+.dockyard-root .dockyard-field-shell input, .dockyard-root .dockyard-field-shell select { flex: 1 1 auto; min-width: 0; border: 0; background: transparent; padding: 8px 0; color: var(--dy-text); font: inherit; }
+.dockyard-root .dockyard-field-shell input:focus-visible, .dockyard-root .dockyard-field-shell select:focus-visible { outline: none; }
+.dockyard-root .dockyard-field-shell:focus-within { outline: 2px solid var(--dy-accent-text); outline-offset: 1px; }
+.dockyard-root .dockyard-status-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--dy-text-2); }
+.dockyard-root .dockyard-status-dot.status-backlog { background: var(--dy-neutral); }
+.dockyard-root .dockyard-status-dot.status-in_progress { background: var(--dy-info); }
+.dockyard-root .dockyard-status-dot.status-in_review { background: var(--dy-warning); }
+.dockyard-root .dockyard-status-dot.status-blocked { background: var(--dy-danger); }
+.dockyard-root .dockyard-status-dot.status-done { background: var(--dy-success); }
+.dockyard-root .dockyard-field-clear { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--dy-text-2); cursor: pointer; flex: none; }
+.dockyard-root .dockyard-field-clear svg { width: 12px; height: 12px; }
+.dockyard-root .dockyard-field-clear:hover:not(:disabled) { color: var(--dy-text); background: var(--dy-surface); }
+.dockyard-root .dockyard-field-clear:disabled { opacity: 0.35; cursor: default; }
+.dockyard-root .dockyard-assignee-field { display: flex; align-items: end; gap: 6px; }
+.dockyard-root .dockyard-assignee-field .dockyard-picker, .dockyard-root .dockyard-assignee-field > :first-child { flex: 1 1 auto; min-width: 0; }
+.dockyard-root .dockyard-detail-activity { margin: 0; padding: 4px 24px 10px; }
+.dockyard-root .dockyard-detail-activity-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dockyard-root .dockyard-detail-activity-head h3 { margin: 6px 0 2px; font-size: 12px; }
+.dockyard-root .dockyard-activity-scope { display: inline-flex; align-items: center; gap: 8px; }
+.dockyard-root .dockyard-activity-scope-shell { padding: 0 8px; }
+.dockyard-root .dockyard-activity-scope-shell select { padding: 6px 0; font-size: 11.5px; }
+.dockyard-root .dockyard-detail-modal .dockyard-history-list { margin: 7px 0 0; padding: 0 0 0 2px; list-style: none; max-height: 180px; overflow-y: auto; }
+.dockyard-root .dockyard-detail-modal .dockyard-history-list li { padding: 9px 0; border-top: 1px solid var(--dy-border); font-size: 11px; }
+.dockyard-root .dockyard-detail-modal .dockyard-history-list strong { display: block; color: var(--dy-text); font-size: 11px; }
+.dockyard-root .dockyard-detail-modal .dockyard-history-list span { display: block; margin-top: 2px; color: var(--dy-text-2); }
+.dockyard-root [data-bulk-import-layer] .import-row-error { color: var(--dy-danger); grid-column: 2 / -1; font-size: 11px; }
++/* Approved import design: summary cards, warnings toggle, per-row badges,
++   split-pane preview with parsed values + will-import-as. */
+.dockyard-root [data-bulk-import-layer] .import-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 10px; align-items: center; margin: 10px 0 6px; }
+.dockyard-root [data-bulk-import-layer] .import-stat { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface-subtle); font-size: 12px; }
+.dockyard-root [data-bulk-import-layer] .import-stat strong { font-size: 14px; }
+.dockyard-root [data-bulk-import-layer] .import-stat svg { width: 14px; height: 14px; flex: none; }
+.dockyard-root [data-bulk-import-layer] .import-stat.valid svg { color: var(--dy-success); }
+.dockyard-root [data-bulk-import-layer] .import-stat.warn svg { color: var(--dy-warning); }
+.dockyard-root [data-bulk-import-layer] .import-stat.errored svg { color: var(--dy-danger); }
+.dockyard-root [data-bulk-import-layer] .import-warnings-toggle { display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--dy-text-2); white-space: nowrap; cursor: pointer; }
+.dockyard-root [data-bulk-import-layer] .import-split { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(240px, 1fr); gap: 14px; align-items: start; }
+.dockyard-root [data-bulk-import-layer] .import-badge { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 700; }
+.dockyard-root [data-bulk-import-layer] .import-badge.ok { color: var(--dy-success); background: var(--dy-success-bg); }
+.dockyard-root [data-bulk-import-layer] .import-badge.warning { color: var(--dy-warning); background: var(--dy-warning-bg); }
+.dockyard-root [data-bulk-import-layer] .import-badge.error { color: var(--dy-danger); background: var(--dy-danger-bg); }
+.dockyard-root [data-bulk-import-layer] [data-import-preview] li { cursor: pointer; }
+.dockyard-root [data-bulk-import-layer] [data-import-preview] li.selected { border-color: var(--dy-accent-border); outline: 1px solid var(--dy-accent-border); }
+.dockyard-root [data-bulk-import-layer] [data-import-preview] li.has-warning { border-left: 3px solid var(--dy-warning); }
+.dockyard-root [data-bulk-import-layer] [data-import-preview] li.has-error { border-left: 3px solid var(--dy-danger); }
+.dockyard-root [data-bulk-import-layer] .import-row-detail { display: grid; gap: 10px; padding: 13px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface-subtle); font-size: 12px; }
+.dockyard-root [data-bulk-import-layer] .import-row-detail h4 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 12px; }
+.dockyard-root [data-bulk-import-layer] .import-warning-text { margin: 0; color: var(--dy-warning); font-size: 11.5px; }
+.dockyard-root [data-bulk-import-layer] .import-parsed { display: grid; gap: 6px; }
+.dockyard-root [data-bulk-import-layer] .import-parsed strong { font-size: 11px; color: var(--dy-text-2); text-transform: uppercase; letter-spacing: 0.04em; }
+.dockyard-root [data-bulk-import-layer] .import-parsed dl { margin: 0; display: grid; gap: 3px; font-size: 11.5px; }
+.dockyard-root [data-bulk-import-layer] .import-parsed dl > div { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 8px; }
+.dockyard-root [data-bulk-import-layer] .import-parsed dt { color: var(--dy-text-2); }
+.dockyard-root [data-bulk-import-layer] .import-parsed dd { margin: 0; overflow-wrap: anywhere; }
+.dockyard-root [data-bulk-import-layer] .import-as { display: grid; gap: 4px; padding-top: 9px; border-top: 1px solid var(--dy-border); }
+.dockyard-root [data-bulk-import-layer] .import-as strong { font-size: 11px; color: var(--dy-text-2); text-transform: uppercase; letter-spacing: 0.04em; }
+.dockyard-root [data-bulk-import-layer] .import-as p { margin: 0; font-weight: 700; }
+.dockyard-root [data-bulk-import-layer] .dockyard-wizard-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.dockyard-root [data-bulk-import-layer] .dockyard-wizard-actions-left, .dockyard-root [data-bulk-import-layer] .dockyard-wizard-actions-right { display: inline-flex; gap: 9px; }
++@media (max-width: 760px) { .dockyard-root [data-bulk-import-layer] .import-split { grid-template-columns: 1fr; } .dockyard-root [data-bulk-import-layer] .import-summary { grid-template-columns: 1fr 1fr; } }
+.dockyard-root [data-bulk-import-layer] :is(button,input,textarea,select):focus-visible,
+.dockyard-root [data-backlog-board] :is(button,input,select):focus-visible { outline: 2px solid var(--dy-accent-text); outline-offset: 2px; }
+.dockyard-root .dockyard-detail-modal { width: min(870px, 100%); padding: 0; }
+.dockyard-root .dockyard-detail-modal > .dockyard-modal-head { padding: 20px 24px 15px; border-bottom: 1px solid var(--dy-border); }
+.dockyard-root .dockyard-detail-modal .dockyard-detail-columns { grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr); gap: 18px; padding: 18px 24px 12px; margin: 0; }
+.dockyard-root .dockyard-detail-modal .dockyard-detail-side { padding: 12px; }
+.dockyard-root .dockyard-detail-modal .dockyard-detail-footer { margin: 0; padding: 13px 24px 18px; }
+.dockyard-root .dockyard-detail-modal .dockyard-work-editor { gap: 5px; }
+.dockyard-root .dockyard-detail-modal .dockyard-work-editor textarea { min-height: 80px; }
+.dockyard-root .dockyard-detail-modal .dockyard-detail-grid { margin-top: 8px; }
+.dockyard-root .dockyard-history-list { margin: 7px 0 0; padding: 0; list-style: none; }
+.dockyard-root .dockyard-history-list li { padding: 9px 0; border-top: 1px solid var(--dy-border); font-size: 11px; }
+.dockyard-root .dockyard-history-list strong { display: block; color: var(--dy-text); font-size: 11px; }
+.dockyard-root .dockyard-history-list span { display: block; margin-top: 2px; color: var(--dy-text-2); }
+@media (max-width: 720px) { .dockyard-root .dockyard-detail-modal .dockyard-detail-columns { grid-template-columns: 1fr; } }
 `
 
 let _rest = null
@@ -1898,7 +2102,7 @@ const ICON_NAME = Object.freeze({
   alert: 'triangle-alert', refresh: 'rotate-cw', activity: 'activity',
   eye: 'eye', chevron: 'chevron-right', 'chevron-down': 'chevron-down',
   search: 'search', pencil: 'pencil', bell: 'bell',
-  'type-epic': 'list-checks', 'type-feature': 'folders',
+  'type-epic': 'list-checks', 'type-feature': 'folders', 'type-initiative': 'flag',
   'type-task': 'square-check-big', 'type-subtask': 'list-checks',
   'type-bug': 'bug', 'type-spike': 'zap',
 })
@@ -3659,6 +3863,11 @@ function WorkItemDetail({ item, projectId, profiles, onClose, onRefresh }) {
   const [feedback, setFeedback] = useState(null)
   const [error, setError] = useState(null)
   const [depRef, setDepRef] = useState('')
+  // Dirty-state guard: Escape / outside click with unsaved edits must ask,
+  // not silently destroy the operator's work. Undo restores the canonical
+  // baseline; Discard is explicit and separate. (isDirty is defined below,
+  // after the baseline state it compares against.)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   // Canonical baseline (round-4 Residual B): fields are compared against this
   // refreshed record, not the stale inbox list item, so consecutive edits and
   // re-edits both reach the backend.
@@ -3685,6 +3894,14 @@ function WorkItemDetail({ item, projectId, profiles, onClose, onRefresh }) {
     setBaseline(record)
     return record
   }
+  // isDirty + undoChanges live here, after baseline/draft state exist.
+  const isDirty = Boolean(draft && baseline && (
+    draft.title !== baseline.title || draft.type !== baseline.type ||
+    draft.body !== (baseline.body ?? '') || draft.labels !== baseline.labels ||
+    draft.estimate_days !== baseline.estimate_days || draft.due !== baseline.due ||
+    draft.parent_ref !== baseline.parent_ref || draft.evidence_refs !== baseline.evidence_refs ||
+    (draft.assignee ?? '') !== (baseline.assignee ?? '') || draft.status !== baseline.status))
+  const undoChanges = () => { if (baseline) { setDraft({ ...baseline }); setConfirmDiscard(false); setError(null) } }
   useEffect(() => {
     if (!item) {
       setDraft(null)
@@ -3720,10 +3937,14 @@ function WorkItemDetail({ item, projectId, profiles, onClose, onRefresh }) {
   }, [item])
   useEffect(() => {
     if (!item) return undefined
-    const closeOnEscape = (event) => { if (event.key === 'Escape') onClose() }
+    const closeOnEscape = (event) => {
+      if (event.key !== 'Escape') return
+      if (isDirty) { setConfirmDiscard(true); return }
+      onClose()
+    }
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [item, onClose])
+  }, [item, onClose, isDirty])
   // Full supported-field detail (P5.3): canonical relationships, evidence and
   // history come from the existing work-item detail reader. Requests carry a
   // lifetime/identity guard (round-5 regression): an obsolete response — one
@@ -3741,8 +3962,8 @@ function WorkItemDetail({ item, projectId, profiles, onClose, onRefresh }) {
         if (record && !busy) setDraft((current) => (current ? { ...record } : current))
         return result
       })
-      .catch(() => {
-        if (!guard || guard.current.alive) setDetail(null)
+      .catch((failure) => {
+        if (!guard || guard.current.alive) { setDetail(null); setError(`Could not load item details: ${String(failure?.message ?? failure)}`) }
         return null
       })
   }
@@ -3826,101 +4047,235 @@ function WorkItemDetail({ item, projectId, profiles, onClose, onRefresh }) {
     }
     setBusy(false)
   }
+  // History filtering matches the approved reference: the timeline header
+  // carries an 'All activity' dropdown; narrower scopes cut the list.
+  const [historyFilter, setHistoryFilter] = useState('all')
+  useEffect(() => { setHistoryFilter('all') }, [item?.ref])
+  const historyEntries = (detail?.history ?? []).filter((entry) => {
+    if (historyFilter === 'all') return true
+    const action = String(entry.summary || entry.action || entry.kind || '').toLowerCase()
+    if (historyFilter === 'status') return /status|transition|state/.test(action)
+    if (historyFilter === 'assignee') return /assign/.test(action)
+    if (historyFilter === 'fields') return !/status|transition|state|assign/.test(action)
+    return true
+  })
+  const detailProject = detail?.project?.title || detail?.project?.name || item?.project_name || projectId
+  // Approved reference: icon inside the field control, plus an explicit X
+  // that clears the value (assignee, due date). Backend-supported only.
+  const clearDue = () => { if (!busy && draft?.due) setDraft({ ...draft, due: '' }) }
+  const clearAssignee = () => { if (!busy && draft?.assignee) setDraft({ ...draft, assignee: '' }) }
   return jsx('section', {
     className: 'dockyard-modal-layer',
     'data-work-item-detail-layer': true,
     hidden: !item,
-    onClick: (event) => { if (event.target === event.currentTarget) onClose() },
+    onClick: (event) => {
+      if (event.target !== event.currentTarget) return
+      if (isDirty) { setConfirmDiscard(true); return }
+      onClose()
+    },
     children: item ? jsxs('div', {
       className: 'dockyard-modal dockyard-detail-modal',
       role: 'dialog',
       'aria-modal': true,
       'aria-labelledby': 'dockyard-work-item-title',
       'data-work-item-detail': item.ref,
+      'data-dirty': isDirty ? 'true' : undefined,
       children: [
         jsxs('header', { className: 'dockyard-modal-head', children: [
           jsxs('div', { children: [
-            jsx('span', { className: 'dockyard-card-label', children: 'EDITABLE WORK ITEM' }),
-            jsx('h2', { id: 'dockyard-work-item-title', children: item.title || item.ref }),
+            // Approved reference breadcrumb: project · item ref · type.
+            jsxs('nav', { className: 'dockyard-detail-breadcrumb', 'aria-label': 'Work item location', children: [
+              jsx('span', { children: detailProject || 'Project' }),
+              jsx(Icon, { name: 'chevron-right' }),
+              jsx('span', { children: item.ref }),
+              jsx(Icon, { name: 'chevron-right' }),
+              jsx('span', { children: readableLabel(item.type || 'task') }),
+            ]}),
+            jsx('h2', { id: 'dockyard-work-item-title', children: draft?.title || item.title || item.ref }),
           ]}),
-          jsx(Button, { action: 'close-work-item-detail', ariaLabel: 'Close work item details', onClick: onClose, children: 'Close' }),
+          jsx(Button, { action: 'close-work-item-detail', ariaLabel: 'Close work item details', onClick: () => { if (isDirty) { setConfirmDiscard(true) } else { onClose() } }, children: 'Close' }),
         ]}),
+        isDirty ? jsxs('div', { className: 'dockyard-dirty-banner', role: 'status', 'data-dirty-banner': true, children: [
+          jsx('span', { children: 'Unsaved changes' }),
+          jsxs('span', { className: 'dockyard-dirty-actions', children: [
+            jsx(Button, { small: true, action: 'undo-work-item-changes', disabled: busy, onClick: undoChanges, children: 'Undo changes' }),
+            jsx(Button, { small: true, action: 'discard-work-item-changes', disabled: busy, onClick: () => { setConfirmDiscard(false); onClose() }, children: 'Discard' }),
+          ]}),
+        ] }) : null,
+        confirmDiscard ? jsxs('div', { className: 'dockyard-dirty-confirm', role: 'alertdialog', 'aria-label': 'Unsaved changes', 'data-discard-confirm': true, children: [
+          jsx('strong', { children: 'Discard unsaved changes?' }),
+          jsx('p', { children: 'Your edits to this work item have not been saved. Choosing discard loses them; keep editing returns you to the form.' }),
+          jsxs('div', { className: 'dockyard-modal-actions', children: [
+            jsx(Button, { action: 'keep-editing', variant: 'primary', onClick: () => setConfirmDiscard(false), children: 'Keep editing' }),
+            jsx(Button, { action: 'confirm-discard', onClick: () => { setConfirmDiscard(false); onClose() }, children: 'Discard changes' }),
+          ]}),
+        ] }) : null,
+        jsxs('div', { className: 'dockyard-detail-columns', children: [
         jsxs('div', { className: 'dockyard-work-editor', children: [
           jsxs('label', { children: ['Title ', jsx('input', {
             value: draft?.title ?? '', onChange: (event) => setDraft({ ...draft, title: event.target.value }),
           })]}),
-          jsxs('label', { children: ['Type ', jsx('select', {
-            value: draft?.type ?? 'task', onChange: (event) => setDraft({ ...draft, type: event.target.value }), children:
-            ['task', 'bug', 'spike', 'subtask', 'gate'].map((kind) => jsx('option', { value: kind, children: kind }, kind)),
-          })]}),
+          jsxs('div', { className: 'dockyard-field-pair', children: [
+            // Approved reference: the Type control carries its Lucide icon
+            // inside the field, before the value.
+            jsxs('label', { className: 'dockyard-field-iconed', children: ['Type ', jsxs('span', { className: 'dockyard-field-shell', children: [
+              jsx(Icon, { name: ICON_NAME[`type-${draft?.type ?? 'task'}`] ?? 'square-check-big' }),
+              jsx('select', {
+                value: draft?.type ?? 'task', onChange: (event) => setDraft({ ...draft, type: event.target.value }), children:
+                ['task', 'bug', 'spike', 'subtask', 'gate'].map((kind) => jsx('option', { value: kind, children: kind }, kind)),
+              }),
+            ]})]}),
+            // Approved reference: status selector shows a semantic status dot
+            // inside the control. Colours stay semantic, never theme-coloured.
+            jsxs('label', { className: 'dockyard-field-iconed', children: ['Status ', jsxs('span', { className: 'dockyard-field-shell', children: [
+              jsx('span', { className: `dockyard-status-dot status-${draft?.status ?? 'backlog'}`, 'data-status-dot': draft?.status ?? 'backlog', 'aria-hidden': true }),
+              jsx('select', {
+                value: draft?.status ?? 'backlog', onChange: (event) => setDraft({ ...draft, status: event.target.value }), children:
+                ['backlog', 'in_progress', 'in_review', 'blocked', 'done'].map((status) => jsx('option', { value: status, children: readableLabel(status) }, status)),
+              }),
+            ]})]}),
+          ]}),
           jsx('label', { children: 'Body' }),
           jsx('textarea', {
-            'aria-label': 'Body', value: draft?.body ?? '', rows: 3,
+            'aria-label': 'Body', value: draft?.body ?? '', rows: 5,
             onChange: (event) => setDraft({ ...draft, body: event.target.value }),
           }),
-          jsxs('label', { children: ['Labels (comma separated) ', jsx('input', {
-            value: draft?.labels ?? '', onChange: (event) => setDraft({ ...draft, labels: event.target.value }),
-          })]}),
-          jsxs('label', { children: ['Estimate days ', jsx('input', {
-            type: 'number', min: 0, step: 0.5, value: draft?.estimate_days ?? '',
-            onChange: (event) => setDraft({ ...draft, estimate_days: event.target.value }),
-          })]}),
-          jsxs('label', { children: ['Due date ', jsx('input', {
-            type: 'date', value: draft?.due ?? '',
-            onChange: (event) => setDraft({ ...draft, due: event.target.value }),
-          })]}),
-          jsxs('label', { children: ['Parent ref ', jsx('input', {
-            value: draft?.parent_ref ?? '', onChange: (event) => setDraft({ ...draft, parent_ref: event.target.value }),
-          })]}),
-          jsxs('label', { children: ['Evidence refs (comma separated) ', jsx('input', {
-            'aria-label': 'Evidence refs', value: draft?.evidence_refs ?? '', onChange: (event) => setDraft({ ...draft, evidence_refs: event.target.value }),
-          })]}),
-          jsx(DiscoveredProfilePicker, {
-            profiles, name: 'work-assignee', label: 'Assignee', value: draft?.assignee ?? '',
-            onChange: (value) => setDraft({ ...draft, assignee: value }), disabled: busy,
+          jsxs('div', { className: 'dockyard-field-pair', children: [
+            jsxs('label', { className: 'dockyard-field-iconed', children: ['Labels ', jsxs('span', { className: 'dockyard-field-shell', children: [
+              jsx(Icon, { name: 'sticky-note' }),
+              jsx('input', {
+                value: draft?.labels ?? '', onChange: (event) => setDraft({ ...draft, labels: event.target.value }),
+              }),
+            ]})]}),
+            jsxs('label', { className: 'dockyard-field-iconed', children: ['Estimate days ', jsxs('span', { className: 'dockyard-field-shell', children: [
+              jsx(Icon, { name: 'clock-3' }),
+              jsx('input', {
+                type: 'number', min: 0, step: 0.5, value: draft?.estimate_days ?? '',
+                onChange: (event) => setDraft({ ...draft, estimate_days: event.target.value }),
+              }),
+            ]})]}),
+          ]}),
+          jsxs('div', { className: 'dockyard-field-pair', children: [
+            // Approved reference: calendar icon inside the field and an explicit
+            // X that clears the due date.
+            jsxs('label', { className: 'dockyard-field-iconed', children: ['Due date ', jsxs('span', { className: 'dockyard-field-shell', children: [
+              jsx(Icon, { name: 'calendar' }),
+              jsx('input', {
+                type: 'date', 'aria-label': 'Due date', value: draft?.due ?? '',
+                onChange: (event) => setDraft({ ...draft, due: event.target.value }),
+              }),
+              jsx('button', {
+                type: 'button', className: 'dockyard-field-clear', 'data-action': 'clear-due-date',
+                'aria-label': 'Clear due date', disabled: busy || !draft?.due,
+                onClick: clearDue, children: jsx(Icon, { name: 'x' }),
+              }),
+            ]})]}),
+            // Assignee keeps the existing DiscoveredProfilePicker; the approved
+            // reference adds an explicit X to unassign (the assign endpoint
+            // already accepts null).
+            jsxs('span', { className: 'dockyard-field-iconed dockyard-assignee-field', children: [
+              jsx(DiscoveredProfilePicker, {
+                profiles, name: 'work-assignee', label: 'Assignee', value: draft?.assignee ?? '',
+                onChange: (value) => setDraft({ ...draft, assignee: value }), disabled: busy,
+              }),
+              jsx('button', {
+                type: 'button', className: 'dockyard-field-clear', 'data-action': 'clear-assignee',
+                'aria-label': 'Clear assignee', disabled: busy || !draft?.assignee,
+                onClick: clearAssignee, children: jsx(Icon, { name: 'x' }),
+              }),
+            ]}),
+          ]}),
+        ]}),
+        jsxs('aside', { className: 'dockyard-detail-side', children: [
+          jsxs('label', { className: 'dockyard-field-iconed', children: ['Parent ', jsxs('span', { className: 'dockyard-field-shell', children: [
+            jsx(Icon, { name: 'layers' }),
+            jsx('select', {
+              value: draft?.parent_ref ?? '', onChange: (event) => setDraft({ ...draft, parent_ref: event.target.value }), children: [
+              jsx('option', { value: '', children: '— top level —' }, 'none'),
+              ...(detail?.parent_choices ?? []).map((choice) => jsx('option', { value: choice.ref, children: `${choice.ref} · ${choice.title}` }, choice.ref)),
+              (draft?.parent_ref && !(detail?.parent_choices ?? []).some((choice) => choice.ref === draft.parent_ref))
+                ? jsx('option', { value: draft.parent_ref, children: draft.parent_ref }, 'current-parent')
+                : null,
+            ],
+            }),
+          ]})]}),
+          jsxs('label', { className: 'dockyard-field-iconed', children: ['Evidence refs ', jsxs('span', { className: 'dockyard-field-shell', children: [
+            jsx(Icon, { name: 'link' }),
+            jsx('input', {
+              'aria-label': 'Evidence refs', value: draft?.evidence_refs ?? '', onChange: (event) => setDraft({ ...draft, evidence_refs: event.target.value }),
+            }),
+          ]})]}),
+          jsxs('dl', { className: 'dockyard-detail-grid', children: [
+            jsxs('div', { children: [jsx('dt', { children: 'Reference' }), jsx('dd', { children: item.ref })] }),
+            jsxs('div', { children: [jsx('dt', { children: 'Initiative' }), jsx('dd', { children: detail?.work_item?.initiative_ref || item.initiative_ref || 'Not linked' })] }),
+            jsxs('div', { children: [jsx('dt', { children: 'Evidence' }), jsx('dd', { children: `${number((detail?.work_item?.evidence_refs ?? item.evidence_refs)?.length ?? 0)} attached` })] }),
+          ]}),
+          detail
+            ? jsxs('div', { className: 'dockyard-dependency-editor', 'data-dependency-editor': true, children: [
+                jsx('h3', { children: 'Dependencies' }),
+                (detail.dependencies ?? []).length === 0
+                  ? jsx('p', { className: 'dockyard-meta', children: 'No dependencies recorded.' })
+                  : jsx('ul', { children: (detail.dependencies ?? []).map((dependency) => jsx('li', { children: `${dependency.ref}: ${dependency.title}` }, dependency.ref)) }),
+                jsxs('div', { className: 'dockyard-form-actions', children: [
+                  jsx('input', {
+                    'aria-label': 'Dependency task ref', placeholder: 'e.g. HDY-4',
+                    value: depRef, onChange: (event) => setDepRef(event.target.value),
+                  }),
+                  jsx(Button, {
+                    action: 'add-dependency', variant: 'quiet', disabled: busy || !depRef.trim(),
+                    onClick: addDependency, children: 'Add dependency',
+                  }),
+                ]}),
+              ]})
+            : null,
+        ]}),
+        ]}),
+        // Approved reference: the Activity timeline is a full-width section
+        // below the field columns, with an 'All activity' scope dropdown.
+        detail ? jsxs('section', { className: 'dockyard-detail-activity', 'data-work-history': true, 'aria-label': 'Task activity', children: [
+          jsxs('div', { className: 'dockyard-detail-activity-head', children: [
+            jsx('h3', { children: 'Activity' }),
+            jsx('label', { className: 'dockyard-activity-scope', children: [
+              jsx('span', { className: 'dockyard-meta', children: 'Scope' }),
+              jsxs('span', { className: 'dockyard-field-shell dockyard-activity-scope-shell', children: [
+                jsx(Icon, { name: 'filter' }),
+                jsx('select', { 'data-activity-scope': true, 'aria-label': 'Activity scope', value: historyFilter, onChange: (event) => setHistoryFilter(event.target.value), children: [
+                  jsx('option', { value: 'all', children: 'All activity' }, 'all'),
+                  jsx('option', { value: 'status', children: 'Status changes' }, 'status'),
+                  jsx('option', { value: 'assignee', children: 'Assignment' }, 'assignee'),
+                  jsx('option', { value: 'fields', children: 'Field edits' }, 'fields'),
+                ] }),
+              ]}),
+            ]}),
+          ]}),
+          detail === null ? jsx('p', { className: 'dockyard-meta', children: 'Loading recorded activity…' })
+            : historyEntries.length
+              ? jsx('ol', { className: 'dockyard-history-list', children: historyEntries.map((entry, index) => {
+                  const action = String(entry.summary || entry.action || entry.kind || 'Work item updated').replace(/[._]/g, ' ')
+                  const actor = entry.actor_id || entry.actor || entry.verified_actor || 'Actor not recorded'
+                  const at = entry.ts || entry.created_at || entry.at
+                  return jsxs('li', { children: [jsx('strong', { children: action }), jsx('span', { children: `${actor}${at ? ` · ${formatWhen(at)}` : ''}` }), entry.detail?.reason ? jsx('span', { children: `Reason: ${entry.detail.reason}` }) : null] }, String(entry.id ?? index))
+                }) })
+              : jsx('p', { className: 'dockyard-meta', children: (detail?.history ?? []).length ? 'No entries match this scope.' : 'No recorded activity for this item yet.' }),
+        ] }) : null,
+        jsxs('div', { className: 'dockyard-form-actions dockyard-detail-footer', children: [
+          // Approved reference: Cancel sits on the left; 'Unsaved changes' and
+          // the primary Save sit on the right. Cancel discards via the same
+          // guarded path as Escape (dirty edits ask first).
+          jsx(Button, {
+            action: 'cancel-work-item-detail', onClick: () => { if (isDirty) { setConfirmDiscard(true) } else { onClose() } },
+            disabled: busy, children: 'Cancel',
           }),
-          jsxs('label', { children: ['Status ', jsx('select', {
-            value: draft?.status ?? 'backlog', onChange: (event) => setDraft({ ...draft, status: event.target.value }), children:
-            ['backlog', 'in_progress', 'in_review', 'blocked', 'done'].map((status) => jsx('option', { value: status, children: readableLabel(status) }, status)),
-          })]}),
-          jsxs('div', { className: 'dockyard-form-actions', children: [
+          jsxs('span', { className: 'dockyard-detail-footer-right', children: [
+            isDirty ? jsx('span', { className: 'dockyard-dirty-note', 'data-unsaved-note': true, children: 'Unsaved changes' }) : null,
             jsx(Button, {
-              action: 'save-work-item', variant: 'primary', disabled: busy,
+              action: 'save-work-item', variant: 'primary', disabled: busy || !isDirty,
               onClick: save, children: busy ? 'Saving...' : 'Save changes',
             }),
             feedback ? jsx('span', { role: 'status', children: feedback }) : null,
+            error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
           ]}),
-          error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
         ]}),
-        detail
-          ? jsxs('div', { className: 'dockyard-dependency-editor', 'data-dependency-editor': true, children: [
-              jsx('h3', { children: 'Dependencies' }),
-              (detail.dependencies ?? []).length === 0
-                ? jsx('p', { className: 'dockyard-meta', children: 'No dependencies recorded.' })
-                : jsx('ul', { children: (detail.dependencies ?? []).map((dependency) => jsx('li', { children: `${dependency.ref}: ${dependency.title}` }, dependency.ref)) }),
-              jsxs('div', { className: 'dockyard-form-actions', children: [
-                jsx('input', {
-                  'aria-label': 'Dependency task ref', placeholder: 'e.g. HDY-4',
-                  value: depRef, onChange: (event) => setDepRef(event.target.value),
-                }),
-                jsx(Button, {
-                  action: 'add-dependency', variant: 'quiet', disabled: busy || !depRef.trim(),
-                  onClick: addDependency, children: 'Add dependency',
-                }),
-              ]}),
-            ]})
-          : null,
-        jsxs('dl', { className: 'dockyard-detail-grid', children: [
-          jsxs('div', { children: [jsx('dt', { children: 'Reference' }), jsx('dd', { children: item.ref })] }),
-          jsxs('div', { children: [jsx('dt', { children: 'Initiative' }), jsx('dd', { children: detail?.work_item?.initiative_ref || item.initiative_ref || 'Not linked' })] }),
-          jsxs('div', { children: [jsx('dt', { children: 'Evidence' }), jsx('dd', { children: `${number((detail?.work_item?.evidence_refs ?? item.evidence_refs)?.length ?? 0)} attached` })] }),
-        ]}),
-        detail?.history?.length
-          ? jsxs('details', { 'data-work-history': true, children: [
-              jsx('summary', { children: 'Canonical history' }),
-              jsx('ul', { children: detail.history.map((entry, index) => jsx('li', { children: JSON.stringify(entry) }, String(entry.id ?? index))) }),
-            ]})
-          : null,
       ],
     }) : null,
   })
@@ -5460,7 +5815,32 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   ]})
 }
 
-function BacklogView({ view, onSelectProject, onRefresh }) {
+const DOCKYARD_TYPE_NAMES = ['epic', 'feature', 'task', 'subtask', 'bug', 'spike', 'initiative']
+const DOCKYARD_EDITABLE_TYPES = ['task', 'subtask', 'bug', 'spike']
+const DOCKYARD_ROOT_TYPES = ['epic', 'task', 'bug', 'spike']
+const DOCKYARD_CREATE_CHILD_TYPES = Object.freeze({
+  epic: ['task', 'subtask', 'bug', 'spike'],
+  feature: ['task', 'subtask'],
+  initiative: ['subtask'],
+  task: ['subtask'],
+  bug: ['subtask'],
+  spike: [],
+  subtask: [],
+})
+const DOCKYARD_ALLOWED_CHILDREN = Object.freeze({
+  epic: ['feature', 'task', 'subtask', 'bug', 'spike', 'initiative'],
+  feature: ['task', 'subtask'],
+  initiative: ['subtask'],
+  task: ['subtask'],
+  bug: ['subtask'],
+  spike: [],
+  subtask: [],
+})
+const dockyardTypeLabel = (type) => ({ epic: 'Epic', initiative: 'Initiative', feature: 'Feature', task: 'Task', subtask: 'Sub-task', bug: 'Bug', spike: 'Spike' }[type] || readableLabel(type || 'task'))
+const dockyardChildTypes = (parentType) => DOCKYARD_CREATE_CHILD_TYPES[parentType] ?? []
+const dockyardParentAccepts = (parentType, childType) => (DOCKYARD_ALLOWED_CHILDREN[parentType] ?? []).includes(childType)
+
+function BacklogView({ view, onRefresh }) {
   const [draggedRef, setDraggedRef] = useState(null)
   const [pendingMove, setPendingMove] = useState(null)
   const [reason, setReason] = useState('')
@@ -5470,7 +5850,7 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
   const [createSaving, setCreateSaving] = useState(false)
   const [createError, setCreateError] = useState(null)
   const [createForm, setCreateForm] = useState({
-    type: 'task', title: '', assignee: '', initiative: '', rank: '1', reason: '', parent: '', due: '',
+    type: 'task', title: '', assignee: '', initiative: '', estimate_days: '', rank: '1', reason: '', parent: '', due: '',
   })
   const [createTouched, setCreateTouched] = useState({})
   const [bulkSelected, setBulkSelected] = useState([])
@@ -5479,6 +5859,7 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
   const [sortKey, setSortKey] = useState('rank')
   const [sortDir, setSortDir] = useState(1)
   const [groupBy, setGroupBy] = useState('none')
+  const [columnFilters, setColumnFilters] = useState({ type: '', status: '', initiative: '', assignee: '' })
   const [hiddenCols, setHiddenCols] = useState([])
   const [cmMenu, setCmMenu] = useState(null)
   const [collapsed, setCollapsed] = useState([])
@@ -5490,10 +5871,30 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
   const [importText, setImportText] = useState('')
   const [importMode, setImportMode] = useState('csv')
   const [importRows, setImportRows] = useState(null)
+  const [importValid, setImportValid] = useState(false)
   const [importError, setImportError] = useState(null)
   const [importBusy, setImportBusy] = useState(false)
   const [importResult, setImportResult] = useState(null)
+  // Approved import design: selected preview row for the split pane and a
+  // warnings-only filter toggle.
+  const [importSelected, setImportSelected] = useState(null)
+  const [importWarningsOnly, setImportWarningsOnly] = useState(false)
   const [detailItem, setDetailItem] = useState(null)
+  useEffect(() => {
+    if (!importOpen) return undefined
+    const onEscape = (event) => {
+      if (event.key !== 'Escape' || importBusy) return
+      setImportOpen(false)
+      setImportStep(1)
+      setImportRows(null)
+      setImportValid(false)
+      setImportError(null)
+      setImportResult(null)
+      document.querySelector('[data-action="open-bulk-import"]')?.focus()
+    }
+    document.addEventListener('keydown', onEscape)
+    return () => document.removeEventListener('keydown', onEscape)
+  }, [importOpen, importBusy])
 
   useEffect(() => {
     const onKey = (event) => {
@@ -5530,32 +5931,78 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
   const STATUS_LABELS = { backlog: 'Backlog', triage: 'Backlog', todo: 'Backlog', ready: 'Backlog', running: 'In progress', in_progress: 'In progress', review: 'In review', in_review: 'In review', blocked: 'Blocked', done: 'Done' }
   const STATUS_UI = { backlog: 'backlog', triage: 'backlog', todo: 'backlog', ready: 'backlog', running: 'in_progress', in_progress: 'in_progress', review: 'in_review', in_review: 'in_review', blocked: 'blocked', done: 'done' }
   const STATUS_OPTIONS = ['backlog', 'in_progress', 'in_review', 'blocked', 'done']
-  const TYPE_NAMES = ['epic', 'feature', 'task', 'subtask', 'bug', 'spike']
+  const TYPE_NAMES = DOCKYARD_TYPE_NAMES
+  const ROOT_TYPES = DOCKYARD_ROOT_TYPES
+  const CHILD_TYPES = DOCKYARD_CREATE_CHILD_TYPES
+  const typeLabel = dockyardTypeLabel
+  const childTypesFor = dockyardChildTypes
+  const parentAccepts = dockyardParentAccepts
   const todayISO = () => new Date().toISOString().slice(0, 10)
+  const allItems = view.workItems ?? []
+  const initiativeByRef = Object.fromEntries((view.initiatives ?? []).map((initiative) => [initiative.ref, initiative]))
+  const botById = Object.fromEntries((view.bots ?? []).map((bot) => [bot.id, bot]))
+  const initiativeLabel = (ref) => ref ? (initiativeByRef[ref]?.title || ref) : 'No initiative'
+  const ownerLabel = (id) => id ? (botById[id]?.name || id) : 'Unassigned'
   const parentOf = {}
   const childrenOf = {}
+  const allChildrenOf = {}
   const entrySet = new Set(entries.map((entry) => entry.item_ref))
-  for (const it of (view.workItems ?? [])) {
-    if (it.parent_ref && entrySet.has(it.parent_ref) && it.parent_ref !== it.ref) {
-      parentOf[it.ref] = it.parent_ref
-      ;(childrenOf[it.parent_ref] ||= []).push(it.ref)
+  const parentRefOf = (item) => item?.parent_ref || item?.parent_task_id || item?.parent_id || ''
+  for (const it of allItems) {
+    const parentRef = parentRefOf(it)
+    if (!parentRef || parentRef === it.ref) continue
+    ;(allChildrenOf[parentRef] ||= []).push(it.ref)
+    if (entrySet.has(it.ref) && entrySet.has(parentRef)) {
+      parentOf[it.ref] = parentRef
+      ;(childrenOf[parentRef] ||= []).push(it.ref)
     }
   }
   const rankOf = (ref) => { const e = entries.find((entry) => entry.item_ref === ref); return e ? Number(e.rank) : 1e9 }
   const collapsedSet = new Set(collapsed)
   const q = search.trim().toLowerCase()
+  const typeFilterValues = [...new Set(entries.map((entry) => workByRef[entry.item_ref]?.type || 'task'))].sort((a, b) => typeLabel(a).localeCompare(typeLabel(b)))
+  const statusFilterValues = [...new Set(entries.map((entry) => STATUS_UI[workByRef[entry.item_ref]?.status] || workByRef[entry.item_ref]?.status || 'backlog'))]
+    .sort((a, b) => STATUS_OPTIONS.indexOf(a) - STATUS_OPTIONS.indexOf(b))
+  const initiativeFilterValues = [...new Set(entries.map((entry) => workByRef[entry.item_ref]?.initiative_ref).filter(Boolean))]
+    .sort((a, b) => initiativeLabel(a).localeCompare(initiativeLabel(b)))
+  const assigneeFilterValues = [...new Set(entries.map((entry) => workByRef[entry.item_ref]?.assignee).filter(Boolean))]
+    .sort((a, b) => ownerLabel(a).localeCompare(ownerLabel(b)))
+  const hasUnassignedItems = entries.some((entry) => !workByRef[entry.item_ref]?.assignee)
+  const activeFilterCount = Object.values(columnFilters).filter(Boolean).length
+  const hasFilters = activeFilterCount > 0 || Boolean(q)
   const selfMatch = (ref) => {
-    if (!q) return true
     const it = workByRef[ref] ?? {}
-    return [it.title, it.assignee, it.type, ref, STATUS_LABELS[it.status]].join(' ').toLowerCase().includes(q)
+    const statusValue = STATUS_UI[it.status] || it.status || 'backlog'
+    const filterMatch = (!columnFilters.type || (it.type || 'task') === columnFilters.type)
+      && (!columnFilters.status || statusValue === columnFilters.status)
+      && (!columnFilters.initiative || (it.initiative_ref || '') === columnFilters.initiative)
+      && (!columnFilters.assignee || (columnFilters.assignee === '__unassigned__' ? !it.assignee : it.assignee === columnFilters.assignee))
+    if (!filterMatch) return false
+    if (!q) return true
+    const entry = entries.find((candidate) => candidate.item_ref === ref)
+    return [it.title, it.body, ref, typeLabel(it.type), ownerLabel(it.assignee), STATUS_LABELS[it.status],
+      initiativeLabel(it.initiative_ref), it.due, entry?.priority_reason].join(' ').toLowerCase().includes(q)
   }
   const branchMatch = (ref) => selfMatch(ref) || (childrenOf[ref] ?? []).some(branchMatch)
   const visibleTop = entries.map((entry) => entry.item_ref).filter((ref) => !parentOf[ref] && branchMatch(ref))
   const sortCmp = (a, b) => {
     const ia = workByRef[a] ?? {}, ib = workByRef[b] ?? {}
-    const keyVal = (item, ref) => sortKey === 'rank' ? rankOf(ref) : sortKey === 'title' ? String(item.title || '').toLowerCase() : sortKey === 'status' ? String(item.status || '') : sortKey === 'assignee' ? String(item.assignee || '~~~') : sortKey === 'type' ? String(item.type || '') : String(item.due || '9999-99-99')
+    const keyVal = (item, ref) => ({
+      rank: rankOf(ref),
+      type: typeLabel(item.type),
+      title: String(item.title || ref),
+      status: STATUS_LABELS[item.status] || readableLabel(item.status || 'backlog'),
+      initiative: item.initiative_ref ? initiativeLabel(item.initiative_ref) : '\\uffff',
+      assignee: item.assignee ? ownerLabel(item.assignee) : '\\uffff',
+      age: entries.find((candidate) => candidate.item_ref === ref)?.aged_since || '9999-12-31',
+      estimate: item.estimate_days !== null && item.estimate_days !== undefined && item.estimate_days !== '' && Number.isFinite(Number(item.estimate_days)) ? Number(item.estimate_days) : Number.POSITIVE_INFINITY,
+      due: item.due || '9999-12-31',
+    }[sortKey])
     const va = keyVal(ia, a), vb = keyVal(ib, b)
-    return (va < vb ? -1 : va > vb ? 1 : 0) * sortDir
+    const cmp = typeof va === 'number' && typeof vb === 'number'
+      ? (va < vb ? -1 : va > vb ? 1 : 0)
+      : String(va).localeCompare(String(vb), undefined, { numeric: true, sensitivity: 'base' })
+    return cmp * sortDir
   }
   const treeRows = []
   ;(function build(refs, depth, prefixOpen) {
@@ -5563,7 +6010,7 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
       const last = idx === refs.length - 1
       const guides = depth === 0 ? [] : prefixOpen.map((open) => (open ? 'line' : 'blank')).concat([last ? 'elbow' : 'tee'])
       treeRows.push({ ref, depth, guides })
-      const kids = (childrenOf[ref] ?? []).filter(branchMatch).sort((a, b) => rankOf(a) - rankOf(b))
+      const kids = (childrenOf[ref] ?? []).filter(branchMatch).sort(sortCmp)
       if (kids.length && !collapsedSet.has(ref)) build(kids, depth + 1, prefixOpen.concat([!last]))
     })
   })(visibleTop.slice().sort(sortCmp), 0, [])
@@ -5571,19 +6018,61 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
     const map = new Map()
     for (const row of treeRows) {
       const it = workByRef[row.ref] ?? {}
-      const key = groupBy === 'status' ? (STATUS_LABELS[it.status] || it.status || 'Unset') : groupBy === 'assignee' ? (it.assignee || 'Unassigned') : groupBy === 'type' ? (it.type || 'task') : String(it.due || 'No date').slice(0, 7) || 'No date'
+      const key = groupBy === 'status' ? (STATUS_LABELS[it.status] || it.status || 'Unset')
+        : groupBy === 'assignee' ? ownerLabel(it.assignee)
+          : groupBy === 'initiative' ? initiativeLabel(it.initiative_ref)
+            : groupBy === 'type' ? typeLabel(it.type)
+              : String(it.due || 'No due date').slice(0, 7) || 'No due date'
       ;(map.get(key) || map.set(key, []).get(key)).push(row)
     }
     return [...map.entries()].sort((a, b) => String(a[0]).localeCompare(String(b[0])))
   })()
   const toggleCollapse = (ref) => setCollapsed((current) => current.includes(ref) ? current.filter((r) => r !== ref) : [...current, ref])
-  const descendantsOf = (ref) => { const out = []; (function walk(r) { for (const k of (childrenOf[r] ?? [])) { out.push(k); walk(k) } })(ref); return out }
+  const descendantsOf = (ref) => {
+    const out = []
+    const seen = new Set([ref])
+    ;(function walk(current) {
+      for (const childRef of allChildrenOf[current] ?? []) {
+        if (seen.has(childRef)) continue
+        seen.add(childRef)
+        out.push(childRef)
+        walk(childRef)
+      }
+    })(ref)
+    return out
+  }
+  const reparentTargets = (ref) => {
+    const item = workByRef[ref]
+    const banned = new Set([ref, ...descendantsOf(ref)])
+    return entries
+      .map((entry) => workByRef[entry.item_ref])
+      .filter((candidate) => candidate && !banned.has(candidate.ref) && parentAccepts(candidate.type, item?.type || 'task'))
+  }
+  const typeChoicesFor = (ref) => {
+    const item = workByRef[ref]
+    if (!item) return []
+    if (item.type === 'epic' || !DOCKYARD_EDITABLE_TYPES.includes(item.type)) return [item.type]
+    const parent = workByRef[parentRefOf(item)]
+    const childRefs = allChildrenOf[ref] ?? []
+    const choices = DOCKYARD_EDITABLE_TYPES.filter((candidate) =>
+      (candidate !== 'subtask' || Boolean(parent))
+      && (!parent || parentAccepts(parent.type, candidate))
+      && childRefs.every((childRef) => parentAccepts(candidate, workByRef[childRef]?.type)))
+    return choices.includes(item.type) ? choices : [item.type, ...choices]
+  }
+  const createTypesForParent = (parentRef) => parentRef ? childTypesFor(workByRef[parentRef]?.type) : ROOT_TYPES
+  const createParentsForType = (type, excludeRef = '') => {
+    const descendants = new Set(excludeRef ? descendantsOf(excludeRef) : [])
+    return allItems.filter((candidate) => candidate.ref !== excludeRef && !descendants.has(candidate.ref)
+      && parentAccepts(candidate.type, type))
+  }
+  const statusChoicesFor = (item) => STATUS_OPTIONS.filter((status) => item?.type !== 'epic' || status !== 'done')
   const flashCell = (ref, field, message) => { setCellError({ ref, field, message }) }
   const patchItem = async (ref, patch, okMessage) => {
     const item = workByRef[ref]
     if (!item) return
     try {
-      await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}`, { method: 'PATCH', body: patch })
+      await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}`, { method: 'PATCH', body: { ...patch, actor_id: 'sahil', actor_kind: 'human' } })
       setCellError(null)
       emitToast('success', okMessage || `${item.title} updated.`)
       onRefresh()
@@ -5608,7 +6097,7 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
     if (!item || nextStatus === item.status) return
     if ((item.type || 'task') === 'epic' && nextStatus === 'done') { flashCell(ref, 'status', 'Epics are completed through their children — close the sub-items first.'); return }
     try {
-      await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}/transition`, { method: 'POST', body: { status: nextStatus } })
+      await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}/transition`, { method: 'POST', body: { status: nextStatus, actor_id: 'sahil', actor_kind: 'human' } })
       setCellError(null)
       emitToast('success', `${item.title} → ${STATUS_LABELS[nextStatus] || nextStatus}`)
       onRefresh()
@@ -5621,7 +6110,7 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
     if (!item) return
     if ((item.type || 'task') === 'epic') { flashCell(ref, 'assignee', 'Epics are never assigned — assign one of its children instead.'); return }
     try {
-      await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}/assign`, { method: 'POST', body: { assignee_id: bot || null } })
+      await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}/assign`, { method: 'POST', body: { assignee_id: bot || null, assignee_kind: 'bot', actor_id: 'sahil', actor_kind: 'human' } })
       setCellError(null)
       emitToast('success', bot ? `${item.title} → ${bot}` : `${item.title} unassigned.`)
       onRefresh()
@@ -5632,24 +6121,26 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
   const changeType = (ref, nextType) => {
     const item = workByRef[ref]
     if (!item || nextType === item.type) return
-    if ((item.type === 'epic' || nextType === 'epic') && (childrenOf[ref]?.length || item.parent_ref)) { flashCell(ref, 'type', 'Conversion between epic and work with links is not supported.'); return }
-    patchItem(ref, { type: nextType }, `${item.title} is now ${nextType}.`)
+    if (!typeChoicesFor(ref).includes(nextType)) {
+      flashCell(ref, 'type', `Changing ${item.type} to ${nextType} is not valid for this item's parent and children.`)
+      return
+    }
+    patchItem(ref, { type: nextType }, `${item.title} is now ${typeLabel(nextType)}.`)
   }
-  const unassign = (ref) => assignItem(ref, null)
   const requestReparent = (ref) => {
     setMenuRef(null)
-    setPendingMove({ ref, mode: 'parent', title: workByRef[ref]?.title || ref })
+    setPendingMove({ ref, mode: 'parent', title: workByRef[ref]?.title || ref, parent_ref: parentRefOf(workByRef[ref]) || '' })
     setReason('')
     setError(null)
   }
   const saveParent = async () => {
-    if (!pendingMove || !reason.trim()) return
+    if (!pendingMove || !pendingParentChanged || reason.trim().length < 4) return
     setSaving(true)
     setError(null)
     try {
-      const parent = document.getElementById('dockyard-parent-select')?.value || null
+      const parent = pendingParentRef || null
       await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(pendingMove.ref)}`, {
-        method: 'PATCH', body: { parent_ref: parent },
+        method: 'PATCH', body: { parent_ref: parent, reason: reason.trim(), actor_id: 'sahil', actor_kind: 'human' },
       })
       const title = pendingMove.title
       setPendingMove(null)
@@ -5661,22 +6152,10 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
     }
     setSaving(false)
   }
-  const cancelItem = async (ref) => {
-    const item = workByRef[ref]
-    if (!item) return
-    try {
-      await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}/transition`, {
-        method: 'POST', body: { to: 'cancelled', actor_id: 'stewardship-api', actor_kind: 'human', reason: 'cancelled from backlog prototype' },
-      })
-      emitToast('success', `${item.title} cancelled (closed, not deleted — canonical history stays).`)
-      onRefresh()
-    } catch (failure) {
-      flashCell(ref, 'cancel', String(failure?.message ?? failure).replace(/^\d+:\s*/, '').slice(0, 110))
-    }
-  }
-  const closeImport = () => { setImportOpen(false); setImportStep(1); setImportRows(null); setImportError(null); setImportResult(null) }
+  const closeImport = () => { setImportOpen(false); setImportStep(1); setImportRows(null); setImportValid(false); setImportError(null); setImportResult(null); setImportSelected(null); setImportWarningsOnly(false) }
   const parseImport = (advance) => {
     setImportError(null)
+    setImportValid(false)
     const text = importText.trim()
     if (!text) { setImportError('Paste CSV lines or a JSON array first.'); setImportRows(null); return }
     // P6.7/P6.8: the shared backend validator is the single source of truth.
@@ -5689,8 +6168,8 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
         rowsJson = JSON.parse(text)
         if (!Array.isArray(rowsJson)) throw new Error('JSON must be an array')
       } catch (bad) { setImportError(`Could not read that: ${bad?.message || bad}`); setImportRows(null); return }
-      const header = 'row_key,type,title,parent_key,labels,estimate_days'
-      const toCsvCell = (value) => String(value ?? '').replace(/[\r\n,]/g, ' ').trim()
+      const header = 'row_key,type,title,parent_key,labels,estimate_days,due,initiative_ref'
+      const toCsvCell = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`
       csvText = [header].concat(rowsJson.map((row, idx) => [
         toCsvCell(row.row_key ?? `json-${idx + 1}`),
         toCsvCell(row.type ?? 'task'),
@@ -5698,31 +6177,9 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
         toCsvCell(row.parent ?? row.parent_key ?? ''),
         toCsvCell(row.labels ?? ''),
         toCsvCell(row.estimate_days ?? ''),
+        toCsvCell(row.due ?? ''),
+        toCsvCell(row.initiative_ref ?? ''),
       ].join(','))).join('\n')
-    } else {
-      // CSV paste: translate the friendly legacy header (type,title,
-      // assignee,due,parent) into the shared validator vocabulary
-      // (row_key,type,title,parent_key,...) so one validation contract backs
-      // both entry paths. row_key defaults to csv-<n> in file order.
-      const lines = text.split(/\r?\n/).filter((line) => line.trim().length)
-      const headerLine = (lines[0] ?? '').toLowerCase()
-      const legacy = headerLine.includes('type') && headerLine.includes('title')
-        && !headerLine.includes('row_key')
-      if (legacy) {
-        // row keys must be unique per file instance: the shared validator
-        // derives durable idempotency keys from them, so re-importing the
-        // same-named rows must not silently collide with an earlier file.
-        const fileKey = `csv-${Date.now().toString(36)}`
-        const body = lines.slice(1).map((line, idx) => {
-          const cells = line.split(',')
-          // type,title,assignee,due,parent
-          const [type, title, , due, parent] = cells
-          return [`${fileKey}-${idx + 1}`, type ?? '', title ?? '', parent ?? '', '', due ?? '']
-            .map((cell) => String(cell ?? '').replace(/[\r\n]/g, ' ').trim()).join(',')
-        })
-        csvText = ['row_key,type,title,parent_key,labels,estimate_days,due,initiative_ref']
-          .concat(body).join('\n')
-      }
     }
     setImportBusy(true)
     api(`/projects/${encodeURIComponent(project.id)}/backlog/import`, {
@@ -5740,12 +6197,24 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
         const type = String(row.type ?? 'task').toLowerCase()
         const title = String(row.title ?? '').trim()
         const parent = String(row.parent_key ?? '').trim()
-        const problems = [...(errorByRow[String(idx + 2)] ?? [])]
+        const labels = String(row.labels ?? '').trim()
+        const estimate = row.estimate_days == null || row.estimate_days === '' ? '' : String(row.estimate_days)
+        const due = String(row.due ?? '').trim()
+        const initiative = String(row.initiative_ref ?? '').trim()
+        const rowKey = String(row.row_key ?? '').trim()
+        const problems = [...(errorByRow[String(idx + 2)] ?? []), ...(errorByRow[String(row.row_key ?? '')] ?? [])]
         if (parent && type === 'epic') problems.push('epics are top level — parent must be empty')
-        return { idx, type, title, parent, assignee: String(row.owner ?? row.assignee ?? '').trim(), due: String(row.due ?? '').trim(), problems, csv_text: csvText }
+        // Warnings are non-blocking (e.g. empty initiative_ref); errors block.
+        const errors = problems.filter((problem) => !/can still be imported|warning/i.test(problem))
+        const warnings = problems.filter((problem) => /can still be imported|warning/i.test(problem))
+        return { idx, type, title, parent, labels, estimate, due, initiative, rowKey, assignee: String(row.owner ?? row.assignee ?? '').trim(), problems, errors, warnings, csv_text: csvText }
       })
       if (!parsed.length) { setImportError('No rows found in that input.'); setImportRows(null); return }
+      if ((preview.errors ?? []).length && !parsed.some((row) => row.problems.length)) {
+        setImportError((preview.errors ?? []).map((problem) => `Row ${problem.row}: ${problem.error}`).join('; '))
+      }
       setImportRows(parsed)
+      setImportValid(preview.valid === true && parsed.every((row) => !row.errors.length))
       if (advance) setImportStep(2)
     }).catch((bad) => {
       setImportBusy(false)
@@ -5754,20 +6223,22 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
     })
   }
   const runImport = async () => {
-    const good = (importRows ?? []).filter((row) => !row.problems.length)
-    if (!good.length) return
+    // Approved contract: warnings never block; only rows with errors do.
+    const good = (importRows ?? []).filter((row) => !row.errors.length)
+    if (!good.length || good.length !== importRows.length) return
     setImportBusy(true)
     try {
       // One shared-validator commit for the whole file: parent-first order,
       // cycle protection and idempotent row keys are enforced server-side.
       const result = await api(`/projects/${encodeURIComponent(project.id)}/backlog/import`, {
-        method: 'POST', body: { csv_text: good[0].csv_text, apply: true },
+        method: 'POST', body: { csv_text: good[0].csv_text, apply: true, actor_id: 'sahil', actor_kind: 'human' },
       })
       setImportBusy(false)
       setImportResult({
-        written: Number(result?.imported ?? good.length),
+        written: Number(result?.imported ?? 0),
         failed: (result?.preview?.errors ?? []).map((problem) => `row ${problem.row}: ${problem.error}`),
       })
+      if (result?.preview?.valid === false) setImportError('The server rejected the import. Return to the source and correct the reported rows.')
       setImportStep(3)
       onRefresh()
     } catch (bad) {
@@ -5783,7 +6254,7 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
     setError(null)
     try {
       await api(`/projects/${encodeURIComponent(project.id)}/backlog/${encodeURIComponent(pendingMove.ref)}/rerank`, {
-        method: 'POST', body: { new_rank: pendingMove.newRank, reason: reason.trim() },
+        method: 'POST', body: { new_rank: pendingMove.newRank, reason: reason.trim(), actor_id: 'sahil', actor_kind: 'human' },
       })
       setPendingMove(null)
       setReason('')
@@ -5794,16 +6265,32 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
     setSaving(false)
   }
   const updateCreate = (key, value) => {
-    setCreateForm((current) => ({ ...current, [key]: value }))
+    setCreateForm((current) => {
+      const next = { ...current, [key]: value }
+      if (key === 'parent') {
+        const allowed = createTypesForParent(value)
+        if (!allowed.includes(next.type)) next.type = allowed.includes('task') ? 'task' : (allowed[0] || 'task')
+      } else if (key === 'type' && next.parent
+        && !childTypesFor(workByRef[next.parent]?.type).includes(value)) {
+        next.parent = ''
+      }
+      return next
+    })
     setCreateTouched((current) => ({ ...current, [key]: true }))
   }
   const maxInitialRank = entries.length + 1
   const initialRank = Number(createForm.rank)
+  const availableCreateTypes = createTypesForParent(createForm.parent)
+  const availableCreateParents = createParentsForType(createForm.type)
+  const estimateValid = createForm.estimate_days === ''
+    || (Number.isFinite(Number(createForm.estimate_days)) && Number(createForm.estimate_days) >= 0)
   const createFieldError = (key) => {
     if (!createTouched[key]) return null
     if (key === 'title' && createForm.title.trim().length < 3) return 'At least 3 characters.'
     if (key === 'assignee' && !createForm.assignee) return 'Choose who picks this up.'
     if (key === 'reason' && createForm.reason.trim().length < 4) return 'A ranking reason is required (audit trail).'
+    if (key === 'estimate_days' && !estimateValid) return 'Use a non-negative number of days.'
+    if (key === 'type' && !availableCreateTypes.includes(createForm.type)) return 'Choose a supported type for this parent.'
     return null
   }
   const createValid = createForm.title.trim().length >= 3
@@ -5812,9 +6299,16 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
     && initialRank >= 1
     && initialRank <= maxInitialRank
     && createForm.reason.trim().length >= 4
+    && estimateValid
+    && availableCreateTypes.includes(createForm.type)
+    && (!createForm.parent || availableCreateParents.some((parent) => parent.ref === createForm.parent))
   const openCreate = (parentRef) => {
     if (!canCreate) return
-    setCreateForm({ type: 'task', title: '', assignee: '', initiative: '', rank: String(maxInitialRank), reason: '', parent: typeof parentRef === 'string' ? parentRef : '', due: '' })
+    const parent = typeof parentRef === 'string' ? parentRef : ''
+    const allowed = createTypesForParent(parent)
+    if (parent && allowed.length === 0) return
+    const type = allowed.includes('task') ? 'task' : (allowed[0] || 'task')
+    setCreateForm({ type, title: '', assignee: '', initiative: '', estimate_days: '', rank: String(maxInitialRank), reason: '', parent, due: '' })
     setCreateTouched({})
     setCreateError(null)
     setCreateOpen(true)
@@ -5827,22 +6321,18 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
       const body = {
         type: createForm.type,
         title: createForm.title.trim(),
+        creator_id: 'sahil',
+        creator_kind: 'human',
         assignee_id: createForm.assignee,
         assignee_kind: 'bot',
-        ...(createForm.initiative ? { initiative_ref: createForm.initiative } : {}),
+        initiative_ref: createForm.initiative || null,
+        parent_ref: createForm.parent || null,
+        estimate_days: createForm.estimate_days === '' ? null : Number(createForm.estimate_days),
+        due: createForm.due || null,
         rank: initialRank,
         reason: createForm.reason.trim(),
       }
       const created = await api(`/projects/${encodeURIComponent(project.id)}/backlog/items`, { method: 'POST', body })
-      if (createForm.due) {
-        await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(created.ref)}`, { method: 'PATCH', body: { due: createForm.due } })
-      }
-      // PROTOTYPE: attach parent after create (canonical create has no parent field yet)
-      if (createForm.parent) {
-        await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(created.ref)}`, {
-          method: 'PATCH', body: { parent_ref: createForm.parent },
-        })
-      }
       setCreateOpen(false)
       emitToast('success', `${created.ref || 'Work item'} created and added to the backlog.`)
       onRefresh()
@@ -5891,20 +6381,34 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
   }
   const previewEligible = new Set((bulkPreview?.eligible_items ?? []).map((item) => item.id))
   const selectedEligible = bulkSelected.length > 0 && bulkSelected.every((ref) => previewEligible.has(ref))
+  const pendingParentItem = pendingMove?.mode === 'parent' ? workByRef[pendingMove.ref] : null
+  const pendingCurrentParent = parentRefOf(pendingParentItem)
+  const pendingParentRef = pendingMove?.parent_ref ?? pendingCurrentParent ?? ''
+  const pendingParentChoices = pendingMove?.mode === 'parent' ? reparentTargets(pendingMove.ref) : []
+  if (pendingCurrentParent && !pendingParentChoices.some((item) => item.ref === pendingCurrentParent) && workByRef[pendingCurrentParent]) {
+    pendingParentChoices.unshift(workByRef[pendingCurrentParent])
+  }
+  const pendingParentChanged = Boolean(pendingMove?.mode === 'parent' && pendingParentRef !== pendingCurrentParent)
+  const sortLabels = { rank: 'Rank', type: 'Type', title: 'Work item', status: 'Status', initiative: 'Initiative', assignee: 'Assignee', age: 'Age', estimate: 'Estimate', due: 'Due date' }
+  const sortHeader = (key, label, className = '') => jsx('button', {
+    type: 'button',
+    className: `th-sort th-cell ${className}${sortKey === key ? ' active' : ''}`.trim(),
+    'data-head-sort': key,
+    'data-dir': sortKey === key && sortDir < 0 ? 'desc' : 'asc',
+    onClick: () => { if (sortKey === key) setSortDir(-sortDir); else { setSortKey(key); setSortDir(1) } },
+    children: [label, jsx(Icon, { name: 'chevron-down' }, 'v4-chev')],
+  })
+  const resetFilters = () => { setSearch(''); setColumnFilters({ type: '', status: '', initiative: '', assignee: '' }) }
   return jsxs('div', { 'data-backlog-board': project.id, children: [
     jsx(PageHead, {
-      title: 'Prioritised backlog',
-      description: 'Ranked work with a mandatory reason for every change.',
+      title: 'Backlog',
+      description: 'One ranked queue for what should happen next.',
       status: `${number(entries.length)} ranked`,
       onRefresh,
     }),
-    jsxs('div', { className: 'dockyard-project-toolbar', children: [
-      jsx('label', { children: 'Project' }),
-      jsx('select', { value: project.id, onChange: (event) => onSelectProject(event.target.value), children:
-        (view.projects ?? []).map((option) => jsx('option', { value: option.id, children: option.id }, option.id)),
-      }),
-      jsx('span', { className: 'dockyard-meta', children: 'Click a cell to edit · drag ⠿ to rank · saving always asks why' }),
-      jsx(Button, { action: 'open-bulk-import', small: true, disabled: !canCreate, onClick: () => { setImportOpen(true); setImportRows(null); setImportError(null); setImportResult(null); setImportStep(1) }, children: 'Import' }),
+    jsxs('div', { className: 'dockyard-project-toolbar backlog-create-toolbar', children: [
+      jsx('span', { className: 'dockyard-meta', children: `${project.name || project.id} / Work items` }),
+      jsx(Button, { action: 'open-bulk-import', small: true, disabled: !canCreate, onClick: () => { setImportOpen(true); setImportRows(null); setImportValid(false); setImportError(null); setImportResult(null); setImportStep(1) }, children: 'Import' }),
       jsx(Button, { action: 'open-create-backlog-item', variant: 'primary', small: true, disabled: !canCreate, onClick: () => openCreate(), children: 'Create item' }),
     ]}),
     // PROTOTYPE v4: bulk reassignment now lives in the selection popover;
@@ -5922,47 +6426,75 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
       bulkOperation.state !== 'completed' ? jsx(Button, { action: 'retry-bulk-reassignment', disabled: bulkBusy, small: true, onClick: retryBulk, children: 'Retry remaining items' }) : null,
     ] }) : null,
     entries.length > 0 ? jsxs('section', { className: 'dockyard-backlog-list', 'data-backlog-table': true, children: [
-      !window.__V4_DISABLE?.has('cmdbar') ? jsxs('div', { className: 'dockyard-cmdbar', children: [
+      !window.__V4_DISABLE?.has('cmdbar') ? jsxs('div', { className: 'dockyard-cmdbar', 'data-column-filters': true, children: [
         jsxs('label', { className: 'cm-search', children: [
           jsx(Icon, { name: 'search' }, 'v4-search'),
-          jsx('input', { type: 'search', 'data-cm-search': true, placeholder: 'Search title, ref, assignee, status…', value: search, onInput: (event) => setSearch(event.target.value) }),
+          jsx('input', { type: 'search', 'data-cm-search': true, 'aria-label': 'Search backlog', placeholder: 'Search backlog', value: search, onInput: (event) => setSearch(event.target.value) }),
         ] }),
         jsxs('span', { className: 'cm-anchor', children: [
-          jsxs('button', { type: 'button', className: 'cm-chip', 'data-cm-menu-btn': 'sort', onClick: (event) => { event.stopPropagation(); setCmMenu(cmMenu === 'sort' ? null : 'sort') }, children: [`Sort: ${{ rank: 'Rank', title: 'Title', status: 'Status', assignee: 'Assignee', type: 'Type', due: 'Due' }[sortKey]}`, jsx(Icon, { name: 'chevron-down' }, 'v4-chev')] }),
-          cmMenu === 'sort' ? jsx('div', { className: 'cm-menu', 'data-cm-menu': 'sort', onClick: (event) => event.stopPropagation(), children: ['rank', 'title', 'status', 'assignee', 'type', 'due'].map((key) => jsxs('button', { type: 'button', 'data-cm-option': `sort-${key}`, onClick: () => { if (sortKey === key) setSortDir(-sortDir); else { setSortKey(key); setSortDir(1) } setCmMenu(null) }, children: [`${{ rank: 'Rank', title: 'Title', status: 'Status', assignee: 'Assignee', type: 'Type', due: 'Due date' }[key]}${sortKey === key ? (sortDir > 0 ? '  ↑' : '  ↓') : ''}`] }, key)) }) : null,
+          jsxs('button', { type: 'button', className: 'cm-chip', 'data-cm-menu-btn': 'sort', onClick: (event) => { event.stopPropagation(); setCmMenu(cmMenu === 'sort' ? null : 'sort') }, children: [`Sort: ${sortLabels[sortKey]}`, jsx(Icon, { name: 'chevron-down' }, 'v4-chev')] }),
+          cmMenu === 'sort' ? jsx('div', { className: 'cm-menu', 'data-cm-menu': 'sort', onClick: (event) => event.stopPropagation(), children: ['rank', 'type', 'title', 'status', 'initiative', 'assignee', 'age'].map((key) => jsxs('button', { type: 'button', 'data-cm-option': `sort-${key}`, onClick: () => { if (sortKey === key) setSortDir(-sortDir); else { setSortKey(key); setSortDir(1) } setCmMenu(null) }, children: [`${sortLabels[key]}${sortKey === key ? (sortDir > 0 ? '  ↑' : '  ↓') : ''}`] }, key)) }) : null,
         ] }),
         jsxs('span', { className: 'cm-anchor', children: [
-          jsxs('button', { type: 'button', className: 'cm-chip', 'data-cm-menu-btn': 'group', onClick: (event) => { event.stopPropagation(); setCmMenu(cmMenu === 'group' ? null : 'group') }, children: [`Group: ${{ none: 'None', status: 'Status', assignee: 'Assignee', type: 'Type', month: 'Due month' }[groupBy]}`, jsx(Icon, { name: 'chevron-down' }, 'v4-chev')] }),
-          cmMenu === 'group' ? jsx('div', { className: 'cm-menu', 'data-cm-menu': 'group', onClick: (event) => event.stopPropagation(), children: [['none', 'None'], ['status', 'Status'], ['assignee', 'Assignee'], ['type', 'Type'], ['month', 'Due month']].map(([key, label]) => jsxs('button', { type: 'button', 'data-cm-option': `group-${key}`, onClick: () => { setGroupBy(key); setCmMenu(null) }, children: [`${label}${groupBy === key ? '  ✓' : ''}`] }, key)) }) : null,
+          jsxs('button', { type: 'button', className: 'cm-chip', 'data-cm-menu-btn': 'group', onClick: (event) => { event.stopPropagation(); setCmMenu(cmMenu === 'group' ? null : 'group') }, children: [`Group: ${{ none: 'None', status: 'Status', assignee: 'Owner', type: 'Type', initiative: 'Initiative', month: 'Due month' }[groupBy]}`, jsx(Icon, { name: 'chevron-down' }, 'v4-chev')] }),
+          cmMenu === 'group' ? jsx('div', { className: 'cm-menu', 'data-cm-menu': 'group', onClick: (event) => event.stopPropagation(), children: [['none', 'None'], ['status', 'Status'], ['assignee', 'Owner'], ['type', 'Type'], ['initiative', 'Initiative'], ['month', 'Due month']].map(([key, label]) => jsxs('button', { type: 'button', 'data-cm-option': `group-${key}`, onClick: () => { setGroupBy(key); setCmMenu(null) }, children: [`${label}${groupBy === key ? '  ✓' : ''}`] }, key)) }) : null,
         ] }),
-        jsxs('span', { className: 'cm-anchor', children: [
-          jsxs('button', { type: 'button', className: 'cm-chip', 'data-cm-menu-btn': 'cols', onClick: (event) => { event.stopPropagation(); setCmMenu(cmMenu === 'cols' ? null : 'cols') }, children: ['Manage columns', jsx(Icon, { name: 'chevron-down' }, 'v4-chev')] }),
-          cmMenu === 'cols' ? jsxs('div', { className: 'cm-menu', 'data-cm-menu': 'cols', onClick: (event) => event.stopPropagation(), children: [
-            jsx('div', { className: 'menu-label', children: 'Toggle columns' }),
-            ...[['rank', 'Rank'], ['due', 'Due date']].map(([key, label]) => jsxs('button', { type: 'button', 'data-cm-option': `col-${key}`, onClick: () => { setHiddenCols((current) => current.includes(key) ? current.filter((c) => c !== key) : [...current, key]) }, children: [`${hiddenCols.includes(key) ? '☐' : '☑'} ${label}`] }, key)),
-          ] }) : null,
+
+        jsx('span', { className: 'cm-count', 'data-cm-count': true, children: [
+          `${number(treeRows.length)} of ${number(entries.length)} items`,
+          q ? ` · search “${search}”` : '',
+          activeFilterCount ? ` · ${activeFilterCount} filter${activeFilterCount === 1 ? '' : 's'}` : '',
+          sortKey !== 'rank' ? ` · sorted by ${sortLabels[sortKey]}` : '',
+          groupBy !== 'none' ? ` · grouped by ${{ status: 'Status', assignee: 'Owner', initiative: 'Initiative', type: 'Type', month: 'Due month' }[groupBy]}` : '',
         ] }),
         jsx('span', { className: 'cm-spacer' }),
-        jsxs('span', { className: 'cm-count', 'data-cm-count': true, children: [
-          `${number(treeRows.length)} of ${number(entries.length)} shown`,
-          q ? ` · filter “${search}”` : '',
-          sortKey !== 'rank' ? ` · by ${{ title: 'title', status: 'status', assignee: 'assignee', type: 'type', due: 'due' }[sortKey]}` : '',
-          groupBy !== 'none' ? ` · grouped ${groupBy}` : '',
+        jsx('span', { className: 'filterbar-title', children: 'Filters' }),
+        jsxs('label', { className: 'cm-filter', children: [
+          jsx('span', { children: 'Type' }),
+          jsx('select', { 'data-filter-field': 'type', 'aria-label': 'Filter by type', value: columnFilters.type, onChange: (event) => setColumnFilters((current) => ({ ...current, type: event.target.value })), children: [
+            jsx('option', { value: '', children: 'All types' }),
+            ...typeFilterValues.map((type) => jsx('option', { value: type, children: typeLabel(type) }, type)),
+          ] }),
         ] }),
+        jsxs('label', { className: 'cm-filter', children: [
+          jsx('span', { children: 'Status' }),
+          jsx('select', { 'data-filter-field': 'status', 'aria-label': 'Filter by status', value: columnFilters.status, onChange: (event) => setColumnFilters((current) => ({ ...current, status: event.target.value })), children: [
+            jsx('option', { value: '', children: 'All statuses' }),
+            ...statusFilterValues.map((status) => jsx('option', { value: status, children: STATUS_LABELS[status] || readableLabel(status) }, status)),
+          ] }),
+        ] }),
+        jsxs('label', { className: 'cm-filter', children: [
+          jsx('span', { children: 'Initiative' }),
+          jsx('select', { 'data-filter-field': 'initiative', 'aria-label': 'Filter by initiative', value: columnFilters.initiative, onChange: (event) => setColumnFilters((current) => ({ ...current, initiative: event.target.value })), children: [
+            jsx('option', { value: '', children: 'All initiatives' }),
+            ...initiativeFilterValues.map((ref) => jsx('option', { value: ref, children: initiativeLabel(ref) }, ref)),
+          ] }),
+        ] }),
+        jsxs('label', { className: 'cm-filter', children: [
+          jsx('span', { children: 'Assignee' }),
+          jsx('select', { 'data-filter-field': 'assignee', 'aria-label': 'Filter by assignee', value: columnFilters.assignee, onChange: (event) => setColumnFilters((current) => ({ ...current, assignee: event.target.value })), children: [
+            jsx('option', { value: '', children: 'All assignees' }),
+            hasUnassignedItems ? jsx('option', { value: '__unassigned__', children: 'Unassigned' }, 'unassigned') : null,
+            ...assigneeFilterValues.map((owner) => jsx('option', { value: owner, children: ownerLabel(owner) }, owner)),
+          ] }),
+        ] }),
+        hasFilters ? jsx('button', { type: 'button', className: 'cm-reset-filters', 'data-clear-filters': true, onClick: resetFilters, children: 'Clear all' }) : null,
       ] }) : null,
       !window.__V4_DISABLE?.has('head') ? jsxs('div', { className: 'tree-head', children: [
         jsx('span', { className: 'th-gutter' }),
-        jsx('button', { type: 'button', className: `th-sort${sortKey === 'title' ? ' active' : ''}`, 'data-head-sort': 'title', onClick: () => { if (sortKey === 'title') setSortDir(-sortDir); else { setSortKey('title'); setSortDir(1) } }, children: ['Title', jsx(Icon, { name: 'chevron-down' }, 'v4-chev')] }),
-        jsx('span', { className: 'cm-spacer' }),
-        jsx('button', { type: 'button', className: `th-sort th-rank${sortKey === 'rank' ? ' active' : ''}`, 'data-head-sort': 'rank', onClick: () => { if (sortKey === 'rank') setSortDir(-sortDir); else { setSortKey('rank'); setSortDir(1) } }, children: ['Rank', jsx(Icon, { name: 'chevron-down' }, 'v4-chev')] }),
-        jsx('button', { type: 'button', className: `th-sort th-status${sortKey === 'status' ? ' active' : ''}`, 'data-head-sort': 'status', onClick: () => { if (sortKey === 'status') setSortDir(-sortDir); else { setSortKey('status'); setSortDir(1) } }, children: ['Status', jsx(Icon, { name: 'chevron-down' }, 'v4-chev')] }),
-        jsx('button', { type: 'button', className: `th-sort th-who${sortKey === 'assignee' ? ' active' : ''}`, 'data-head-sort': 'assignee', onClick: () => { if (sortKey === 'assignee') setSortDir(-sortDir); else { setSortKey('assignee'); setSortDir(1) } }, children: ['Assignee', jsx(Icon, { name: 'chevron-down' }, 'v4-chev')] }),
-        !hiddenCols.includes('due') ? jsx('button', { type: 'button', className: `th-sort th-due${sortKey === 'due' ? ' active' : ''}`, 'data-head-sort': 'due', onClick: () => { if (sortKey === 'due') setSortDir(-sortDir); else { setSortKey('due'); setSortDir(1) } }, children: ['Due', jsx(Icon, { name: 'chevron-down' }, 'v4-chev')] }) : null,
-        jsx('span', { className: 'th-act' }),
+        sortHeader('rank', 'Rank', 'th-rank'),
+        sortHeader('type', 'Type', 'th-type'),
+        sortHeader('title', 'Work item', 'th-title'),
+        sortHeader('status', 'Status', 'th-status'),
+        sortHeader('initiative', 'Initiative', 'th-initiative'),
+        sortHeader('assignee', 'Assignee', 'th-who'),
+        sortHeader('age', 'Age', 'th-age'),
+        jsx('span', { className: 'th-reason', children: 'Priority reason' }),
+        jsx('span', { className: 'th-act', 'aria-label': 'Actions' }),
       ] }) : null,
       !window.__V4_DISABLE?.has('head') && treeRows.length === 0 ? jsxs('div', { className: 'tree-group-head', 'data-no-matches': true, children: [
-        jsx('span', { children: `No items match “${search}”.` }),
-        jsx('button', { type: 'button', className: 'cm-chip', onClick: () => setSearch(''), children: 'Clear filter' }),
+        jsx('span', { children: hasFilters ? 'No items match the current search and filters.' : 'No backlog items to show.' }),
+        hasFilters ? jsx('button', { type: 'button', className: 'cm-chip', onClick: resetFilters, children: 'Clear filters' }) : null,
       ] }) : null,
       ...(window.__V4_DISABLE?.has('rows') ? [] : groups.flatMap(([label, rows], gi) => [
         label !== null ? jsxs('div', { className: 'tree-group-head', children: [
@@ -5978,7 +6510,25 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
           const err = cellError && cellError.ref === ref ? cellError : null
           const cell = editing && editing.ref === ref ? editing.field : null
           const titleText = item.title || ref
-          const openDetails = (event) => { event.stopPropagation(); setDetailItem(item) }
+          const validTypeChoices = typeChoicesFor(ref)
+          const validStatusChoices = statusChoicesFor(item)
+          const validParentChoices = reparentTargets(ref)
+          const mayAddChild = canCreate && childTypesFor(item.type).length > 0
+          const mayReparent = Boolean(validParentChoices.length || parentRefOf(item))
+          const estimateDays = item.estimate_days !== null && item.estimate_days !== undefined && item.estimate_days !== ''
+            ? Number(item.estimate_days) : null
+          const { openDetails, openDetailsSoon, startTitleEdit } = (function () {
+            // Shared per-row click timer: single click opens the detail drawer
+            // after a short delay; a double click cancels it and switches to
+            // inline title editing (JIRA-style). The timer id lives on the
+            // row's closures via titleClickTimer.
+            let titleClickTimer = null
+            const cancelTitleTimer = () => { if (titleClickTimer) { clearTimeout(titleClickTimer); titleClickTimer = null } }
+            var openDetails = (event) => { event.stopPropagation(); cancelTitleTimer(); setDetailItem(item) }
+            var openDetailsSoon = (event) => { event.stopPropagation(); cancelTitleTimer(); titleClickTimer = setTimeout(() => { titleClickTimer = null; setDetailItem(item) }, 220) }
+            var startTitleEdit = (event) => { event.stopPropagation(); cancelTitleTimer(); setEditing({ ref, field: 'title' }) }
+            return { openDetails, openDetailsSoon, startTitleEdit, cancelTitleTimer }
+          })()
           return jsxs('div', {
             onClick: (event) => { if (event.target.closest('button, input, select, a, [data-bulk-select], .tree-twisty, .drag-grip')) return; openDetails(event) },
             className: `dockyard-tree-row${draggedRef === ref ? ' tree-dragging' : ''}`, role: 'treeitem', 'aria-level': depth + 1,
@@ -5997,8 +6547,18 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
               jsxs('span', { className: 'tree-gutter', children: [
                 ...guides.map((mode, idx) => jsx('span', { className: `tree-guide ${mode}`, 'aria-hidden': true }, `g${idx}`)),
                 kids.length ? jsx('button', { type: 'button', className: 'tree-twisty', 'data-collapse-ref': ref, 'aria-expanded': String(!collapsedSet.has(ref)), 'aria-label': `${collapsedSet.has(ref) ? 'Expand' : 'Collapse'} ${kids.length} sub-item${kids.length === 1 ? '' : 's'}`, onClick: (event) => { event.stopPropagation(); toggleCollapse(ref) }, children: jsx(Icon, { name: 'chevron' }) }) : null,
-                jsx('span', { className: `tree-type ${TYPE_NAMES.includes(item.type) ? item.type : 'task'}`, title: `Type: ${item.type || 'task'}`, children: jsx(Icon, { name: `type-${TYPE_NAMES.includes(item.type) ? item.type : 'task'}` }) }),
                 jsx('input', { type: 'checkbox', className: 'tree-check', 'data-bulk-select': ref, 'aria-label': `Select ${titleText}`, checked: bulkSelected.includes(ref), onClick: (event) => event.stopPropagation(), onChange: () => toggleBulk(ref) }),
+              ] }),
+              !hiddenCols.includes('rank') ? jsxs('span', { className: 'tree-rank', children: [
+                depth === 0 ? jsx('span', { className: 'drag-grip', 'aria-hidden': true, draggable: true, onDragStart: (event) => { event.stopPropagation(); setDraggedRef(ref) }, children: '⠿' }) : null,
+                entry ? (cell === 'rank'
+                  ? jsx('input', { autoFocus: true, type: 'number', min: 1, max: entries.length, 'data-cell-input': 'rank', defaultValue: String(entry.rank), onKeyDown: (event) => { if (event.key === 'Enter') event.target.blur(); if (event.key === 'Escape') setEditing(null) }, onBlur: (event) => commitRank(entry, event.target.value) })
+                  : jsx('button', { type: 'button', className: 'cell-edit cell-rank', 'data-cell': 'rank', onClick: (event) => { event.stopPropagation(); setEditing({ ref, field: 'rank' }) }, children: number(entry.rank) }))
+                  : jsx('span', { children: '·' }),
+              ] }) : null,
+              jsxs('span', { className: 'tree-type-cell', title: `Type: ${typeLabel(item.type)}`, children: [
+                jsx('span', { className: `tree-type ${TYPE_NAMES.includes(item.type) ? item.type : 'task'}`, 'aria-hidden': true, children: jsx(Icon, { name: `type-${TYPE_NAMES.includes(item.type) ? item.type : 'task'}` }) }),
+                jsx('span', { children: typeLabel(item.type) }),
               ] }),
               jsxs('span', { className: 'tree-title', children: [
                 cell === 'title'
@@ -6007,28 +6567,40 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
                       err && err.field === 'title' ? jsx('span', { className: 'dockyard-inline-error', role: 'alert', 'data-cell-error': 'title', style: { fontSize: 10.5, padding: '1px 6px', whiteSpace: 'nowrap' }, children: err.message }) : null,
                     ] })
                   : jsxs('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }, children: [
-                      jsx('button', { type: 'button', className: 'cell-edit', 'data-cell': 'title', 'data-open-details': ref, title: 'Open details — edit inside the drawer', onClick: openDetails, children: jsxs('span', { className: 'cell-title', title: `${titleText}${entry?.priority_reason ? ` — reason: ${entry.priority_reason}` : ''}`, children: [titleText, depth && parentOf[ref] ? jsx('span', { className: 'tree-parent', children: ` · in ${workByRef[parentOf[ref]]?.title || parentOf[ref]}` }) : null] }) }),
+                      jsxs('span', { className: 'tree-title-stack', children: [
+                        jsxs('span', { className: 'tree-title-line', children: [
+                          jsx('span', { className: 'tree-ref-chip', children: item.ref }),
+                          jsx('button', {
+                            type: 'button', className: 'cell-edit cell-title', 'data-cell': 'title', 'data-title-edit': ref,
+                            title: 'Double-click to edit title inline · single-click opens details',
+                            onDoubleClick: startTitleEdit,
+                            onClick: openDetailsSoon, children: titleText,
+                          }),
+                          depth && parentOf[ref] ? jsx('span', { className: 'tree-parent', children: ` · in ${workByRef[parentOf[ref]]?.title || parentOf[ref]}` }) : null,
+                        ] }),
+                        item.body ? jsx('span', { className: 'tree-desc', children: String(item.body).replace(/\s+/g, ' ').slice(0, 90) }) : null,
+                      ] }),
                       err && err.field === 'title' ? jsx('span', { className: 'dockyard-inline-error', role: 'alert', 'data-cell-error': 'title', style: { fontSize: 10.5, padding: '1px 6px', whiteSpace: 'nowrap' }, children: err.message }) : null,
-                      entry ? jsx('button', { type: 'button', className: 'cell-edit cell-reason', 'data-cell': 'reason', onClick: (event) => { event.stopPropagation(); flashCell(ref, 'reason', 'Priority reasons move through the re-rank dialog (audit contract).') }, children: entry.priority_reason || 'no reason — why this rank?' }) : null,
-                      err && err.field === 'reason' ? jsx('span', { className: 'dockyard-inline-error', role: 'alert', 'data-cell-error': 'reason', style: { fontSize: 10.5, padding: '1px 6px', whiteSpace: 'nowrap' }, children: err.message }) : null,
+
                     ] }),
               ] }),
-              !hiddenCols.includes('rank') ? jsxs('span', { className: 'tree-rank', children: [
-                depth === 0 ? jsx('span', { className: 'drag-grip', 'aria-hidden': true, draggable: true, onDragStart: (event) => { event.stopPropagation(); setDraggedRef(ref) }, children: '⠿' }) : null,
-                entry ? (cell === 'rank'
-                  ? jsx('input', { autoFocus: true, type: 'number', min: 1, max: entries.length, 'data-cell-input': 'rank', defaultValue: String(entry.rank), onKeyDown: (event) => { if (event.key === 'Enter') { event.target.blur(); } if (event.key === 'Escape') { setEditing(null) } }, onBlur: (event) => commitRank(entry, event.target.value) })
-                  : jsx('button', { type: 'button', className: 'cell-edit cell-rank', 'data-cell': 'rank', title: `Rank ${entry.rank} — click to type a rank`, onClick: (event) => { event.stopPropagation(); setEditing({ ref, field: 'rank' }) }, children: `#${number(entry.rank)}` }))
-                  : jsx('span', { className: 'cell-rank', title: 'Ranked via its parent or Board', children: '·' }),
-                err && err.field === 'rank' ? jsx('span', { className: 'cell-due overdue', children: err.message }) : null,
-              ] }) : null,
+
               jsxs('span', { className: 'tree-status', children: [
                 cell === 'status'
-                  ? jsx('select', { autoFocus: true, className: 'cell-edit is-input', 'data-cell-input': 'status', value: (item.status && STATUS_UI[item.status]) || 'backlog', onChange: (event) => { setEditing(null); changeStatus(ref, event.target.value) }, onBlur: () => setEditing(null), children: STATUS_OPTIONS.map((st) => jsx('option', { value: st, children: STATUS_LABELS[st] }, st)) })
+                  ? jsx('select', { autoFocus: true, className: 'cell-edit is-input', 'data-cell-input': 'status', value: (item.status && STATUS_UI[item.status]) || 'backlog', onChange: (event) => { setEditing(null); changeStatus(ref, event.target.value) }, onBlur: () => setEditing(null), children: validStatusChoices.map((st) => jsx('option', { value: st, children: STATUS_LABELS[st] }, st)) })
                   : jsx('button', { type: 'button', className: `cell-edit cell-status tree-status ${stUi === 'done' ? 'success' : (overdue || stUi === 'blocked') ? 'danger' : stUi === 'in_progress' ? 'info' : stUi === 'in_review' ? 'warning' : 'neutral'}`, 'data-cell': 'status', title: 'Change status', onClick: (event) => { event.stopPropagation(); setEditing({ ref, field: 'status' }) }, children: [
                       jsx('span', { className: 'tree-status-icon', 'aria-hidden': true }),
                       jsx('span', { children: STATUS_LABELS[item.status] || 'Backlog' }),
                     ] }),
                 err && err.field === 'status' ? jsx('span', { className: 'cell-due overdue', children: err.message }) : null,
+              ] }),
+              jsxs('span', { className: 'tree-initiative', title: item.initiative_ref ? `Initiative ${item.initiative_ref}` : 'No linked initiative', children: [
+                item.initiative_ref
+                  ? jsxs('span', { className: 'initiative-cell-value', children: [
+                      jsx('strong', { children: initiativeLabel(item.initiative_ref) }),
+                      jsx('small', { children: item.initiative_ref }),
+                    ] })
+                  : jsx('span', { className: 'initiative-cell-empty', children: '—' }),
               ] }),
               jsxs('span', { className: 'tree-who', children: [
                 cell === 'assignee'
@@ -6038,32 +6610,37 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
                     ] })
                   : jsx('button', { type: 'button', className: 'cell-edit cell-who', 'data-cell': 'assignee', title: (item.type === 'epic') ? 'Epics are never assigned — their children carry the work' : 'Change assignee', disabled: (item.type || 'task') === 'epic', onClick: (event) => { event.stopPropagation(); if ((item.type || 'task') === 'epic') { flashCell(ref, 'assignee', 'Epics are never assigned — assign one of its children instead.'); return } setEditing({ ref, field: 'assignee' }) }, children: [
                       item.assignee ? jsx('span', { className: 'tree-avatar', children: String(item.assignee).replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase() }) : jsx('span', { className: 'tree-avatar none', children: '—' }),
-                      jsx('span', { className: 'who-name', children: item.assignee || 'Unassigned' }),
+                      jsx('span', { className: 'who-name', children: ownerLabel(item.assignee) }),
                     ] }),
                 err && err.field === 'assignee' ? jsx('span', { className: 'cell-due overdue', children: err.message }) : null,
               ] }),
-              !hiddenCols.includes('due') ? jsxs('span', { className: 'tree-due', children: [
-                cell === 'due'
-                  ? jsx('input', { autoFocus: true, type: 'date', className: 'cell-due-input', 'data-cell-input': 'due', defaultValue: item.due || '', onKeyDown: (event) => { if (event.key === 'Escape') setEditing(null); if (event.key === 'Enter') { setEditing(null); const v = event.target.value; if (v) patchItem(ref, { due: v }) } }, onBlur: (event) => { setEditing(null); const v = event.target.value; if (v && v !== item.due) patchItem(ref, { due: v }) } })
-                  : entry || item.due ? jsx('button', { type: 'button', className: `cell-edit cell-due${overdue ? ' overdue' : ''}${!item.due ? ' empty' : ''}`, 'data-cell': 'due', title: overdue ? 'Overdue — click to change' : 'Due date — click to set', onClick: (event) => { event.stopPropagation(); setEditing({ ref, field: 'due' }) }, children: item.due || 'Set date' }) : jsx('span', { className: 'cell-due empty', children: '—' }),
-                err && err.field === 'due' ? jsx('span', { className: 'cell-due overdue', children: err.message }) : null,
-              ] }) : null,
+              jsx('span', { className: 'tree-age', title: entry?.aged_since ? `Ranked since ${entry.aged_since}` : 'Rank date unavailable', children: entry?.aged_since ? `${Math.max(0, Math.floor((Date.now() - Date.parse(entry.aged_since)) / 86400000))}d` : '—' }),
+              jsx('span', { className: 'tree-priority-reason', title: entry?.priority_reason || 'No priority reason recorded', children: entry?.priority_reason || 'No reason recorded' }),
               jsxs('span', { className: 'tree-actions', children: [
                 jsx('button', { type: 'button', className: 'tree-menu-btn', 'data-menu-ref': ref, 'aria-expanded': String(menuRef === ref), 'aria-label': `Actions for ${titleText}`, onClick: (event) => { event.stopPropagation(); setMenuRef(menuRef === ref ? null : ref) }, children: '⋯' }),
               ] }),
               menuRef === ref ? jsxs('div', { className: 'tree-menu', role: 'menu', onClick: (event) => event.stopPropagation(), children: [
-                jsx('div', { className: 'menu-label', children: 'Item' }),
-                jsxs('button', { type: 'button', role: 'menuitem', 'data-menu-action': 'details', onClick: () => { setMenuRef(null); setDetailItem(item) }, children: [jsx(Icon, { name: 'pencil' }), 'Full details (edit drawer)'] }),
-                canCreate ? jsxs('button', { type: 'button', role: 'menuitem', 'data-menu-action': 'add-child', onClick: () => { setMenuRef(null); openCreate(ref) }, children: [jsx(Icon, { name: 'type-subtask' }), 'Add child item…'] }) : null,
-                jsxs('label', { style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--dy-text-3)', padding: '2px 9px' }, children: ['Type', jsxs('select', { 'data-menu-type': ref, value: TYPE_NAMES.includes(item.type) ? item.type : 'task', onChange: (event) => { setMenuRef(null); changeType(ref, event.target.value) }, children: TYPE_NAMES.map((t) => jsx('option', { value: t, children: t }, t)) })] }),
-                jsx('div', { className: 'menu-label', children: 'Move' }),
-                jsx('button', { type: 'button', role: 'menuitem', 'data-menu-action': 'up', disabled: Number(entry?.rank) <= 1, onClick: () => { setMenuRef(null); requestMove(entry, Number(entry.rank) - 1) }, children: 'Move up' }),
-                jsx('button', { type: 'button', role: 'menuitem', 'data-menu-action': 'down', disabled: Number(entry?.rank) >= entries.length, onClick: () => { setMenuRef(null); requestMove(entry, Number(entry.rank) + 1) }, children: 'Move down' }),
-                jsx('button', { type: 'button', role: 'menuitem', 'data-menu-action': 'reparent', onClick: () => requestReparent(ref), children: 'Re-parent…' }),
-                jsx('div', { className: 'menu-label', children: 'Status' }),
-                jsx('button', { type: 'button', role: 'menuitem', 'data-menu-action': 'status-done', disabled: item.status === 'done' || (item.type || 'task') === 'epic', onClick: () => { setMenuRef(null); changeStatus(ref, 'done') }, children: 'Mark done' }),
-
-                canCreate ? jsx('button', { type: 'button', role: 'menuitem', 'data-menu-action': 'convert-feature', disabled: item.type === 'feature', onClick: () => { setMenuRef(null); changeType(ref, 'feature') }, children: 'Convert to feature' }) : null,
+                jsx('div', { className: 'menu-label', children: 'Open' }),
+                jsxs('button', { type: 'button', role: 'menuitem', 'data-menu-action': 'details', onClick: () => { setMenuRef(null); setDetailItem(item) }, children: [jsx(Icon, { name: 'pencil' }), 'Open task details'] }),
+                validTypeChoices.length > 1 ? jsxs('label', { className: 'tree-menu-field', children: [
+                  jsx('span', { children: 'Type' }),
+                  jsx('select', { 'data-menu-type': ref, 'aria-label': `Change type for ${titleText}`, value: item.type, onChange: (event) => { setMenuRef(null); changeType(ref, event.target.value) }, children:
+                    validTypeChoices.map((type) => jsx('option', { value: type, children: typeLabel(type) }, type)),
+                  }),
+                ] }) : jsx('div', { className: 'tree-menu-static', children: [jsx('span', { children: 'Type' }), jsx('strong', { children: typeLabel(item.type) })] }),
+                mayAddChild || mayReparent || (depth === 0 && entry)
+                  ? jsx('div', { className: 'menu-label', children: 'Structure' }) : null,
+                mayAddChild ? jsxs('button', { type: 'button', role: 'menuitem', 'data-menu-action': 'add-child', onClick: () => { setMenuRef(null); openCreate(ref) }, children: [jsx(Icon, { name: 'type-subtask' }), 'Add child item'] }) : null,
+                mayReparent ? jsxs('button', { type: 'button', role: 'menuitem', 'data-menu-action': 'reparent', onClick: () => requestReparent(ref), children: [jsx(Icon, { name: 'arrow-right' }), 'Change parent…'] }) : null,
+                depth === 0 && entry ? jsxs('div', { className: 'tree-menu-rank-actions', children: [
+                  jsx('div', { className: 'menu-label', children: 'Priority' }),
+                  jsx('button', { type: 'button', role: 'menuitem', 'data-menu-action': 'up', disabled: Number(entry.rank) <= 1, onClick: () => { setMenuRef(null); requestMove(entry, Number(entry.rank) - 1) }, children: 'Move up' }),
+                  jsx('button', { type: 'button', role: 'menuitem', 'data-menu-action': 'down', disabled: Number(entry.rank) >= entries.length, onClick: () => { setMenuRef(null); requestMove(entry, Number(entry.rank) + 1) }, children: 'Move down' }),
+                ] }) : null,
+                item.status !== 'done' && item.type !== 'epic' ? jsxs('div', { className: 'tree-menu-status-actions', children: [
+                  jsx('div', { className: 'menu-label', children: 'Status' }),
+                  jsx('button', { type: 'button', role: 'menuitem', 'data-menu-action': 'status-done', onClick: () => { setMenuRef(null); changeStatus(ref, 'done') }, children: 'Mark done' }),
+                ] }) : null,
               ] }) : null,
             ],
           }, ref)
@@ -6102,31 +6679,32 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
         jsxs('header', { className: 'dockyard-onboarding-head', children: [
           jsxs('div', { children: [
             jsx('h2', { id: 'dockyard-import-title', children: 'Bulk import backlog items' }),
-            jsx('p', { children: 'CSV or JSON from your current tracker. Columns: type, title, assignee, due, parent. Nothing is written until you confirm; invalid rows are skipped.' }),
+            jsx('p', { children: `Import into ${project.name || project.id}. Paste JSON or choose a CSV file, validate every row, then confirm. No rows are written during preview.` }),
           ] }),
           jsx('button', { type: 'button', className: 'dockyard-modal-close', 'aria-label': 'Close bulk import', onClick: closeImport, children: '×' }),
         ] }),
         jsx('div', { className: 'dockyard-wizard-progress', role: 'progressbar', 'aria-label': 'Import progress', 'aria-valuemin': 1, 'aria-valuemax': 3, 'aria-valuenow': importStep, children:
-          [['Source', 'Paste and validate'], ['Review', 'Check every row'], ['Result', 'What was written']].map(([label, detail], index) => jsxs('div', { className: index + 1 <= importStep ? 'complete' : '', children: [
+          [['Source', 'Upload or paste'], ['Preview', 'Validate every row'], ['Result', 'Commit outcome']].map(([label, detail], index) => jsxs('div', { className: index + 1 <= importStep ? 'complete' : '', children: [
             jsx('span', { children: number(index + 1) }),
             jsxs('span', { children: [jsx('strong', { children: label }), jsx('small', { children: detail })] }),
           ] }, label)),
         }),
         jsxs('div', { className: 'dockyard-wizard-body', children: [
           jsxs('div', { className: importStep === 1 ? 'dockyard-wizard-step active' : 'dockyard-wizard-step', hidden: importStep !== 1, 'data-import-step': '1', children: [
-            jsx('h3', { children: 'Paste your rows' }),
+            jsx('h3', { children: 'Add your source' }),
+            jsx('p', { children: 'Use the CSV template for supported columns: row_key, type, title, parent_key, labels, estimate_days, due and initiative_ref. Assignee is not imported.' }),
             jsxs('div', { className: 'dockyard-tabs', role: 'tablist', children: [
               jsx('button', { type: 'button', role: 'tab', 'aria-selected': String(importMode === 'csv'), className: importMode === 'csv' ? 'active' : '', onClick: () => { setImportMode('csv'); setImportRows(null) }, children: 'CSV' }),
               jsx('button', { type: 'button', role: 'tab', 'aria-selected': String(importMode === 'json'), className: importMode === 'json' ? 'active' : '', onClick: () => { setImportMode('json'); setImportRows(null) }, children: 'JSON' }),
             ] }),
             jsx('textarea', {
-              'data-import-input': true, spellCheck: false, value: importText,
-              onInput: (event) => setImportText(event.target.value),
+              'data-import-input': true, 'aria-label': 'CSV or JSON import content', spellCheck: false, value: importText,
+              onInput: (event) => { setImportText(event.target.value); setImportRows(null); setImportValid(false); setImportError(null) },
               placeholder: importMode === 'json'
-                ? '[{"type":"epic","title":"Partner API v3","assignee":"bot-worker"},{"type":"task","title":"Rotation cron","assignee":"bot-worker","parent":"t_xxxx"}]'
-                : 'type,title,assignee,due,parent\ntask,Export to CSV,bot-worker,2026-10-01,t_xxxx',
+                ? '[{"row_key":"release-1","type":"task","title":"Verify release checklist","estimate_days":2}]'
+                : 'row_key,type,title,parent_key,labels,estimate_days,due,initiative_ref\nrelease-1,task,Verify release checklist,,,2,,',
             }),
-            jsxs('div', { style: { display: 'flex', gap: 8, marginTop: 10 }, children: [
+            jsxs('div', { className: 'dockyard-import-actions-row', children: [
               importMode === 'csv' ? jsxs('div', { className: 'import-drop', 'data-import-drop': true,
                 onDragOver: (event) => { event.preventDefault(); event.currentTarget.classList.add('dragover') },
                 onDragLeave: (event) => event.currentTarget.classList.remove('dragover'),
@@ -6138,9 +6716,18 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
                   reader.onload = () => { setImportMode('csv'); setImportText(String(reader.result ?? '')); setImportRows(null); setImportError(null) }
                   reader.readAsText(file)
                 }, children: [
-                  jsx('strong', { children: 'Drop your CSV export here' }),
-                  jsx('div', { children: 'or paste rows below · columns: type, title, assignee, due, parent' }),
-                ] }) : jsx('div', { className: 'create-help', children: 'JSON is paste-only: copy an array of { type, title, assignee, due, parent } objects below.' }),
+                  jsx(Icon, { name: 'upload' }),
+                  jsx('strong', { children: 'Choose a CSV file or drop it here' }),
+                  jsx('small', { children: 'CSV only. File contents appear above before validation.' }),
+                  jsx('input', { type: 'file', accept: '.csv,text/csv', 'aria-label': 'Choose CSV file', onChange: (event) => {
+                    const file = event.target.files?.[0]
+                    if (!file) return
+                    const reader = new FileReader()
+                    reader.onload = () => { setImportMode('csv'); setImportText(String(reader.result ?? '')); setImportRows(null); setImportValid(false); setImportError(null) }
+                    reader.onerror = () => setImportError('Could not read the selected CSV file.')
+                    reader.readAsText(file)
+                  } }),
+                ] }) : jsx('div', { className: 'create-help', children: 'JSON is paste-only. Use an array of objects with row_key, type and title; optional parent_key, labels, estimate_days, due and initiative_ref.' }),
               jsx(Button, { action: 'import-download-template', small: true, onClick: () => {
                 // P6.10: the downloadable template must match the shared
                 // validator exactly; prefer the backend template and fall
@@ -6162,30 +6749,86 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
                   document.body.appendChild(a); a.click(); a.remove()
                   setTimeout(() => URL.revokeObjectURL(a.href), 4000)
                 })
-              }, children: 'Download CSV template' }),
+              }, children: [jsx(Icon, { name: 'download' }), 'Download CSV template'] }),
             ] }),
             importError ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: importError }) : null,
           ] }),
           importRows && importRows.length ? jsxs('div', { className: importStep === 2 ? 'dockyard-wizard-step active' : 'dockyard-wizard-step', hidden: importStep !== 2, 'data-import-step': '2', children: [
             jsx('h3', { children: 'Review before writing' }),
-            jsxs('p', { children: [
-              jsx(StatusTag, { tone: 'success', label: `${importRows.filter((row) => !row.problems.length).length} ready` }),
-              ' ',
-              importRows.some((row) => row.problems.length) ? jsx(StatusTag, { tone: 'danger', label: `${importRows.filter((row) => row.problems.length).length} will be skipped` }) : null,
-              ' ',
-              jsx('span', { className: 'dockyard-meta', children: `into ${project.id}` }),
+            // Approved design: four validation summary cards + warnings-only
+            // toggle. Warnings never block; errors do.
+            jsxs('div', { className: 'import-summary', 'data-import-summary': true, children: [
+              jsxs('div', { className: 'import-stat', children: [jsx('strong', { children: importRows.length }), jsx('span', { children: 'rows detected' })] }),
+              jsxs('div', { className: 'import-stat valid', children: [jsx(Icon, { name: 'circle-check' }), jsxs('span', { children: [jsx('strong', { children: importRows.filter((row) => !row.problems.length).length }), ' valid'] })] }),
+              jsxs('div', { className: 'import-stat warn', children: [jsx(Icon, { name: 'triangle-alert' }), jsxs('span', { children: [jsx('strong', { children: importRows.filter((row) => row.warnings.length).length }), ' warning', importRows.filter((row) => row.warnings.length).length === 1 ? '' : 's'] })] }),
+              jsxs('div', { className: 'import-stat errored', children: [jsx(Icon, { name: 'alert' }), jsxs('span', { children: [jsx('strong', { children: importRows.filter((row) => row.errors.length).length }), ' error', importRows.filter((row) => row.errors.length).length === 1 ? '' : 's'] })] }),
+              jsxs('label', { className: 'import-warnings-toggle', children: [
+                jsx('input', { type: 'checkbox', 'data-warnings-toggle': true, checked: importWarningsOnly, onChange: (event) => setImportWarningsOnly(event.target.checked) }),
+                'Show warnings only',
+              ] }),
             ] }),
-            jsx('ul', { 'data-import-preview': true, children: importRows.map((row) => jsxs('li', {
-              className: row.problems.length ? 'dockyard-inline-error' : '',
-              'data-import-row': row.idx, children: [
-                `${row.type || '?'} · ${row.title || '—'}`,
-                row.parent ? ` · under ${row.parent}` : '',
-                row.problems.length ? ` — ${row.problems.join('; ')}` : '',
-              ],
-            }, row.idx)) }),
+            jsx('p', { className: 'dockyard-meta', children: 'You can still go back and edit the source before committing.' }),
+            !importValid ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: 'Validation found errors. Nothing can be committed until every row is valid. Go back and correct the source.' }) : jsx('p', { children: 'All rows passed server validation. Confirm to write them as one import.' }),
+            importError ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: importError }) : null,
+            // Approved design: split pane — left: per-row table with validation
+            // badges; right: selected row's parsed values and will-import-as.
+            jsxs('div', { className: 'import-split', 'data-import-split': true, children: [
+              jsx('ul', { 'data-import-preview': true, children: importRows
+                .filter((row) => !importWarningsOnly || row.warnings.length)
+                .map((row) => jsxs('li', {
+                  className: [row.errors.length ? 'has-error' : '', row.warnings.length ? 'has-warning' : '', importSelected === row.idx ? 'selected' : ''].filter(Boolean).join(' '),
+                  'data-import-row': row.idx,
+                  onClick: () => setImportSelected(row.idx), children: [
+                  jsx('strong', { children: row.type || 'Unknown' }),
+                  jsx('span', { children: row.title || 'Untitled row' }),
+                  row.errors.length
+                    ? jsx('span', { className: 'import-badge error', children: 'Error' })
+                    : row.warnings.length
+                      ? jsx('span', { className: 'import-badge warning', children: 'Warning' })
+                      : jsx('span', { className: 'import-badge ok', 'data-import-badge': 'ready', children: 'Ready' }),
+                  row.problems.length ? jsx('span', { className: 'import-row-error', children: row.problems.join('; ') }) : null,
+                ],
+                }, row.idx)) }),
+              (() => {
+                const selectedRow = (importRows ?? []).find((row) => row.idx === importSelected) ?? importRows.find((row) => row.problems.length) ?? importRows[0]
+                return jsxs('aside', { className: 'import-row-detail', 'data-import-row-detail': true, children: [
+                  jsxs('h4', { children: [
+                    'Row validation',
+                    selectedRow.rowKey ? jsx('span', { className: 'dockyard-meta', children: ` · ${selectedRow.rowKey}` }) : null,
+                    selectedRow.errors.length
+                      ? jsx('span', { className: 'import-badge error', children: 'Error' })
+                      : selectedRow.warnings.length
+                        ? jsx('span', { className: 'import-badge warning', children: 'Warning' })
+                        : jsx('span', { className: 'import-badge ok', children: 'Ready' }),
+                  ] }),
+                  selectedRow.errors.length
+                    ? jsx('p', { className: 'dockyard-inline-error', children: selectedRow.errors.join('; ') })
+                    : selectedRow.warnings.length
+                      ? jsx('p', { className: 'import-warning-text', children: selectedRow.warnings.join('; ') })
+                      : jsx('p', { className: 'dockyard-meta', children: 'No validation problems for this row.' }),
+                  jsxs('div', { className: 'import-parsed', children: [
+                    jsx('strong', { children: 'Parsed values (from CSV)' }),
+                    jsx('dl', { children: [
+                      jsxs('div', { children: [jsx('dt', { children: 'Type' }), jsx('dd', { children: selectedRow.type || 'task' })] }),
+                      jsxs('div', { children: [jsx('dt', { children: 'Title' }), jsx('dd', { children: selectedRow.title || '—' })] }),
+                      jsxs('div', { children: [jsx('dt', { children: 'Parent' }), jsx('dd', { children: selectedRow.parent || '—' })] }),
+                      jsxs('div', { children: [jsx('dt', { children: 'Labels' }), jsx('dd', { children: selectedRow.labels || '—' })] }),
+                      jsxs('div', { children: [jsx('dt', { children: 'Estimate' }), jsx('dd', { children: selectedRow.estimate || '—' })] }),
+                      jsxs('div', { children: [jsx('dt', { children: 'Due' }), jsx('dd', { children: selectedRow.due || '—' })] }),
+                      jsxs('div', { children: [jsx('dt', { children: 'Initiative' }), jsx('dd', { children: selectedRow.initiative || '—' })] }),
+                    ] }),
+                  ] }),
+                  jsxs('div', { className: 'import-as', children: [
+                    jsx('strong', { children: 'Will import as' }),
+                    jsx('p', { children: `${readableLabel(selectedRow.type || 'task')} → ${readableLabel('backlog')}` }),
+                    jsx('small', { className: 'dockyard-meta', children: `A new ${selectedRow.type || 'task'} will be created in ${project.name || project.id}.` }),
+                  ] }),
+                ] })
+              })(),
+            ] }),
           ] }) : null,
           importResult ? jsxs('div', { className: importStep === 3 ? 'dockyard-wizard-step active' : 'dockyard-wizard-step', hidden: importStep !== 3, 'data-import-step': '3', children: [
-            jsx('h3', { children: 'Import finished' }),
+            jsx('h3', { children: importResult.written ? 'Import complete' : 'No items imported' }),
             jsxs('p', { role: 'status', children: [
               `Imported ${importResult.written} item${importResult.written === 1 ? '' : 's'}.`,
               importResult.failed.length ? ` ${importResult.failed.length} row(s) failed: ${importResult.failed.join(' | ')}` : '',
@@ -6193,11 +6836,18 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
           ] }) : null,
         ] }),
         jsxs('footer', { className: 'dockyard-wizard-actions', children: [
-          jsx(Button, { onClick: closeImport, children: 'Cancel' }),
-          importStep > 1 && !importResult ? jsx(Button, { onClick: () => setImportStep(importStep - 1), children: 'Back' }) : null,
-          importStep === 1 ? jsx(Button, { action: 'import-next', variant: 'primary', onClick: () => parseImport(true), children: 'Next: review' }) : null,
-          importStep === 2 ? jsx(Button, { action: 'confirm-bulk-import', variant: 'primary', disabled: importBusy || !(importRows ?? []).some((row) => !row.problems.length), onClick: runImport, children: importBusy ? 'Importing...' : `Import ${importRows.filter((row) => !row.problems.length).length} item${importRows.filter((row) => !row.problems.length).length === 1 ? '' : 's'}` }) : null,
-          importStep === 3 && importResult ? jsx(Button, { variant: 'primary', onClick: closeImport, children: 'Done' }) : null,
+          // Approved design: Cancel (and Back to source) on the left; the
+          // primary forward action on the right.
+          jsxs('span', { className: 'dockyard-wizard-actions-left', children: [
+            importStep !== 3 ? jsx(Button, { onClick: closeImport, children: 'Cancel' }) : null,
+            importStep === 2 && !importResult ? jsx(Button, { onClick: () => setImportStep(1), children: 'Back to source' }) : null,
+            importStep === 3 && importResult ? jsx(Button, { onClick: () => setImportStep(1), children: 'Back to source' }) : null,
+          ] }),
+          jsxs('span', { className: 'dockyard-wizard-actions-right', children: [
+            importStep === 1 ? jsx(Button, { action: 'import-next', variant: 'primary', disabled: importBusy, onClick: () => parseImport(true), children: importBusy ? 'Validating…' : 'Validate and preview →' }) : null,
+importStep === 2 ? (importValid ? jsx(Button, { action: 'confirm-bulk-import', variant: 'primary', disabled: importBusy, onClick: runImport, children: importBusy ? 'Importing...' : `Import ${importRows.length} item${importRows.length === 1 ? '' : 's'} →` }) : jsx(Button, { variant: 'primary', disabled: true, 'data-import-blocked': true, children: 'Import blocked — fix row errors first' })) : null,
+            importStep === 3 && importResult ? jsx(Button, { variant: 'primary', onClick: closeImport, children: 'Done' }) : null,
+          ] }),
         ] }),
       ] }),
     ] }) : null,
@@ -6209,20 +6859,25 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
           : `Move ${pendingMove.title} to rank ${pendingMove.newRank}.`) : '' }),
         pendingMove?.mode === 'parent' ? jsxs('label', { children: [
           jsx('span', { children: 'New parent' }, 'np-label'),
-          jsx('select', { id: 'dockyard-parent-select', children: [
-            jsx('option', { value: '', children: '— top level —' }, 'none'),
-            ...entries.filter((entry) => entry.item_ref !== pendingMove.ref && !descendantsOf(pendingMove.ref).includes(entry.item_ref))
-              .map((entry) => jsx('option', { value: entry.item_ref, children: `${workByRef[entry.item_ref]?.title || entry.item_ref} (#${rankOf(entry.item_ref)})` }, entry.item_ref)),
-          ] }, 'np-select'),
+          jsx('select', {
+            id: 'dockyard-parent-select',
+            value: pendingParentRef,
+            onChange: (event) => setPendingMove((current) => ({ ...current, parent_ref: event.target.value })),
+            children: [
+              pendingParentItem?.type !== 'subtask' ? jsx('option', { value: '', children: 'No parent · top level' }, 'none') : null,
+              ...pendingParentChoices.map((parent) => jsx('option', { value: parent.ref, children: `${parent.title || parent.ref} · ${typeLabel(parent.type)}` }, parent.ref)),
+            ],
+          }, 'np-select'),
         ] }) : null,
         jsx('label', { htmlFor: 'dockyard-rank-reason', children: pendingMove?.mode === 'parent' ? 'Reason for re-parenting' : 'Reason for this priority change' }),
-        jsx('textarea', { id: 'dockyard-rank-reason', value: reason, onChange: (event) => setReason(event.target.value), placeholder: 'Explain why this position is better for the project.' }),
+        jsx('textarea', { id: 'dockyard-rank-reason', value: reason, onChange: (event) => setReason(event.target.value), placeholder: pendingMove?.mode === 'parent' ? 'Explain why this parent is the right fit.' : 'Explain why this rank is right for the project.' }),
+        jsx('p', { className: 'dockyard-form-hint', children: 'Enter at least 4 characters; this reason is stored in the audit history.' }),
         error ? jsx('p', { className: 'dockyard-inline-error', children: error }) : null,
         jsxs('div', { className: 'dockyard-modal-actions', children: [
           jsx(Button, { onClick: () => setPendingMove(null), children: 'Cancel' }),
           pendingMove?.mode === 'parent'
-            ? jsx(Button, { variant: 'primary', disabled: saving || !reason.trim(), onClick: saveParent, children: saving ? 'Saving...' : 'Save reason and re-parent' })
-            : jsx(Button, { variant: 'primary', disabled: saving || !reason.trim(), onClick: saveMove, children: saving ? 'Saving...' : 'Save reason and move' }),
+            ? jsx(Button, { variant: 'primary', disabled: saving || !pendingParentChanged || reason.trim().length < 4, onClick: saveParent, children: saving ? 'Saving...' : 'Save parent change' })
+            : jsx(Button, { variant: 'primary', disabled: saving || reason.trim().length < 4, onClick: saveMove, children: saving ? 'Saving...' : 'Save rank change' }),
         ]}),
       ]}),
     ]}),
@@ -6242,16 +6897,14 @@ function BacklogView({ view, onSelectProject, onRefresh }) {
         jsxs('div', { className: 'dockyard-settings-grid', children: [
           jsxs('label', { className: 'dockyard-field dockyard-field-wide', children: [jsx('span', { children: 'Title' }), jsx('input', { 'data-create-field': 'title', value: createForm.title, onInput: (event) => updateCreate('title', event.target.value), onChange: (event) => updateCreate('title', event.target.value), placeholder: 'Describe the delivery outcome' })] }),
           jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Parent (optional)' }), jsx('select', { 'data-create-field': 'parent', value: createForm.parent, onChange: (event) => updateCreate('parent', event.target.value), children: [
-            jsx('option', { value: '', children: 'Top level' }, 'none'),
-            ...entries.map((entry) => jsx('option', { value: entry.item_ref, children: `${workByRef[entry.item_ref]?.title || entry.item_ref} (${workByRef[entry.item_ref]?.type || 'task'})` }, entry.item_ref)),
+            ROOT_TYPES.includes(createForm.type) ? jsx('option', { value: '', children: 'Top level' }, 'none') : null,
+            ...availableCreateParents.map((parent) => jsx('option', { value: parent.ref, children: `${parent.title || parent.ref} · ${typeLabel(parent.type)}` }, parent.ref)),
           ]})] }),
           jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Due date (optional)' }), jsx('input', { type: 'date', 'data-create-field': 'due', value: createForm.due, onInput: (event) => updateCreate('due', event.target.value), onChange: (event) => updateCreate('due', event.target.value) })] }),
-          jsxs('label', { className: 'dockyard-field field-required', children: [jsx('span', { children: 'Type' }), jsx('select', { 'data-create-field': 'type', value: createForm.type, onChange: (event) => updateCreate('type', event.target.value), children: [
-            jsx('option', { value: 'task', children: 'Task' }, 'task'),
-            jsx('option', { value: 'bug', children: 'Bug' }, 'bug'),
-            jsx('option', { value: 'spike', children: 'Spike' }, 'spike'),
-            jsx('option', { value: 'epic', children: 'Epic' }, 'epic'),
-          ]})] }),
+          jsxs('label', { className: 'dockyard-field field-required', children: [jsx('span', { children: 'Type' }), jsx('select', { 'data-create-field': 'type', value: createForm.type, onChange: (event) => updateCreate('type', event.target.value), children:
+            availableCreateTypes.map((type) => jsx('option', { value: type, children: typeLabel(type) }, type)),
+          })] }),
+          jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Estimated days (optional)' }), jsx('input', { type: 'number', min: 0, step: 0.5, 'data-create-field': 'estimate_days', value: createForm.estimate_days, onInput: (event) => updateCreate('estimate_days', event.target.value), onChange: (event) => updateCreate('estimate_days', event.target.value), placeholder: 'e.g. 2.5' })] }),
           jsxs('label', { className: 'dockyard-field field-required', children: [jsx('span', { children: 'Assignee' }), jsx('select', { 'data-create-field': 'assignee', value: createForm.assignee, onChange: (event) => updateCreate('assignee', event.target.value), children: [
             jsx('option', { value: '', children: 'Select a bot' }, 'none'),
             ...(view.bots ?? []).map((bot) => jsx('option', { value: bot.id, children: bot.name || bot.id }, bot.id)),
@@ -7487,7 +8140,7 @@ function DashboardPage() {
   } else if (tab === 'onboard') {
     content = jsx(OnboardPanel, { view: payload, onOpen: () => setOnboardingOpen(true), onRefresh: refresh })
   } else if (tab === 'backlog') {
-    content = jsx(BacklogView, { view: payload, onSelectProject: setSelectedProject, onRefresh: refresh })
+    content = jsx(BacklogView, { view: payload, onRefresh: refresh })
   } else if (tab === 'teams') {
     content = jsx(TeamsView, { view: payload, onRefresh: refresh })
   } else if (tab === 'initiative') {

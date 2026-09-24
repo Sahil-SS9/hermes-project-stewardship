@@ -9,12 +9,13 @@ const dir = dirname(fileURLToPath(import.meta.url));
 const iconsDir = join(dir, '..', 'node_modules', 'lucide-static', 'icons');
 const output = join(dir, '..', '..', 'desktop', 'lucide-icons.js');
 const names = [
-  'activity', 'arrow-up-right', 'bell', 'bug', 'chevron-down',
-  'chevron-right', 'circle-check', 'clock-3', 'eye', 'file-text',
-  'folder-kanban', 'folder-open', 'folders', 'layout-dashboard',
-  'list-checks', 'message-square', 'pencil', 'rotate-cw', 'search',
-  'shield-alert', 'square-check-big', 'triangle-alert', 'users',
-  'workflow', 'zap',
+  'activity', 'arrow-up-right', 'bell', 'bug', 'calendar', 'chevron-down',
+  'chevron-right', 'circle-check', 'clock-3', 'copy', 'download', 'eye',
+  'file-text', 'filter', 'flag', 'folder-kanban', 'folder-open', 'folders',
+  'history', 'layers', 'layout-dashboard', 'link', 'list-checks',
+  'list-filter', 'message-square', 'paperclip', 'pencil', 'rotate-cw',
+  'search', 'shield-alert', 'square-check-big', 'sticky-note', 'target',
+  'triangle-alert', 'upload', 'user', 'workflow', 'x', 'zap',
 ];
 const tags = new Set(['path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse']);
 const attribute = (name) => name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());

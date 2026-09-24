@@ -82,6 +82,22 @@ class FakeCanonicalAdapter(KanbanAdapter):
                 return dict(item)
         raise ValueError("canonical work was not found")
 
+    def update_work(self, project_id: str, kind: str, item_id: str, **changes):
+        for key, item in list(self.items.items()):
+            if key[0] != project_id or key[2] != item_id:
+                continue
+            updated = dict(item)
+            new_kind = changes.pop("kind", kind) if "kind" in changes else kind
+            updated.update(changes)
+            updated["kind"] = new_kind
+            updated["type"] = new_kind
+            if "parent_id" in changes:
+                updated["parent_task_id"] = changes["parent_id"]
+            self.items.pop(key)
+            self.items[(project_id, new_kind, item_id)] = updated
+            return dict(updated)
+        raise ValueError("canonical work was not found")
+
     def transition_work(
         self,
         project_id: str,
@@ -254,3 +270,93 @@ def test_api_work_and_backlog_routes_use_canonical_service_only(store, enabled):
     assert progress.status_code == 200
     assert progress.json()["total"] == 1
     assert progress.json()["done"] == 0
+
+
+def test_work_item_detail_exposes_only_scoped_audit_history(store, enabled):
+    adapter = FakeCanonicalAdapter()
+    client = TestClient(create_app(store, kanban_adapter=adapter))
+    base = f"/stewardship/v1/projects/{enabled}"
+    created = client.post(
+        f"{base}/work-items",
+        json={
+            "type": "task",
+            "title": "History-backed task",
+            "actor_id": "sahil",
+            "actor_kind": "human",
+        },
+    )
+    assert created.status_code == 200, created.text
+    ref = created.json()["ref"]
+    transitioned = client.post(
+        f"{base}/work-items/{ref}/transition",
+        json={"status": "in_progress", "actor_id": "sahil", "actor_kind": "human"},
+    )
+    assert transitioned.status_code == 200, transitioned.text
+
+    detail = client.get(f"{base}/work-items/{ref}")
+    assert detail.status_code == 200, detail.text
+    history = detail.json()["history"]
+    assert [row["action"] for row in history] == [
+        "workitem.transition",
+        "workitem.created",
+    ]
+    assert all(row["detail"]["project_id"] == enabled for row in history)
+
+
+def test_create_queued_item_persists_parent_and_planning_fields(store, enabled):
+    adapter = FakeCanonicalAdapter()
+    client = TestClient(create_app(store, kanban_adapter=adapter))
+    base = f"/stewardship/v1/projects/{enabled}"
+    parent = client.post(
+        f"{base}/work-items",
+        json={"type": "epic", "title": "Parent epic", "actor_id": "sahil", "actor_kind": "human"},
+    )
+    assert parent.status_code == 200, parent.text
+    child = client.post(
+        f"{base}/backlog/items",
+        json={
+            "type": "task", "title": "Sized child task", "creator_id": "sahil", "creator_kind": "human",
+            "assignee_id": "coder-bot", "assignee_kind": "bot", "rank": 1,
+            "reason": "unblocks launch work", "parent_ref": parent.json()["ref"],
+            "estimate_days": 2.5, "due": "2026-10-01",
+        },
+    )
+    assert child.status_code == 200, child.text
+    detail = client.get(f"{base}/work-items/{child.json()['ref']}")
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["work_item"]["parent_task_id"] == parent.json()["ref"]
+    assert detail.json()["work_item"]["estimate_days"] == 2.5
+    assert detail.json()["work_item"]["due"] == "2026-10-01"
+    assert any(choice["ref"] == parent.json()["ref"] for choice in detail.json()["parent_choices"])
+
+
+def test_reparent_requires_and_records_reason(store, enabled):
+    adapter = FakeCanonicalAdapter()
+    client = TestClient(create_app(store, kanban_adapter=adapter))
+    base = f"/stewardship/v1/projects/{enabled}"
+    parent = client.post(
+        f"{base}/work-items",
+        json={"type": "epic", "title": "Parent initiative", "actor_id": "sahil", "actor_kind": "human"},
+    )
+    child = client.post(
+        f"{base}/work-items",
+        json={"type": "task", "title": "Child task", "actor_id": "sahil", "actor_kind": "human"},
+    )
+    assert parent.status_code == child.status_code == 200
+    ref = child.json()["ref"]
+
+    missing_reason = client.patch(
+        f"{base}/work-items/{ref}",
+        json={"parent_ref": parent.json()["ref"], "actor_id": "sahil"},
+    )
+    assert missing_reason.status_code == 422
+    updated = client.patch(
+        f"{base}/work-items/{ref}",
+        json={"parent_ref": parent.json()["ref"], "reason": "grouped for release", "actor_id": "sahil"},
+    )
+    assert updated.status_code == 200, updated.text
+
+    history = client.get(f"{base}/work-items/{ref}").json()["history"]
+    changed = next(row for row in history if row["action"] == "workitem.updated")
+    assert changed["detail"]["reason"] == "grouped for release"
+    assert changed["detail"]["fields"] == ["parent_ref"]

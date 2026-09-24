@@ -339,6 +339,7 @@ class WorkItemUpdate(BaseModel):
     evidence_refs: Optional[List[str]] = None
     estimate_days: Optional[float] = None
     due: Optional[str] = None
+    reason: Optional[str] = None
     actor_id: str
     actor_kind: str = "human"
 
@@ -381,6 +382,9 @@ class QueuedWorkItemCreate(BaseModel):
     rank: int
     reason: str
     initiative_ref: Optional[str] = None
+    parent_ref: Optional[str] = None
+    estimate_days: Optional[float] = None
+    due: Optional[str] = None
     idempotency_key: Optional[str] = None
 
 
@@ -1648,6 +1652,9 @@ def create_app(
                 rank=body.rank,
                 reason=body.reason,
                 initiative_ref=body.initiative_ref,
+                parent_ref=body.parent_ref,
+                estimate_days=body.estimate_days,
+                due=body.due,
                 idempotency_key=body.idempotency_key,
             )
         except Exception as exc:

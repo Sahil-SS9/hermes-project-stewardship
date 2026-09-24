@@ -333,6 +333,10 @@ class TeamManagementService:
         }
 
     def _audit_completed(self, op_id: str, actor: str) -> None:
+        journal = self.store._conn.execute(
+            "SELECT project_id FROM operation_journal WHERE op_id=?", (op_id,)
+        ).fetchone()
+        project_id = journal["project_id"] if journal is not None else None
         for row in self.store._conn.execute(
             "SELECT item_id FROM operation_items WHERE op_id=? AND outcome='completed'", (op_id,)
         ).fetchall():
@@ -342,4 +346,4 @@ class TeamManagementService:
                 (row["item_id"], f"%{marker}%"),
             ).fetchone()
             if exists is None:
-                self.store.audit(actor=actor, interface="team_management", action="workitem.reassigned", subject=row["item_id"], detail={"operation": op_id})
+                self.store.audit(actor=actor, interface="team_management", action="workitem.reassigned", subject=row["item_id"], detail={"operation": op_id, "project_id": project_id})

@@ -10,7 +10,7 @@ import { test } from 'node:test'
 const require = createRequire(fileURLToPath(new URL('../dashboard/package.json', import.meta.url)))
 const { chromium } = require('playwright')
 const BASE = process.env.STEWARD_DESKTOP_URL || 'http://127.0.0.1:19500/desktop'
-const API = 'http://127.0.0.1:19500/api/plugins/hermes-dockyard'
+const API = process.env.STEWARD_API_URL || 'http://127.0.0.1:19500/api/plugins/hermes-dockyard'
 const TOKEN = 'demo-session-token'
 
 const api = async (path, method = 'GET', body) => {
@@ -27,7 +27,7 @@ test('Phase 6 rendered import journey: invalid preview writes nothing, valid com
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
   const errors = []
   page.on('pageerror', (error) => errors.push(String(error)))
-  const project = 'payments-relaunch'
+  const project = 'atlas-mobile'
   const stamp = Date.now()
   const epicTitle = `P6 e2e epic ${stamp}`
   const taskTitle = `P6 e2e task ${stamp}`
@@ -50,28 +50,29 @@ test('Phase 6 rendered import journey: invalid preview writes nothing, valid com
 
     // --- 1. INVALID csv: unknown type + unknown parent -> preview errors.
     const badCsv = [
-      'type,title,assignee,due,parent',
-      `epic,${epicTitle},bot-worker,,`,
-      `nonsense,${taskTitle},bot-worker,,epic-x`,
+      'row_key,type,title,assignee,due,parent',
+      `epic-key-early,${epicTitle},bot-worker,,`,
+      `task-key-early,${taskTitle.replace('P6 e2e','nonsense')},bot-worker,,`,
     ].join('\n')
     await page.locator('[data-import-input]').fill(badCsv)
-    await page.locator('button:has-text("Next: review")').click()
+    await page.locator('[data-action="import-next"]').click()
     await page.waitForTimeout(800)
     // server-side preview must flag the bad row; the good row may pass
     const preview = await page.locator('[data-import-preview]').innerText()
-    assert.match(preview, /nonsense/, 'preview flags the invalid type row')
+    assert.match(preview, /unsupported work type/, 'preview flags the invalid type row')
     assert.match(preview, /unsupported work type/, 'server-side validator supplies the row error')
-    // Commit only counts READY rows — the skipped row is excluded from the label.
-    const commitButton = page.locator('[data-bulk-import-layer] button', { hasText: /^Import \d+ item/ })
-    await commitButton.waitFor({ timeout: 5000 })
-    assert.match(await commitButton.textContent(), /^Import 1 item\b/, 'commit excludes the skipped row')
+    // Errors block the commit entirely: the primary action is rendered but
+    // disabled with an explicit blocked label (approved contract).
+    const blockedButton = page.locator('[data-bulk-import-layer] [data-import-blocked]')
+    await blockedButton.waitFor({ timeout: 5000 })
+    assert.match(await blockedButton.textContent(), /Import blocked/, 'error rows block the commit action')
 
     // Nothing written: count unchanged (preview is non-destructive).
     const afterInvalid = await api(`/projects/${project}/backlog`)
     assert.equal((afterInvalid.backlog ?? []).length, beforeCount, 'invalid preview writes zero rows')
 
     // --- 2. Back to step 1, fix the rows, then a valid commit.
-    await page.locator('[data-bulk-import-layer] button:has-text("Back")').click()
+    await page.locator('[data-bulk-import-layer] button:has-text("Back to source")').click()
     await page.waitForTimeout(500)
     // Canonical-header file: exercises the validator vocabulary directly and
     // links the task under the epic via parent_key.
@@ -81,7 +82,7 @@ test('Phase 6 rendered import journey: invalid preview writes nothing, valid com
       `task-key-${stamp},task,${taskTitle},epic-key-${stamp}`,
     ].join('\n')
     await page.locator('[data-import-input]').fill(goodCsv)
-    await page.locator('button:has-text("Next: review")').click()
+    await page.locator('[data-action="import-next"]').click()
     await page.locator('[data-import-preview]').waitFor({ timeout: 8000 })
     const preview2 = await page.locator('[data-import-preview]').innerText()
     assert.match(preview2, new RegExp(epicTitle))
