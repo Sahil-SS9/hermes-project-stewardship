@@ -9,7 +9,8 @@ const dir = dirname(fileURLToPath(import.meta.url));
 const iconsDir = join(dir, '..', 'node_modules', 'lucide-static', 'icons');
 const output = join(dir, '..', '..', 'desktop', 'lucide-icons.js');
 const names = [
-  'activity', 'arrow-up-right', 'bell', 'bug', 'calendar', 'chevron-down',
+  'activity', 'arrow-down-wide-narrow', 'arrow-up-down', 'arrow-up-narrow-wide',
+  'arrow-up-right', 'bell', 'bug', 'calendar', 'check', 'chevron-down',
   'chevron-right', 'circle-check', 'clock-3', 'copy', 'download', 'eye',
   'file-text', 'filter', 'flag', 'folder-kanban', 'folder-open', 'folders',
   'history', 'layers', 'layout-dashboard', 'link', 'list-checks',

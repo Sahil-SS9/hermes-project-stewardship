@@ -1889,9 +1889,33 @@ const DOCKYARD_CSS = `
 .dockyard-root [data-backlog-board] .dockyard-filterbar { padding: 6px 14px 12px; gap: 10px; }
 /* Approved design: single-line toolbar — search and every control on one
    row; the filter row folds into the same line at desktop width. */
-.dockyard-root [data-backlog-board] .dockyard-cmdbar { flex-wrap: nowrap; overflow-x: auto; }
-.dockyard-root [data-backlog-board] .dockyard-cmdbar .cm-count { margin-left: auto; white-space: nowrap; }
 .dockyard-root [data-backlog-board] .cm-search { max-width: 440px; background: var(--dy-surface); }
+/* LANE-TOOLBAR: backlog toolbar — one line at desktop width, wraps (never
+   scrolls) when narrow; icon Sort/Group buttons with floating popovers. */
+.dockyard-root [data-backlog-board] .dockyard-cmdbar { flex-wrap: wrap; overflow: visible; row-gap: 8px; gap: 8px; z-index: 30; }
+.dockyard-root [data-backlog-board] .dockyard-cmdbar .cm-search { flex: 1 1 180px; min-width: 160px; max-width: 360px; height: 29px; padding: 0 9px; border-color: var(--dy-control-border); border-radius: 7px; box-sizing: border-box; }
+.dockyard-root [data-backlog-board] .dockyard-cmdbar .cm-search input { font-size: 12px; }
+.dockyard-root .cm-icon-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 29px; height: 29px; padding: 0; box-sizing: border-box; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface-subtle); color: var(--dy-text-2); cursor: pointer; }
+.dockyard-root .cm-icon-btn svg { width: 14px; height: 14px; }
+.dockyard-root .cm-icon-btn:hover { color: var(--dy-text); border-color: var(--dy-accent-border); }
+.dockyard-root .cm-icon-btn:focus-visible { outline: 2px solid var(--dy-accent-border); outline-offset: 1px; }
+.dockyard-root .cm-icon-btn[aria-expanded="true"] { color: var(--dy-accent-text); border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
+.dockyard-root .cm-icon-btn.is-modified { color: var(--dy-accent-text); }
+.dockyard-root .cm-icon-dot { position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: var(--dy-accent-text); }
+.dockyard-root .cm-anchor { position: relative; display: inline-flex; flex: none; }
+.dockyard-root .cm-anchor .cm-menu.cm-popover { position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; min-width: 190px; max-height: 62vh; overflow: auto; padding: 5px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface-strong); box-shadow: var(--dy-shadow); }
+.dockyard-root .cm-popover button { width: 100%; font-size: 12px; padding: 6px 8px; }
+.dockyard-root .cm-popover button:focus-visible { outline: 0; background: var(--dy-accent-soft); color: var(--dy-accent-text); }
+.dockyard-root .cm-popover button.is-active { font-weight: 680; }
+.dockyard-root .cm-popover .cm-check { display: inline-flex; width: 13px; flex: none; color: var(--dy-accent-text); }
+.dockyard-root .cm-popover .cm-option-label { flex: 1; }
+.dockyard-root .cm-popover .cm-dir { display: inline-flex; color: var(--dy-text-3); }
+.dockyard-root [data-backlog-board] .cm-divider { width: 1px; height: 18px; background: var(--dy-border); flex: none; margin: 0 2px; }
+.dockyard-root [data-backlog-board] .dockyard-cmdbar .cm-filter { flex: none; }
+.dockyard-root [data-backlog-board] .dockyard-cmdbar .cm-filter > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.dockyard-root [data-backlog-board] .dockyard-cmdbar .cm-filter select { min-width: 0; width: auto; max-width: 150px; }
+.dockyard-root [data-backlog-board] .dockyard-cmdbar .cm-count { margin-left: auto; font-size: 11px; color: var(--dy-text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* /LANE-TOOLBAR */
 .dockyard-root [data-backlog-board] .tree-head { min-height: 37px; }
 .dockyard-root [data-backlog-board] .dockyard-tree-row { min-height: 55px; }
 .dockyard-root [data-backlog-board] .th-gutter, .dockyard-root [data-backlog-board] .tree-gutter { width: 34px; }
@@ -2106,6 +2130,8 @@ const ICON_NAME = Object.freeze({
   'type-task': 'square-check-big', 'type-subtask': 'list-checks',
   'type-bug': 'bug', 'type-spike': 'zap',
 })
+// LANE-TOOLBAR: backlog group-by labels shared by the toolbar and count summary.
+const GROUP_LABELS = Object.freeze({ none: 'None', status: 'Status', assignee: 'Owner', type: 'Type', initiative: 'Initiative', month: 'Due month' })
 function Icon({ name }) {
   const iconName = ICON_NAME[name] ?? name
   const nodes = LUCIDE_ICON_NODES[iconName] ?? LUCIDE_ICON_NODES.bell
@@ -5903,6 +5929,13 @@ function BacklogView({ view, onRefresh }) {
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [])
+  // LANE-TOOLBAR: Sort/Group popovers close on any outside pointer press.
+  useEffect(() => {
+    if (!cmMenu) return undefined
+    const onPointer = (event) => { if (!event.target?.closest?.('[data-cm-anchor]')) setCmMenu(null) }
+    document.addEventListener('pointerdown', onPointer)
+    return () => document.removeEventListener('pointerdown', onPointer)
+  }, [cmMenu])
   const [bulkReplacement, setBulkReplacement] = useState('')
   const [bulkPreview, setBulkPreview] = useState(null)
   const [bulkOperation, setBulkOperation] = useState(null)
@@ -6431,24 +6464,40 @@ function BacklogView({ view, onRefresh }) {
           jsx(Icon, { name: 'search' }, 'v4-search'),
           jsx('input', { type: 'search', 'data-cm-search': true, 'aria-label': 'Search backlog', placeholder: 'Search backlog', value: search, onInput: (event) => setSearch(event.target.value) }),
         ] }),
-        jsxs('span', { className: 'cm-anchor', children: [
-          jsxs('button', { type: 'button', className: 'cm-chip', 'data-cm-menu-btn': 'sort', onClick: (event) => { event.stopPropagation(); setCmMenu(cmMenu === 'sort' ? null : 'sort') }, children: [`Sort: ${sortLabels[sortKey]}`, jsx(Icon, { name: 'chevron-down' }, 'v4-chev')] }),
-          cmMenu === 'sort' ? jsx('div', { className: 'cm-menu', 'data-cm-menu': 'sort', onClick: (event) => event.stopPropagation(), children: ['rank', 'type', 'title', 'status', 'initiative', 'assignee', 'age'].map((key) => jsxs('button', { type: 'button', 'data-cm-option': `sort-${key}`, onClick: () => { if (sortKey === key) setSortDir(-sortDir); else { setSortKey(key); setSortDir(1) } setCmMenu(null) }, children: [`${sortLabels[key]}${sortKey === key ? (sortDir > 0 ? '  ↑' : '  ↓') : ''}`] }, key)) }) : null,
-        ] }),
-        jsxs('span', { className: 'cm-anchor', children: [
-          jsxs('button', { type: 'button', className: 'cm-chip', 'data-cm-menu-btn': 'group', onClick: (event) => { event.stopPropagation(); setCmMenu(cmMenu === 'group' ? null : 'group') }, children: [`Group: ${{ none: 'None', status: 'Status', assignee: 'Owner', type: 'Type', initiative: 'Initiative', month: 'Due month' }[groupBy]}`, jsx(Icon, { name: 'chevron-down' }, 'v4-chev')] }),
-          cmMenu === 'group' ? jsx('div', { className: 'cm-menu', 'data-cm-menu': 'group', onClick: (event) => event.stopPropagation(), children: [['none', 'None'], ['status', 'Status'], ['assignee', 'Owner'], ['type', 'Type'], ['initiative', 'Initiative'], ['month', 'Due month']].map(([key, label]) => jsxs('button', { type: 'button', 'data-cm-option': `group-${key}`, onClick: () => { setGroupBy(key); setCmMenu(null) }, children: [`${label}${groupBy === key ? '  ✓' : ''}`] }, key)) }) : null,
-        ] }),
-
-        jsx('span', { className: 'cm-count', 'data-cm-count': true, children: [
-          `${number(treeRows.length)} of ${number(entries.length)} items`,
-          q ? ` · search “${search}”` : '',
-          activeFilterCount ? ` · ${activeFilterCount} filter${activeFilterCount === 1 ? '' : 's'}` : '',
-          sortKey !== 'rank' ? ` · sorted by ${sortLabels[sortKey]}` : '',
-          groupBy !== 'none' ? ` · grouped by ${{ status: 'Status', assignee: 'Owner', initiative: 'Initiative', type: 'Type', month: 'Due month' }[groupBy]}` : '',
-        ] }),
-        jsx('span', { className: 'cm-spacer' }),
-        jsx('span', { className: 'filterbar-title', children: 'Filters' }),
+        // LANE-TOOLBAR: icon-driven Sort/Group controls with floating popover menus.
+        ...[
+          ['sort', 'arrow-up-down', 'Sort', `${sortLabels[sortKey]} ${sortDir > 0 ? '↑' : '↓'}`, sortKey !== 'rank' || sortDir < 0,
+            ['rank', 'type', 'title', 'status', 'initiative', 'assignee', 'age'].map((key) => [key, sortLabels[key], sortKey === key]),
+            (key) => { if (sortKey === key) setSortDir(-sortDir); else { setSortKey(key); setSortDir(1) } }],
+          ['group', 'layers', 'Group', GROUP_LABELS[groupBy], groupBy !== 'none',
+            Object.entries(GROUP_LABELS).map(([key, label]) => [key, label, groupBy === key]),
+            (key) => setGroupBy(key)],
+        ].map(([menu, icon, label, value, modified, options, choose]) => jsxs('span', { className: 'cm-anchor', 'data-cm-anchor': menu, children: [
+          jsxs('button', { type: 'button', className: `cm-icon-btn${modified ? ' is-modified' : ''}`, 'data-cm-menu-btn': menu, 'aria-haspopup': 'menu', 'aria-expanded': cmMenu === menu ? 'true' : 'false', 'aria-label': `${label}: ${value}`, title: `${label}: ${value}`,
+            onClick: (event) => { event.stopPropagation(); setCmMenu(cmMenu === menu ? null : menu) },
+            onKeyDown: (event) => { if (event.key === 'ArrowDown') { event.preventDefault(); setCmMenu(menu) } },
+            children: [jsx(Icon, { name: icon }, `${menu}-icon`), modified ? jsx('span', { className: 'cm-icon-dot', 'aria-hidden': true }, `${menu}-dot`) : null] }),
+          cmMenu === menu ? jsxs('div', { className: 'cm-menu cm-popover', role: 'menu', 'aria-label': `${label} by`, 'data-cm-menu': menu, onClick: (event) => event.stopPropagation(),
+            onKeyDown: (event) => {
+              const items = [...event.currentTarget.querySelectorAll('[data-cm-option]')]
+              const at = items.indexOf(document.activeElement)
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); items[(at + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus() }
+              else if (event.key === 'Home') { event.preventDefault(); items[0]?.focus() }
+              else if (event.key === 'End') { event.preventDefault(); items[items.length - 1]?.focus() }
+              else if (event.key === 'Tab') setCmMenu(null)
+            },
+            children: [
+              jsx('div', { className: 'menu-label', children: `${label} by` }, 'label'),
+              ...options.map(([key, optionLabel, active]) => jsxs('button', { type: 'button', role: 'menuitemradio', 'aria-checked': active ? 'true' : 'false', className: active ? 'is-active' : '', 'data-cm-option': `${menu}-${key}`, autoFocus: active,
+                onClick: () => { choose(key); setCmMenu(null); document.querySelector(`[data-cm-menu-btn="${menu}"]`)?.focus() },
+                children: [
+                  jsx('span', { className: 'cm-check', children: active ? jsx(Icon, { name: 'check' }) : null }, 'check'),
+                  jsx('span', { className: 'cm-option-label', children: optionLabel }, 'label'),
+                  menu === 'sort' && active ? jsx('span', { className: 'cm-dir', title: sortDir > 0 ? 'Ascending — select again to reverse' : 'Descending — select again to reverse', children: jsx(Icon, { name: sortDir > 0 ? 'arrow-up-narrow-wide' : 'arrow-down-wide-narrow' }) }, 'dir') : null,
+                ] }, key)),
+            ] }) : null,
+        ] }, menu)),
+        jsx('span', { className: 'cm-divider', 'aria-hidden': true }),
         jsxs('label', { className: 'cm-filter', children: [
           jsx('span', { children: 'Type' }),
           jsx('select', { 'data-filter-field': 'type', 'aria-label': 'Filter by type', value: columnFilters.type, onChange: (event) => setColumnFilters((current) => ({ ...current, type: event.target.value })), children: [
@@ -6479,6 +6528,13 @@ function BacklogView({ view, onRefresh }) {
           ] }),
         ] }),
         hasFilters ? jsx('button', { type: 'button', className: 'cm-reset-filters', 'data-clear-filters': true, onClick: resetFilters, children: 'Clear all' }) : null,
+        jsx('span', { className: 'cm-count', 'data-cm-count': true, role: 'status', title: [
+          `${number(treeRows.length)} of ${number(entries.length)} items`,
+          q ? `search “${search}”` : '',
+          activeFilterCount ? `${activeFilterCount} filter${activeFilterCount === 1 ? '' : 's'}` : '',
+          sortKey !== 'rank' ? `sorted by ${sortLabels[sortKey]}` : '',
+          groupBy !== 'none' ? `grouped by ${GROUP_LABELS[groupBy]}` : '',
+        ].filter(Boolean).join(' · '), children: treeRows.length === entries.length ? `${number(entries.length)} items` : `${number(treeRows.length)} of ${number(entries.length)}` }),
       ] }) : null,
       !window.__V4_DISABLE?.has('head') ? jsxs('div', { className: 'tree-head', children: [
         jsx('span', { className: 'th-gutter' }),

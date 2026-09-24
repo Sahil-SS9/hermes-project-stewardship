@@ -10,6 +10,96 @@ export const LUCIDE_ICON_NODES = {
       }
     ]
   ],
+  "arrow-down-wide-narrow": [
+    [
+      "path",
+      {
+        "d": "m3 16 4 4 4-4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M7 20V4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M11 4h10"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M11 8h7"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M11 12h4"
+      }
+    ]
+  ],
+  "arrow-up-down": [
+    [
+      "path",
+      {
+        "d": "m21 16-4 4-4-4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M17 20V4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m3 8 4-4 4 4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M7 4v16"
+      }
+    ]
+  ],
+  "arrow-up-narrow-wide": [
+    [
+      "path",
+      {
+        "d": "m3 8 4-4 4 4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M7 4v16"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M11 12h4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M11 16h7"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M11 20h10"
+      }
+    ]
+  ],
   "arrow-up-right": [
     [
       "path",
@@ -133,6 +223,14 @@ export const LUCIDE_ICON_NODES = {
       "path",
       {
         "d": "M3 9h18"
+      }
+    ]
+  ],
+  "check": [
+    [
+      "path",
+      {
+        "d": "M20 6 9 17l-5-5"
       }
     ]
   ],
