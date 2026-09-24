@@ -5960,6 +5960,7 @@ function BacklogView({ view, onRefresh }) {
   const [importWarningsOnly, setImportWarningsOnly] = useState(false)
   const [importColumnMetadata, setImportColumnMetadata] = useState([])
   const [detailItem, setDetailItem] = useState(null)
+  const project = view.project
   useEffect(() => {
     if (!importOpen) return undefined
     const onEscape = (event) => {
@@ -6011,7 +6012,6 @@ function BacklogView({ view, onRefresh }) {
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [createOpen, createSaving])
-  const project = view.project
   if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Select a project before prioritising its backlog.', icon: 'project' })
   const canCreate = project.enabled !== false && project.phase === 'active'
   const workByRef = Object.fromEntries((view.workItems ?? []).map((item) => [item.ref, item]))
