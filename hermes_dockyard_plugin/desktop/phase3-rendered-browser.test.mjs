@@ -13,9 +13,17 @@ test('Phase 3 rendered Desktop: scope isolation, dirty switching, keyboard and n
   await page.getByRole('heading',{name:'Command Center',exact:true}).waitFor();
   assert.deepEqual(await page.locator('[data-tab]').evaluateAll(els=>els.map(e=>e.dataset.tab)),tabs);
   assert.equal(await picker.count(),1);
+  // Dashboard metric strip is rendered from real backend data (restored check).
+  assert.deepEqual(await page.locator('[data-metric]').evaluateAll(els=>els.map(e=>e.dataset.metric)),['projects','needs-your-review','on-track','evidence-files']);
+  // Three fixture projects exist in the disposable backend; the metric must reflect real data.
+  assert.equal(await page.locator('[data-metric="projects"] strong').innerText(),'3');
+  assert.match(await page.locator('body').innerText(),/payments-relaunch/);
+  assert.equal(await page.locator('[data-tab="dashboard"]').getAttribute('aria-selected'),'true');
   await page.locator('[data-tab="dashboard"]').focus();await page.keyboard.press('ArrowRight');
   assert.equal(await page.evaluate(()=>document.activeElement?.dataset.tab),'project');
   await page.locator('[data-project-view="overview"].active').waitFor();
+  assert.equal(await page.locator('[data-tab="project"]').getAttribute('aria-selected'),'true');
+  assert.equal(await page.locator('[data-tab="dashboard"]').getAttribute('aria-selected'),'false');
   await select('payments-relaunch');
   await page.locator('[data-project-dashboard="payments-relaunch"]').waitFor();
   // Delay a genuine earlier response; do not synthesize project data.
@@ -38,7 +46,11 @@ test('Phase 3 rendered Desktop: scope isolation, dirty switching, keyboard and n
   const styles=await root.evaluate(el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,color:s.color,font:s.fontFamily}});
   assert.notEqual(styles.bg,'rgba(0, 0, 0, 0)');assert.notEqual(styles.color,'rgba(0, 0, 0, 0)');assert.ok(!styles.font.includes('Times New Roman'));
   await page.setViewportSize({width:390,height:844});
+  await page.waitForTimeout(250);
+  assert.ok((await root.boundingBox()).width<=390,'root must fit a 390px viewport');
   assert.equal(await page.locator('body').evaluate(el=>el.scrollWidth<=window.innerWidth+1),true);
+  assert.ok(await page.locator('[data-tab="dashboard"]').isVisible());
+  assert.ok(await picker.isVisible(),'project picker must stay reachable at narrow width');
   await select('payments-relaunch');await page.locator('[data-tab="dashboard"]').click();
   await page.getByRole('heading',{name:'Command Center',exact:true}).waitFor();
   assert.ok(await page.locator('[data-project-row="payments-relaunch"]').count());

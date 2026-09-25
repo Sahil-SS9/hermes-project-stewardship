@@ -96,8 +96,11 @@ class ReferenceKanbanAdapter(KanbanAdapter):
     );
     """
 
-    def __init__(self, store: Store) -> None:
+    def __init__(self, store: Store, *, profiles: Optional[List[str]] = None) -> None:
         self.store = store
+        # Reference adapter has no host to discover; callers declare the
+        # profiles it should report (the default profile is always present).
+        self._profiles = tuple(dict.fromkeys(p for p in (profiles or ()) if p and p != "default"))
         self._canonical_items: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._canonical_keys: dict[str, tuple[str, str, str]] = {}
         self._canonical_sequence = 0
@@ -150,7 +153,9 @@ class ReferenceKanbanAdapter(KanbanAdapter):
             )
 
     def list_profiles(self) -> List[Dict[str, Any]]:
-        return [{"name": "default", "is_default": True}]
+        return [{"name": "default", "is_default": True}] + [
+            {"name": name, "is_default": False} for name in self._profiles
+        ]
 
     def validate_project(self, **payload: Any) -> Dict[str, Any]:
         return dict(payload)

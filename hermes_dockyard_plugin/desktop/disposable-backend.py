@@ -23,17 +23,11 @@ from hermes_project_stewardship.kanban import ReferenceKanbanAdapter
 from hermes_project_stewardship.persistence.service import StewardshipService
 
 store = plugin_api._store
-adapter = ReferenceKanbanAdapter(store)
-# Phase-5 workflow binding validates overrides against "discovered" host
-# profiles (P5.2). The reference adapter's discovery is static, so expose the
-# profiles the fixture team members actually use.
-REAL_REFERENCE_PROFILES = ("worker", "reviewer", "fixture-lead", "octacon", "quan")
-_original_reference_list_profiles = adapter.list_profiles
-def _reference_list_profiles():
-    return [{"name": "default", "is_default": True}] + [
-        {"name": name, "is_default": False} for name in REAL_REFERENCE_PROFILES
-    ]
-adapter.list_profiles = _reference_list_profiles
+# Phase-5 workflow binding validates overrides against discovered profiles
+# (P5.2). Declare the fixture team's profiles through the adapter's own
+# constructor seam. This is reference-adapter coverage, not vanilla-host proof.
+adapter = ReferenceKanbanAdapter(
+    store, profiles=["worker", "reviewer", "fixture-lead", "octacon", "quan"])
 service = StewardshipService(store)
 for pid in ("payments-relaunch", "mobile-client", "atlas-mobile"):
     service.enable(pid, mission=f"Deliver {pid}", lead_profile="fixture-lead",

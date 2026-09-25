@@ -703,7 +703,7 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
     if (method === 'GET' && path === '/operations/OP-PHASE4') return { op_id: 'OP-PHASE4', state: 'completed', project_id: 'payments-relaunch', actor: 'sahil', items: [{ item_id: 'HDY-12', outcome: 'completed', actor: 'sahil' }, { item_id: 'HDY-13', outcome: 'completed', actor: 'sahil' }] };
     if (method === 'GET' && path === '/operations/OP-BULK') return { op_id: 'OP-BULK', state: 'completed', project_id: 'payments-relaunch', actor: 'sahil', operation_audit: { operation: 'OP-BULK', actor: 'sahil' }, items: [{ item_id: 'HDY-13', outcome: 'completed', audit: { actor: 'sahil', action: 'workitem.reassigned' } }] };
     if (path === '/dashboard') return clone(data.dashboard);
-    if (path === '/portfolio') { console.error('DBG_PORTFOLIO', JSON.stringify(clone(data.portfolio ?? POPULATED_PORTFOLIO)).slice(0,200)); return clone(data.portfolio ?? POPULATED_PORTFOLIO); }
+    if (path === '/portfolio') return clone(data.portfolio ?? POPULATED_PORTFOLIO);
     if (path === '/onboard/discover') return clone(data.DISCOVER);
     if (method === 'POST' && path === '/onboard/preflight') return clone(data.PREFLIGHT);
     if (method === 'POST' && /^\/projects\/[^/]+\/first-assessment$/.test(path)) {
@@ -1048,11 +1048,6 @@ async function testReferenceBenchmarkDashboardComposition() {
   await runtime.flush(60);
   const doc = runtime.dom.window.document;
 
-  console.error('DBG_CMDS3', JSON.stringify({empty: doc.body.textContent.includes('No decisions or blocked work'), approvals: doc.querySelectorAll('[data-approval-ref]').length}));
-  console.error('DBG_CMDS3', JSON.stringify({empty: doc.body.textContent.includes('No decisions or blocked work'), approvals: doc.querySelectorAll('[data-approval-ref]').length}));
-  console.error('DBG_CMDS2', JSON.stringify({needsYouNow: doc.body.textContent.includes('Needs you now'), dec: doc.querySelectorAll('.dockyard-command-attention-row').length, grp: !!doc.querySelector('.dockyard-command-table-wrap')}));
-  console.error('DBG_CMDS2', JSON.stringify({needsYouNow: doc.body.textContent.includes('Needs you now'), dec: doc.querySelectorAll('.dockyard-command-attention-row').length, grp: !!doc.querySelector('.dockyard-command-table-wrap')}));
-  console.error('DBG_CMDS', doc.querySelectorAll('[class*="command"]').length, JSON.stringify([...doc.querySelectorAll('[class*="command"]')].slice(0,5).map(e=>e.className)));
   const decisionRows = [...doc.querySelectorAll('.dockyard-command-attention-row')].filter((row) => row.textContent.includes('Approval'));
   assert.equal(decisionRows.length, 2, 'command table must show the actual owner decisions, not only a count (count=' + decisionRows.length + ')');
   assert(decisionRows.every((row) => row.textContent.includes('Add weekly digest email') || row.textContent.includes('Enable one-click refunds')), 'command table rows carry the pending initiative decisions');
@@ -1566,8 +1561,6 @@ async function testBacklogCreateFormValidationAndReadback() {
     assignee_id: 'quan-bot',
     assignee_kind: 'bot',
     body: null,
-    creator_id: 'sahil',
-    creator_kind: 'human',
     due: null,
     estimate_days: null,
     evidence_refs: [],

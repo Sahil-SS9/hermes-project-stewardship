@@ -742,16 +742,17 @@ async def project_canvas(project_id: str) -> dict:
 @plugin_api.put("/projects/{project_id}/canvas")
 async def save_project_canvas(project_id: str, body: dict) -> dict:
     return await _proxy(
-        "PUT", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvas", body
+        "PUT", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvas",
+        {**body, "actor": _ACTOR_ID},
     )
 
 
 @plugin_api.delete("/projects/{project_id}/canvas/objects/{object_id}")
-async def remove_canvas_object(project_id: str, object_id: str, expected_revision: int, actor: str = "system") -> dict:
+async def remove_canvas_object(project_id: str, object_id: str, expected_revision: int) -> dict:
     return await _proxy(
         "DELETE",
         f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvas/objects/{quote(object_id, safe='')}",
-        params={"expected_revision": expected_revision, "actor": actor},
+        params={"expected_revision": expected_revision, "actor": _ACTOR_ID},
     )
 
 
@@ -762,7 +763,7 @@ async def curate_project_canvas(project_id: str) -> dict:
 
 @plugin_api.post("/projects/{project_id}/canvas/sessions")
 async def start_canvas_session(project_id: str, body: dict) -> dict:
-    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvas/sessions", body)
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvas/sessions", {**body, "actor": _ACTOR_ID})
 
 
 @plugin_api.get("/canvas/sessions/{session_id}")
@@ -772,12 +773,12 @@ async def get_canvas_session(session_id: str) -> dict:
 
 @plugin_api.post("/canvas/sessions/{session_id}/answer")
 async def answer_canvas_session(session_id: str, body: dict) -> dict:
-    return await _proxy("POST", f"/stewardship/v1/canvas/sessions/{quote(session_id, safe='')}/answer", body)
+    return await _proxy("POST", f"/stewardship/v1/canvas/sessions/{quote(session_id, safe='')}/answer", {**body, "actor": _ACTOR_ID})
 
 
 @plugin_api.post("/canvas/proposals/{proposal_id}/decision")
 async def decide_canvas_proposal(proposal_id: str, body: dict) -> dict:
-    return await _proxy("POST", f"/stewardship/v1/canvas/proposals/{quote(proposal_id, safe='')}/decision", body)
+    return await _proxy("POST", f"/stewardship/v1/canvas/proposals/{quote(proposal_id, safe='')}/decision", {**body, "actor": _ACTOR_ID})
 
 
 @plugin_api.get("/projects/{project_id}/content")
@@ -978,10 +979,12 @@ class WorkUpdateBody(BaseModel):
     type: str | None = None
     body: str | None = None
     parent_ref: str | None = None
+    initiative_ref: str | None = None
     labels: list[str] | None = None
     evidence_refs: list[str] | None = None
     estimate_days: float | None = None
     due: str | None = None
+    reason: str | None = None
 
 
 class WorkAssignBody(BaseModel):
@@ -1032,13 +1035,21 @@ class BacklogAddBody(BaseModel):
 
 
 class QueuedItemBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     type: str
     title: str
+    body: str | None = None
+    labels: list[str] = []
+    evidence_refs: list[str] = []
     assignee_id: str
     assignee_kind: str = "bot"
     rank: int
     reason: str
     initiative_ref: str | None = None
+    parent_ref: str | None = None
+    estimate_days: float | None = None
+    due: str | None = None
+    idempotency_key: str | None = None
 
 
 class BacklogRerankBody(BaseModel):

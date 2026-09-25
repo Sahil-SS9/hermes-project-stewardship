@@ -8,7 +8,8 @@
   ],
   "build": [],
   "test": [
-    ".venv/bin/python -m pytest"
+    ".venv/bin/python -m pytest",
+    "node hermes_dockyard_plugin/desktop/run-browser-suite.mjs"
   ],
   "start": ".venv/bin/python -m hermes_project_stewardship.api.server",
   "port": 9310,

@@ -27,7 +27,7 @@ test('approved backlog slice is present in the production plugin surface', () =>
   ]) assert.ok(source.includes(marker), `missing approved marker: ${marker}`)
   // P6.7/P6.8: import flows through the shared backend validator endpoint.
   assert.match(source, /\/backlog\/import`, \{\s*method: 'POST', body: \{ csv_text: csvText, apply: false \}/)
-  assert.match(source, /body: \{ csv_text: good\[0\]\.csv_text, apply: true,/)
+  assert.match(source, /body: \{ csv_text: good\[0\]\.csv_text, apply: true \}/)
   assert.match(source, /download = 'backlog-import-template\.csv'/)
 })
 

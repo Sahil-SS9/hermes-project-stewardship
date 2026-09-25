@@ -3257,44 +3257,6 @@ function AttentionPanel({ items, onReview }) {
   ]})
 }
 
-function FleetMetrics({ view }) {
-  const projects = view.projects ?? []
-  const totals = view.totals ?? {}
-  const workload = view.workload ?? { busy: [], idle: [], stuck: [] }
-  const healthy = projects.filter((project) => project.health === 'healthy').length
-  const watch = projects.filter((project) => ['watch', 'degraded', 'attention', 'critical', 'frozen'].includes(project.health)).length
-  const unknown = projects.filter((project) => !project.health || project.health === 'unknown').length
-  const blocked = Number(totals.blocked ?? 0)
-  const owed = Number(view.inbox?.count ?? view.owed_decisions ?? 0)
-  const unread = Number((view.notifications?.notifications ?? []).filter((note) => !note.acked).length)
-  const ownerAttention = owed + unread
-  const healthValue = healthy > 0 ? `${number(healthy)} healthy` : `${number(unknown)} unverified`
-  const healthDelta = [watch > 0 ? `${number(watch)} need review` : null, unknown > 0 ? `${number(unknown)} unverified` : null].filter(Boolean).join(', ') || 'No health warnings'
-  const botDelta = `${number(workload.idle?.length ?? 0)} idle, ${number(workload.stuck?.length ?? 0)} stuck`
-  return jsxs('section', { className: 'dockyard-metric-strip', 'aria-label': 'Fleet summary', children: [
-    jsxs('div', { className: 'dockyard-metric', 'data-metric': 'health', children: [
-      jsx('span', { children: 'PROJECT HEALTH' }),
-      jsx('strong', { children: healthValue }),
-      jsx('small', { children: healthDelta }),
-    ]}),
-    jsxs('div', { className: 'dockyard-metric', 'data-metric': 'work', children: [
-      jsx('span', { children: 'ACTIVE WORK' }),
-      jsx('strong', { children: `${number(totals.active_work ?? 0)} items` }),
-      jsx('small', { children: `${number(blocked)} blocked` }),
-    ]}),
-    jsxs('div', { className: 'dockyard-metric', 'data-metric': 'bots', children: [
-      jsx('span', { children: 'BOT WORKLOAD' }),
-      jsx('strong', { children: `${number(workload.busy?.length ?? 0)} busy` }),
-      jsx('small', { children: botDelta }),
-    ]}),
-    jsxs('div', { className: 'dockyard-metric', 'data-metric': 'attention', children: [
-      jsx('span', { children: 'OWNER ATTENTION' }),
-      jsx('strong', { className: ownerAttention === 0 ? 'success' : 'warning', children: ownerAttention === 0 ? 'No action needed' : `${number(ownerAttention)} open` }),
-      jsx('small', { children: ownerAttention === 0 ? 'Fleet can keep moving' : `${number(owed)} decisions, ${number(unread)} alerts` }),
-    ]}),
-  ]})
-}
-
 function WorkBar({ work, project = false, label = 'Work distribution' }) {
   const backlog = Number(work?.backlog ?? 0)
   const active = Number(work?.active ?? 0)
@@ -3487,6 +3449,7 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
   const statusName = { on_track: 'On track', at_risk: 'At risk', stalled: 'Stalled', idle: 'Idle' }
   const metric = (label, value, detail, icon, tone, onClick) => jsxs(onClick ? 'button' : 'div', {
     type: onClick ? 'button' : undefined, onClick,
+    'data-metric': label.toLowerCase().replace(/[^a-z]+/g, '-'),
     className: `dockyard-command-metric dockyard-command-metric-${tone}${onClick ? ' is-actionable' : ''}`, children: [
       jsxs('span', { className: 'dockyard-command-metric-label', children: [jsx(Icon, { name: icon }), label] }),
       jsx('strong', { children: value }), jsx('small', { children: detail }),
@@ -4229,19 +4192,19 @@ function WorkItemDetail({ item, projectId, profiles, initiatives = [], onClose, 
       if (hasFieldChanges()) {
         await api(`/projects/${encodeURIComponent(projectIdResolved)}/work-items/${encodeURIComponent(item.ref)}`, {
           method: 'PATCH',
-          body: { ...changes, actor_id: 'sahil', actor_kind: 'human' },
+          body: changes,
         })
       }
       if ((draft.assignee ?? '') !== (base.assignee ?? '')) {
         await api(`/projects/${encodeURIComponent(projectIdResolved)}/work-items/${encodeURIComponent(item.ref)}/assign`, {
           method: 'POST',
-          body: { assignee_id: draft.assignee.trim() || null, actor_id: 'sahil', actor_kind: 'human' },
+          body: { assignee_id: draft.assignee.trim() || null },
         })
       }
       if (draft.status !== base.status) {
         await api(`/projects/${encodeURIComponent(projectIdResolved)}/work-items/${encodeURIComponent(item.ref)}/transition`, {
           method: 'POST',
-          body: { status: draft.status, actor_id: 'sahil', actor_kind: 'human' },
+          body: { status: draft.status },
         })
       }
       // Rebase onto canonical state so the NEXT edit diffs against reality
@@ -4262,7 +4225,7 @@ function WorkItemDetail({ item, projectId, profiles, initiatives = [], onClose, 
     setError(null)
     try {
       await api(`/projects/${encodeURIComponent(projectId || item.project_id)}/work-items/${encodeURIComponent(item.ref)}/dependencies`, {
-        method: 'POST', body: { dependency_ref: depRef.trim(), actor_id: 'sahil', actor_kind: 'human' },
+        method: 'POST', body: { dependency_ref: depRef.trim() },
       })
       setDepRef('')
       await loadDetail(item.ref)
@@ -5347,7 +5310,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     try {
       const rows = persistableObjects()
       const edges = persistableConnectors(rows)
-      const saved = await api(`/projects/${encoded}/canvas`, { method: 'PUT', body: { expected_revision: revision, objects: rows, connectors: edges, actor: 'desktop-user' } })
+      const saved = await api(`/projects/${encoded}/canvas`, { method: 'PUT', body: { expected_revision: revision, objects: rows, connectors: edges } })
       setCanvas(saved); setObjects(saved.objects ?? []); setConnectors(saved.connectors ?? []); setDirty(false)
       setNotice({ tone: 'ok', text: `Canvas saved — revision ${saved.revision} with ${(saved.objects ?? []).length} object(s) and ${(saved.connectors ?? []).length} connector(s).` })
       onRefresh?.()
@@ -5522,7 +5485,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   const curate = async () => {
     setBusy(true); setChatOpen(true)
     try {
-      const result = await api(`/projects/${encoded}/canvas/sessions`, { method: 'POST', body: { actor: 'desktop-user' } })
+      const result = await api(`/projects/${encoded}/canvas/sessions`, { method: 'POST', body: {} })
       setSession(result)
       const proposals = (result.proposals ?? []).length
       setNotice(result.status === 'active' && result.current_question
@@ -5546,7 +5509,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     if (!session?.session_id) return
     setBusy(true)
     try {
-      const result = await api(`/canvas/sessions/${encodeURIComponent(session.session_id)}/answer`, { method: 'POST', body: { outcome, answer, actor: 'desktop-user' } })
+      const result = await api(`/canvas/sessions/${encodeURIComponent(session.session_id)}/answer`, { method: 'POST', body: { outcome, answer } })
       setSession(result); setAnswer('')
       const proposals = (result.proposals ?? []).length
       if (result.status === 'active' && result.current_question) setNotice({ tone: 'ok', text: `Question: ${result.current_question.question}` })
@@ -5558,7 +5521,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   const decideProposal = async (proposal, approve) => {
     setBusy(true)
     try {
-      const result = await api(`/canvas/proposals/${encodeURIComponent(proposal.proposal_id)}/decision`, { method: 'POST', body: { approve, actor: 'desktop-user' } })
+      const result = await api(`/canvas/proposals/${encodeURIComponent(proposal.proposal_id)}/decision`, { method: 'POST', body: { approve } })
       // Read the decision back from the session rather than trusting the local
       // optimistic flip; the recorded status is the one that counts.
       if (session?.session_id) {
@@ -5772,7 +5735,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   })
 }
 
-function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, savedViewsMode }) {
+function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView }) {
   const [projectView, setProjectView] = useState(initialView || 'overview')
   const [selectedWorkItem, setSelectedWorkItem] = useState(null)
   const [workNotice, setWorkNotice] = useState(null)
@@ -6303,7 +6266,7 @@ function BacklogView({ view, onRefresh }) {
     const item = workByRef[ref]
     if (!item) return
     try {
-      await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}`, { method: 'PATCH', body: { ...patch, actor_id: 'sahil', actor_kind: 'human' } })
+      await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}`, { method: 'PATCH', body: patch })
       setCellError(null)
       emitToast('success', okMessage || `${item.title} updated.`)
       onRefresh()
@@ -6328,7 +6291,7 @@ function BacklogView({ view, onRefresh }) {
     if (!item || nextStatus === item.status) return
     if ((item.type || 'task') === 'epic' && nextStatus === 'done') { flashCell(ref, 'status', 'Epics are completed through their children — close the sub-items first.'); return }
     try {
-      await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}/transition`, { method: 'POST', body: { status: nextStatus, actor_id: 'sahil', actor_kind: 'human' } })
+      await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}/transition`, { method: 'POST', body: { status: nextStatus } })
       setCellError(null)
       emitToast('success', `${item.title} → ${STATUS_LABELS[nextStatus] || nextStatus}`)
       onRefresh()
@@ -6341,7 +6304,7 @@ function BacklogView({ view, onRefresh }) {
     if (!item) return
     if ((item.type || 'task') === 'epic') { flashCell(ref, 'assignee', 'Epics are never assigned — assign one of its children instead.'); return }
     try {
-      await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}/assign`, { method: 'POST', body: { assignee_id: bot || null, assignee_kind: 'bot', actor_id: 'sahil', actor_kind: 'human' } })
+      await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}/assign`, { method: 'POST', body: { assignee_id: bot || null } })
       setCellError(null)
       emitToast('success', bot ? `${item.title} → ${bot}` : `${item.title} unassigned.`)
       onRefresh()
@@ -6371,7 +6334,7 @@ function BacklogView({ view, onRefresh }) {
     try {
       const parent = pendingParentRef || null
       await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(pendingMove.ref)}`, {
-        method: 'PATCH', body: { parent_ref: parent, reason: reason.trim(), actor_id: 'sahil', actor_kind: 'human' },
+        method: 'PATCH', body: { parent_ref: parent, reason: reason.trim() },
       })
       const title = pendingMove.title
       setPendingMove(null)
@@ -6465,7 +6428,7 @@ function BacklogView({ view, onRefresh }) {
       // One shared-validator commit for the whole file: parent-first order,
       // cycle protection and idempotent row keys are enforced server-side.
       const result = await api(`/projects/${encodeURIComponent(project.id)}/backlog/import`, {
-        method: 'POST', body: { csv_text: good[0].csv_text, apply: true, actor_id: 'sahil', actor_kind: 'human' },
+        method: 'POST', body: { csv_text: good[0].csv_text, apply: true },
       })
       setImportBusy(false)
       setImportResult({
@@ -6489,7 +6452,7 @@ function BacklogView({ view, onRefresh }) {
     setError(null)
     try {
       await api(`/projects/${encodeURIComponent(project.id)}/backlog/${encodeURIComponent(pendingMove.ref)}/rerank`, {
-        method: 'POST', body: { new_rank: pendingMove.newRank, reason: reason.trim(), actor_id: 'sahil', actor_kind: 'human' },
+        method: 'POST', body: { new_rank: pendingMove.newRank, reason: reason.trim() },
       })
       setPendingMove(null)
       setReason('')
@@ -6559,8 +6522,6 @@ function BacklogView({ view, onRefresh }) {
         body: createForm.body.trim() || null,
         labels: createForm.labels.split(',').map((label) => label.trim()).filter(Boolean),
         evidence_refs: createForm.evidence_refs.split(',').map((ref) => ref.trim()).filter(Boolean),
-        creator_id: 'sahil',
-        creator_kind: 'human',
         assignee_id: createForm.assignee,
         assignee_kind: 'bot',
         initiative_ref: createForm.initiative || null,
@@ -7580,15 +7541,6 @@ function InitiativeView({ view, onRefresh }) {
 // project-scoped. Initiative keeps its own evidence-backed loop screen
 // (approved map row 5: "Initiative KEEP (→ Delivery)"); planning keeps the
 // milestone table contract with no new scheduling engine.
-function DeliveryView({ view, onRefresh }) {
-  const project = view.project
-  if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Select a project before opening delivery.', icon: 'project' })
-  return jsxs('div', { 'data-delivery-view': project.id, children: [
-    jsx(InitiativeView, { view, onRefresh }),
-    jsx(PlanningPanel, { project, view, milestones: view.milestones ?? [], workItems: view.workItems ?? [], onRefresh }, `${project.id}:planning`),
-  ]})
-}
-
 function OnboardPanel({ view, onOpen, onRefresh }) {
   const profiles = view.profiles ?? []
   return jsxs('div', { 'data-onboard-tab': true, children: [
@@ -8222,7 +8174,7 @@ function DashboardPage() {
     setError(null)
     const loader = tab === 'dashboard'
       ? loadDashboardData
-      : (tab === 'project' || tab === 'delivery' || tab === 'work' || tab === 'reports' || tab === 'settings' || tab === 'workflows')
+      : (tab === 'project' || tab === 'settings' || tab === 'workflows')
         ? () => loadProjectData(selectedProject)
       : tab === 'backlog'
         ? () => loadBacklogData(selectedProject)
@@ -8378,32 +8330,6 @@ function DashboardPage() {
       onPendingWorkConsumed: () => setPendingWorkRef(null),
       notice: deepLinkNotice,
     }, `project:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
-  } else if (tab === 'delivery') {
-    content = jsx(DeliveryView, {
-      view: payload,
-      onRefresh: refresh,
-    }, `delivery:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
-  } else if (tab === 'work') {
-    content = jsx(ProjectDashboard, {
-      view: payload,
-      initialView: 'board',
-      savedViewsMode: true,
-      onSelectProject: selectProject,
-      onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
-      onRefresh: refresh,
-      pendingWorkRef,
-      onPendingWorkConsumed: () => setPendingWorkRef(null),
-      notice: deepLinkNotice,
-    }, `work:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
-  } else if (tab === 'reports') {
-    content = jsx(ProjectDashboard, {
-      view: payload,
-      initialView: 'reports',
-      onSelectProject: selectProject,
-      onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
-      onRefresh: refresh,
-      notice: deepLinkNotice,
-    }, `reports:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
   } else if (tab === 'settings') {
     content = jsx(ProjectDashboard, {
       view: payload,
