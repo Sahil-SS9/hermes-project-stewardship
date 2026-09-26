@@ -1,6 +1,6 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
-import { LUCIDE_ICON_NODES } from '../runtime/lucide-icons.js'
+import { LUCIDE_ICON_NODES } from '../../lucide-icons.js'
 import { jsxs } from '../runtime/react.js'
 import { jsx } from '../runtime/react.js'
 import { readableLabel } from '../data/loaders.js'

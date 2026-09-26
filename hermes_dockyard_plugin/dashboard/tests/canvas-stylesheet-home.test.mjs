@@ -101,10 +101,18 @@ test('canvas stylesheet: the published copies are the single source, byte for by
   // 5) The Desktop source module wires the generated sibling into the plugin —
   //    the committed bundle intentionally contains no relative import.
   const desktopSource = readFileSync(join(PLUGIN, 'desktop', 'src', 'runtime', 'context.js'), 'utf8')
-  assert.match(desktopSource, /import workflowCanvasCss from ['"]\.\/workflow-canvas-css\.js['"]/,
+  assert.match(desktopSource, /import workflowCanvasCss from ['"]\.\.\/\.\.\/workflow-canvas-css\.js['"]/,
     'desktop/src/runtime/context.js must import the generated sibling')
   assert.match(desktopSource, /useStylesheet\(['"]dy-wf-stylesheet['"], ['"]dyWfStylesheet['"], workflowCanvasCss\)/,
     'desktop/src/runtime/context.js must install the canvas stylesheet')
+  const shipped = readFileSync(join(PLUGIN, 'desktop', 'plugin.js'), 'utf8')
+  assert.match(shipped, /useStylesheet\(["']dy-wf-stylesheet["'], ["']dyWfStylesheet["'], workflow_canvas_css_default\)/,
+    'desktop/plugin.js must install the inlined canvas stylesheet')
+  const inlined = shipped.match(/^var workflow_canvas_css_default = (`[^`]*`);$/m)
+  assert.ok(inlined, 'desktop/plugin.js must inline the generated canvas stylesheet')
+  // Test-only: read the template literal's value (the shipped file has no eval).
+  assert.equal(new Function(`return ${inlined[1]}`)(), source,
+    'desktop/plugin.js inlines a STALE canvas stylesheet — rebuild desktop/plugin.js')
 
   // 6) ...and the surface that renders the canvas carries the scope class the
   //    stylesheet is scoped to.

@@ -27,7 +27,7 @@ export const ALLOWED_IMPORTS = Object.freeze([
 
 const CANVAS_EXTERNALS = Object.freeze([
   './workflow-canvas-mount.js',
-  '../runtime/workflow-canvas-mount.js',
+  '../../workflow-canvas-mount.js',
 ]);
 
 function buildOptions(stdin, bundle) {

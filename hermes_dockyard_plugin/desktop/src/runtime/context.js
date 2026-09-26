@@ -2,7 +2,7 @@
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 import { useEffect } from './react.js'
 import { DOCKYARD_CSS } from '../styles/dockyard-css.js'
-import workflowCanvasCss from './workflow-canvas-css.js'
+import workflowCanvasCss from '../../workflow-canvas-css.js'
 export let _rest = null
 export let _os = null
 export let _toastId = 0

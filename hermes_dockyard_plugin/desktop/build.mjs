@@ -9,6 +9,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DESKTOP = dirname(fileURLToPath(import.meta.url));
+// Pin esbuild's working directory so module-path comments in plugin.js are the
+// same whichever directory the build is launched from.
+const REPO = join(DESKTOP, '..', '..');
 const SRC = join(DESKTOP, 'src');
 const OUT = join(DESKTOP, 'plugin.js');
 const ENTRY = join(SRC, 'index.js');
@@ -21,12 +24,12 @@ mkdirSync(DESKTOP, { recursive: true });
 const result = await build({
   entryPoints: [ENTRY],
   bundle: true,
+  absWorkingDir: REPO,
   outfile: OUT,
   format: 'esm',
   target: 'es2022',
   platform: 'browser',
   minify: false,
-  // Keep a stable, review-friendly module order for the existing text probes.
   treeShaking: true,
   sourcemap: false,
   legalComments: 'none',
@@ -39,22 +42,6 @@ const result = await build({
 });
 
 if (result.errors.length) throw new Error(`esbuild reported ${result.errors.length} error(s)`);
-const generated = readFileSync(OUT, 'utf8');
-const initiativeMarker = '// hermes_dockyard_plugin/desktop/src/views/initiative.js';
-const teamsMarker = '// hermes_dockyard_plugin/desktop/src/views/teams.js';
-const initiativeAt = generated.indexOf(initiativeMarker);
-const teamsAt = generated.indexOf(teamsMarker);
-if (initiativeAt >= 0 && teamsAt > initiativeAt) {
-  const initiativeEnd = teamsAt;
-  const teamsEnd = generated.indexOf('\n// hermes_dockyard_plugin/desktop/', teamsAt + teamsMarker.length);
-  if (teamsEnd >= 0) {
-    const prefix = generated.slice(0, initiativeAt);
-    const initiative = generated.slice(initiativeAt, initiativeEnd);
-    const teams = generated.slice(teamsAt, teamsEnd);
-    const suffix = generated.slice(teamsEnd);
-    writeFileSync(OUT, `${prefix}${teams}${initiative}${suffix}`);
-  }
-}
 const bytes = readFileSync(OUT);
 const hash = createHash('sha256').update(bytes).digest('hex');
 const relative = OUT.slice(DESKTOP.length + 1);

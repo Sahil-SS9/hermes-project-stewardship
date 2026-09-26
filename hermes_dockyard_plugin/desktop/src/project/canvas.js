@@ -1,15 +1,15 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
-import { gridSlot } from '../runtime/planning-canvas-geometry.js'
+import { gridSlot } from '../../planning-canvas-geometry.js'
 import { useState } from '../runtime/react.js'
 import { useRef } from '../runtime/react.js'
 import { useEffect } from '../runtime/react.js'
 import { api } from '../runtime/context.js'
-import { CANVAS_MIN_POS } from '../runtime/planning-canvas-geometry.js'
+import { CANVAS_MIN_POS } from '../../planning-canvas-geometry.js'
 import { number } from '../lib/ui.js'
-import { layoutConnectors } from '../runtime/planning-canvas-geometry.js'
+import { layoutConnectors } from '../../planning-canvas-geometry.js'
 import { jsx } from '../runtime/react.js'
-import { layoutFrames } from '../runtime/planning-canvas-geometry.js'
+import { layoutFrames } from '../../planning-canvas-geometry.js'
 import { jsxs } from '../runtime/react.js'
 import { Button } from '../lib/ui.js'
 export const CANVAS_OBJECT_KINDS = Object.freeze(['evidence', 'claim', 'question', 'decision', 'plan_block', 'note', 'link', 'media'])

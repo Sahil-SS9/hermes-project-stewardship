@@ -7,7 +7,9 @@ const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost'});
 global.window=dom.window;global.document=dom.window.document;global.navigator=dom.window.navigator;global.IS_REACT_ACT_ENVIRONMENT=true;
 const {createRoot}=req('react-dom/client'), rt=req('react/jsx-runtime');
 const source=fs.readFileSync(base+'/hermes_dockyard_plugin/desktop/plugin.js','utf8');
-const code=source.slice(source.indexOf('function TeamsView('),source.indexOf('function InitiativeView('));
+const start=source.indexOf('function TeamsView(');assert(start>=0,'TeamsView missing from plugin.js');
+const tail=source.slice(start).search(/\n\/\/ \S+\.js\n/);const next=tail<0?-1:start+tail;assert(next>start,'TeamsView module end marker missing');
+const code=source.slice(start,next);
 const requests=[];
 function api(path,opts){return new Promise(resolve=>requests.push({path,opts,resolve}));}
 const Button=({children,onClick,action,disabled})=>React.createElement('button',{'data-action':action,onClick,disabled},children);

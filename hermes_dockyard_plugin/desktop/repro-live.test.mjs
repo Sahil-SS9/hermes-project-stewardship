@@ -873,12 +873,14 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
   };
 
   const pluginSource = readFileSync(PLUGIN_PATH, 'utf8');
-  // DOCKYARD_EVALUATE_ARTIFACT=1 evaluates the supplied file itself instead of
-  // the maintained source tree. Used only by the old-vs-new equivalence run so
-  // the pre-split revision renders through this one harness.
-  const loaded = process.env.DOCKYARD_EVALUATE_ARTIFACT === '1'
-    ? evaluateArtifact(pluginSource, { navigate: (path) => navigations.push(path) }, { assertImports: false })
-    : evaluatePlugin(pluginSource, { navigate: (path) => navigations.push(path) });
+  // Default: render the SHIPPED artifact (plugin.js), i.e. exactly what Hermes
+  // Desktop loads. DOCKYARD_EVALUATE_SOURCE=1 renders the maintained src/ tree
+  // instead (debugging only). DOCKYARD_EVALUATE_ARTIFACT=1 is kept for the
+  // old-vs-new equivalence run and relaxes the import check for pre-split files.
+  const loaded = process.env.DOCKYARD_EVALUATE_SOURCE === '1'
+    ? evaluatePlugin(pluginSource, { navigate: (path) => navigations.push(path) })
+    : evaluateArtifact(pluginSource, { navigate: (path) => navigations.push(path) },
+      { assertImports: process.env.DOCKYARD_EVALUATE_ARTIFACT !== '1' });
   // shared loader owns the source bundle; the canvas seam is injected above
   const contributions = [];
   loaded.plugin.register({
@@ -1420,7 +1422,11 @@ async function testPhase5ManagementJourneys() {
   // Phase 5 canvas port: the stored definition is inspectable through the
   // production canvas mount plus the raw stored-version details.
   assert(doc.querySelector('[data-workflow-canvas="release"]'), 'workflow planning canvas host is missing');
-  assert(rt.canvasMounts.some((mount) => mount.projectId === 'payments-relaunch' && mount.workflowName === 'release'), 'stored workflow definition did not reach the canvas mount');
+  // Source-tree runs inject a canvas stub (rt.canvasMounts). The shipped
+  // artifact inlines the real canvas, so there the proof is the real mount's DOM.
+  const canvasHost = doc.querySelector('[data-workflow-canvas="release"]');
+  const realCanvasMounted = Boolean(canvasHost && (canvasHost.matches('.dy-wf-scope') || canvasHost.querySelector('.dy-wf-scope, svg[data-lod]')));
+  assert(rt.canvasMounts.some((mount) => mount.projectId === 'payments-relaunch' && mount.workflowName === 'release') || realCanvasMounted, 'stored workflow definition did not reach the canvas mount');
   assert(doc.querySelector('[data-workflow-definition-version="1"]'), 'stored workflow definition is not inspectable');
   const liveRun = doc.querySelector('[data-workflow-live-run="browser-run-1"]');
   assert(liveRun && /browser-run-1/.test(liveRun.textContent), 'workflow run history did not render the real run_key contract');
