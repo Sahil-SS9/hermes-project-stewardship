@@ -15,6 +15,7 @@ import test from 'node:test';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { evaluatePlugin as evaluatePluginBundle } from './test-support/load-plugin.mjs';
 
 const HARNESS_PACKAGE = fileURLToPath(new URL('../dashboard/package.json', import.meta.url));
 const PLUGIN_PATH = process.env.DOCKYARD_PLUGIN_PATH
@@ -35,34 +36,11 @@ rt.LUCIDE_ICON_NODES = LUCIDE_ICON_NODES;
 const wait = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
-function sourceImports(source) {
-  return [...source.matchAll(/^import\s+.+?from\s+['"]([^'"]+)['"];?$/gm)].map((match) => match[1]);
-}
-
 function evaluatePlugin(source, host) {
-  const imports = sourceImports(source);
-  assert.deepEqual(
-    [...new Set(imports)].sort(),
-    ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime', './workflow-canvas-mount.js', './workflow-canvas-css.js', './planning-canvas-geometry.js', './download.js', './lucide-icons.js'].sort(),
-    `unsupported or missing imports: ${imports.join(', ')}`,
-  );
-  let stripped = source.replace(/^import\s.*$/gm, '');
-  stripped = stripped.replace(/^export default __plugin;?$/m, '');
-  const stub = `
-const jsx = __rt.jsx, jsxs = __rt.jsxs, Fragment = __rt.Fragment;
-const { useEffect, useRef, useState } = React;
-const mountDesktopWorkflowCanvas = () => () => {};
-const workflowCanvasCss = '';
-const layoutConnectors = () => []; const layoutFrames = () => []; const gridSlot = (i) => ({ x: 60 + (i % 3) * 340, y: 60 + Math.floor(i / 3) * 220 }); const CANVAS_MIN_POS = { x: 18, y: 30 };
-const downloadTextFile = (content, filename) => { __rt.downloads = __rt.downloads || []; __rt.downloads.push({ content, filename }); return true; };
-const reportDownloadFilename = __rt.reportDownloadFilename;
-const LUCIDE_ICON_NODES = __rt.LUCIDE_ICON_NODES;
-`;
-  const factory = new Function(
-    'React', '__rt', 'host',
-    `${stub}${stripped}\nreturn { plugin: __plugin };`,
-  );
-  return factory(React, rt, host);
+  const loaded = evaluatePluginBundle(source, host, { assertImports: false });
+  assert.deepEqual([...new Set(loaded.imports)].sort(), ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime']);
+  assert.equal(loaded.plugin.id, 'hermes-dockyard');
+  return loaded;
 }
 
 async function createRuntime() {

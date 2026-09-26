@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { evaluatePlugin as evaluatePluginBundle } from './test-support/load-plugin.mjs';
 
 const HARNESS_PACKAGE = fileURLToPath(new URL('../dashboard/package.json', import.meta.url));
 // Resolve the candidate plugin relative to this harness so a clean worktree
@@ -19,20 +20,6 @@ const React = require('react');
 const { act } = React;
 const { createRoot } = require('react-dom/client');
 const rt = require('react/jsx-runtime');
-import { downloadTextFile, reportDownloadFilename } from './download.js';
-import { LUCIDE_ICON_NODES } from './lucide-icons.js';
-import workflowCanvasCss from './workflow-canvas-css.js';
-// The plugin resolves local modules through __rt so jsdom journeys exercise
-// the REAL download helpers. The workflow canvas module is TS source (not
-// loadable here) — stub it and record mounts so journeys can still assert
-// the mount contract; the browser bundle test covers the real canvas.
-// The canvas stylesheet IS loadable (a generated plain-ESM string), so it is
-// resolved for real — a stub would hide exactly the delivery regression this
-// harness exists to catch.
-rt.downloadTextFile = downloadTextFile;
-rt.reportDownloadFilename = reportDownloadFilename;
-rt.LUCIDE_ICON_NODES = LUCIDE_ICON_NODES;
-rt.workflowCanvasCss = workflowCanvasCss;
 rt.canvasMounts = [];
 rt.mountDesktopWorkflowCanvas = function mountDesktopWorkflowCanvasStub(hostEl, projectId, workflowName) {
   rt.canvasMounts.push({ projectId, workflowName });
@@ -291,34 +278,14 @@ const EMPTY = {
 const wait = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
-function sourceImports(source) {
-  return [...source.matchAll(/^import\s+.+?from\s+['"]([^'"]+)['"];?$/gm)].map((match) => match[1]);
-}
-
 function evaluatePlugin(source, host) {
-  const imports = sourceImports(source);
-  assert.deepEqual(
-    [...new Set(imports)].sort(),
-    ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime', './workflow-canvas-mount.js', './workflow-canvas-css.js', './planning-canvas-geometry.js', './download.js', './lucide-icons.js'].sort(),
-    `unsupported or missing imports: ${imports.join(', ')}`,
-  );
-  let stripped = source.replace(/^import\s.*$/gm, '');
-  stripped = stripped.replace(/^export default __plugin;?$/m, '');
-  const stub = `
-const jsx = __rt.jsx, jsxs = __rt.jsxs, Fragment = __rt.Fragment;
-const { useEffect, useRef, useState } = React;
-const mountDesktopWorkflowCanvas = __rt.mountDesktopWorkflowCanvas;
-const downloadTextFile = __rt.downloadTextFile;
-const reportDownloadFilename = __rt.reportDownloadFilename;
-const LUCIDE_ICON_NODES = __rt.LUCIDE_ICON_NODES;
-const workflowCanvasCss = __rt.workflowCanvasCss;
-const layoutConnectors = () => []; const layoutFrames = () => []; const gridSlot = (i) => ({ x: 60 + (i % 3) * 340, y: 60 + Math.floor(i / 3) * 220 }); const CANVAS_MIN_POS = { x: 18, y: 30 };
-`;
-  const factory = new Function(
-    'React', '__rt', 'host',
-    `${stub}${stripped}\nreturn { plugin: __plugin, test: typeof DOCKYARD_TEST === 'undefined' ? null : DOCKYARD_TEST };`,
-  );
-  return factory(React, rt, host);
+  // The generated bundle is self-contained; keep the legacy canvas seam
+  // observable for the existing journeys by injecting the same test double
+  // through the loader's runtime options.
+  const loaded = evaluatePluginBundle(source, host, { runtime: rt, assertImports: false });
+  assert.deepEqual([...new Set(loaded.imports)].sort(), ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime']);
+  assert.equal(loaded.plugin.id, 'hermes-dockyard');
+  return loaded;
 }
 
 function createDeferred() {
@@ -906,6 +873,7 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
   };
 
   const loaded = evaluatePlugin(readFileSync(PLUGIN_PATH, 'utf8'), { navigate: (path) => navigations.push(path) });
+  // shared loader owns the source bundle; the canvas seam is injected above
   const contributions = [];
   loaded.plugin.register({
     register: (item) => contributions.push(item),

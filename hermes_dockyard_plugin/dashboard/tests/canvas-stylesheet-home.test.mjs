@@ -98,12 +98,13 @@ test('canvas stylesheet: the published copies are the single source, byte for by
       `src/style.css must not re-declare ${cls} — the planning canvas rules live in workflow-canvas-css.ts`)
   }
 
-  // 5) The plugin actually imports and installs it — the delivery is wired.
-  const plugin = readFileSync(join(PLUGIN, 'desktop', 'plugin.js'), 'utf8')
-  assert.match(plugin, /import workflowCanvasCss from '\.\/workflow-canvas-css\.js'/,
-    'desktop/plugin.js must import the generated sibling (the only legal Desktop seam)')
-  assert.match(plugin, /useStylesheet\('dy-wf-stylesheet', 'dyWfStylesheet', workflowCanvasCss\)/,
-    'desktop/plugin.js must install the canvas stylesheet')
+  // 5) The Desktop source module wires the generated sibling into the plugin —
+  //    the committed bundle intentionally contains no relative import.
+  const desktopSource = readFileSync(join(PLUGIN, 'desktop', 'src', 'runtime', 'context.js'), 'utf8')
+  assert.match(desktopSource, /import workflowCanvasCss from ['"]\.\/workflow-canvas-css\.js['"]/,
+    'desktop/src/runtime/context.js must import the generated sibling')
+  assert.match(desktopSource, /useStylesheet\(['"]dy-wf-stylesheet['"], ['"]dyWfStylesheet['"], workflowCanvasCss\)/,
+    'desktop/src/runtime/context.js must install the canvas stylesheet')
 
   // 6) ...and the surface that renders the canvas carries the scope class the
   //    stylesheet is scoped to.

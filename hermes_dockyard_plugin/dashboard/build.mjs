@@ -83,7 +83,7 @@ const meta = {
     'src/style.css', 'src/workflow-canvas-css.ts',
   ],
 };
-writeFileSync('dist/build-meta.json', JSON.stringify(meta, null, 2) + '\n');
+writeFileSync(join(dir, 'dist', 'build-meta.json'), JSON.stringify(meta, null, 2) + '\n');
 
 for (const f of [join(dir, 'dist', 'index.js'), join(dir, 'dist', 'style.css'), DESKTOP_SIBLING]) {
   const size = statSync(f).size;

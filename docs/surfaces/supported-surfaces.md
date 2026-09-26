@@ -9,7 +9,11 @@ capabilities are named explicitly; nothing is implied.
 ## Hermes Desktop — the complete management surface
 
 Desktop (`hermes_dockyard_plugin/desktop/plugin.js`) is the complete product
-surface. Every management operation is available there: onboarding, team
+surface. The committed file is generated from the hand-edited modules in
+`hermes_dockyard_plugin/desktop/src/`; run
+`node hermes_dockyard_plugin/desktop/build.mjs` after editing those modules.
+The generated blob is a single ESM bundle and may import only the SDK and React
+allowlist. Every management operation is available there: onboarding, team
 membership, lead transfer, work transfer/reassignment with previews and
 recovery, goals/objectives/milestones, workflows, managed content (including
 dependency-aware removal), project lifecycle including archive/restore,

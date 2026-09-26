@@ -6,7 +6,10 @@
     "uv sync --locked --extra dev --extra plugin",
     "uv pip install --python .venv/bin/python pyyaml"
   ],
-  "build": [],
+  "build": [
+    "node hermes_dockyard_plugin/desktop/build.mjs",
+    "git diff --exit-code -- hermes_dockyard_plugin/desktop/plugin.js"
+  ],
   "test": [
     ".venv/bin/python -m pytest",
     "node hermes_dockyard_plugin/desktop/run-browser-suite.mjs"

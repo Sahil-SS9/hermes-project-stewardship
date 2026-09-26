@@ -5,13 +5,28 @@
 // Heavy Playwright matrix runs under /tmp/stewardship-heavy-gates.lock
 // post-integration; this file is the reusable light gate.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 
 const PLUGIN_PATH = process.env.DOCKYARD_PLUGIN_PATH
   || fileURLToPath(new URL('./plugin.js', import.meta.url));
-const text = readFileSync(PLUGIN_PATH, 'utf8');
+const SRC_DIR = process.env.DOCKYARD_SRC_DIR
+  || fileURLToPath(new URL('./src', import.meta.url));
+function sourceText(dir) {
+  const files = [];
+  const walk = (path) => {
+    for (const name of readdirSync(path)) {
+      const child = join(path, name);
+      if (statSync(child).isDirectory()) walk(child);
+      else if (name.endsWith('.js')) files.push(child);
+    }
+  };
+  walk(dir);
+  return files.sort().map((file) => readFileSync(file, 'utf8')).join('\n');
+}
+const text = sourceText(SRC_DIR);
 
 function luminance(hex) {
   const h = hex.replace('#', '');

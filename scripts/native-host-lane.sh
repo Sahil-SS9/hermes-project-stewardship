@@ -33,7 +33,7 @@ trap 'rm -rf "$SANDBOX"' EXIT
 if [ -n "$EXPECTED_SHA" ]; then
   ACTUAL_SHA="$(git -C "$HOST" rev-parse HEAD)"
   if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
-    echo "FATAL: host $HOST is at $ACTUAL_SHA, expected $EXPECTED_SHA" >&2
+    echo "FATAL: Hermes checkout ${HOST} is at ${ACTUAL_SHA}, expected ${EXPECTED_SHA}" >&2
     exit 2
   fi
   echo "host revision verified: $ACTUAL_SHA"
