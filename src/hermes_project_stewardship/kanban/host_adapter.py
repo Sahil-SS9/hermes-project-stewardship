@@ -40,6 +40,10 @@ _COLUMN_STATUS = {
     "done": "done",
     "blocked": "blocked",
 }
+# Hermes Kanban refuses to complete a card with no result/summary evidence.
+# Dockyard closes cards on an operator's explicit move, so say so.
+_DONE_EVIDENCE = "Completed through Hermes Dockyard (operator marked this item done)."
+
 _SAFE_HOST_MESSAGES = {
     "board_not_found": "canonical board was not found",
     "project_not_found": "canonical project was not found",
@@ -510,6 +514,8 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
             options: dict[str, Any] = {"board": board}
             if target == "review":
                 options["force_review"] = True
+            if target == "done":
+                options["summary"] = _DONE_EVIDENCE
             self.host.transition_task(item_id, target, **options)
             # Always use canonical post-write readback.  Mutation payloads can
             # be stale on hosts that return the pre-transition card.
@@ -709,6 +715,8 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
                 return
             if status == "done" and current_status in {"backlog", "triage", "todo"}:
                 self.host.transition_task(card_id, "ready", board=board_id)
+            if status == "done":
+                options["summary"] = _DONE_EVIDENCE
             self.host.transition_task(card_id, status, **options)
         except Exception as exc:
             raise self._mapped_error(exc) from None

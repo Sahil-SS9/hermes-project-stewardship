@@ -453,7 +453,16 @@ class ProjectKanbanHost:
                 if not (native_status == "review" and force_review):
                     raise HostError("transition_conflict", "transition requires ownership of the current claim")
             if native_status == "done":
-                if not kb.complete_task(conn, task_id, summary=_kwargs.get("summary"), expected_run_id=expected_run_id):
+                try:
+                    completed = kb.complete_task(
+                        conn, task_id, result=_kwargs.get("result"),
+                        summary=_kwargs.get("summary"), expected_run_id=expected_run_id,
+                    )
+                except ValueError:
+                    # e.g. EmptyCompletionError: newer hosts refuse a close
+                    # with no evidence. Keep the stable HostError contract.
+                    raise HostError("transition_conflict", "canonical task transition was rejected") from None
+                if not completed:
                     raise HostError("transition_conflict", "canonical task transition was rejected")
             elif native_status == "blocked":
                 if not kb.block_task(conn, task_id, reason=_kwargs.get("reason"), expected_run_id=expected_run_id):
@@ -505,8 +514,10 @@ class ProjectKanbanHost:
                     task = kb.get_task(conn, epic_id)
                 if task is None or task.status != "triage":
                     raise HostError("transition_conflict", "epic is not in its native triage lane")
+            closing = changes["status"] == "done"
             result = self.transition_task(
-                epic_id, "done" if changes["status"] == "done" else "ready", board=board
+                epic_id, "done" if closing else "ready", board=board,
+                **({"summary": changes.get("summary") or "Epic closed through Hermes Dockyard."} if closing else {}),
             )
         return result
 

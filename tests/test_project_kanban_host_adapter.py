@@ -303,10 +303,12 @@ def test_adapter_card_creation_is_idempotent_and_move_uses_host_transition():
 
     assert first == replay
     assert len(host.tasks) == 1
-    assert host.transition_calls == [
-        (first, "ready", {"board": "alpha"}),
-        (first, "done", {"board": "alpha"}),
-    ]
+    assert host.transition_calls[0] == (first, "ready", {"board": "alpha"})
+    done_id, done_status, done_payload = host.transition_calls[1]
+    assert (done_id, done_status, done_payload["board"]) == (first, "done", "alpha")
+    # Hermes Kanban refuses evidence-free completions; the adapter must send one.
+    assert done_payload["summary"].strip()
+    assert len(host.transition_calls) == 2
 
 
 def test_adapter_exposes_project_scoped_canonical_work_service_operations():
