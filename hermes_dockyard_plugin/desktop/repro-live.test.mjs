@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { evaluatePlugin as evaluatePluginBundle } from './test-support/load-plugin.mjs';
+import { evaluatePlugin as evaluatePluginBundle, evaluateArtifact } from './test-support/load-plugin.mjs';
 
 const HARNESS_PACKAGE = fileURLToPath(new URL('../dashboard/package.json', import.meta.url));
 // Resolve the candidate plugin relative to this harness so a clean worktree
@@ -872,7 +872,13 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
     throw new Error(`Unhandled test request: ${method} ${path}`);
   };
 
-  const loaded = evaluatePlugin(readFileSync(PLUGIN_PATH, 'utf8'), { navigate: (path) => navigations.push(path) });
+  const pluginSource = readFileSync(PLUGIN_PATH, 'utf8');
+  // DOCKYARD_EVALUATE_ARTIFACT=1 evaluates the supplied file itself instead of
+  // the maintained source tree. Used only by the old-vs-new equivalence run so
+  // the pre-split revision renders through this one harness.
+  const loaded = process.env.DOCKYARD_EVALUATE_ARTIFACT === '1'
+    ? evaluateArtifact(pluginSource, { navigate: (path) => navigations.push(path) }, { assertImports: false })
+    : evaluatePlugin(pluginSource, { navigate: (path) => navigations.push(path) });
   // shared loader owns the source bundle; the canvas seam is injected above
   const contributions = [];
   loaded.plugin.register({
