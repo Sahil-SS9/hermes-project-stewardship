@@ -289,103 +289,134 @@ def test_backlog_creation_is_explicit_and_uses_canonical_endpoints(tmp_path):
     assert any(item["title"] == created[0]["ref"] or item["ref"] == created[0]["ref"] for item in readback["work_items"])
 
 
-# ------------------------------------------------------------ migration v32 --
-def test_plan_table_migration_round_trip(tmp_path):
-    """v32 round-trip proof: seed planning data at v30-base, then upgrade -> downgrade
-    -> upgrade with row counts and data identical at each step, and the
-    canvas_plans table removed cleanly on downgrade.
+def test_saving_the_document_twice_does_not_duplicate_content(store, svc, enabled):
+    # Kensei review: a second click on "Save doc to Content" uploaded a second
+    # identical Markdown file. Saving is idempotent per plan.
+    _seed_canvas(store, enabled)
+    technical = _approve_technical_plan(store, enabled)
+    service = PlanDocumentService(store)
+    plan = service.synthesise_plan(enabled, proposal_id=technical["proposal_id"], actor="sahil")
+    doc = service.build_implementation_document(enabled, plan["plan_id"])
+    first = service.save_implementation_document(enabled, plan["plan_id"], doc, actor="sahil")
+    second = service.save_implementation_document(enabled, plan["plan_id"], doc, actor="sahil")
+    assert second["doc_content_id"] == first["doc_content_id"]
+    named = [row for row in svc.project_content(enabled) if row["filename"] == f"implementation-{plan['plan_id']}.md"]
+    assert len(named) == 1, "one plan, one document"
 
-    Must be rebased onto Batch W's v31 before merge; proven here against
-    the current v30 base per the owner decision (Sahil, 2026-09-27)."""
+
+def test_backlog_steps_cannot_be_created_twice(tmp_path):
+    # Kensei review: "Create backlog items" stayed enabled after confirming,
+    # and a second confirm created a second copy of every item.
+    client = _api(tmp_path)
+    B = "/stewardship/v1"
+    canvas = client.get(f"{B}/projects/p7/canvas").json()
+    objects = [
+        {"id": "e1", "kind": "evidence", "content": {"text": "Users stall at import"}, "x": 80, "y": 80},
+        {"id": "c1", "kind": "claim", "content": {"text": "Import feels unsafe"}, "x": 400, "y": 80},
+        {"id": "p1", "kind": "plan_block", "content": {"text": "Preview before commit"}, "x": 400, "y": 300},
+    ]
+    client.put(f"{B}/projects/p7/canvas", json={"expected_revision": canvas["revision"], "objects": objects, "connectors": []})
+    session = client.post(f"{B}/projects/p7/canvas/sessions", json={}).json()
+    technical = next(p for p in session["proposals"] if p["kind"] == "technical_plan")
+    client.post(f"{B}/canvas/proposals/{technical['proposal_id']}/decision", json={"approve": True})
+    plan = client.post(f"{B}/canvas/proposals/{technical['proposal_id']}/plan", json={"project_id": "p7"}).json()
+    client.post(f"{B}/projects/p7/plans/{plan['plan_id']}/document/save", json={})
+    before = len(client.get(f"{B}/projects/p7/work-items").json()["work_items"])
+    first = client.post(f"{B}/projects/p7/plans/{plan['plan_id']}/backlog", json={"step_orders": [1]})
+    assert first.status_code == 200, first.text
+    again = client.post(f"{B}/projects/p7/plans/{plan['plan_id']}/backlog", json={"step_orders": [1]})
+    assert again.status_code == 409, again.text
+    after = len(client.get(f"{B}/projects/p7/work-items").json()["work_items"])
+    assert after == before + 1, "each plan step becomes at most one backlog item"
+    readback = client.get(f"{B}/projects/p7/plans/{plan['plan_id']}").json()
+    assert [row["order"] for row in readback["backlog_created"]] == [1], "the plan remembers what it created"
+
+
+# ------------------------------------------------------------ migration v32 --
+def test_plan_table_migration_round_trip(tmp_path, monkeypatch):
+    """v32 round-trip through the real Store.migrate() runner.
+
+    Seed planning data, then v32 -> v30 (downgrade SQL + migration record
+    removed) -> v32 (reopen: the real runner applies the migration) -> v30 ->
+    v32. Prior tables are identical at every step and the downgrade removes
+    canvas_plans cleanly. Must be rebased onto Batch W's v31 before merge;
+    proven here against the current v30 base (owner decision, 27/09/2026)."""
+    from hermes_project_stewardship.api.server import _canvas_provider
     from hermes_project_stewardship.persistence.canvas_plan_document import (
         PlanDocumentService)
     from hermes_project_stewardship.persistence.migrations import MIGRATIONS
     from hermes_project_stewardship.persistence.service import StewardshipService
     from hermes_project_stewardship.persistence.store import Store
 
+    # Deterministic fake provider, scoped to this test only (never a real model).
+    monkeypatch.setenv("HPS_CANVAS_PROVIDER", "fake")
     migration = next(item for item in MIGRATIONS if item.version == 32)
-    store = Store(tmp_path / "plan-roundtrip.db")
+    base_version = max(item.version for item in MIGRATIONS if item.version < 32)
+    db = tmp_path / "plan-roundtrip.db"
+
+    store = Store(db)
     try:
-        # ---- seed planning data at the current (pre-v32) schema ----
         StewardshipService(store).enable(
             "prp", mission="migration proof", lead_profile="l",
             member_profiles=["coder", "qa"], autonomy_level=2)
-        canvas_service = CanvasService(store)
         _seed_gap_canvas(store, "prp")
-        from hermes_project_stewardship.api.server import _canvas_provider
-        # The pytest process has no Hermes runtime, so HPS_CANVAS_PROVIDER=fake must
-        # be forced for the deterministic journey provider (never a real model).
-        import os
-        os.environ["HPS_CANVAS_PROVIDER"] = "fake"
         provider = _canvas_provider()
-        assert provider is not None, "journey provider must resolve for the seed"
+        assert provider is not None, "fake provider must resolve for the seed"
         planning = CanvasPlanningService(store, provider=provider)
         session = planning.start("prp", actor="sahil")
-        question = session["current_question"]
         planning.answer(session["session_id"], outcome="answer",
                         answer="seeded proof evidence", actor="sahil")
-        answered = planning.get(session["session_id"])
-        proposals = answered["proposals"]
-        assert proposals, "seeded session must produce proposals"
-        plan_service = PlanDocumentService(store)
-        approved_plan_proposal = next(
-            row for row in proposals if row.get("kind") == "technical_plan")
-        planning.decide(approved_plan_proposal["proposal_id"],
-                        approve=True, actor="sahil")
-        plan = plan_service.synthesise_plan(
-            "prp", proposal_id=approved_plan_proposal["proposal_id"],
-            actor="sahil")
-        assert plan["steps"], "synthesised plan must have steps"
-
-        def snapshot():
-            canvases = store._conn.execute(
-                "SELECT * FROM project_canvases ORDER BY canvas_id").fetchall()
-            sessions = store._conn.execute(
-                "SELECT * FROM canvas_sessions ORDER BY session_id").fetchall()
-            proposals_rows = store._conn.execute(
-                "SELECT * FROM canvas_proposals ORDER BY proposal_id").fetchall()
-            return canvases, sessions, proposals_rows
-
-        def plan_rows():
-            return store._conn.execute(
-                "SELECT * FROM canvas_plans ORDER BY plan_id").fetchall()
-
-        before = snapshot()
-        canvas_count_before = len(before[0])
-        session_count_before = len(before[1])
-        proposal_count_before = len(before[2])
-
-        # ---- upgrade to v32 (the table is created on a fresh Store, so here we
-        # apply the upgrade SQL directly to prove this migration in isolation) --
-        store._conn.executescript(migration.upgrade_sql)
-        assert plan_rows(), ("upgrade must keep the synthesised plan in "
-                             "canvas_plans")
-        plan_ids_up = [row["plan_id"] for row in plan_rows()]
-        assert snapshot() == before, "upgrade must not disturb prior tables"
-
-        # ---- downgrade: table removed cleanly, prior data intact ----
-        store._conn.executescript(migration.downgrade_sql)
-        tables = {row["name"] for row in store._conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-        assert "canvas_plans" not in tables
-        assert snapshot() == before, "downgrade must not disturb prior tables"
-
-        # ---- re-upgrade: table recreated, prior data still intact ----
-        store._conn.executescript(migration.upgrade_sql)
-        assert snapshot() == before
-        # the downgraded rows are gone (clean drop), the table is usable again
-        assert plan_rows() == []
-
-        # ---- full re-run through the service on the re-upgraded schema ----
-        again = plan_service.synthesise_plan(
-            "prp", proposal_id=approved_plan_proposal["proposal_id"],
-            actor="sahil")
-        assert again["steps"], "re-upgraded schema must accept new plans"
-        plan_ids_again = [row["plan_id"] for row in plan_rows()]
-        assert set(plan_ids_again) == set(plan_ids_up) | set(plan_ids_again)
-        assert plan_ids_again, "re-upgraded schema must persist the new plan"
+        proposals = planning.get(session["session_id"])["proposals"]
+        plan_proposal = next(row for row in proposals if row.get("kind") == "technical_plan")
+        planning.decide(plan_proposal["proposal_id"], approve=True, actor="sahil")
+        assert PlanDocumentService(store).synthesise_plan(
+            "prp", proposal_id=plan_proposal["proposal_id"], actor="sahil")["steps"]
     finally:
         store.close()
+
+    def snapshot(s):
+        return tuple(
+            tuple(tuple(row) for row in s._conn.execute(f"SELECT * FROM {table} ORDER BY 1").fetchall())
+            for table in ("project_stewardship", "project_canvases",
+                          "canvas_sessions", "canvas_proposals"))
+
+    def tables(s):
+        return {row["name"] for row in s._conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+
+    def downgrade(s):
+        s._conn.executescript(migration.downgrade_sql)
+        s._conn.execute("DELETE FROM schema_migrations WHERE version = 32")
+        s._conn.commit()
+
+    store = Store(db)
+    try:
+        assert store.schema_version == 32
+        before = snapshot(store)
+        assert all(before[1:]), "seed must populate canvas, sessions and proposals"
+        assert store._conn.execute("SELECT COUNT(*) FROM canvas_plans").fetchone()[0] == 1
+        downgrade(store)
+        assert "canvas_plans" not in tables(store)
+        assert store.schema_version == base_version
+        assert snapshot(store) == before, "downgrade must not disturb prior tables"
+    finally:
+        store.close()
+
+    for cycle in range(2):
+        store = Store(db)  # real runner: applies v32 to a v30 database holding data
+        try:
+            assert store.schema_version == 32, f"cycle {cycle}: runner did not upgrade"
+            assert "canvas_plans" in tables(store)
+            assert snapshot(store) == before, f"cycle {cycle}: upgrade changed prior data"
+            again = PlanDocumentService(store).synthesise_plan(
+                "prp", proposal_id=plan_proposal["proposal_id"], actor="sahil")
+            assert again["steps"], "upgraded schema must accept a new plan"
+            assert store._conn.execute("SELECT COUNT(*) FROM canvas_plans").fetchone()[0] == 1
+            downgrade(store)
+            assert "canvas_plans" not in tables(store)
+            assert snapshot(store) == before, f"cycle {cycle}: downgrade changed prior data"
+        finally:
+            store.close()
 
 def test_canvas_save_conflict_returns_409_at_route_level(tmp_path):
     """NEW-2: a stale expected_revision through the HTTP route must give 409."""

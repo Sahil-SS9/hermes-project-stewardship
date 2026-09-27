@@ -2475,7 +2475,15 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-svg .dy-pc-arrowhead { fill: var(--dy-text-3); }
 .dy-pc-scope .dy-pc-svg circle { fill: var(--dy-surface); }
 /* Objects: one real kind each, kind carried by an edge stripe (v6's cue). */
-.dy-pc-scope .dy-pc-obj { position: absolute; z-index: 2; min-width: 180px; max-width: 260px; padding: 11px 13px; border: 1px solid var(--dy-border); border-left: 3px solid var(--dy-pc-kind-note); border-radius: 10px; background: var(--dy-pc-surface); box-shadow: var(--dy-shadow); color: var(--dy-text); text-align: left; cursor: grab; user-select: none; touch-action: none; }
+.dy-pc-scope .dy-pc-obj { position: absolute; z-index: 2; min-width: 180px; max-width: 260px; padding: 11px 13px; border: 1px solid var(--dy-border); border-left: 3px solid var(--dy-pc-kind-note); border-radius: 10px; background: var(--dy-pc-surface); box-shadow: var(--dy-shadow); color: var(--dy-text); text-align: left; cursor: grab; user-select: none; touch-action: none; overflow: hidden; }
+/* B9: the stored rect drives the rendered box \u2014 the inline height style set by
+   canvas.js is authoritative (attr() is not reliably parsed with units here),
+   so connector anchors and de-overlap match what was persisted. */
+.dy-pc-scope .dy-pc-obj .dy-pc-obj-kind-icon { position: absolute; top: 9px; right: 10px; color: var(--dy-text-3); display: inline-flex; pointer-events: none; }
+.dy-pc-scope .dy-pc-obj .dy-pc-obj-kind-icon svg { width: 13px; height: 13px; }
+.dy-pc-scope .dy-pc-obj.marquee-selected { box-shadow: 0 0 0 2px var(--dy-accent-soft), 0 0 0 1px var(--dy-accent-border), var(--dy-shadow); }
+.dy-pc-scope .dy-pc-marquee { position: absolute; z-index: 5; border: 1px dashed var(--dy-accent-border); background: var(--dy-accent-soft); pointer-events: none; }
+.dy-pc-scope .dy-pc-chat input[data-canvas-chat-input] { flex: 1 1 auto; min-width: 0; }
 .dy-pc-scope .dy-pc-obj:active { cursor: grabbing; }
 .dy-pc-scope .dy-pc-obj[data-canvas-kind="evidence"] { border-left-color: var(--dy-pc-kind-evidence); }
 .dy-pc-scope .dy-pc-obj[data-canvas-kind="claim"] { border-left-color: var(--dy-pc-kind-claim); }
@@ -2533,6 +2541,12 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-notice[data-pc-tone="danger"] { background: var(--dy-danger-bg); color: var(--dy-pc-danger-text); }
 @media (max-width: 1100px) {
   .dy-pc-scope .dy-pc-chat.open { width: 320px; }
+}
+/* Narrow screens: the add row wraps and the draft input may shrink, so the
+   Add object button stays on screen (was clipped at 390px). */
+@media (max-width: 640px) {
+  .dy-pc-scope .dy-pc-add { flex-wrap: wrap; flex: 1 1 100%; }
+  .dy-pc-scope .dy-pc-add input { min-width: 0; flex: 1 1 140px; }
 }
 `;
 
@@ -7898,12 +7912,16 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     }
     setPlanBusy(false);
   };
+  const planDocSaved = planPanel?.status === "documented";
+  const createdOrders = new Set((planPanel?.backlog_created ?? []).map((row) => row.order));
+  const pendingSteps = (planPanel?.steps ?? []).map((step) => step.order).filter((order) => !createdOrders.has(order));
   const createBacklogItems = async () => {
     if (!planPanel?.plan_id || !backlogConfirm?.length) return;
     setPlanBusy(true);
     try {
       const result = await api(`/projects/${encoded}/plans/${encodeURIComponent(planPanel.plan_id)}/backlog`, { method: "POST", body: { step_orders: backlogConfirm } });
-      setNotice({ tone: "ok", text: `${number((result.created ?? []).length)} backlog item(s) created through the canonical work endpoints.` });
+      setPlanPanel((current) => ({ ...current ?? {}, backlog_created: result.backlog_created ?? [] }));
+      setNotice({ tone: "ok", text: `${number((result.created ?? []).length)} backlog item(s) created: ${(result.created ?? []).map((row) => row.ref).join(", ")}.` });
       setBacklogConfirm(null);
       onRefresh?.();
     } catch (failure) {
@@ -8084,7 +8102,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
                 jsx("div", { className: "dy-pc-msg bot", children: assistantSummary }),
                 jsx("div", { "data-canvas-chat-log": true, children: (chatLog ?? []).map((message, index) => jsx("div", { className: `dy-pc-msg ${message.role}`, children: message.text }, `chat-${index}`)) }),
                 questionBlock,
-                review ? jsx("p", { className: "dy-pc-drawer-meta", "data-canvas-review": true, children: `Review: ${number(review.summary?.evidence_count)} evidence, ${number(review.summary?.claim_count)} claim, ${number(review.summary?.question_count)} question, ${number(review.summary?.plan_block_count)} plan block block(s).` }) : null,
+                review ? jsx("p", { className: "dy-pc-drawer-meta", "data-canvas-review": true, children: `Review: ${number(review.summary?.evidence_count)} evidence, ${number(review.summary?.claim_count)} claim, ${number(review.summary?.question_count)} question, ${number(review.summary?.plan_block_count)} plan block(s).` }) : null,
                 proposalCards.length ? jsx("div", { "data-canvas-proposals": true, children: proposalCards }) : null,
                 session?.answers?.length ? jsx("div", { className: "dy-pc-msg me", children: `${number(session.answers.length)} clarification answer(s) recorded.` }) : null,
                 planPanel ? jsxs("div", { className: "dy-pc-proposal", "data-canvas-plan": planPanel.plan_id, children: [
@@ -8092,12 +8110,13 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
                   jsx("small", { children: `${number((planPanel.steps ?? []).length)} step(s) \xB7 from proposal ${planPanel.proposal_id} \xB7 nothing applied to the board.` }),
                   jsx("pre", { className: "dy-pc-plan-steps", children: (planPanel.steps ?? []).map((step) => `${step.order}. ${step.title}`).join("\n") }),
                   jsxs("div", { className: "dockyard-form-actions", children: [
-                    jsx(Button, { small: true, variant: "primary", action: "save-plan-document", disabled: planBusy, onClick: savePlanDocument, children: "Save doc to Content" }),
-                    jsx(Button, { small: true, action: "backlog-from-plan", disabled: planBusy || planPanel.status !== "documented", onClick: () => setBacklogConfirm((planPanel.steps ?? []).map((step) => step.order)), children: "Create backlog items" })
+                    jsx(Button, { small: true, variant: planDocSaved ? "" : "primary", action: "save-plan-document", disabled: planBusy || planDocSaved, onClick: savePlanDocument, children: planDocSaved ? "Doc saved to Content" : "Save doc to Content" }),
+                    jsx(Button, { small: true, variant: planDocSaved && pendingSteps.length ? "primary" : "", action: "backlog-from-plan", disabled: planBusy || !planDocSaved || !pendingSteps.length || Boolean(backlogConfirm?.length), onClick: () => setBacklogConfirm(pendingSteps), children: planDocSaved && !pendingSteps.length ? "Backlog items created" : "Create backlog items" })
                   ] }),
                   backlogConfirm?.length ? jsxs("div", { className: "dy-pc-proposal", "data-canvas-backlog-confirm": true, children: [
                     jsx("small", { children: `Create ${number(backlogConfirm.length)} backlog item(s)? One confirm per batch, nothing auto-runs.` }),
-                    jsx(Button, { small: true, variant: "primary", action: "confirm-backlog-from-plan", disabled: planBusy, onClick: createBacklogItems, children: "Confirm create" })
+                    jsx(Button, { small: true, variant: "primary", action: "confirm-backlog-from-plan", disabled: planBusy, onClick: createBacklogItems, children: "Confirm create" }),
+                    jsx(Button, { small: true, action: "cancel-backlog-from-plan", disabled: planBusy, onClick: () => setBacklogConfirm(null), children: "Cancel" })
                   ] }) : null
                 ] }) : null
               ] }),

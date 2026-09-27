@@ -346,4 +346,10 @@ export const WORKFLOW_CANVAS_CSS = `
 @media (max-width: 1100px) {
   .dy-pc-scope .dy-pc-chat.open { width: 320px; }
 }
+/* Narrow screens: the add row wraps and the draft input may shrink, so the
+   Add object button stays on screen (was clipped at 390px). */
+@media (max-width: 640px) {
+  .dy-pc-scope .dy-pc-add { flex-wrap: wrap; flex: 1 1 100%; }
+  .dy-pc-scope .dy-pc-add input { min-width: 0; flex: 1 1 140px; }
+}
 `

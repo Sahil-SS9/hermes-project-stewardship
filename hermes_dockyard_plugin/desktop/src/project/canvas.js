@@ -534,12 +534,16 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     } catch (failure) { setNotice({ tone: 'danger', text: `Document save failed: ${String(failure?.message ?? failure)}` }) }
     setPlanBusy(false)
   }
+  const planDocSaved = planPanel?.status === 'documented'
+  const createdOrders = new Set((planPanel?.backlog_created ?? []).map((row) => row.order))
+  const pendingSteps = (planPanel?.steps ?? []).map((step) => step.order).filter((order) => !createdOrders.has(order))
   const createBacklogItems = async () => {
     if (!planPanel?.plan_id || !backlogConfirm?.length) return
     setPlanBusy(true)
     try {
       const result = await api(`/projects/${encoded}/plans/${encodeURIComponent(planPanel.plan_id)}/backlog`, { method: 'POST', body: { step_orders: backlogConfirm } })
-      setNotice({ tone: 'ok', text: `${number((result.created ?? []).length)} backlog item(s) created through the canonical work endpoints.` })
+      setPlanPanel((current) => ({ ...(current ?? {}), backlog_created: result.backlog_created ?? [] }))
+      setNotice({ tone: 'ok', text: `${number((result.created ?? []).length)} backlog item(s) created: ${(result.created ?? []).map((row) => row.ref).join(', ')}.` })
       setBacklogConfirm(null)
       onRefresh?.()
     } catch (failure) { setNotice({ tone: 'danger', text: `Backlog creation failed: ${String(failure?.message ?? failure)}` }) }
@@ -721,7 +725,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
                 jsx('div', { className: 'dy-pc-msg bot', children: assistantSummary }),
                 jsx('div', { 'data-canvas-chat-log': true, children: (chatLog ?? []).map((message, index) => jsx('div', { className: `dy-pc-msg ${message.role}`, children: message.text }, `chat-${index}`)) }),
                 questionBlock,
-                review ? jsx('p', { className: 'dy-pc-drawer-meta', 'data-canvas-review': true, children: `Review: ${number(review.summary?.evidence_count)} evidence, ${number(review.summary?.claim_count)} claim, ${number(review.summary?.question_count)} question, ${number(review.summary?.plan_block_count)} plan block block(s).` }) : null,
+                review ? jsx('p', { className: 'dy-pc-drawer-meta', 'data-canvas-review': true, children: `Review: ${number(review.summary?.evidence_count)} evidence, ${number(review.summary?.claim_count)} claim, ${number(review.summary?.question_count)} question, ${number(review.summary?.plan_block_count)} plan block(s).` }) : null,
                 proposalCards.length ? jsx('div', { 'data-canvas-proposals': true, children: proposalCards }) : null,
                 session?.answers?.length ? jsx('div', { className: 'dy-pc-msg me', children: `${number(session.answers.length)} clarification answer(s) recorded.` }) : null,
                 planPanel ? jsxs('div', { className: 'dy-pc-proposal', 'data-canvas-plan': planPanel.plan_id, children: [
@@ -729,12 +733,13 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
                   jsx('small', { children: `${number((planPanel.steps ?? []).length)} step(s) · from proposal ${planPanel.proposal_id} · nothing applied to the board.` }),
                   jsx('pre', { className: 'dy-pc-plan-steps', children: (planPanel.steps ?? []).map((step) => `${step.order}. ${step.title}`).join('\n') }),
                   jsxs('div', { className: 'dockyard-form-actions', children: [
-                    jsx(Button, { small: true, variant: 'primary', action: 'save-plan-document', disabled: planBusy, onClick: savePlanDocument, children: 'Save doc to Content' }),
-                    jsx(Button, { small: true, action: 'backlog-from-plan', disabled: planBusy || planPanel.status !== 'documented', onClick: () => setBacklogConfirm((planPanel.steps ?? []).map((step) => step.order)), children: 'Create backlog items' }),
+                    jsx(Button, { small: true, variant: planDocSaved ? '' : 'primary', action: 'save-plan-document', disabled: planBusy || planDocSaved, onClick: savePlanDocument, children: planDocSaved ? 'Doc saved to Content' : 'Save doc to Content' }),
+                    jsx(Button, { small: true, variant: planDocSaved && pendingSteps.length ? 'primary' : '', action: 'backlog-from-plan', disabled: planBusy || !planDocSaved || !pendingSteps.length || Boolean(backlogConfirm?.length), onClick: () => setBacklogConfirm(pendingSteps), children: planDocSaved && !pendingSteps.length ? 'Backlog items created' : 'Create backlog items' }),
                   ]}),
                   backlogConfirm?.length ? jsxs('div', { className: 'dy-pc-proposal', 'data-canvas-backlog-confirm': true, children: [
                     jsx('small', { children: `Create ${number(backlogConfirm.length)} backlog item(s)? One confirm per batch, nothing auto-runs.` }),
                     jsx(Button, { small: true, variant: 'primary', action: 'confirm-backlog-from-plan', disabled: planBusy, onClick: createBacklogItems, children: 'Confirm create' }),
+                    jsx(Button, { small: true, action: 'cancel-backlog-from-plan', disabled: planBusy, onClick: () => setBacklogConfirm(null), children: 'Cancel' }),
                   ]}) : null,
                 ]}) : null,
               ]}),

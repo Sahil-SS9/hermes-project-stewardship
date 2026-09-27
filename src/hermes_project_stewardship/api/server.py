@@ -1326,11 +1326,13 @@ def create_app(
 
     @router.post("/projects/{project_id}/plans/{plan_id}/backlog")
     def create_backlog_from_plan(project_id: str, plan_id: str, body: CanvasPlanBacklogRequest):
-        from ..persistence.canvas_plan_document import PlanDocumentService
+        from ..persistence.canvas_plan_document import PlanConflictError, PlanDocumentService
         try:
             return PlanDocumentService(store).create_backlog_items(
                 project_id, plan_id, step_orders=body.step_orders,
                 actor=_principal_id(body.actor), work=work)
+        except PlanConflictError as exc:
+            raise HTTPException(409, str(exc)) from exc
         except ValueError as exc:
             message = str(exc)
             if "unknown" in message:

@@ -23,6 +23,10 @@ PLAN_KINDS = frozenset({"synthesis", "user_journey", "edge_case", "technical_pla
 IMPL_KINDS = frozenset({"technical_plan", "user_journey", "edge_case"})
 
 
+class PlanConflictError(ValueError):
+    """The request repeats an action the plan has already recorded."""
+
+
 class PlanDocumentService:
     """Synthesis from approved proposals; pure document building otherwise."""
 
@@ -77,6 +81,15 @@ class PlanDocumentService:
         plan = self.get_plan(project_id, plan_id)
         if plan.get("status") not in {"draft", "documented"}:
             raise ValueError("implementation document requires an approved plan")
+        existing = self._conn().execute(
+            "SELECT doc_content_id FROM canvas_plans WHERE project_id=? AND plan_id=?",
+            (project_id, plan_id),
+        ).fetchone()
+        if plan.get("status") == "documented" and existing and existing["doc_content_id"]:
+            # Idempotent: one plan owns one document. A repeat save returns the
+            # stored record instead of uploading a duplicate file.
+            return {**plan, "doc_content_id": existing["doc_content_id"],
+                    "doc_filename": f"implementation-{plan_id}.md"}
         media_type = "text/markdown"
         svc = StewardshipService(self.store)
         record = svc.upload_project_content(
@@ -332,6 +345,10 @@ class PlanDocumentService:
         unknown = [order for order in step_orders if order not in steps_by_order]
         if unknown:
             raise ValueError(f"unknown step(s): {unknown}")
+        already = {row["order"] for row in plan.get("backlog_created") or []}
+        repeated = sorted(set(step_orders) & already)
+        if repeated:
+            raise PlanConflictError(f"backlog items already created for step(s): {repeated}")
         created = []
         for order in sorted(set(step_orders)):
             step = steps_by_order[order]
@@ -345,4 +362,17 @@ class PlanDocumentService:
                 body=f"From plan {plan_id} step {order} (board objects: {', '.join(step.get('source_object_ids') or [])})",
             )
             created.append({"order": order, "ref": record.get("ref") or record.get("id")})
-        return {"plan_id": plan_id, "created": created}
+        # Remember what this plan created so a repeat confirm cannot duplicate
+        # work items. Stored inside plan_json: no schema change.
+        row = self._conn().execute(
+            "SELECT plan_json FROM canvas_plans WHERE project_id=? AND plan_id=?",
+            (project_id, plan_id),
+        ).fetchone()
+        stored = json.loads(row["plan_json"])
+        stored["backlog_created"] = sorted((stored.get("backlog_created") or []) + created, key=lambda item: item["order"])
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE canvas_plans SET plan_json=?, updated_at=? WHERE project_id=? AND plan_id=?",
+                (json.dumps(stored, sort_keys=True), iso(self.store._clock()), project_id, plan_id),
+            )
+        return {"plan_id": plan_id, "created": created, "backlog_created": stored["backlog_created"]}

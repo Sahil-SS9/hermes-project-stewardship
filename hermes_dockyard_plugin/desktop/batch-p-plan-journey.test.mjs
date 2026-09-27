@@ -79,7 +79,9 @@ test('Batch P rendered journey: undo/duplicate/marquee + plan doc + backlog conf
     }
     // Plan from the approved technical_plan proposal.
     const planButton = canvas.getByRole('button', { name: 'Plan from proposal' })
-    if (await planButton.count()) {
+    // Not optional: without an approved technical plan the P2 steps below never run.
+    assert.ok(await planButton.count() >= 1, 'an approved technical_plan proposal offers Plan from proposal')
+    {
       await planButton.first().click()
       await page.waitForTimeout(500)
       const planCard = canvas.locator('[data-canvas-plan]')
@@ -89,16 +91,21 @@ test('Batch P rendered journey: undo/duplicate/marquee + plan doc + backlog conf
       await planCard.getByRole('button', { name: 'Save doc to Content' }).click()
       await page.waitForTimeout(500)
       assert.match(await canvas.innerText(), /Implementation document saved/)
-      // Backlog creation is explicit and confirm-gated.
+      // Saving is one-shot: the button locks so a second click cannot upload a duplicate.
+      const savedDoc = planCard.getByRole('button', { name: 'Doc saved to Content' })
+      assert.equal(await savedDoc.isDisabled(), true, 'saved doc button must lock')
+      // Backlog creation is explicit and confirm-gated. Not optional: the step must run.
       const backlogButton = planCard.getByRole('button', { name: 'Create backlog items' })
-      if (await backlogButton.isEnabled()) {
-        await backlogButton.click()
-        const confirmCard = canvas.locator('[data-canvas-backlog-confirm]')
-        await confirmCard.waitFor({ timeout: 10000 })
-        await confirmCard.getByRole('button', { name: 'Confirm create' }).click()
-        await page.waitForTimeout(500)
-        assert.match(await canvas.innerText(), /backlog item\(s\) created/)
-      }
+      assert.equal(await backlogButton.isEnabled(), true, 'backlog button must unlock once the doc is saved')
+      await backlogButton.click()
+      const confirmCard = canvas.locator('[data-canvas-backlog-confirm]')
+      await confirmCard.waitFor({ timeout: 10000 })
+      assert.equal(await backlogButton.isDisabled(), true, 'backlog button locks while the confirm is open')
+      await confirmCard.getByRole('button', { name: 'Confirm create' }).click()
+      await page.waitForTimeout(500)
+      assert.match(await canvas.innerText(), /backlog item\(s\) created/)
+      const doneButton = planCard.getByRole('button', { name: 'Backlog items created' })
+      assert.equal(await doneButton.isDisabled(), true, 'a created backlog cannot be created twice')
     }
     assert.deepEqual(errors, [], errors.join('\n'))
   } catch (failure) {
