@@ -19,11 +19,6 @@ test('real backend Kanban transition readback, audit actor and project isolation
   await page.locator('[data-tab="project"]').click();
   await page.locator('[data-project-view="board"]').click();
   const ref=(await get('/projects/payments-relaunch/work-items')).work_items.find(i=>i.title==='Verify payments-relaunch').ref;
-  // The full suite runs heavier tests first (the batch-P journey), so the board
-  // may still be settling when this drag starts. Wait for the app to be idle
-  // (no in-flight fetches) before the single-shot drag — fixing the setup, not
-  // weakening the assertion.
-  await page.waitForLoadState('networkidle');
   await page.locator(`[data-work-card="${ref}"]`).dragTo(page.locator('[data-board-column="active"]'));
   await page.getByText('Work item moved to in progress.',{exact:true}).waitFor();
   assert.equal((await get('/projects/payments-relaunch/work-items')).work_items.find(i=>i.ref===ref).status,'in_progress');
