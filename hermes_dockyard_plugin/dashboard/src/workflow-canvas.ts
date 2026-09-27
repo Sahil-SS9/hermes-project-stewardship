@@ -647,6 +647,10 @@ export function mountWorkflowCanvas(
     // re-mounts the canvas and discards the passport the click just opened.
     const movedBy = Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y);
     if (movedBy > 3) session.moved = true;
+    // Ignore sub-threshold pointer jitter altogether. Moving the SVG node on
+    // a plain click can change its hit target while the passport is opening,
+    // detaching the Save control when the subsequent version refresh lands.
+    if (!session.moved) return;
     const world = worldPoint(e.clientX, e.clientY);
     writeNodePosition(session.nodeId, g, world.x - session.offsetX, world.y - session.offsetY);
   };

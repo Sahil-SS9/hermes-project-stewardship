@@ -27,12 +27,21 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   // Both read the same mount; neither invents graph state.
   const [mode, setMode] = useState('live')
   const [validation, setValidation] = useState(null)
+  const [layoutPendingVersion, setLayoutPendingVersion] = useState(null)
   const encoded = encodeURIComponent(project.id)
   const grouped = Object.values((workflows ?? []).reduce((all, row) => {
     const item = all[row.name] ?? { name: row.name, versions: [], archived_at: row.archived_at }
     item.versions.push(row); item.archived_at = row.archived_at; all[row.name] = item; return all
   }, {}))
   const current = grouped.find((item) => item.name === selected) ?? grouped[0]
+  // An auto-layout POST creates a new version. Keep the graph non-interactive
+  // until that version is rendered, otherwise selecting a node during the
+  // refresh exposes an editor whose Save button is immediately detached.
+  useEffect(() => {
+    if (layoutPendingVersion !== null && current?.versions?.length > layoutPendingVersion) {
+      setLayoutPendingVersion(null)
+    }
+  }, [layoutPendingVersion, current?.versions?.length])
   const definition = current?.versions?.[current.versions.length - 1]?.definition ?? { nodes: [] }
   const nodes = definition.nodes ?? []
   // The persisted definition's nodes in the canvas's own vocabulary, so toolbar
@@ -86,8 +95,8 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
     })  }, [project.id, current?.name, current?.versions?.length, runs, mode])
   const mutate = async (path, body = {}) => {
     setError(null)
-    try { await api(path, { method: 'POST', body }); onRefresh?.() }
-    catch (failure) { setError(String(failure?.message ?? failure)) }
+    try { await api(path, { method: 'POST', body }); onRefresh?.(); return true }
+    catch (failure) { setError(String(failure?.message ?? failure)); return false }
   }
   const define = () => {
     if (!name.trim() || !title.trim()) return
@@ -98,8 +107,8 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   }
   // Toolbar actions persist through the SAME version contract the canvas uses.
   const persistNodes = (nextNodes) => {
-    if (!current) return
-    void mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/versions`, {
+    if (!current) return Promise.resolve(false)
+    return mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/versions`, {
       nodes: nextNodes.map(({ node_id, title: nodeTitle, depends_on, human_gate, task_ref, kind, phase_team, canvas_position }) => ({ id: node_id, title: nodeTitle, depends_on, human_gate, task_ref, kind, phase_team, canvas_position })),
     })
   }
@@ -115,7 +124,11 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   }
   // Auto layout: dropping canvas_position lets the layout engine place every
   // node by topology again. It writes the version, like any other edit.
-  const autoLayout = () => persistNodes(currentCanvasNodes())
+  const autoLayout = async () => {
+    if (!current || layoutPendingVersion !== null) return
+    setLayoutPendingVersion(current.versions.length)
+    if (!await persistNodes(currentCanvasNodes())) setLayoutPendingVersion(null)
+  }
   const validateGraph = () => {
     const nodesNow = currentCanvasNodes()
     const issues = []
@@ -133,6 +146,9 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   const statusFor = (run, node) => run?.nodes?.find((item) => item.node_id === (node.id || node.node_id))?.status ?? 'pending'
   const latest = runs[0]
   const liveCounts = latest ? (latest.nodes ?? []).reduce((acc, node) => { const key = node.status ?? 'pending'; acc[key] = (acc[key] ?? 0) + 1; return acc }, {}) : null
+  // W5 live map: read only from the canonical run projection. A node needs
+  // attention when it is blocked or waiting on a human decision — the two
+  // states the run projection actually reports; nothing is inferred beyond it.
   return jsxs('section', { className: 'dockyard-feature-card dockyard-workflows-v6', 'data-workflows-prototype': project.id, 'data-executable-workflows': project.id, children: [
     jsxs('div', { className: 'dockyard-wf-entry', 'data-workflow-library-entry': true, children: [
       jsx(Button, { action: 'open-workflow-library', variant: 'primary', onClick: onOpenLibrary, children: 'Open workflow library' }),
@@ -171,13 +187,14 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
           jsx('span', { className: 'dockyard-wf3-sep', 'aria-hidden': true }),
           jsx(Button, { small: true, action: 'wf-add-step', disabled: !current, onClick: () => addNode(false), children: '＋ Step' }),
           jsx(Button, { small: true, action: 'wf-add-gate', disabled: !current, onClick: () => addNode(true), children: '＋ Gate' }),
-          jsx(Button, { small: true, action: 'wf-auto-layout', disabled: !current, onClick: autoLayout, children: 'Auto layout' }),
+          jsx(Button, { small: true, action: 'wf-auto-layout', disabled: !current || layoutPendingVersion !== null, onClick: autoLayout, children: layoutPendingVersion !== null ? 'Saving layout…' : 'Auto layout' }),
           jsx(Button, { small: true, action: 'wf-validate', disabled: !current, onClick: validateGraph, children: 'Validate' }),
           jsx('span', { className: 'dockyard-wf3-sep', 'aria-hidden': true }),
           jsx(Button, { small: true, action: 'inspect-workflow', disabled: !current, onClick: () => { setSelected(current.name); loadRuns(current.name) }, children: 'Refresh canvas' }),
         ]}),
         validation ? jsx('p', { className: 'dockyard-wf3-validation', role: 'status', 'data-wf-validate-result': validation.ok ? 'ok' : 'issues', children: validation.text }) : null,
-        current ? jsx('div', { ref: canvasRef, className: 'dockyard-workflow-graph', 'data-workflow-canvas': current.name, role: 'img', 'aria-label': 'Workflow planning graph' }) : jsx('p', { className: 'dockyard-meta', children: 'No workflow selected.' }),
+        layoutPendingVersion !== null ? jsx('p', { role: 'status', 'data-wf-layout-saving': true, children: 'Saving layout version before the graph can be edited…' }) : null,
+        current ? jsx('div', { ref: canvasRef, className: 'dockyard-workflow-graph', 'data-workflow-canvas': current.name, role: 'img', 'aria-label': 'Workflow planning graph', 'aria-busy': layoutPendingVersion !== null, style: layoutPendingVersion !== null ? { pointerEvents: 'none' } : undefined }) : jsx('p', { className: 'dockyard-meta', children: 'No workflow selected.' }),
       ]}),
       // ---- Zone 3: run inspector (canonical runs + versions + lifecycle) --
       jsxs('aside', { className: 'dockyard-wf3-insp', children: [
@@ -186,7 +203,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
           jsx(StatusTag, { tone: latest.status === 'completed' ? 'success' : latest.status === 'failed' ? 'danger' : 'info', label: latest.status }),
           jsx('p', { className: 'dockyard-wf3-runkey', children: `${latest.run_key} · v${latest.version}` }),
           liveCounts ? jsx('p', { className: 'dockyard-wf3-counts', children: ['done', 'working', 'blocked', 'pending'].filter((k) => liveCounts[k]).map((k) => `${liveCounts[k]} ${k}`).join(' · ') }) : null,
-          jsx('ul', { children: (latest.nodes ?? []).map((node) => jsx('li', { children: `${node.title} — ${node.status ?? 'pending'}${node.assignee ? ` · ${node.assignee}` : ''}` }, node.node_id)) }),
+          jsx('ul', { 'data-wf-live-map': latest.run_key, children: (latest.nodes ?? []).map((node) => jsx('li', { 'data-wf-live-node': node.node_id, 'data-wf-needs-attention': (node.status === 'blocked' || (node.status === 'pending' && node.human_gate)) ? 'true' : undefined, children: `${node.title} — ${node.status ?? 'pending'}${node.assignee ? ` · ${node.assignee}` : ''}${(node.status === 'blocked' || (node.status === 'pending' && node.human_gate)) ? ' · needs attention' : ''}` }, node.node_id)) }),
         ] }) : jsx('p', { className: 'dockyard-meta', children: 'No canonical run recorded. Start a run to see truthful state.' }),
         jsxs('div', { className: 'dockyard-form-actions', children: current ? current.versions.map((version) => jsx(Button, { action: 'start-workflow', disabled: Boolean(current.archived_at), onClick: async () => { await mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/start`, { version: version.version, run_key: runKey || `${current.name}-${Date.now()}` }); await loadRuns(current.name) }, children: `Start v${version.version}` }, String(version.version))) : null }),
         current ? jsxs('details', { className: 'dockyard-workflow-definitions', 'data-workflow-definitions': current.name, children: [
