@@ -294,3 +294,27 @@ def test_plan_table_migration_round_trip(store):
     rows = store._conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='canvas_plans'").fetchall()
     assert rows, "v31 creates the canvas_plans table"
 
+def test_canvas_save_conflict_returns_409_at_route_level(tmp_path):
+    """NEW-2: a stale expected_revision through the HTTP route must give 409."""
+    from fastapi.testclient import TestClient
+    from hermes_project_stewardship.api.server import create_app
+    from hermes_project_stewardship.kanban import ReferenceKanbanAdapter
+    from hermes_project_stewardship.persistence.store import Store
+    store = Store(tmp_path / "b7c.db")
+    client = TestClient(create_app(store, kanban_adapter=ReferenceKanbanAdapter(store)))
+    client.post("/stewardship/v1/projects/p7c/enable", json={
+        "project_id": "p7c", "mission": "probe", "lead_profile": "l", "autonomy_level": 2})
+    planning = CanvasPlanningService(store)
+    planning.start("p7c", actor="sahil")
+    current = client.get("/stewardship/v1/projects/p7c/canvas").json()
+    objects = [dict(current["objects"][0])] if current["objects"] else [
+        {"id": "c1", "kind": "note", "content": {"text": "first"}, "x": 40, "y": 40,
+         "width": 240, "height": 140, "tags": [], "evidence_ref": None, "work_ref": None}]
+    body = {"expected_revision": current["revision"] + 5, "objects": objects, "connectors": []}
+    conflict = client.put("/stewardship/v1/projects/p7c/canvas", json=body)
+    assert conflict.status_code == 409
+    payload = conflict.json()
+    assert payload["error"]["code"] in {"revision_conflict", "conflict"}
+    # The canonical revision is unchanged and a fresh save still succeeds.
+    after = client.get("/stewardship/v1/projects/p7c/canvas").json()
+    assert after["revision"] == current["revision"]

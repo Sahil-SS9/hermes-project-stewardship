@@ -274,7 +274,8 @@ class PlanDocumentService:
         merged = []
         for index, (title, source_ids) in enumerate(order, start=1):
             base = next(step for step in plan["steps"] if step["title"] == title)
-            known_sources = [s for s in source_ids if s in {item["id"] for item in plan.get("source_object_ids", [])}]
+            known = {str(s) for s in (plan.get("source_object_ids") or [])}
+            known_sources = [s for s in source_ids if s in known]
             merged.append({**base, "order": index, "source_object_ids": known_sources or base["source_object_ids"]})
         return {**plan, "steps": merged}
 

@@ -45,9 +45,9 @@ class CanvasCurationService:
             if required and gap_id not in resolved_question_ids:
                 missing.append({"id": gap_id, "question": question})
         context_fingerprint = sha256(json.dumps(canvas, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        if self.provider is not None and not missing:
+        if self.provider is not None and objects:
             try:
-                provider_result = self.provider.propose({"canvas": canvas, "untrusted_content": True})
+                provider_result = self.provider.propose({"canvas": canvas, "untrusted_content": True, "clarifications": clarifications})
                 if not isinstance(provider_result, dict) or not isinstance(provider_result.get("proposals", []), list):
                     raise ValueError("provider returned malformed curation output")
             except Exception as exc:  # provider failures are explicit, never simulated success

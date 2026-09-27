@@ -255,6 +255,47 @@ def _canvas_provider():
     requested = os.environ.get("HPS_CANVAS_PROVIDER", "hermes")
     if requested == "none":
         return None
+    if requested == "fake":
+        # Deterministic test-safe provider for browser journeys: synthesises a
+        # technical_plan proposal from the canvas seed, never touches a model.
+        class _JourneyProvider:
+            provider_id = "fake"
+            model_id = "fake-model"
+
+            def propose(self, context):
+                canvas = context.get("canvas") or {}
+                plan = context.get("plan")
+                if isinstance(plan, dict):
+                    # Plan refinement: echo the approved step titles verbatim
+                    # (refinement-only contract; invention is rejected anyway).
+                    steps = [
+                        {"title": step.get("title"), "source_object_ids": list(step.get("source_object_ids") or [])}
+                        for step in (plan.get("steps") or []) if isinstance(step, dict) and step.get("title")
+                    ]
+                    return {"proposals": [
+                        {"kind": "technical_plan", "title": "Technical implementation plan",
+                         "body": {"steps": steps}},
+                    ]}
+                objects = [
+                    {"id": row.get("id"), "kind": row.get("kind"), "content": row.get("content") or {}}
+                    for row in (canvas.get("objects") or [])
+                ]
+                seen_titles = set()
+                plan_items = []
+                for row in objects:
+                    title = f"Implement: {(row.get('content') or {}).get('text') or row.get('kind')}"
+                    if title in seen_titles:
+                        continue
+                    seen_titles.add(title)
+                    plan_items.append(
+                        {"title": title, "source_object_ids": [row.get("id")]}
+                    )
+                return {"proposals": [
+                    {"kind": "technical_plan", "title": "Technical implementation plan",
+                     "body": {"steps": plan_items}},
+                ]}
+
+        return _JourneyProvider()
     if requested == "hermes":
         from ..persistence.hermes_curation_provider import HermesCurationProvider
         try:
@@ -1202,7 +1243,7 @@ def create_app(
     def answer_canvas_session(session_id: str, body: CanvasSessionAnswerRequest):
         from ..persistence.canvas_planning import CanvasPlanningService
         try:
-            return CanvasPlanningService(store).answer(session_id, outcome=body.outcome, answer=body.answer, actor=_principal_id(body.actor))
+            return CanvasPlanningService(store, provider=_canvas_provider()).answer(session_id, outcome=body.outcome, answer=body.answer, actor=_principal_id(body.actor))
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
 

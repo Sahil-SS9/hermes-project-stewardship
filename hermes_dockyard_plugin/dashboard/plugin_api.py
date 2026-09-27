@@ -781,6 +781,37 @@ async def decide_canvas_proposal(proposal_id: str, body: dict) -> dict:
     return await _proxy("POST", f"/stewardship/v1/canvas/proposals/{quote(proposal_id, safe='')}/decision", {**body, "actor": _ACTOR_ID})
 
 
+@plugin_api.post("/canvas/proposals/{proposal_id}/plan")
+async def synthesise_canvas_plan(proposal_id: str, body: dict) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/canvas/proposals/{quote(proposal_id, safe='')}/plan", body)
+
+
+@plugin_api.get("/projects/{project_id}/plans")
+async def list_project_plans(project_id: str) -> dict:
+    return await _proxy("GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/plans")
+
+
+@plugin_api.get("/projects/{project_id}/plans/{plan_id}")
+async def get_project_plan(project_id: str, plan_id: str) -> dict:
+    return await _proxy("GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/plans/{quote(plan_id, safe='')}")
+
+
+@plugin_api.post("/projects/{project_id}/plans/{plan_id}/document")
+async def build_project_plan_document(project_id: str, plan_id: str) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/plans/{quote(plan_id, safe='')}/document", {})
+
+
+@plugin_api.post("/projects/{project_id}/plans/{plan_id}/document/save")
+async def save_project_plan_document(project_id: str, plan_id: str) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/plans/{quote(plan_id, safe='')}/document/save", {})
+
+
+@plugin_api.post("/projects/{project_id}/plans/{plan_id}/backlog")
+async def create_plan_backlog_items(project_id: str, plan_id: str, body: dict) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/plans/{quote(plan_id, safe='')}/backlog", body)
+
+
+
 @plugin_api.get("/projects/{project_id}/content")
 async def project_content(
     project_id: str, include_archived: bool = True,
