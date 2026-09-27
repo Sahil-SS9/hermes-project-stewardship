@@ -227,6 +227,46 @@ class CanvasProposalDecisionRequest(BaseModel):
     actor: str = "system"
 
 
+class CanvasPlanSynthesisRequest(BaseModel):
+    project_id: str
+    actor: str = "system"
+
+
+class CanvasPlanDocumentRequest(BaseModel):
+    actor: str = "system"
+
+
+class CanvasPlanBacklogRequest(BaseModel):
+    step_orders: List[int]
+    actor: str = "system"
+
+
+def _canvas_provider():
+    """The curation provider for canvas sessions.
+
+    The assistant runs through the provider seam, never a hard-coded model.
+    Default is the REAL Hermes adapter (whatever model Hermes is configured
+    for). A provider seam must stay test-safe: the pytest suite never calls a
+    real model, so tests inject a fake provider (or set HPS_CANVAS_PROVIDER)
+    instead of going through this route's default.
+    """
+    import os
+
+    requested = os.environ.get("HPS_CANVAS_PROVIDER", "hermes")
+    if requested == "none":
+        return None
+    if requested == "hermes":
+        from ..persistence.hermes_curation_provider import HermesCurationProvider
+        try:
+            return HermesCurationProvider()
+        except Exception:
+            # No Hermes runtime/configured model in this process (tests,
+            # bare hosts): fall back to the provider-neutral local contract
+            # instead of failing every session route.
+            return None
+    raise ValueError(f"unknown canvas provider: {requested}")
+
+
 class InitiativeProposal(BaseModel):
     title: str
     rationale: str
@@ -1097,7 +1137,10 @@ def create_app(
     @router.get("/projects/{project_id}/canvas")
     def project_canvas(project_id: str):
         from ..persistence.canvas_service import CanvasService
-        return CanvasService(store).get(project_id)
+        try:
+            return CanvasService(store).get(project_id)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
 
     @router.put("/projects/{project_id}/canvas")
     def save_project_canvas(project_id: str, body: CanvasSaveRequest):
@@ -1138,10 +1181,14 @@ def create_app(
     @router.post("/projects/{project_id}/canvas/sessions")
     def start_canvas_session(project_id: str, body: CanvasSessionStartRequest):
         from ..persistence.canvas_planning import CanvasPlanningService
+        provider = _canvas_provider()
         try:
-            return CanvasPlanningService(store).start(project_id, actor=_principal_id(body.actor))
+            return CanvasPlanningService(store, provider=provider).start(project_id, actor=_principal_id(body.actor))
         except ValueError as exc:
-            raise HTTPException(422, str(exc)) from exc
+            message = str(exc)
+            if "unknown" in message:
+                raise HTTPException(404, message) from exc
+            raise HTTPException(422, message) from exc
 
     @router.get("/canvas/sessions/{session_id}")
     def get_canvas_session(session_id: str):
@@ -1165,7 +1212,89 @@ def create_app(
         try:
             return CanvasPlanningService(store).decide(proposal_id, approve=body.approve, actor=_principal_id(body.actor))
         except ValueError as exc:
-            raise HTTPException(422, str(exc)) from exc
+            message = str(exc)
+            if "unknown" in message:
+                raise HTTPException(404, message) from exc
+            raise HTTPException(422, message) from exc
+
+    @router.post("/canvas/proposals/{proposal_id}/plan")
+    def synthesise_canvas_plan(proposal_id: str, body: CanvasPlanSynthesisRequest):
+        from ..persistence.canvas_plan_document import PlanDocumentService
+        provider = _canvas_provider()
+        try:
+            return PlanDocumentService(store, provider=provider).synthesise_plan(
+                body.project_id, proposal_id=proposal_id, actor=_principal_id(body.actor))
+        except ValueError as exc:
+            message = str(exc)
+            if "unknown" in message:
+                raise HTTPException(404, message) from exc
+            raise HTTPException(422, message) from exc
+
+    @router.get("/projects/{project_id}/plans")
+    def list_canvas_plans(project_id: str):
+        from ..persistence.canvas_plan_document import PlanDocumentService
+        return {"plans": PlanDocumentService(store).list_plans(project_id)}
+
+    @router.get("/projects/{project_id}/plans/{plan_id}")
+    def get_canvas_plan(project_id: str, plan_id: str):
+        from ..persistence.canvas_plan_document import PlanDocumentService
+        try:
+            return PlanDocumentService(store).get_plan(project_id, plan_id)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+    @router.post("/projects/{project_id}/plans/{plan_id}/document")
+    def build_canvas_plan_document(project_id: str, plan_id: str):
+        """Preview the implementation document without persisting it."""
+        from ..persistence.canvas_plan_document import PlanDocumentService
+        try:
+            return {"plan_id": plan_id, "markdown": PlanDocumentService(store).build_implementation_document(project_id, plan_id)}
+        except ValueError as exc:
+            message = str(exc)
+            if "unknown" in message:
+                raise HTTPException(404, message) from exc
+            raise HTTPException(422, message) from exc
+
+    @router.post("/projects/{project_id}/plans/{plan_id}/document/save")
+    def save_canvas_plan_document(project_id: str, plan_id: str, body: CanvasPlanDocumentRequest):
+        """D-P2: persist the implementation document into the project's
+        Content tab (Markdown)."""
+        from ..persistence.canvas_plan_document import PlanDocumentService
+        service = PlanDocumentService(store)
+        try:
+            service.save_implementation_document(
+                project_id, plan_id, service.build_implementation_document(project_id, plan_id),
+                actor=_principal_id(body.actor))
+        except ValueError as exc:
+            message = str(exc)
+            if "unknown" in message:
+                raise HTTPException(404, message) from exc
+            raise HTTPException(422, message) from exc
+        return service.get_plan(project_id, plan_id)
+
+    @router.get("/projects/{project_id}/plans/{plan_id}/document")
+    def fetch_canvas_plan_document(project_id: str, plan_id: str):
+        from ..persistence.canvas_plan_document import PlanDocumentService
+        try:
+            return PlanDocumentService(store).get_implementation_document(project_id, plan_id)
+        except ValueError as exc:
+            message = str(exc)
+            if "unknown" in message:
+                raise HTTPException(404, message) from exc
+            raise HTTPException(422, message) from exc
+
+    @router.post("/projects/{project_id}/plans/{plan_id}/backlog")
+    def create_backlog_from_plan(project_id: str, plan_id: str, body: CanvasPlanBacklogRequest):
+        from ..persistence.canvas_plan_document import PlanDocumentService
+        try:
+            return PlanDocumentService(store).create_backlog_items(
+                project_id, plan_id, step_orders=body.step_orders,
+                actor=_principal_id(body.actor), work=work)
+        except ValueError as exc:
+            message = str(exc)
+            if "unknown" in message:
+                raise HTTPException(404, message) from exc
+            raise HTTPException(422, message) from exc
 
     @router.get("/projects/{project_id}/content")
     def project_content(

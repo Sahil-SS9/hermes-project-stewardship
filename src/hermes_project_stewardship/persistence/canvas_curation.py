@@ -71,10 +71,14 @@ class CanvasCurationService:
                     ("technical_plan", "Technical implementation plan"),
                 )
             ] if objects and not missing else [])
+        provider_id = getattr(self.provider, "provider_id", "provider-neutral")
+        model_id = getattr(self.provider, "model_id", "provider-neutral")
         for proposal in proposals:
             proposal.setdefault("requires_approval", True)
             proposal.setdefault("context_fingerprint", context_fingerprint)
             proposal.setdefault("source_object_ids", [o["id"] for o in objects])
+            proposal.setdefault("provider_id", provider_id)
+            proposal.setdefault("model_id", model_id)
         return {
             "canvas_revision": canvas.get("revision"),
             "status": "needs_clarification" if missing else "ready_for_review",

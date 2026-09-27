@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 30
+SCHEMA_VERSION = 31
 
 
 @dataclass(frozen=True)
@@ -1256,5 +1256,24 @@ MIGRATIONS: List[Migration] = [
         CREATE INDEX IF NOT EXISTS idx_canvas_proposals_project ON canvas_proposals(project_id);
         """,
         downgrade_sql="DROP INDEX IF EXISTS idx_canvas_proposals_project; DROP INDEX IF EXISTS idx_canvas_sessions_project; DROP TABLE IF EXISTS canvas_proposals; DROP TABLE IF EXISTS canvas_sessions;",
+    ),
+    Migration(
+        version=31,
+        name="batch p plan documents",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS canvas_plans (
+            plan_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            proposal_id TEXT,
+            canvas_revision INTEGER NOT NULL,
+            plan_json TEXT NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('draft','approved','documented')),
+            doc_content_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_canvas_plans_project ON canvas_plans(project_id);
+        """,
+        downgrade_sql="DROP INDEX IF EXISTS idx_canvas_plans_project; DROP TABLE IF EXISTS canvas_plans;",
     ),
 ]

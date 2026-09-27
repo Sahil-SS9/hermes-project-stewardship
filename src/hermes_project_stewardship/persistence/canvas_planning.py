@@ -9,32 +9,88 @@ from .canvas_curation import CanvasCurationService
 from .canvas_service import CanvasService
 from .store import Store, iso
 
+OUTCOME_ANSWER = "answer"
+OUTCOME_SKIP = "skip"
+OUTCOME_DEFER = "defer"
+OUTCOME_STOP = "stop"
+_OUTCOMES = {OUTCOME_ANSWER, OUTCOME_SKIP, OUTCOME_DEFER, OUTCOME_STOP}
+
 
 class CanvasPlanningService:
+    """Runs a clarify → propose → decide loop on top of the canvas.
+
+    The ledger is the source of truth for what has been answered: the
+    curation contract receives every prior answer (answer / skip) so an
+    explicitly resolved gap is never re-asked. A *defer* keeps a gap open,
+    so its question is re-presented when curation runs again. Proposals are
+    always scratch: deciding them never mutates the canvas.
+    """
+
     def __init__(self, store: Store, provider=None) -> None:
         self.store = store
         self.provider = provider
         self.canvas = CanvasService(store)
 
+    def _ledger_answers(self, project_id: str) -> list[dict[str, Any]]:
+        rows = self.store._conn.execute(
+            "SELECT answers_json FROM canvas_sessions WHERE project_id=? ORDER BY created_at",
+            (project_id,),
+        ).fetchall()
+        ledger: list[dict[str, Any]] = []
+        for row in rows:
+            try:
+                ledger.extend(json.loads(row["answers_json"]))
+            except (TypeError, ValueError):
+                continue
+        return ledger
+
+    def _session_at_revision(self, project_id: str, canvas_revision: int) -> dict[str, Any] | None:
+        rows = self.store._conn.execute(
+            "SELECT session_id FROM canvas_sessions WHERE project_id=? AND canvas_revision=? ORDER BY created_at",
+            (project_id, canvas_revision),
+        ).fetchall()
+        if not rows:
+            return None
+        return self.get(rows[-1]["session_id"])
+
     def start(self, project_id: str, *, actor: str) -> dict[str, Any]:
         current = self.canvas.get(project_id)
-        now = iso(self.store._clock())
-        session_id = "canvas-session-" + uuid.uuid4().hex[:16]
-        result = CanvasCurationService(self.provider).curate(current)
+        ledger = self._ledger_answers(project_id)
+        existing = self._session_at_revision(project_id, current["revision"])
+        result = CanvasCurationService(self.provider).curate(current, clarifications=ledger)
         questions = result.get("clarifying_questions", [])
         question = questions[0] if questions else None
         status = "active" if question else "complete"
+        if existing is not None:
+            # Same canvas revision: re-evaluate against the ledger instead of
+            # crashing on the UNIQUE(project_id, canvas_revision) constraint.
+            # Already-decided proposals stay decided — a re-run never
+            # resurrects a rejected proposal.
+            with self.store.tx() as cx:
+                cx.execute(
+                    "UPDATE canvas_sessions SET status=?, current_question_json=?, updated_at=? WHERE session_id=?",
+                    (status, json.dumps(question) if question else None, iso(self.store._clock()), existing["session_id"]),
+                )
+            if status == "complete" and not existing["proposals"]:
+                self._store_proposals(existing["session_id"], project_id, current["revision"], result)
+            return self.get(existing["session_id"])
+        session_id = "canvas-session-" + uuid.uuid4().hex[:16]
+        now = iso(self.store._clock())
         with self.store.tx() as cx:
             cx.execute(
                 "INSERT INTO canvas_sessions(session_id, project_id, canvas_revision, status, current_question_json, answers_json, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?)",
                 (session_id, project_id, current["revision"], status, json.dumps(question) if question else None, "[]", now, now),
             )
-            for proposal in result.get("proposals", []):
+        self._store_proposals(session_id, project_id, current["revision"], result)
+        return self.get(session_id)
+
+    def _store_proposals(self, session_id: str, project_id: str, canvas_revision: int, result: dict[str, Any]) -> None:
+        for proposal in result.get("proposals", []):
+            with self.store.tx() as cx:
                 cx.execute(
                     "INSERT INTO canvas_proposals(proposal_id, project_id, session_id, canvas_revision, proposal_json, status, created_at) VALUES(?,?,?,?,?,?,?)",
-                    ("canvas-proposal-" + uuid.uuid4().hex[:16], project_id, session_id, current["revision"], json.dumps(proposal, sort_keys=True), "pending", now),
+                    ("canvas-proposal-" + uuid.uuid4().hex[:16], project_id, session_id, canvas_revision, json.dumps(proposal, sort_keys=True), "pending", iso(self.store._clock())),
                 )
-        return self.get(session_id)
 
     def get(self, session_id: str) -> dict[str, Any]:
         row = self.store._conn.execute("SELECT * FROM canvas_sessions WHERE session_id=?", (session_id,)).fetchone()
@@ -44,15 +100,26 @@ class CanvasPlanningService:
         return {"session_id": row["session_id"], "project_id": row["project_id"], "canvas_revision": row["canvas_revision"], "status": row["status"], "current_question": json.loads(row["current_question_json"]) if row["current_question_json"] else None, "answers": json.loads(row["answers_json"]), "proposals": [{"proposal_id": p["proposal_id"], "status": p["status"], **json.loads(p["proposal_json"])} for p in proposals]}
 
     def answer(self, session_id: str, *, outcome: str, answer: str = "", actor: str) -> dict[str, Any]:
-        if outcome not in {"answer", "skip", "defer", "stop"}:
+        if outcome not in _OUTCOMES:
             raise ValueError("invalid clarification outcome")
         current = self.get(session_id)
         if current["status"] != "active":
             raise ValueError("canvas session is not active")
         answers = [*current["answers"], {"question": current["current_question"], "outcome": outcome, "answer": answer, "actor": actor}]
-        status = "stopped" if outcome == "stop" else "complete"
+        status = "stopped" if outcome == OUTCOME_STOP else "complete"
         with self.store.tx() as cx:
             cx.execute("UPDATE canvas_sessions SET status=?, current_question_json=NULL, answers_json=?, updated_at=? WHERE session_id=?", (status, json.dumps(answers, sort_keys=True), iso(self.store._clock()), session_id))
+        resolved = current.get("current_question")
+        if resolved and outcome in {OUTCOME_ANSWER, OUTCOME_SKIP}:
+            # The answer just closed the last open gap: run curation with the
+            # updated ledger so its proposals are waiting for review now,
+            # instead of hiding behind the next manual re-run.
+            canvas = self.canvas.get(current["project_id"])
+            result = CanvasCurationService(self.provider).curate(
+                canvas,
+                clarifications=self._ledger_answers(current["project_id"]),
+            )
+            self._store_proposals(session_id, current["project_id"], canvas["revision"], result)
         return self.get(session_id)
 
     def decide(self, proposal_id: str, *, approve: bool, actor: str) -> dict[str, Any]:

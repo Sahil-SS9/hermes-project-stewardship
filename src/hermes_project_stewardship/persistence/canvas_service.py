@@ -65,6 +65,7 @@ class CanvasService:
     @classmethod
     def _normalise_connectors(cls, connectors: list[dict[str, Any]], object_ids: set[str]) -> list[dict[str, Any]]:
         seen: set[str] = set()
+        triples: set[tuple[str, str, str]] = set()
         result: list[dict[str, Any]] = []
         for raw in connectors:
             if not isinstance(raw, dict):
@@ -79,6 +80,12 @@ class CanvasService:
                 raise ValueError("canvas connector references an unknown object")
             if meaning not in CONNECTOR_MEANINGS:
                 raise ValueError(f"unknown connector meaning: {meaning or '<empty>'}")
+            if source == target:
+                raise ValueError("canvas connectors cannot link an object to itself")
+            triple = (source, target, meaning)
+            if triple in triples:
+                raise ValueError(f"duplicate canvas connector: {source} -> {target} ({meaning}) already exists")
+            triples.add(triple)
             seen.add(edge_id)
             result.append({"id": edge_id, "source": source, "target": target, "meaning": meaning})
         return result
