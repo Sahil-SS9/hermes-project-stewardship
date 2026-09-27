@@ -19,16 +19,13 @@ test('real backend Kanban transition readback, audit actor and project isolation
   await page.locator('[data-tab="project"]').click();
   await page.locator('[data-project-view="board"]').click();
   const ref=(await get('/projects/payments-relaunch/work-items')).work_items.find(i=>i.title==='Verify payments-relaunch').ref;
-  // Drag is load-sensitive under the full suite (my journey test runs first and
-  // adds CPU pressure); retry a couple of times before declaring the drag failed
-  // rather than letting a single flaky drop mask a real regression.
-  let dragged=false;
-  for(let attempt=0;attempt<3 && !dragged;attempt++){
-    await page.locator(`[data-work-card="${ref}"]`).dragTo(page.locator('[data-board-column="active"]'));
-    await page.getByText('Work item moved to in progress.',{exact:true}).waitFor({timeout:5000}).catch(()=>{});
-    dragged=(await get('/projects/payments-relaunch/work-items')).work_items.find(i=>i.ref===ref).status==='in_progress';
-  }
-  assert.ok(dragged,'drag to in-progress (retried 3x)');
+  // The full suite runs heavier tests first (the batch-P journey), so the board
+  // may still be settling when this drag starts. Wait for the app to be idle
+  // (no in-flight fetches) before the single-shot drag — fixing the setup, not
+  // weakening the assertion.
+  await page.waitForLoadState('networkidle');
+  await page.locator(`[data-work-card="${ref}"]`).dragTo(page.locator('[data-board-column="active"]'));
+  await page.getByText('Work item moved to in progress.',{exact:true}).waitFor();
   assert.equal((await get('/projects/payments-relaunch/work-items')).work_items.find(i=>i.ref===ref).status,'in_progress');
   await page.getByRole('combobox',{name:`Move ${ref}`,exact:true}).selectOption('in_review');
   await page.locator(`[data-board-column="review"] [data-work-card="${ref}"]`).waitFor();

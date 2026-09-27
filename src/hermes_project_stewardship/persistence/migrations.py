@@ -10,7 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 31
+# v31 is reserved for Batch W (merges before this branch); canvas_plans is v32
+# and must be rebased onto W's v31 before merge (Sahil-approved 2026-09-27).
+SCHEMA_VERSION = 32
 
 
 @dataclass(frozen=True)
@@ -1258,7 +1260,7 @@ MIGRATIONS: List[Migration] = [
         downgrade_sql="DROP INDEX IF EXISTS idx_canvas_proposals_project; DROP INDEX IF EXISTS idx_canvas_sessions_project; DROP TABLE IF EXISTS canvas_proposals; DROP TABLE IF EXISTS canvas_sessions;",
     ),
     Migration(
-        version=31,
+        version=32,
         name="batch p plan documents",
         upgrade_sql="""
         CREATE TABLE IF NOT EXISTS canvas_plans (
