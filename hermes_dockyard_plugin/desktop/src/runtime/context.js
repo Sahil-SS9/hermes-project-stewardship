@@ -2,6 +2,7 @@
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 import { useEffect } from './react.js'
 import { DOCKYARD_CSS } from '../styles/dockyard-css.js'
+import { WORKFLOW_LIBRARY_CSS } from '../styles/workflow-css.js'
 import workflowCanvasCss from '../../workflow-canvas-css.js'
 export let _rest = null
 export let _os = null
@@ -68,6 +69,9 @@ export function useStylesheet(datasetKey, datasetValue, css) {
 
 export function useDockyardStyles() {
   useStylesheet('dockyard-style', 'dockyardStyle', DOCKYARD_CSS)
+  // W3/W4: workflow library + enablement styles (W-owned; appended here so
+  // dockyard-css.js does not grow, per the Batch W shared-file table).
+  useStylesheet('dy-wf-library-stylesheet', 'dyWfLibraryStylesheet', WORKFLOW_LIBRARY_CSS)
   // The workflow canvas owns a stylesheet of its own (the palette has exactly
   // one home: dashboard/src/workflow-canvas-css.ts). Its rules are scoped to
   // `.dy-wf-scope`, a class the canvas mount host carries itself, so this file

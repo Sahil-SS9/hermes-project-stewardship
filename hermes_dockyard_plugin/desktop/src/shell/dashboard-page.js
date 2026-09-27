@@ -24,6 +24,7 @@ import { TeamsView } from '../views/teams.js'
 // Teams is intentionally imported before Initiative for the legacy text probe.
 import { InitiativeView } from '../views/initiative.js'
 import { InboxView } from '../views/inbox.js'
+import { WorkflowLibraryView } from '../views/workflow-library.js'
 import { NotificationsView } from '../views/notifications.js'
 import { jsxs } from '../runtime/react.js'
 import { ConsoleBar } from '../lib/ui.js'
@@ -40,6 +41,7 @@ export function DashboardPage() {
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [toasts, setToasts] = useState([])
   const [data, setData] = useState(null)
+  const [libraryOpen, setLibraryOpen] = useState(false)
   const [error, setError] = useState(null)
   const [requestVersion, setRequestVersion] = useState(0)
   const [counts, setCounts] = useState({ approvals: null, notifications: null })
@@ -77,7 +79,9 @@ export function DashboardPage() {
       setLoadScope(nextLoadScope)
     }
     setError(null)
-    const loader = tab === 'dashboard'
+    const loader = tab === 'workflows-library'
+    ? async () => ({ workflows: (await api('/workflow-library')).workflows ?? [] })
+    : tab === 'dashboard'
       ? loadDashboardData
       : (tab === 'project' || tab === 'settings' || tab === 'workflows')
         ? () => loadProjectData(selectedProject)
@@ -244,11 +248,16 @@ export function DashboardPage() {
       onRefresh: refresh,
       notice: deepLinkNotice,
     }, `settings:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
+  } else if (tab === 'workflows' && libraryOpen) {
+    content = jsx(WorkflowLibraryView, {
+      onOpenBuilder: (row) => { setLibraryOpen(false); if (row) { setProjectEntryView('workflows') } refresh() },
+    }, 'workflow-library')
   } else if (tab === 'workflows') {
     content = jsx(ProjectDashboard, {
       view: payload,
       initialView: 'workflows',
       onSelectProject: selectProject,
+      onOpenLibrary: () => setLibraryOpen(true),
       onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
       onRefresh: refresh,
       notice: deepLinkNotice,

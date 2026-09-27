@@ -11,7 +11,7 @@ import { jsx } from '../runtime/react.js'
 import { StatusTag } from '../lib/ui.js'
 import { number } from '../lib/ui.js'
 import { Button } from '../lib/ui.js'
-export function ExecutableWorkflowsPanel({ project, workflows, onRefresh }) {
+export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary }) {
   const [name, setName] = useState('release')
   const [title, setTitle] = useState('Draft release plan')
   const [team, setTeam] = useState('')
@@ -134,6 +134,10 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh }) {
   const latest = runs[0]
   const liveCounts = latest ? (latest.nodes ?? []).reduce((acc, node) => { const key = node.status ?? 'pending'; acc[key] = (acc[key] ?? 0) + 1; return acc }, {}) : null
   return jsxs('section', { className: 'dockyard-feature-card dockyard-workflows-v6', 'data-workflows-prototype': project.id, 'data-executable-workflows': project.id, children: [
+    jsxs('div', { className: 'dockyard-wf-entry', 'data-workflow-library-entry': true, children: [
+      jsx(Button, { action: 'open-workflow-library', variant: 'primary', onClick: onOpenLibrary, children: 'Open workflow library' }),
+      jsx('span', { children: 'The library holds every workflow: global (available to all projects) and this project\'s dedicated ones.' }),
+    ]}),
     jsxs('header', { className: 'dockyard-section-head', children: [jsxs('div', { children: [jsx('h2', { children: 'Workflows' }), jsx('p', { children: 'Planning is saved as a version; execution is shown only from canonical runs.' })] }), jsx(StatusTag, { tone: latest?.status === 'running' ? 'info' : 'neutral', label: latest ? `Live: ${latest.status}` : `${number(grouped.length)} instances` })] }),
     error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
     jsxs('div', { className: 'dockyard-wf3', children: [

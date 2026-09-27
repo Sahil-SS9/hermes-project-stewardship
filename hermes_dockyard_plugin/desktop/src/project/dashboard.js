@@ -31,7 +31,7 @@ import { formatWhen } from '../lib/ui.js'
 import { FirstAssessmentCard } from '../views/dashboard.js'
 import { PageHead } from '../lib/ui.js'
 import { WorkItemDetail } from '../work-item/detail.js'
-export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView }) {
+export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary }) {
   const [projectView, setProjectView] = useState(initialView || 'overview')
   const [selectedWorkItem, setSelectedWorkItem] = useState(null)
   const [workNotice, setWorkNotice] = useState(null)
@@ -179,7 +179,7 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
   } else if (projectView === 'planning') {
     panel = jsx(PlanningCanvasPanel, { project, canvas: view.canvas, content: view.content ?? [], onRefresh }, project.id)
   } else if (projectView === 'workflows') {
-    panel = jsx(ExecutableWorkflowsPanel, { project, workflows: view.workflows ?? [], onRefresh }, project.id)
+    panel = jsx(ExecutableWorkflowsPanel, { project, workflows: view.workflows ?? [], onRefresh, onOpenLibrary }, project.id)
   } else if (projectView === 'content') {
     panel = jsx(ProjectContentPanel, { project, content: view.content ?? [], onRefresh }, project.id)
   } else if (projectView === 'activity') {

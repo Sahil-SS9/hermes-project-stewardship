@@ -33,6 +33,8 @@ const days = (n) => new Date(Date.now() + n * 86400000).toISOString();
 function seed() {
   return {
     calls: [],
+    library: [],
+    enablement: {},
     dashboard: {
       projects: [
         { id: 'payments-relaunch', enabled: true, phase: 'active', health: 'watch', work: { backlog: 1, active: 2, done: 1, blocked: 1 }, unacked_notifications: 1 },
@@ -256,6 +258,62 @@ function route(method, path, query, body) {
   if (path.endsWith('/events')) return { events: [] };
   if (path.endsWith('/milestones')) return { milestones: [] };
   if (path.endsWith('/workflows')) return { workflows: [] };
+  if (path === '/workflow-library' && method === 'GET') {
+    const scope = query.get('scope');
+    return { workflows: (data.library ?? []).filter((row) => !scope || row.scope === scope) };
+  }
+  if (path === '/workflow-library' && method === 'POST') {
+    const row = { scope: body?.scope ?? 'global', name: body?.name ?? 'workflow', version: 1,
+      definition: { nodes: body?.nodes ?? [] }, owner_project_id: null, archived_at: null };
+    (data.library ??= []).unshift(row); return row;
+  }
+  const libraryArchive = path.match(/^\/workflow-library\/([^/]+)\/([^/]+)\/archive$/);
+  if (method === 'POST' && libraryArchive) {
+    const row = (data.library ?? []).find((item) => item.scope === decodeURIComponent(libraryArchive[1])
+      && item.name === decodeURIComponent(libraryArchive[2]));
+    if (!row) throw Object.assign(new Error('workflow was not found'), { status: 404 });
+    row.archived_at = new Date().toISOString(); return row;
+  }
+  const libraryRestore = path.match(/^\/workflow-library\/([^/]+)\/([^/]+)\/restore$/);
+  if (method === 'POST' && libraryRestore) {
+    const row = (data.library ?? []).find((item) => item.scope === decodeURIComponent(libraryRestore[1])
+      && item.name === decodeURIComponent(libraryRestore[2]));
+    if (!row) throw Object.assign(new Error('workflow was not found'), { status: 404 });
+    row.archived_at = null; return row;
+  }
+  const libraryDelete = path.match(/^\/workflow-library\/([^/]+)\/([^/]+)$/);
+  if (method === 'DELETE' && libraryDelete) {
+    const scope = decodeURIComponent(libraryDelete[1]); const name = decodeURIComponent(libraryDelete[2]);
+    const before = (data.library ?? []).length;
+    data.library = (data.library ?? []).filter((item) => !(item.scope === scope && item.name === name));
+    if (data.library.length === before) throw Object.assign(new Error('workflow was not found'), { status: 404 });
+    return { scope, name, deleted: true };
+  }
+  const enableMatch = path.match(/^\/projects\/([^/]+)\/workflows\/(global|project)\/([^/]+)\/enablement$/);
+  if (method === 'PUT' && enableMatch) {
+    const pid = decodeURIComponent(enableMatch[1]); const scope = enableMatch[2];
+    const name = decodeURIComponent(enableMatch[3]);
+    const key = `${pid}:${scope}:${name}`;
+    const row = { project_id: pid, scope, name, enabled: Boolean(body?.enabled), updated_at: new Date().toISOString() };
+    data.enablement[key] = row; return row;
+  }
+  const scopedStartMatch = path.match(/^\/projects\/([^/]+)\/workflows\/(global|project)\/([^/]+)\/start$/);
+  if (method === 'POST' && scopedStartMatch) {
+    const pid = decodeURIComponent(scopedStartMatch[1]); const scope = scopedStartMatch[2];
+    const name = decodeURIComponent(scopedStartMatch[3]);
+    if (!(data.enablement[`${pid}:${scope}:${name}`]?.enabled)) {
+      throw Object.assign(new Error(`workflow is disabled for this project (run refused)`), { status: 409 });
+    }
+    return { project_id: pid, name, scope, run_key: body?.run_key, status: 'pending', tasks: {} };
+  }
+  const availableMatch = path.match(/^\/projects\/([^/]+)\/workflows\/available$/);
+  if (method === 'GET' && availableMatch) {
+    const pid = decodeURIComponent(availableMatch[1]);
+    const state = (row) => data.enablement[`${pid}:${row.scope}:${row.name}`]?.enabled ?? row.scope === 'project';
+    const rows = (data.library ?? []).filter((row) => row.scope === 'global' || row.owner_project_id === pid)
+      .map((row) => ({ ...row, enabled: state(row) }));
+    return { workflows: rows };
+  }
 
   const evaluateMatch = path.match(/^\/projects\/([^/]+)\/objectives\/(\d+)\/evaluate$/);
   if (method === 'POST' && evaluateMatch) {
