@@ -2598,7 +2598,7 @@ async function api(path, init) {
     return result;
   } catch (error) {
     const raw = String(error?.message ?? error).slice(0, 240);
-    const message = /(?:error\s*)?500|internal service error/i.test(raw) ? "Dockyard could not confirm the request." : raw;
+    const message = /^403:\s*\[object Object\]$/.test(raw) && /^\/projects\/[^/]+\/workflows\/[^/]+\/archive$/.test(path) ? "403 Forbidden: archive permission (project_archive) is required or this action is denied. No change was made." : /(?:error\s*)?500|internal service error/i.test(raw) ? "Dockyard could not confirm the request." : raw;
     if (method !== "GET" && !init?.suppressErrorToast) emitToast("danger", message);
     const failure = new Error(message);
     failure.cause = error;
