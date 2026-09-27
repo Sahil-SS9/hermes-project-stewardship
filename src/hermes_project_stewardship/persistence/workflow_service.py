@@ -318,7 +318,8 @@ class WorkflowService:
 
     # ---- definition versions -----------------------------------------
 
-    def define(self, project_id: str, name: str, definition: Mapping[str, Any]) -> dict[str, Any]:
+    def define(self, project_id: str, name: str, definition: Mapping[str, Any], *,
+               actor: str = "system", interface: str = "service") -> dict[str, Any]:
         clean_name = str(name or "").strip()
         if not clean_name:
             raise ValueError("workflow name is required")
@@ -343,6 +344,8 @@ class WorkflowService:
                 (project_id, clean_name, version, json.dumps(clean, sort_keys=True),
                  iso(self.store._clock())),
             )
+        self.store.audit(actor=actor, interface=interface, action="workflow.defined",
+                         subject=f"{project_id}:{clean_name}:v{version}")
         return {"project_id": project_id, "name": clean_name,
                 "version": version, "definition": clean}
 
@@ -613,6 +616,13 @@ class WorkflowService:
             raise ValueError("workflow was not found")
         if row["archived_at"] is not None:
             raise ValueError("workflow is archived; restore it before starting a run")
+        choice = self.store._conn.execute(
+            "SELECT enabled FROM dockyard_workflow_enablement WHERE "
+            "project_id=? AND scope='project' AND workflow_name=?",
+            (project_id, name),
+        ).fetchone()
+        if choice is not None and not choice["enabled"]:
+            raise ValueError("workflow is disabled for this project")
         existing = self.store._conn.execute(
             "SELECT result_json,status FROM dockyard_workflow_runs WHERE project_id=? AND name=? "
             "AND version=? AND run_key=?",
@@ -700,8 +710,11 @@ class WorkflowService:
             "node_states": states,
             "iterations": iterations,
         }
-        return self._finish_run(project_id, name, row["version"], key, result,
-                                status="pending")
+        finished = self._finish_run(project_id, name, row["version"], key, result,
+                                    status="pending")
+        self.store.audit(actor="system", interface="service", action="workflow.started",
+                         subject=f"{project_id}:{name}:{key}")
+        return finished
 
     def _materialise_node(self, project_id: str, name: str, version: int, run_key: str,
                           node: Mapping[str, Any], *, iteration: int | None) -> dict[str, Any]:

@@ -2137,7 +2137,8 @@ def create_app(
         except KanbanAdapterError as exc:
             _raise_work_error(exc)
         except ValueError as exc:
-            raise HTTPException(409 if "archived" in str(exc) else 422, str(exc)) from None
+            raise HTTPException(409 if any(word in str(exc) for word in ("archived", "disabled"))
+                                else 422, str(exc)) from None
 
     @router.get("/projects/{project_id}/workflows/{name}/runs")
     def list_workflow_runs(project_id: str, name: str):
