@@ -11,12 +11,13 @@ const output = join(dir, '..', '..', 'desktop', 'lucide-icons.js');
 const names = [
   'activity', 'arrow-down-wide-narrow', 'arrow-up-down', 'arrow-up-narrow-wide',
   'arrow-up-right', 'bell', 'bug', 'calendar', 'check', 'chevron-down',
-  'chevron-right', 'circle-check', 'clock-3', 'copy', 'download', 'eye',
+  'chevron-right', 'circle-check', 'clock-3', 'copy', 'copy-plus', 'download', 'eye',
   'file-text', 'filter', 'flag', 'folder-kanban', 'folder-open', 'folders',
-  'history', 'layers', 'layout-dashboard', 'link', 'list-checks',
-  'list-filter', 'message-square', 'paperclip', 'pencil', 'rotate-cw',
-  'search', 'shield-alert', 'square-check-big', 'sticky-note', 'target',
-  'triangle-alert', 'upload', 'user', 'workflow', 'x', 'zap',
+  'history', 'image', 'layers', 'layout-dashboard', 'lightbulb', 'link', 'list-checks',
+  'list-filter', 'message-square', 'notebook', 'paperclip', 'pencil', 'redo-2',
+  'rotate-cw', 'scroll-text', 'search', 'shield-alert', 'square-check-big',
+  'square-dashed', 'sticky-note', 'target', 'triangle-alert', 'undo-2',
+  'upload', 'user', 'workflow', 'x', 'zap',
 ];
 const tags = new Set(['path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse']);
 const attribute = (name) => name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());

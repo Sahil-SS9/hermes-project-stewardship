@@ -11,10 +11,17 @@ import { layoutConnectors } from '../../planning-canvas-geometry.js'
 import { jsx } from '../runtime/react.js'
 import { layoutFrames } from '../../planning-canvas-geometry.js'
 import { jsxs } from '../runtime/react.js'
-import { Button } from '../lib/ui.js'
+import { Button, Icon } from '../lib/ui.js'
 export const CANVAS_OBJECT_KINDS = Object.freeze(['evidence', 'claim', 'question', 'decision', 'plan_block', 'note', 'link', 'media'])
 export const CANVAS_CONNECTOR_MEANINGS = Object.freeze(['supports', 'contradicts', 'derived_from', 'clarifies', 'depends_on', 'implements', 'raises_question'])
 export const CANVAS_KIND_LABELS = Object.freeze({ evidence: 'Evidence', claim: 'Claim', question: 'Question', decision: 'Decision', plan_block: 'Plan block', note: 'Note', link: 'Link', media: 'Media' })
+// D-P1 a11y: each kind carries its own Lucide icon so it is never identified
+// by colour alone. Names must exist in the generated lucide-icons.js subset.
+export const CANVAS_KIND_ICONS = Object.freeze({
+  evidence: 'file-text', claim: 'message-square', question: 'lightbulb',
+  decision: 'flag', plan_block: 'list-checks', note: 'sticky-note',
+  link: 'link', media: 'image',
+})
 export const CANVAS_MEANING_LABELS = Object.freeze({ supports: 'supports', contradicts: 'contradicts', derived_from: 'derived from', clarifies: 'clarifies', depends_on: 'depends on', implements: 'implements', raises_question: 'raises a question' })
 export const CANVAS_WORLD = Object.freeze({ width: 2000, height: 1400 })
 export const CANVAS_CARD = Object.freeze({ width: 240, height: 140 })
@@ -44,6 +51,23 @@ export const canvasPlaced = (objects) => {
   }
   return { x: 60, y: 60 }
 }
+// Signed-v1 de-overlap on drop: push a dropped card out of every card it
+// overlaps, deterministically (rightward only, resolved against each hit).
+export const canvasDeOverlap = (objects, movedId) => {
+  const moved = objects.find((item) => item.id === movedId)
+  if (!moved) return objects
+  const rect = canvasRect(moved)
+  let x = rect.x
+  const y = rect.y
+  const others = objects.filter((item) => item.id !== movedId).map(canvasRect)
+  for (let guard = 0; guard < 64; guard += 1) {
+    const hit = others.find((other) => x < other.x + other.width && x + rect.width > other.x && y < other.y + other.height && y + rect.height > other.y)
+    if (!hit) break
+    x = hit.x + hit.width + 20
+  }
+  if (x === rect.x) return objects
+  return objects.map((item) => item.id === movedId ? { ...item, x } : item)
+}
 
 export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onRefresh }) {
   const [canvas, setCanvas] = useState(initialCanvas ?? null)
@@ -55,6 +79,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   const [mode, setMode] = useState('select')
   const [pendingConnect, setPendingConnect] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
+  const [selectedIds, setSelectedIds] = useState([])
   const [drawerText, setDrawerText] = useState('')
   const [drawerKind, setDrawerKind] = useState('note')
   const [linkSource, setLinkSource] = useState('')
@@ -68,14 +93,73 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   const [review, setReview] = useState(null)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState(null)
+  // Signed-v1 undo/redo: a bounded scratch history of object/connector
+  // snapshots taken before each board edit. Client-side edit aid only; the
+  // server revision only moves through Save.
+  const [history, setHistory] = useState([])
+  const [future, setFuture] = useState([])
+  const [marquee, setMarquee] = useState(null)
+  const [chatDraft, setChatDraft] = useState('')
+  const [chatLog, setChatLog] = useState([])
+  const [chatBusy, setChatBusy] = useState(false)
+  const [planPanel, setPlanPanel] = useState(null)
+  const [planBusy, setPlanBusy] = useState(false)
+  const [backlogConfirm, setBacklogConfirm] = useState(null)
   const stageRef = useRef(null)
   const encoded = encodeURIComponent(project.id)
   const revision = Number(canvas?.revision ?? 0)
   useEffect(() => {
     const next = initialCanvas ?? { revision: 0, objects: [], connectors: [] }
     setCanvas(next); setObjects(next.objects ?? []); setConnectors(next.connectors ?? []); setDirty(false)
+    setHistory([]); setFuture([]); setSelectedIds([]); setSelectedId(null)
   }, [initialCanvas])
   const selected = objects.find((item) => item.id === selectedId) ?? null
+  const snapshot = (currentObjects, currentConnectors) => ({ objects: currentObjects.map((row) => ({ ...row })), connectors: currentConnectors.map((row) => ({ ...row })) })
+  const undo = () => {
+    setHistory((current) => {
+      if (!current.length) return current
+      const before = current[current.length - 1]
+      setFuture((next) => [...next, snapshot(objects, connectors)])
+      setObjects(before.objects); setConnectors(before.connectors); setDirty(true)
+      return current.slice(0, -1)
+    })
+  }
+  const redo = () => {
+    setFuture((current) => {
+      if (!current.length) return current
+      const after = current[current.length - 1]
+      setHistory((next) => [...next, snapshot(objects, connectors)])
+      setObjects(after.objects); setConnectors(after.connectors); setDirty(true)
+      return current.slice(0, -1)
+    })
+  }
+  const duplicateSelection = () => {
+    const ids = selectedIds.length ? selectedIds : (selectedId ? [selectedId] : [])
+    if (!ids.length) return
+    const before = snapshot(objects, connectors)
+    const stamp = Date.now()
+    setObjects((current) => {
+      const next = [...current]
+      ids.forEach((id) => {
+        const origin = current.find((row) => row.id === id)
+        if (!origin) return
+        canvasObjectSeq += 1
+        const rect = canvasRect(origin)
+        next.push({
+          ...origin,
+          id: `canvas-obj-${stamp}-${canvasObjectSeq}`,
+          content: { ...(origin.content ?? {}) },
+          tags: [...(origin.tags ?? [])],
+          x: canvasClamp(rect.x + 24, CANVAS_MIN_POS.x, CANVAS_WORLD.width - CANVAS_CARD.width - CANVAS_MIN_POS.x),
+          y: canvasClamp(rect.y + 24, CANVAS_MIN_POS.y, CANVAS_WORLD.height - CANVAS_CARD.height - CANVAS_MIN_POS.y),
+        })
+      })
+      return next
+    })
+    setHistory((current) => [...current.slice(-49), before]); setFuture([])
+    setDirty(true)
+    setNotice({ tone: 'ok', text: `Duplicated ${ids.length} object(s) — Save canvas to persist the copies.` })
+  }
   const persistableObjects = () => objects.map((item) => ({
     id: item.id, kind: item.kind, content: item.content ?? { text: canvasText(item) },
     x: canvasNumber(item.x), y: canvasNumber(item.y),
@@ -95,7 +179,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
       const fresh = await api(`/projects/${encoded}/canvas`)
       const discarded = dirty
       setCanvas(fresh); setObjects(fresh.objects ?? []); setConnectors(fresh.connectors ?? [])
-      setDirty(false); setSelectedId(null)
+      setDirty(false); setSelectedId(null); setHistory([]); setFuture([]); setSelectedIds([])
       setNotice(discarded
         ? { tone: 'danger', text: `Canvas reloaded at revision ${fresh.revision} — unsaved edits were discarded, not applied.` }
         : { tone: 'ok', text: `Canvas reloaded at revision ${fresh.revision}.` })
@@ -130,6 +214,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   const addObject = (objectKind, text) => {
     const body = String(text ?? '').trim()
     if (!body) return null
+    const before = snapshot(objects, connectors)
     const position = canvasPlaced(objects)
     canvasObjectSeq += 1
     const item = {
@@ -138,6 +223,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
       tags: [], evidence_ref: null, work_ref: null,
     }
     setObjects((current) => [...current, item])
+    setHistory((current) => [...current.slice(-49), before]); setFuture([])
     setDirty(true)
     setNotice({ tone: 'ok', text: `${CANVAS_KIND_LABELS[objectKind] ?? objectKind} added as scratch — Save canvas to persist it.` })
     return item
@@ -155,12 +241,15 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     if (!selected) return
     const text = drawerText.trim()
     if (!text) return
+    const before = snapshot(objects, connectors)
     setObjects((current) => current.map((item) => item.id === selected.id ? { ...item, kind: drawerKind, content: { ...(item.content ?? {}), text } } : item))
+    setHistory((current) => [...current.slice(-49), before]); setFuture([])
     setDirty(true)
     setNotice({ tone: 'ok', text: 'Object updated — Save canvas to persist the change.' })
   }
   const removeSelected = async () => {
     if (!selected) return
+    const before = snapshot(objects, connectors)
     const persistable = new Set((canvas?.objects ?? []).map((row) => row.id))
     // A persisted object with no other unsaved work goes through the real
     // DELETE route (revision bumped server-side). Anything else is removed
@@ -170,6 +259,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
       const removedId = selected.id
       setObjects((current) => current.filter((row) => row.id !== removedId))
       setConnectors((current) => current.filter((edge) => edge.source !== removedId && edge.target !== removedId))
+      setHistory((current) => [...current.slice(-49), before]); setFuture([])
       setDirty(true); setSelectedId(null)
       setNotice({ tone: 'ok', text: wasPersisted ? 'Removed locally — Save canvas to persist the removal.' : 'Scratch object removed — it was never saved.' })
       return
@@ -192,8 +282,10 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
       setNotice({ tone: 'danger', text: `Already linked: these two objects already carry a "${meaning}" connector.` })
       return
     }
+    const before = snapshot(objects, connectors)
     canvasEdgeSeq += 1
     setConnectors((current) => [...current, { id: `canvas-edge-${Date.now()}-${canvasEdgeSeq}`, source, target, meaning }])
+    setHistory((current) => [...current.slice(-49), before]); setFuture([])
     setDirty(true)
     setNotice({ tone: 'ok', text: `Connector added (${CANVAS_MEANING_LABELS[meaning] ?? meaning}) — Save canvas to persist it.` })
   }
@@ -220,7 +312,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
       setObjects((current) => current.map((row) => row.id === item.id ? {
         ...row,
         x: canvasClamp(origin.x + dx / zoom, CANVAS_MIN_POS.x, CANVAS_WORLD.width - CANVAS_CARD.width - CANVAS_MIN_POS.x),
-        y: canvasClamp(origin.y + dy / zoom, CANVAS_MIN_POS.y, CANVAS_WORLD.height - CANVAS_CARD.height - CANVAS_MIN_POS.x),
+        y: canvasClamp(origin.y + dy / zoom, CANVAS_MIN_POS.y, CANVAS_WORLD.height - CANVAS_CARD.height - CANVAS_MIN_POS.y),
       } : row))
       setDirty(true)
     }
@@ -229,26 +321,70 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
       document.removeEventListener('pointerup', finish)
       // Drag moves the card; a click (no travel) opens the drawer instead, so
       // the drawer can never cover the drop target mid-gesture.
-      if (moved) setNotice({ tone: 'ok', text: 'Moved — Save canvas to persist the new position.' })
+      if (moved) {
+        // Signed v1: de-overlap on drop, then state the save intent.
+        setObjects((current) => canvasDeOverlap(current, item.id))
+        setNotice({ tone: 'ok', text: 'Moved — Save canvas to persist the new position.' })
+      }
       else openDrawer(item)
     }
     document.addEventListener('pointermove', move)
     document.addEventListener('pointerup', finish)
   }
+  // Drag on empty stage = marquee multi-select (signed v1). A click (no
+  // travel) clears the selection as before. Panning keeps its drag gesture in
+  // connect mode; in select mode pan happens through zoom/fit controls.
   const beginPan = (event) => {
     if (event.button !== 0) return
     const target = event.target
     if (target?.closest?.('.dy-pc-obj') || target?.closest?.('.dy-pc-drawer') || target?.closest?.('.dy-pc-chat')) return
+    const stageBox = stageRef.current?.getBoundingClientRect()
+    if (!stageBox) return
     const startX = event.clientX
     const startY = event.clientY
-    const origin = { x: pan.x, y: pan.y }
+    const originPan = { x: pan.x, y: pan.y }
     let moved = false
+    if (mode === 'select') {
+      const band = { x: startX - stageBox.x, y: startY - stageBox.y, width: 0, height: 0 }
+      const marqueeMove = (moveEvent) => {
+        const dx = moveEvent.clientX - startX
+        const dy = moveEvent.clientY - startY
+        if (!moved && Math.abs(dx) <= 3 && Math.abs(dy) <= 3) return
+        moved = true
+        band.x = dx < 0 ? startX - stageBox.x + dx : startX - stageBox.x
+        band.y = dy < 0 ? startY - stageBox.y + dy : startY - stageBox.y
+        band.width = Math.abs(dx)
+        band.height = Math.abs(dy)
+        setMarquee({ ...band })
+      }
+      const marqueeFinish = (moveEvent) => {
+        document.removeEventListener('pointermove', marqueeMove)
+        document.removeEventListener('pointerup', marqueeFinish)
+        setMarquee(null)
+        if (!moved) { setSelectedId(null); setPendingConnect(null); setSelectedIds([]); return }
+        const scale = zoom
+        const x1 = (Math.min(startX, moveEvent.clientX) - stageBox.x - pan.x) / scale
+        const y1 = (Math.min(startY, moveEvent.clientY) - stageBox.y - pan.y) / scale
+        const x2 = (Math.max(startX, moveEvent.clientX) - stageBox.x - pan.x) / scale
+        const y2 = (Math.max(startY, moveEvent.clientY) - stageBox.y - pan.y) / scale
+        const hits = []
+        objects.forEach((row) => {
+          const rect = canvasRect(row)
+          if (rect.x < x2 && rect.x + rect.width > x1 && rect.y < y2 && rect.y + rect.height > y1) hits.push(row.id)
+        })
+        setSelectedIds(hits)
+        if (hits.length) setNotice({ tone: 'ok', text: `Marquee selected ${hits.length} object(s).` })
+      }
+      document.addEventListener('pointermove', marqueeMove)
+      document.addEventListener('pointerup', marqueeFinish)
+      return
+    }
     const move = (moveEvent) => {
       const dx = moveEvent.clientX - startX
       const dy = moveEvent.clientY - startY
       if (!moved && Math.abs(dx) <= 3 && Math.abs(dy) <= 3) return
       moved = true
-      setPan({ x: origin.x + dx, y: origin.y + dy })
+      setPan({ x: originPan.x + dx, y: originPan.y + dy })
     }
     const finish = () => {
       document.removeEventListener('pointermove', move)
@@ -275,12 +411,39 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   // Tidy is a deterministic grid, not a layout engine: it only rewrites
   // positions and still needs the save that follows any other edit.
   const tidy = () => {
+    const before = snapshot(objects, connectors)
     setObjects((current) => current.map((item, index) => ({ ...item, ...gridSlot(index, 3) })))
+    setHistory((current) => [...current.slice(-49), before]); setFuture([])
     setDirty(true)
     setNotice({ tone: 'ok', text: 'Tidied into a grid — Save canvas to persist the new positions.' })
   }
+  // Full keyboard support (signed v1): Del removes, Ctrl/Cmd+Z undo,
+  // Ctrl/Cmd+Shift+Z or Ctrl+Y redo, Ctrl/Cmd+D duplicate, Escape clears.
+  const onStageKeyDown = (event) => {
+    const key = event.key
+    const meta = event.ctrlKey || event.metaKey
+    if (key === 'Escape') { setSelectedId(null); setSelectedIds([]); setPendingConnect(null); return }
+    if (meta && key.toLowerCase() === 'z') {
+      event.preventDefault()
+      if (event.shiftKey) redo(); else undo()
+      return
+    }
+    if (meta && key.toLowerCase() === 'y') { event.preventDefault(); redo(); return }
+    if (meta && key.toLowerCase() === 'd') { event.preventDefault(); duplicateSelection(); return }
+    if (key === 'Delete' || key === 'Backspace') {
+      const ids = selectedIds.length ? selectedIds : (selectedId ? [selectedId] : [])
+      if (!ids.length) return
+      event.preventDefault()
+      const before = snapshot(objects, connectors)
+      setObjects((current) => current.filter((row) => !ids.includes(row.id)))
+      setConnectors((current) => current.filter((edge) => !ids.includes(edge.source) && !ids.includes(edge.target)))
+      setHistory((current) => [...current.slice(-49), before]); setFuture([])
+      setDirty(true); setSelectedId(null); setSelectedIds([])
+      setNotice({ tone: 'ok', text: `Removed ${ids.length} object(s) locally — Save canvas to persist.` })
+    }
+  }
   const curate = async () => {
-    setBusy(true); setChatOpen(true)
+    setBusy(true); setChatOpen(true); setChatBusy(true)
     try {
       const result = await api(`/projects/${encoded}/canvas/sessions`, { method: 'POST', body: {} })
       setSession(result)
@@ -289,7 +452,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
         ? { tone: 'ok', text: `Question: ${result.current_question.question}` }
         : { tone: 'ok', text: `${number(proposals)} proposal(s) ready for review — nothing is applied automatically.` })
     } catch (failure) { setNotice({ tone: 'danger', text: `Curation failed: ${String(failure?.message ?? failure)}` }) }
-    setBusy(false)
+    setBusy(false); setChatBusy(false)
   }
   const reviewCanvas = async () => {
     setBusy(true); setChatOpen(true)
@@ -315,6 +478,20 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     } catch (failure) { setNotice({ tone: 'danger', text: `Answer failed: ${String(failure?.message ?? failure)}` }) }
     setBusy(false)
   }
+  // The docked assistant chat: Enter sends, Shift+Enter newline, Stop
+  // interrupts a pending ask. The log is real state, never simulated replies.
+  const sendChat = async () => {
+    const text = chatDraft.trim()
+    if (!text || chatBusy) return
+    setChatLog((current) => [...current, { role: 'me', text }])
+    setChatDraft('')
+    await curate()
+  }
+  const stopChat = () => {
+    setChatBusy(false)
+    setBusy(false)
+    setNotice({ tone: 'ok', text: 'Assistant stopped — nothing runs after Stop.' })
+  }
   const decideProposal = async (proposal, approve) => {
     setBusy(true)
     try {
@@ -332,6 +509,41 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
       setNotice({ tone: 'ok', text: `Proposal ${result.status} — recorded only; the canvas is unchanged until you save an edit.` })
     } catch (failure) { setNotice({ tone: 'danger', text: `Decision failed: ${String(failure?.message ?? failure)}` }) }
     setBusy(false)
+  }
+  // Plan synthesis (NEW-3): from an APPROVED technical_plan proposal only.
+  const synthesizePlan = async (proposal) => {
+    setPlanBusy(true)
+    try {
+      const plan = await api(`/canvas/proposals/${encodeURIComponent(proposal.proposal_id)}/plan`, { method: 'POST', body: { project_id: project.id }, suppressErrorToast: true })
+      setPlanPanel(plan)
+      setNotice({ tone: 'ok', text: `Plan drafted from the approved proposal — ${number((plan.steps ?? []).length)} step(s), nothing applied to the board.` })
+    } catch (failure) {
+      setPlanPanel(null)
+      setNotice({ tone: 'danger', text: `Plan synthesis failed: ${String(failure?.message ?? failure)}` })
+    }
+    setPlanBusy(false)
+  }
+  const savePlanDocument = async () => {
+    if (!planPanel?.plan_id) return
+    setPlanBusy(true)
+    try {
+      const saved = await api(`/projects/${encoded}/plans/${encodeURIComponent(planPanel.plan_id)}/document/save`, { method: 'POST', body: {} })
+      setPlanPanel((current) => ({ ...(current ?? {}), ...saved }))
+      setNotice({ tone: 'ok', text: 'Implementation document saved to the Content tab as Markdown.' })
+      onRefresh?.()
+    } catch (failure) { setNotice({ tone: 'danger', text: `Document save failed: ${String(failure?.message ?? failure)}` }) }
+    setPlanBusy(false)
+  }
+  const createBacklogItems = async () => {
+    if (!planPanel?.plan_id || !backlogConfirm?.length) return
+    setPlanBusy(true)
+    try {
+      const result = await api(`/projects/${encoded}/plans/${encodeURIComponent(planPanel.plan_id)}/backlog`, { method: 'POST', body: { step_orders: backlogConfirm } })
+      setNotice({ tone: 'ok', text: `${number((result.created ?? []).length)} backlog item(s) created through the canonical work endpoints.` })
+      setBacklogConfirm(null)
+      onRefresh?.()
+    } catch (failure) { setNotice({ tone: 'danger', text: `Backlog creation failed: ${String(failure?.message ?? failure)}` }) }
+    setPlanBusy(false)
   }
   const renderConnectors = () => {
     const byId = new Map(objects.map((item) => [item.id, item]))
@@ -361,18 +573,21 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     const rect = canvasRect(item)
     const tag = (Array.isArray(item.tags) ? item.tags : [])[0]
     const label = CANVAS_KIND_LABELS[item.kind] ?? item.kind
+    const multiSelected = selectedIds.includes(item.id)
     return jsxs('button', {
       type: 'button',
-      className: `dy-pc-obj${selectedId === item.id ? ' selected' : ''}${pendingConnect === item.id ? ' pending' : ''}`,
+      className: `dy-pc-obj${selectedId === item.id ? ' selected' : ''}${pendingConnect === item.id ? ' pending' : ''}${multiSelected ? ' marquee-selected' : ''}`,
       'data-canvas-object': item.id,
       'data-canvas-kind': item.kind,
       'data-canvas-x': String(Math.round(rect.x)),
       'data-canvas-y': String(Math.round(rect.y)),
-      style: { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px` },
+      style: { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` },
+      'data-canvas-height': String(Math.round(rect.height)),
       'aria-label': `${label}: ${canvasText(item) || 'untitled'}`,
       onPointerDown: (event) => beginObjectDrag(event, item),
       children: [
-        jsx('small', { children: tag ? `${label} · ${tag}` : label }),
+        jsx('small', { children: `${label}${tag ? ` · ${tag}` : ''}` }),
+        jsx('span', { className: 'dy-pc-obj-kind-icon', 'aria-hidden': true, children: jsx(Icon, { name: CANVAS_KIND_ICONS[item.kind] ?? 'sticky-note' }) }),
         jsx('strong', { children: canvasText(item) || 'Untitled object' }),
         jsx('span', { className: 'dy-pc-obj-meta', children: `${item.evidence_ref ? `evidence ${item.evidence_ref}` : 'no evidence reference'}${item.work_ref ? ` · work ${item.work_ref}` : ''}` }),
       ],
@@ -404,7 +619,9 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
             jsx(Button, { small: true, action: 'dismiss-canvas-proposal', disabled: busy, onClick: () => decideProposal(proposal, false), children: 'Dismiss' }),
             jsx(Button, { small: true, variant: 'primary', action: 'approve-canvas-proposal', disabled: busy, onClick: () => decideProposal(proposal, true), children: 'Approve' }),
           ]})
-        : jsx('small', { children: 'Decision recorded — this proposal can no longer be decided again.' }),
+        : status === 'approved' && proposal.kind === 'technical_plan'
+          ? jsx(Button, { small: true, action: 'plan-from-proposal', disabled: planBusy, onClick: () => synthesizePlan(proposal), children: 'Plan from proposal' })
+          : jsx('small', { children: 'Decision recorded — this proposal can no longer be decided again.' }),
     ]}, proposal.proposal_id)
   })
   return jsxs('section', {
@@ -427,6 +644,9 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
             jsx(Button, { small: true, variant: mode === 'select' ? 'primary' : '', action: 'pc-mode-select', onClick: () => { setMode('select'); setPendingConnect(null) }, children: 'Select' }),
             jsx(Button, { small: true, variant: mode === 'connect' ? 'primary' : '', action: 'pc-mode-connect', onClick: () => { setMode('connect'); setPendingConnect(null) }, children: 'Connect' }),
           ]}),
+          jsx(Button, { small: true, action: 'pc-undo', disabled: !history.length, onClick: undo, children: 'Undo' }),
+          jsx(Button, { small: true, action: 'pc-redo', disabled: !future.length, onClick: redo, children: 'Redo' }),
+          jsx(Button, { small: true, action: 'pc-duplicate', disabled: !(selectedIds.length || selectedId), onClick: duplicateSelection, children: 'Duplicate' }),
           jsx('span', { className: 'dy-pc-sep', 'aria-hidden': true }),
           jsxs('div', { className: 'dy-pc-add', children: [
             jsx('select', { 'data-canvas-kind-picker': true, 'aria-label': 'Object kind', value: kind, onChange: (event) => setKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx('option', { value, children: CANVAS_KIND_LABELS[value] }, value)) }),
@@ -469,7 +689,9 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
           'data-pc-mode': mode,
           role: 'group',
           'aria-label': 'Planning canvas stage',
+          tabIndex: 0,
           onPointerDown: beginPan,
+          onKeyDown: onStageKeyDown,
           children: [
             jsxs('div', {
               className: 'dy-pc-world',
@@ -481,9 +703,11 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
                 jsx('svg', { className: 'dy-pc-svg', viewBox: `0 0 ${CANVAS_WORLD.width} ${CANVAS_WORLD.height}`, width: CANVAS_WORLD.width, height: CANVAS_WORLD.height, 'aria-hidden': true, children: renderConnectors() }),
                 ...renderFrames(),
                 ...objects.map(renderObject),
+                marquee ? jsx('div', { className: 'dy-pc-marquee', 'data-pc-marquee': true, style: { left: `${marquee.x}px`, top: `${marquee.y}px`, width: `${marquee.width}px`, height: `${marquee.height}px` } }) : null,
                 objects.length === 0 ? jsx('p', { className: 'dy-pc-empty', children: 'No canvas objects yet. Capture a note or evidence above, then drag it into place.' }) : null,
               ],
             }),
+            jsx('div', { className: `dy-pc-backdrop${selected ? ' open' : ''}`, 'data-pc-backdrop': true, onClick: () => setSelectedId(null) }),
             jsxs('aside', { className: `dy-pc-chat ${chatOpen ? 'open' : 'closed'}`, 'data-canvas-assistant': true, children: [
               jsxs('button', { type: 'button', className: 'dy-pc-chat-h', 'data-action': 'pc-chat-toggle', onClick: () => setChatOpen((current) => !current), children: [
                 jsx('span', { className: 'av', 'aria-hidden': true, children: 'AI' }),
@@ -495,14 +719,30 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
               ]}),
               jsxs('div', { className: 'dy-pc-chat-b', children: [
                 jsx('div', { className: 'dy-pc-msg bot', children: assistantSummary }),
+                jsx('div', { 'data-canvas-chat-log': true, children: (chatLog ?? []).map((message, index) => jsx('div', { className: `dy-pc-msg ${message.role}`, children: message.text }, `chat-${index}`)) }),
                 questionBlock,
                 review ? jsx('p', { className: 'dy-pc-drawer-meta', 'data-canvas-review': true, children: `Review: ${number(review.summary?.evidence_count)} evidence, ${number(review.summary?.claim_count)} claim, ${number(review.summary?.question_count)} question, ${number(review.summary?.plan_block_count)} plan block block(s).` }) : null,
                 proposalCards.length ? jsx('div', { 'data-canvas-proposals': true, children: proposalCards }) : null,
                 session?.answers?.length ? jsx('div', { className: 'dy-pc-msg me', children: `${number(session.answers.length)} clarification answer(s) recorded.` }) : null,
+                planPanel ? jsxs('div', { className: 'dy-pc-proposal', 'data-canvas-plan': planPanel.plan_id, children: [
+                  jsx('strong', { children: 'Plan ready for review' }),
+                  jsx('small', { children: `${number((planPanel.steps ?? []).length)} step(s) · from proposal ${planPanel.proposal_id} · nothing applied to the board.` }),
+                  jsx('pre', { className: 'dy-pc-plan-steps', children: (planPanel.steps ?? []).map((step) => `${step.order}. ${step.title}`).join('\n') }),
+                  jsxs('div', { className: 'dockyard-form-actions', children: [
+                    jsx(Button, { small: true, variant: 'primary', action: 'save-plan-document', disabled: planBusy, onClick: savePlanDocument, children: 'Save doc to Content' }),
+                    jsx(Button, { small: true, action: 'backlog-from-plan', disabled: planBusy || planPanel.status !== 'documented', onClick: () => setBacklogConfirm((planPanel.steps ?? []).map((step) => step.order)), children: 'Create backlog items' }),
+                  ]}),
+                  backlogConfirm?.length ? jsxs('div', { className: 'dy-pc-proposal', 'data-canvas-backlog-confirm': true, children: [
+                    jsx('small', { children: `Create ${number(backlogConfirm.length)} backlog item(s)? One confirm per batch, nothing auto-runs.` }),
+                    jsx(Button, { small: true, variant: 'primary', action: 'confirm-backlog-from-plan', disabled: planBusy, onClick: createBacklogItems, children: 'Confirm create' }),
+                  ]}) : null,
+                ]}) : null,
               ]}),
               jsxs('div', { className: 'dy-pc-chat-f', children: [
                 jsx('span', { className: 'dy-pc-readout', children: 'Approval contract: scratch + suggested only.' }),
-                jsx(Button, { small: true, action: 'pc-start-curation', disabled: busy, onClick: curate, children: 'Start curation' }),
+                jsx('input', { 'data-canvas-chat-input': true, 'aria-label': 'Message the steward', value: chatDraft, placeholder: 'Ask the steward about this board...', onChange: (event) => setChatDraft(event.target.value), onKeyDown: (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendChat() } } }),
+                jsx(Button, { small: true, action: 'pc-chat-send', disabled: chatBusy || !chatDraft.trim(), onClick: sendChat, children: 'Send' }),
+                jsx(Button, { small: true, action: 'pc-chat-stop', disabled: !chatBusy, onClick: stopChat, children: 'Stop' }),
               ]}),
             ]}),
             jsxs('aside', { className: `dy-pc-drawer${selected ? ' open' : ''}`, 'data-canvas-drawer': selected?.id ?? 'none', children: [
@@ -523,7 +763,6 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
                 ]}),
               ]}) : jsx('p', { className: 'dy-pc-drawer-meta', children: 'Select an object on the canvas to edit its title, kind or removal.' }),
             ]}),
-            jsx('div', { className: `dy-pc-backdrop${selected ? ' open' : ''}`, 'data-pc-backdrop': true, onClick: () => setSelectedId(null) }),
           ],
         }),
         notice ? jsx('p', { className: 'dy-pc-notice', role: 'status', 'data-pc-tone': notice.tone, 'data-canvas-notice': true, children: notice.text }) : null,
