@@ -247,32 +247,16 @@ class WorkflowService:
 
     def define_template(self, name: str, definition: Mapping[str, Any], *,
                         actor: str, interface: str = "rpc") -> dict[str, Any]:
-        clean_name = str(name or "").strip()
-        if not clean_name:
-            raise ValueError("template name is required")
-        clean = self._validated(definition)
-        clean.pop("template", None)  # templates are the origin, not derived
-        with self.store.tx() as cx:
-            row = cx.execute(
-                "SELECT COALESCE(MAX(version), 0) AS version FROM dockyard_workflow_templates "
-                "WHERE name=?", (clean_name,),
-            ).fetchone()
-            version = int(row["version"]) + 1
-            cx.execute(
-                "INSERT INTO dockyard_workflow_templates("
-                "name,version,definition_json,created_at,created_by) VALUES(?,?,?,?,?)",
-                (clean_name, version, json.dumps(clean, sort_keys=True),
-                 iso(self.store._clock()), actor),
-            )
-        self.store.audit(actor=actor, interface=interface,
-                         action="workflow.template_defined",
-                         subject=f"template:{clean_name}:v{version}")
-        return {"name": clean_name, "version": version, "definition": clean}
+        from .workflow_library import WorkflowLibrary
+        result = WorkflowLibrary(self).define(name, "global", definition,
+                                              actor=actor, interface=interface)
+        return {"name": result["name"], "version": result["version"],
+                "definition": result["definition"]}
 
     def list_templates(self) -> list[dict[str, Any]]:
         rows = self.store._conn.execute(
             "SELECT name,version,definition_json,created_at,created_by "
-            "FROM dockyard_workflow_templates ORDER BY name, version",
+            "FROM dockyard_global_workflows ORDER BY name, version",
         ).fetchall()
         latest: dict[str, dict[str, Any]] = {}
         for row in rows:
@@ -287,11 +271,11 @@ class WorkflowService:
         clean_name = str(name or "").strip()
         if version is None:
             row = self.store._conn.execute(
-                "SELECT * FROM dockyard_workflow_templates WHERE name=? "
+                "SELECT * FROM dockyard_global_workflows WHERE name=? "
                 "ORDER BY version DESC LIMIT 1", (clean_name,)).fetchone()
         else:
             row = self.store._conn.execute(
-                "SELECT * FROM dockyard_workflow_templates WHERE name=? AND version=?",
+                "SELECT * FROM dockyard_global_workflows WHERE name=? AND version=?",
                 (clean_name, version)).fetchone()
         if row is None:
             raise ValueError("template was not found")
@@ -354,7 +338,10 @@ class WorkflowService:
         rows = self.store._conn.execute(
             "SELECT project_id,name,version,definition_json,created_at,"
             " archived_at,archived_by FROM dockyard_workflows "
-            f"WHERE project_id=?{archive_clause} ORDER BY name,version",
+            f"WHERE project_id=?{archive_clause} AND NOT EXISTS ("
+            "SELECT 1 FROM dockyard_global_instances gi WHERE "
+            "gi.project_id=dockyard_workflows.project_id AND "
+            "gi.internal_name=dockyard_workflows.name) ORDER BY name,version",
             (project_id,),
         ).fetchall()
         return [{"project_id": row["project_id"], "name": row["name"],
@@ -616,6 +603,19 @@ class WorkflowService:
             raise ValueError("workflow was not found")
         if row["archived_at"] is not None:
             raise ValueError("workflow is archived; restore it before starting a run")
+        shadow = self.store._conn.execute(
+            "SELECT workflow_name FROM dockyard_global_instances "
+            "WHERE project_id=? AND internal_name=?",
+            (project_id, name),
+        ).fetchone()
+        if shadow is not None:
+            choice = self.store._conn.execute(
+                "SELECT enabled FROM dockyard_workflow_enablement WHERE "
+                "project_id=? AND scope='global' AND workflow_name=?",
+                (project_id, shadow["workflow_name"]),
+            ).fetchone()
+            if choice is not None and not choice["enabled"]:
+                raise ValueError("workflow is disabled for this project")
         choice = self.store._conn.execute(
             "SELECT enabled FROM dockyard_workflow_enablement WHERE "
             "project_id=? AND scope='project' AND workflow_name=?",

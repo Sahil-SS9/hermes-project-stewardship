@@ -97,6 +97,13 @@ class WorkflowLibrary:
                        "VALUES(?,?,?,?,?)",
                        (name, version, json.dumps(clean, sort_keys=True),
                         iso(self.store._clock()), actor))
+            # v30 compatibility shadow: the old template routes and a v31→v30
+            # downgrade must retain the same versions and definitions.
+            cx.execute("INSERT INTO dockyard_workflow_templates "
+                       "(name,version,definition_json,created_at,created_by) "
+                       "VALUES(?,?,?,?,?)",
+                       (name, version, json.dumps(clean, sort_keys=True),
+                        iso(self.store._clock()), actor))
         self.store.audit(actor=actor, interface=interface, action="workflow.library_defined",
                          subject=f"global:{name}:v{version}")
         return {"name": name, "scope": scope, "version": version,
@@ -147,7 +154,8 @@ class WorkflowLibrary:
         return row["internal_name"] if row else None
 
     def start(self, project_id: str, name: str, scope: str, run_key: str,
-              *, actor: str = "system", interface: str = "service"):
+              *, actor: str = "system", interface: str = "service",
+              known_profiles=None, project_members=None):
         self._exists(project_id)
         row = self._latest(name, scope, project_id)
         if row is None:
@@ -157,7 +165,9 @@ class WorkflowLibrary:
         if not self.enabled(project_id, name, scope):
             raise ValueError("workflow is disabled for this project")
         if scope == "project":
-            result = self.engine.start(project_id, name, run_key)
+            result = self.engine.start(project_id, name, run_key,
+                                       known_profiles=known_profiles,
+                                       project_members=project_members)
         else:
             internal = self._internal_name(project_id, name)
             if internal is None:
@@ -174,7 +184,9 @@ class WorkflowLibrary:
             existing = self._latest(internal, "project", project_id)
             if existing is None or json.loads(existing["definition_json"]) != definition:
                 self.engine.define(project_id, internal, definition)
-            result = {**self.engine.start(project_id, internal, run_key),
+            result = {**self.engine.start(project_id, internal, run_key,
+                                          known_profiles=known_profiles,
+                                          project_members=project_members),
                       "name": name, "scope": "global"}
         self.store.audit(actor=actor, interface=interface,
                          action="workflow.library_started",
