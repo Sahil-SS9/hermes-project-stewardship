@@ -11,7 +11,7 @@ const repo=path.resolve(here,'../..');
 const {outDir,bundle}=buildBundle(true);
 const port=Number(process.env.HPS_BROWSER_PORT || 19652);
 const base=`http://127.0.0.1:${port}`;
-const server=spawn(path.join(repo,'.venv/bin/python'),[path.join(here,'disposable-backend.py')],{env:{...process.env,HPS_BROWSER_PORT:String(port),HPS_BROWSER_BUNDLE:bundle},stdio:'inherit'});
+const server=spawn(path.join(repo,'.venv/bin/python'),[path.join(here,'disposable-backend.py')],{env:{...process.env,HPS_BROWSER_PORT:String(port),HPS_BROWSER_BUNDLE:bundle,HPS_CANVAS_PROVIDER:process.env.HPS_CANVAS_PROVIDER || 'fake'},stdio:'inherit'});
 try {
  for(let n=0;;n++){try {if((await fetch(base+'/health')).ok)break;}catch{} if(n>100)throw Error('backend not ready');await new Promise(r=>setTimeout(r,100));}
  console.log('DISPOSABLE_BACKEND',await (await fetch(base+'/health')).json());
