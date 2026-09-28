@@ -11,14 +11,14 @@ const payload = JSON.parse(execFileSync(python, ['-c', `
 import tempfile, json, sys, importlib, os
 from pathlib import Path
 sys.modules['httpx'] = importlib.import_module('httpx2')
-from fastapi.testclient import TestClient
-from hermes_project_stewardship.api.server import create_app
-from hermes_project_stewardship.kanban import ReferenceKanbanAdapter
-from hermes_project_stewardship.persistence.store import Store
-from hermes_project_stewardship.persistence.service import StewardshipService
 with tempfile.TemporaryDirectory(prefix='steward-inbox-contract-') as root:
  os.environ['HERMES_HOME'] = root
  os.environ['HERMES_KANBAN_HOME'] = root
+ from fastapi.testclient import TestClient
+ from hermes_project_stewardship.api.server import create_app
+ from hermes_project_stewardship.kanban import ReferenceKanbanAdapter
+ from hermes_project_stewardship.persistence.store import Store
+ from hermes_project_stewardship.persistence.service import StewardshipService
  store = Store(Path(root) / 'inbox.db')
  try:
   service = StewardshipService(store)

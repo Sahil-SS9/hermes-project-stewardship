@@ -21,6 +21,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import {makeTestStateRoot, stateEnv, disposeTestState} from './test-state-guard.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { evaluatePlugin as evaluatePluginBundle } from './test-support/load-plugin.mjs';
@@ -36,8 +37,11 @@ const { createRoot } = require('react-dom/client');
 const rt = require('react/jsx-runtime');
 
 const PLUGIN_PATH = fileURLToPath(new URL('./plugin.js', import.meta.url));
+
 const PYTHON = process.env.STEWARD_TEST_PYTHON
   || fileURLToPath(new URL('../../.venv/bin/python', import.meta.url));
+const TEST_STATE_ROOT = makeTestStateRoot('hps-milestone-chain-');
+const TEST_ENV = stateEnv(TEST_STATE_ROOT);
 
 const SERVER_SCRIPT = `
 import importlib, os, sys, tempfile, atexit, shutil
@@ -98,7 +102,8 @@ test('milestone journey: real UI drives real HTTP through proxy to backend', asy
   const port = 18900 + Math.floor(Math.random() * 500);
   const child = spawn(PYTHON, ['-c', SERVER_SCRIPT], {
     env: {
-      ...process.env,
+      ...TEST_ENV,
+      STEWARD_TEST_PYTHON: PYTHON,
       PM0009_PORT: String(port),
       PLUGIN_DIR: fileURLToPath(new URL('../../dashboard', import.meta.url)),
     },
