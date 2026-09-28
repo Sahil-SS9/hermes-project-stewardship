@@ -118,8 +118,10 @@ function startHost(bundleCode) {
 async function openWorkflows(page, host) {
   await page.goto(`${host.base}/desktop`, { waitUntil: 'load' })
   await page.addScriptTag({ url: `${host.base}/api/bundle.js` })
-  await page.waitForSelector('[data-tab="workflows"]')
-  await page.click('[data-tab="workflows"]')
+  await page.waitForSelector('[data-tab="project"]')
+  // Option A: project workflows live under Project > Workflows.
+  await page.click('[data-tab="project"]')
+  await page.click('[data-project-view="workflows"]')
   // The library zone proves the composed panel (not the old header tab row).
   await page.waitForSelector('[data-workflow-library]', { timeout: 20000 })
   await page.waitForSelector('[data-workflow-canvas="release"] [data-node-id="a"]', { timeout: 20000 })

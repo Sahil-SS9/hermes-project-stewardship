@@ -239,6 +239,29 @@ class WorkflowStartBody(BaseModel):
     version: int
 
 
+# Batch W library contract. Shapes mirror the backend models exactly; no
+# attribution fields, so the backend's trusted principal is always used.
+class WorkflowLibraryBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    scope: str
+    name: str
+    owner_project_id: str | None = None
+    nodes: list[dict]
+
+
+class WorkflowEnablementBody(BaseModel):
+    # strict: only a JSON boolean is accepted ("true"/1 are refused), matching
+    # the backend's StrictBool without a non-builtin annotation.
+    model_config = ConfigDict(extra="forbid", strict=True)
+    enabled: bool
+
+
+class WorkflowScopedStartBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_key: str
+    version: int | None = None
+
+
 class ContentUploadBody(BaseModel):
     filename: str
     media_type: str
@@ -1440,6 +1463,99 @@ async def project_observations(project_id: str) -> dict:
 async def run_observation(ref: str) -> dict:
     r = quote(ref, safe="")
     return await _proxy("POST", f"/stewardship/v1/observations/{r}/run", {})
+
+
+# ---- Batch W: workflow library (global + dedicated) --------------------
+# Desktop reaches the backend only through this proxy; without these routes
+# the library, per-project enablement and scoped runs 404 in the real stack.
+_SCOPES = ("global", "project")
+
+
+def _scope(scope: str) -> str:
+    if scope not in _SCOPES:
+        raise HTTPException(422, "scope must be global or project")
+    return scope
+
+
+def _owner(owner_project_id: str | None) -> dict | None:
+    return {"owner_project_id": owner_project_id} if owner_project_id else None
+
+
+@plugin_api.get("/workflow-library")
+async def workflow_library(scope: str | None = None, include_archived: bool = False) -> dict:
+    params: dict = {"include_archived": include_archived}
+    if scope:
+        params["scope"] = _scope(scope)
+    return await _proxy("GET", "/stewardship/v1/workflow-library", params=params)
+
+
+@plugin_api.post("/workflow-library")
+async def create_workflow_library(body: WorkflowLibraryBody) -> dict:
+    _scope(body.scope)
+    return await _proxy("POST", "/stewardship/v1/workflow-library", body.model_dump())
+
+
+@plugin_api.post("/workflow-library/{scope}/{name}/versions")
+async def version_workflow_library(scope: str, name: str, body: WorkflowVersionBody,
+                                   owner_project_id: str | None = None) -> dict:
+    return await _proxy(
+        "POST", f"/stewardship/v1/workflow-library/{_scope(scope)}/{quote(name, safe='')}/versions",
+        body.model_dump(), params=_owner(owner_project_id))
+
+
+@plugin_api.post("/workflow-library/{scope}/{name}/archive")
+async def archive_workflow_library(scope: str, name: str,
+                                   owner_project_id: str | None = None) -> dict:
+    return await _proxy(
+        "POST", f"/stewardship/v1/workflow-library/{_scope(scope)}/{quote(name, safe='')}/archive",
+        {}, params=_owner(owner_project_id))
+
+
+@plugin_api.post("/workflow-library/{scope}/{name}/restore")
+async def restore_workflow_library(scope: str, name: str,
+                                   owner_project_id: str | None = None) -> dict:
+    return await _proxy(
+        "POST", f"/stewardship/v1/workflow-library/{_scope(scope)}/{quote(name, safe='')}/restore",
+        {}, params=_owner(owner_project_id))
+
+
+@plugin_api.delete("/workflow-library/{scope}/{name}")
+async def delete_workflow_library(scope: str, name: str,
+                                  owner_project_id: str | None = None) -> dict:
+    return await _proxy(
+        "DELETE", f"/stewardship/v1/workflow-library/{_scope(scope)}/{quote(name, safe='')}",
+        params=_owner(owner_project_id))
+
+
+@plugin_api.get("/projects/{project_id}/workflows/available")
+async def available_workflows(project_id: str) -> dict:
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/available")
+
+
+@plugin_api.put("/projects/{project_id}/workflows/{scope}/{name}/enablement")
+async def workflow_enablement(project_id: str, scope: str, name: str,
+                              body: WorkflowEnablementBody) -> dict:
+    return await _proxy(
+        "PUT",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{_scope(scope)}/{quote(name, safe='')}/enablement",
+        body.model_dump())
+
+
+@plugin_api.post("/projects/{project_id}/workflows/{scope}/{name}/start")
+async def start_scoped_workflow(project_id: str, scope: str, name: str,
+                                body: WorkflowScopedStartBody) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{_scope(scope)}/{quote(name, safe='')}/start",
+        body.model_dump(exclude_none=True))
+
+
+@plugin_api.get("/projects/{project_id}/workflows/{scope}/{name}/runs")
+async def scoped_workflow_runs(project_id: str, scope: str, name: str) -> dict:
+    return await _proxy(
+        "GET",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{_scope(scope)}/{quote(name, safe='')}/runs")
 
 
 @plugin_api.get("/projects/{project_id}/workflows")

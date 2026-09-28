@@ -8,10 +8,16 @@ import {fixtureBrowser} from './browser-harness.mjs';
 // drives; nothing here invents workflow state.
 
 test('W3 library: create global workflow, filter by scope, archive and restore', async()=>fixtureBrowser(async(page)=>{
- await page.locator('[data-tab="workflows"]').click();
- // Project view shows the library entry point.
+ // Option A: Project > Workflows keeps a library entry point that lands on
+ // the top Workflows tab, and the top tab opens the library directly.
+ await page.locator('[data-tab="project"]').click();
+ await page.locator('[data-project-view="workflows"]').click();
  await page.locator('[data-workflow-library-entry] [data-action="open-workflow-library"]').waitFor();
  await page.locator('[data-workflow-library-entry] [data-action="open-workflow-library"]').click();
+ await page.locator('[data-workflow-library-screen]').waitFor();
+ assert.equal(await page.locator('[data-tab="workflows"]').getAttribute('aria-selected'),'true');
+ await page.locator('[data-tab="dashboard"]').click();
+ await page.locator('[data-tab="workflows"]').click();
  await page.locator('[data-workflow-library-screen]').waitFor();
  // Empty state before any workflow exists.
  await page.getByRole('heading',{name:'No workflows yet'}).waitFor();
@@ -47,8 +53,6 @@ test('W3 library: create global workflow, filter by scope, archive and restore',
 
 test('W4 toggle drives enablement: off refuses a run, on starts it, and errors surface', async()=>fixtureBrowser(async(page)=>{
  await page.locator('[data-tab="workflows"]').click();
- await page.locator('[data-workflow-library-entry] [data-action="open-workflow-library"]').waitFor();
- await page.locator('[data-workflow-library-entry] [data-action="open-workflow-library"]').click();
  await page.locator('[data-workflow-library-screen]').waitFor();
  await page.locator('[data-action="library-create"]').click();
  await page.locator('[data-library-name]').fill('nightly-audit');

@@ -128,6 +128,62 @@ def test_reference_adapter_reports_only_declared_profiles(tmp_path):
         store.close()
 
 
+def test_workflow_library_routes_reach_backend_through_proxy(tmp_path, monkeypatch):
+    # Batch W review: Desktop only talks to the plugin proxy. Every library /
+    # enablement / scoped-start call the UI makes must exist on the proxy, or
+    # the feature works only against the phase4 mock host.
+    _module, _adapter, client = _load_proxy(tmp_path, monkeypatch)
+    created = client.post("/api/workflow-library", headers=HEADERS, json={
+        "scope": "global", "name": "release-cadence",
+        "nodes": [{"id": "cut", "title": "Cut release", "depends_on": []}]})
+    assert created.status_code == 200, created.text
+    listed = client.get("/api/workflow-library", headers=HEADERS, params={"scope": "global"})
+    assert listed.status_code == 200, listed.text
+    assert [w["name"] for w in listed.json()["workflows"]] == ["release-cadence"]
+    versioned = client.post("/api/workflow-library/global/release-cadence/versions", headers=HEADERS,
+                            json={"nodes": [{"id": "cut", "title": "Cut release v2", "depends_on": []}]})
+    assert versioned.status_code == 200 and versioned.json()["version"] == 2, versioned.text
+
+    base = "/api/projects/p2/workflows"
+    # Globals default OFF per project: start is refused with 409, not 404.
+    refused = client.post(f"{base}/global/release-cadence/start", headers=HEADERS, json={"run_key": "r1"})
+    assert refused.status_code == 409, refused.text
+    loose = client.put(f"{base}/global/release-cadence/enablement", headers=HEADERS, json={"enabled": "true"})
+    assert loose.status_code == 422, "enablement accepts only a JSON boolean"
+    on = client.put(f"{base}/global/release-cadence/enablement", headers=HEADERS, json={"enabled": True})
+    assert on.status_code == 200 and on.json()["project_id"] == "p2", on.text
+    available = client.get(f"{base}/available", headers=HEADERS).json()["workflows"]
+    assert {(w["scope"], w["name"], w["enabled"]) for w in available} == {("global", "release-cadence", True)}
+    # p1 is unaffected by p2's toggle.
+    p1 = client.get("/api/projects/p1/workflows/available", headers=HEADERS).json()["workflows"]
+    assert [w["enabled"] for w in p1] == [False]
+    started = client.post(f"{base}/global/release-cadence/start", headers=HEADERS, json={"run_key": "r1"})
+    assert started.status_code == 200, started.text
+    runs = client.get(f"{base}/global/release-cadence/runs", headers=HEADERS)
+    assert runs.status_code == 200 and [r["run_key"] for r in runs.json()["runs"]] == ["r1"], runs.text
+
+    # Lifecycle through the proxy: delete is refused while history exists; archive/restore work.
+    blocked = client.delete("/api/workflow-library/global/release-cadence", headers=HEADERS)
+    assert blocked.status_code == 409, blocked.text
+    archived = client.post("/api/workflow-library/global/release-cadence/archive", headers=HEADERS)
+    assert archived.status_code == 200 and archived.json()["archived_at"], archived.text
+    restored = client.post("/api/workflow-library/global/release-cadence/restore", headers=HEADERS)
+    assert restored.status_code == 200 and restored.json()["archived_at"] is None, restored.text
+
+    # Dedicated workflows carry their owner through the proxy query string.
+    dedicated = client.post("/api/workflow-library", headers=HEADERS, json={
+        "scope": "project", "name": "p1-only", "owner_project_id": "p1",
+        "nodes": [{"id": "a", "title": "A", "depends_on": []}]})
+    assert dedicated.status_code == 200, dedicated.text
+    gone = client.delete("/api/workflow-library/project/p1-only", headers=HEADERS,
+                         params={"owner_project_id": "p1"})
+    assert gone.status_code == 200 and gone.json()["deleted"] is True, gone.text
+    # Attribution is trusted, never client-supplied.
+    forged = client.post("/api/workflow-library", headers=HEADERS, json={
+        "scope": "global", "name": "x", "nodes": [], "actor": "forged"})
+    assert forged.status_code == 422
+
+
 def test_create_and_queue_keeps_every_form_field(tmp_path, monkeypatch):
     _module, _adapter, client = _load_proxy(tmp_path, monkeypatch)
     epic = _ref(client, title="Parent epic", kind="epic")

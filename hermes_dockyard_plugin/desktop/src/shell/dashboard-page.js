@@ -41,7 +41,6 @@ export function DashboardPage() {
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [toasts, setToasts] = useState([])
   const [data, setData] = useState(null)
-  const [libraryOpen, setLibraryOpen] = useState(false)
   const [error, setError] = useState(null)
   const [requestVersion, setRequestVersion] = useState(0)
   const [counts, setCounts] = useState({ approvals: null, notifications: null })
@@ -235,6 +234,7 @@ export function DashboardPage() {
       onSelectProject: selectProject,
       onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
       onRefresh: refresh,
+      onOpenLibrary: () => setTab('workflows'),
       pendingWorkRef,
       onPendingWorkConsumed: () => setPendingWorkRef(null),
       notice: deepLinkNotice,
@@ -248,20 +248,19 @@ export function DashboardPage() {
       onRefresh: refresh,
       notice: deepLinkNotice,
     }, `settings:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
-  } else if (tab === 'workflows' && libraryOpen) {
-    content = jsx(WorkflowLibraryView, {
-      onOpenBuilder: (row) => { setLibraryOpen(false); if (row) { setProjectEntryView('workflows') } refresh() },
-    }, 'workflow-library')
   } else if (tab === 'workflows') {
-    content = jsx(ProjectDashboard, {
-      view: payload,
-      initialView: 'workflows',
-      onSelectProject: selectProject,
-      onOpenLibrary: () => setLibraryOpen(true),
-      onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
-      onRefresh: refresh,
-      notice: deepLinkNotice,
-    }, `workflows:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
+    // Option A (Sahil 28/09): the top Workflows tab IS the library. Project
+    // workflows live under Project > Workflows. Enablement and runs act on the
+    // project selected in the global picker, never an implicit first project.
+    content = jsx(WorkflowLibraryView, {
+      projectId: selectedProject,
+      onOpenBuilder: (row) => {
+        const owner = row?.owner_project_id
+        if (owner && owner !== selectedProject) setSelectedProject(owner)
+        setProjectEntryView('workflows')
+        setTab('project')
+      },
+    }, `workflow-library:${selectedProject ?? 'none'}`)
   } else if (tab === 'onboard') {
     content = jsx(OnboardPanel, { view: payload, onOpen: () => setOnboardingOpen(true), onRefresh: refresh })
   } else if (tab === 'backlog') {

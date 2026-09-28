@@ -18,7 +18,7 @@ import { number } from '../lib/ui.js'
 // edit lives here — global (available to every project) or dedicated to one
 // project. No workflow data is invented: empty, loading and error states read
 // only from the real /workflow-library contract.
-export function WorkflowLibraryView({ onOpenBuilder }) {
+export function WorkflowLibraryView({ projectId, onOpenBuilder }) {
   const [scope, setScope] = useState('all')
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState(null)
@@ -35,17 +35,17 @@ export function WorkflowLibraryView({ onOpenBuilder }) {
       const result = await api(`/workflow-library${scope === 'all' ? '' : `?scope=${scope}`}`)
       const nextRows = result.workflows ?? []
       setRows(nextRows)
-      // Enablement is a per-project contract; this library view reads the
-      // first project's availability so the switch is never invented state.
-      const dashboard = await api('/dashboard')
-      const firstProject = (dashboard.projects ?? [])[0]?.id
-      if (firstProject) {
-        const available = await api(`/projects/${encodeURIComponent(firstProject)}/workflows/available`)
+      // Enablement is per project: read it for the project selected in the
+      // global picker so every switch reflects persisted state for THAT project.
+      if (projectId) {
+        const available = await api(`/projects/${encodeURIComponent(projectId)}/workflows/available`)
         setEnablement(Object.fromEntries((available.workflows ?? []).map((row) => [`${row.scope}:${row.name}`, row.enabled])))
+      } else {
+        setEnablement({})
       }
     } catch (failure) { setError(String(failure?.message ?? failure)) }
   }
-  useEffect(() => { void load() }, [scope])
+  useEffect(() => { void load() }, [scope, projectId])
   const filtered = (rows ?? []).filter((row) =>
     !search.trim() || row.name.toLowerCase().includes(search.trim().toLowerCase()))
   const create = async () => {
@@ -75,29 +75,25 @@ export function WorkflowLibraryView({ onOpenBuilder }) {
     finally { setBusy(false) }
   }
   const toggle = async (rowScope, rowName) => {
-    const dashboard = await api('/dashboard')
-    const firstProject = (dashboard.projects ?? [])[0]?.id
-    if (!firstProject) return
+    if (!projectId) return
     const key = `${rowScope}:${rowName}`
     setBusy(true); setError(null)
     try {
       const next = !(enablement[key] ?? rowScope === 'project')
-      await api(`/projects/${encodeURIComponent(firstProject)}/workflows/${rowScope}/${encodeURIComponent(rowName)}/enablement`, { method: 'PUT', body: { enabled: next } })
+      await api(`/projects/${encodeURIComponent(projectId)}/workflows/${rowScope}/${encodeURIComponent(rowName)}/enablement`, { method: 'PUT', body: { enabled: next } })
       setEnablement((current) => ({ ...current, [key]: next }))
-      emitToast('success', `Workflow turned ${next ? 'on' : 'off'} for ${firstProject}.`)
+      emitToast('success', `Workflow turned ${next ? 'on' : 'off'} for ${projectId}.`)
     } catch (failure) { setError(String(failure?.message ?? failure)) }
     finally { setBusy(false) }
   }
   const start = async (rowScope, rowName) => {
-    const dashboard = await api('/dashboard')
-    const firstProject = (dashboard.projects ?? [])[0]?.id
-    if (!firstProject) return
+    if (!projectId) return
     const key = `${rowScope}:${rowName}`
     setBusy(true); setError(null)
     try {
-      await api(`/projects/${encodeURIComponent(firstProject)}/workflows/${rowScope}/${encodeURIComponent(rowName)}/start`, { method: 'POST', body: { run_key: `${rowName}-${Date.now()}` } })
+      await api(`/projects/${encodeURIComponent(projectId)}/workflows/${rowScope}/${encodeURIComponent(rowName)}/start`, { method: 'POST', body: { run_key: `${rowName}-${Date.now()}` } })
       setRefusals((current) => ({ ...current, [key]: null }))
-      emitToast('success', `Run of ${rowName} started for ${firstProject}.`)
+      emitToast('success', `Run of ${rowName} started for ${projectId}.`)
     } catch (failure) {
       setRefusals((current) => ({ ...current, [key]: `Run refused: ${String(failure?.message ?? failure)}` }))
     } finally { setBusy(false) }
@@ -139,13 +135,15 @@ export function WorkflowLibraryView({ onOpenBuilder }) {
                     jsx(Button, { small: true, action: 'library-archive', disabled: busy, onClick: () => act(`/workflow-library/${row.scope}/${encodeURIComponent(row.name)}/archive${row.owner_project_id ? `?owner_project_id=${encodeURIComponent(row.owner_project_id)}` : ''}`), children: 'Archive' }),
                     jsx(Button, { small: true, action: 'library-delete', variant: 'danger', disabled: busy, onClick: () => remove(row.scope, row.name, row.owner_project_id), children: 'Delete' }),
                   ] }),
-              jsxs('div', { className: 'dockyard-wf-enablement', children: [
+              !projectId || (row.scope === 'project' && row.owner_project_id !== projectId)
+                ? jsx('p', { className: 'dockyard-meta', 'data-wf-enablement-na': `${row.scope}:${row.name}`, children: projectId ? `Only ${row.owner_project_id} can run this workflow.` : 'Select a project to turn workflows on or off.' })
+                : jsxs('div', { className: 'dockyard-wf-enablement', children: [
                 jsxs('label', { className: 'dockyard-switch', children: [
-                  jsx('input', { type: 'checkbox', role: 'switch', 'data-wf-enablement': `${row.scope}:${row.name}`, 'aria-checked': String(Boolean(enablement[`${row.scope}:${row.name}`] ?? row.scope === 'project')), disabled: busy, onChange: () => toggle(row.scope, row.name) }),
+                  jsx('input', { type: 'checkbox', role: 'switch', 'data-wf-enablement': `${row.scope}:${row.name}`, 'aria-label': `Turn ${row.name} on for ${projectId}`, checked: Boolean(enablement[`${row.scope}:${row.name}`] ?? row.scope === 'project'), 'aria-checked': String(Boolean(enablement[`${row.scope}:${row.name}`] ?? row.scope === 'project')), disabled: busy, onChange: () => toggle(row.scope, row.name) }),
                   jsx('span', { className: 'dockyard-switch-track', 'aria-hidden': true }),
                   jsx('span', { className: 'dockyard-switch-thumb', 'aria-hidden': true }),
                 ]}),
-                jsx('span', { children: row.scope === 'global' ? 'On for the current project (off by default)' : 'On for this project' }),
+                jsx('span', { className: 'dockyard-wf-enablement-label', children: row.scope === 'global' ? `On for ${projectId} (off by default)` : `On for ${projectId}` }),
                 jsx(Button, { small: true, action: 'library-run', data: { 'data-wf-run-start': `${row.scope}:${row.name}` }, disabled: busy, onClick: () => start(row.scope, row.name), children: 'Start run' }),
               ]}),
               refusals[`${row.scope}:${row.name}`]

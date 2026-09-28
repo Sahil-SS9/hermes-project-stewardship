@@ -10,7 +10,9 @@ async function projectWorkflows(page) {
   await page.getByRole('button', { name: 'Project context', exact: true }).click();
   await page.getByRole('combobox', { name: 'Find project' }).fill('payments-relaunch');
   await page.getByRole('listbox', { name: 'Projects' }).getByRole('option', { name: 'payments-relaunch', exact: true }).click();
-  await page.locator('[data-tab="workflows"]').click();
+  // Option A: project workflows live under Project > Workflows.
+  await page.locator('[data-tab="project"]').click();
+  await page.locator('[data-project-view="workflows"]').click();
   await page.locator('[data-executable-workflows="payments-relaunch"]').waitFor();
 }
 

@@ -729,6 +729,7 @@
       if (!g) return;
       const movedBy = Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y);
       if (movedBy > 3) session.moved = true;
+      if (!session.moved) return;
       const world = worldPoint(e.clientX, e.clientY);
       writeNodePosition(session.nodeId, g, world.x - session.offsetX, world.y - session.offsetY);
     };

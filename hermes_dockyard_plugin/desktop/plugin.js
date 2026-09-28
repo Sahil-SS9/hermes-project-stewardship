@@ -2225,7 +2225,8 @@ var WORKFLOW_LIBRARY_CSS = `
 .dockyard-wf-library-grid article h3 { margin: 0; font-size: 15px; }
 .dockyard-wf-library-grid article .dockyard-meta { margin: 6px 0 0; font-size: 12px; }
 .dockyard-wf-library-grid article .dockyard-form-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-.dockyard-wf-enablement { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--dy-border, #87909d); }
+.dockyard-wf-enablement { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--dy-border, #87909d); }
+.dockyard-wf-enablement .dockyard-wf-enablement-label { flex: 1 1 140px; min-width: 0; overflow-wrap: anywhere; }
 .dockyard-wf-enablement .dockyard-switch { position: relative; display: inline-flex; width: 40px; height: 22px; flex: none; }
 .dockyard-wf-enablement .dockyard-switch input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .dockyard-wf-enablement .dockyard-switch .dockyard-switch-track { position: absolute; inset: 0; border-radius: 11px; background: var(--dy-border, #87909d); transition: background 120ms ease; pointer-events: none; }
@@ -11463,7 +11464,7 @@ function InboxView({ view, onRefresh }) {
 }
 
 // hermes_dockyard_plugin/desktop/src/views/workflow-library.js
-function WorkflowLibraryView({ onOpenBuilder }) {
+function WorkflowLibraryView({ projectId, onOpenBuilder }) {
   const [scope, setScope] = useState("all");
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState(null);
@@ -11480,11 +11481,11 @@ function WorkflowLibraryView({ onOpenBuilder }) {
       const result = await api(`/workflow-library${scope === "all" ? "" : `?scope=${scope}`}`);
       const nextRows = result.workflows ?? [];
       setRows(nextRows);
-      const dashboard = await api("/dashboard");
-      const firstProject = (dashboard.projects ?? [])[0]?.id;
-      if (firstProject) {
-        const available = await api(`/projects/${encodeURIComponent(firstProject)}/workflows/available`);
+      if (projectId) {
+        const available = await api(`/projects/${encodeURIComponent(projectId)}/workflows/available`);
         setEnablement(Object.fromEntries((available.workflows ?? []).map((row) => [`${row.scope}:${row.name}`, row.enabled])));
+      } else {
+        setEnablement({});
       }
     } catch (failure) {
       setError(String(failure?.message ?? failure));
@@ -11492,7 +11493,7 @@ function WorkflowLibraryView({ onOpenBuilder }) {
   };
   useEffect(() => {
     void load();
-  }, [scope]);
+  }, [scope, projectId]);
   const filtered = (rows ?? []).filter((row) => !search.trim() || row.name.toLowerCase().includes(search.trim().toLowerCase()));
   const create = async () => {
     if (!name.trim() || !title.trim()) return;
@@ -11539,17 +11540,15 @@ function WorkflowLibraryView({ onOpenBuilder }) {
     }
   };
   const toggle = async (rowScope, rowName) => {
-    const dashboard = await api("/dashboard");
-    const firstProject = (dashboard.projects ?? [])[0]?.id;
-    if (!firstProject) return;
+    if (!projectId) return;
     const key = `${rowScope}:${rowName}`;
     setBusy(true);
     setError(null);
     try {
       const next = !(enablement[key] ?? rowScope === "project");
-      await api(`/projects/${encodeURIComponent(firstProject)}/workflows/${rowScope}/${encodeURIComponent(rowName)}/enablement`, { method: "PUT", body: { enabled: next } });
+      await api(`/projects/${encodeURIComponent(projectId)}/workflows/${rowScope}/${encodeURIComponent(rowName)}/enablement`, { method: "PUT", body: { enabled: next } });
       setEnablement((current) => ({ ...current, [key]: next }));
-      emitToast("success", `Workflow turned ${next ? "on" : "off"} for ${firstProject}.`);
+      emitToast("success", `Workflow turned ${next ? "on" : "off"} for ${projectId}.`);
     } catch (failure) {
       setError(String(failure?.message ?? failure));
     } finally {
@@ -11557,16 +11556,14 @@ function WorkflowLibraryView({ onOpenBuilder }) {
     }
   };
   const start = async (rowScope, rowName) => {
-    const dashboard = await api("/dashboard");
-    const firstProject = (dashboard.projects ?? [])[0]?.id;
-    if (!firstProject) return;
+    if (!projectId) return;
     const key = `${rowScope}:${rowName}`;
     setBusy(true);
     setError(null);
     try {
-      await api(`/projects/${encodeURIComponent(firstProject)}/workflows/${rowScope}/${encodeURIComponent(rowName)}/start`, { method: "POST", body: { run_key: `${rowName}-${Date.now()}` } });
+      await api(`/projects/${encodeURIComponent(projectId)}/workflows/${rowScope}/${encodeURIComponent(rowName)}/start`, { method: "POST", body: { run_key: `${rowName}-${Date.now()}` } });
       setRefusals((current) => ({ ...current, [key]: null }));
-      emitToast("success", `Run of ${rowName} started for ${firstProject}.`);
+      emitToast("success", `Run of ${rowName} started for ${projectId}.`);
     } catch (failure) {
       setRefusals((current) => ({ ...current, [key]: `Run refused: ${String(failure?.message ?? failure)}` }));
     } finally {
@@ -11602,13 +11599,13 @@ function WorkflowLibraryView({ onOpenBuilder }) {
         jsx(Button, { small: true, action: "library-archive", disabled: busy, onClick: () => act(`/workflow-library/${row.scope}/${encodeURIComponent(row.name)}/archive${row.owner_project_id ? `?owner_project_id=${encodeURIComponent(row.owner_project_id)}` : ""}`), children: "Archive" }),
         jsx(Button, { small: true, action: "library-delete", variant: "danger", disabled: busy, onClick: () => remove(row.scope, row.name, row.owner_project_id), children: "Delete" })
       ] }),
-      jsxs("div", { className: "dockyard-wf-enablement", children: [
+      !projectId || row.scope === "project" && row.owner_project_id !== projectId ? jsx("p", { className: "dockyard-meta", "data-wf-enablement-na": `${row.scope}:${row.name}`, children: projectId ? `Only ${row.owner_project_id} can run this workflow.` : "Select a project to turn workflows on or off." }) : jsxs("div", { className: "dockyard-wf-enablement", children: [
         jsxs("label", { className: "dockyard-switch", children: [
-          jsx("input", { type: "checkbox", role: "switch", "data-wf-enablement": `${row.scope}:${row.name}`, "aria-checked": String(Boolean(enablement[`${row.scope}:${row.name}`] ?? row.scope === "project")), disabled: busy, onChange: () => toggle(row.scope, row.name) }),
+          jsx("input", { type: "checkbox", role: "switch", "data-wf-enablement": `${row.scope}:${row.name}`, "aria-label": `Turn ${row.name} on for ${projectId}`, checked: Boolean(enablement[`${row.scope}:${row.name}`] ?? row.scope === "project"), "aria-checked": String(Boolean(enablement[`${row.scope}:${row.name}`] ?? row.scope === "project")), disabled: busy, onChange: () => toggle(row.scope, row.name) }),
           jsx("span", { className: "dockyard-switch-track", "aria-hidden": true }),
           jsx("span", { className: "dockyard-switch-thumb", "aria-hidden": true })
         ] }),
-        jsx("span", { children: row.scope === "global" ? "On for the current project (off by default)" : "On for this project" }),
+        jsx("span", { className: "dockyard-wf-enablement-label", children: row.scope === "global" ? `On for ${projectId} (off by default)` : `On for ${projectId}` }),
         jsx(Button, { small: true, action: "library-run", data: { "data-wf-run-start": `${row.scope}:${row.name}` }, disabled: busy, onClick: () => start(row.scope, row.name), children: "Start run" })
       ] }),
       refusals[`${row.scope}:${row.name}`] ? jsx("p", { className: "dockyard-inline-error", role: "alert", "data-wf-run-refused": `${row.scope}:${row.name}`, children: refusals[`${row.scope}:${row.name}`] }) : null
@@ -11694,7 +11691,6 @@ function DashboardPage() {
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [data, setData] = useState(null);
-  const [libraryOpen, setLibraryOpen] = useState(false);
   const [error, setError] = useState(null);
   const [requestVersion, setRequestVersion] = useState(0);
   const [counts, setCounts] = useState({ approvals: null, notifications: null });
@@ -11863,6 +11859,7 @@ function DashboardPage() {
       onSelectProject: selectProject,
       onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
       onRefresh: refresh,
+      onOpenLibrary: () => setTab("workflows"),
       pendingWorkRef,
       onPendingWorkConsumed: () => setPendingWorkRef(null),
       notice: deepLinkNotice
@@ -11876,26 +11873,16 @@ function DashboardPage() {
       onRefresh: refresh,
       notice: deepLinkNotice
     }, `settings:${payload.project?.id ?? payload.missingProject ?? "none"}`);
-  } else if (tab === "workflows" && libraryOpen) {
-    content = jsx(WorkflowLibraryView, {
-      onOpenBuilder: (row) => {
-        setLibraryOpen(false);
-        if (row) {
-          setProjectEntryView("workflows");
-        }
-        refresh();
-      }
-    }, "workflow-library");
   } else if (tab === "workflows") {
-    content = jsx(ProjectDashboard, {
-      view: payload,
-      initialView: "workflows",
-      onSelectProject: selectProject,
-      onOpenLibrary: () => setLibraryOpen(true),
-      onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
-      onRefresh: refresh,
-      notice: deepLinkNotice
-    }, `workflows:${payload.project?.id ?? payload.missingProject ?? "none"}`);
+    content = jsx(WorkflowLibraryView, {
+      projectId: selectedProject,
+      onOpenBuilder: (row) => {
+        const owner = row?.owner_project_id;
+        if (owner && owner !== selectedProject) setSelectedProject(owner);
+        setProjectEntryView("workflows");
+        setTab("project");
+      }
+    }, `workflow-library:${selectedProject ?? "none"}`);
   } else if (tab === "onboard") {
     content = jsx(OnboardPanel, { view: payload, onOpen: () => setOnboardingOpen(true), onRefresh: refresh });
   } else if (tab === "backlog") {

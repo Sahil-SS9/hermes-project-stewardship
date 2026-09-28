@@ -15,7 +15,8 @@ export const WORKFLOW_LIBRARY_CSS = `
 .dockyard-wf-library-grid article h3 { margin: 0; font-size: 15px; }
 .dockyard-wf-library-grid article .dockyard-meta { margin: 6px 0 0; font-size: 12px; }
 .dockyard-wf-library-grid article .dockyard-form-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-.dockyard-wf-enablement { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--dy-border, #87909d); }
+.dockyard-wf-enablement { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--dy-border, #87909d); }
+.dockyard-wf-enablement .dockyard-wf-enablement-label { flex: 1 1 140px; min-width: 0; overflow-wrap: anywhere; }
 .dockyard-wf-enablement .dockyard-switch { position: relative; display: inline-flex; width: 40px; height: 22px; flex: none; }
 .dockyard-wf-enablement .dockyard-switch input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .dockyard-wf-enablement .dockyard-switch .dockyard-switch-track { position: absolute; inset: 0; border-radius: 11px; background: var(--dy-border, #87909d); transition: background 120ms ease; pointer-events: none; }

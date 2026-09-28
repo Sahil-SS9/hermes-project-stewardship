@@ -151,13 +151,15 @@ test('Desktop canvas: computed styles resolve in light and dark (no black boxes)
       page.on('pageerror', (e) => errors.push(`${theme}: ${e.message}`))
       await page.goto(`${host.base}/desktop`, { waitUntil: 'load' })
       await page.addScriptTag({ url: `${host.base}/api/bundle.js` })
-      await page.waitForSelector('[data-tab="workflows"]')
+      await page.waitForSelector('[data-tab="project"]')
       // The theme switch the Desktop host itself uses is the root's own
       // attribute. Nothing about the CSS is injected by this test.
       if (theme === 'dark') {
         await page.evaluate(() => document.querySelector('.dockyard-root')?.setAttribute('data-theme', 'dark'))
       }
-      await page.click('[data-tab="workflows"]')
+      // Option A: project workflows live under Project > Workflows.
+      await page.click('[data-tab="project"]')
+      await page.click('[data-project-view="workflows"]')
       await page.waitForSelector('[data-workflow-canvas="release"] [data-node-id="a"]', { timeout: 20000 })
       // Freeze decorative animation so the reading is stable.
       await page.addStyleTag({ content: '*{animation:none !important;transition:none !important}' })
