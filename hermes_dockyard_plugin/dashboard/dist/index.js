@@ -604,6 +604,7 @@
   function mountWorkflowCanvas(host, projectId, runName, fetchRuns, handlers, pollMs = 8e3) {
     host.replaceChildren();
     host.className = "dy-wf dy-wf-scope";
+    const canvasWindow = host.ownerDocument?.defaultView ?? globalThis.window;
     const wrap = elu("div", "dy-wf-wrap");
     const svg = sEl("svg", { class: "dy-wf-svg" });
     svg.setAttribute("data-lod", "read");
@@ -1143,7 +1144,7 @@
       }
       const assignments = currentNodes.some((n) => (n.team ?? n.phase_team ?? "").trim());
       const laneOf = assignments ? laneKeyOf : (n) => isExceptionNode(n) ? EXCEPTION_LANE_KEY : "main-path";
-      const mobileLayout = window.innerWidth <= 640;
+      const mobileLayout = canvasWindow.innerWidth <= 640;
       svg.dataset.mobileLayout = String(mobileLayout);
       if (previousMobileLayout !== null && previousMobileLayout !== mobileLayout) nodePositions = {};
       previousMobileLayout = mobileLayout;
@@ -1762,7 +1763,7 @@
     const onResize = () => {
       if (!disposed && lastRun) render(lastRun);
     };
-    window.addEventListener("resize", onResize);
+    canvasWindow.addEventListener("resize", onResize);
     disposers.push(() => {
       disposed = true;
       if (timer) clearInterval(timer);
@@ -1770,7 +1771,7 @@
       clearInterval(clockTimer);
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("resize", onResize);
+      canvasWindow.removeEventListener("resize", onResize);
       host.replaceChildren();
     });
     return () => {

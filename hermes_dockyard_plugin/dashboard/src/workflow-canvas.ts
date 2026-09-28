@@ -465,6 +465,9 @@ export function mountWorkflowCanvas(
   // Desktop surface never provided (that missing ancestor is what made every
   // fill resolve to nothing and render black).
   host.className = 'dy-wf dy-wf-scope';
+  // Resolve the window from the host's own document so embedded/test surfaces
+  // that shim document but not globalThis.window still mount (jsdom lanes).
+  const canvasWindow = (host.ownerDocument?.defaultView ?? globalThis.window) as Window & typeof globalThis;
 
   const wrap = elu<HTMLDivElement>('div', 'dy-wf-wrap');
   const svg = sEl('svg', { class: 'dy-wf-svg' }) as SVGSVGElement;
@@ -1107,7 +1110,7 @@ export function mountWorkflowCanvas(
     const laneOf = assignments
       ? laneKeyOf
       : (n: CanvasNode) => (isExceptionNode(n) ? EXCEPTION_LANE_KEY : 'main-path');
-    const mobileLayout = window.innerWidth <= 640;
+    const mobileLayout = canvasWindow.innerWidth <= 640;
     svg.dataset.mobileLayout = String(mobileLayout);
     if (previousMobileLayout !== null && previousMobileLayout !== mobileLayout) nodePositions = {};
     previousMobileLayout = mobileLayout;
@@ -1793,7 +1796,7 @@ export function mountWorkflowCanvas(
   pollOnce();
   if (pollMs > 0) timer = setInterval(pollOnce, pollMs);
   const onResize = () => { if (!disposed && lastRun) render(lastRun); };
-  window.addEventListener('resize', onResize);
+  canvasWindow.addEventListener('resize', onResize);
 
   disposers.push(() => {
     disposed = true;
@@ -1802,7 +1805,7 @@ export function mountWorkflowCanvas(
     clearInterval(clockTimer);
     document.removeEventListener('keydown', onKeyDown);
     document.removeEventListener('visibilitychange', onVisibility);
-    window.removeEventListener('resize', onResize);
+    canvasWindow.removeEventListener('resize', onResize);
     host.replaceChildren();
   });
   return () => {

@@ -8466,6 +8466,7 @@ function buildLayout(nodes, opts) {
 function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pollMs = 8e3) {
   host2.replaceChildren();
   host2.className = "dy-wf dy-wf-scope";
+  const canvasWindow = host2.ownerDocument?.defaultView ?? globalThis.window;
   const wrap = elu("div", "dy-wf-wrap");
   const svg = sEl("svg", { class: "dy-wf-svg" });
   svg.setAttribute("data-lod", "read");
@@ -9005,7 +9006,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     }
     const assignments = currentNodes.some((n) => (n.team ?? n.phase_team ?? "").trim());
     const laneOf = assignments ? laneKeyOf : (n) => isExceptionNode(n) ? EXCEPTION_LANE_KEY : "main-path";
-    const mobileLayout = window.innerWidth <= 640;
+    const mobileLayout = canvasWindow.innerWidth <= 640;
     svg.dataset.mobileLayout = String(mobileLayout);
     if (previousMobileLayout !== null && previousMobileLayout !== mobileLayout) nodePositions = {};
     previousMobileLayout = mobileLayout;
@@ -9624,7 +9625,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   const onResize = () => {
     if (!disposed && lastRun) render(lastRun);
   };
-  window.addEventListener("resize", onResize);
+  canvasWindow.addEventListener("resize", onResize);
   disposers.push(() => {
     disposed = true;
     if (timer) clearInterval(timer);
@@ -9632,7 +9633,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     clearInterval(clockTimer);
     document.removeEventListener("keydown", onKeyDown);
     document.removeEventListener("visibilitychange", onVisibility);
-    window.removeEventListener("resize", onResize);
+    canvasWindow.removeEventListener("resize", onResize);
     host2.replaceChildren();
   });
   return () => {
