@@ -92,6 +92,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
         await api(`/projects/${encoded}/work-items/${encodeURIComponent(ref)}/transition`, { method: 'POST', body: { status: 'backlog' } })
         await loadRuns(current.name)
       },
+      fetchTimeline: async (pid, wname, runKey) => api(`/projects/${encodeURIComponent(pid)}/workflows/${encodeURIComponent(wname)}/runs/${encodeURIComponent(runKey)}/timeline`),
     })  }, [project.id, current?.name, current?.versions?.length, runs, mode])
   const mutate = async (path, body = {}) => {
     setError(null)

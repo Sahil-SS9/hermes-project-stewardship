@@ -198,6 +198,13 @@ class WorkflowLibrary:
         internal = self._internal_name(project_id, name) if scope == "global" else name
         return self.engine.runs(project_id, internal) if internal else []
 
+    def timeline(self, project_id: str, name: str, scope: str, run_key: str):
+        self._exists(project_id)
+        internal = self._internal_name(project_id, name) if scope == "global" else name
+        if not internal:
+            raise ValueError("workflow run was not found")
+        return self.engine.timeline(project_id, internal, run_key)
+
     def archive(self, name: str, scope: str, *, actor: str,
                 project_id: str | None = None, restore: bool = False,
                 interface: str = "service"):

@@ -102,6 +102,78 @@ class WorkflowService:
     def __init__(self, store: Store, port: CanonicalWorkPort) -> None:
         self.store = store
         self.port = port
+        # Timeline cursors are process-local only; the durable source remains
+        # the canonical run projection plus domain_events. A cursor prevents a
+        # poll from recording the same observed status twice.
+        self._timeline_seen: dict[tuple[str, str, int, str], dict[str, str | None]] = {}
+
+    def _timeline_key(self, project_id: str, name: str, version: int, run_key: str) -> tuple[str, str, int, str]:
+        return (project_id, name, version, run_key)
+
+    def _timeline_events(self, project_id: str, name: str, version: int, run_key: str,
+                         result: Mapping[str, Any], snapshot: Mapping[str, Any],
+                         work_index: Mapping[str, Mapping[str, Any]]) -> list[dict[str, Any]]:
+        key = self._timeline_key(project_id, name, version, run_key)
+        seen = self._timeline_seen.setdefault(key, {})
+        now = iso(self.store._clock())
+        events: list[dict[str, Any]] = []
+        refs = result.get("tasks") or {}
+        states = result.get("node_states") or {}
+        # The initial observation is ordered by the stored graph, while later
+        # observations append only changed nodes. The persisted domain-event
+        # rows supply the global sequence in timeline().
+        for node in snapshot.get("nodes", []):
+            node_id = str(node["id"])
+            ref = refs.get(node_id)
+            item = work_index.get(ref) if ref else None
+            status = (item or {}).get("status") if item else states.get(node_id)
+            # The display status is the same canonical vocabulary returned by
+            # runs(); no synthetic 'thinking' or tool-call events are created.
+            status = status or states.get(node_id) or "waiting"
+            previous = seen.get(node_id, None)
+            if node_id not in seen or previous != status:
+                event = {
+                    "seq": len(events), "run_key": run_key, "node_id": node_id,
+                    "task_ref": ref, "kind": (item or {}).get("kind") or ("gate" if node.get("human_gate") else "task"),
+                    "title": node.get("title"), "from_status": previous,
+                    "to_status": status, "ts": now,
+                }
+                events.append(event)
+                seen[node_id] = status
+        return events
+
+    def timeline(self, project_id: str, name: str, run_key: str) -> dict[str, Any]:
+        row = self._run_row(project_id, name, run_key)
+        result = json.loads(row["result_json"]) or {}
+        snapshot = json.loads(row["effective_json"]) if row["effective_json"] else {"nodes": []}
+        work_index = {item["id"]: item for item in self.port.list_work(project_id)}
+        # Timeline events are materialised in domain_events so they survive a
+        # service restart and can be replayed by the canvas. The per-process
+        # cursor only decides what to append on this observation.
+        key = self._timeline_key(project_id, name, row["version"], run_key)
+        existing = self.store._conn.execute(
+            "SELECT id, ts, payload_json FROM domain_events WHERE event_type=? AND project_id=? AND subject=? ORDER BY id",
+            ("workflow.node_state", project_id, f"{name}:v{row['version']}:{run_key}"),
+        ).fetchall()
+        if existing:
+            seen = self._timeline_seen.setdefault(key, {})
+            for item in existing:
+                payload = json.loads(item["payload_json"])
+                seen[payload["node_id"]] = payload["to_status"]
+        new_events = self._timeline_events(project_id, name, row["version"], run_key, result, snapshot, work_index)
+        with self.store.tx() as cx:
+            for event in new_events:
+                event["seq"] = len(existing)
+                cur = cx.execute(
+                    "INSERT INTO domain_events(ts,event_type,project_id,subject,payload_json,emitted_by) VALUES(?,?,?,?,?,?)",
+                    (event["ts"], "workflow.node_state", project_id, f"{name}:v{row['version']}:{run_key}", json.dumps(event, sort_keys=True), "workflow-service"),
+                )
+                event["id"] = int(cur.lastrowid or 0)
+                existing.append({"id": event["id"], "ts": event["ts"], "payload_json": json.dumps(event)})
+        events = [json.loads(item["payload_json"]) | {"id": int(item["id"])} for item in existing]
+        for index, event in enumerate(events):
+            event["seq"] = index
+        return {"project_id": project_id, "name": name, "version": row["version"], "run_key": run_key, "events": events}
 
     # ---- validation ---------------------------------------------------
 

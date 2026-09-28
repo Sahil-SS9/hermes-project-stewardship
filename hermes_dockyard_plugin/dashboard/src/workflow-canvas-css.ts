@@ -50,13 +50,35 @@ export const WORKFLOW_CANVAS_CSS = `
 .dy-wf-scope .dy-wf-wrap { position: relative; width: 100%; height: 100%; }
 .dy-wf-scope .dy-wf-svg { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
 .dy-wf-scope .dy-wf-svg:active { cursor: grabbing; }
+/* Playback and activity controls belong to the canvas toolbar surface. */
+.dy-wf-scope .dy-wf-playback { position: absolute; left: 50%; bottom: 14px; z-index: 12; display: flex; align-items: center; gap: 8px; width: min(680px, calc(100% - 34px)); transform: translateX(-50%); padding: 8px 11px; border: 1px solid var(--dy-border, #2a2f3a); border-radius: 9px; background: color-mix(in srgb, var(--dy-bg-deep, #0f1218) 92%, transparent); box-shadow: 0 8px 26px rgba(0,0,0,.24); }
+.dy-wf-scope .dy-wf-playback-btn { flex: 0 0 auto; min-width: 70px; padding: 6px 9px; border: 1px solid var(--dy-border, #2a2f3a); border-radius: 6px; background: var(--dy-surface, #171c25); color: var(--dy-text, #e6edf3); cursor: pointer; }
+.dy-wf-scope .dy-wf-playback-btn:disabled { cursor: not-allowed; opacity: .55; }
+.dy-wf-scope .dy-wf-playback-slider { flex: 1 1 auto; min-width: 80px; accent-color: var(--dy-accent, #58a6ff); }
+.dy-wf-scope .dy-wf-playback-label { flex: 0 0 auto; min-width: 100px; color: var(--dy-text-3, #8b949e); font-size: 11px; text-align: right; }
+.dy-wf-scope .dy-wf-motion-btn { flex: 0 0 auto; padding: 6px 8px; border: 1px solid var(--dy-border, #2a2f3a); border-radius: 6px; background: var(--dy-surface, #171c25); color: var(--dy-text, #e6edf3); cursor: pointer; font-size: 11px; }
+.dy-wf-scope.dy-wf-still .dy-wf-node.working .dy-wf-shape, .dy-wf-scope.dy-wf-still .dy-wf-flowdot { animation: none !important; opacity: 0; }
+.dy-wf-scope.dy-wf-still .dy-wf-edge { stroke-dasharray: none; }
+.dy-wf-scope .dy-wf-node.dy-wf-playback-active .dy-wf-shape { filter: drop-shadow(0 0 8px var(--dy-accent, #58a6ff)); }
+.dy-wf-scope .dy-wf-node[data-wf-playback-status="done"] .dy-wf-shape { stroke: var(--dy-wf-status-done); }
+@media (max-width: 640px) {
+  .dy-wf-scope .dy-wf-playback { bottom: 8px; width: calc(100% - 18px); }
+  .dy-wf-scope .dy-wf-playback-label { min-width: 72px; font-size: 10px; }
+  .dy-wf-scope .dy-wf-motion-btn { padding-inline: 6px; }
+  .dy-wf-scope .dy-wf-index { display: none; }
+  .dy-wf-scope .dy-wf-feed { max-width: calc(100% - 24px); }
+  .dy-wf-scope .dy-wf-passport { left: 10px; right: 10px; top: auto; bottom: 62px; max-height: 42%; width: auto; }
+}
 /* LOD tiers (archify): map < 75% / read / full > 140% */
 .dy-wf-scope .dy-wf-svg[data-lod="map"] .dy-wf-sub,
 .dy-wf-scope .dy-wf-svg[data-lod="map"] .dy-wf-timer,
 .dy-wf-scope .dy-wf-svg[data-lod="map"] .dy-wf-assignee { opacity: 0; }
 .dy-wf-scope .dy-wf-svg .dy-wf-sub, .dy-wf-scope .dy-wf-svg .dy-wf-timer,
 .dy-wf-scope .dy-wf-svg .dy-wf-assignee { transition: opacity .3s; }
-.dy-wf-scope .dy-wf-node { cursor: pointer; outline: none; }
+.dy-wf-scope .dy-wf-node { cursor: pointer; outline: none; transition: opacity .22s ease, filter .22s ease; }
+.dy-wf-scope .dy-wf-node.dy-wf-route-dim { opacity: .22; filter: saturate(.25); }
+.dy-wf-scope .dy-wf-node-history { display: grid; gap: 3px; margin: 10px 0 0; padding-left: 18px; color: var(--dy-text-3, #8b949e); font-size: 11px; }
+.dy-wf-scope .dy-wf-edge.dy-wf-route-edge { stroke: var(--dy-edge-dep-active); stroke-width: 2.5; filter: drop-shadow(0 0 4px var(--dy-edge-dep-active)); }
 /* Purpose silhouette: the shape is drawn inside the fixed node box, so ports,
    edge endpoints and the layout grid keep their geometry. Fill = PURPOSE. */
 .dy-wf-scope .dy-wf-node .dy-wf-shape { stroke-width: 1.5; transition: stroke .5s, fill .3s, stroke-width .2s; }
@@ -131,6 +153,13 @@ export const WORKFLOW_CANVAS_CSS = `
 .dy-wf-scope .dy-wf-feed-time { font: 10px ui-monospace, monospace; color: #59626f; flex: none; padding-top: 1px; }
 .dy-wf-scope .dy-wf-mini-view { fill: none; stroke: #58a6ff; stroke-width: 2; }
 .dy-wf-scope .dy-wf-passport { position: absolute; top: 10px; right: 10px; width: 280px; max-height: calc(100% - 20px); overflow-y: auto; background: #161b22; border: 1px solid #2a2f3a; border-radius: 8px; padding: 12px; color: var(--dy-text, #e6edf3); }
+/* No permanent inspector: an empty passport must not sit above the graph and
+   intercept/occlude the canvas. It becomes visible only after node selection. */
+.dy-wf-scope .dy-wf-passport:empty { display: none; }
+/* This selector intentionally outranks the base passport rule above. */
+@media (max-width: 640px) {
+  .dy-wf-scope .dy-wf-wrap .dy-wf-passport { left: 10px; right: 10px; top: auto; bottom: 62px; max-height: 42%; width: auto; }
+}
 /* P8.2: zoom controls + keyboard focus ring + equivalent list view. */
 .dy-wf-scope .dy-wf-zoombar { display: flex; gap: 6px; margin: 6px 0; }
 .dy-wf-scope .dy-wf-zoombtn { background: #0d1117; color: var(--dy-text, #e6edf3); border: 1px solid #2a2f3a; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; }

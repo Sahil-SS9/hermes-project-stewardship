@@ -120,6 +120,12 @@
       approve: (ref, payload) => post(`/initiatives/${encodeURIComponent(ref)}/approve`, payload),
       reject: (ref, payload) => post(`/initiatives/${encodeURIComponent(ref)}/reject`, payload),
       workflowRuns: (projectId, name) => get(`/projects/${encodeURIComponent(projectId)}/workflows/${encodeURIComponent(name)}/runs`),
+      workflowTimeline: (projectId, name, runKey) => get(
+        `/projects/${encodeURIComponent(projectId)}/workflows/${encodeURIComponent(name)}/runs/${encodeURIComponent(runKey)}/timeline`
+      ),
+      workflowScopedTimeline: (projectId, scope, name, runKey) => get(
+        `/projects/${encodeURIComponent(projectId)}/workflows/${encodeURIComponent(scope)}/${encodeURIComponent(name)}/runs/${encodeURIComponent(runKey)}/timeline`
+      ),
       initiatives: (projectId) => get(
         `/projects/${encodeURIComponent(projectId)}/initiatives`
       ),
@@ -525,6 +531,12 @@
     nodes.forEach((n) => computeDepth(n.node_id));
     const perDepth = {};
     const positions = {};
+    if (opts?.mobile) {
+      nodes.forEach((n, index) => {
+        positions[n.node_id] = { x: PAD, y: PAD + index * (NODE_H + ROW_GAP + 24), depth: index };
+      });
+      return { positions, lanes: [], width: PAD * 2 + NODE_W, height: PAD * 2 + nodes.length * (NODE_H + ROW_GAP + 24) };
+    }
     nodes.forEach((n) => {
       const d = depthCache.get(n.node_id) ?? 0;
       const row = perDepth[d] ?? 0;
@@ -663,7 +675,37 @@
       listBody.style.display = open ? "none" : "block";
     });
     listView.append(listHead, listBody);
-    wrap.append(svg, SVG_INDEX, feed, minimap, passport, zoomBar, listView);
+    let playbackBar = null;
+    let playbackSlider = null;
+    let playbackLabel = null;
+    let playbackButton = null;
+    playbackBar = elu("div", "dy-wf-playback");
+    playbackBar.setAttribute("role", "group");
+    playbackBar.setAttribute("aria-label", "Workflow playback");
+    playbackButton = elu("button", "dy-wf-playback-btn", "\u25B6 Play");
+    playbackButton.type = "button";
+    playbackButton.disabled = true;
+    playbackSlider = elu("input", "dy-wf-playback-slider");
+    playbackSlider.type = "range";
+    playbackSlider.min = "0";
+    playbackSlider.value = "0";
+    playbackSlider.step = "1";
+    playbackSlider.disabled = true;
+    playbackSlider.setAttribute("aria-label", "Workflow playback");
+    playbackLabel = elu("span", "dy-wf-playback-label", "Live");
+    const motionButton = elu("button", "dy-wf-motion-btn", "Motion on");
+    motionButton.type = "button";
+    motionButton.setAttribute("aria-label", "Toggle workflow canvas motion");
+    motionButton.setAttribute("aria-pressed", "true");
+    motionButton.addEventListener("click", () => {
+      const on = motionButton.getAttribute("aria-pressed") === "true";
+      motionButton.setAttribute("aria-pressed", String(!on));
+      motionButton.textContent = on ? "Motion off" : "Motion on";
+      host.classList.toggle("dy-wf-still", on);
+    });
+    playbackBar.append(playbackButton, playbackSlider, playbackLabel, motionButton);
+    wrap.append(svg, SVG_INDEX, feed, minimap, passport, zoomBar, listView, playbackBar);
+    playbackBar.style.overflowX = "auto";
     host.appendChild(wrap);
     let panX = 0;
     let panY = 0;
@@ -674,6 +716,7 @@
     let originY = 0;
     let currentNodes = [];
     let nodePositions = {};
+    let previousMobileLayout = null;
     let dragNode = null;
     let dragStart = { x: 0, y: 0, ox: 0, oy: 0 };
     let connectFrom = null;
@@ -845,6 +888,49 @@
       defs.appendChild(mkMarker(meaning.activeMarker, meaning.activeColor, "#9cc4ff"));
     }
     svg.appendChild(defs);
+    const timelineFor = (run) => run?.timeline ?? [];
+    const clearRoute = () => {
+      viewport.querySelectorAll(".dy-wf-route-dim, .dy-wf-route-edge").forEach((el) => el.classList.remove("dy-wf-route-dim", "dy-wf-route-edge"));
+    };
+    const renderPlaybackState = (run, index) => {
+      if (!run || index === null || !run.timeline?.length) return;
+      const state = /* @__PURE__ */ new Map();
+      for (const event of run.timeline.slice(0, index + 1)) state.set(event.node_id, event.to_status);
+      viewport.querySelectorAll("[data-node-id]").forEach((g) => {
+        const id = g.getAttribute("data-node-id") ?? "";
+        const status = state.get(id);
+        if (status) g.dataset.wfPlaybackStatus = status;
+        g.classList.toggle("dy-wf-playback-active", state.has(id));
+      });
+      if (playbackLabel) playbackLabel.textContent = `Event ${index + 1}/${run.timeline.length}`;
+    };
+    const setPlayback = (run, index) => {
+      const timeline = timelineFor(run);
+      playbackIndex = index;
+      const enabled = timeline.length > 1;
+      if (playbackSlider) {
+        playbackSlider.disabled = !enabled;
+        playbackSlider.max = String(Math.max(0, timeline.length - 1));
+        playbackSlider.value = String(Math.max(0, index ?? timeline.length - 1));
+      }
+      if (playbackButton) playbackButton.disabled = !enabled;
+      render(run);
+      if (index !== null) renderPlaybackState(run, index);
+    };
+    playbackSlider?.addEventListener("input", () => {
+      if (lastRun) setPlayback(lastRun, Number(playbackSlider?.value ?? 0));
+    });
+    playbackButton?.addEventListener("click", () => {
+      if (!lastRun?.timeline?.length) return;
+      const next = playbackIndex === null ? 0 : playbackIndex + 1;
+      if (next >= lastRun.timeline.length) {
+        setPlayback(lastRun, null);
+        if (playbackButton) playbackButton.textContent = "\u25B6 Play";
+        return;
+      }
+      if (playbackButton) playbackButton.textContent = "\u23F8 Pause";
+      setPlayback(lastRun, next);
+    });
     let lastRun = null;
     const renderList = (run) => {
       listBody.replaceChildren();
@@ -893,6 +979,7 @@
       });
       g.dataset.wfPurpose = purpose;
       g.dataset.wfStatus = status;
+      if (playbackIndex !== null) g.dataset.wfPlaybackStatus = n.status ?? "pending";
       g.setAttribute("tabindex", "0");
       g.setAttribute("role", "button");
       g.setAttribute("data-node-id", n.node_id);
@@ -1027,6 +1114,17 @@
     };
     const render = (run) => {
       lastRun = run;
+      const timeline = timelineFor(run);
+      if (playbackSlider) {
+        playbackSlider.disabled = timeline.length < 2;
+        playbackSlider.max = String(Math.max(0, timeline.length - 1));
+        playbackSlider.value = String(Math.max(0, playbackIndex ?? timeline.length - 1));
+      }
+      if (playbackButton) {
+        playbackButton.disabled = timeline.length < 2;
+        playbackButton.textContent = playbackIndex === null ? "\u25B6 Play" : "\u23F8 Pause";
+      }
+      if (playbackLabel) playbackLabel.textContent = playbackIndex === null ? timeline.length ? `Live \xB7 ${timeline.length} events` : "Live" : `Event ${playbackIndex + 1}/${timeline.length}`;
       renderList(run);
       viewport.replaceChildren();
       viewport.appendChild(defs);
@@ -1038,10 +1136,19 @@
         return;
       }
       currentNodes = run.nodes;
-      const assignments = run.nodes.some((n) => (n.team ?? n.phase_team ?? "").trim());
+      if (timeline.length > 1 && playbackIndex !== null) {
+        const states = /* @__PURE__ */ new Map();
+        for (const event of timeline.slice(0, playbackIndex + 1)) states.set(event.node_id, event.to_status);
+        currentNodes = currentNodes.map((node) => states.has(node.node_id) ? { ...node, status: states.get(node.node_id) ?? node.status } : { ...node, status: "pending" });
+      }
+      const assignments = currentNodes.some((n) => (n.team ?? n.phase_team ?? "").trim());
       const laneOf = assignments ? laneKeyOf : (n) => isExceptionNode(n) ? EXCEPTION_LANE_KEY : "main-path";
-      let layout = buildLayout(run.nodes, { laneOf });
-      if (layout.lanes.length < 2) layout = buildLayout(run.nodes);
+      const mobileLayout = window.innerWidth <= 640;
+      svg.dataset.mobileLayout = String(mobileLayout);
+      if (previousMobileLayout !== null && previousMobileLayout !== mobileLayout) nodePositions = {};
+      previousMobileLayout = mobileLayout;
+      let layout = buildLayout(run.nodes, { laneOf, mobile: mobileLayout });
+      if (!mobileLayout && layout.lanes.length < 2) layout = buildLayout(run.nodes);
       const positions = nodePositions = Object.keys(nodePositions).length ? { ...layout.positions, ...nodePositions } : run.nodes.reduce((acc, item) => {
         if (item.canvas_position) acc[item.node_id] = { ...layout.positions[item.node_id], ...item.canvas_position };
         return acc;
@@ -1077,7 +1184,7 @@
         viewport.append(band, lbl);
       }
       const depMeaning = EDGE_MEANINGS[DEFAULT_EDGE_MEANING];
-      for (const n of run.nodes) {
+      for (const n of currentNodes) {
         const from = positions[n.node_id];
         for (const dep of n.depends_on) {
           const to = positions[dep];
@@ -1090,8 +1197,14 @@
             // lane anchors, so a dependency that crosses lanes reads as one
             // flow instead of a ruler line.
             d: (() => {
+              if (mobileLayout) {
+                const x12 = to.x + NODE_W / 2, y12 = to.y + NODE_H;
+                const x22 = from.x + NODE_W / 2, y22 = from.y;
+                const dy = Math.max(ROW_GAP / 2, Math.abs(y22 - y12) * 0.45);
+                return `M ${x12} ${y12} C ${x12} ${y12 + dy}, ${x22} ${y22 - dy}, ${x22} ${y22}`;
+              }
               const x1 = to.x + NODE_W, y1 = to.y + NODE_H / 2;
-              const x2 = from.x - 6, y2 = from.y + NODE_H / 2;
+              const x2 = from.x, y2 = from.y + NODE_H / 2;
               const sameBand = Math.abs(y1 - y2) < NODE_H / 2;
               const dx = Math.max(COL_GAP / 2, Math.abs(x2 - x1) * 0.55);
               if (sameBand) {
@@ -1100,18 +1213,20 @@
               }
               return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
             })(),
-            // Leaves the marker 6px of room before the shape, so the head is
-            // never tucked under the node it points at.
+            // Terminate at the dependent node's left boundary. The arrowhead
+            // is part of the connector, so the line remains visibly attached.
             "marker-end": `url(#${depMeaning.marker})`
           });
           path.dataset.from = dep;
           path.dataset.to = n.node_id;
+          path.dataset.sourcePort = mobileLayout ? "bottom" : "right";
+          path.dataset.targetPort = mobileLayout ? "top" : "left";
           viewport.appendChild(path);
           const dot = sEl("circle", { class: "dy-wf-flowdot", r: 3.2, opacity: 0 });
           viewport.appendChild(dot);
         }
       }
-      for (const n of run.nodes) {
+      for (const n of currentNodes) {
         const p = positions[n.node_id];
         viewport.appendChild(buildNode(n, p, run, Boolean(handlers.onEdit)));
       }
@@ -1210,10 +1325,30 @@
     });
     let lastFrames = [];
     let selectedEl = null;
+    let playbackIndex = null;
     const openPassport = (n, g) => {
       if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
       selectedEl = g ?? null;
       if (selectedEl) selectedEl.classList.add("dy-wf-selected");
+      const selectedId = n.node_id;
+      const related = /* @__PURE__ */ new Set([selectedId]);
+      const byId = new Map(currentNodes.map((node) => [node.node_id, node]));
+      const walkUp = (id) => {
+        for (const dep of byId.get(id)?.depends_on ?? []) if (!related.has(dep)) {
+          related.add(dep);
+          walkUp(dep);
+        }
+      };
+      const walkDown = (id) => {
+        for (const node of currentNodes) if (node.depends_on.includes(id) && !related.has(node.node_id)) {
+          related.add(node.node_id);
+          walkDown(node.node_id);
+        }
+      };
+      walkUp(selectedId);
+      walkDown(selectedId);
+      viewport.querySelectorAll(".dy-wf-node").forEach((node) => node.classList.toggle("dy-wf-route-dim", !related.has(node.getAttribute("data-node-id") ?? "")));
+      viewport.querySelectorAll(".dy-wf-edge").forEach((edge) => edge.classList.toggle("dy-wf-route-edge", related.has(edge.dataset.from ?? "") && related.has(edge.dataset.to ?? "")));
       passport.replaceChildren();
       passport.appendChild(elu("h3", "", n.title));
       if (handlers.onEdit) {
@@ -1248,6 +1383,12 @@
         passport.appendChild(edit);
       }
       passport.appendChild(elu("span", `badge ${n.status ?? "pending"}`, n.status ?? "pending"));
+      const nodeEvents = (lastRun?.timeline ?? []).filter((event) => event.node_id === n.node_id);
+      if (nodeEvents.length) {
+        const history = elu("ol", "dy-wf-node-history");
+        for (const event of nodeEvents.slice(-6)) history.appendChild(elu("li", "", `${event.from_status ?? "\u2014"} \u2192 ${event.to_status}`));
+        passport.appendChild(history);
+      }
       const lastConfirmed = elu("p", "dy-wf-last-confirmed");
       const updated = lastRun?.updated_at ?? null;
       lastConfirmed.textContent = `Last confirmed update: ${updated && isFinite(Date.parse(updated)) ? updated.replace("T", " ").slice(0, 16) + " UTC" : "unknown"}`;
@@ -1471,6 +1612,7 @@
         passport.replaceChildren();
         if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
         selectedEl = null;
+        clearRoute();
       }
     };
     document.addEventListener("keydown", onKeyDown);
@@ -1535,6 +1677,7 @@
     }, 40);
     let timer = null;
     let lastSig = "";
+    let lastTimelineCount = 0;
     let pollTicket = 0;
     let appliedTicket = 0;
     let disposed = false;
@@ -1553,11 +1696,28 @@
     document.addEventListener("visibilitychange", onVisibility);
     const pollOnce = () => {
       const ticket = ++pollTicket;
-      fetchRuns().then((runs) => {
+      fetchRuns().then(async (runs) => {
         if (disposed || ticket < appliedTicket) return;
         appliedTicket = ticket;
         const latest = runs && runs.length ? runs[0] : null;
+        if (latest?.run_key && latest.status !== "definition" && handlers.fetchTimeline) {
+          try {
+            const history = await handlers.fetchTimeline(projectId, runName, latest.run_key);
+            latest.timeline = (history.events ?? []).map((event) => ({
+              seq: Number(event.seq ?? 0),
+              node_id: String(event.node_id),
+              from_status: event.from_status == null ? null : String(event.from_status),
+              to_status: String(event.to_status ?? "pending"),
+              ts: event.ts == null ? void 0 : String(event.ts)
+            }));
+          } catch {
+          }
+        }
         const sig = JSON.stringify(latest?.nodes.map((n) => [n.node_id, n.status]) ?? []);
+        if (latest?.timeline?.length && latest.timeline.length > lastTimelineCount) {
+          feedLog(`Run timeline: ${latest.timeline.length} observed events`);
+          lastTimelineCount = latest.timeline.length;
+        }
         if (sig !== lastSig) {
           if (lastSig !== "") {
             const prev = /* @__PURE__ */ new Map();
@@ -1576,6 +1736,7 @@
         }
         const frameSig = JSON.stringify(latest ?? null);
         if (frameSig !== lastFrameSig) {
+          playbackIndex = null;
           render(latest);
           lastFrameSig = frameSig;
         }
@@ -1598,6 +1759,10 @@
     };
     pollOnce();
     if (pollMs > 0) timer = setInterval(pollOnce, pollMs);
+    const onResize = () => {
+      if (!disposed && lastRun) render(lastRun);
+    };
+    window.addEventListener("resize", onResize);
     disposers.push(() => {
       disposed = true;
       if (timer) clearInterval(timer);
@@ -1605,6 +1770,7 @@
       clearInterval(clockTimer);
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("resize", onResize);
       host.replaceChildren();
     });
     return () => {
@@ -3172,7 +3338,8 @@
                 };
               })
             };
-          }
+          },
+          fetchTimeline: (timelineProjectId, timelineName, timelineRunKey) => s.api.workflowTimeline(timelineProjectId, timelineName, timelineRunKey)
         }
       );
       canvasHost.dyDispose = dispose;

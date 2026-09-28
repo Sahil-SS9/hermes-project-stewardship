@@ -51,6 +51,8 @@ GET   /projects/{id}/views
 GET   /projects/{id}/work-items
 GET   /projects/{id}/work-items/{ref}
 GET   /projects/{id}/workflows/{name}/runs
+GET   /projects/{id}/workflows/{scope}/{name}/runs/{run_key}/timeline
+GET   /projects/{id}/workflows/{name}/runs/{run_key}/timeline
 PATCH /projects/{id}/features
 PATCH /projects/{id}/milestones/{name}
 PATCH /projects/{id}/work-items/{ref}

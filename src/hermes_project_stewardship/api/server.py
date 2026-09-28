@@ -2273,6 +2273,23 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(404, str(exc)) from None
 
+    @router.get("/projects/{project_id}/workflows/{scope}/{name}/runs/{run_key}/timeline")
+    def scoped_workflow_run_timeline(project_id: str, scope: str, name: str, run_key: str):
+        svc.require_feature(project_id, "workflow_canvas")
+        try:
+            return workflow_library.timeline(project_id, name, scope, run_key)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from None
+
+    @router.get("/projects/{project_id}/workflows/{name}/runs/{run_key}/timeline")
+    def workflow_run_timeline(project_id: str, name: str, run_key: str):
+        """Ordered canonical node-state history for canvas playback."""
+        svc.require_feature(project_id, "workflow_canvas")
+        try:
+            return workflows.timeline(project_id, name, run_key)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from None
+
     @router.get("/projects/{project_id}/workflows/{name}/binding")
     def get_workflow_binding(project_id: str, name: str):
         svc.require_feature(project_id, "workflow_canvas")

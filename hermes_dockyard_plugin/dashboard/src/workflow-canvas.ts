@@ -27,6 +27,8 @@ export interface CanvasNode {
   phase_team?: string | null;
   evidence_refs: string[];
   canvas_position?: { x: number; y: number };
+  // Optional read-only playback history attached by the host poller.
+  timeline?: Array<{ seq?: number; node_id: string; from_status?: string | null; to_status: string; ts?: string }>;
   // Graph-shape modifiers carried by the run projection. A node with an
   // upstream condition is a conditional branch; a loop bound makes it a
   // bounded loop. (workflow_service.py validates `kind` as task|gate only —
@@ -42,6 +44,7 @@ export interface CanvasRun {
   started_at: string | null;
   updated_at: string | null;
   nodes: CanvasNode[];
+  timeline?: Array<{ seq?: number; node_id: string; from_status?: string | null; to_status: string; ts?: string }>;
 }
 
 import {
@@ -84,6 +87,9 @@ export interface CanvasHandlers {
   onExpand?: (taskRef: string) => Promise<ExpansionData | null>;
   // Persist the edited graph as a new workflow version through the host seam.
   onEdit?: (nodes: CanvasNode[]) => Promise<unknown> | void;
+  // Read-only canonical event history. If absent (e.g. definition-only
+  // frames), playback stays disabled rather than inventing events.
+  fetchTimeline?: (projectId: string, workflowName: string, runKey: string) => Promise<{ events?: Array<Record<string, unknown>> }>;
 }
 
 const NODE_W = 208;
@@ -353,7 +359,7 @@ export function isExceptionNode(n: CanvasNode): boolean {
 }
 
 // ---- buildLayout: pure, exported for tests ----
-export function buildLayout(nodes: CanvasNode[], opts?: { laneOf?: (n: CanvasNode) => string }): {
+export function buildLayout(nodes: CanvasNode[], opts?: { laneOf?: (n: CanvasNode) => string; mobile?: boolean }): {
   positions: Record<string, { x: number; y: number; depth: number }>;
   lanes: LaneMeta[];
   width: number;
@@ -373,6 +379,10 @@ export function buildLayout(nodes: CanvasNode[], opts?: { laneOf?: (n: CanvasNod
   nodes.forEach((n) => computeDepth(n.node_id));
   const perDepth: Record<number, number> = {};
   const positions: Record<string, { x: number; y: number; depth: number }> = {};
+  if (opts?.mobile) {
+    nodes.forEach((n, index) => { positions[n.node_id] = { x: PAD, y: PAD + index * (NODE_H + ROW_GAP + 24), depth: index }; });
+    return { positions, lanes: [], width: PAD * 2 + NODE_W, height: PAD * 2 + nodes.length * (NODE_H + ROW_GAP + 24) };
+  }
   nodes.forEach((n) => {
     const d = depthCache.get(n.node_id) ?? 0;
     const row = perDepth[d] ?? 0;
@@ -549,7 +559,35 @@ export function mountWorkflowCanvas(
   });
   listView.append(listHead, listBody);
 
-  wrap.append(svg, SVG_INDEX, feed, minimap, passport, zoomBar, listView);
+  // Playback is a canvas control, not a side-panel feature. It is disabled
+  // until the real timeline endpoint supplies at least two observed events.
+  let playbackBar: HTMLDivElement | null = null;
+  let playbackSlider: HTMLInputElement | null = null;
+  let playbackLabel: HTMLSpanElement | null = null;
+  let playbackButton: HTMLButtonElement | null = null;
+  playbackBar = elu<HTMLDivElement>('div', 'dy-wf-playback');
+  playbackBar.setAttribute('role', 'group');
+  playbackBar.setAttribute('aria-label', 'Workflow playback');
+  playbackButton = elu<HTMLButtonElement>('button', 'dy-wf-playback-btn', '▶ Play');
+  playbackButton.type = 'button';
+  playbackButton.disabled = true;
+  playbackSlider = elu<HTMLInputElement>('input', 'dy-wf-playback-slider');
+  playbackSlider.type = 'range'; playbackSlider.min = '0'; playbackSlider.value = '0'; playbackSlider.step = '1'; playbackSlider.disabled = true;
+  playbackSlider.setAttribute('aria-label', 'Workflow playback');
+  playbackLabel = elu<HTMLSpanElement>('span', 'dy-wf-playback-label', 'Live');
+  const motionButton = elu<HTMLButtonElement>('button', 'dy-wf-motion-btn', 'Motion on');
+  motionButton.type = 'button'; motionButton.setAttribute('aria-label', 'Toggle workflow canvas motion'); motionButton.setAttribute('aria-pressed', 'true');
+  motionButton.addEventListener('click', () => {
+    const on = motionButton.getAttribute('aria-pressed') === 'true';
+    motionButton.setAttribute('aria-pressed', String(!on));
+    motionButton.textContent = on ? 'Motion off' : 'Motion on';
+    host.classList.toggle('dy-wf-still', on);
+  });
+  playbackBar.append(playbackButton, playbackSlider, playbackLabel, motionButton);
+  wrap.append(svg, SVG_INDEX, feed, minimap, passport, zoomBar, listView, playbackBar);
+  // Keep the canvas frame itself scroll-free on mobile: the control row owns
+  // its horizontal overflow and remains fully reachable by touch/keyboard.
+  playbackBar.style.overflowX = 'auto';
   host.appendChild(wrap);
 
   // camera state
@@ -565,6 +603,7 @@ export function mountWorkflowCanvas(
   let originY = 0;
   let currentNodes: CanvasNode[] = [];
   let nodePositions: Record<string, CanvasPosition> = {};
+  let previousMobileLayout: boolean | null = null;
   let dragNode: string | null = null;
   let dragStart = { x: 0, y: 0, ox: 0, oy: 0 };
   let connectFrom: string | null = null;
@@ -793,6 +832,39 @@ export function mountWorkflowCanvas(
   }
   svg.appendChild(defs);
 
+  const timelineFor = (run: CanvasRun | null) => run?.timeline ?? [];
+  const clearRoute = () => {
+    viewport.querySelectorAll('.dy-wf-route-dim, .dy-wf-route-edge').forEach((el) => el.classList.remove('dy-wf-route-dim', 'dy-wf-route-edge'));
+  };
+  const renderPlaybackState = (run: CanvasRun | null, index: number | null) => {
+    if (!run || index === null || !run.timeline?.length) return;
+    const state = new Map<string, string>();
+    for (const event of run.timeline.slice(0, index + 1)) state.set(event.node_id, event.to_status);
+    viewport.querySelectorAll<SVGGElement>('[data-node-id]').forEach((g) => {
+      const id = g.getAttribute('data-node-id') ?? '';
+      const status = state.get(id);
+      if (status) g.dataset.wfPlaybackStatus = status;
+      g.classList.toggle('dy-wf-playback-active', state.has(id));
+    });
+    if (playbackLabel) playbackLabel.textContent = `Event ${index + 1}/${run.timeline.length}`;
+  };
+  const setPlayback = (run: CanvasRun | null, index: number | null) => {
+    const timeline = timelineFor(run);
+    playbackIndex = index;
+    const enabled = timeline.length > 1;
+    if (playbackSlider) { playbackSlider.disabled = !enabled; playbackSlider.max = String(Math.max(0, timeline.length - 1)); playbackSlider.value = String(Math.max(0, index ?? timeline.length - 1)); }
+    if (playbackButton) playbackButton.disabled = !enabled;
+    render(run);
+    if (index !== null) renderPlaybackState(run, index);
+  };
+  playbackSlider?.addEventListener('input', () => { if (lastRun) setPlayback(lastRun, Number(playbackSlider?.value ?? 0)); });
+  playbackButton?.addEventListener('click', () => {
+    if (!lastRun?.timeline?.length) return;
+    const next = playbackIndex === null ? 0 : playbackIndex + 1;
+    if (next >= lastRun.timeline.length) { setPlayback(lastRun, null); if (playbackButton) playbackButton.textContent = '▶ Play'; return; }
+    if (playbackButton) playbackButton.textContent = '⏸ Pause'; setPlayback(lastRun, next);
+  });
+
   // ---- render frame (event-driven: called on poll arrival / state delta) ----
   let lastRun: CanvasRun | null = null;
   const renderList = (run: CanvasRun | null) => {
@@ -847,6 +919,7 @@ export function mountWorkflowCanvas(
     }) as SVGGElement;
     g.dataset.wfPurpose = purpose;
     g.dataset.wfStatus = status;
+    if (playbackIndex !== null) g.dataset.wfPlaybackStatus = n.status ?? 'pending';
     g.setAttribute('tabindex', '0');
     g.setAttribute('role', 'button');
     g.setAttribute('data-node-id', n.node_id);
@@ -1001,6 +1074,12 @@ export function mountWorkflowCanvas(
 
   const render = (run: CanvasRun | null) => {
     lastRun = run;
+    const timeline = timelineFor(run);
+    if (playbackSlider) { playbackSlider.disabled = timeline.length < 2; playbackSlider.max = String(Math.max(0, timeline.length - 1)); playbackSlider.value = String(Math.max(0, playbackIndex ?? timeline.length - 1)); }
+    if (playbackButton) { playbackButton.disabled = timeline.length < 2; playbackButton.textContent = playbackIndex === null ? '▶ Play' : '⏸ Pause'; }
+    if (playbackLabel) playbackLabel.textContent = playbackIndex === null
+      ? (timeline.length ? `Live · ${timeline.length} events` : 'Live')
+      : `Event ${playbackIndex + 1}/${timeline.length}`;
     renderList(run);
     viewport.replaceChildren();
     viewport.appendChild(defs);
@@ -1012,15 +1091,28 @@ export function mountWorkflowCanvas(
       return;
     }
     currentNodes = run.nodes;
+    // Timeline playback uses a read-only derived frame; the live run remains
+    // the source of truth and reappears when playback is cleared.
+    if (timeline.length > 1 && playbackIndex !== null) {
+      const states = new Map<string, string>();
+      for (const event of timeline.slice(0, playbackIndex + 1)) states.set(event.node_id, event.to_status);
+      currentNodes = currentNodes.map((node) => states.has(node.node_id)
+        ? { ...node, status: states.get(node.node_id) ?? node.status }
+        : { ...node, status: 'pending' });
+    }
     // Lane grouping: the resolved assignment when the run states one, else the
     // shape-derived exception partition (both real — see laneKeyOf). A single
     // band is not a band: bands only render when there are two or more.
-    const assignments = run.nodes.some((n) => ((n.team ?? n.phase_team) ?? '').trim());
+    const assignments = currentNodes.some((n) => ((n.team ?? n.phase_team) ?? '').trim());
     const laneOf = assignments
       ? laneKeyOf
       : (n: CanvasNode) => (isExceptionNode(n) ? EXCEPTION_LANE_KEY : 'main-path');
-    let layout = buildLayout(run.nodes, { laneOf });
-    if (layout.lanes.length < 2) layout = buildLayout(run.nodes);
+    const mobileLayout = window.innerWidth <= 640;
+    svg.dataset.mobileLayout = String(mobileLayout);
+    if (previousMobileLayout !== null && previousMobileLayout !== mobileLayout) nodePositions = {};
+    previousMobileLayout = mobileLayout;
+    let layout = buildLayout(run.nodes, { laneOf, mobile: mobileLayout });
+    if (!mobileLayout && layout.lanes.length < 2) layout = buildLayout(run.nodes);
     const positions = nodePositions = Object.keys(nodePositions).length ? { ...layout.positions, ...nodePositions } : run.nodes.reduce((acc, item) => { if (item.canvas_position) acc[item.node_id] = { ...layout.positions[item.node_id], ...item.canvas_position }; return acc; }, { ...layout.positions } as Record<string, CanvasPosition>);
     // The world must contain every node it renders. Persisted canvas_position
     // values survive layout changes, so a stale drag can sit outside the
@@ -1060,7 +1152,7 @@ export function mountWorkflowCanvas(
     // edges first (under nodes). Every dependency edge carries the default
     // workflow meaning; its colour and arrowhead come from the meaning table.
     const depMeaning = EDGE_MEANINGS[DEFAULT_EDGE_MEANING];
-    for (const n of run.nodes) {
+    for (const n of currentNodes) {
       const from = positions[n.node_id];
       for (const dep of n.depends_on) {
         const to = positions[dep];
@@ -1073,29 +1165,37 @@ export function mountWorkflowCanvas(
           // lane anchors, so a dependency that crosses lanes reads as one
           // flow instead of a ruler line.
           d: (() => {
+            // Dependency points from upstream `dep` to dependent `n`.
+            if (mobileLayout) {
+              const x1 = to.x + NODE_W / 2, y1 = to.y + NODE_H;
+              const x2 = from.x + NODE_W / 2, y2 = from.y;
+              const dy = Math.max(ROW_GAP / 2, Math.abs(y2 - y1) * 0.45);
+              return `M ${x1} ${y1} C ${x1} ${y1 + dy}, ${x2} ${y2 - dy}, ${x2} ${y2}`;
+            }
             const x1 = to.x + NODE_W, y1 = to.y + NODE_H / 2;
-            const x2 = from.x - 6, y2 = from.y + NODE_H / 2;
+            const x2 = from.x, y2 = from.y + NODE_H / 2;
             const sameBand = Math.abs(y1 - y2) < NODE_H / 2;
             const dx = Math.max(COL_GAP / 2, Math.abs(x2 - x1) * 0.55);
             if (sameBand) {
-              // Bow: lift the two control points symmetrically off the line.
               const bow = Math.min(46, Math.max(18, dx * 0.35));
               return `M ${x1} ${y1} C ${x1 + dx} ${y1 - bow}, ${x2 - dx} ${y2 - bow}, ${x2} ${y2}`;
             }
             return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
           })(),
-          // Leaves the marker 6px of room before the shape, so the head is
-          // never tucked under the node it points at.
+          // Terminate at the dependent node's left boundary. The arrowhead
+          // is part of the connector, so the line remains visibly attached.
           'marker-end': `url(#${depMeaning.marker})`,
         });
         path.dataset.from = dep;
         path.dataset.to = n.node_id;
+        path.dataset.sourcePort = mobileLayout ? 'bottom' : 'right';
+        path.dataset.targetPort = mobileLayout ? 'top' : 'left';
         viewport.appendChild(path);
         const dot = sEl('circle', { class: 'dy-wf-flowdot', r: 3.2, opacity: 0 });
         viewport.appendChild(dot);
       }
     }
-    for (const n of run.nodes) {
+    for (const n of currentNodes) {
       const p = positions[n.node_id];
       viewport.appendChild(buildNode(n, p, run, Boolean(handlers.onEdit)));
     }
@@ -1206,11 +1306,23 @@ export function mountWorkflowCanvas(
   // ---- passport with lazy expansion ----
   let lastFrames: CanvasRun[] = [];
   let selectedEl: SVGGElement | null = null;
+  let playbackIndex: number | null = null;
   const openPassport = (n: CanvasNode, g?: SVGGElement | null) => {
     // unmistakable selection: clear previous, mark current
     if (selectedEl) selectedEl.classList.remove('dy-wf-selected');
     selectedEl = g ?? null;
     if (selectedEl) selectedEl.classList.add('dy-wf-selected');
+    // Selection owns a route highlight: unrelated nodes/connectors dim, while
+    // upstream and downstream dependency edges stay readable. This is derived
+    // from the same canonical depends_on graph; no visual-only relationships.
+    const selectedId = n.node_id;
+    const related = new Set<string>([selectedId]);
+    const byId = new Map(currentNodes.map((node) => [node.node_id, node]));
+    const walkUp = (id: string) => { for (const dep of byId.get(id)?.depends_on ?? []) if (!related.has(dep)) { related.add(dep); walkUp(dep); } };
+    const walkDown = (id: string) => { for (const node of currentNodes) if (node.depends_on.includes(id) && !related.has(node.node_id)) { related.add(node.node_id); walkDown(node.node_id); } };
+    walkUp(selectedId); walkDown(selectedId);
+    viewport.querySelectorAll<SVGGElement>('.dy-wf-node').forEach((node) => node.classList.toggle('dy-wf-route-dim', !related.has(node.getAttribute('data-node-id') ?? '')));
+    viewport.querySelectorAll<SVGPathElement>('.dy-wf-edge').forEach((edge) => edge.classList.toggle('dy-wf-route-edge', related.has(edge.dataset.from ?? '') && related.has(edge.dataset.to ?? '')));
     passport.replaceChildren();
     passport.appendChild(elu('h3', '', n.title));
     if (handlers.onEdit) {
@@ -1229,6 +1341,12 @@ export function mountWorkflowCanvas(
       passport.appendChild(edit);
     }
     passport.appendChild(elu('span', `badge ${n.status ?? 'pending'}`, n.status ?? 'pending'));
+    const nodeEvents = (lastRun?.timeline ?? []).filter((event) => event.node_id === n.node_id);
+    if (nodeEvents.length) {
+      const history = elu('ol', 'dy-wf-node-history');
+      for (const event of nodeEvents.slice(-6)) history.appendChild(elu('li', '', `${event.from_status ?? '—'} → ${event.to_status}`));
+      passport.appendChild(history);
+    }
     // P8.3: last-confirmed update for the run (not a node-level claim).
     const lastConfirmed = elu<HTMLParagraphElement>('p', 'dy-wf-last-confirmed');
     const updated = lastRun?.updated_at ?? null;
@@ -1503,6 +1621,7 @@ export function mountWorkflowCanvas(
       passport.replaceChildren();
       if (selectedEl) selectedEl.classList.remove('dy-wf-selected');
       selectedEl = null;
+      clearRoute();
     }
   };
   document.addEventListener('keydown', onKeyDown);
@@ -1580,6 +1699,7 @@ export function mountWorkflowCanvas(
   // ---- polling (the event source; keep last frame, apply on arrival) ----
   let timer: ReturnType<typeof setInterval> | null = null;
   let lastSig = '';
+  let lastTimelineCount = 0;
   // Ignore responses older than the last applied response, not merely the
   // last issued request: slow successful requests must still render.
   let pollTicket = 0;
@@ -1608,11 +1728,25 @@ export function mountWorkflowCanvas(
   const pollOnce = () => {
     const ticket = ++pollTicket;
     fetchRuns()
-      .then((runs) => {
+      .then(async (runs) => {
         if (disposed || ticket < appliedTicket) return;
         appliedTicket = ticket;
         const latest = runs && runs.length ? runs[0] : null;
+        if (latest?.run_key && latest.status !== 'definition' && handlers.fetchTimeline) {
+          try {
+            const history = await handlers.fetchTimeline(projectId, runName, latest.run_key);
+            latest.timeline = (history.events ?? []).map((event) => ({
+              seq: Number(event.seq ?? 0), node_id: String(event.node_id),
+              from_status: event.from_status == null ? null : String(event.from_status),
+              to_status: String(event.to_status ?? 'pending'), ts: event.ts == null ? undefined : String(event.ts),
+            }));
+          } catch { /* keep the run frame; stale indicator covers poll failure */ }
+        }
         const sig = JSON.stringify(latest?.nodes.map((n) => [n.node_id, n.status]) ?? []);
+        if (latest?.timeline?.length && latest.timeline.length > lastTimelineCount) {
+          feedLog(`Run timeline: ${latest.timeline.length} observed events`);
+          lastTimelineCount = latest.timeline.length;
+        }
         if (sig !== lastSig) {
           if (lastSig !== '') {
             const prev = new Map<string, string | null>();
@@ -1633,6 +1767,7 @@ export function mountWorkflowCanvas(
         // compares the full frame so changed run data reaches the canvas.
         const frameSig = JSON.stringify(latest ?? null);
         if (frameSig !== lastFrameSig) {
+          playbackIndex = null;
           render(latest);
           lastFrameSig = frameSig;
         }
@@ -1657,6 +1792,8 @@ export function mountWorkflowCanvas(
   };
   pollOnce();
   if (pollMs > 0) timer = setInterval(pollOnce, pollMs);
+  const onResize = () => { if (!disposed && lastRun) render(lastRun); };
+  window.addEventListener('resize', onResize);
 
   disposers.push(() => {
     disposed = true;
@@ -1665,6 +1802,7 @@ export function mountWorkflowCanvas(
     clearInterval(clockTimer);
     document.removeEventListener('keydown', onKeyDown);
     document.removeEventListener('visibilitychange', onVisibility);
+    window.removeEventListener('resize', onResize);
     host.replaceChildren();
   });
   return () => {

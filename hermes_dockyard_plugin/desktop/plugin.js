@@ -1678,8 +1678,8 @@ var DOCKYARD_CSS = `
   .dockyard-root .dockyard-console-action-label { display: none; }
   .dockyard-root .dockyard-console-action svg { flex: 0 0 auto; margin: 0; }
   .dockyard-root .dockyard-project-toolbar { flex-wrap: wrap; overflow-x: visible; }
-  .dockyard-root .dockyard-project-tabs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); flex: 1 1 100%; width: 100%; margin-left: 0; }
-  .dockyard-root .dockyard-project-tabs button { min-width: 0; padding-right: 5px; padding-left: 5px; font-size: 11px; }
+  .dockyard-root .dockyard-project-tabs { display: flex; flex: 1 1 100%; width: 100%; margin-left: 0; gap: 4px; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; padding-bottom: 3px; }
+  .dockyard-root .dockyard-project-tabs button { flex: 0 0 auto; min-width: max-content; min-height: 40px; padding: 8px 12px; font-size: 12px; white-space: nowrap; }
   .dockyard-root .dockyard-wizard-progress { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 4px; }
   .dockyard-root .dockyard-metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dockyard-root .dockyard-portfolio-visual { grid-template-columns: 1fr; gap: 14px; }
@@ -1760,6 +1760,15 @@ var DOCKYARD_CSS = `
 @media (max-width: 1250px) {
   .dockyard-root .dockyard-wf3 { grid-template-columns: 220px minmax(0, 1fr); }
   .dockyard-root .dockyard-wf3-insp { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--dy-border); }
+}
+@media (max-width: 640px) {
+  .dockyard-root .dockyard-wf3 { display: block; }
+  .dockyard-root .dockyard-wf3-lib { display: none; }
+  .dockyard-root .dockyard-wf3-stage { min-width: 0; }
+  .dockyard-root .dockyard-wf3-stage .dockyard-wf3-toolbar { overflow: visible; flex-wrap: wrap; justify-content: flex-start; gap: 4px; }
+  .dockyard-root .dockyard-wf3-stage .dockyard-wf3-toolbar .dockyard-button { flex: 0 0 auto; min-height: 38px; padding-inline: 8px; white-space: nowrap; }
+  .dockyard-root .dockyard-wf3-stage .dockyard-workflow-graph .dy-wf { height: 70vh; min-height: 520px; }
+  .dockyard-root .dockyard-wf3-insp { margin-top: 10px; max-height: 230px; }
 }
 
 /* Command Center: screenshot-led wide scan tables with a contextual inspector. */
@@ -2272,13 +2281,35 @@ var workflow_canvas_css_default = `
 .dy-wf-scope .dy-wf-wrap { position: relative; width: 100%; height: 100%; }
 .dy-wf-scope .dy-wf-svg { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
 .dy-wf-scope .dy-wf-svg:active { cursor: grabbing; }
+/* Playback and activity controls belong to the canvas toolbar surface. */
+.dy-wf-scope .dy-wf-playback { position: absolute; left: 50%; bottom: 14px; z-index: 12; display: flex; align-items: center; gap: 8px; width: min(680px, calc(100% - 34px)); transform: translateX(-50%); padding: 8px 11px; border: 1px solid var(--dy-border, #2a2f3a); border-radius: 9px; background: color-mix(in srgb, var(--dy-bg-deep, #0f1218) 92%, transparent); box-shadow: 0 8px 26px rgba(0,0,0,.24); }
+.dy-wf-scope .dy-wf-playback-btn { flex: 0 0 auto; min-width: 70px; padding: 6px 9px; border: 1px solid var(--dy-border, #2a2f3a); border-radius: 6px; background: var(--dy-surface, #171c25); color: var(--dy-text, #e6edf3); cursor: pointer; }
+.dy-wf-scope .dy-wf-playback-btn:disabled { cursor: not-allowed; opacity: .55; }
+.dy-wf-scope .dy-wf-playback-slider { flex: 1 1 auto; min-width: 80px; accent-color: var(--dy-accent, #58a6ff); }
+.dy-wf-scope .dy-wf-playback-label { flex: 0 0 auto; min-width: 100px; color: var(--dy-text-3, #8b949e); font-size: 11px; text-align: right; }
+.dy-wf-scope .dy-wf-motion-btn { flex: 0 0 auto; padding: 6px 8px; border: 1px solid var(--dy-border, #2a2f3a); border-radius: 6px; background: var(--dy-surface, #171c25); color: var(--dy-text, #e6edf3); cursor: pointer; font-size: 11px; }
+.dy-wf-scope.dy-wf-still .dy-wf-node.working .dy-wf-shape, .dy-wf-scope.dy-wf-still .dy-wf-flowdot { animation: none !important; opacity: 0; }
+.dy-wf-scope.dy-wf-still .dy-wf-edge { stroke-dasharray: none; }
+.dy-wf-scope .dy-wf-node.dy-wf-playback-active .dy-wf-shape { filter: drop-shadow(0 0 8px var(--dy-accent, #58a6ff)); }
+.dy-wf-scope .dy-wf-node[data-wf-playback-status="done"] .dy-wf-shape { stroke: var(--dy-wf-status-done); }
+@media (max-width: 640px) {
+  .dy-wf-scope .dy-wf-playback { bottom: 8px; width: calc(100% - 18px); }
+  .dy-wf-scope .dy-wf-playback-label { min-width: 72px; font-size: 10px; }
+  .dy-wf-scope .dy-wf-motion-btn { padding-inline: 6px; }
+  .dy-wf-scope .dy-wf-index { display: none; }
+  .dy-wf-scope .dy-wf-feed { max-width: calc(100% - 24px); }
+  .dy-wf-scope .dy-wf-passport { left: 10px; right: 10px; top: auto; bottom: 62px; max-height: 42%; width: auto; }
+}
 /* LOD tiers (archify): map < 75% / read / full > 140% */
 .dy-wf-scope .dy-wf-svg[data-lod="map"] .dy-wf-sub,
 .dy-wf-scope .dy-wf-svg[data-lod="map"] .dy-wf-timer,
 .dy-wf-scope .dy-wf-svg[data-lod="map"] .dy-wf-assignee { opacity: 0; }
 .dy-wf-scope .dy-wf-svg .dy-wf-sub, .dy-wf-scope .dy-wf-svg .dy-wf-timer,
 .dy-wf-scope .dy-wf-svg .dy-wf-assignee { transition: opacity .3s; }
-.dy-wf-scope .dy-wf-node { cursor: pointer; outline: none; }
+.dy-wf-scope .dy-wf-node { cursor: pointer; outline: none; transition: opacity .22s ease, filter .22s ease; }
+.dy-wf-scope .dy-wf-node.dy-wf-route-dim { opacity: .22; filter: saturate(.25); }
+.dy-wf-scope .dy-wf-node-history { display: grid; gap: 3px; margin: 10px 0 0; padding-left: 18px; color: var(--dy-text-3, #8b949e); font-size: 11px; }
+.dy-wf-scope .dy-wf-edge.dy-wf-route-edge { stroke: var(--dy-edge-dep-active); stroke-width: 2.5; filter: drop-shadow(0 0 4px var(--dy-edge-dep-active)); }
 /* Purpose silhouette: the shape is drawn inside the fixed node box, so ports,
    edge endpoints and the layout grid keep their geometry. Fill = PURPOSE. */
 .dy-wf-scope .dy-wf-node .dy-wf-shape { stroke-width: 1.5; transition: stroke .5s, fill .3s, stroke-width .2s; }
@@ -2353,6 +2384,13 @@ var workflow_canvas_css_default = `
 .dy-wf-scope .dy-wf-feed-time { font: 10px ui-monospace, monospace; color: #59626f; flex: none; padding-top: 1px; }
 .dy-wf-scope .dy-wf-mini-view { fill: none; stroke: #58a6ff; stroke-width: 2; }
 .dy-wf-scope .dy-wf-passport { position: absolute; top: 10px; right: 10px; width: 280px; max-height: calc(100% - 20px); overflow-y: auto; background: #161b22; border: 1px solid #2a2f3a; border-radius: 8px; padding: 12px; color: var(--dy-text, #e6edf3); }
+/* No permanent inspector: an empty passport must not sit above the graph and
+   intercept/occlude the canvas. It becomes visible only after node selection. */
+.dy-wf-scope .dy-wf-passport:empty { display: none; }
+/* This selector intentionally outranks the base passport rule above. */
+@media (max-width: 640px) {
+  .dy-wf-scope .dy-wf-wrap .dy-wf-passport { left: 10px; right: 10px; top: auto; bottom: 62px; max-height: 42%; width: auto; }
+}
 /* P8.2: zoom controls + keyboard focus ring + equivalent list view. */
 .dy-wf-scope .dy-wf-zoombar { display: flex; gap: 6px; margin: 6px 0; }
 .dy-wf-scope .dy-wf-zoombtn { background: #0d1117; color: var(--dy-text, #e6edf3); border: 1px solid #2a2f3a; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
@@ -8355,6 +8393,12 @@ function buildLayout(nodes, opts) {
   nodes.forEach((n) => computeDepth(n.node_id));
   const perDepth = {};
   const positions = {};
+  if (opts?.mobile) {
+    nodes.forEach((n, index) => {
+      positions[n.node_id] = { x: PAD, y: PAD + index * (NODE_H + ROW_GAP + 24), depth: index };
+    });
+    return { positions, lanes: [], width: PAD * 2 + NODE_W, height: PAD * 2 + nodes.length * (NODE_H + ROW_GAP + 24) };
+  }
   nodes.forEach((n) => {
     const d = depthCache.get(n.node_id) ?? 0;
     const row = perDepth[d] ?? 0;
@@ -8493,7 +8537,37 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     listBody.style.display = open ? "none" : "block";
   });
   listView.append(listHead, listBody);
-  wrap.append(svg, SVG_INDEX, feed, minimap, passport, zoomBar, listView);
+  let playbackBar = null;
+  let playbackSlider = null;
+  let playbackLabel = null;
+  let playbackButton = null;
+  playbackBar = elu("div", "dy-wf-playback");
+  playbackBar.setAttribute("role", "group");
+  playbackBar.setAttribute("aria-label", "Workflow playback");
+  playbackButton = elu("button", "dy-wf-playback-btn", "\u25B6 Play");
+  playbackButton.type = "button";
+  playbackButton.disabled = true;
+  playbackSlider = elu("input", "dy-wf-playback-slider");
+  playbackSlider.type = "range";
+  playbackSlider.min = "0";
+  playbackSlider.value = "0";
+  playbackSlider.step = "1";
+  playbackSlider.disabled = true;
+  playbackSlider.setAttribute("aria-label", "Workflow playback");
+  playbackLabel = elu("span", "dy-wf-playback-label", "Live");
+  const motionButton = elu("button", "dy-wf-motion-btn", "Motion on");
+  motionButton.type = "button";
+  motionButton.setAttribute("aria-label", "Toggle workflow canvas motion");
+  motionButton.setAttribute("aria-pressed", "true");
+  motionButton.addEventListener("click", () => {
+    const on = motionButton.getAttribute("aria-pressed") === "true";
+    motionButton.setAttribute("aria-pressed", String(!on));
+    motionButton.textContent = on ? "Motion off" : "Motion on";
+    host2.classList.toggle("dy-wf-still", on);
+  });
+  playbackBar.append(playbackButton, playbackSlider, playbackLabel, motionButton);
+  wrap.append(svg, SVG_INDEX, feed, minimap, passport, zoomBar, listView, playbackBar);
+  playbackBar.style.overflowX = "auto";
   host2.appendChild(wrap);
   let panX = 0;
   let panY = 0;
@@ -8504,6 +8578,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   let originY = 0;
   let currentNodes = [];
   let nodePositions = {};
+  let previousMobileLayout = null;
   let dragNode = null;
   let dragStart = { x: 0, y: 0, ox: 0, oy: 0 };
   let connectFrom = null;
@@ -8675,6 +8750,49 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     defs.appendChild(mkMarker(meaning.activeMarker, meaning.activeColor, "#9cc4ff"));
   }
   svg.appendChild(defs);
+  const timelineFor = (run) => run?.timeline ?? [];
+  const clearRoute = () => {
+    viewport.querySelectorAll(".dy-wf-route-dim, .dy-wf-route-edge").forEach((el) => el.classList.remove("dy-wf-route-dim", "dy-wf-route-edge"));
+  };
+  const renderPlaybackState = (run, index) => {
+    if (!run || index === null || !run.timeline?.length) return;
+    const state = /* @__PURE__ */ new Map();
+    for (const event of run.timeline.slice(0, index + 1)) state.set(event.node_id, event.to_status);
+    viewport.querySelectorAll("[data-node-id]").forEach((g) => {
+      const id = g.getAttribute("data-node-id") ?? "";
+      const status = state.get(id);
+      if (status) g.dataset.wfPlaybackStatus = status;
+      g.classList.toggle("dy-wf-playback-active", state.has(id));
+    });
+    if (playbackLabel) playbackLabel.textContent = `Event ${index + 1}/${run.timeline.length}`;
+  };
+  const setPlayback = (run, index) => {
+    const timeline = timelineFor(run);
+    playbackIndex = index;
+    const enabled = timeline.length > 1;
+    if (playbackSlider) {
+      playbackSlider.disabled = !enabled;
+      playbackSlider.max = String(Math.max(0, timeline.length - 1));
+      playbackSlider.value = String(Math.max(0, index ?? timeline.length - 1));
+    }
+    if (playbackButton) playbackButton.disabled = !enabled;
+    render(run);
+    if (index !== null) renderPlaybackState(run, index);
+  };
+  playbackSlider?.addEventListener("input", () => {
+    if (lastRun) setPlayback(lastRun, Number(playbackSlider?.value ?? 0));
+  });
+  playbackButton?.addEventListener("click", () => {
+    if (!lastRun?.timeline?.length) return;
+    const next = playbackIndex === null ? 0 : playbackIndex + 1;
+    if (next >= lastRun.timeline.length) {
+      setPlayback(lastRun, null);
+      if (playbackButton) playbackButton.textContent = "\u25B6 Play";
+      return;
+    }
+    if (playbackButton) playbackButton.textContent = "\u23F8 Pause";
+    setPlayback(lastRun, next);
+  });
   let lastRun = null;
   const renderList = (run) => {
     listBody.replaceChildren();
@@ -8723,6 +8841,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     });
     g.dataset.wfPurpose = purpose;
     g.dataset.wfStatus = status;
+    if (playbackIndex !== null) g.dataset.wfPlaybackStatus = n.status ?? "pending";
     g.setAttribute("tabindex", "0");
     g.setAttribute("role", "button");
     g.setAttribute("data-node-id", n.node_id);
@@ -8857,6 +8976,17 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   };
   const render = (run) => {
     lastRun = run;
+    const timeline = timelineFor(run);
+    if (playbackSlider) {
+      playbackSlider.disabled = timeline.length < 2;
+      playbackSlider.max = String(Math.max(0, timeline.length - 1));
+      playbackSlider.value = String(Math.max(0, playbackIndex ?? timeline.length - 1));
+    }
+    if (playbackButton) {
+      playbackButton.disabled = timeline.length < 2;
+      playbackButton.textContent = playbackIndex === null ? "\u25B6 Play" : "\u23F8 Pause";
+    }
+    if (playbackLabel) playbackLabel.textContent = playbackIndex === null ? timeline.length ? `Live \xB7 ${timeline.length} events` : "Live" : `Event ${playbackIndex + 1}/${timeline.length}`;
     renderList(run);
     viewport.replaceChildren();
     viewport.appendChild(defs);
@@ -8868,10 +8998,19 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       return;
     }
     currentNodes = run.nodes;
-    const assignments = run.nodes.some((n) => (n.team ?? n.phase_team ?? "").trim());
+    if (timeline.length > 1 && playbackIndex !== null) {
+      const states = /* @__PURE__ */ new Map();
+      for (const event of timeline.slice(0, playbackIndex + 1)) states.set(event.node_id, event.to_status);
+      currentNodes = currentNodes.map((node) => states.has(node.node_id) ? { ...node, status: states.get(node.node_id) ?? node.status } : { ...node, status: "pending" });
+    }
+    const assignments = currentNodes.some((n) => (n.team ?? n.phase_team ?? "").trim());
     const laneOf = assignments ? laneKeyOf : (n) => isExceptionNode(n) ? EXCEPTION_LANE_KEY : "main-path";
-    let layout = buildLayout(run.nodes, { laneOf });
-    if (layout.lanes.length < 2) layout = buildLayout(run.nodes);
+    const mobileLayout = window.innerWidth <= 640;
+    svg.dataset.mobileLayout = String(mobileLayout);
+    if (previousMobileLayout !== null && previousMobileLayout !== mobileLayout) nodePositions = {};
+    previousMobileLayout = mobileLayout;
+    let layout = buildLayout(run.nodes, { laneOf, mobile: mobileLayout });
+    if (!mobileLayout && layout.lanes.length < 2) layout = buildLayout(run.nodes);
     const positions = nodePositions = Object.keys(nodePositions).length ? { ...layout.positions, ...nodePositions } : run.nodes.reduce((acc, item) => {
       if (item.canvas_position) acc[item.node_id] = { ...layout.positions[item.node_id], ...item.canvas_position };
       return acc;
@@ -8907,7 +9046,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       viewport.append(band, lbl);
     }
     const depMeaning = EDGE_MEANINGS[DEFAULT_EDGE_MEANING];
-    for (const n of run.nodes) {
+    for (const n of currentNodes) {
       const from = positions[n.node_id];
       for (const dep of n.depends_on) {
         const to = positions[dep];
@@ -8920,8 +9059,14 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
           // lane anchors, so a dependency that crosses lanes reads as one
           // flow instead of a ruler line.
           d: (() => {
+            if (mobileLayout) {
+              const x12 = to.x + NODE_W / 2, y12 = to.y + NODE_H;
+              const x22 = from.x + NODE_W / 2, y22 = from.y;
+              const dy = Math.max(ROW_GAP / 2, Math.abs(y22 - y12) * 0.45);
+              return `M ${x12} ${y12} C ${x12} ${y12 + dy}, ${x22} ${y22 - dy}, ${x22} ${y22}`;
+            }
             const x1 = to.x + NODE_W, y1 = to.y + NODE_H / 2;
-            const x2 = from.x - 6, y2 = from.y + NODE_H / 2;
+            const x2 = from.x, y2 = from.y + NODE_H / 2;
             const sameBand = Math.abs(y1 - y2) < NODE_H / 2;
             const dx = Math.max(COL_GAP / 2, Math.abs(x2 - x1) * 0.55);
             if (sameBand) {
@@ -8930,18 +9075,20 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
             }
             return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
           })(),
-          // Leaves the marker 6px of room before the shape, so the head is
-          // never tucked under the node it points at.
+          // Terminate at the dependent node's left boundary. The arrowhead
+          // is part of the connector, so the line remains visibly attached.
           "marker-end": `url(#${depMeaning.marker})`
         });
         path.dataset.from = dep;
         path.dataset.to = n.node_id;
+        path.dataset.sourcePort = mobileLayout ? "bottom" : "right";
+        path.dataset.targetPort = mobileLayout ? "top" : "left";
         viewport.appendChild(path);
         const dot = sEl("circle", { class: "dy-wf-flowdot", r: 3.2, opacity: 0 });
         viewport.appendChild(dot);
       }
     }
-    for (const n of run.nodes) {
+    for (const n of currentNodes) {
       const p = positions[n.node_id];
       viewport.appendChild(buildNode(n, p, run, Boolean(handlers.onEdit)));
     }
@@ -9040,10 +9187,30 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   });
   let lastFrames = [];
   let selectedEl = null;
+  let playbackIndex = null;
   const openPassport = (n, g) => {
     if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
     selectedEl = g ?? null;
     if (selectedEl) selectedEl.classList.add("dy-wf-selected");
+    const selectedId = n.node_id;
+    const related = /* @__PURE__ */ new Set([selectedId]);
+    const byId = new Map(currentNodes.map((node) => [node.node_id, node]));
+    const walkUp = (id) => {
+      for (const dep of byId.get(id)?.depends_on ?? []) if (!related.has(dep)) {
+        related.add(dep);
+        walkUp(dep);
+      }
+    };
+    const walkDown = (id) => {
+      for (const node of currentNodes) if (node.depends_on.includes(id) && !related.has(node.node_id)) {
+        related.add(node.node_id);
+        walkDown(node.node_id);
+      }
+    };
+    walkUp(selectedId);
+    walkDown(selectedId);
+    viewport.querySelectorAll(".dy-wf-node").forEach((node) => node.classList.toggle("dy-wf-route-dim", !related.has(node.getAttribute("data-node-id") ?? "")));
+    viewport.querySelectorAll(".dy-wf-edge").forEach((edge) => edge.classList.toggle("dy-wf-route-edge", related.has(edge.dataset.from ?? "") && related.has(edge.dataset.to ?? "")));
     passport.replaceChildren();
     passport.appendChild(elu("h3", "", n.title));
     if (handlers.onEdit) {
@@ -9078,6 +9245,12 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       passport.appendChild(edit);
     }
     passport.appendChild(elu("span", `badge ${n.status ?? "pending"}`, n.status ?? "pending"));
+    const nodeEvents = (lastRun?.timeline ?? []).filter((event) => event.node_id === n.node_id);
+    if (nodeEvents.length) {
+      const history = elu("ol", "dy-wf-node-history");
+      for (const event of nodeEvents.slice(-6)) history.appendChild(elu("li", "", `${event.from_status ?? "\u2014"} \u2192 ${event.to_status}`));
+      passport.appendChild(history);
+    }
     const lastConfirmed = elu("p", "dy-wf-last-confirmed");
     const updated = lastRun?.updated_at ?? null;
     lastConfirmed.textContent = `Last confirmed update: ${updated && isFinite(Date.parse(updated)) ? updated.replace("T", " ").slice(0, 16) + " UTC" : "unknown"}`;
@@ -9301,6 +9474,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       passport.replaceChildren();
       if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
       selectedEl = null;
+      clearRoute();
     }
   };
   document.addEventListener("keydown", onKeyDown);
@@ -9365,6 +9539,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   }, 40);
   let timer = null;
   let lastSig = "";
+  let lastTimelineCount = 0;
   let pollTicket = 0;
   let appliedTicket = 0;
   let disposed = false;
@@ -9383,11 +9558,28 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   document.addEventListener("visibilitychange", onVisibility);
   const pollOnce = () => {
     const ticket = ++pollTicket;
-    fetchRuns().then((runs) => {
+    fetchRuns().then(async (runs) => {
       if (disposed || ticket < appliedTicket) return;
       appliedTicket = ticket;
       const latest = runs && runs.length ? runs[0] : null;
+      if (latest?.run_key && latest.status !== "definition" && handlers.fetchTimeline) {
+        try {
+          const history = await handlers.fetchTimeline(projectId, runName, latest.run_key);
+          latest.timeline = (history.events ?? []).map((event) => ({
+            seq: Number(event.seq ?? 0),
+            node_id: String(event.node_id),
+            from_status: event.from_status == null ? null : String(event.from_status),
+            to_status: String(event.to_status ?? "pending"),
+            ts: event.ts == null ? void 0 : String(event.ts)
+          }));
+        } catch {
+        }
+      }
       const sig = JSON.stringify(latest?.nodes.map((n) => [n.node_id, n.status]) ?? []);
+      if (latest?.timeline?.length && latest.timeline.length > lastTimelineCount) {
+        feedLog(`Run timeline: ${latest.timeline.length} observed events`);
+        lastTimelineCount = latest.timeline.length;
+      }
       if (sig !== lastSig) {
         if (lastSig !== "") {
           const prev = /* @__PURE__ */ new Map();
@@ -9406,6 +9598,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       }
       const frameSig = JSON.stringify(latest ?? null);
       if (frameSig !== lastFrameSig) {
+        playbackIndex = null;
         render(latest);
         lastFrameSig = frameSig;
       }
@@ -9428,6 +9621,10 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   };
   pollOnce();
   if (pollMs > 0) timer = setInterval(pollOnce, pollMs);
+  const onResize = () => {
+    if (!disposed && lastRun) render(lastRun);
+  };
+  window.addEventListener("resize", onResize);
   disposers.push(() => {
     disposed = true;
     if (timer) clearInterval(timer);
@@ -9435,6 +9632,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     clearInterval(clockTimer);
     document.removeEventListener("keydown", onKeyDown);
     document.removeEventListener("visibilitychange", onVisibility);
+    window.removeEventListener("resize", onResize);
     host2.replaceChildren();
   });
   return () => {
@@ -9473,7 +9671,14 @@ var toCanvasRun = (run) => ({
   status: run.status ?? "unknown",
   started_at: run.started_at ?? null,
   updated_at: run.updated_at ?? null,
-  nodes: (run.nodes ?? []).map(toCanvasNode)
+  nodes: (run.nodes ?? []).map(toCanvasNode),
+  timeline: (run.timeline ?? []).map((event) => ({
+    seq: event.seq,
+    node_id: String(event.node_id),
+    from_status: event.from_status ?? null,
+    to_status: String(event.to_status ?? "pending"),
+    ts: event.ts
+  }))
 });
 function mountDesktopWorkflowCanvas(host2, projectId, workflowName, definition, runs, handlers = {}) {
   const nodes = (definition?.nodes ?? []).map(toCanvasNode);
@@ -9486,7 +9691,8 @@ function mountDesktopWorkflowCanvas(host2, projectId, workflowName, definition, 
     onReject: handlers.onReject ?? (() => void 0),
     onRetry: handlers.onRetry,
     onExpand: handlers.onExpand,
-    onEdit: handlers.onEdit
+    onEdit: handlers.onEdit,
+    fetchTimeline: handlers.fetchTimeline
   }, handlers.pollMs ?? 6e4);
 }
 
@@ -9567,7 +9773,8 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
       onRetry: async (ref) => {
         await api(`/projects/${encoded}/work-items/${encodeURIComponent(ref)}/transition`, { method: "POST", body: { status: "backlog" } });
         await loadRuns(current.name);
-      }
+      },
+      fetchTimeline: async (pid, wname, runKey2) => api(`/projects/${encodeURIComponent(pid)}/workflows/${encodeURIComponent(wname)}/runs/${encodeURIComponent(runKey2)}/timeline`)
     });
   }, [project.id, current?.name, current?.versions?.length, runs, mode]);
   const mutate = async (path, body = {}) => {

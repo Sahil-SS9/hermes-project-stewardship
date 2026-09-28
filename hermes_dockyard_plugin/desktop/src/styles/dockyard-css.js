@@ -1543,8 +1543,8 @@ export const DOCKYARD_CSS = `
   .dockyard-root .dockyard-console-action-label { display: none; }
   .dockyard-root .dockyard-console-action svg { flex: 0 0 auto; margin: 0; }
   .dockyard-root .dockyard-project-toolbar { flex-wrap: wrap; overflow-x: visible; }
-  .dockyard-root .dockyard-project-tabs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); flex: 1 1 100%; width: 100%; margin-left: 0; }
-  .dockyard-root .dockyard-project-tabs button { min-width: 0; padding-right: 5px; padding-left: 5px; font-size: 11px; }
+  .dockyard-root .dockyard-project-tabs { display: flex; flex: 1 1 100%; width: 100%; margin-left: 0; gap: 4px; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; padding-bottom: 3px; }
+  .dockyard-root .dockyard-project-tabs button { flex: 0 0 auto; min-width: max-content; min-height: 40px; padding: 8px 12px; font-size: 12px; white-space: nowrap; }
   .dockyard-root .dockyard-wizard-progress { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 4px; }
   .dockyard-root .dockyard-metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dockyard-root .dockyard-portfolio-visual { grid-template-columns: 1fr; gap: 14px; }
@@ -1625,6 +1625,15 @@ export const DOCKYARD_CSS = `
 @media (max-width: 1250px) {
   .dockyard-root .dockyard-wf3 { grid-template-columns: 220px minmax(0, 1fr); }
   .dockyard-root .dockyard-wf3-insp { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--dy-border); }
+}
+@media (max-width: 640px) {
+  .dockyard-root .dockyard-wf3 { display: block; }
+  .dockyard-root .dockyard-wf3-lib { display: none; }
+  .dockyard-root .dockyard-wf3-stage { min-width: 0; }
+  .dockyard-root .dockyard-wf3-stage .dockyard-wf3-toolbar { overflow: visible; flex-wrap: wrap; justify-content: flex-start; gap: 4px; }
+  .dockyard-root .dockyard-wf3-stage .dockyard-wf3-toolbar .dockyard-button { flex: 0 0 auto; min-height: 38px; padding-inline: 8px; white-space: nowrap; }
+  .dockyard-root .dockyard-wf3-stage .dockyard-workflow-graph .dy-wf { height: 70vh; min-height: 520px; }
+  .dockyard-root .dockyard-wf3-insp { margin-top: 10px; max-height: 230px; }
 }
 
 /* Command Center: screenshot-led wide scan tables with a contextual inspector. */

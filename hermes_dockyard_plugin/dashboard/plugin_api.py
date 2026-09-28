@@ -1551,6 +1551,20 @@ async def start_scoped_workflow(project_id: str, scope: str, name: str,
         body.model_dump(exclude_none=True))
 
 
+@plugin_api.get("/projects/{project_id}/workflows/{scope}/{name}/runs/{run_key}/timeline")
+async def scoped_workflow_run_timeline(project_id: str, scope: str, name: str, run_key: str) -> dict:
+    return await _proxy(
+        "GET",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{_scope(scope)}/{quote(name, safe='')}/runs/{quote(run_key, safe='')}/timeline")
+
+
+@plugin_api.get("/projects/{project_id}/workflows/{name}/runs/{run_key}/timeline")
+async def workflow_run_timeline(project_id: str, name: str, run_key: str) -> dict:
+    return await _proxy(
+        "GET",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{quote(name, safe='')}/runs/{quote(run_key, safe='')}/timeline")
+
+
 @plugin_api.get("/projects/{project_id}/workflows/{scope}/{name}/runs")
 async def scoped_workflow_runs(project_id: str, scope: str, name: str) -> dict:
     return await _proxy(

@@ -37,12 +37,18 @@ const toCanvasRun = (run) => ({
   started_at: run.started_at ?? null,
   updated_at: run.updated_at ?? null,
   nodes: (run.nodes ?? []).map(toCanvasNode),
+  timeline: (run.timeline ?? []).map((event) => ({
+    seq: event.seq, node_id: String(event.node_id), from_status: event.from_status ?? null,
+    to_status: String(event.to_status ?? 'pending'), ts: event.ts,
+  })),
 })
 
 export function mountDesktopWorkflowCanvas(host, projectId, workflowName, definition, runs, handlers = {}) {
   const nodes = (definition?.nodes ?? []).map(toCanvasNode)
   const fetchRuns = async () => {
     const mapped = (runs ?? []).map(toCanvasRun)
+    // The shared canvas owns timeline fetching. Keeping it here would fetch
+    // the same history twice on every poll and could race a newer frame.
     return mapped.length ? mapped : [{ run_key: `definition:${workflowName}`, version: 0, status: 'definition', started_at: null, updated_at: null, nodes }]
   }
   return mountWorkflowCanvas(host, projectId, workflowName, fetchRuns, {
@@ -51,6 +57,7 @@ export function mountDesktopWorkflowCanvas(host, projectId, workflowName, defini
     onRetry: handlers.onRetry,
     onExpand: handlers.onExpand,
     onEdit: handlers.onEdit,
+    fetchTimeline: handlers.fetchTimeline,
   }, handlers.pollMs ?? 60000)
 }
 
