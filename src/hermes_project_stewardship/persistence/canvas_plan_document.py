@@ -44,29 +44,36 @@ class PlanDocumentService:
         now = iso(self.store._clock())
         with self.store.tx() as cx:
             cx.execute(
-                "INSERT INTO canvas_plans(plan_id, project_id, proposal_id, canvas_revision, plan_json, status, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?) "
+                "INSERT INTO canvas_plans(plan_id, project_id, canvas_id, proposal_id, canvas_revision, plan_json, status, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?) "
                 "ON CONFLICT(plan_id) DO UPDATE SET plan_json=excluded.plan_json, status=excluded.status, updated_at=excluded.updated_at",
-                (plan_id, project_id, plan.get("proposal_id"), int(plan.get("canvas_revision") or 0),
+                (plan_id, project_id, plan.get("canvas_id"), plan.get("proposal_id"), int(plan.get("canvas_revision") or 0),
                  json.dumps(plan, sort_keys=True), "draft", now, now),
             )
+        if plan.get("canvas_id"):
+            # A plan moves its board to "Plan made" unless a person has
+            # already completed or archived it.
+            self.canvas.advance(plan["canvas_id"], "planned", only_from=("draft", "submitted"))
         return self.get_plan(project_id, plan_id)
 
-    def list_plans(self, project_id: str) -> list[dict[str, Any]]:
-        rows = self._conn().execute(
-            "SELECT plan_id, status, created_at, updated_at FROM canvas_plans WHERE project_id=? ORDER BY updated_at",
-            (project_id,),
-        ).fetchall()
+    def list_plans(self, project_id: str, *, canvas_id: str | None = None) -> list[dict[str, Any]]:
+        sql = "SELECT plan_id, canvas_id, status, created_at, updated_at FROM canvas_plans WHERE project_id=?"
+        args: tuple[Any, ...] = (project_id,)
+        if canvas_id is not None:
+            sql += " AND canvas_id=?"
+            args += (canvas_id,)
+        rows = self._conn().execute(sql + " ORDER BY updated_at, plan_id", args).fetchall()
         return [dict(row) for row in rows]
 
     def get_plan(self, project_id: str, plan_id: str) -> dict[str, Any]:
         row = self._conn().execute(
-            "SELECT plan_json, status, updated_at FROM canvas_plans WHERE project_id=? AND plan_id=?",
+            "SELECT plan_json, canvas_id, status, updated_at FROM canvas_plans WHERE project_id=? AND plan_id=?",
             (project_id, plan_id),
         ).fetchone()
         if row is None:
             raise ValueError(f"unknown canvas plan: {plan_id}")
         plan = json.loads(row["plan_json"])
         plan["plan_id"] = plan_id
+        plan["canvas_id"] = row["canvas_id"]
         plan["status"] = row["status"]
         plan["updated_at"] = row["updated_at"]
         return plan
@@ -133,7 +140,7 @@ class PlanDocumentService:
         with zero writes.
         """
         row = self._conn().execute(
-            "SELECT proposal_json, status, session_id, canvas_revision FROM canvas_proposals WHERE proposal_id=? AND project_id=?",
+            "SELECT proposal_json, status, session_id, canvas_id, canvas_revision FROM canvas_proposals WHERE proposal_id=? AND project_id=?",
             (proposal_id, project_id),
         ).fetchone()
         if row is None:
@@ -144,7 +151,8 @@ class PlanDocumentService:
         if proposal.get("kind") != "technical_plan":
             raise ValueError("plan synthesis requires an approved technical_plan proposal")
 
-        canvas = self.canvas.get(project_id)
+        # Build from the board the proposal came from, never "the" project board.
+        canvas = self.canvas.get(project_id, row["canvas_id"])
         by_id = {item["id"]: item for item in canvas["objects"]}
         steps = self._steps_from_proposal(proposal, by_id)
         open_questions = [item["content"].get("text") or item["content"].get("title") or item["id"]
@@ -154,6 +162,7 @@ class PlanDocumentService:
             "plan_hash": self._plan_hash(project_id, proposal_id, steps),
             "proposal_id": proposal_id,
             "session_id": row["session_id"],
+            "canvas_id": canvas["canvas_id"],
             "canvas_revision": row["canvas_revision"],
             "status": "draft",
             "actor": actor,

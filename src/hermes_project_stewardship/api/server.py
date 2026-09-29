@@ -216,6 +216,25 @@ class CanvasSessionStartRequest(BaseModel):
     actor: str = "system"
 
 
+class CanvasBoardCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=400)
+    actor: str = "system"
+
+
+class CanvasBoardModel(BaseModel):
+    provider: str = Field(min_length=1, max_length=200)
+    model: str = Field(min_length=1, max_length=200)
+
+
+class CanvasBoardUpdateRequest(BaseModel):
+    """Only fields present in the body change; ``null`` clears theme/model."""
+    name: Optional[str] = Field(default=None, max_length=400)
+    status: Optional[str] = None
+    theme: Optional[str] = None
+    model: Optional[CanvasBoardModel] = None
+    actor: str = "system"
+
+
 class CanvasSessionAnswerRequest(BaseModel):
     outcome: str
     answer: str = ""
@@ -241,8 +260,11 @@ class CanvasPlanBacklogRequest(BaseModel):
     actor: str = "system"
 
 
-def _canvas_provider():
+def _canvas_provider(board_model: dict | None = None):
     """The curation provider for canvas sessions.
+
+    ``board_model`` is the board's saved {provider, model}; when unset the
+    Hermes-configured default is used.
 
     The assistant runs through the provider seam, never a hard-coded model.
     Default is the REAL Hermes adapter (whatever model Hermes is configured
@@ -299,6 +321,9 @@ def _canvas_provider():
     if requested == "hermes":
         from ..persistence.hermes_curation_provider import HermesCurationProvider
         try:
+            if board_model:
+                return HermesCurationProvider(provider_id=board_model.get("provider"),
+                                              model_id=board_model.get("model"))
             return HermesCurationProvider()
         except Exception:
             # No Hermes runtime/configured model in this process (tests,
@@ -1212,6 +1237,97 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
 
+    # ---- D14/D16/D19: several named boards per project ------------------
+    def _board_error(exc: Exception):
+        from ..persistence.canvas_service import CanvasConflictError
+        message = str(exc)
+        if isinstance(exc, CanvasConflictError):
+            return HTTPException(409, message)
+        if message.startswith("unknown project") or message.startswith("unknown canvas board"):
+            return HTTPException(404, message)
+        if "already exists" in message:
+            return HTTPException(409, message)
+        return HTTPException(422, message)
+
+    @router.get("/canvas/models")
+    def canvas_models():
+        from ..persistence import hermes_curation_provider
+        return hermes_curation_provider.list_hermes_models()
+
+    @router.get("/projects/{project_id}/canvases")
+    def list_canvas_boards(project_id: str, include_archived: bool = False):
+        from ..persistence.canvas_service import CanvasService
+        try:
+            return {"canvases": CanvasService(store).list_boards(project_id, include_archived=include_archived)}
+        except ValueError as exc:
+            raise _board_error(exc) from exc
+
+    @router.post("/projects/{project_id}/canvases")
+    def create_canvas_board(project_id: str, body: CanvasBoardCreateRequest):
+        from ..persistence.canvas_service import CanvasService
+        try:
+            return CanvasService(store).create_board(project_id, name=body.name, actor=_principal_id(body.actor))
+        except ValueError as exc:
+            raise _board_error(exc) from exc
+
+    @router.get("/projects/{project_id}/canvases/{canvas_id}")
+    def get_canvas_board(project_id: str, canvas_id: str):
+        from ..persistence.canvas_service import CanvasService
+        try:
+            return CanvasService(store).get_board(project_id, canvas_id)
+        except ValueError as exc:
+            raise _board_error(exc) from exc
+
+    @router.put("/projects/{project_id}/canvases/{canvas_id}")
+    def save_canvas_board(project_id: str, canvas_id: str, body: CanvasSaveRequest):
+        from ..persistence.canvas_service import CanvasConflictError, CanvasService
+        try:
+            return CanvasService(store).save(
+                project_id, canvas_id=canvas_id, expected_revision=body.expected_revision,
+                objects=[item.model_dump() for item in body.objects],
+                connectors=[item.model_dump() for item in body.connectors],
+                actor=_principal_id(body.actor))
+        except (CanvasConflictError, ValueError) as exc:
+            raise _board_error(exc) from exc
+
+    @router.patch("/projects/{project_id}/canvases/{canvas_id}")
+    def update_canvas_board(project_id: str, canvas_id: str, body: CanvasBoardUpdateRequest):
+        from ..persistence import hermes_curation_provider
+        from ..persistence.canvas_service import CanvasService
+        fields = body.model_dump(exclude_unset=True)
+        fields.pop("actor", None)
+        catalogue = hermes_curation_provider.list_hermes_models() if fields.get("model") else None
+        if "name" in fields and fields["name"] is None:
+            raise HTTPException(422, "board name cannot be cleared")
+        if "status" in fields and fields["status"] is None:
+            raise HTTPException(422, "board status cannot be cleared")
+        try:
+            return CanvasService(store).update_board(
+                project_id, canvas_id, actor=_principal_id(body.actor), catalogue=catalogue, **fields)
+        except ValueError as exc:
+            raise _board_error(exc) from exc
+
+    @router.post("/projects/{project_id}/canvases/{canvas_id}/sessions")
+    def start_canvas_board_session(project_id: str, canvas_id: str, body: CanvasSessionStartRequest):
+        from ..persistence.canvas_planning import CanvasPlanningService
+        from ..persistence.canvas_service import CanvasConflictError, CanvasService
+        try:
+            board = CanvasService(store).get_board(project_id, canvas_id)
+            return CanvasPlanningService(store, provider=_canvas_provider(board.get("model"))).start(
+                project_id, canvas_id=canvas_id, actor=_principal_id(body.actor))
+        except (CanvasConflictError, ValueError) as exc:
+            raise _board_error(exc) from exc
+
+    @router.get("/projects/{project_id}/canvases/{canvas_id}/plans")
+    def list_canvas_board_plans(project_id: str, canvas_id: str):
+        from ..persistence.canvas_plan_document import PlanDocumentService
+        from ..persistence.canvas_service import CanvasService
+        try:
+            CanvasService(store).get_board(project_id, canvas_id)
+        except ValueError as exc:
+            raise _board_error(exc) from exc
+        return {"plans": PlanDocumentService(store).list_plans(project_id, canvas_id=canvas_id)}
+
     @router.post("/projects/{project_id}/canvas/curate")
     def curate_project_canvas(project_id: str):
         from ..persistence.canvas_curation import CanvasCurationService
@@ -1222,9 +1338,12 @@ def create_app(
     @router.post("/projects/{project_id}/canvas/sessions")
     def start_canvas_session(project_id: str, body: CanvasSessionStartRequest):
         from ..persistence.canvas_planning import CanvasPlanningService
+        from ..persistence.canvas_service import CanvasConflictError
         provider = _canvas_provider()
         try:
             return CanvasPlanningService(store, provider=provider).start(project_id, actor=_principal_id(body.actor))
+        except CanvasConflictError as exc:
+            raise HTTPException(409, str(exc)) from exc
         except ValueError as exc:
             message = str(exc)
             if "unknown" in message:
@@ -1242,8 +1361,11 @@ def create_app(
     @router.post("/canvas/sessions/{session_id}/answer")
     def answer_canvas_session(session_id: str, body: CanvasSessionAnswerRequest):
         from ..persistence.canvas_planning import CanvasPlanningService
+        from ..persistence.canvas_service import CanvasConflictError
         try:
             return CanvasPlanningService(store, provider=_canvas_provider()).answer(session_id, outcome=body.outcome, answer=body.answer, actor=_principal_id(body.actor))
+        except CanvasConflictError as exc:
+            raise HTTPException(409, str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
 

@@ -786,6 +786,68 @@ async def synthesise_canvas_plan(proposal_id: str, body: dict) -> dict:
     return await _proxy("POST", f"/stewardship/v1/canvas/proposals/{quote(proposal_id, safe='')}/plan", body)
 
 
+# ---- D14/D16/D19: several named planning boards per project ---------------
+# Writes always carry the trusted desktop principal; a client "actor" field is
+# overwritten, never forwarded.
+@plugin_api.get("/canvas/models")
+async def canvas_models() -> dict:
+    return await _proxy("GET", "/stewardship/v1/canvas/models")
+
+
+@plugin_api.get("/projects/{project_id}/canvases")
+async def list_canvas_boards(project_id: str, include_archived: bool = False) -> dict:
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases",
+        params={"include_archived": "true" if include_archived else "false"},
+    )
+
+
+@plugin_api.post("/projects/{project_id}/canvases")
+async def create_canvas_board(project_id: str, body: dict) -> dict:
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases",
+        {**body, "actor": _ACTOR_ID},
+    )
+
+
+@plugin_api.get("/projects/{project_id}/canvases/{canvas_id}")
+async def get_canvas_board(project_id: str, canvas_id: str) -> dict:
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases/{quote(canvas_id, safe='')}")
+
+
+@plugin_api.put("/projects/{project_id}/canvases/{canvas_id}")
+async def save_canvas_board(project_id: str, canvas_id: str, body: dict) -> dict:
+    return await _proxy(
+        "PUT", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases/{quote(canvas_id, safe='')}",
+        {**body, "actor": _ACTOR_ID},
+    )
+
+
+@plugin_api.patch("/projects/{project_id}/canvases/{canvas_id}")
+async def update_canvas_board(project_id: str, canvas_id: str, body: dict) -> dict:
+    return await _proxy(
+        "PATCH", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases/{quote(canvas_id, safe='')}",
+        {**body, "actor": _ACTOR_ID},
+    )
+
+
+@plugin_api.post("/projects/{project_id}/canvases/{canvas_id}/sessions")
+async def start_canvas_board_session(project_id: str, canvas_id: str, body: dict) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases/{quote(canvas_id, safe='')}/sessions",
+        {**body, "actor": _ACTOR_ID},
+    )
+
+
+@plugin_api.get("/projects/{project_id}/canvases/{canvas_id}/plans")
+async def list_canvas_board_plans(project_id: str, canvas_id: str) -> dict:
+    return await _proxy(
+        "GET",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases/{quote(canvas_id, safe='')}/plans")
+
+
 @plugin_api.get("/projects/{project_id}/plans")
 async def list_project_plans(project_id: str) -> dict:
     return await _proxy("GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/plans")

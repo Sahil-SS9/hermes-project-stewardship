@@ -12,7 +12,7 @@ from typing import List
 
 # v31 is reserved for Batch W (merges before this branch); canvas_plans is v32
 # and must be rebased onto W's v31 before merge (Sahil-approved 2026-09-27).
-SCHEMA_VERSION = 32
+SCHEMA_VERSION = 33
 
 
 @dataclass(frozen=True)
@@ -1277,5 +1277,137 @@ MIGRATIONS: List[Migration] = [
         CREATE INDEX IF NOT EXISTS idx_canvas_plans_project ON canvas_plans(project_id);
         """,
         downgrade_sql="DROP INDEX IF EXISTS idx_canvas_plans_project; DROP TABLE IF EXISTS canvas_plans;",
+    ),
+    Migration(
+        version=33,
+        name="multiple named planning boards per project",
+        # One project -> many boards. project_canvases loses UNIQUE(project_id)
+        # and gains name / lifecycle status / archive memory / theme / model;
+        # sessions become unique per board revision (two fresh boards share
+        # revision 1). Proposals and plans carry their board. The legacy
+        # single canvas becomes "Main board" and keeps its whole history; its
+        # status is derived from what already happened to it.
+        upgrade_sql="""
+        CREATE TABLE project_canvases_v33 (
+            canvas_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'draft'
+                CHECK (status IN ('draft','submitted','planned','completed','archived')),
+            archived_from TEXT
+                CHECK (archived_from IS NULL OR archived_from IN ('draft','submitted','planned','completed')),
+            theme TEXT CHECK (theme IS NULL OR theme IN ('light','dark')),
+            model_json TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            objects_json TEXT NOT NULL DEFAULT '[]',
+            connectors_json TEXT NOT NULL DEFAULT '[]',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            updated_by TEXT NOT NULL
+        );
+        INSERT INTO project_canvases_v33(canvas_id, project_id, name, status, revision,
+            objects_json, connectors_json, created_at, updated_at, updated_by)
+            SELECT c.canvas_id, c.project_id, 'Main board',
+                   CASE WHEN EXISTS (SELECT 1 FROM canvas_plans p WHERE p.project_id = c.project_id) THEN 'planned'
+                        WHEN EXISTS (SELECT 1 FROM canvas_sessions s WHERE s.project_id = c.project_id) THEN 'submitted'
+                        ELSE 'draft' END,
+                   c.revision, c.objects_json, c.connectors_json, c.created_at, c.updated_at, c.updated_by
+            FROM project_canvases c;
+        DROP INDEX IF EXISTS idx_project_canvases_project;
+        DROP TABLE project_canvases;
+        ALTER TABLE project_canvases_v33 RENAME TO project_canvases;
+        CREATE INDEX idx_project_canvases_project ON project_canvases(project_id, status);
+        CREATE UNIQUE INDEX ux_project_canvases_live_name
+            ON project_canvases(project_id, lower(name)) WHERE status != 'archived';
+        CREATE TABLE canvas_sessions_v33 (
+            session_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            canvas_id TEXT REFERENCES project_canvases(canvas_id),
+            canvas_revision INTEGER NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('active','complete','stopped')),
+            current_question_json TEXT,
+            answers_json TEXT NOT NULL DEFAULT '[]',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(canvas_id, canvas_revision)
+        );
+        INSERT INTO canvas_sessions_v33
+            SELECT s.session_id, s.project_id,
+                   (SELECT c.canvas_id FROM project_canvases c WHERE c.project_id = s.project_id),
+                   s.canvas_revision, s.status, s.current_question_json, s.answers_json,
+                   s.created_at, s.updated_at
+            FROM canvas_sessions s;
+        DROP INDEX IF EXISTS idx_canvas_sessions_project;
+        DROP TABLE canvas_sessions;
+        ALTER TABLE canvas_sessions_v33 RENAME TO canvas_sessions;
+        CREATE INDEX idx_canvas_sessions_project ON canvas_sessions(project_id);
+        ALTER TABLE canvas_proposals ADD COLUMN canvas_id TEXT;
+        UPDATE canvas_proposals SET canvas_id =
+            (SELECT c.canvas_id FROM project_canvases c WHERE c.project_id = canvas_proposals.project_id);
+        CREATE INDEX idx_canvas_proposals_canvas ON canvas_proposals(canvas_id);
+        ALTER TABLE canvas_plans ADD COLUMN canvas_id TEXT;
+        UPDATE canvas_plans SET canvas_id =
+            (SELECT c.canvas_id FROM project_canvases c WHERE c.project_id = canvas_plans.project_id);
+        CREATE INDEX idx_canvas_plans_canvas ON canvas_plans(canvas_id);
+        """,
+        # Refuses (IntegrityError, before any change) when a project has more
+        # than one board: v32 cannot hold them, and a downgrade must never be
+        # the thing that deletes a board. Board name/theme/model are v33-only
+        # metadata and are not representable below v33. Foreign keys are off
+        # for the rebuild so dropping canvas_sessions never nulls proposals.
+        downgrade_sql="""
+        CREATE TEMP TABLE IF NOT EXISTS _v33_downgrade_guard (
+            projects_with_many_boards INTEGER NOT NULL CHECK (projects_with_many_boards = 0));
+        DELETE FROM _v33_downgrade_guard;
+        INSERT INTO _v33_downgrade_guard
+            SELECT COUNT(*) FROM (SELECT project_id FROM project_canvases GROUP BY project_id HAVING COUNT(*) > 1);
+        DROP TABLE _v33_downgrade_guard;
+        PRAGMA foreign_keys=OFF;
+        BEGIN;
+        DROP INDEX IF EXISTS idx_canvas_plans_canvas;
+        ALTER TABLE canvas_plans DROP COLUMN canvas_id;
+        DROP INDEX IF EXISTS idx_canvas_proposals_canvas;
+        ALTER TABLE canvas_proposals DROP COLUMN canvas_id;
+        CREATE TABLE canvas_sessions_v32 (
+            session_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            canvas_revision INTEGER NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('active','complete','stopped')),
+            current_question_json TEXT,
+            answers_json TEXT NOT NULL DEFAULT '[]',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(project_id, canvas_revision)
+        );
+        INSERT INTO canvas_sessions_v32
+            SELECT session_id, project_id, canvas_revision, status, current_question_json,
+                   answers_json, created_at, updated_at
+            FROM canvas_sessions;
+        DROP INDEX IF EXISTS idx_canvas_sessions_project;
+        DROP TABLE canvas_sessions;
+        ALTER TABLE canvas_sessions_v32 RENAME TO canvas_sessions;
+        CREATE INDEX IF NOT EXISTS idx_canvas_sessions_project ON canvas_sessions(project_id);
+        CREATE TABLE project_canvases_v32 (
+            canvas_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL UNIQUE REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            objects_json TEXT NOT NULL DEFAULT '[]',
+            connectors_json TEXT NOT NULL DEFAULT '[]',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            updated_by TEXT NOT NULL
+        );
+        INSERT INTO project_canvases_v32
+            SELECT canvas_id, project_id, revision, objects_json, connectors_json,
+                   created_at, updated_at, updated_by
+            FROM project_canvases;
+        DROP INDEX IF EXISTS ux_project_canvases_live_name;
+        DROP INDEX IF EXISTS idx_project_canvases_project;
+        DROP TABLE project_canvases;
+        ALTER TABLE project_canvases_v32 RENAME TO project_canvases;
+        CREATE INDEX IF NOT EXISTS idx_project_canvases_project ON project_canvases(project_id);
+        COMMIT;
+        PRAGMA foreign_keys=ON;
+        """,
     ),
 ]

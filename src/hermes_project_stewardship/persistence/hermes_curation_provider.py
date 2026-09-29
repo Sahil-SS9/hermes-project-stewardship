@@ -9,6 +9,48 @@ import json
 from typing import Any
 
 
+def list_hermes_models() -> dict[str, Any]:
+    """The providers/models this Hermes install has configured, for the board
+    model picker. Read-only; never probes offline custom endpoints. Returns
+    ``available: False`` (never raises) when no Hermes runtime is importable,
+    so the picker degrades to "Hermes default" instead of failing.
+    """
+    from importlib import import_module
+
+    try:
+        hermes_constants = import_module("hermes_constants")
+        inventory = import_module("hermes_cli.inventory")
+        load_config = import_module("hermes_cli.config").load_config
+        token = hermes_constants.set_hermes_home_override(hermes_constants.get_process_hermes_home())
+        try:
+            config = load_config() or {}
+            model_config = config.get("model") or {}
+            if isinstance(model_config, str):
+                current_model, current_provider = model_config, ""
+            else:
+                current_model = str(model_config.get("default") or model_config.get("model") or "")
+                current_provider = str(model_config.get("provider") or "")
+            rows = inventory.build_aux_picker_rows(
+                current_provider=current_provider, current_model=current_model, max_models=50)
+        finally:
+            hermes_constants.reset_hermes_home_override(token)
+    except Exception:
+        return {"available": False, "default": None, "providers": []}
+    providers = []
+    for row in rows or []:
+        slug = str(row.get("slug") or "").strip()
+        if not slug:
+            continue
+        providers.append({
+            "slug": slug,
+            "name": str(row.get("name") or slug),
+            "models": [str(m) for m in (row.get("models") or []) if str(m).strip()],
+            "is_current": bool(row.get("is_current")),
+        })
+    default = {"provider": current_provider, "model": current_model} if current_model else None
+    return {"available": True, "default": default, "providers": providers}
+
+
 class HermesCurationProvider:
     def __init__(self, *, provider_id: str | None = None, model_id: str | None = None) -> None:
         # Hermes internals stay behind the optional-adapter boundary (PM-0607):

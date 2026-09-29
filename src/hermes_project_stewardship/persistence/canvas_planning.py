@@ -31,10 +31,12 @@ class CanvasPlanningService:
         self.provider = provider
         self.canvas = CanvasService(store)
 
-    def _ledger_answers(self, project_id: str) -> list[dict[str, Any]]:
+    def _ledger_answers(self, canvas_id: str) -> list[dict[str, Any]]:
+        # The ledger is per board: an answer on one board never closes a gap
+        # on another board of the same project.
         rows = self.store._conn.execute(
-            "SELECT answers_json FROM canvas_sessions WHERE project_id=? ORDER BY created_at",
-            (project_id,),
+            "SELECT answers_json FROM canvas_sessions WHERE canvas_id=? ORDER BY created_at",
+            (canvas_id,),
         ).fetchall()
         ledger: list[dict[str, Any]] = []
         for row in rows:
@@ -44,19 +46,21 @@ class CanvasPlanningService:
                 continue
         return ledger
 
-    def _session_at_revision(self, project_id: str, canvas_revision: int) -> dict[str, Any] | None:
+    def _session_at_revision(self, canvas_id: str, canvas_revision: int) -> dict[str, Any] | None:
         rows = self.store._conn.execute(
-            "SELECT session_id FROM canvas_sessions WHERE project_id=? AND canvas_revision=? ORDER BY created_at",
-            (project_id, canvas_revision),
+            "SELECT session_id FROM canvas_sessions WHERE canvas_id=? AND canvas_revision=? ORDER BY created_at",
+            (canvas_id, canvas_revision),
         ).fetchall()
         if not rows:
             return None
         return self.get(rows[-1]["session_id"])
 
-    def start(self, project_id: str, *, actor: str) -> dict[str, Any]:
-        current = self.canvas.get(project_id)
-        ledger = self._ledger_answers(project_id)
-        existing = self._session_at_revision(project_id, current["revision"])
+    def start(self, project_id: str, *, actor: str, canvas_id: str | None = None) -> dict[str, Any]:
+        current = self.canvas.get(project_id, canvas_id)
+        canvas_id = current["canvas_id"]
+        self.canvas.require_editable(project_id, canvas_id)
+        ledger = self._ledger_answers(canvas_id)
+        existing = self._session_at_revision(canvas_id, current["revision"])
         result = CanvasCurationService(self.provider).curate(current, clarifications=ledger)
         questions = result.get("clarifying_questions", [])
         question = questions[0] if questions else None
@@ -72,24 +76,29 @@ class CanvasPlanningService:
                     (status, json.dumps(question) if question else None, iso(self.store._clock()), existing["session_id"]),
                 )
             if status == "complete" and not existing["proposals"]:
-                self._store_proposals(existing["session_id"], project_id, current["revision"], result)
+                self._store_proposals(existing["session_id"], project_id, canvas_id, current["revision"], result)
             return self.get(existing["session_id"])
         session_id = "canvas-session-" + uuid.uuid4().hex[:16]
         now = iso(self.store._clock())
         with self.store.tx() as cx:
             cx.execute(
-                "INSERT INTO canvas_sessions(session_id, project_id, canvas_revision, status, current_question_json, answers_json, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                (session_id, project_id, current["revision"], status, json.dumps(question) if question else None, "[]", now, now),
+                "INSERT INTO canvas_sessions(session_id, project_id, canvas_id, canvas_revision, status, current_question_json, answers_json, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                (session_id, project_id, canvas_id, current["revision"], status, json.dumps(question) if question else None, "[]", now, now),
             )
-        self._store_proposals(session_id, project_id, current["revision"], result)
+        # First AI run submits a draft board; later states are never rewound.
+        self.canvas.advance(canvas_id, "submitted", only_from=("draft",))
+        self._store_proposals(session_id, project_id, canvas_id, current["revision"], result)
         return self.get(session_id)
 
-    def _store_proposals(self, session_id: str, project_id: str, canvas_revision: int, result: dict[str, Any]) -> None:
-        for proposal in result.get("proposals", []):
-            with self.store.tx() as cx:
+    def _store_proposals(self, session_id: str, project_id: str, canvas_id: str, canvas_revision: int, result: dict[str, Any]) -> None:
+        proposals = result.get("proposals", [])
+        if not proposals:
+            return
+        with self.store.tx() as cx:  # all-or-nothing: never half a proposal set
+            for proposal in proposals:
                 cx.execute(
-                    "INSERT INTO canvas_proposals(proposal_id, project_id, session_id, canvas_revision, proposal_json, status, created_at) VALUES(?,?,?,?,?,?,?)",
-                    ("canvas-proposal-" + uuid.uuid4().hex[:16], project_id, session_id, canvas_revision, json.dumps(proposal, sort_keys=True), "pending", iso(self.store._clock())),
+                    "INSERT INTO canvas_proposals(proposal_id, project_id, canvas_id, session_id, canvas_revision, proposal_json, status, created_at) VALUES(?,?,?,?,?,?,?,?)",
+                    ("canvas-proposal-" + uuid.uuid4().hex[:16], project_id, canvas_id, session_id, canvas_revision, json.dumps(proposal, sort_keys=True), "pending", iso(self.store._clock())),
                 )
 
     def get(self, session_id: str) -> dict[str, Any]:
@@ -97,7 +106,7 @@ class CanvasPlanningService:
         if row is None:
             raise ValueError("unknown canvas session")
         proposals = self.store._conn.execute("SELECT * FROM canvas_proposals WHERE session_id=? ORDER BY created_at", (session_id,)).fetchall()
-        return {"session_id": row["session_id"], "project_id": row["project_id"], "canvas_revision": row["canvas_revision"], "status": row["status"], "current_question": json.loads(row["current_question_json"]) if row["current_question_json"] else None, "answers": json.loads(row["answers_json"]), "proposals": [{"proposal_id": p["proposal_id"], "status": p["status"], **json.loads(p["proposal_json"])} for p in proposals]}
+        return {"session_id": row["session_id"], "project_id": row["project_id"], "canvas_id": row["canvas_id"], "canvas_revision": row["canvas_revision"], "status": row["status"], "current_question": json.loads(row["current_question_json"]) if row["current_question_json"] else None, "answers": json.loads(row["answers_json"]), "proposals": [{"proposal_id": p["proposal_id"], "status": p["status"], "canvas_id": p["canvas_id"], **json.loads(p["proposal_json"])} for p in proposals]}
 
     def answer(self, session_id: str, *, outcome: str, answer: str = "", actor: str) -> dict[str, Any]:
         if outcome not in _OUTCOMES:
@@ -105,6 +114,7 @@ class CanvasPlanningService:
         current = self.get(session_id)
         if current["status"] != "active":
             raise ValueError("canvas session is not active")
+        self.canvas.require_editable(current["project_id"], current["canvas_id"])
         answers = [*current["answers"], {"question": current["current_question"], "outcome": outcome, "answer": answer, "actor": actor}]
         status = "stopped" if outcome == OUTCOME_STOP else "complete"
         with self.store.tx() as cx:
@@ -114,12 +124,12 @@ class CanvasPlanningService:
             # The answer just closed the last open gap: run curation with the
             # updated ledger so its proposals are waiting for review now,
             # instead of hiding behind the next manual re-run.
-            canvas = self.canvas.get(current["project_id"])
+            canvas = self.canvas.get(current["project_id"], current["canvas_id"])
             result = CanvasCurationService(self.provider).curate(
                 canvas,
-                clarifications=self._ledger_answers(current["project_id"]),
+                clarifications=self._ledger_answers(current["canvas_id"]),
             )
-            self._store_proposals(session_id, current["project_id"], canvas["revision"], result)
+            self._store_proposals(session_id, current["project_id"], current["canvas_id"], canvas["revision"], result)
         return self.get(session_id)
 
     def decide(self, proposal_id: str, *, approve: bool, actor: str) -> dict[str, Any]:

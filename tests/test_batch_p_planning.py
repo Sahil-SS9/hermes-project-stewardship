@@ -332,25 +332,27 @@ def test_backlog_steps_cannot_be_created_twice(tmp_path):
     assert [row["order"] for row in readback["backlog_created"]] == [1], "the plan remembers what it created"
 
 
-# ------------------------------------------------------------ migration v32 --
+# ------------------------------------------------------ migration v32/v33 --
 def test_plan_table_migration_round_trip(tmp_path, monkeypatch):
-    """v32 round-trip through the real Store.migrate() runner.
+    """Planning migrations round-trip through the real Store.migrate() runner.
 
-    Seed planning data, then v32 -> v30 (downgrade SQL + migration record
-    removed) -> v32 (reopen: the real runner applies the migration) -> v30 ->
-    v32. Prior tables are identical at every step and the downgrade removes
-    canvas_plans cleanly. Must be rebased onto Batch W's v31 before merge;
-    proven here against the current v30 base (owner decision, 27/09/2026)."""
+    Seed planning data with today's code, then walk the whole chain down
+    (v33 -> v32 -> base) and back up (reopen: the runner re-applies v32 and
+    v33) twice. Every pre-v32 column is identical at every step, the downgrade
+    removes canvas_plans cleanly, and the re-upgraded schema accepts a new plan
+    from the surviving approved proposal. v32 must be rebased onto Batch W's
+    v31 before merge (owner decision, 27/09/2026)."""
     from hermes_project_stewardship.api.server import _canvas_provider
     from hermes_project_stewardship.persistence.canvas_plan_document import (
         PlanDocumentService)
-    from hermes_project_stewardship.persistence.migrations import MIGRATIONS
+    from hermes_project_stewardship.persistence.migrations import MIGRATIONS, SCHEMA_VERSION
     from hermes_project_stewardship.persistence.service import StewardshipService
     from hermes_project_stewardship.persistence.store import Store
 
     # Deterministic fake provider, scoped to this test only (never a real model).
     monkeypatch.setenv("HPS_CANVAS_PROVIDER", "fake")
-    migration = next(item for item in MIGRATIONS if item.version == 32)
+    down_chain = sorted((item for item in MIGRATIONS if item.version >= 32),
+                        key=lambda item: item.version, reverse=True)
     base_version = max(item.version for item in MIGRATIONS if item.version < 32)
     db = tmp_path / "plan-roundtrip.db"
 
@@ -374,49 +376,60 @@ def test_plan_table_migration_round_trip(tmp_path, monkeypatch):
     finally:
         store.close()
 
+    # Only the columns every schema from base to current shares.
+    legacy = {
+        "project_stewardship": "*",
+        "project_canvases": "canvas_id, project_id, revision, objects_json, connectors_json, created_at, updated_at, updated_by",
+        "canvas_sessions": "session_id, project_id, canvas_revision, status, current_question_json, answers_json, created_at, updated_at",
+        "canvas_proposals": "proposal_id, project_id, session_id, canvas_revision, proposal_json, status, created_at",
+    }
+
     def snapshot(s):
         return tuple(
-            tuple(tuple(row) for row in s._conn.execute(f"SELECT * FROM {table} ORDER BY 1").fetchall())
-            for table in ("project_stewardship", "project_canvases",
-                          "canvas_sessions", "canvas_proposals"))
+            tuple(tuple(row) for row in s._conn.execute(f"SELECT {cols} FROM {table} ORDER BY 1").fetchall())
+            for table, cols in legacy.items())
 
     def tables(s):
         return {row["name"] for row in s._conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
 
-    def downgrade(s):
-        s._conn.executescript(migration.downgrade_sql)
-        s._conn.execute("DELETE FROM schema_migrations WHERE version = 32")
-        s._conn.commit()
+    def downgrade_to_base(s):
+        for item in down_chain:
+            s._conn.executescript(item.downgrade_sql)
+            s._conn.execute("DELETE FROM schema_migrations WHERE version = ?", (item.version,))
+            s._conn.commit()
 
     store = Store(db)
     try:
-        assert store.schema_version == 32
+        assert store.schema_version == SCHEMA_VERSION
         before = snapshot(store)
         assert all(before[1:]), "seed must populate canvas, sessions and proposals"
         assert store._conn.execute("SELECT COUNT(*) FROM canvas_plans").fetchone()[0] == 1
-        downgrade(store)
+        downgrade_to_base(store)
         assert "canvas_plans" not in tables(store)
         assert store.schema_version == base_version
         assert snapshot(store) == before, "downgrade must not disturb prior tables"
+        assert store._conn.execute("PRAGMA foreign_key_check").fetchall() == []
     finally:
         store.close()
 
     for cycle in range(2):
-        store = Store(db)  # real runner: applies v32 to a v30 database holding data
+        store = Store(db)  # real runner: re-applies v32 and v33 to a base database holding data
         try:
-            assert store.schema_version == 32, f"cycle {cycle}: runner did not upgrade"
+            assert store.schema_version == SCHEMA_VERSION, f"cycle {cycle}: runner did not upgrade"
             assert "canvas_plans" in tables(store)
             assert snapshot(store) == before, f"cycle {cycle}: upgrade changed prior data"
             again = PlanDocumentService(store).synthesise_plan(
                 "prp", proposal_id=plan_proposal["proposal_id"], actor="sahil")
             assert again["steps"], "upgraded schema must accept a new plan"
+            assert again["canvas_id"] == before[1][0][0], "plan is tied to the legacy board"
             assert store._conn.execute("SELECT COUNT(*) FROM canvas_plans").fetchone()[0] == 1
-            downgrade(store)
+            downgrade_to_base(store)
             assert "canvas_plans" not in tables(store)
             assert snapshot(store) == before, f"cycle {cycle}: downgrade changed prior data"
         finally:
             store.close()
+
 
 def test_canvas_save_conflict_returns_409_at_route_level(tmp_path):
     """NEW-2: a stale expected_revision through the HTTP route must give 409."""
