@@ -53,6 +53,11 @@ export HERMES_KANBAN_HOME="$EVIDENCE/hermes-home"
 export COVERAGE_FILE="$EVIDENCE/.coverage"
 export PYTHONDONTWRITEBYTECODE=1
 unset STEWARD_DB_PATH DOCKYARD_PLUGIN_DB STEWARD_RPC_TOKEN DOCKYARD_PLUGIN_URL DOCKYARD_ACTOR_ID
+# Hermetic interpreter: an inherited PYTHONPATH (e.g. a live Hermes checkout)
+# would put foreign packages on sys.path, so the suite and the dependency
+# audit would judge libraries this project never installs. Drop it, and let
+# the audit gate below prove sys.path holds only the candidate venv.
+unset PYTHONPATH PYTHONHOME PYTHONSTARTUP
 echo "evidence: $EVIDENCE"
 "$PY" -c 'from pathlib import Path; import hermes_project_stewardship as p; print("candidate import:", p.__file__); assert Path(p.__file__).resolve().is_relative_to(Path.cwd() / "src")' || exit 1
 

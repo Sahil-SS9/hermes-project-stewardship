@@ -148,26 +148,48 @@ class Store:
                 f" supports (max {SCHEMA_VERSION}); refusing to open a"
                 " database migrated by a newer Hermes build"
             )
-        for m in MIGRATIONS:
-            if m.version <= current:
-                continue
-            with self.tx() as cx:
-                statement = ""
-                for character in m.upgrade_sql:
-                    statement += character
-                    if character == ";" and sqlite3.complete_statement(statement):
-                        sql = statement.strip()
-                        statement = ""
-                        if sql:
-                            cx.execute(sql)
-                if statement.strip():
-                    raise sqlite3.OperationalError(
-                        f"incomplete SQL in migration {m.version}"
-                    )
-                cx.execute(
-                    "INSERT INTO schema_migrations(version, applied_at) VALUES(?,?)",
-                    (m.version, iso(self._clock())),
+        pending = [m for m in MIGRATIONS if m.version > current]
+        if not pending:
+            return
+        # SQLite's table-rebuild procedure (CREATE new, copy, DROP old, RENAME)
+        # requires foreign keys OFF: with them on, DROP of a parent table runs
+        # ON DELETE CASCADE and silently empties every child table (v30 lost
+        # all decision receipts this way). The pragma is a no-op inside a
+        # transaction, so it is switched here, and every migration is then
+        # proven by foreign_key_check before its commit.
+        self._conn.execute("PRAGMA foreign_keys=OFF")
+        try:
+            for m in pending:
+                self._apply_migration(m)
+        finally:
+            self._conn.execute("PRAGMA foreign_keys=ON")
+
+    def _apply_migration(self, m) -> None:
+        with self.tx() as cx:
+            statement = ""
+            for character in m.upgrade_sql:
+                statement += character
+                if character == ";" and sqlite3.complete_statement(statement):
+                    sql = statement.strip()
+                    statement = ""
+                    if sql:
+                        cx.execute(sql)
+            if statement.strip():
+                raise sqlite3.OperationalError(
+                    f"incomplete SQL in migration {m.version}"
                 )
+            # Foreign keys are off for the rebuild, so integrity is proven
+            # explicitly: any dangling reference rolls the migration back.
+            dangling = cx.execute("PRAGMA foreign_key_check").fetchall()
+            if dangling:
+                raise sqlite3.IntegrityError(
+                    f"migration {m.version} left {len(dangling)} dangling"
+                    f" foreign key reference(s), first: {tuple(dangling[0])}"
+                )
+            cx.execute(
+                "INSERT INTO schema_migrations(version, applied_at) VALUES(?,?)",
+                (m.version, iso(self._clock())),
+            )
 
     @property
     def schema_version(self) -> int:

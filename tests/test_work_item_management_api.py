@@ -66,9 +66,13 @@ def test_work_item_edit_assignment_and_dependency_flow(store, enabled):
         json={"dependency_ref": dependency, "actor_id": "sahil", "actor_kind": "human"},
     )
     assert linked.status_code == 200, linked.text
-    detail = client.get(
+    detail_response = client.get(
         f"/stewardship/v1/projects/{enabled}/work-items/{task}"
-    ).json()
+    )
+    # Status first: a bare KeyError hid the real response once in CI.
+    assert detail_response.status_code == 200, detail_response.text
+    detail = detail_response.json()
+    assert "dependencies" in detail, detail
     assert [item["ref"] for item in detail["dependencies"]] == [dependency]
 
     removed = client.post(
