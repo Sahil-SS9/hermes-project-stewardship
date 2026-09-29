@@ -1731,8 +1731,14 @@ var DOCKYARD_CSS = `
    versions + lifecycle). The canvas draws its own styling; these rules only
    place it and the zones around it. Tokens: the shared dockyard palette. */
 .dockyard-root .dockyard-workflows-v6 { display: grid; gap: 0; }
-.dockyard-root .dockyard-wf3 { display: grid; grid-template-columns: 250px minmax(0, 1fr) 320px; gap: 0; margin-top: 16px; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); }
-.dockyard-root .dockyard-wf3-lib { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--dy-border); background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-wf3 { display: grid; grid-template-columns: 250px minmax(0, 1fr); transition: grid-template-columns .22s ease; gap: 0; margin-top: 16px; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); }
+.dockyard-root .dockyard-wf3-lib { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--dy-border); background: var(--dy-surface-subtle); overflow: hidden; }
+/* Collapsible library: the column folds to zero so the canvas takes the width. */
+.dockyard-root .dockyard-wf3.lib-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
+.dockyard-root .dockyard-wf3.lib-collapsed .dockyard-wf3-lib { visibility: hidden; border-right: 0; pointer-events: none; }
+.dockyard-root .dockyard-wf3-libtoggle { width: 30px; height: 30px; padding: 0; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text-2); font-size: 15px; line-height: 1; cursor: pointer; }
+.dockyard-root .dockyard-wf3-libtoggle:hover { border-color: var(--dy-accent-border); color: var(--dy-accent-text); }
+@media (prefers-reduced-motion: reduce) { .dockyard-root .dockyard-wf3 { transition: none; } }
 .dockyard-root .dockyard-wf3-lib-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--dy-border); }
 .dockyard-root .dockyard-wf3-lib-head strong { font-size: 12.5px; }
 .dockyard-root .dockyard-wf3-lib-head span { color: var(--dy-text-3); font-size: 11px; }
@@ -1749,26 +1755,38 @@ var DOCKYARD_CSS = `
 .dockyard-root .dockyard-wf3-validation { margin: 0; padding: 8px 14px; border-bottom: 1px solid var(--dy-border); background: var(--dy-warning-bg); color: var(--dy-warning); font-size: 12px; }
 .dockyard-root .dockyard-wf3-stage .dockyard-workflow-graph { min-width: 0; }
 .dockyard-root .dockyard-wf3-stage .dockyard-workflow-graph .dy-wf { height: 62vh; border: 0; border-radius: 0; }
-.dockyard-root .dockyard-wf3-insp { display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: auto; padding: 14px; border-left: 1px solid var(--dy-border); background: var(--dy-surface-subtle); }
-.dockyard-root .dockyard-wf3-insp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--dy-border); }
-.dockyard-root .dockyard-wf3-insp-head strong { font-size: 12.5px; }
-.dockyard-root .dockyard-wf3-insp-head span { color: var(--dy-text-3); font-size: 11px; }
-.dockyard-root .dockyard-wf3-runkey { margin: 6px 0 2px; color: var(--dy-text); font-size: 12.5px; font-weight: 600; }
-.dockyard-root .dockyard-wf3-counts { margin: 0 0 6px; color: var(--dy-text-3); font-size: 11px; }
-.dockyard-root .dockyard-wf3-insp ul { margin: 6px 0 0; padding: 0 0 0 16px; display: grid; gap: 3px; }
-.dockyard-root .dockyard-wf3-insp li { color: var(--dy-text-2); font-size: 12px; }
+/* Toolbar lifecycle controls + versions menu (the inspector column is gone). */
+.dockyard-root .dockyard-wf3-toolbar { position: relative; }
+.dockyard-root .dockyard-wf3-versions { position: relative; }
+.dockyard-root .dockyard-wf3-versions > summary { list-style: none; cursor: pointer; padding: 5px 10px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font-size: 12px; font-weight: 600; }
+.dockyard-root .dockyard-wf3-versions > summary::-webkit-details-marker { display: none; }
+.dockyard-root .dockyard-wf3-versions[open] > summary { border-color: var(--dy-accent-border); color: var(--dy-accent-text); }
+.dockyard-root .dockyard-wf3-versions-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; width: min(420px, 80vw); max-height: 360px; overflow: auto; display: grid; gap: 10px; padding: 12px; border: 1px solid var(--dy-border); border-radius: 12px; background: var(--dy-surface); box-shadow: 0 16px 40px rgba(0,0,0,.28); }
+.dockyard-root .dockyard-wf3-version-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dockyard-root .dockyard-wf3-versions-menu pre { margin: 6px 0 0; max-height: 140px; overflow: auto; font-size: 11px; }
+/* Run readout: one line above the canvas. */
+.dockyard-root .dockyard-wf3-run { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; padding: 8px 14px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface-subtle); font-size: 12px; }
+.dockyard-root .dockyard-wf3-runkey { color: var(--dy-text); font-weight: 600; }
+.dockyard-root .dockyard-wf3-counts { color: var(--dy-text-3); }
+.dockyard-root .dockyard-wf3-steps { margin-left: auto; position: relative; }
+.dockyard-root .dockyard-wf3-steps > summary { cursor: pointer; color: var(--dy-text-2); }
+.dockyard-root .dockyard-wf3-steps ul { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 260px; margin: 0; padding: 10px 12px 10px 28px; display: grid; gap: 4px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); box-shadow: 0 16px 40px rgba(0,0,0,.28); }
+.dockyard-root .dockyard-wf3-steps li { color: var(--dy-text-2); font-size: 12px; }
+.dockyard-root .dockyard-wf3-steps li[data-wf-needs-attention="true"] { color: var(--dy-warning); }
 @media (max-width: 1250px) {
   .dockyard-root .dockyard-wf3 { grid-template-columns: 220px minmax(0, 1fr); }
-  .dockyard-root .dockyard-wf3-insp { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--dy-border); }
+  .dockyard-root .dockyard-wf3.lib-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
 }
 @media (max-width: 640px) {
   .dockyard-root .dockyard-wf3 { display: block; }
   .dockyard-root .dockyard-wf3-lib { display: none; }
+  .dockyard-root .dockyard-wf3-libtoggle, .dockyard-root .dockyard-wf3-libtoggle + .dockyard-wf3-sep { display: none; }
   .dockyard-root .dockyard-wf3-stage { min-width: 0; }
   .dockyard-root .dockyard-wf3-stage .dockyard-wf3-toolbar { overflow: visible; flex-wrap: wrap; justify-content: flex-start; gap: 4px; }
   .dockyard-root .dockyard-wf3-stage .dockyard-wf3-toolbar .dockyard-button { flex: 0 0 auto; min-height: 38px; padding-inline: 8px; white-space: nowrap; }
   .dockyard-root .dockyard-wf3-stage .dockyard-workflow-graph .dy-wf { height: 70vh; min-height: 520px; }
-  .dockyard-root .dockyard-wf3-insp { margin-top: 10px; max-height: 230px; }
+  .dockyard-root .dockyard-wf3-steps { margin-left: 0; }
+  .dockyard-root .dockyard-wf3-steps ul { left: 0; right: auto; }
 }
 
 /* Command Center: screenshot-led wide scan tables with a contextual inspector. */
@@ -2247,202 +2265,256 @@ var WORKFLOW_LIBRARY_CSS = `
 
 // hermes_dockyard_plugin/desktop/workflow-canvas-css.js
 var workflow_canvas_css_default = `
-/* ---- Workflow canvas: purpose + status token set -------------------------
-   Two independent visual dimensions, deliberately kept on separate axes.
-   PURPOSE (what a node is)  -> fill, silhouette, symbol, purpose text.
-   STATUS  (where a node is) -> outline stroke, status chip, status word.
-   Purpose hues are cyan/blue/violet/magenta (182/232/272/314 deg); status hues
-   are green/amber/red/grey (128/42/3 deg), so no status colour can collide with
-   a purpose colour, and purpose fills read as tinted rather than near-black.
-   Measured (WCAG 2.1 relative luminance) on every purpose fill:
-   status text >= 5.3:1, status stroke >= 3.7:1, purpose text >= 6.6:1, and
-   every fill clears its canvas background by >= 1.63:1 so the tint is visible.
+/* ---- Workflow canvas: card + status token set ----------------------------
+   Every node is the SAME glass card. Two things are communicated, on separate
+   channels:
+   PURPOSE (what a node is)  -> the purpose word on the card (no colour, no shape).
+   STATUS  (where a node is) -> card border, soft glow, status dot, status word.
+   The canvas area alone is dark (it is a lit stage); the plugin chrome around
+   it keeps its normal theme. Contrast measured (WCAG 2.1) on the card fill:
+   label >= 13:1, purpose word >= 7:1, every status word >= 7:1.
    Single home for the palette: the literals below. */
 .dy-wf-scope {
-  --dy-wf-purpose-task-fill: #482f5e;   --dy-wf-purpose-task-line: #a862e6;   --dy-wf-purpose-task-text: #ddc1f5;
-  --dy-wf-purpose-gate-fill: #0f4345;   --dy-wf-purpose-gate-line: #18dfe6;   --dy-wf-purpose-gate-text: #a5f2f5;
-  --dy-wf-purpose-branch-fill: #611f52; --dy-wf-purpose-branch-line: #e632bc; --dy-wf-purpose-branch-text: #f5afe4;
-  --dy-wf-purpose-loop-fill: #33395e;   --dy-wf-purpose-loop-line: #6c7ce6;   --dy-wf-purpose-loop-text: #c6ccf5;
+  --dy-wf-canvas-bg: #070b14;      --dy-wf-canvas-glow: #10213d;  --dy-wf-canvas-grid: #1a2740;
+  --dy-wf-card-fill: #101c30;      --dy-wf-card-line: #2c4466;
+  --dy-wf-card-text: #eef4ff;      --dy-wf-card-dim: #9fb2cc;
+  --dy-wf-glass: rgba(12, 20, 36, .72); --dy-wf-glass-line: rgba(140, 180, 255, .20);
+  --dy-wf-accent: #6ab7ff;
   --dy-wf-status-done: #4ade80;    --dy-wf-status-done-text: #5ee08a;
   --dy-wf-status-working: #e3b341; --dy-wf-status-working-text: #f0c04a;
   --dy-wf-status-blocked: #ff7b72; --dy-wf-status-blocked-text: #ff9d97;
-  --dy-wf-status-pending: #8b99a8; --dy-wf-status-pending-text: #a9b6c6;
-  --dy-edge-dep: #8fa3c8;                   --dy-edge-dep-active: #9cc4ff;
-  /* The planning connector meanings (--dy-edge-plan-*) used to sit here as
-     reserved tokens-only vocabulary. The planning canvas now DRAWS them, so each
-     moved to the carrier that consumes it (.dy-pc-scope, planning section
-     below) \u2014 declared once instead of twice. */
+  --dy-wf-status-pending: #8b99a8; --dy-wf-status-pending-text: #b4c1d2;
+  --dy-edge-dep: #5d7aa6;          --dy-edge-dep-active: #9cc4ff;
+  /* The planning connector meanings (--dy-edge-plan-*) live on the carrier
+     that consumes them (.dy-pc-scope, planning section below). */
 }
 .dy-wf-scope .dy-wf-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
-/* The mount root IS the canvas frame: sized, bordered, positioned.
-   (.dy-wf-host was removed - no element ever carried it; styles move to .dy-wf) */
+/* The mount root IS the canvas frame: sized, bordered, positioned, and the
+   only dark surface. A soft radial light plus a fine dot grid gives the stage
+   depth without competing with the cards. */
 .dy-wf-scope .dy-wf,
-.dy-wf-scope.dy-wf { position: relative; height: 72vh; border: 1px solid var(--dy-border, #2a2f3a); border-radius: 10px; overflow: hidden; background: var(--dy-bg-deep, #0f1218); }
+.dy-wf-scope.dy-wf {
+  position: relative; height: 72vh; border: 1px solid var(--dy-wf-card-line); border-radius: 14px; overflow: hidden;
+  background-color: var(--dy-wf-canvas-bg);
+  background-image:
+    radial-gradient(ellipse at 30% 20%, var(--dy-wf-canvas-glow) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 90%, rgba(80, 60, 160, .16) 0%, transparent 55%),
+    radial-gradient(circle, var(--dy-wf-canvas-grid) 1px, transparent 1.2px);
+  background-size: 100% 100%, 100% 100%, 22px 22px;
+  color: var(--dy-wf-card-text);
+}
 .dy-wf-scope .dy-wf-wrap { position: relative; width: 100%; height: 100%; }
 .dy-wf-scope .dy-wf-svg { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
 .dy-wf-scope .dy-wf-svg:active { cursor: grabbing; }
-/* Playback and activity controls belong to the canvas toolbar surface. */
-.dy-wf-scope .dy-wf-playback { position: absolute; left: 50%; bottom: 14px; z-index: 12; display: flex; align-items: center; gap: 8px; width: min(680px, calc(100% - 34px)); transform: translateX(-50%); padding: 8px 11px; border: 1px solid var(--dy-border, #2a2f3a); border-radius: 9px; background: color-mix(in srgb, var(--dy-bg-deep, #0f1218) 92%, transparent); box-shadow: 0 8px 26px rgba(0,0,0,.24); }
-.dy-wf-scope .dy-wf-playback-btn { flex: 0 0 auto; min-width: 70px; padding: 6px 9px; border: 1px solid var(--dy-border, #2a2f3a); border-radius: 6px; background: var(--dy-surface, #171c25); color: var(--dy-text, #e6edf3); cursor: pointer; }
-.dy-wf-scope .dy-wf-playback-btn:disabled { cursor: not-allowed; opacity: .55; }
-.dy-wf-scope .dy-wf-playback-slider { flex: 1 1 auto; min-width: 80px; accent-color: var(--dy-accent, #58a6ff); }
-.dy-wf-scope .dy-wf-playback-label { flex: 0 0 auto; min-width: 100px; color: var(--dy-text-3, #8b949e); font-size: 11px; text-align: right; }
-.dy-wf-scope .dy-wf-motion-btn { flex: 0 0 auto; padding: 6px 8px; border: 1px solid var(--dy-border, #2a2f3a); border-radius: 6px; background: var(--dy-surface, #171c25); color: var(--dy-text, #e6edf3); cursor: pointer; font-size: 11px; }
-.dy-wf-scope.dy-wf-still .dy-wf-node.working .dy-wf-shape, .dy-wf-scope.dy-wf-still .dy-wf-flowdot { animation: none !important; opacity: 0; }
-.dy-wf-scope.dy-wf-still .dy-wf-edge { stroke-dasharray: none; }
-.dy-wf-scope .dy-wf-node.dy-wf-playback-active .dy-wf-shape { filter: drop-shadow(0 0 8px var(--dy-accent, #58a6ff)); }
-.dy-wf-scope .dy-wf-node[data-wf-playback-status="done"] .dy-wf-shape { stroke: var(--dy-wf-status-done); }
-@media (max-width: 640px) {
-  .dy-wf-scope .dy-wf-playback { bottom: 8px; width: calc(100% - 18px); }
-  .dy-wf-scope .dy-wf-playback-label { min-width: 72px; font-size: 10px; }
-  .dy-wf-scope .dy-wf-motion-btn { padding-inline: 6px; }
-  .dy-wf-scope .dy-wf-index { display: none; }
-  .dy-wf-scope .dy-wf-feed { max-width: calc(100% - 24px); }
-  .dy-wf-scope .dy-wf-passport { left: 10px; right: 10px; top: auto; bottom: 62px; max-height: 42%; width: auto; }
+/* Smooth camera: button, fit and minimap moves ease; direct manipulation
+   (pan drag, wheel) sets .dy-wf-panning so the world tracks the pointer. */
+.dy-wf-scope .dy-wf-viewport { transition: transform .45s cubic-bezier(.22, .8, .24, 1); }
+.dy-wf-scope.dy-wf-panning .dy-wf-viewport, .dy-wf-scope .dy-wf-panning .dy-wf-viewport { transition: none; }
+
+/* Floating glass surfaces over the canvas: tools, activity, overview,
+   playback, list, step details. One recipe for all of them. */
+.dy-wf-scope .dy-wf-glass {
+  background: var(--dy-wf-glass); border: 1px solid var(--dy-wf-glass-line); border-radius: 12px;
+  -webkit-backdrop-filter: blur(14px) saturate(1.3); backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, .38), inset 0 1px 0 rgba(255, 255, 255, .05);
+  color: var(--dy-wf-card-text);
 }
+
+/* Playback (bottom centre). */
+.dy-wf-scope .dy-wf-playback { position: absolute; left: 50%; bottom: 14px; z-index: 12; display: flex; align-items: center; gap: 8px; width: min(640px, calc(100% - 230px)); transform: translateX(-50%); padding: 8px 11px; }
+.dy-wf-scope .dy-wf-playback-btn,
+.dy-wf-scope .dy-wf-motion-btn,
+.dy-wf-scope .dy-wf-zoombtn {
+  flex: 0 0 auto; padding: 5px 10px; border: 1px solid var(--dy-wf-glass-line); border-radius: 8px;
+  background: rgba(255, 255, 255, .04); color: var(--dy-wf-card-text); cursor: pointer; font-size: 12px;
+  transition: background .18s, border-color .18s, transform .12s;
+}
+.dy-wf-scope .dy-wf-playback-btn { min-width: 70px; }
+.dy-wf-scope .dy-wf-playback-btn:hover:not(:disabled),
+.dy-wf-scope .dy-wf-motion-btn:hover,
+.dy-wf-scope .dy-wf-zoombtn:hover { background: rgba(106, 183, 255, .14); border-color: var(--dy-wf-accent); }
+.dy-wf-scope .dy-wf-playback-btn:active:not(:disabled),
+.dy-wf-scope .dy-wf-zoombtn:active { transform: scale(.96); }
+.dy-wf-scope .dy-wf-playback-btn:disabled { cursor: not-allowed; opacity: .45; }
+.dy-wf-scope .dy-wf-playback-slider { flex: 1 1 auto; min-width: 80px; accent-color: var(--dy-wf-accent); }
+.dy-wf-scope .dy-wf-playback-label { flex: 0 0 auto; min-width: 92px; color: var(--dy-wf-card-dim); font-size: 11px; text-align: right; }
+.dy-wf-scope .dy-wf-motion-btn { font-size: 11px; }
+
+/* Tool cluster (top right): camera + list toggle. */
+.dy-wf-scope .dy-wf-zoombar { position: absolute; top: 12px; right: 12px; z-index: 11; display: flex; gap: 5px; padding: 6px; }
+.dy-wf-scope .dy-wf-zoombar .dy-wf-list-head { font-weight: 600; }
+
+/* Still mode (motion toggle) and playback cues. */
+.dy-wf-scope.dy-wf-still .dy-wf-node .dy-wf-shape, .dy-wf-scope.dy-wf-still .dy-wf-statusdot { animation: none !important; }
+.dy-wf-scope.dy-wf-still .dy-wf-flowdot { animation: none !important; opacity: 0; }
+.dy-wf-scope.dy-wf-still .dy-wf-edge { stroke-dasharray: none; }
+.dy-wf-scope .dy-wf-node.dy-wf-playback-active .dy-wf-shape { stroke: var(--dy-wf-accent); stroke-width: 2.4; filter: drop-shadow(0 0 12px var(--dy-wf-accent)); }
+.dy-wf-scope .dy-wf-node[data-wf-playback-status="done"] .dy-wf-shape { stroke: var(--dy-wf-status-done); }
+
 /* LOD tiers (archify): map < 75% / read / full > 140% */
 .dy-wf-scope .dy-wf-svg[data-lod="map"] .dy-wf-sub,
 .dy-wf-scope .dy-wf-svg[data-lod="map"] .dy-wf-timer,
 .dy-wf-scope .dy-wf-svg[data-lod="map"] .dy-wf-assignee { opacity: 0; }
 .dy-wf-scope .dy-wf-svg .dy-wf-sub, .dy-wf-scope .dy-wf-svg .dy-wf-timer,
 .dy-wf-scope .dy-wf-svg .dy-wf-assignee { transition: opacity .3s; }
-.dy-wf-scope .dy-wf-node { cursor: pointer; outline: none; transition: opacity .22s ease, filter .22s ease; }
-.dy-wf-scope .dy-wf-node.dy-wf-route-dim { opacity: .22; filter: saturate(.25); }
-.dy-wf-scope .dy-wf-node-history { display: grid; gap: 3px; margin: 10px 0 0; padding-left: 18px; color: var(--dy-text-3, #8b949e); font-size: 11px; }
-.dy-wf-scope .dy-wf-edge.dy-wf-route-edge { stroke: var(--dy-edge-dep-active); stroke-width: 2.5; filter: drop-shadow(0 0 4px var(--dy-edge-dep-active)); }
-/* Purpose silhouette: the shape is drawn inside the fixed node box, so ports,
-   edge endpoints and the layout grid keep their geometry. Fill = PURPOSE. */
-.dy-wf-scope .dy-wf-node .dy-wf-shape { stroke-width: 1.5; transition: stroke .5s, fill .3s, stroke-width .2s; }
-.dy-wf-scope .dy-wf-node.task .dy-wf-shape { fill: var(--dy-wf-purpose-task-fill); stroke: var(--dy-wf-purpose-task-line); }
-.dy-wf-scope .dy-wf-node.gate .dy-wf-shape { fill: var(--dy-wf-purpose-gate-fill); stroke: var(--dy-wf-purpose-gate-line); }
-.dy-wf-scope .dy-wf-node.branch .dy-wf-shape { fill: var(--dy-wf-purpose-branch-fill); stroke: var(--dy-wf-purpose-branch-line); }
-.dy-wf-scope .dy-wf-node.loop .dy-wf-shape { fill: var(--dy-wf-purpose-loop-fill); stroke: var(--dy-wf-purpose-loop-line); }
 
-/* Purpose cues: symbol + purpose name in the purpose's own text colour. */
-.dy-wf-scope .dy-wf-node .dy-wf-glyph { font: 13px system-ui, sans-serif; pointer-events: none; }
-.dy-wf-scope .dy-wf-node.task .dy-wf-glyph { fill: var(--dy-wf-purpose-task-text); }
-.dy-wf-scope .dy-wf-node.gate .dy-wf-glyph { fill: var(--dy-wf-purpose-gate-text); }
-.dy-wf-scope .dy-wf-node.branch .dy-wf-glyph { fill: var(--dy-wf-purpose-branch-text); }
-.dy-wf-scope .dy-wf-node.loop .dy-wf-glyph { fill: var(--dy-wf-purpose-loop-text); }
-
-/* Status cues: outline stroke + chip + status word. Status never re-colours
-   the fill, so a status colour cannot collide with a purpose colour. */
-.dy-wf-scope .dy-wf-node.done .dy-wf-shape { stroke: var(--dy-wf-status-done); }
-.dy-wf-scope .dy-wf-node.working .dy-wf-shape { stroke: var(--dy-wf-status-working); animation: dyPulseNode 1.5s ease-in-out infinite; }
-.dy-wf-scope .dy-wf-node.blocked .dy-wf-shape { stroke: var(--dy-wf-status-blocked); }
-.dy-wf-scope .dy-wf-node.pending .dy-wf-shape { stroke: var(--dy-wf-status-pending); }
-@keyframes dyPulseNode { 0%,100% { stroke-width: 1.5; } 50% { stroke-width: 2.6; } }
-.dy-wf-scope .dy-wf-node .dy-wf-statuschip { stroke: none; }
-.dy-wf-scope .dy-wf-node .dy-wf-statuschip.done { fill: color-mix(in srgb, var(--dy-wf-status-done) 20%, transparent); }
-.dy-wf-scope .dy-wf-node .dy-wf-statuschip.working { fill: color-mix(in srgb, var(--dy-wf-status-working) 20%, transparent); }
-.dy-wf-scope .dy-wf-node .dy-wf-statuschip.blocked { fill: color-mix(in srgb, var(--dy-wf-status-blocked) 22%, transparent); }
-.dy-wf-scope .dy-wf-node .dy-wf-statuschip.pending { fill: color-mix(in srgb, var(--dy-wf-status-pending) 24%, transparent); }
-.dy-wf-scope .dy-wf-node .dy-wf-statustext { font: 600 10.5px system-ui, sans-serif; pointer-events: none; }
+/* ---- The card (identical for every node) ------------------------------- */
+.dy-wf-scope .dy-wf-node { cursor: pointer; outline: none; transition: opacity .25s ease, filter .25s ease; }
+.dy-wf-scope .dy-wf-node:hover .dy-wf-shape { filter: brightness(1.18); }
+.dy-wf-scope .dy-wf-node:focus-visible .dy-wf-shape { stroke: var(--dy-wf-accent); stroke-width: 2.4; }
+.dy-wf-scope .dy-wf-node.dy-wf-route-dim { opacity: .2; filter: saturate(.2); }
+.dy-wf-scope .dy-wf-node-history { display: grid; gap: 3px; margin: 10px 0 0; padding-left: 18px; color: var(--dy-wf-card-dim); font-size: 11px; }
+.dy-wf-scope .dy-wf-node .dy-wf-shape {
+  fill: var(--dy-wf-card-fill); stroke: var(--dy-wf-card-line); stroke-width: 1.4;
+  transition: stroke .5s, stroke-width .2s, filter .3s;
+}
+.dy-wf-scope .dy-wf-card-sheen { fill: url(#dyWfCardSheen); pointer-events: none; }
+/* Status: border + glow + dot + word. The card fill never changes. */
+.dy-wf-scope .dy-wf-node.done .dy-wf-shape    { stroke: var(--dy-wf-status-done);    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--dy-wf-status-done) 40%, transparent)); }
+.dy-wf-scope .dy-wf-node.working .dy-wf-shape { stroke: var(--dy-wf-status-working); animation: dyWfBreath 2.2s ease-in-out infinite; }
+.dy-wf-scope .dy-wf-node.blocked .dy-wf-shape { stroke: var(--dy-wf-status-blocked); filter: drop-shadow(0 0 7px color-mix(in srgb, var(--dy-wf-status-blocked) 45%, transparent)); }
+.dy-wf-scope .dy-wf-node.pending .dy-wf-shape { stroke: var(--dy-wf-status-pending); stroke-dasharray: 5 4; }
+.dy-wf-scope .dy-wf-node.awaiting .dy-wf-shape { stroke: var(--dy-wf-status-working); stroke-dasharray: 5 4; animation: dyWfAwait 2.6s ease-in-out infinite; }
+@keyframes dyWfBreath {
+  0%, 100% { stroke-width: 1.5; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--dy-wf-status-working) 35%, transparent)); }
+  50% { stroke-width: 2.4; filter: drop-shadow(0 0 14px color-mix(in srgb, var(--dy-wf-status-working) 70%, transparent)); }
+}
+@keyframes dyWfAwait { 0%, 100% { stroke-opacity: .55; } 50% { stroke-opacity: 1; } }
+.dy-wf-scope .dy-wf-statusdot { stroke: none; }
+.dy-wf-scope .dy-wf-statusdot.done { fill: var(--dy-wf-status-done); }
+.dy-wf-scope .dy-wf-statusdot.working { fill: var(--dy-wf-status-working); animation: dyWfDot 1.4s ease-in-out infinite; }
+.dy-wf-scope .dy-wf-statusdot.blocked { fill: var(--dy-wf-status-blocked); }
+.dy-wf-scope .dy-wf-statusdot.pending { fill: var(--dy-wf-status-pending); }
+@keyframes dyWfDot { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.dy-wf-scope .dy-wf-node .dy-wf-statustext { font: 600 10.5px system-ui, sans-serif; letter-spacing: .3px; pointer-events: none; }
 .dy-wf-scope .dy-wf-node .dy-wf-statustext.done { fill: var(--dy-wf-status-done-text); }
 .dy-wf-scope .dy-wf-node .dy-wf-statustext.working { fill: var(--dy-wf-status-working-text); }
 .dy-wf-scope .dy-wf-node .dy-wf-statustext.blocked { fill: var(--dy-wf-status-blocked-text); }
 .dy-wf-scope .dy-wf-node .dy-wf-statustext.pending { fill: var(--dy-wf-status-pending-text); }
-.dy-wf-scope .dy-wf-node .dy-wf-port { fill: var(--dy-bg-deep, #0f1218); stroke: var(--dy-wf-purpose-task-line); stroke-width: 2; }
-.dy-wf-scope .dy-wf-node.gate .dy-wf-port { stroke: var(--dy-wf-purpose-gate-line); }
-.dy-wf-scope .dy-wf-node.branch .dy-wf-port { stroke: var(--dy-wf-purpose-branch-line); }
-.dy-wf-scope .dy-wf-node.loop .dy-wf-port { stroke: var(--dy-wf-purpose-loop-line); }
+.dy-wf-scope .dy-wf-node .dy-wf-port { fill: var(--dy-wf-canvas-bg); stroke: var(--dy-wf-accent); stroke-width: 2; transition: r .15s, fill .15s; }
+.dy-wf-scope .dy-wf-node .dy-wf-port-hit { fill: transparent; stroke: none; cursor: crosshair; }
+.dy-wf-scope .dy-wf-node[data-wf-editable="false"] .dy-wf-port-hit { cursor: pointer; }
+.dy-wf-scope .dy-wf-node:hover .dy-wf-port { fill: var(--dy-wf-accent); }
 .dy-wf-scope .dy-wf-node.dy-wf-connecting .dy-wf-port { fill: var(--dy-edge-dep-active); }
-/* unmistakable selection: accent ring + tint (stronger than hover dash) */
+/* Unmistakable selection: accent ring + glow. */
 .dy-wf-scope .dy-wf-node.dy-wf-selected .dy-wf-shape {
-  stroke: #58a6ff; stroke-width: 3;
-  filter: drop-shadow(0 0 6px rgba(88,166,255,.65));
+  stroke: var(--dy-wf-accent); stroke-width: 2.6; stroke-dasharray: none;
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--dy-wf-accent) 75%, transparent));
 }
-@keyframes dySelPulse { 0%,100% { stroke-width: 3; } 50% { stroke-width: 3.8; } }
-.dy-wf-scope .dy-wf-svg .dy-wf-node.dy-wf-selected .dy-wf-shape { animation: dySelPulse 1.6s ease-in-out infinite; }
-.dy-wf-scope .dy-wf-label { fill: var(--dy-text, #e6edf3); font: 600 13px system-ui, sans-serif; pointer-events: none; }
-.dy-wf-scope .dy-wf-sub { fill: var(--dy-dim, #9aa7b8); font: 11px system-ui, sans-serif; pointer-events: none; }
-.dy-wf-scope .dy-wf-node.task .dy-wf-sub { fill: var(--dy-wf-purpose-task-text); }
-.dy-wf-scope .dy-wf-node.gate .dy-wf-sub { fill: var(--dy-wf-purpose-gate-text); }
-.dy-wf-scope .dy-wf-node.branch .dy-wf-sub { fill: var(--dy-wf-purpose-branch-text); }
-.dy-wf-scope .dy-wf-node.loop .dy-wf-sub { fill: var(--dy-wf-purpose-loop-text); }
-.dy-wf-scope .dy-wf-timer { fill: var(--dy-wf-status-working-text); font: 11px ui-monospace, monospace; }
-.dy-wf-scope .dy-wf-assignee { fill: var(--dy-dim, #9aa7b8); font: 10.5px ui-monospace, monospace; pointer-events: none; }
-.dy-wf-scope .dy-wf-edge { stroke: var(--dy-edge-dep); stroke-width: 2; fill: none; transition: stroke .4s; }
-.dy-wf-scope .dy-wf-edge.active { stroke: var(--dy-edge-dep-active); }
-.dy-wf-scope .dy-wf-arrow { stroke: none; }
-/* purpose legend (rendered from the same token tables the nodes use) */
-.dy-wf-scope .dy-wf-index { position: absolute; right: 10px; top: 10px; pointer-events: none; }
-.dy-wf-scope .dy-wf-index-bg { fill: rgba(15,18,24,.88); stroke: #2a2f3a; }
-.dy-wf-scope .dy-wf-index-title { fill: #8b949e; font: 600 9.5px system-ui, sans-serif; letter-spacing: .8px; }
-.dy-wf-scope .dy-wf-index-shape { stroke-width: 1.2; }
-.dy-wf-scope .dy-wf-index-glyph { font: 11px system-ui, sans-serif; fill: var(--dy-text, #e6edf3); }
-.dy-wf-scope .dy-wf-index-label { font: 11px system-ui, sans-serif; fill: var(--dy-dim, #9aa7b8); }
-.dy-wf-scope .dy-wf-index-edge { stroke: var(--dy-edge-dep); stroke-width: 2; fill: none; }
-.dy-wf-scope .dy-wf-index-edge-label { font: 10px system-ui, sans-serif; fill: var(--dy-dim, #9aa7b8); }
-.dy-wf-scope .dy-wf-flowdot { fill: var(--dy-edge-dep-active); }
-.dy-wf-scope .dy-wf-minimap { position: absolute; right: 10px; bottom: 10px; background: rgba(15,18,24,.88); border: 1px solid #2a2f3a; border-radius: 6px; }
-/* live activity strip: top-left, collapsible (position deliberate, not carried over from demo) */
-.dy-wf-scope .dy-wf-feed { position: absolute; top: 10px; left: 10px; width: 300px; background: rgba(15,18,24,.88); border: 1px solid #2a2f3a; border-radius: 6px; overflow: hidden; }
-.dy-wf-scope .dy-wf-feed-head { display: block; width: 100%; text-align: left; background: transparent; border: none; border-radius: 0; padding: 5px 10px; font-size: 11.5px; color: #8b949e; cursor: pointer; letter-spacing: .3px; }
-.dy-wf-scope .dy-wf-feed-body { max-height: 160px; overflow: hidden; padding: 0 10px 6px; }
-.dy-wf-scope .dy-wf-feed-item { display: flex; gap: 6px; font-size: 11px; color: var(--dy-text, #e6edf3); padding: 2px 0; border-bottom: 1px dashed #23293a; transition: opacity 1.2s; }
-.dy-wf-scope .dy-wf-feed-time { font: 10px ui-monospace, monospace; color: #59626f; flex: none; padding-top: 1px; }
-.dy-wf-scope .dy-wf-mini-view { fill: none; stroke: #58a6ff; stroke-width: 2; }
-.dy-wf-scope .dy-wf-passport { position: absolute; top: 10px; right: 10px; width: 280px; max-height: calc(100% - 20px); overflow-y: auto; background: #161b22; border: 1px solid #2a2f3a; border-radius: 8px; padding: 12px; color: var(--dy-text, #e6edf3); }
-/* No permanent inspector: an empty passport must not sit above the graph and
-   intercept/occlude the canvas. It becomes visible only after node selection. */
-.dy-wf-scope .dy-wf-passport:empty { display: none; }
-/* This selector intentionally outranks the base passport rule above. */
-@media (max-width: 640px) {
-  .dy-wf-scope .dy-wf-wrap .dy-wf-passport { left: 10px; right: 10px; top: auto; bottom: 62px; max-height: 42%; width: auto; }
-}
-/* P8.2: zoom controls + keyboard focus ring + equivalent list view. */
-.dy-wf-scope .dy-wf-zoombar { display: flex; gap: 6px; margin: 6px 0; }
-.dy-wf-scope .dy-wf-zoombtn { background: #0d1117; color: var(--dy-text, #e6edf3); border: 1px solid #2a2f3a; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
-.dy-wf-scope .dy-wf-zoombtn:hover { border-color: #58a6ff; }
-.dy-wf-scope .dy-wf-node:focus { outline: 2px solid #58a6ff; outline-offset: 2px; }
-.dy-wf-scope .dy-wf-list { margin: 8px 0; }
-.dy-wf-scope .dy-wf-list-head { background: none; border: none; color: var(--dy-text, #e6edf3); font-weight: 600; cursor: pointer; padding: 4px 0; font-size: 13px; }
-.dy-wf-scope .dy-wf-list-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #21262d; flex-wrap: wrap; }
-.dy-wf-scope .dy-wf-list-row:last-child { border-bottom: none; }
-.dy-wf-scope .dy-wf-list-title { min-width: 140px; color: var(--dy-text, #e6edf3); font-weight: 600; }
-.dy-wf-scope .dy-wf-list-kind { font-size: 11px; text-transform: uppercase; color: #8b949e; border: 1px solid #2a3140; border-radius: 4px; padding: 1px 6px; }
-/* The list is the canvas's equivalent view, so it carries the same purpose
-   colours (purpose only \u2014 status stays the status column beside it). */
-.dy-wf-scope .dy-wf-list-kind.task { color: var(--dy-wf-purpose-task-text); border-color: var(--dy-wf-purpose-task-line); }
-.dy-wf-scope .dy-wf-list-kind.gate { color: var(--dy-wf-purpose-gate-text); border-color: var(--dy-wf-purpose-gate-line); }
-.dy-wf-scope .dy-wf-list-kind.branch { color: var(--dy-wf-purpose-branch-text); border-color: var(--dy-wf-purpose-branch-line); }
-.dy-wf-scope .dy-wf-list-kind.loop { color: var(--dy-wf-purpose-loop-text); border-color: var(--dy-wf-purpose-loop-line); }
-.dy-wf-scope .dy-wf-list-deps { color: #8b949e; font-size: 12px; flex: 1; }
-.dy-wf-scope .dy-wf-list-status { font-weight: 600; }
-.dy-wf-scope .dy-wf-list-status.done { color: #3fb950; }
-.dy-wf-scope .dy-wf-list-status.blocked { color: var(--dy-warn, #f0883e); }
-.dy-wf-scope .dy-wf-list-status.working { color: #58a6ff; }
-.dy-wf-scope .dy-wf-list-open { background: #0d1117; color: var(--dy-text, #e6edf3); border: 1px solid #2a2f3a; border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
-/* P8.3/P8.4: decision state + unsupported-control truth. */
-.dy-wf-scope .dy-wf-decision-state { display: inline-block; margin: 6px 0; padding: 2px 8px; border-radius: 6px; border: 1px solid #2a3140; font-size: 12px; color: #e3b341; }
-.dy-wf-scope .dy-wf-recovery { margin-top: 8px; }
-.dy-wf-scope .dy-wf-unsupported { color: #8b949e; font-size: 12px; margin: 6px 0 0; }
-.dy-wf-scope .dy-wf-passport h3 { margin: 0 0 4px; font-size: 14px; }
-.dy-wf-scope .dy-wf-passport .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; border: 1px solid #8fa3b8; color: #c9d4de; }
-.dy-wf-scope .dy-wf-passport .badge.done { border-color: #3fb950; color: #3fb950; }
-.dy-wf-scope .dy-wf-passport .badge.working { border-color: #d29922; color: #d29922; }
-.dy-wf-scope .dy-wf-passport .badge.blocked { border-color: #f85149; color: #f85149; }
-.dy-wf-scope .dy-wf-passport h4 { margin: 10px 0 4px; font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: .4px; }
-.dy-wf-scope .dy-wf-actions { display: flex; gap: 8px; margin-top: 10px; }
-.dy-wf-scope .dy-wf-expand { margin-top: 10px; }
-.dy-wf-scope .dy-wf-expand-head { width: 100%; text-align: left; background: #21262d; border: 1px solid #2a2f3a; border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; color: var(--dy-text, #e6edf3); }
-.dy-wf-scope .dy-wf-expand-body { padding: 8px 2px; }
-.dy-wf-scope .dy-wf-empty { fill: #8b949e; font: 13px system-ui, sans-serif; }
-/* Lane bands (v6 composition): the horizontal bands are part of the picture,
-   so they are styled with the canvas's own tokens. The label is an axis label,
-   never a control. The "exception" modifier marks the band carrying
-   branches/loops or a blocked node - derived from the same inputs the node
-   purposes use. (Backticks cannot appear inside this template literal.) */
-.dy-wf-scope .dy-wf-lane { fill: rgba(148, 163, 184, .055); stroke: #23293a; stroke-width: 1; }
-.dy-wf-scope .dy-wf-lane.exception { fill: rgba(255, 123, 114, .07); }
-.dy-wf-scope .dy-wf-lane-label { fill: #8b949e; font: 600 7px system-ui, sans-serif; letter-spacing: .9px; text-transform: uppercase; pointer-events: none; }
+@keyframes dySelPulse { 0%,100% { stroke-width: 2.6; } 50% { stroke-width: 3.4; } }
+.dy-wf-scope .dy-wf-svg .dy-wf-node.dy-wf-selected .dy-wf-shape { animation: dySelPulse 1.8s ease-in-out infinite; }
+.dy-wf-scope .dy-wf-label { fill: var(--dy-wf-card-text); font: 600 13px system-ui, sans-serif; pointer-events: none; }
+.dy-wf-scope .dy-wf-sub { fill: var(--dy-wf-card-dim); font: 500 10.5px system-ui, sans-serif; letter-spacing: .5px; text-transform: uppercase; pointer-events: none; }
+.dy-wf-scope .dy-wf-timer { fill: var(--dy-wf-status-working-text); font: 10.5px ui-monospace, monospace; }
+.dy-wf-scope .dy-wf-assignee { fill: var(--dy-wf-card-dim); font: 10.5px ui-monospace, monospace; pointer-events: none; }
 
-/* Reduced motion: the canvas is decorative once animated; honour the platform
-   setting for the canvas's own elements. (Lives here with the rest of the
-   canvas styles \u2014 the canvas is the only thing these selectors touch.) */
+/* ---- Connectors ---------------------------------------------------------- */
+.dy-wf-scope .dy-wf-edge { stroke: var(--dy-edge-dep); stroke-width: 1.8; fill: none; stroke-linecap: round; transition: stroke .4s, stroke-width .3s; }
+.dy-wf-scope .dy-wf-edge.active { stroke: var(--dy-edge-dep-active); stroke-width: 2.2; stroke-dasharray: 7 7; animation: dyWfFlow 1.1s linear infinite; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--dy-edge-dep-active) 60%, transparent)); }
+@keyframes dyWfFlow { to { stroke-dashoffset: -14; } }
+.dy-wf-scope .dy-wf-edge.dy-wf-route-edge { stroke: var(--dy-wf-accent); stroke-width: 2.6; filter: drop-shadow(0 0 6px var(--dy-wf-accent)); }
+.dy-wf-scope .dy-wf-arrow { stroke: none; }
+.dy-wf-scope .dy-wf-flowdot { fill: var(--dy-edge-dep-active); filter: drop-shadow(0 0 4px var(--dy-edge-dep-active)); }
+
+/* ---- Overview, activity, list, details ----------------------------------- */
+.dy-wf-scope .dy-wf-minimap { position: absolute; right: 12px; bottom: 14px; z-index: 11; }
+.dy-wf-scope .dy-wf-mini-view { fill: rgba(106, 183, 255, .08); stroke: var(--dy-wf-accent); stroke-width: 2; }
+/* Live activity strip: top left, collapsible. */
+.dy-wf-scope .dy-wf-feed { position: absolute; top: 12px; left: 12px; z-index: 11; width: 290px; overflow: hidden; }
+.dy-wf-scope .dy-wf-feed-head { display: block; width: 100%; text-align: left; background: transparent; border: none; border-radius: 0; padding: 7px 12px; font-size: 11.5px; color: var(--dy-wf-card-dim); cursor: pointer; letter-spacing: .3px; }
+.dy-wf-scope .dy-wf-feed-body { max-height: 150px; overflow: hidden; padding: 0 12px 8px; }
+.dy-wf-scope .dy-wf-feed-item { display: flex; gap: 6px; font-size: 11px; color: var(--dy-wf-card-text); padding: 3px 0; border-bottom: 1px dashed rgba(140, 180, 255, .12); transition: opacity 1.2s; animation: dyWfFeedIn .45s ease-out; }
+@keyframes dyWfFeedIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.dy-wf-scope .dy-wf-feed-time { font: 10px ui-monospace, monospace; color: #7086a6; flex: none; padding-top: 1px; }
+/* List view: floating glass panel opened from the tool cluster. */
+.dy-wf-scope .dy-wf-list { position: absolute; top: 60px; right: 12px; z-index: 13; width: min(460px, calc(100% - 24px)); max-height: calc(100% - 140px); overflow-y: auto; padding: 6px 14px; }
+.dy-wf-scope .dy-wf-list[hidden] { display: none; }
+.dy-wf-scope .dy-wf-list-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(140, 180, 255, .12); flex-wrap: wrap; }
+.dy-wf-scope .dy-wf-list-row:last-child { border-bottom: none; }
+.dy-wf-scope .dy-wf-list-title { min-width: 140px; color: var(--dy-wf-card-text); font-weight: 600; }
+.dy-wf-scope .dy-wf-list-kind { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--dy-wf-card-dim); border: 1px solid var(--dy-wf-glass-line); border-radius: 5px; padding: 1px 6px; }
+.dy-wf-scope .dy-wf-list-deps { color: var(--dy-wf-card-dim); font-size: 12px; flex: 1; }
+.dy-wf-scope .dy-wf-list-status { font-weight: 600; color: var(--dy-wf-status-pending-text); }
+.dy-wf-scope .dy-wf-list-status.done { color: var(--dy-wf-status-done-text); }
+.dy-wf-scope .dy-wf-list-status.blocked { color: var(--dy-wf-status-blocked-text); }
+.dy-wf-scope .dy-wf-list-status.working { color: var(--dy-wf-status-working-text); }
+.dy-wf-scope .dy-wf-list-open { background: rgba(255, 255, 255, .04); color: var(--dy-wf-card-text); border: 1px solid var(--dy-wf-glass-line); border-radius: 7px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
+/* Step details: floating glass panel, opens only on selection. One reading
+   order: header (kind, status, title) -> facts -> history -> actions -> edit.
+   Every colour comes from the canvas tokens so nothing inherits the plugin's
+   light-theme text or white form controls. */
+.dy-wf-scope .dy-wf-passport { position: absolute; top: 62px; right: 12px; z-index: 14; width: 320px; max-height: calc(100% - 140px); overflow-y: auto; padding: 0; color: var(--dy-wf-card-text); font: 13px/1.45 system-ui, sans-serif; animation: dyWfPanelIn .28s cubic-bezier(.22, .8, .24, 1); scrollbar-width: thin; scrollbar-color: rgba(140, 180, 255, .25) transparent; }
+.dy-wf-scope .dy-wf-passport:empty { display: none; }
+@keyframes dyWfPanelIn { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
+.dy-wf-scope .dy-wf-passport > * { margin-left: 16px; margin-right: 16px; }
+.dy-wf-scope .dy-wf-pp-head { position: sticky; top: 0; z-index: 1; margin: 0 0 4px; padding: 14px 48px 12px 16px; border-bottom: 1px solid var(--dy-wf-glass-line); background: rgba(12, 20, 36, .92); backdrop-filter: blur(10px); }
+.dy-wf-scope .dy-wf-pp-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.dy-wf-scope .dy-wf-passport-close { position: absolute; top: 12px; right: 12px; width: 28px; height: 28px; border: 1px solid var(--dy-wf-glass-line); border-radius: 8px; background: rgba(255, 255, 255, .04); color: var(--dy-wf-card-dim); cursor: pointer; font-size: 16px; line-height: 1; }
+.dy-wf-scope .dy-wf-passport-close:hover { color: var(--dy-wf-card-text); border-color: var(--dy-wf-accent); }
+.dy-wf-scope .dy-wf-passport-kind { margin: 0; font-size: 10.5px; font-weight: 600; letter-spacing: .7px; text-transform: uppercase; color: var(--dy-wf-card-dim); }
+.dy-wf-scope .dy-wf-passport h3 { margin: 0; font-size: 16px; font-weight: 650; line-height: 1.3; color: var(--dy-wf-card-text); overflow-wrap: anywhere; }
+.dy-wf-scope .dy-wf-passport .badge { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; text-transform: capitalize; border: 1px solid var(--dy-wf-status-pending); color: var(--dy-wf-status-pending-text); background: rgba(139, 153, 168, .10); }
+.dy-wf-scope .dy-wf-passport .badge.done { border-color: var(--dy-wf-status-done); color: var(--dy-wf-status-done-text); background: rgba(74, 222, 128, .10); }
+.dy-wf-scope .dy-wf-passport .badge.working { border-color: var(--dy-wf-status-working); color: var(--dy-wf-status-working-text); background: rgba(227, 179, 65, .10); }
+.dy-wf-scope .dy-wf-passport .badge.blocked { border-color: var(--dy-wf-status-blocked); color: var(--dy-wf-status-blocked-text); background: rgba(255, 123, 114, .10); }
+.dy-wf-scope .dy-wf-pp-facts { display: grid; gap: 0; margin-top: 8px; margin-bottom: 0; }
+.dy-wf-scope .dy-wf-pp-fact { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(140, 180, 255, .08); }
+.dy-wf-scope .dy-wf-pp-fact:last-child { border-bottom: 0; }
+.dy-wf-scope .dy-wf-pp-fact dt { margin: 0; color: var(--dy-wf-card-dim); font-size: 11.5px; }
+.dy-wf-scope .dy-wf-pp-fact dd { margin: 0; color: var(--dy-wf-card-text); font-size: 12.5px; overflow-wrap: anywhere; }
+.dy-wf-scope .dy-wf-passport h4 { margin-top: 16px; margin-bottom: 6px; font-size: 10.5px; font-weight: 600; color: var(--dy-wf-card-dim); text-transform: uppercase; letter-spacing: .7px; }
+.dy-wf-scope .dy-wf-passport .dy-wf-node-history { margin-top: 0; padding-left: 34px; color: var(--dy-wf-card-text); font-size: 12px; }
+.dy-wf-scope .dy-wf-pp-note { margin-top: 12px; margin-bottom: 0; color: var(--dy-wf-card-dim); font-size: 12px; line-height: 1.5; }
+.dy-wf-scope .dy-wf-passport button:not(.dy-wf-passport-close) { min-height: 32px; background: rgba(255, 255, 255, .05); color: var(--dy-wf-card-text); border: 1px solid var(--dy-wf-glass-line); border-radius: 8px; padding: 5px 12px; font: 600 12.5px system-ui, sans-serif; cursor: pointer; }
+.dy-wf-scope .dy-wf-passport button:not(.dy-wf-passport-close):hover:not(:disabled) { border-color: var(--dy-wf-accent); }
+.dy-wf-scope .dy-wf-passport button.primary { background: var(--dy-wf-accent); border-color: var(--dy-wf-accent); color: #04101f; }
+.dy-wf-scope .dy-wf-passport button.primary:hover:not(:disabled) { filter: brightness(1.08); }
+.dy-wf-scope .dy-wf-passport button:disabled { opacity: .6; cursor: default; }
+.dy-wf-scope .dy-wf-decision-state { display: inline-block; margin-top: 14px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--dy-wf-status-working); background: rgba(227, 179, 65, .10); font-size: 12px; font-weight: 600; color: var(--dy-wf-status-working-text); }
+.dy-wf-scope .dy-wf-recovery { margin-top: 14px; }
+.dy-wf-scope .dy-wf-actions { display: flex; gap: 8px; margin-top: 10px; }
+.dy-wf-scope .dy-wf-actions button { flex: 1; }
+.dy-wf-scope .dy-wf-expand { margin-top: 14px; }
+.dy-wf-scope .dy-wf-passport .dy-wf-expand-head { width: 100%; text-align: left; }
+.dy-wf-scope .dy-wf-expand-body { padding: 8px 2px; color: var(--dy-wf-card-text); }
+.dy-wf-scope .dy-wf-expand-body .dy-dim { color: var(--dy-wf-card-dim); }
+.dy-wf-scope .dy-wf-edit { display: grid; gap: 10px; margin-top: 16px; margin-bottom: 16px; padding-top: 4px; border-top: 1px solid var(--dy-wf-glass-line); }
+.dy-wf-scope .dy-wf-edit h4 { margin-bottom: 0; }
+.dy-wf-scope .dy-wf-field { display: grid; gap: 4px; }
+.dy-wf-scope .dy-wf-field > span { color: var(--dy-wf-card-dim); font-size: 11.5px; }
+.dy-wf-scope .dy-wf-field input { width: 100%; box-sizing: border-box; min-height: 34px; padding: 6px 10px; border: 1px solid var(--dy-wf-glass-line); border-radius: 8px; background: rgba(4, 10, 22, .65); color: var(--dy-wf-card-text); font: 13px system-ui, sans-serif; outline: none; }
+.dy-wf-scope .dy-wf-field input::placeholder { color: rgba(159, 178, 204, .55); }
+.dy-wf-scope .dy-wf-field input:focus { border-color: var(--dy-wf-accent); box-shadow: 0 0 0 3px rgba(106, 183, 255, .18); }
+.dy-wf-scope .dy-wf-edit > button { justify-self: start; }
+.dy-wf-scope .dy-wf-passport > :last-child { margin-bottom: 16px; }
+.dy-wf-scope .dy-wf-empty { fill: var(--dy-wf-card-dim); font: 13px system-ui, sans-serif; }
+/* Lane bands (v6 composition): axis labels, never controls. The "exception"
+   band carries branches/loops or a blocked node. (No backticks in here.) */
+.dy-wf-scope .dy-wf-lane { fill: rgba(140, 170, 220, .035); stroke: rgba(140, 180, 255, .09); stroke-width: 1; }
+.dy-wf-scope .dy-wf-lane.exception { fill: rgba(255, 123, 114, .05); }
+.dy-wf-scope .dy-wf-lane-label { fill: #6f86a8; font: 600 7px system-ui, sans-serif; letter-spacing: .9px; text-transform: uppercase; pointer-events: none; }
+
+/* Phone width: stacked layout; floating surfaces reflow so none overlaps
+   another and none is cut off. */
+@media (max-width: 640px) {
+  .dy-wf-scope .dy-wf-feed { width: auto; right: 12px; top: 58px; }
+  .dy-wf-scope .dy-wf-feed-body { max-height: 90px; }
+  .dy-wf-scope .dy-wf-zoombar { left: 12px; right: 12px; justify-content: space-between; flex-wrap: wrap; }
+  .dy-wf-scope .dy-wf-minimap { display: none; }
+  .dy-wf-scope .dy-wf-playback { bottom: 8px; width: calc(100% - 18px); }
+  .dy-wf-scope .dy-wf-playback-label { min-width: 64px; font-size: 10px; }
+  .dy-wf-scope .dy-wf-motion-btn { padding-inline: 6px; }
+  .dy-wf-scope .dy-wf-wrap .dy-wf-passport,
+  .dy-wf-scope .dy-wf-wrap .dy-wf-list { left: 8px; right: 8px; top: auto; bottom: 8px; max-height: 62%; width: auto; z-index: 16; }
+  .dy-wf-scope .dy-wf-pp-fact { grid-template-columns: 96px minmax(0, 1fr); }
+}
+
+/* Reduced motion: honour the platform setting for every canvas animation. */
 @media (prefers-reduced-motion: reduce) {
-  .dy-wf-scope .dy-wf-node.working .dy-wf-shape { animation: none; }
+  .dy-wf-scope .dy-wf-node .dy-wf-shape, .dy-wf-scope .dy-wf-statusdot,
+  .dy-wf-scope .dy-wf-edge.active, .dy-wf-scope .dy-wf-feed-item,
+  .dy-wf-scope .dy-wf-passport { animation: none !important; }
+  .dy-wf-scope .dy-wf-viewport { transition: none; }
   .dy-wf-scope .dy-wf-svg .dy-wf-sub, .dy-wf-scope .dy-wf-svg .dy-wf-timer { transition: none; }
 }
 
@@ -8210,42 +8282,10 @@ var STATUS_TOKENS = {
   pending: "--dy-wf-status-pending"
 };
 var PURPOSE_VISUALS = {
-  task: {
-    fill: "--dy-wf-purpose-task-fill",
-    line: "--dy-wf-purpose-task-line",
-    text: "--dy-wf-purpose-task-text",
-    glyph: "\u25A1",
-    label: "Task",
-    glyphX: 20,
-    textX: 36
-  },
-  gate: {
-    fill: "--dy-wf-purpose-gate-fill",
-    line: "--dy-wf-purpose-gate-line",
-    text: "--dy-wf-purpose-gate-text",
-    glyph: "\u25C6",
-    label: "Human gate",
-    glyphX: 24,
-    textX: 42
-  },
-  branch: {
-    fill: "--dy-wf-purpose-branch-fill",
-    line: "--dy-wf-purpose-branch-line",
-    text: "--dy-wf-purpose-branch-text",
-    glyph: "\u22D4",
-    label: "Conditional branch",
-    glyphX: 22,
-    textX: 40
-  },
-  loop: {
-    fill: "--dy-wf-purpose-loop-fill",
-    line: "--dy-wf-purpose-loop-line",
-    text: "--dy-wf-purpose-loop-text",
-    glyph: "\u21BB",
-    label: "Bounded loop",
-    glyphX: 20,
-    textX: 36
-  }
+  task: { label: "Task" },
+  gate: { label: "Human gate" },
+  branch: { label: "Conditional branch" },
+  loop: { label: "Bounded loop" }
 };
 function nodePurpose(n) {
   if (n.human_gate || n.kind === "gate") return "gate";
@@ -8253,25 +8293,10 @@ function nodePurpose(n) {
   if (n.when) return "branch";
   return "task";
 }
-function nodeShapePath(purpose, w = NODE_W, h = NODE_H) {
-  switch (purpose) {
-    case "gate": {
-      const i = Math.round(h * 0.22);
-      return `M ${i} 0 H ${w - i} L ${w} ${h / 2} L ${w - i} ${h} H ${i} L 0 ${h / 2} Z`;
-    }
-    case "branch": {
-      const i = Math.round(h * 0.19);
-      return `M ${i} 0 H ${w - i} L ${w} ${i} V ${h - i} L ${w - i} ${h} H ${i} L 0 ${h - i} V ${i} Z`;
-    }
-    case "loop": {
-      const r = 9;
-      const notch = 13;
-      return `M ${r} 0 H ${w - r} A ${r} ${r} 0 0 1 ${w} ${r} V ${h - r} A ${r} ${r} 0 0 1 ${w - r} ${h} H ${r} A ${r} ${r} 0 0 1 0 ${h - r} V ${h / 2 + 10} L ${notch} ${h / 2} L 0 ${h / 2 - 10} V ${r} A ${r} ${r} 0 0 1 ${r} 0 Z`;
-    }
-    default:
-      return null;
-  }
+function isAwaitingDecision(n) {
+  return nodePurpose(n) === "gate" && statusToken(n.status) === "pending";
 }
+var CARD_RADIUS = 12;
 var EDGE_MEANINGS = {
   depends_on: {
     meaning: "depends_on",
@@ -8472,13 +8497,13 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   svg.setAttribute("data-lod", "read");
   const viewport = sEl("g", { class: "dy-wf-viewport" });
   svg.appendChild(viewport);
-  const SVG_INDEX = sEl("svg", { class: "dy-wf-index" });
-  const minimap = sEl("svg", { class: "dy-wf-minimap", width: 170, height: 104 });
+  const minimap = sEl("svg", { class: "dy-wf-minimap dy-wf-glass", width: 170, height: 104 });
+  minimap.setAttribute("aria-label", "Canvas overview: click to move the view");
   const miniViewport = sEl("rect", { class: "dy-wf-mini-view" });
   minimap.appendChild(miniViewport);
-  const passport = elu("div", "dy-wf-passport");
+  const passport = elu("div", "dy-wf-passport dy-wf-glass");
   passport.setAttribute("aria-live", "polite");
-  const zoomBar = elu("div", "dy-wf-zoombar");
+  const zoomBar = elu("div", "dy-wf-zoombar dy-wf-glass");
   zoomBar.setAttribute("role", "group");
   zoomBar.setAttribute("aria-label", "Zoom controls");
   const zoomButton = (action, label, title) => {
@@ -8493,7 +8518,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   const zoomFitBtn = zoomButton("zoom-fit", "Fit", "Fit graph to view");
   const zoomResetBtn = zoomButton("zoom-reset", "Reset", "Reset zoom to 100%");
   zoomBar.append(zoomInBtn, zoomOutBtn, zoomFitBtn, zoomResetBtn);
-  const feed = elu("div", "dy-wf-feed");
+  const feed = elu("div", "dy-wf-feed dy-wf-glass");
   feed.setAttribute("aria-live", "polite");
   const feedHead = elu("button", "dy-wf-feed-head", "\u25BE Activity");
   const feedBody = elu("div", "dy-wf-feed-body");
@@ -8522,27 +8547,30 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       m.el.style.opacity = String(Math.max(0.25, 1 - i * 0.15));
     });
   };
-  const listView = elu("div", "dy-wf-list");
+  const listView = elu("div", "dy-wf-list dy-wf-glass");
   listView.dataset.wfList = "";
-  const listHead = elu("button", "dy-wf-list-head", "\u25B8 List view");
+  const listHead = elu("button", "dy-wf-zoombtn dy-wf-list-head", "\u25B8 List view");
   listHead.type = "button";
   listHead.setAttribute("aria-expanded", "false");
   const listBody = elu("div", "dy-wf-list-body");
   listBody.setAttribute("role", "table");
   listBody.setAttribute("aria-label", "Workflow run as list");
   listBody.style.display = "none";
+  listView.hidden = true;
   listHead.addEventListener("click", () => {
     const open = listHead.getAttribute("aria-expanded") === "true";
     listHead.setAttribute("aria-expanded", String(!open));
     listHead.textContent = open ? "\u25B8 List view" : "\u25BE List view";
     listBody.style.display = open ? "none" : "block";
+    listView.hidden = open;
   });
-  listView.append(listHead, listBody);
+  zoomBar.appendChild(listHead);
+  listView.append(listBody);
   let playbackBar = null;
   let playbackSlider = null;
   let playbackLabel = null;
   let playbackButton = null;
-  playbackBar = elu("div", "dy-wf-playback");
+  playbackBar = elu("div", "dy-wf-playback dy-wf-glass");
   playbackBar.setAttribute("role", "group");
   playbackBar.setAttribute("aria-label", "Workflow playback");
   playbackButton = elu("button", "dy-wf-playback-btn", "\u25B6 Play");
@@ -8567,7 +8595,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     host2.classList.toggle("dy-wf-still", on);
   });
   playbackBar.append(playbackButton, playbackSlider, playbackLabel, motionButton);
-  wrap.append(svg, SVG_INDEX, feed, minimap, passport, zoomBar, listView, playbackBar);
+  wrap.append(svg, feed, minimap, passport, zoomBar, listView, playbackBar);
   playbackBar.style.overflowX = "auto";
   host2.appendChild(wrap);
   let panX = 0;
@@ -8696,6 +8724,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   };
   const apply = () => {
     viewport.setAttribute("transform", `translate(${panX} ${panY}) scale(${zoom})`);
+    viewport.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
     svg.setAttribute("data-lod", zoom > LOD_FULL ? "full" : zoom < 0.75 ? "map" : "read");
   };
   const ZOOM_STEP = 1.25;
@@ -8750,6 +8779,12 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     defs.appendChild(mkMarker(meaning.marker, meaning.color, "#8fa3c8"));
     defs.appendChild(mkMarker(meaning.activeMarker, meaning.activeColor, "#9cc4ff"));
   }
+  const sheenGrad = sEl("linearGradient", { id: "dyWfCardSheen", x1: "0", y1: "0", x2: "0", y2: "1" });
+  sheenGrad.append(
+    sEl("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0.09" }),
+    sEl("stop", { offset: "100%", "stop-color": "#ffffff", "stop-opacity": "0" })
+  );
+  defs.appendChild(sheenGrad);
   svg.appendChild(defs);
   const timelineFor = (run) => run?.timeline ?? [];
   const clearRoute = () => {
@@ -8836,12 +8871,14 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     const purpose = nodePurpose(n);
     const status = statusToken(n.status);
     const visuals = PURPOSE_VISUALS[purpose];
+    const awaiting = isAwaitingDecision(n);
     const g = sEl("g", {
-      class: `dy-wf-node ${purpose} ${status}`,
+      class: `dy-wf-node ${purpose} ${status}${awaiting ? " awaiting" : ""}`,
       transform: `translate(${p.x} ${p.y})`
     });
     g.dataset.wfPurpose = purpose;
     g.dataset.wfStatus = status;
+    if (awaiting) g.dataset.wfAwaiting = "true";
     if (playbackIndex !== null) g.dataset.wfPlaybackStatus = n.status ?? "pending";
     g.setAttribute("tabindex", "0");
     g.setAttribute("role", "button");
@@ -8849,35 +8886,38 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     g.setAttribute("aria-label", `${visuals.label}: ${n.title} (${n.status ?? "pending"})`);
     g.dataset.wfEditable = String(editable);
     g.setAttribute("aria-describedby", `wf-help-${n.node_id}`);
-    const outline = nodeShapePath(purpose);
-    const shape = outline === null ? sEl("rect", { width: NODE_W, height: NODE_H, rx: 9, class: "dy-wf-shape dy-wf-rect" }) : sEl("path", { d: outline, class: "dy-wf-shape dy-wf-rect" });
-    shape.setAttribute("fill", `var(${visuals.fill})`);
-    const glyph = sEl("text", { x: visuals.glyphX, y: 26, class: "dy-wf-glyph" });
-    glyph.textContent = visuals.glyph;
-    const label = sEl("text", { x: visuals.textX, y: 25, class: "dy-wf-label" });
-    label.textContent = n.title.slice(0, 18);
-    const sub = sEl("text", { x: 12, y: 45, class: "dy-wf-sub" });
-    sub.textContent = visuals.label;
-    const chip = sEl("rect", {
-      x: NODE_W - 66,
-      y: 34,
-      width: 54,
-      height: 16,
-      rx: 8,
-      class: `dy-wf-statuschip ${status}`
+    const shape = sEl("rect", {
+      width: NODE_W,
+      height: NODE_H,
+      rx: CARD_RADIUS,
+      class: "dy-wf-shape dy-wf-card"
     });
+    shape.setAttribute("fill", "#101c30");
+    const sheen = sEl("rect", {
+      x: 1,
+      y: 1,
+      width: NODE_W - 2,
+      height: NODE_H / 2,
+      rx: CARD_RADIUS - 1,
+      class: "dy-wf-card-sheen"
+    });
+    const dot = sEl("circle", { cx: 18, cy: 22, r: 4.5, class: `dy-wf-statusdot ${status}` });
+    const label = sEl("text", { x: 30, y: 26, class: "dy-wf-label" });
+    label.textContent = n.title.length > 22 ? n.title.slice(0, 21) + "\u2026" : n.title;
+    const sub = sEl("text", { x: 14, y: 46, class: "dy-wf-sub" });
+    sub.textContent = visuals.label;
     const statusText = sEl("text", {
-      x: NODE_W - 39,
-      y: 45.5,
-      "text-anchor": "middle",
+      x: NODE_W - 14,
+      y: 46,
+      "text-anchor": "end",
       class: `dy-wf-statustext ${status}`
     });
-    statusText.textContent = n.status ?? "pending";
-    g.append(shape, glyph, label, sub, chip, statusText);
+    statusText.textContent = awaiting ? "awaiting decision" : n.status ?? "pending";
+    g.append(shape, sheen, dot, label, sub, statusText);
     if (n.status === "working") {
       const timer2 = sEl("text", {
-        x: 12,
-        y: 60,
+        x: 14,
+        y: 62,
         class: "dy-wf-timer full"
       });
       timer2.textContent = `Workflow: ${elapsedLabel(run.started_at)}`;
@@ -8885,30 +8925,32 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       g.appendChild(timer2);
     }
     if (n.assignee) {
-      g.appendChild((() => {
-        const who = sEl("text", {
-          x: NODE_W - 12,
-          y: 60,
-          "text-anchor": "end",
-          class: "dy-wf-assignee"
-        });
-        who.textContent = n.assignee;
-        return who;
-      })());
+      const who = sEl("text", {
+        x: NODE_W - 14,
+        y: 62,
+        "text-anchor": "end",
+        class: "dy-wf-assignee"
+      });
+      who.textContent = n.assignee;
+      g.appendChild(who);
     }
-    const port = sEl("circle", { cx: NODE_W, cy: NODE_H / 2, r: 11, class: "dy-wf-port" });
+    const port = sEl("circle", { cx: NODE_W, cy: NODE_H / 2, r: 7, class: "dy-wf-port" });
+    const portHit = sEl("circle", { cx: NODE_W, cy: NODE_H / 2, r: 12, class: "dy-wf-port-hit" });
+    portHit.setAttribute("aria-hidden", "true");
     port.setAttribute("data-connect-from", n.node_id);
     port.setAttribute("tabindex", "0");
     port.setAttribute("aria-label", `Connect from ${n.title}`);
-    g.appendChild(port);
+    g.append(portHit, port);
     const dash = () => shape.setAttribute("stroke-dasharray", "4 3");
     const undash = () => shape.removeAttribute("stroke-dasharray");
-    port.addEventListener("pointerdown", (ev) => {
-      const e = ev;
-      if (e.button !== 0 || !editable) return;
-      e.stopPropagation();
-      startConnect(n.node_id, g);
-    });
+    for (const target of [port, portHit]) {
+      target.addEventListener("pointerdown", (ev) => {
+        const e = ev;
+        if (e.button !== 0 || !editable) return;
+        e.stopPropagation();
+        startConnect(n.node_id, g);
+      });
+    }
     g.addEventListener("pointerdown", (ev) => {
       const e = ev;
       if (e.button !== 0 || !editable) return;
@@ -9093,60 +9135,8 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       const p = positions[n.node_id];
       viewport.appendChild(buildNode(n, p, run, Boolean(handlers.onEdit)));
     }
-    renderLegend(run);
     apply();
     updateMinimap();
-  };
-  const renderLegend = (run) => {
-    SVG_INDEX.replaceChildren();
-    SVG_INDEX.setAttribute("aria-label", "Node purposes on this canvas");
-    if (!run || run.nodes.length === 0) return;
-    const present = new Set(run.nodes.map((n) => nodePurpose(n)));
-    const purposes = Object.keys(PURPOSE_VISUALS).filter((p) => present.has(p));
-    const rowH = 26;
-    const padX = 12;
-    const width = 214;
-    const height = 22 + purposes.length * rowH;
-    SVG_INDEX.setAttribute("viewBox", `0 0 ${width} ${height}`);
-    SVG_INDEX.setAttribute("width", String(width));
-    SVG_INDEX.setAttribute("height", String(height));
-    const frame = sEl("rect", {
-      x: 0.5,
-      y: 0.5,
-      width: width - 1,
-      height: height - 1,
-      rx: 7,
-      class: "dy-wf-index-bg"
-    });
-    const heading = sEl("text", { x: padX, y: 15, class: "dy-wf-index-title" });
-    heading.textContent = "NODE PURPOSE";
-    SVG_INDEX.append(frame, heading);
-    purposes.forEach((p, i) => {
-      const v = PURPOSE_VISUALS[p];
-      const cy = 22 + i * rowH + 8;
-      const outline = nodeShapePath(p, 20, 16);
-      const swatch = outline === null ? sEl("rect", { x: 0, y: 0, width: 20, height: 16, rx: 3, class: "dy-wf-index-shape" }) : sEl("path", { d: outline, class: "dy-wf-index-shape" });
-      swatch.setAttribute("fill", `var(${v.fill})`);
-      swatch.setAttribute("stroke", `var(${v.line})`);
-      swatch.setAttribute("data-wf-purpose", p);
-      const row = sEl("g", { transform: `translate(${padX} ${cy - 8})` });
-      row.appendChild(swatch);
-      const glyph = sEl("text", { x: 30, y: 13, class: "dy-wf-index-glyph" });
-      glyph.textContent = v.glyph;
-      row.appendChild(glyph);
-      const name = sEl("text", { x: 48, y: 13, class: "dy-wf-index-label" });
-      name.textContent = v.label;
-      row.appendChild(name);
-      SVG_INDEX.appendChild(row);
-    });
-    const dep = EDGE_MEANINGS[DEFAULT_EDGE_MEANING];
-    const edgeRow = sEl("g", { transform: `translate(${padX} ${height - 4})` });
-    const line = sEl("path", { d: "M 0 -5 L 20 -5", class: "dy-wf-index-edge" });
-    edgeRow.appendChild(line);
-    const edgeLabel = sEl("text", { x: 30, y: -1, class: "dy-wf-index-edge-label" });
-    edgeLabel.textContent = `${dep.label} \u2192 (workflow edges)`;
-    edgeRow.appendChild(edgeLabel);
-    SVG_INDEX.appendChild(edgeRow);
   };
   const updateMinimap = () => {
     minimap.replaceChildren(miniViewport);
@@ -9213,19 +9203,61 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     viewport.querySelectorAll(".dy-wf-node").forEach((node) => node.classList.toggle("dy-wf-route-dim", !related.has(node.getAttribute("data-node-id") ?? "")));
     viewport.querySelectorAll(".dy-wf-edge").forEach((edge) => edge.classList.toggle("dy-wf-route-edge", related.has(edge.dataset.from ?? "") && related.has(edge.dataset.to ?? "")));
     passport.replaceChildren();
-    passport.appendChild(elu("h3", "", n.title));
-    if (handlers.onEdit) {
+    const status = n.status ?? "pending";
+    const head = elu("div", "dy-wf-pp-head");
+    const meta = elu("div", "dy-wf-pp-meta");
+    meta.append(elu("span", "dy-wf-passport-kind", PURPOSE_VISUALS[nodePurpose(n)].label), elu("span", `badge ${status}`, status));
+    const close = elu("button", "dy-wf-passport-close", "\xD7");
+    close.type = "button";
+    close.setAttribute("aria-label", "Close step details");
+    close.addEventListener("click", () => closePassport());
+    head.append(meta, elu("h3", "", n.title), close);
+    passport.appendChild(head);
+    const facts = elu("dl", "dy-wf-pp-facts");
+    const fact = (k, v, cls = "") => {
+      const row = elu("div", `dy-wf-pp-fact ${cls}`.trim());
+      row.append(elu("dt", "", k), elu("dd", "", v));
+      facts.appendChild(row);
+      return row;
+    };
+    const updated = lastRun?.updated_at ?? null;
+    const lastConfirmed = fact("Last confirmed update", updated && isFinite(Date.parse(updated)) ? updated.replace("T", " ").slice(0, 16) + " UTC" : "unknown", "dy-wf-last-confirmed");
+    lastConfirmed.setAttribute("data-last-confirmed", updated ?? "unknown");
+    if (n.depends_on.length) fact("Depends on", n.depends_on.join(", "));
+    if (n.assignee) fact("Assignee", n.assignee);
+    if (n.evidence_refs.length) fact("Evidence", n.evidence_refs.join(", "));
+    if (n.task_ref) fact("Work item", n.task_ref);
+    passport.appendChild(facts);
+    const nodeEvents = (lastRun?.timeline ?? []).filter((event) => event.node_id === n.node_id);
+    if (nodeEvents.length) {
+      passport.appendChild(elu("h4", "", "Status history"));
+      const history = elu("ol", "dy-wf-node-history");
+      for (const event of nodeEvents.slice(-6)) history.appendChild(elu("li", "", `${event.from_status ?? "\u2014"} \u2192 ${event.to_status}`));
+      passport.appendChild(history);
+    }
+    const appendEditor = () => {
+      if (!handlers.onEdit) return;
       const edit = elu("div", "dy-wf-edit");
+      edit.appendChild(elu("h4", "", "Edit step"));
+      const field = (label, input) => {
+        const f = elu("label", "dy-wf-field");
+        f.append(elu("span", "", label), input);
+        edit.appendChild(f);
+      };
       const title = elu("input", "dy-wf-edit-title");
       title.value = n.title;
       title.setAttribute("aria-label", "Node title");
       const deps = elu("input", "dy-wf-edit-deps");
       deps.value = n.depends_on.join(", ");
+      deps.placeholder = "e.g. build, tests";
       deps.setAttribute("aria-label", "Dependencies");
       const team = elu("input", "dy-wf-edit-team");
       team.value = n.phase_team ?? "";
       team.placeholder = "phase team override";
       team.setAttribute("aria-label", "Phase team override");
+      field("Title", title);
+      field("Depends on (step IDs)", deps);
+      field("Phase team", team);
       const save = elu("button", "dy-btn primary", "Save graph version");
       save.type = "button";
       save.addEventListener("click", async () => {
@@ -9242,28 +9274,10 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
           save.textContent = "Save failed \u2014 retry";
         }
       });
-      edit.append(elu("label", "", "Title"), title, elu("label", "", "Dependencies (node IDs)"), deps, elu("label", "", "Phase team"), team, save);
+      edit.appendChild(save);
       passport.appendChild(edit);
-    }
-    passport.appendChild(elu("span", `badge ${n.status ?? "pending"}`, n.status ?? "pending"));
-    const nodeEvents = (lastRun?.timeline ?? []).filter((event) => event.node_id === n.node_id);
-    if (nodeEvents.length) {
-      const history = elu("ol", "dy-wf-node-history");
-      for (const event of nodeEvents.slice(-6)) history.appendChild(elu("li", "", `${event.from_status ?? "\u2014"} \u2192 ${event.to_status}`));
-      passport.appendChild(history);
-    }
-    const lastConfirmed = elu("p", "dy-wf-last-confirmed");
-    const updated = lastRun?.updated_at ?? null;
-    lastConfirmed.textContent = `Last confirmed update: ${updated && isFinite(Date.parse(updated)) ? updated.replace("T", " ").slice(0, 16) + " UTC" : "unknown"}`;
-    lastConfirmed.setAttribute("data-last-confirmed", updated ?? "unknown");
-    passport.appendChild(lastConfirmed);
-    if (n.assignee) passport.appendChild(elu("p", "dy-dim", `assignee: ${n.assignee}`));
-    if (n.evidence_refs.length) {
-      const p = elu("p", "dy-dim", "evidence: " + n.evidence_refs.join(", "));
-      passport.appendChild(p);
-    }
+    };
     if (n.task_ref) {
-      passport.appendChild(elu("p", "dy-dim", `deep link: ${n.task_ref}`));
       const decisionState = n.kind === "gate" && n.status !== "done" && n.status !== "blocked" ? elu("span", "dy-wf-decision-state", "Awaiting decision") : null;
       if (decisionState) {
         decisionState.setAttribute("data-decision-state", "awaiting_decision");
@@ -9333,7 +9347,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
         }
         const unsupported = elu(
           "p",
-          "dy-wf-unsupported",
+          "dy-wf-unsupported dy-wf-pp-note",
           "Pause and cancel are not supported by the native execution contract \u2014 a running worker cannot be stopped from here."
         );
         unsupported.setAttribute("data-unsupported-controls", "pause,cancel");
@@ -9342,15 +9356,15 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       }
       if (handlers.onExpand) {
         const sec = elu("div", "dy-wf-expand");
-        const head = elu("button", "dy-wf-expand-head", "\u25B8 Live detail");
-        head.setAttribute("aria-expanded", "false");
+        const head2 = elu("button", "dy-wf-expand-head", "\u25B8 Live detail");
+        head2.setAttribute("aria-expanded", "false");
         const body = elu("div", "dy-wf-expand-body");
         body.style.display = "none";
         body.appendChild(elu("p", "dy-dim", "Loading live detail\u2026"));
-        head.addEventListener("click", () => {
-          const isOpen = head.getAttribute("aria-expanded") === "true";
-          head.setAttribute("aria-expanded", String(!isOpen));
-          head.textContent = isOpen ? "\u25B8 Live detail" : "\u25BE Live detail";
+        head2.addEventListener("click", () => {
+          const isOpen = head2.getAttribute("aria-expanded") === "true";
+          head2.setAttribute("aria-expanded", String(!isOpen));
+          head2.textContent = isOpen ? "\u25B8 Live detail" : "\u25BE Live detail";
           body.style.display = isOpen ? "none" : "block";
           if (!isOpen && !body.dataset.loaded) {
             body.dataset.loaded = "1";
@@ -9394,12 +9408,13 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
             });
           }
         });
-        sec.append(head, body);
+        sec.append(head2, body);
         passport.appendChild(sec);
       }
     } else {
-      passport.appendChild(elu("p", "dy-dim", "No canonical work bound to this node yet."));
+      passport.appendChild(elu("p", "dy-wf-pp-note", "No canonical work bound to this step yet."));
     }
+    appendEditor();
   };
   const buildThread = (items) => buildActivityThread(items, { decay: true });
   const buildTasks = (tasks, onOpen) => buildTaskListMini(tasks, onOpen);
@@ -9409,6 +9424,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   svg.addEventListener("pointerdown", (e) => {
     if (e.target?.closest?.(".dy-wf-node")) return;
     dragging = true;
+    host2.classList.add("dy-wf-panning");
     lastX = e.clientX;
     lastY = e.clientY;
     const target = e.target;
@@ -9434,6 +9450,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     if (dragSession) {
       endDragSession(e, true);
       dragging = false;
+      host2.classList.remove("dy-wf-panning");
       return;
     }
     if (connectFrom) {
@@ -9450,17 +9467,22 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     if (dragSession) endDragSession(e, false);
     cancelConnect();
     dragging = false;
+    host2.classList.remove("dy-wf-panning");
     try {
       svg.releasePointerCapture(e.pointerId);
     } catch {
     }
   });
+  let wheelSettle = null;
   svg.addEventListener("wheel", (e) => {
     e.preventDefault();
     const ev = e;
     const rect = svg.getBoundingClientRect();
     const cx = ev.clientX - rect.left;
     const cy = ev.clientY - rect.top;
+    host2.classList.add("dy-wf-panning");
+    if (wheelSettle) clearTimeout(wheelSettle);
+    wheelSettle = setTimeout(() => host2.classList.remove("dy-wf-panning"), 160);
     const factor = ev.deltaY < 0 ? ZOOM_IN : ZOOM_OUT;
     const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom * factor));
     const k = next / zoom;
@@ -9470,13 +9492,14 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     apply();
     updateMinimap();
   }, { passive: false });
+  const closePassport = () => {
+    passport.replaceChildren();
+    if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
+    selectedEl = null;
+    clearRoute();
+  };
   const onKeyDown = (e) => {
-    if (e.key === "Escape") {
-      passport.replaceChildren();
-      if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
-      selectedEl = null;
-      clearRoute();
-    }
+    if (e.key === "Escape") closePassport();
   };
   document.addEventListener("keydown", onKeyDown);
   let flowT = 0;
@@ -9626,6 +9649,20 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     if (!disposed && lastRun) render(lastRun);
   };
   canvasWindow.addEventListener("resize", onResize);
+  let lastHostWidth = host2.clientWidth;
+  let resizeFrame = 0;
+  const RO = canvasWindow.ResizeObserver;
+  const hostObserver = RO ? new RO(() => {
+    const w = host2.clientWidth;
+    if (w === lastHostWidth) return;
+    lastHostWidth = w;
+    if (resizeFrame) canvasWindow.cancelAnimationFrame(resizeFrame);
+    resizeFrame = canvasWindow.requestAnimationFrame(() => {
+      resizeFrame = 0;
+      onResize();
+    });
+  }) : null;
+  hostObserver?.observe(host2);
   disposers.push(() => {
     disposed = true;
     if (timer) clearInterval(timer);
@@ -9634,6 +9671,8 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     document.removeEventListener("keydown", onKeyDown);
     document.removeEventListener("visibilitychange", onVisibility);
     canvasWindow.removeEventListener("resize", onResize);
+    hostObserver?.disconnect();
+    if (resizeFrame) canvasWindow.cancelAnimationFrame(resizeFrame);
     host2.replaceChildren();
   });
   return () => {
@@ -9711,6 +9750,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
   const [mode, setMode] = useState("live");
   const [validation, setValidation] = useState(null);
   const [layoutPendingVersion, setLayoutPendingVersion] = useState(null);
+  const [libCollapsed, setLibCollapsed] = useState(false);
   const encoded = encodeURIComponent(project.id);
   const grouped = Object.values((workflows ?? []).reduce((all, row) => {
     const item = all[row.name] ?? { name: row.name, versions: [], archived_at: row.archived_at };
@@ -9837,6 +9877,14 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
   };
   const statusFor = (run, node) => run?.nodes?.find((item) => item.node_id === (node.id || node.node_id))?.status ?? "pending";
   const latest = runs[0];
+  const latestVersion = current?.versions?.[current.versions.length - 1] ?? null;
+  const needsAttention = (node) => node.status === "blocked" || node.status === "pending" && node.human_gate;
+  const attentionCount = latest ? (latest.nodes ?? []).filter(needsAttention).length : 0;
+  const startVersion = async (version) => {
+    if (!current || !version) return;
+    await mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/start`, { version: version.version, run_key: runKey || `${current.name}-${Date.now()}` });
+    await loadRuns(current.name);
+  };
   const liveCounts = latest ? (latest.nodes ?? []).reduce((acc, node) => {
     const key = node.status ?? "pending";
     acc[key] = (acc[key] ?? 0) + 1;
@@ -9849,9 +9897,9 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     ] }),
     jsxs("header", { className: "dockyard-section-head", children: [jsxs("div", { children: [jsx("h2", { children: "Workflows" }), jsx("p", { children: "Planning is saved as a version; execution is shown only from canonical runs." })] }), jsx(StatusTag, { tone: latest?.status === "running" ? "info" : "neutral", label: latest ? `Live: ${latest.status}` : `${number(grouped.length)} instances` })] }),
     error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: error }) : null,
-    jsxs("div", { className: "dockyard-wf3", children: [
+    jsxs("div", { className: libCollapsed ? "dockyard-wf3 lib-collapsed" : "dockyard-wf3", "data-wf-library-collapsed": libCollapsed ? "true" : "false", children: [
       // ---- Zone 1: workflow library + create/define editor ---------------
-      jsxs("aside", { className: "dockyard-wf3-lib", "data-workflow-library": project.id, children: [
+      jsxs("aside", { className: "dockyard-wf3-lib", "data-workflow-library": project.id, "aria-hidden": libCollapsed ? "true" : void 0, inert: libCollapsed ? true : void 0, children: [
         jsxs("div", { className: "dockyard-wf3-lib-head", children: [jsx("strong", { children: "Library" }), jsx("span", { children: number(grouped.length) })] }),
         grouped.length ? jsx("div", { className: "dockyard-wf3-lib-list", children: grouped.map((item) => jsxs("button", {
           type: "button",
@@ -9875,9 +9923,14 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
           jsx(Button, { action: "define-workflow", variant: "primary", disabled: !name.trim() || !title.trim(), onClick: define, children: current ? "Save planning version" : "Create instance" })
         ] })
       ] }),
-      // ---- Zone 2: toolbar + canvas (the surface) -------------------------
+      // ---- Zone 2: toolbar + run readout + canvas (the surface) ----------
+      // There is no third column: run lifecycle lives in the toolbar, the
+      // canonical run state is a one-line readout above the canvas, and step
+      // details open in the canvas's own floating panel.
       jsxs("div", { className: "dockyard-wf3-stage", children: [
         jsxs("div", { className: "dockyard-wf3-toolbar", role: "toolbar", "aria-label": "Workflow canvas tools", children: [
+          jsx("button", { type: "button", className: "dockyard-wf3-libtoggle", "data-action": "wf-toggle-library", "aria-expanded": libCollapsed ? "false" : "true", "aria-label": libCollapsed ? "Show workflow library" : "Hide workflow library", title: libCollapsed ? "Show library" : "Hide library", onClick: () => setLibCollapsed((v) => !v), children: libCollapsed ? "\xBB" : "\xAB" }),
+          jsx("span", { className: "dockyard-wf3-sep", "aria-hidden": true }),
           jsx(Button, { small: true, action: "wf-view-definition", variant: mode === "definition" ? "primary" : "", onClick: () => setMode("definition"), children: "Definition" }),
           jsx(Button, { small: true, action: "wf-view-live", variant: mode === "live" ? "primary" : "", disabled: !latest, onClick: () => setMode("live"), children: "Live run" }),
           jsx("span", { className: "dockyard-wf3-sep", "aria-hidden": true }),
@@ -9886,38 +9939,38 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
           jsx(Button, { small: true, action: "wf-auto-layout", disabled: !current || layoutPendingVersion !== null, onClick: autoLayout, children: layoutPendingVersion !== null ? "Saving layout\u2026" : "Auto layout" }),
           jsx(Button, { small: true, action: "wf-validate", disabled: !current, onClick: validateGraph, children: "Validate" }),
           jsx("span", { className: "dockyard-wf3-sep", "aria-hidden": true }),
+          // Run lifecycle (was the inspector column). Start runs the LATEST
+          // stored version; older versions start from the Versions menu.
+          jsx(Button, { small: true, action: "start-workflow", variant: "primary", disabled: !current || Boolean(current?.archived_at), onClick: () => startVersion(latestVersion), children: latestVersion ? `\u25B6 Start v${latestVersion.version}` : "\u25B6 Start" }),
+          current ? jsxs("details", { className: "dockyard-wf3-versions", "data-workflow-definitions": current.name, children: [
+            jsx("summary", { children: `Versions (${current.versions.length})` }),
+            jsx("div", { className: "dockyard-wf3-versions-menu", children: [...current.versions].reverse().map((version) => jsxs("section", { "data-workflow-definition-version": version.version, children: [
+              jsxs("div", { className: "dockyard-wf3-version-head", children: [
+                jsx("strong", { children: `Version ${version.version}${version === latestVersion ? " \xB7 latest" : ""}` }),
+                jsx(Button, { small: true, action: "start-workflow-version", disabled: Boolean(current.archived_at), onClick: () => startVersion(version), children: `Start v${version.version}` })
+              ] }),
+              jsx("pre", { children: JSON.stringify(version.definition?.nodes ?? [], null, 2) })
+            ] }, `definition-${version.version}`)) })
+          ] }) : null,
+          current ? current.archived_at ? jsx(Button, { small: true, action: "restore-workflow", onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/restore`), children: "Restore" }) : jsx(Button, { small: true, action: "archive-workflow", variant: "danger", onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/archive`), children: "Archive" }) : null,
           jsx(Button, { small: true, action: "inspect-workflow", disabled: !current, onClick: () => {
             setSelected(current.name);
             loadRuns(current.name);
-          }, children: "Refresh canvas" })
+          }, children: "Refresh" })
         ] }),
         validation ? jsx("p", { className: "dockyard-wf3-validation", role: "status", "data-wf-validate-result": validation.ok ? "ok" : "issues", children: validation.text }) : null,
         layoutPendingVersion !== null ? jsx("p", { role: "status", "data-wf-layout-saving": true, children: "Saving layout version before the graph can be edited\u2026" }) : null,
-        current ? jsx("div", { ref: canvasRef, className: "dockyard-workflow-graph", "data-workflow-canvas": current.name, role: "img", "aria-label": "Workflow planning graph", "aria-busy": layoutPendingVersion !== null, style: layoutPendingVersion !== null ? { pointerEvents: "none" } : void 0 }) : jsx("p", { className: "dockyard-meta", children: "No workflow selected." })
-      ] }),
-      // ---- Zone 3: run inspector (canonical runs + versions + lifecycle) --
-      jsxs("aside", { className: "dockyard-wf3-insp", children: [
-        jsxs("div", { className: "dockyard-wf3-insp-head", children: [jsx("strong", { children: "Run inspector" }), current ? jsx("span", { children: `v${current.versions[current.versions.length - 1].version}` }) : null] }),
-        latest ? jsxs("div", { "data-workflow-live-run": latest.run_key, children: [
+        // Run readout: the latest canonical run only. Nothing here is inferred.
+        latest ? jsxs("div", { className: "dockyard-wf3-run", "data-workflow-live-run": latest.run_key, children: [
           jsx(StatusTag, { tone: latest.status === "completed" ? "success" : latest.status === "failed" ? "danger" : "info", label: latest.status }),
-          jsx("p", { className: "dockyard-wf3-runkey", children: `${latest.run_key} \xB7 v${latest.version}` }),
-          liveCounts ? jsx("p", { className: "dockyard-wf3-counts", children: ["done", "working", "blocked", "pending"].filter((k) => liveCounts[k]).map((k) => `${liveCounts[k]} ${k}`).join(" \xB7 ") }) : null,
-          jsx("ul", { "data-wf-live-map": latest.run_key, children: (latest.nodes ?? []).map((node) => jsx("li", { "data-wf-live-node": node.node_id, "data-wf-needs-attention": node.status === "blocked" || node.status === "pending" && node.human_gate ? "true" : void 0, children: `${node.title} \u2014 ${node.status ?? "pending"}${node.assignee ? ` \xB7 ${node.assignee}` : ""}${node.status === "blocked" || node.status === "pending" && node.human_gate ? " \xB7 needs attention" : ""}` }, node.node_id)) })
-        ] }) : jsx("p", { className: "dockyard-meta", children: "No canonical run recorded. Start a run to see truthful state." }),
-        jsxs("div", { className: "dockyard-form-actions", children: current ? current.versions.map((version) => jsx(Button, { action: "start-workflow", disabled: Boolean(current.archived_at), onClick: async () => {
-          await mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/start`, { version: version.version, run_key: runKey || `${current.name}-${Date.now()}` });
-          await loadRuns(current.name);
-        }, children: `Start v${version.version}` }, String(version.version))) : null }),
-        current ? jsxs("details", { className: "dockyard-workflow-definitions", "data-workflow-definitions": current.name, children: [
-          jsx("summary", { children: "Stored definition versions" }),
-          ...current.versions.map((version) => jsxs("section", { "data-workflow-definition-version": version.version, children: [
-            jsx("strong", { children: `Version ${version.version}` }),
-            jsx("pre", { children: JSON.stringify(version.definition?.nodes ?? [], null, 2) })
-          ] }, `definition-${version.version}`))
-        ] }) : null,
-        jsxs("div", { className: "dockyard-form-actions", children: current ? [
-          current.archived_at ? jsx(Button, { action: "restore-workflow", onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/restore`), children: "Restore workflow" }) : jsx(Button, { action: "archive-workflow", variant: "danger", onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/archive`), children: "Archive workflow" })
-        ] : null })
+          jsx("span", { className: "dockyard-wf3-runkey", children: `${latest.run_key} \xB7 v${latest.version}` }),
+          liveCounts ? jsx("span", { className: "dockyard-wf3-counts", children: ["done", "working", "blocked", "pending"].filter((k) => liveCounts[k]).map((k) => `${liveCounts[k]} ${k}`).join(" \xB7 ") }) : null,
+          jsxs("details", { className: "dockyard-wf3-steps", children: [
+            jsx("summary", { children: attentionCount ? `Steps \xB7 ${attentionCount} need attention` : "Steps" }),
+            jsx("ul", { "data-wf-live-map": latest.run_key, children: (latest.nodes ?? []).map((node) => jsx("li", { "data-wf-live-node": node.node_id, "data-wf-needs-attention": needsAttention(node) ? "true" : void 0, children: `${node.title} \u2014 ${node.status ?? "pending"}${node.assignee ? ` \xB7 ${node.assignee}` : ""}${needsAttention(node) ? " \xB7 needs attention" : ""}` }, node.node_id)) })
+          ] })
+        ] }) : jsx("p", { className: "dockyard-wf3-run dockyard-meta", "data-workflow-no-run": true, children: "No canonical run recorded. Start a run to see truthful state." }),
+        current ? jsx("div", { ref: canvasRef, className: "dockyard-workflow-graph", "data-workflow-canvas": current.name, role: "img", "aria-label": "Workflow planning graph", "aria-busy": layoutPendingVersion !== null, style: layoutPendingVersion !== null ? { pointerEvents: "none" } : void 0 }) : jsx("p", { className: "dockyard-meta", children: "No workflow selected." })
       ] })
     ] })
   ] });

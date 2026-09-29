@@ -348,42 +348,10 @@
     pending: "--dy-wf-status-pending"
   };
   var PURPOSE_VISUALS = {
-    task: {
-      fill: "--dy-wf-purpose-task-fill",
-      line: "--dy-wf-purpose-task-line",
-      text: "--dy-wf-purpose-task-text",
-      glyph: "\u25A1",
-      label: "Task",
-      glyphX: 20,
-      textX: 36
-    },
-    gate: {
-      fill: "--dy-wf-purpose-gate-fill",
-      line: "--dy-wf-purpose-gate-line",
-      text: "--dy-wf-purpose-gate-text",
-      glyph: "\u25C6",
-      label: "Human gate",
-      glyphX: 24,
-      textX: 42
-    },
-    branch: {
-      fill: "--dy-wf-purpose-branch-fill",
-      line: "--dy-wf-purpose-branch-line",
-      text: "--dy-wf-purpose-branch-text",
-      glyph: "\u22D4",
-      label: "Conditional branch",
-      glyphX: 22,
-      textX: 40
-    },
-    loop: {
-      fill: "--dy-wf-purpose-loop-fill",
-      line: "--dy-wf-purpose-loop-line",
-      text: "--dy-wf-purpose-loop-text",
-      glyph: "\u21BB",
-      label: "Bounded loop",
-      glyphX: 20,
-      textX: 36
-    }
+    task: { label: "Task" },
+    gate: { label: "Human gate" },
+    branch: { label: "Conditional branch" },
+    loop: { label: "Bounded loop" }
   };
   function nodePurpose(n) {
     if (n.human_gate || n.kind === "gate") return "gate";
@@ -391,25 +359,10 @@
     if (n.when) return "branch";
     return "task";
   }
-  function nodeShapePath(purpose, w = NODE_W, h = NODE_H) {
-    switch (purpose) {
-      case "gate": {
-        const i = Math.round(h * 0.22);
-        return `M ${i} 0 H ${w - i} L ${w} ${h / 2} L ${w - i} ${h} H ${i} L 0 ${h / 2} Z`;
-      }
-      case "branch": {
-        const i = Math.round(h * 0.19);
-        return `M ${i} 0 H ${w - i} L ${w} ${i} V ${h - i} L ${w - i} ${h} H ${i} L 0 ${h - i} V ${i} Z`;
-      }
-      case "loop": {
-        const r = 9;
-        const notch = 13;
-        return `M ${r} 0 H ${w - r} A ${r} ${r} 0 0 1 ${w} ${r} V ${h - r} A ${r} ${r} 0 0 1 ${w - r} ${h} H ${r} A ${r} ${r} 0 0 1 0 ${h - r} V ${h / 2 + 10} L ${notch} ${h / 2} L 0 ${h / 2 - 10} V ${r} A ${r} ${r} 0 0 1 ${r} 0 Z`;
-      }
-      default:
-        return null;
-    }
+  function isAwaitingDecision(n) {
+    return nodePurpose(n) === "gate" && statusToken(n.status) === "pending";
   }
+  var CARD_RADIUS = 12;
   var EDGE_MEANINGS = {
     depends_on: {
       meaning: "depends_on",
@@ -610,13 +563,13 @@
     svg.setAttribute("data-lod", "read");
     const viewport = sEl("g", { class: "dy-wf-viewport" });
     svg.appendChild(viewport);
-    const SVG_INDEX = sEl("svg", { class: "dy-wf-index" });
-    const minimap = sEl("svg", { class: "dy-wf-minimap", width: 170, height: 104 });
+    const minimap = sEl("svg", { class: "dy-wf-minimap dy-wf-glass", width: 170, height: 104 });
+    minimap.setAttribute("aria-label", "Canvas overview: click to move the view");
     const miniViewport = sEl("rect", { class: "dy-wf-mini-view" });
     minimap.appendChild(miniViewport);
-    const passport = elu("div", "dy-wf-passport");
+    const passport = elu("div", "dy-wf-passport dy-wf-glass");
     passport.setAttribute("aria-live", "polite");
-    const zoomBar = elu("div", "dy-wf-zoombar");
+    const zoomBar = elu("div", "dy-wf-zoombar dy-wf-glass");
     zoomBar.setAttribute("role", "group");
     zoomBar.setAttribute("aria-label", "Zoom controls");
     const zoomButton = (action, label2, title) => {
@@ -631,7 +584,7 @@
     const zoomFitBtn = zoomButton("zoom-fit", "Fit", "Fit graph to view");
     const zoomResetBtn = zoomButton("zoom-reset", "Reset", "Reset zoom to 100%");
     zoomBar.append(zoomInBtn, zoomOutBtn, zoomFitBtn, zoomResetBtn);
-    const feed = elu("div", "dy-wf-feed");
+    const feed = elu("div", "dy-wf-feed dy-wf-glass");
     feed.setAttribute("aria-live", "polite");
     const feedHead = elu("button", "dy-wf-feed-head", "\u25BE Activity");
     const feedBody = elu("div", "dy-wf-feed-body");
@@ -660,27 +613,30 @@
         m.el.style.opacity = String(Math.max(0.25, 1 - i * 0.15));
       });
     };
-    const listView = elu("div", "dy-wf-list");
+    const listView = elu("div", "dy-wf-list dy-wf-glass");
     listView.dataset.wfList = "";
-    const listHead = elu("button", "dy-wf-list-head", "\u25B8 List view");
+    const listHead = elu("button", "dy-wf-zoombtn dy-wf-list-head", "\u25B8 List view");
     listHead.type = "button";
     listHead.setAttribute("aria-expanded", "false");
     const listBody = elu("div", "dy-wf-list-body");
     listBody.setAttribute("role", "table");
     listBody.setAttribute("aria-label", "Workflow run as list");
     listBody.style.display = "none";
+    listView.hidden = true;
     listHead.addEventListener("click", () => {
       const open = listHead.getAttribute("aria-expanded") === "true";
       listHead.setAttribute("aria-expanded", String(!open));
       listHead.textContent = open ? "\u25B8 List view" : "\u25BE List view";
       listBody.style.display = open ? "none" : "block";
+      listView.hidden = open;
     });
-    listView.append(listHead, listBody);
+    zoomBar.appendChild(listHead);
+    listView.append(listBody);
     let playbackBar = null;
     let playbackSlider = null;
     let playbackLabel = null;
     let playbackButton = null;
-    playbackBar = elu("div", "dy-wf-playback");
+    playbackBar = elu("div", "dy-wf-playback dy-wf-glass");
     playbackBar.setAttribute("role", "group");
     playbackBar.setAttribute("aria-label", "Workflow playback");
     playbackButton = elu("button", "dy-wf-playback-btn", "\u25B6 Play");
@@ -705,7 +661,7 @@
       host.classList.toggle("dy-wf-still", on);
     });
     playbackBar.append(playbackButton, playbackSlider, playbackLabel, motionButton);
-    wrap.append(svg, SVG_INDEX, feed, minimap, passport, zoomBar, listView, playbackBar);
+    wrap.append(svg, feed, minimap, passport, zoomBar, listView, playbackBar);
     playbackBar.style.overflowX = "auto";
     host.appendChild(wrap);
     let panX = 0;
@@ -834,6 +790,7 @@
     };
     const apply = () => {
       viewport.setAttribute("transform", `translate(${panX} ${panY}) scale(${zoom})`);
+      viewport.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
       svg.setAttribute("data-lod", zoom > LOD_FULL ? "full" : zoom < 0.75 ? "map" : "read");
     };
     const ZOOM_STEP = 1.25;
@@ -888,6 +845,12 @@
       defs.appendChild(mkMarker(meaning.marker, meaning.color, "#8fa3c8"));
       defs.appendChild(mkMarker(meaning.activeMarker, meaning.activeColor, "#9cc4ff"));
     }
+    const sheenGrad = sEl("linearGradient", { id: "dyWfCardSheen", x1: "0", y1: "0", x2: "0", y2: "1" });
+    sheenGrad.append(
+      sEl("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0.09" }),
+      sEl("stop", { offset: "100%", "stop-color": "#ffffff", "stop-opacity": "0" })
+    );
+    defs.appendChild(sheenGrad);
     svg.appendChild(defs);
     const timelineFor = (run) => run?.timeline ?? [];
     const clearRoute = () => {
@@ -974,12 +937,14 @@
       const purpose = nodePurpose(n);
       const status = statusToken(n.status);
       const visuals = PURPOSE_VISUALS[purpose];
+      const awaiting = isAwaitingDecision(n);
       const g = sEl("g", {
-        class: `dy-wf-node ${purpose} ${status}`,
+        class: `dy-wf-node ${purpose} ${status}${awaiting ? " awaiting" : ""}`,
         transform: `translate(${p.x} ${p.y})`
       });
       g.dataset.wfPurpose = purpose;
       g.dataset.wfStatus = status;
+      if (awaiting) g.dataset.wfAwaiting = "true";
       if (playbackIndex !== null) g.dataset.wfPlaybackStatus = n.status ?? "pending";
       g.setAttribute("tabindex", "0");
       g.setAttribute("role", "button");
@@ -987,35 +952,38 @@
       g.setAttribute("aria-label", `${visuals.label}: ${n.title} (${n.status ?? "pending"})`);
       g.dataset.wfEditable = String(editable);
       g.setAttribute("aria-describedby", `wf-help-${n.node_id}`);
-      const outline = nodeShapePath(purpose);
-      const shape = outline === null ? sEl("rect", { width: NODE_W, height: NODE_H, rx: 9, class: "dy-wf-shape dy-wf-rect" }) : sEl("path", { d: outline, class: "dy-wf-shape dy-wf-rect" });
-      shape.setAttribute("fill", `var(${visuals.fill})`);
-      const glyph = sEl("text", { x: visuals.glyphX, y: 26, class: "dy-wf-glyph" });
-      glyph.textContent = visuals.glyph;
-      const label2 = sEl("text", { x: visuals.textX, y: 25, class: "dy-wf-label" });
-      label2.textContent = n.title.slice(0, 18);
-      const sub = sEl("text", { x: 12, y: 45, class: "dy-wf-sub" });
-      sub.textContent = visuals.label;
-      const chip = sEl("rect", {
-        x: NODE_W - 66,
-        y: 34,
-        width: 54,
-        height: 16,
-        rx: 8,
-        class: `dy-wf-statuschip ${status}`
+      const shape = sEl("rect", {
+        width: NODE_W,
+        height: NODE_H,
+        rx: CARD_RADIUS,
+        class: "dy-wf-shape dy-wf-card"
       });
+      shape.setAttribute("fill", "#101c30");
+      const sheen = sEl("rect", {
+        x: 1,
+        y: 1,
+        width: NODE_W - 2,
+        height: NODE_H / 2,
+        rx: CARD_RADIUS - 1,
+        class: "dy-wf-card-sheen"
+      });
+      const dot = sEl("circle", { cx: 18, cy: 22, r: 4.5, class: `dy-wf-statusdot ${status}` });
+      const label2 = sEl("text", { x: 30, y: 26, class: "dy-wf-label" });
+      label2.textContent = n.title.length > 22 ? n.title.slice(0, 21) + "\u2026" : n.title;
+      const sub = sEl("text", { x: 14, y: 46, class: "dy-wf-sub" });
+      sub.textContent = visuals.label;
       const statusText = sEl("text", {
-        x: NODE_W - 39,
-        y: 45.5,
-        "text-anchor": "middle",
+        x: NODE_W - 14,
+        y: 46,
+        "text-anchor": "end",
         class: `dy-wf-statustext ${status}`
       });
-      statusText.textContent = n.status ?? "pending";
-      g.append(shape, glyph, label2, sub, chip, statusText);
+      statusText.textContent = awaiting ? "awaiting decision" : n.status ?? "pending";
+      g.append(shape, sheen, dot, label2, sub, statusText);
       if (n.status === "working") {
         const timer2 = sEl("text", {
-          x: 12,
-          y: 60,
+          x: 14,
+          y: 62,
           class: "dy-wf-timer full"
         });
         timer2.textContent = `Workflow: ${elapsedLabel(run.started_at)}`;
@@ -1023,30 +991,32 @@
         g.appendChild(timer2);
       }
       if (n.assignee) {
-        g.appendChild((() => {
-          const who = sEl("text", {
-            x: NODE_W - 12,
-            y: 60,
-            "text-anchor": "end",
-            class: "dy-wf-assignee"
-          });
-          who.textContent = n.assignee;
-          return who;
-        })());
+        const who = sEl("text", {
+          x: NODE_W - 14,
+          y: 62,
+          "text-anchor": "end",
+          class: "dy-wf-assignee"
+        });
+        who.textContent = n.assignee;
+        g.appendChild(who);
       }
-      const port = sEl("circle", { cx: NODE_W, cy: NODE_H / 2, r: 11, class: "dy-wf-port" });
+      const port = sEl("circle", { cx: NODE_W, cy: NODE_H / 2, r: 7, class: "dy-wf-port" });
+      const portHit = sEl("circle", { cx: NODE_W, cy: NODE_H / 2, r: 12, class: "dy-wf-port-hit" });
+      portHit.setAttribute("aria-hidden", "true");
       port.setAttribute("data-connect-from", n.node_id);
       port.setAttribute("tabindex", "0");
       port.setAttribute("aria-label", `Connect from ${n.title}`);
-      g.appendChild(port);
+      g.append(portHit, port);
       const dash = () => shape.setAttribute("stroke-dasharray", "4 3");
       const undash = () => shape.removeAttribute("stroke-dasharray");
-      port.addEventListener("pointerdown", (ev) => {
-        const e = ev;
-        if (e.button !== 0 || !editable) return;
-        e.stopPropagation();
-        startConnect(n.node_id, g);
-      });
+      for (const target of [port, portHit]) {
+        target.addEventListener("pointerdown", (ev) => {
+          const e = ev;
+          if (e.button !== 0 || !editable) return;
+          e.stopPropagation();
+          startConnect(n.node_id, g);
+        });
+      }
       g.addEventListener("pointerdown", (ev) => {
         const e = ev;
         if (e.button !== 0 || !editable) return;
@@ -1231,60 +1201,8 @@
         const p = positions[n.node_id];
         viewport.appendChild(buildNode(n, p, run, Boolean(handlers.onEdit)));
       }
-      renderLegend(run);
       apply();
       updateMinimap();
-    };
-    const renderLegend = (run) => {
-      SVG_INDEX.replaceChildren();
-      SVG_INDEX.setAttribute("aria-label", "Node purposes on this canvas");
-      if (!run || run.nodes.length === 0) return;
-      const present = new Set(run.nodes.map((n) => nodePurpose(n)));
-      const purposes = Object.keys(PURPOSE_VISUALS).filter((p) => present.has(p));
-      const rowH = 26;
-      const padX = 12;
-      const width = 214;
-      const height = 22 + purposes.length * rowH;
-      SVG_INDEX.setAttribute("viewBox", `0 0 ${width} ${height}`);
-      SVG_INDEX.setAttribute("width", String(width));
-      SVG_INDEX.setAttribute("height", String(height));
-      const frame = sEl("rect", {
-        x: 0.5,
-        y: 0.5,
-        width: width - 1,
-        height: height - 1,
-        rx: 7,
-        class: "dy-wf-index-bg"
-      });
-      const heading = sEl("text", { x: padX, y: 15, class: "dy-wf-index-title" });
-      heading.textContent = "NODE PURPOSE";
-      SVG_INDEX.append(frame, heading);
-      purposes.forEach((p, i) => {
-        const v = PURPOSE_VISUALS[p];
-        const cy = 22 + i * rowH + 8;
-        const outline = nodeShapePath(p, 20, 16);
-        const swatch = outline === null ? sEl("rect", { x: 0, y: 0, width: 20, height: 16, rx: 3, class: "dy-wf-index-shape" }) : sEl("path", { d: outline, class: "dy-wf-index-shape" });
-        swatch.setAttribute("fill", `var(${v.fill})`);
-        swatch.setAttribute("stroke", `var(${v.line})`);
-        swatch.setAttribute("data-wf-purpose", p);
-        const row = sEl("g", { transform: `translate(${padX} ${cy - 8})` });
-        row.appendChild(swatch);
-        const glyph = sEl("text", { x: 30, y: 13, class: "dy-wf-index-glyph" });
-        glyph.textContent = v.glyph;
-        row.appendChild(glyph);
-        const name = sEl("text", { x: 48, y: 13, class: "dy-wf-index-label" });
-        name.textContent = v.label;
-        row.appendChild(name);
-        SVG_INDEX.appendChild(row);
-      });
-      const dep = EDGE_MEANINGS[DEFAULT_EDGE_MEANING];
-      const edgeRow = sEl("g", { transform: `translate(${padX} ${height - 4})` });
-      const line = sEl("path", { d: "M 0 -5 L 20 -5", class: "dy-wf-index-edge" });
-      edgeRow.appendChild(line);
-      const edgeLabel = sEl("text", { x: 30, y: -1, class: "dy-wf-index-edge-label" });
-      edgeLabel.textContent = `${dep.label} \u2192 (workflow edges)`;
-      edgeRow.appendChild(edgeLabel);
-      SVG_INDEX.appendChild(edgeRow);
     };
     const updateMinimap = () => {
       minimap.replaceChildren(miniViewport);
@@ -1351,19 +1269,61 @@
       viewport.querySelectorAll(".dy-wf-node").forEach((node) => node.classList.toggle("dy-wf-route-dim", !related.has(node.getAttribute("data-node-id") ?? "")));
       viewport.querySelectorAll(".dy-wf-edge").forEach((edge) => edge.classList.toggle("dy-wf-route-edge", related.has(edge.dataset.from ?? "") && related.has(edge.dataset.to ?? "")));
       passport.replaceChildren();
-      passport.appendChild(elu("h3", "", n.title));
-      if (handlers.onEdit) {
+      const status = n.status ?? "pending";
+      const head = elu("div", "dy-wf-pp-head");
+      const meta = elu("div", "dy-wf-pp-meta");
+      meta.append(elu("span", "dy-wf-passport-kind", PURPOSE_VISUALS[nodePurpose(n)].label), elu("span", `badge ${status}`, status));
+      const close = elu("button", "dy-wf-passport-close", "\xD7");
+      close.type = "button";
+      close.setAttribute("aria-label", "Close step details");
+      close.addEventListener("click", () => closePassport());
+      head.append(meta, elu("h3", "", n.title), close);
+      passport.appendChild(head);
+      const facts = elu("dl", "dy-wf-pp-facts");
+      const fact = (k, v, cls = "") => {
+        const row = elu("div", `dy-wf-pp-fact ${cls}`.trim());
+        row.append(elu("dt", "", k), elu("dd", "", v));
+        facts.appendChild(row);
+        return row;
+      };
+      const updated = lastRun?.updated_at ?? null;
+      const lastConfirmed = fact("Last confirmed update", updated && isFinite(Date.parse(updated)) ? updated.replace("T", " ").slice(0, 16) + " UTC" : "unknown", "dy-wf-last-confirmed");
+      lastConfirmed.setAttribute("data-last-confirmed", updated ?? "unknown");
+      if (n.depends_on.length) fact("Depends on", n.depends_on.join(", "));
+      if (n.assignee) fact("Assignee", n.assignee);
+      if (n.evidence_refs.length) fact("Evidence", n.evidence_refs.join(", "));
+      if (n.task_ref) fact("Work item", n.task_ref);
+      passport.appendChild(facts);
+      const nodeEvents = (lastRun?.timeline ?? []).filter((event) => event.node_id === n.node_id);
+      if (nodeEvents.length) {
+        passport.appendChild(elu("h4", "", "Status history"));
+        const history = elu("ol", "dy-wf-node-history");
+        for (const event of nodeEvents.slice(-6)) history.appendChild(elu("li", "", `${event.from_status ?? "\u2014"} \u2192 ${event.to_status}`));
+        passport.appendChild(history);
+      }
+      const appendEditor = () => {
+        if (!handlers.onEdit) return;
         const edit = elu("div", "dy-wf-edit");
+        edit.appendChild(elu("h4", "", "Edit step"));
+        const field = (label2, input) => {
+          const f = elu("label", "dy-wf-field");
+          f.append(elu("span", "", label2), input);
+          edit.appendChild(f);
+        };
         const title = elu("input", "dy-wf-edit-title");
         title.value = n.title;
         title.setAttribute("aria-label", "Node title");
         const deps = elu("input", "dy-wf-edit-deps");
         deps.value = n.depends_on.join(", ");
+        deps.placeholder = "e.g. build, tests";
         deps.setAttribute("aria-label", "Dependencies");
         const team = elu("input", "dy-wf-edit-team");
         team.value = n.phase_team ?? "";
         team.placeholder = "phase team override";
         team.setAttribute("aria-label", "Phase team override");
+        field("Title", title);
+        field("Depends on (step IDs)", deps);
+        field("Phase team", team);
         const save = elu("button", "dy-btn primary", "Save graph version");
         save.type = "button";
         save.addEventListener("click", async () => {
@@ -1380,28 +1340,10 @@
             save.textContent = "Save failed \u2014 retry";
           }
         });
-        edit.append(elu("label", "", "Title"), title, elu("label", "", "Dependencies (node IDs)"), deps, elu("label", "", "Phase team"), team, save);
+        edit.appendChild(save);
         passport.appendChild(edit);
-      }
-      passport.appendChild(elu("span", `badge ${n.status ?? "pending"}`, n.status ?? "pending"));
-      const nodeEvents = (lastRun?.timeline ?? []).filter((event) => event.node_id === n.node_id);
-      if (nodeEvents.length) {
-        const history = elu("ol", "dy-wf-node-history");
-        for (const event of nodeEvents.slice(-6)) history.appendChild(elu("li", "", `${event.from_status ?? "\u2014"} \u2192 ${event.to_status}`));
-        passport.appendChild(history);
-      }
-      const lastConfirmed = elu("p", "dy-wf-last-confirmed");
-      const updated = lastRun?.updated_at ?? null;
-      lastConfirmed.textContent = `Last confirmed update: ${updated && isFinite(Date.parse(updated)) ? updated.replace("T", " ").slice(0, 16) + " UTC" : "unknown"}`;
-      lastConfirmed.setAttribute("data-last-confirmed", updated ?? "unknown");
-      passport.appendChild(lastConfirmed);
-      if (n.assignee) passport.appendChild(elu("p", "dy-dim", `assignee: ${n.assignee}`));
-      if (n.evidence_refs.length) {
-        const p = elu("p", "dy-dim", "evidence: " + n.evidence_refs.join(", "));
-        passport.appendChild(p);
-      }
+      };
       if (n.task_ref) {
-        passport.appendChild(elu("p", "dy-dim", `deep link: ${n.task_ref}`));
         const decisionState = n.kind === "gate" && n.status !== "done" && n.status !== "blocked" ? elu("span", "dy-wf-decision-state", "Awaiting decision") : null;
         if (decisionState) {
           decisionState.setAttribute("data-decision-state", "awaiting_decision");
@@ -1471,7 +1413,7 @@
           }
           const unsupported = elu(
             "p",
-            "dy-wf-unsupported",
+            "dy-wf-unsupported dy-wf-pp-note",
             "Pause and cancel are not supported by the native execution contract \u2014 a running worker cannot be stopped from here."
           );
           unsupported.setAttribute("data-unsupported-controls", "pause,cancel");
@@ -1480,15 +1422,15 @@
         }
         if (handlers.onExpand) {
           const sec = elu("div", "dy-wf-expand");
-          const head = elu("button", "dy-wf-expand-head", "\u25B8 Live detail");
-          head.setAttribute("aria-expanded", "false");
+          const head2 = elu("button", "dy-wf-expand-head", "\u25B8 Live detail");
+          head2.setAttribute("aria-expanded", "false");
           const body = elu("div", "dy-wf-expand-body");
           body.style.display = "none";
           body.appendChild(elu("p", "dy-dim", "Loading live detail\u2026"));
-          head.addEventListener("click", () => {
-            const isOpen = head.getAttribute("aria-expanded") === "true";
-            head.setAttribute("aria-expanded", String(!isOpen));
-            head.textContent = isOpen ? "\u25B8 Live detail" : "\u25BE Live detail";
+          head2.addEventListener("click", () => {
+            const isOpen = head2.getAttribute("aria-expanded") === "true";
+            head2.setAttribute("aria-expanded", String(!isOpen));
+            head2.textContent = isOpen ? "\u25B8 Live detail" : "\u25BE Live detail";
             body.style.display = isOpen ? "none" : "block";
             if (!isOpen && !body.dataset.loaded) {
               body.dataset.loaded = "1";
@@ -1532,12 +1474,13 @@
               });
             }
           });
-          sec.append(head, body);
+          sec.append(head2, body);
           passport.appendChild(sec);
         }
       } else {
-        passport.appendChild(elu("p", "dy-dim", "No canonical work bound to this node yet."));
+        passport.appendChild(elu("p", "dy-wf-pp-note", "No canonical work bound to this step yet."));
       }
+      appendEditor();
     };
     const buildThread = (items) => buildActivityThread(items, { decay: true });
     const buildTasks = (tasks, onOpen) => buildTaskListMini(tasks, onOpen);
@@ -1547,6 +1490,7 @@
     svg.addEventListener("pointerdown", (e) => {
       if (e.target?.closest?.(".dy-wf-node")) return;
       dragging = true;
+      host.classList.add("dy-wf-panning");
       lastX = e.clientX;
       lastY = e.clientY;
       const target = e.target;
@@ -1572,6 +1516,7 @@
       if (dragSession) {
         endDragSession(e, true);
         dragging = false;
+        host.classList.remove("dy-wf-panning");
         return;
       }
       if (connectFrom) {
@@ -1588,17 +1533,22 @@
       if (dragSession) endDragSession(e, false);
       cancelConnect();
       dragging = false;
+      host.classList.remove("dy-wf-panning");
       try {
         svg.releasePointerCapture(e.pointerId);
       } catch {
       }
     });
+    let wheelSettle = null;
     svg.addEventListener("wheel", (e) => {
       e.preventDefault();
       const ev = e;
       const rect = svg.getBoundingClientRect();
       const cx = ev.clientX - rect.left;
       const cy = ev.clientY - rect.top;
+      host.classList.add("dy-wf-panning");
+      if (wheelSettle) clearTimeout(wheelSettle);
+      wheelSettle = setTimeout(() => host.classList.remove("dy-wf-panning"), 160);
       const factor = ev.deltaY < 0 ? ZOOM_IN : ZOOM_OUT;
       const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom * factor));
       const k = next / zoom;
@@ -1608,13 +1558,14 @@
       apply();
       updateMinimap();
     }, { passive: false });
+    const closePassport = () => {
+      passport.replaceChildren();
+      if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
+      selectedEl = null;
+      clearRoute();
+    };
     const onKeyDown = (e) => {
-      if (e.key === "Escape") {
-        passport.replaceChildren();
-        if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
-        selectedEl = null;
-        clearRoute();
-      }
+      if (e.key === "Escape") closePassport();
     };
     document.addEventListener("keydown", onKeyDown);
     let flowT = 0;
@@ -1764,6 +1715,20 @@
       if (!disposed && lastRun) render(lastRun);
     };
     canvasWindow.addEventListener("resize", onResize);
+    let lastHostWidth = host.clientWidth;
+    let resizeFrame = 0;
+    const RO = canvasWindow.ResizeObserver;
+    const hostObserver = RO ? new RO(() => {
+      const w = host.clientWidth;
+      if (w === lastHostWidth) return;
+      lastHostWidth = w;
+      if (resizeFrame) canvasWindow.cancelAnimationFrame(resizeFrame);
+      resizeFrame = canvasWindow.requestAnimationFrame(() => {
+        resizeFrame = 0;
+        onResize();
+      });
+    }) : null;
+    hostObserver?.observe(host);
     disposers.push(() => {
       disposed = true;
       if (timer) clearInterval(timer);
@@ -1772,6 +1737,8 @@
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("visibilitychange", onVisibility);
       canvasWindow.removeEventListener("resize", onResize);
+      hostObserver?.disconnect();
+      if (resizeFrame) canvasWindow.cancelAnimationFrame(resizeFrame);
       host.replaceChildren();
     });
     return () => {

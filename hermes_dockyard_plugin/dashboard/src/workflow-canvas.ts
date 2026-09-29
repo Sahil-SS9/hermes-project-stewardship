@@ -107,16 +107,12 @@ const LOD_FULL = 1.4;
 const ZOOM_IN = 1.1;
 const ZOOM_OUT = 0.9;
 
-// ---- S1: node purpose / status visual tokens ------------------------------
-// PURPOSE (what a node is) and STATUS (where a node is) are two independent
-// visual dimensions, and they are kept apart on every node:
-//   purpose -> silhouette + fill + symbol + purpose text colour
-//   status  -> outline stroke + status mark + status word
-// Purpose colours live on a violet/cyan/magenta/blue axis and status colours on
-// a green/amber/red/grey axis, so they can never collide (no green-on-green,
-// blue-on-blue). Every value is a CSS custom property declared in style.css, so
-// the palette has exactly one home; the literals below are only the
-// stylesheet-less fallback for the SVG presentation attributes.
+// ---- node status / purpose vocabulary ------------------------------------
+// Every node is drawn as the SAME glass card. What a node is (its purpose) is
+// stated in words on the card; where a node is (its status) is carried by the
+// card border, a status dot and the status word. Status colours are CSS custom
+// properties declared once in workflow-canvas-css.ts; the literals in this file
+// are only stylesheet-less fallbacks for SVG presentation attributes.
 export type CanvasNodePurpose = 'task' | 'gate' | 'branch' | 'loop';
 
 export const STATUS_ORDER = ['done', 'working', 'blocked', 'pending'] as const;
@@ -128,9 +124,6 @@ export function statusToken(status: string | null | undefined): CanvasNodeStatus
   return status === 'done' || status === 'working' || status === 'blocked' ? status : 'pending';
 }
 
-// Status is the second visual dimension: it is carried by the node OUTLINE, a
-// tinted status chip and the status word — never by the node fill, which is
-// purpose. Same custom-property discipline as purpose.
 export const STATUS_TOKENS: Record<CanvasNodeStatusToken, string> = {
   done: '--dy-wf-status-done',
   working: '--dy-wf-status-working',
@@ -138,37 +131,14 @@ export const STATUS_TOKENS: Record<CanvasNodeStatusToken, string> = {
   pending: '--dy-wf-status-pending',
 };
 
-export interface PurposeVisuals {
-  fill: string;
-  line: string;
-  text: string;
-  glyph: string;
-  label: string;
-  glyphX: number;
-  textX: number;
-}
+export interface PurposeVisuals { label: string }
 
+// Purpose names only: the card itself is identical for every purpose.
 export const PURPOSE_VISUALS: Record<CanvasNodePurpose, PurposeVisuals> = {
-  task: {
-    fill: '--dy-wf-purpose-task-fill', line: '--dy-wf-purpose-task-line',
-    text: '--dy-wf-purpose-task-text', glyph: '□', label: 'Task',
-    glyphX: 20, textX: 36,
-  },
-  gate: {
-    fill: '--dy-wf-purpose-gate-fill', line: '--dy-wf-purpose-gate-line',
-    text: '--dy-wf-purpose-gate-text', glyph: '◆', label: 'Human gate',
-    glyphX: 24, textX: 42,
-  },
-  branch: {
-    fill: '--dy-wf-purpose-branch-fill', line: '--dy-wf-purpose-branch-line',
-    text: '--dy-wf-purpose-branch-text', glyph: '⋔', label: 'Conditional branch',
-    glyphX: 22, textX: 40,
-  },
-  loop: {
-    fill: '--dy-wf-purpose-loop-fill', line: '--dy-wf-purpose-loop-line',
-    text: '--dy-wf-purpose-loop-text', glyph: '↻', label: 'Bounded loop',
-    glyphX: 20, textX: 36,
-  },
+  task: { label: 'Task' },
+  gate: { label: 'Human gate' },
+  branch: { label: 'Conditional branch' },
+  loop: { label: 'Bounded loop' },
 };
 
 // A node's purpose is read from the canonical graph shape it takes part in:
@@ -182,38 +152,13 @@ export function nodePurpose(n: CanvasNode): CanvasNodePurpose {
   return 'task';
 }
 
-// Purpose is shape-led. Silhouettes are drawn inside the fixed node box so the
-// layout grid, ports and edges keep their geometry: an ordinary task is a
-// rounded rect (null -> the caller emits a <rect>), a human gate is a hexagon
-// with pointed sides, a conditional branch is a cut-corner octagon and a
-// bounded loop is a rounded rect with a return notch on its upstream edge.
-// No node carries a coloured side stripe.
-export function nodeShapePath(
-  purpose: CanvasNodePurpose,
-  w: number = NODE_W,
-  h: number = NODE_H,
-): string | null {
-  switch (purpose) {
-    case 'gate': {
-      const i = Math.round(h * 0.22); // 14 at h=64
-      return `M ${i} 0 H ${w - i} L ${w} ${h / 2} L ${w - i} ${h} H ${i} L 0 ${h / 2} Z`;
-    }
-    case 'branch': {
-      const i = Math.round(h * 0.19); // 12 at h=64
-      return `M ${i} 0 H ${w - i} L ${w} ${i} V ${h - i} L ${w - i} ${h} H ${i} L 0 ${h - i} V ${i} Z`;
-    }
-    case 'loop': {
-      const r = 9;
-      const notch = 13;
-      return `M ${r} 0 H ${w - r} A ${r} ${r} 0 0 1 ${w} ${r} V ${h - r}`
-        + ` A ${r} ${r} 0 0 1 ${w - r} ${h} H ${r} A ${r} ${r} 0 0 1 0 ${h - r}`
-        + ` V ${h / 2 + 10} L ${notch} ${h / 2} L 0 ${h / 2 - 10} V ${r}`
-        + ` A ${r} ${r} 0 0 1 ${r} 0 Z`;
-    }
-    default:
-      return null; // 'task' -> rounded rect
-  }
+// A pending human gate is waiting on a person: the one status refinement the
+// run projection states directly (human_gate + pending), never inferred.
+export function isAwaitingDecision(n: CanvasNode): boolean {
+  return nodePurpose(n) === 'gate' && statusToken(n.status) === 'pending';
 }
+
+export const CARD_RADIUS = 12;
 
 // ---- S2: edge meaning token system ---------------------------------------
 // Every connector carries one MEANING. The workflow canvas draws `depends_on`
@@ -475,22 +420,22 @@ export function mountWorkflowCanvas(
   const viewport = sEl('g', { class: 'dy-wf-viewport' }) as SVGGElement;
   svg.appendChild(viewport);
 
-  // Purpose legend: the visual set is only useful if it is readable without
-  // opening a node, so the canvas states its own vocabulary. Built from the
-  // same token tables the nodes and edges are drawn from (no second copy).
-  const SVG_INDEX = sEl('svg', { class: 'dy-wf-index' }) as SVGSVGElement;
-
   // minimap: authored bounds + live camera (archify radar principle)
-  const minimap = sEl('svg', { class: 'dy-wf-minimap', width: 170, height: 104 }) as SVGSVGElement;
+  const minimap = sEl('svg', { class: 'dy-wf-minimap dy-wf-glass', width: 170, height: 104 }) as SVGSVGElement;
+  minimap.setAttribute('aria-label', 'Canvas overview: click to move the view');
   const miniViewport = sEl('rect', { class: 'dy-wf-mini-view' }) as SVGRectElement;
   minimap.appendChild(miniViewport);
 
-  const passport = elu<HTMLDivElement>('div', 'dy-wf-passport');
+  const passport = elu<HTMLDivElement>('div', 'dy-wf-passport dy-wf-glass');
   passport.setAttribute('aria-live', 'polite');
 
   // P8.2: explicit zoom controls (in / out / fit / reset) — no pointer-wheel
   // dependence. Keyboard operable (real buttons) with data-wf-action hooks.
-  const zoomBar = elu<HTMLDivElement>('div', 'dy-wf-zoombar');
+  // Floating glass tool cluster (top-right of the canvas): camera controls
+  // plus the list-view toggle. It floats over the canvas so every control is
+  // on screen; it used to sit below the svg inside an overflow-hidden frame
+  // and was clipped out of view entirely.
+  const zoomBar = elu<HTMLDivElement>('div', 'dy-wf-zoombar dy-wf-glass');
   zoomBar.setAttribute('role', 'group');
   zoomBar.setAttribute('aria-label', 'Zoom controls');
   const zoomButton = (action: string, label: string, title: string) => {
@@ -509,7 +454,7 @@ export function mountWorkflowCanvas(
   // Live activity strip (agenttrail streaming feed) — top-left, collapsible.
   // Deliberate addition to the real canvas (previously demo-only), so the
   // canvas itself reports what's moving without opening a node.
-  const feed = elu<HTMLDivElement>('div', 'dy-wf-feed');
+  const feed = elu<HTMLDivElement>('div', 'dy-wf-feed dy-wf-glass');
   feed.setAttribute('aria-live', 'polite');
   const feedHead = elu<HTMLButtonElement>('button', 'dy-wf-feed-head', '▾ Activity');
   const feedBody = elu<HTMLDivElement>('div', 'dy-wf-feed-body');
@@ -545,22 +490,27 @@ export function mountWorkflowCanvas(
   // Stays usable if the canvas fails; rows are keyboard-activatable.
   // Collapsed by default (v6 composition is canvas-first): the list is the
   // on-demand equivalent view, not a second copy of the workflow on screen.
-  const listView = elu<HTMLDivElement>('div', 'dy-wf-list');
+  const listView = elu<HTMLDivElement>('div', 'dy-wf-list dy-wf-glass');
   listView.dataset.wfList = '';
-  const listHead = elu<HTMLButtonElement>('button', 'dy-wf-list-head', '▸ List view');
+  const listHead = elu<HTMLButtonElement>('button', 'dy-wf-zoombtn dy-wf-list-head', '▸ List view');
   listHead.type = 'button';
   listHead.setAttribute('aria-expanded', 'false');
   const listBody = elu<HTMLDivElement>('div', 'dy-wf-list-body');
   listBody.setAttribute('role', 'table');
   listBody.setAttribute('aria-label', 'Workflow run as list');
   listBody.style.display = 'none';
+  listView.hidden = true;
   listHead.addEventListener('click', () => {
     const open = listHead.getAttribute('aria-expanded') === 'true';
     listHead.setAttribute('aria-expanded', String(!open));
     listHead.textContent = open ? '▸ List view' : '▾ List view';
     listBody.style.display = open ? 'none' : 'block';
+    listView.hidden = open;
   });
-  listView.append(listHead, listBody);
+  // The toggle lives in the floating tool cluster; the list opens as a
+  // floating glass panel over the canvas.
+  zoomBar.appendChild(listHead);
+  listView.append(listBody);
 
   // Playback is a canvas control, not a side-panel feature. It is disabled
   // until the real timeline endpoint supplies at least two observed events.
@@ -568,7 +518,7 @@ export function mountWorkflowCanvas(
   let playbackSlider: HTMLInputElement | null = null;
   let playbackLabel: HTMLSpanElement | null = null;
   let playbackButton: HTMLButtonElement | null = null;
-  playbackBar = elu<HTMLDivElement>('div', 'dy-wf-playback');
+  playbackBar = elu<HTMLDivElement>('div', 'dy-wf-playback dy-wf-glass');
   playbackBar.setAttribute('role', 'group');
   playbackBar.setAttribute('aria-label', 'Workflow playback');
   playbackButton = elu<HTMLButtonElement>('button', 'dy-wf-playback-btn', '▶ Play');
@@ -587,7 +537,7 @@ export function mountWorkflowCanvas(
     host.classList.toggle('dy-wf-still', on);
   });
   playbackBar.append(playbackButton, playbackSlider, playbackLabel, motionButton);
-  wrap.append(svg, SVG_INDEX, feed, minimap, passport, zoomBar, listView, playbackBar);
+  wrap.append(svg, feed, minimap, passport, zoomBar, listView, playbackBar);
   // Keep the canvas frame itself scroll-free on mobile: the control row owns
   // its horizontal overflow and remains fully reachable by touch/keyboard.
   playbackBar.style.overflowX = 'auto';
@@ -769,8 +719,13 @@ export function mountWorkflowCanvas(
     void handlers.onEdit?.(nextNodes);
   };
 
+  // Camera. The SVG attribute is the source of truth; the same transform is
+  // mirrored to the CSS property so a browser can ease button/minimap moves.
+  // Direct manipulation (pan drag, wheel) sets dy-wf-panning, which turns the
+  // easing off so the world tracks the pointer with no lag.
   const apply = () => {
     viewport.setAttribute('transform', `translate(${panX} ${panY}) scale(${zoom})`);
+    viewport.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
     svg.setAttribute('data-lod', zoom > LOD_FULL ? 'full' : zoom < 0.75 ? 'map' : 'read');
   };
 
@@ -833,6 +788,13 @@ export function mountWorkflowCanvas(
     defs.appendChild(mkMarker(meaning.marker, meaning.color, '#8fa3c8'));
     defs.appendChild(mkMarker(meaning.activeMarker, meaning.activeColor, '#9cc4ff'));
   }
+  // Glass sheen: one light gradient laid over every card (identical cards).
+  const sheenGrad = sEl('linearGradient', { id: 'dyWfCardSheen', x1: '0', y1: '0', x2: '0', y2: '1' });
+  sheenGrad.append(
+    sEl('stop', { offset: '0%', 'stop-color': '#ffffff', 'stop-opacity': '0.09' }),
+    sEl('stop', { offset: '100%', 'stop-color': '#ffffff', 'stop-opacity': '0' }),
+  );
+  defs.appendChild(sheenGrad);
   svg.appendChild(defs);
 
   const timelineFor = (run: CanvasRun | null) => run?.timeline ?? [];
@@ -900,13 +862,11 @@ export function mountWorkflowCanvas(
       listBody.appendChild(row);
     }
   };
-  // ---- S1: per-purpose node component -------------------------------------
-  // One component per node, differentiated on three independent cues so that
-  // purpose is immediately readable without relying on colour alone:
-  //   silhouette (hexagon gate / cut-corner branch / notched loop / round rect task)
-  //   purpose tint + symbol + purpose name
-  //   the purpose fill, with status carried by the OUTLINE + status chip
-  // No node carries a coloured side stripe.
+  // ---- node card ---------------------------------------------------------
+  // Every node is the same glass card (the approved prototype card). Purpose
+  // is stated in words; status is carried by the card border, a status dot
+  // and the status word. The card fills the fixed node box exactly, so ports,
+  // edge endpoints and the layout grid share one geometry.
   const buildNode = (
     n: CanvasNode,
     p: CanvasPosition,
@@ -916,12 +876,14 @@ export function mountWorkflowCanvas(
     const purpose = nodePurpose(n);
     const status = statusToken(n.status);
     const visuals = PURPOSE_VISUALS[purpose];
+    const awaiting = isAwaitingDecision(n);
     const g = sEl('g', {
-      class: `dy-wf-node ${purpose} ${status}`,
+      class: `dy-wf-node ${purpose} ${status}${awaiting ? ' awaiting' : ''}`,
       transform: `translate(${p.x} ${p.y})`,
     }) as SVGGElement;
     g.dataset.wfPurpose = purpose;
     g.dataset.wfStatus = status;
+    if (awaiting) g.dataset.wfAwaiting = 'true';
     if (playbackIndex !== null) g.dataset.wfPlaybackStatus = n.status ?? 'pending';
     g.setAttribute('tabindex', '0');
     g.setAttribute('role', 'button');
@@ -931,40 +893,36 @@ export function mountWorkflowCanvas(
     g.dataset.wfEditable = String(editable);
     g.setAttribute('aria-describedby', `wf-help-${n.node_id}`);
 
-    // Purpose silhouette, drawn inside the fixed node box so ports, edges and
-    // the layout grid keep their geometry.
-    const outline = nodeShapePath(purpose);
-    const shape = outline === null
-      ? sEl('rect', { width: NODE_W, height: NODE_H, rx: 9, class: 'dy-wf-shape dy-wf-rect' })
-      : sEl('path', { d: outline, class: 'dy-wf-shape dy-wf-rect' });
-    shape.setAttribute('fill', `var(${visuals.fill})`);
-
-    // Purpose cues: symbol + name in the purpose text colour (row 1 / row 2 left).
-    const glyph = sEl('text', { x: visuals.glyphX, y: 26, class: 'dy-wf-glyph' }) as SVGTextElement;
-    glyph.textContent = visuals.glyph;
-    const label = sEl('text', { x: visuals.textX, y: 25, class: 'dy-wf-label' }) as SVGTextElement;
-    label.textContent = n.title.slice(0, 18);
-    const sub = sEl('text', { x: 12, y: 45, class: 'dy-wf-sub' }) as SVGTextElement;
-    sub.textContent = visuals.label;
-
-    // Status cues: outline stroke + tinted chip + the status word itself.
-    // Status never re-colours the fill, so purpose and status cannot collide.
-    const chip = sEl('rect', {
-      x: NODE_W - 66, y: 34, width: 54, height: 16, rx: 8,
-      class: `dy-wf-statuschip ${status}`,
+    // The card. One element, identical geometry for every node.
+    const shape = sEl('rect', {
+      width: NODE_W, height: NODE_H, rx: CARD_RADIUS, class: 'dy-wf-shape dy-wf-card',
     });
+    // Stylesheet-less fallback only; the canvas stylesheet owns the token.
+    shape.setAttribute('fill', '#101c30');
+    // Soft top sheen: decoration inside the card box only.
+    const sheen = sEl('rect', {
+      x: 1, y: 1, width: NODE_W - 2, height: NODE_H / 2, rx: CARD_RADIUS - 1,
+      class: 'dy-wf-card-sheen',
+    });
+
+    // Row 1: status dot + title. Row 2: purpose word + status word.
+    const dot = sEl('circle', { cx: 18, cy: 22, r: 4.5, class: `dy-wf-statusdot ${status}` });
+    const label = sEl('text', { x: 30, y: 26, class: 'dy-wf-label' }) as SVGTextElement;
+    label.textContent = n.title.length > 22 ? n.title.slice(0, 21) + '…' : n.title;
+    const sub = sEl('text', { x: 14, y: 46, class: 'dy-wf-sub' }) as SVGTextElement;
+    sub.textContent = visuals.label;
     const statusText = sEl('text', {
-      x: NODE_W - 39, y: 45.5, 'text-anchor': 'middle',
+      x: NODE_W - 14, y: 46, 'text-anchor': 'end',
       class: `dy-wf-statustext ${status}`,
     }) as SVGTextElement;
-    statusText.textContent = n.status ?? 'pending';
-    g.append(shape, glyph, label, sub, chip, statusText);
+    statusText.textContent = awaiting ? 'awaiting decision' : (n.status ?? 'pending');
+    g.append(shape, sheen, dot, label, sub, statusText);
 
     // Workflow elapsed time, not this node's execution duration.
     // A refresh timestamp must never reset the clock; missing start is unavailable.
     if (n.status === 'working') {
       const timer = sEl('text', {
-        x: 12, y: 60, class: 'dy-wf-timer full',
+        x: 14, y: 62, class: 'dy-wf-timer full',
       }) as SVGTextElement;
       timer.textContent = `Workflow: ${elapsedLabel(run.started_at)}`;
       timer.dataset.for = n.node_id;
@@ -973,21 +931,24 @@ export function mountWorkflowCanvas(
     // Assignee stays on the node face (row 3, opposite the clock) — who owns
     // the node is factual, not decorative, so it is never dropped for styling.
     if (n.assignee) {
-      g.appendChild((() => {
-        const who = sEl('text', {
-          x: NODE_W - 12, y: 60, 'text-anchor': 'end', class: 'dy-wf-assignee',
-        }) as SVGTextElement;
-        who.textContent = n.assignee;
-        return who;
-      })());
+      const who = sEl('text', {
+        x: NODE_W - 14, y: 62, 'text-anchor': 'end', class: 'dy-wf-assignee',
+      }) as SVGTextElement;
+      who.textContent = n.assignee;
+      g.appendChild(who);
     }
 
     // Connect port: single, right side, hit area larger than the visual mark.
-    const port = sEl('circle', { cx: NODE_W, cy: NODE_H / 2, r: 11, class: 'dy-wf-port' });
+    const port = sEl('circle', { cx: NODE_W, cy: NODE_H / 2, r: 7, class: 'dy-wf-port' });
+    // Invisible larger hit ring so the port stays easy to grab.
+    const portHit = sEl('circle', { cx: NODE_W, cy: NODE_H / 2, r: 12, class: 'dy-wf-port-hit' });
+    // Only the visible port carries the connect marker; the hit ring is bound
+    // directly below, so one element per node answers [data-connect-from].
+    portHit.setAttribute('aria-hidden', 'true');
     port.setAttribute('data-connect-from', n.node_id);
     port.setAttribute('tabindex', '0');
     port.setAttribute('aria-label', `Connect from ${n.title}`);
-    g.appendChild(port);
+    g.append(portHit, port);
 
     const dash = () => shape.setAttribute('stroke-dasharray', '4 3');
     const undash = () => shape.removeAttribute('stroke-dasharray');
@@ -995,12 +956,14 @@ export function mountWorkflowCanvas(
     // the node group. Synthetic pointer events and SVG hit-testing can expose
     // the group as the target even when the pointer is on the port, which
     // incorrectly starts a node drag and loses the connection source.
-    port.addEventListener('pointerdown', (ev) => {
-      const e = ev as PointerEvent;
-      if (e.button !== 0 || !editable) return;
-      e.stopPropagation();
-      startConnect(n.node_id, g);
-    });
+    for (const target of [port, portHit]) {
+      target.addEventListener('pointerdown', (ev) => {
+        const e = ev as PointerEvent;
+        if (e.button !== 0 || !editable) return;
+        e.stopPropagation();
+        startConnect(n.node_id, g);
+      });
+    }
     g.addEventListener('pointerdown', (ev) => {
       const e = ev as PointerEvent;
       if (e.button !== 0 || !editable) return;
@@ -1202,64 +1165,8 @@ export function mountWorkflowCanvas(
       const p = positions[n.node_id];
       viewport.appendChild(buildNode(n, p, run, Boolean(handlers.onEdit)));
     }
-    renderLegend(run);
     apply();
     updateMinimap();
-  };
-
-  // ---- purpose legend (rendered from the token tables) ----
-  const renderLegend = (run: CanvasRun | null) => {
-    SVG_INDEX.replaceChildren();
-    SVG_INDEX.setAttribute('aria-label', 'Node purposes on this canvas');
-    if (!run || run.nodes.length === 0) return;
-    // Only purposes this run actually contains are listed, so the legend
-    // describes the picture instead of a hypothetical vocabulary.
-    const present = new Set(run.nodes.map((n) => nodePurpose(n)));
-    const purposes = (Object.keys(PURPOSE_VISUALS) as CanvasNodePurpose[])
-      .filter((p) => present.has(p));
-    const rowH = 26;
-    const padX = 12;
-    const width = 214;
-    const height = 22 + purposes.length * rowH;
-    SVG_INDEX.setAttribute('viewBox', `0 0 ${width} ${height}`);
-    SVG_INDEX.setAttribute('width', String(width));
-    SVG_INDEX.setAttribute('height', String(height));
-    const frame = sEl('rect', {
-      x: 0.5, y: 0.5, width: width - 1, height: height - 1, rx: 7, class: 'dy-wf-index-bg',
-    });
-    const heading = sEl('text', { x: padX, y: 15, class: 'dy-wf-index-title' }) as SVGTextElement;
-    heading.textContent = 'NODE PURPOSE';
-    SVG_INDEX.append(frame, heading);
-    purposes.forEach((p, i) => {
-      const v = PURPOSE_VISUALS[p];
-      const cy = 22 + i * rowH + 8;
-      const outline = nodeShapePath(p, 20, 16);
-      const swatch = outline === null
-        ? sEl('rect', { x: 0, y: 0, width: 20, height: 16, rx: 3, class: 'dy-wf-index-shape' })
-        : sEl('path', { d: outline, class: 'dy-wf-index-shape' });
-      swatch.setAttribute('fill', `var(${v.fill})`);
-      swatch.setAttribute('stroke', `var(${v.line})`);
-      // The swatch states the purpose, so it carries the purpose identity.
-      swatch.setAttribute('data-wf-purpose', p);
-      // One transform per swatch: the group moves it into the legend row.
-      const row = sEl('g', { transform: `translate(${padX} ${cy - 8})` });
-      row.appendChild(swatch);
-      const glyph = sEl('text', { x: 30, y: 13, class: 'dy-wf-index-glyph' }) as SVGTextElement;
-      glyph.textContent = v.glyph;
-      row.appendChild(glyph);
-      const name = sEl('text', { x: 48, y: 13, class: 'dy-wf-index-label' }) as SVGTextElement;
-      name.textContent = v.label;
-      row.appendChild(name);
-      SVG_INDEX.appendChild(row);
-    });
-    const dep = EDGE_MEANINGS[DEFAULT_EDGE_MEANING];
-    const edgeRow = sEl('g', { transform: `translate(${padX} ${height - 4})` });
-    const line = sEl('path', { d: 'M 0 -5 L 20 -5', class: 'dy-wf-index-edge' });
-    edgeRow.appendChild(line);
-    const edgeLabel = sEl('text', { x: 30, y: -1, class: 'dy-wf-index-edge-label' }) as SVGTextElement;
-    edgeLabel.textContent = `${dep.label} → (workflow edges)`;
-    edgeRow.appendChild(edgeLabel);
-    SVG_INDEX.appendChild(edgeRow);
   };
 
   // ---- minimap ----
@@ -1327,12 +1234,55 @@ export function mountWorkflowCanvas(
     viewport.querySelectorAll<SVGGElement>('.dy-wf-node').forEach((node) => node.classList.toggle('dy-wf-route-dim', !related.has(node.getAttribute('data-node-id') ?? '')));
     viewport.querySelectorAll<SVGPathElement>('.dy-wf-edge').forEach((edge) => edge.classList.toggle('dy-wf-route-edge', related.has(edge.dataset.from ?? '') && related.has(edge.dataset.to ?? '')));
     passport.replaceChildren();
-    passport.appendChild(elu('h3', '', n.title));
-    if (handlers.onEdit) {
+    const status = n.status ?? 'pending';
+    // Header: kind + status on one line, title below, close top-right.
+    const head = elu<HTMLDivElement>('div', 'dy-wf-pp-head');
+    const meta = elu<HTMLDivElement>('div', 'dy-wf-pp-meta');
+    meta.append(elu('span', 'dy-wf-passport-kind', PURPOSE_VISUALS[nodePurpose(n)].label), elu('span', `badge ${status}`, status));
+    const close = elu<HTMLButtonElement>('button', 'dy-wf-passport-close', '×');
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Close step details');
+    close.addEventListener('click', () => closePassport());
+    head.append(meta, elu('h3', '', n.title), close);
+    passport.appendChild(head);
+    // Facts: one key/value list instead of loose dim paragraphs.
+    const facts = elu<HTMLDListElement>('dl', 'dy-wf-pp-facts');
+    const fact = (k: string, v: string, cls = '') => {
+      const row = elu<HTMLDivElement>('div', `dy-wf-pp-fact ${cls}`.trim());
+      row.append(elu('dt', '', k), elu('dd', '', v));
+      facts.appendChild(row);
+      return row;
+    };
+    // P8.3: last-confirmed update for the run (not a node-level claim).
+    const updated = lastRun?.updated_at ?? null;
+    const lastConfirmed = fact('Last confirmed update', updated && isFinite(Date.parse(updated)) ? updated.replace('T', ' ').slice(0, 16) + ' UTC' : 'unknown', 'dy-wf-last-confirmed');
+    lastConfirmed.setAttribute('data-last-confirmed', updated ?? 'unknown');
+    if (n.depends_on.length) fact('Depends on', n.depends_on.join(', '));
+    if (n.assignee) fact('Assignee', n.assignee);
+    if (n.evidence_refs.length) fact('Evidence', n.evidence_refs.join(', '));
+    if (n.task_ref) fact('Work item', n.task_ref);
+    passport.appendChild(facts);
+    const nodeEvents = (lastRun?.timeline ?? []).filter((event) => event.node_id === n.node_id);
+    if (nodeEvents.length) {
+      passport.appendChild(elu('h4', '', 'Status history'));
+      const history = elu('ol', 'dy-wf-node-history');
+      for (const event of nodeEvents.slice(-6)) history.appendChild(elu('li', '', `${event.from_status ?? '—'} → ${event.to_status}`));
+      passport.appendChild(history);
+    }
+    // Editing sits last, in its own section, so reading never competes with it.
+    const appendEditor = () => {
+      if (!handlers.onEdit) return;
       const edit = elu<HTMLDivElement>('div', 'dy-wf-edit');
+      edit.appendChild(elu('h4', '', 'Edit step'));
+      const field = (label: string, input: HTMLInputElement) => {
+        const f = elu<HTMLLabelElement>('label', 'dy-wf-field');
+        f.append(elu('span', '', label), input);
+        edit.appendChild(f);
+      };
       const title = elu<HTMLInputElement>('input', 'dy-wf-edit-title'); title.value = n.title; title.setAttribute('aria-label', 'Node title');
-      const deps = elu<HTMLInputElement>('input', 'dy-wf-edit-deps'); deps.value = n.depends_on.join(', '); deps.setAttribute('aria-label', 'Dependencies');
+      const deps = elu<HTMLInputElement>('input', 'dy-wf-edit-deps'); deps.value = n.depends_on.join(', '); deps.placeholder = 'e.g. build, tests'; deps.setAttribute('aria-label', 'Dependencies');
       const team = elu<HTMLInputElement>('input', 'dy-wf-edit-team'); team.value = n.phase_team ?? ''; team.placeholder = 'phase team override'; team.setAttribute('aria-label', 'Phase team override');
+      field('Title', title); field('Depends on (step IDs)', deps); field('Phase team', team);
       const save = elu<HTMLButtonElement>('button', 'dy-btn primary', 'Save graph version'); save.type = 'button';
       save.addEventListener('click', async () => {
         const ids = new Set(deps.value.split(',').map((v) => v.trim()).filter(Boolean)); ids.delete(n.node_id);
@@ -1340,31 +1290,10 @@ export function mountWorkflowCanvas(
         save.disabled = true; save.textContent = 'Saving…';
         try { await handlers.onEdit!(edited); save.textContent = 'Saved ✓'; } catch { save.disabled = false; save.textContent = 'Save failed — retry'; }
       });
-      edit.append(elu('label', '', 'Title'), title, elu('label', '', 'Dependencies (node IDs)'), deps, elu('label', '', 'Phase team'), team, save);
+      edit.appendChild(save);
       passport.appendChild(edit);
-    }
-    passport.appendChild(elu('span', `badge ${n.status ?? 'pending'}`, n.status ?? 'pending'));
-    const nodeEvents = (lastRun?.timeline ?? []).filter((event) => event.node_id === n.node_id);
-    if (nodeEvents.length) {
-      const history = elu('ol', 'dy-wf-node-history');
-      for (const event of nodeEvents.slice(-6)) history.appendChild(elu('li', '', `${event.from_status ?? '—'} → ${event.to_status}`));
-      passport.appendChild(history);
-    }
-    // P8.3: last-confirmed update for the run (not a node-level claim).
-    const lastConfirmed = elu<HTMLParagraphElement>('p', 'dy-wf-last-confirmed');
-    const updated = lastRun?.updated_at ?? null;
-    lastConfirmed.textContent = `Last confirmed update: ${
-      updated && isFinite(Date.parse(updated)) ? updated.replace('T', ' ').slice(0, 16) + ' UTC' : 'unknown'
-    }`;
-    lastConfirmed.setAttribute('data-last-confirmed', updated ?? 'unknown');
-    passport.appendChild(lastConfirmed);
-    if (n.assignee) passport.appendChild(elu('p', 'dy-dim', `assignee: ${n.assignee}`));
-    if (n.evidence_refs.length) {
-      const p = elu('p', 'dy-dim', 'evidence: ' + n.evidence_refs.join(', '));
-      passport.appendChild(p);
-    }
+    };
     if (n.task_ref) {
-      passport.appendChild(elu('p', 'dy-dim', `deep link: ${n.task_ref}`));
       // P8.3: explicit decision state. awaiting_decision -> approved/rejected
       // after server confirmation -> failed (retryable). Phase 4 controls
       // carry the authority; this label never overrides them.
@@ -1451,7 +1380,7 @@ export function mountWorkflowCanvas(
           });
           recovery.appendChild(retry);
         }
-        const unsupported = elu('p', 'dy-wf-unsupported',
+        const unsupported = elu('p', 'dy-wf-unsupported dy-wf-pp-note',
           'Pause and cancel are not supported by the native execution contract — a running worker cannot be stopped from here.');
         unsupported.setAttribute('data-unsupported-controls', 'pause,cancel');
         recovery.appendChild(unsupported);
@@ -1522,8 +1451,9 @@ export function mountWorkflowCanvas(
         passport.appendChild(sec);
       }
     } else {
-      passport.appendChild(elu('p', 'dy-dim', 'No canonical work bound to this node yet.'));
+      passport.appendChild(elu('p', 'dy-wf-pp-note', 'No canonical work bound to this step yet.'));
     }
+    appendEditor();
   };
 
   // shared components (static import): decay thread + task list
@@ -1546,6 +1476,7 @@ export function mountWorkflowCanvas(
     // swallowed node clicks entirely — real-browser verified).
     if ((e.target as Element)?.closest?.('.dy-wf-node')) return;
     dragging = true;
+    host.classList.add('dy-wf-panning');
     lastX = (e as PointerEvent).clientX;
     lastY = (e as PointerEvent).clientY;
     const target = e.target as Element;
@@ -1575,6 +1506,7 @@ export function mountWorkflowCanvas(
     if (dragSession) {
       endDragSession(e as PointerEvent, true);
       dragging = false;
+      host.classList.remove('dy-wf-panning');
       return;
     }
     if (connectFrom) {
@@ -1597,18 +1529,23 @@ export function mountWorkflowCanvas(
     if (dragSession) endDragSession(e as PointerEvent, false);
     cancelConnect();
     dragging = false;
+    host.classList.remove('dy-wf-panning');
     try {
       svg.releasePointerCapture((e as PointerEvent).pointerId);
     } catch {
       /* noop */
     }
   });
+  let wheelSettle: ReturnType<typeof setTimeout> | null = null;
   svg.addEventListener('wheel', (e) => {
     e.preventDefault();
     const ev = e as WheelEvent;
     const rect = svg.getBoundingClientRect();
     const cx = ev.clientX - rect.left;
     const cy = ev.clientY - rect.top;
+    host.classList.add('dy-wf-panning');
+    if (wheelSettle) clearTimeout(wheelSettle);
+    wheelSettle = setTimeout(() => host.classList.remove('dy-wf-panning'), 160);
     const factor = ev.deltaY < 0 ? ZOOM_IN : ZOOM_OUT;
     const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom * factor));
     const k = next / zoom;
@@ -1619,13 +1556,14 @@ export function mountWorkflowCanvas(
     updateMinimap();
   }, { passive: false });
 
+  const closePassport = () => {
+    passport.replaceChildren();
+    if (selectedEl) selectedEl.classList.remove('dy-wf-selected');
+    selectedEl = null;
+    clearRoute();
+  };
   const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      passport.replaceChildren();
-      if (selectedEl) selectedEl.classList.remove('dy-wf-selected');
-      selectedEl = null;
-      clearRoute();
-    }
+    if (e.key === 'Escape') closePassport();
   };
   document.addEventListener('keydown', onKeyDown);
 
@@ -1797,6 +1735,19 @@ export function mountWorkflowCanvas(
   if (pollMs > 0) timer = setInterval(pollOnce, pollMs);
   const onResize = () => { if (!disposed && lastRun) render(lastRun); };
   canvasWindow.addEventListener('resize', onResize);
+  // The host can change width without a window resize (the library sidebar
+  // collapsing). Re-render on real host width changes only.
+  let lastHostWidth = host.clientWidth;
+  let resizeFrame = 0;
+  const RO = (canvasWindow as unknown as { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
+  const hostObserver = RO ? new RO(() => {
+    const w = host.clientWidth;
+    if (w === lastHostWidth) return;
+    lastHostWidth = w;
+    if (resizeFrame) canvasWindow.cancelAnimationFrame(resizeFrame);
+    resizeFrame = canvasWindow.requestAnimationFrame(() => { resizeFrame = 0; onResize(); });
+  }) : null;
+  hostObserver?.observe(host);
 
   disposers.push(() => {
     disposed = true;
@@ -1806,6 +1757,8 @@ export function mountWorkflowCanvas(
     document.removeEventListener('keydown', onKeyDown);
     document.removeEventListener('visibilitychange', onVisibility);
     canvasWindow.removeEventListener('resize', onResize);
+    hostObserver?.disconnect();
+    if (resizeFrame) canvasWindow.cancelAnimationFrame(resizeFrame);
     host.replaceChildren();
   });
   return () => {

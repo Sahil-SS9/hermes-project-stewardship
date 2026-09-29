@@ -79,8 +79,8 @@ function buildDesktopBundle() {
   return { dir, code: readFileSync(bundle, 'utf8') }
 }
 
-// One definition carrying all four purposes the canvas draws, so the per-purpose
-// fill assertions cover the whole vocabulary rather than a single node.
+// One definition carrying all four purposes, so the identical-card assertion
+// covers the whole vocabulary rather than a single node.
 const WORKFLOWS = { workflows: [{
   project_id: 'p1', name: 'release', version: 1, archived_at: null, archived_by: null,
   definition: { nodes: [
@@ -180,7 +180,7 @@ test('Desktop canvas: computed styles resolve in light and dark (no black boxes)
           taskLabelFill: styleOf(first.querySelector('.dy-wf-label')).fill,
           // The custom properties must actually resolve on the scope carrier —
           // that is the level the breakage happened at.
-          taskFillVar: canvasStyle.getPropertyValue('--dy-wf-purpose-task-fill').trim(),
+          cardFillVar: canvasStyle.getPropertyValue('--dy-wf-card-fill').trim(),
           doneVar: canvasStyle.getPropertyValue('--dy-wf-status-done').trim(),
           // Per-purpose fills, so no purpose can silently fall back to black.
           purposeFills: ['a', 'g', 'b', 'l'].map((id) => {
@@ -208,31 +208,35 @@ test('Desktop canvas: computed styles resolve in light and dark (no black boxes)
       assert.notEqual(read.taskFill, 'none', `${theme}: task node has no fill at all`)
 
       // ...and the values are the designed TOKENS, not merely "not black".
-      assert.equal(read.taskFill, rgbOf(expectedToken('dy-wf-purpose-task-fill')),
-        `${theme}: task fill must resolve to the --dy-wf-purpose-task-fill token`)
+      assert.equal(read.taskFill, rgbOf(expectedToken('dy-wf-card-fill')),
+        `${theme}: the card fill must resolve to the --dy-wf-card-fill token`)
       assert.equal(read.taskStroke, rgbOf(expectedToken('dy-wf-status-done')),
         `${theme}: the done node's outline must carry the status-done token (status stays on the outline)`)
       assert.match(read.taskLabelFill, /^rgb\(/, `${theme}: the label fill must be a resolved colour`)
 
       for (const row of read.purposeFills) {
         assert.notEqual(row.fill, 'rgb(0, 0, 0)', `${theme}: ${row.purpose} fill is black`)
-        assert.equal(row.fill, rgbOf(expectedToken(`dy-wf-purpose-${row.purpose}-fill`)),
-          `${theme}: ${row.purpose} fill must resolve to its purpose token`)
+        assert.equal(row.fill, rgbOf(expectedToken('dy-wf-card-fill')),
+          `${theme}: ${row.purpose} uses the same card fill as every node`)
       }
-      assert.equal(read.taskFillVar, expectedToken('dy-wf-purpose-task-fill'),
-        `${theme}: --dy-wf-purpose-task-fill must resolve on the scope carrier`)
+      assert.equal(read.cardFillVar, expectedToken('dy-wf-card-fill'),
+        `${theme}: --dy-wf-card-fill must resolve on the scope carrier`)
       assert.equal(read.doneVar, expectedToken('dy-wf-status-done'),
         `${theme}: --dy-wf-status-done must resolve on the scope carrier`)
       assert.notEqual(read.canvasBackground, 'rgba(0, 0, 0, 0)', `${theme}: the canvas frame has no background`)
       assert.equal(read.nodeCount, 4, `${theme}: all four purpose nodes should render`)
     }
 
-    // Dark must differ from light on the tokens whose value differs, and neither
-    // may be black — this is the "black-on-black cannot ship" guard.
+    // Identical cards: every purpose shares one fill, and the canvas stage is
+    // the same dark surface whichever theme the plugin chrome is in.
     for (const theme of ['light', 'dark']) {
       const fills = readings[theme].purposeFills.map((r) => r.fill)
-      assert.equal(new Set(fills).size, 4, `${theme}: each purpose must have its own fill`)
+      assert.equal(new Set(fills).size, 1, `${theme}: every node is the same card`)
     }
+    assert.equal(readings.light.canvasBackground, readings.dark.canvasBackground,
+      'the canvas stage is dark in both plugin themes (canvas-only dark look)')
+    assert.equal(readings.light.canvasBackground, rgbOf(expectedToken('dy-wf-canvas-bg')),
+      'the canvas stage resolves to its own token')
     assert.deepEqual(errors, [], errors.join('\n'))
   } finally {
     await browser?.close()

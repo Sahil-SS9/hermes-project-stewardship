@@ -150,14 +150,22 @@ test('Workflows v6: three zones render with every preserved hook', { timeout: 12
     }
     assert.ok(await page.$('[data-workflow-canvas="release"]'), 'the production canvas mounts in the stage zone')
 
-    // Zone 3 — run inspector: latest canonical run + stored versions + lifecycle.
-    const inspText = await page.$eval('.dockyard-wf3-insp', (el) => el.textContent)
-    assert.match(inspText, /release-9/, 'the inspector shows the real run_key')
-    assert.match(inspText, /done/, 'run node statuses are listed')
-    assert.ok(await page.$('[data-workflow-live-run="release-9"]'), 'live run hook preserved')
+    // No third column: run lifecycle is in the toolbar, run state is the
+    // readout line above the canvas, and the canvas gets the full width.
+    assert.equal(await page.$('.dockyard-wf3-insp'), null, 'the run inspector column is gone')
+    const runText = await page.$eval('[data-workflow-live-run="release-9"]', (el) => el.textContent)
+    assert.match(runText, /release-9/, 'the run readout shows the real run_key')
+    assert.match(runText, /done/, 'run node statuses are counted')
+    assert.ok(await page.$('[data-wf-live-map="release-9"] [data-wf-live-node]'), 'per-step run list preserved')
     assert.ok(await page.$('[data-workflow-definitions="release"] [data-workflow-definition-version="2"]'), 'stored versions preserved')
-    assert.ok(await page.$('[data-action="start-workflow"]'), 'start control preserved')
-    assert.ok(await page.$('[data-action="archive-workflow"]'), 'archive control preserved')
+    assert.ok(await page.$('.dockyard-wf3-toolbar [data-action="start-workflow"]'), 'start control is in the toolbar')
+    assert.ok(await page.$('.dockyard-wf3-toolbar [data-action="archive-workflow"]'), 'archive control is in the toolbar')
+    const widths = await page.evaluate(() => ({
+      stage: document.querySelector('.dockyard-wf3-stage').getBoundingClientRect().width,
+      frame: document.querySelector('.dockyard-wf3').getBoundingClientRect().width,
+      lib: document.querySelector('.dockyard-wf3-lib').getBoundingClientRect().width,
+    }))
+    assert.ok(Math.abs(widths.frame - widths.lib - widths.stage) <= 2, `canvas stage takes all width beside the library (${JSON.stringify(widths)})`)
 
     // The define form still exists in the library zone (create/version save).
     assert.ok(await page.$('[data-workflow-name]'), 'workflow name input preserved')

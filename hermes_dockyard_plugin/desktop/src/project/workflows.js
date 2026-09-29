@@ -28,6 +28,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   const [mode, setMode] = useState('live')
   const [validation, setValidation] = useState(null)
   const [layoutPendingVersion, setLayoutPendingVersion] = useState(null)
+  const [libCollapsed, setLibCollapsed] = useState(false)
   const encoded = encodeURIComponent(project.id)
   const grouped = Object.values((workflows ?? []).reduce((all, row) => {
     const item = all[row.name] ?? { name: row.name, versions: [], archived_at: row.archived_at }
@@ -146,6 +147,16 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   }
   const statusFor = (run, node) => run?.nodes?.find((item) => item.node_id === (node.id || node.node_id))?.status ?? 'pending'
   const latest = runs[0]
+  const latestVersion = current?.versions?.[current.versions.length - 1] ?? null
+  // A node needs attention when it is blocked or a human gate is waiting —
+  // the two states the run projection actually reports.
+  const needsAttention = (node) => node.status === 'blocked' || (node.status === 'pending' && node.human_gate)
+  const attentionCount = latest ? (latest.nodes ?? []).filter(needsAttention).length : 0
+  const startVersion = async (version) => {
+    if (!current || !version) return
+    await mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/start`, { version: version.version, run_key: runKey || `${current.name}-${Date.now()}` })
+    await loadRuns(current.name)
+  }
   const liveCounts = latest ? (latest.nodes ?? []).reduce((acc, node) => { const key = node.status ?? 'pending'; acc[key] = (acc[key] ?? 0) + 1; return acc }, {}) : null
   // W5 live map: read only from the canonical run projection. A node needs
   // attention when it is blocked or waiting on a human decision — the two
@@ -157,9 +168,9 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
     ]}),
     jsxs('header', { className: 'dockyard-section-head', children: [jsxs('div', { children: [jsx('h2', { children: 'Workflows' }), jsx('p', { children: 'Planning is saved as a version; execution is shown only from canonical runs.' })] }), jsx(StatusTag, { tone: latest?.status === 'running' ? 'info' : 'neutral', label: latest ? `Live: ${latest.status}` : `${number(grouped.length)} instances` })] }),
     error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
-    jsxs('div', { className: 'dockyard-wf3', children: [
+    jsxs('div', { className: libCollapsed ? 'dockyard-wf3 lib-collapsed' : 'dockyard-wf3', 'data-wf-library-collapsed': libCollapsed ? 'true' : 'false', children: [
       // ---- Zone 1: workflow library + create/define editor ---------------
-      jsxs('aside', { className: 'dockyard-wf3-lib', 'data-workflow-library': project.id, children: [
+      jsxs('aside', { className: 'dockyard-wf3-lib', 'data-workflow-library': project.id, 'aria-hidden': libCollapsed ? 'true' : undefined, inert: libCollapsed ? true : undefined, children: [
         jsxs('div', { className: 'dockyard-wf3-lib-head', children: [jsx('strong', { children: 'Library' }), jsx('span', { children: number(grouped.length) })] }),
         grouped.length ? jsx('div', { className: 'dockyard-wf3-lib-list', children: grouped.map((item) => jsxs('button', {
           type: 'button',
@@ -180,9 +191,14 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
           jsx(Button, { action: 'define-workflow', variant: 'primary', disabled: !name.trim() || !title.trim(), onClick: define, children: current ? 'Save planning version' : 'Create instance' }),
         ] }),
       ]}),
-      // ---- Zone 2: toolbar + canvas (the surface) -------------------------
+      // ---- Zone 2: toolbar + run readout + canvas (the surface) ----------
+      // There is no third column: run lifecycle lives in the toolbar, the
+      // canonical run state is a one-line readout above the canvas, and step
+      // details open in the canvas's own floating panel.
       jsxs('div', { className: 'dockyard-wf3-stage', children: [
         jsxs('div', { className: 'dockyard-wf3-toolbar', role: 'toolbar', 'aria-label': 'Workflow canvas tools', children: [
+          jsx('button', { type: 'button', className: 'dockyard-wf3-libtoggle', 'data-action': 'wf-toggle-library', 'aria-expanded': libCollapsed ? 'false' : 'true', 'aria-label': libCollapsed ? 'Show workflow library' : 'Hide workflow library', title: libCollapsed ? 'Show library' : 'Hide library', onClick: () => setLibCollapsed((v) => !v), children: libCollapsed ? '»' : '«' }),
+          jsx('span', { className: 'dockyard-wf3-sep', 'aria-hidden': true }),
           jsx(Button, { small: true, action: 'wf-view-definition', variant: mode === 'definition' ? 'primary' : '', onClick: () => setMode('definition'), children: 'Definition' }),
           jsx(Button, { small: true, action: 'wf-view-live', variant: mode === 'live' ? 'primary' : '', disabled: !latest, onClick: () => setMode('live'), children: 'Live run' }),
           jsx('span', { className: 'dockyard-wf3-sep', 'aria-hidden': true }),
@@ -191,34 +207,37 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
           jsx(Button, { small: true, action: 'wf-auto-layout', disabled: !current || layoutPendingVersion !== null, onClick: autoLayout, children: layoutPendingVersion !== null ? 'Saving layout…' : 'Auto layout' }),
           jsx(Button, { small: true, action: 'wf-validate', disabled: !current, onClick: validateGraph, children: 'Validate' }),
           jsx('span', { className: 'dockyard-wf3-sep', 'aria-hidden': true }),
-          jsx(Button, { small: true, action: 'inspect-workflow', disabled: !current, onClick: () => { setSelected(current.name); loadRuns(current.name) }, children: 'Refresh canvas' }),
+          // Run lifecycle (was the inspector column). Start runs the LATEST
+          // stored version; older versions start from the Versions menu.
+          jsx(Button, { small: true, action: 'start-workflow', variant: 'primary', disabled: !current || Boolean(current?.archived_at), onClick: () => startVersion(latestVersion), children: latestVersion ? `▶ Start v${latestVersion.version}` : '▶ Start' }),
+          current ? jsxs('details', { className: 'dockyard-wf3-versions', 'data-workflow-definitions': current.name, children: [
+            jsx('summary', { children: `Versions (${current.versions.length})` }),
+            jsx('div', { className: 'dockyard-wf3-versions-menu', children: [...current.versions].reverse().map((version) => jsxs('section', { 'data-workflow-definition-version': version.version, children: [
+              jsxs('div', { className: 'dockyard-wf3-version-head', children: [
+                jsx('strong', { children: `Version ${version.version}${version === latestVersion ? ' · latest' : ''}` }),
+                jsx(Button, { small: true, action: 'start-workflow-version', disabled: Boolean(current.archived_at), onClick: () => startVersion(version), children: `Start v${version.version}` }),
+              ] }),
+              jsx('pre', { children: JSON.stringify(version.definition?.nodes ?? [], null, 2) }),
+            ] }, `definition-${version.version}`)) }),
+          ] }) : null,
+          current ? (current.archived_at
+            ? jsx(Button, { small: true, action: 'restore-workflow', onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/restore`), children: 'Restore' })
+            : jsx(Button, { small: true, action: 'archive-workflow', variant: 'danger', onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/archive`), children: 'Archive' })) : null,
+          jsx(Button, { small: true, action: 'inspect-workflow', disabled: !current, onClick: () => { setSelected(current.name); loadRuns(current.name) }, children: 'Refresh' }),
         ]}),
         validation ? jsx('p', { className: 'dockyard-wf3-validation', role: 'status', 'data-wf-validate-result': validation.ok ? 'ok' : 'issues', children: validation.text }) : null,
         layoutPendingVersion !== null ? jsx('p', { role: 'status', 'data-wf-layout-saving': true, children: 'Saving layout version before the graph can be edited…' }) : null,
-        current ? jsx('div', { ref: canvasRef, className: 'dockyard-workflow-graph', 'data-workflow-canvas': current.name, role: 'img', 'aria-label': 'Workflow planning graph', 'aria-busy': layoutPendingVersion !== null, style: layoutPendingVersion !== null ? { pointerEvents: 'none' } : undefined }) : jsx('p', { className: 'dockyard-meta', children: 'No workflow selected.' }),
-      ]}),
-      // ---- Zone 3: run inspector (canonical runs + versions + lifecycle) --
-      jsxs('aside', { className: 'dockyard-wf3-insp', children: [
-        jsxs('div', { className: 'dockyard-wf3-insp-head', children: [jsx('strong', { children: 'Run inspector' }), current ? jsx('span', { children: `v${current.versions[current.versions.length - 1].version}` }) : null] }),
-        latest ? jsxs('div', { 'data-workflow-live-run': latest.run_key, children: [
+        // Run readout: the latest canonical run only. Nothing here is inferred.
+        latest ? jsxs('div', { className: 'dockyard-wf3-run', 'data-workflow-live-run': latest.run_key, children: [
           jsx(StatusTag, { tone: latest.status === 'completed' ? 'success' : latest.status === 'failed' ? 'danger' : 'info', label: latest.status }),
-          jsx('p', { className: 'dockyard-wf3-runkey', children: `${latest.run_key} · v${latest.version}` }),
-          liveCounts ? jsx('p', { className: 'dockyard-wf3-counts', children: ['done', 'working', 'blocked', 'pending'].filter((k) => liveCounts[k]).map((k) => `${liveCounts[k]} ${k}`).join(' · ') }) : null,
-          jsx('ul', { 'data-wf-live-map': latest.run_key, children: (latest.nodes ?? []).map((node) => jsx('li', { 'data-wf-live-node': node.node_id, 'data-wf-needs-attention': (node.status === 'blocked' || (node.status === 'pending' && node.human_gate)) ? 'true' : undefined, children: `${node.title} — ${node.status ?? 'pending'}${node.assignee ? ` · ${node.assignee}` : ''}${(node.status === 'blocked' || (node.status === 'pending' && node.human_gate)) ? ' · needs attention' : ''}` }, node.node_id)) }),
-        ] }) : jsx('p', { className: 'dockyard-meta', children: 'No canonical run recorded. Start a run to see truthful state.' }),
-        jsxs('div', { className: 'dockyard-form-actions', children: current ? current.versions.map((version) => jsx(Button, { action: 'start-workflow', disabled: Boolean(current.archived_at), onClick: async () => { await mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/start`, { version: version.version, run_key: runKey || `${current.name}-${Date.now()}` }); await loadRuns(current.name) }, children: `Start v${version.version}` }, String(version.version))) : null }),
-        current ? jsxs('details', { className: 'dockyard-workflow-definitions', 'data-workflow-definitions': current.name, children: [
-          jsx('summary', { children: 'Stored definition versions' }),
-          ...current.versions.map((version) => jsxs('section', { 'data-workflow-definition-version': version.version, children: [
-            jsx('strong', { children: `Version ${version.version}` }),
-            jsx('pre', { children: JSON.stringify(version.definition?.nodes ?? [], null, 2) }),
-          ]}, `definition-${version.version}`)),
-        ]}) : null,
-        jsxs('div', { className: 'dockyard-form-actions', children: current ? [
-          current.archived_at
-            ? jsx(Button, { action: 'restore-workflow', onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/restore`), children: 'Restore workflow' })
-            : jsx(Button, { action: 'archive-workflow', variant: 'danger', onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/archive`), children: 'Archive workflow' }),
-        ] : null }),
+          jsx('span', { className: 'dockyard-wf3-runkey', children: `${latest.run_key} · v${latest.version}` }),
+          liveCounts ? jsx('span', { className: 'dockyard-wf3-counts', children: ['done', 'working', 'blocked', 'pending'].filter((k) => liveCounts[k]).map((k) => `${liveCounts[k]} ${k}`).join(' · ') }) : null,
+          jsxs('details', { className: 'dockyard-wf3-steps', children: [
+            jsx('summary', { children: attentionCount ? `Steps · ${attentionCount} need attention` : 'Steps' }),
+            jsx('ul', { 'data-wf-live-map': latest.run_key, children: (latest.nodes ?? []).map((node) => jsx('li', { 'data-wf-live-node': node.node_id, 'data-wf-needs-attention': needsAttention(node) ? 'true' : undefined, children: `${node.title} — ${node.status ?? 'pending'}${node.assignee ? ` · ${node.assignee}` : ''}${needsAttention(node) ? ' · needs attention' : ''}` }, node.node_id)) }),
+          ] }),
+        ] }) : jsx('p', { className: 'dockyard-wf3-run dockyard-meta', 'data-workflow-no-run': true, children: 'No canonical run recorded. Start a run to see truthful state.' }),
+        current ? jsx('div', { ref: canvasRef, className: 'dockyard-workflow-graph', 'data-workflow-canvas': current.name, role: 'img', 'aria-label': 'Workflow planning graph', 'aria-busy': layoutPendingVersion !== null, style: layoutPendingVersion !== null ? { pointerEvents: 'none' } : undefined }) : jsx('p', { className: 'dockyard-meta', children: 'No workflow selected.' }),
       ]}),
     ]}),
   ]})

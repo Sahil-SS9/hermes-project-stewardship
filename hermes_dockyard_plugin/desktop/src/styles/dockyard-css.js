@@ -1596,8 +1596,14 @@ export const DOCKYARD_CSS = `
    versions + lifecycle). The canvas draws its own styling; these rules only
    place it and the zones around it. Tokens: the shared dockyard palette. */
 .dockyard-root .dockyard-workflows-v6 { display: grid; gap: 0; }
-.dockyard-root .dockyard-wf3 { display: grid; grid-template-columns: 250px minmax(0, 1fr) 320px; gap: 0; margin-top: 16px; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); }
-.dockyard-root .dockyard-wf3-lib { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--dy-border); background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-wf3 { display: grid; grid-template-columns: 250px minmax(0, 1fr); transition: grid-template-columns .22s ease; gap: 0; margin-top: 16px; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); }
+.dockyard-root .dockyard-wf3-lib { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--dy-border); background: var(--dy-surface-subtle); overflow: hidden; }
+/* Collapsible library: the column folds to zero so the canvas takes the width. */
+.dockyard-root .dockyard-wf3.lib-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
+.dockyard-root .dockyard-wf3.lib-collapsed .dockyard-wf3-lib { visibility: hidden; border-right: 0; pointer-events: none; }
+.dockyard-root .dockyard-wf3-libtoggle { width: 30px; height: 30px; padding: 0; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text-2); font-size: 15px; line-height: 1; cursor: pointer; }
+.dockyard-root .dockyard-wf3-libtoggle:hover { border-color: var(--dy-accent-border); color: var(--dy-accent-text); }
+@media (prefers-reduced-motion: reduce) { .dockyard-root .dockyard-wf3 { transition: none; } }
 .dockyard-root .dockyard-wf3-lib-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--dy-border); }
 .dockyard-root .dockyard-wf3-lib-head strong { font-size: 12.5px; }
 .dockyard-root .dockyard-wf3-lib-head span { color: var(--dy-text-3); font-size: 11px; }
@@ -1614,26 +1620,38 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-wf3-validation { margin: 0; padding: 8px 14px; border-bottom: 1px solid var(--dy-border); background: var(--dy-warning-bg); color: var(--dy-warning); font-size: 12px; }
 .dockyard-root .dockyard-wf3-stage .dockyard-workflow-graph { min-width: 0; }
 .dockyard-root .dockyard-wf3-stage .dockyard-workflow-graph .dy-wf { height: 62vh; border: 0; border-radius: 0; }
-.dockyard-root .dockyard-wf3-insp { display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: auto; padding: 14px; border-left: 1px solid var(--dy-border); background: var(--dy-surface-subtle); }
-.dockyard-root .dockyard-wf3-insp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--dy-border); }
-.dockyard-root .dockyard-wf3-insp-head strong { font-size: 12.5px; }
-.dockyard-root .dockyard-wf3-insp-head span { color: var(--dy-text-3); font-size: 11px; }
-.dockyard-root .dockyard-wf3-runkey { margin: 6px 0 2px; color: var(--dy-text); font-size: 12.5px; font-weight: 600; }
-.dockyard-root .dockyard-wf3-counts { margin: 0 0 6px; color: var(--dy-text-3); font-size: 11px; }
-.dockyard-root .dockyard-wf3-insp ul { margin: 6px 0 0; padding: 0 0 0 16px; display: grid; gap: 3px; }
-.dockyard-root .dockyard-wf3-insp li { color: var(--dy-text-2); font-size: 12px; }
+/* Toolbar lifecycle controls + versions menu (the inspector column is gone). */
+.dockyard-root .dockyard-wf3-toolbar { position: relative; }
+.dockyard-root .dockyard-wf3-versions { position: relative; }
+.dockyard-root .dockyard-wf3-versions > summary { list-style: none; cursor: pointer; padding: 5px 10px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font-size: 12px; font-weight: 600; }
+.dockyard-root .dockyard-wf3-versions > summary::-webkit-details-marker { display: none; }
+.dockyard-root .dockyard-wf3-versions[open] > summary { border-color: var(--dy-accent-border); color: var(--dy-accent-text); }
+.dockyard-root .dockyard-wf3-versions-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; width: min(420px, 80vw); max-height: 360px; overflow: auto; display: grid; gap: 10px; padding: 12px; border: 1px solid var(--dy-border); border-radius: 12px; background: var(--dy-surface); box-shadow: 0 16px 40px rgba(0,0,0,.28); }
+.dockyard-root .dockyard-wf3-version-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dockyard-root .dockyard-wf3-versions-menu pre { margin: 6px 0 0; max-height: 140px; overflow: auto; font-size: 11px; }
+/* Run readout: one line above the canvas. */
+.dockyard-root .dockyard-wf3-run { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; padding: 8px 14px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface-subtle); font-size: 12px; }
+.dockyard-root .dockyard-wf3-runkey { color: var(--dy-text); font-weight: 600; }
+.dockyard-root .dockyard-wf3-counts { color: var(--dy-text-3); }
+.dockyard-root .dockyard-wf3-steps { margin-left: auto; position: relative; }
+.dockyard-root .dockyard-wf3-steps > summary { cursor: pointer; color: var(--dy-text-2); }
+.dockyard-root .dockyard-wf3-steps ul { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 260px; margin: 0; padding: 10px 12px 10px 28px; display: grid; gap: 4px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); box-shadow: 0 16px 40px rgba(0,0,0,.28); }
+.dockyard-root .dockyard-wf3-steps li { color: var(--dy-text-2); font-size: 12px; }
+.dockyard-root .dockyard-wf3-steps li[data-wf-needs-attention="true"] { color: var(--dy-warning); }
 @media (max-width: 1250px) {
   .dockyard-root .dockyard-wf3 { grid-template-columns: 220px minmax(0, 1fr); }
-  .dockyard-root .dockyard-wf3-insp { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--dy-border); }
+  .dockyard-root .dockyard-wf3.lib-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
 }
 @media (max-width: 640px) {
   .dockyard-root .dockyard-wf3 { display: block; }
   .dockyard-root .dockyard-wf3-lib { display: none; }
+  .dockyard-root .dockyard-wf3-libtoggle, .dockyard-root .dockyard-wf3-libtoggle + .dockyard-wf3-sep { display: none; }
   .dockyard-root .dockyard-wf3-stage { min-width: 0; }
   .dockyard-root .dockyard-wf3-stage .dockyard-wf3-toolbar { overflow: visible; flex-wrap: wrap; justify-content: flex-start; gap: 4px; }
   .dockyard-root .dockyard-wf3-stage .dockyard-wf3-toolbar .dockyard-button { flex: 0 0 auto; min-height: 38px; padding-inline: 8px; white-space: nowrap; }
   .dockyard-root .dockyard-wf3-stage .dockyard-workflow-graph .dy-wf { height: 70vh; min-height: 520px; }
-  .dockyard-root .dockyard-wf3-insp { margin-top: 10px; max-height: 230px; }
+  .dockyard-root .dockyard-wf3-steps { margin-left: 0; }
+  .dockyard-root .dockyard-wf3-steps ul { left: 0; right: auto; }
 }
 
 /* Command Center: screenshot-led wide scan tables with a contextual inspector. */
