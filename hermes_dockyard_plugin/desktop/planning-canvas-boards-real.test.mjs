@@ -130,6 +130,7 @@ test('Planning boards (real backend): theme, save, chat, plan steps and board li
 
     // Status move + archive + restore on the real board.
     await canvas.locator('[data-canvas-board-status]').selectOption('submitted')
+    await canvas.locator('[data-action="pc-status-confirm"]').click()
     await page.waitForSelector('[data-canvas-status="submitted"]')
     assert.equal((await board(second)).status, 'submitted')
     await canvas.locator(`[data-canvas-board-row="${second}"] [data-action="pc-board-archive"]`).click()

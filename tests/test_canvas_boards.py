@@ -696,6 +696,66 @@ def test_plan_step_route(tmp_path):
     assert client.patch(f"{B}/projects/p9/plans/ghost", json={"steps": [{"title": "x"}]}).status_code == 404
 
 
+# ---------------------------------------- QA H-1 / H-2 / M-1 regressions --
+def test_resynthesis_keeps_owner_edits_and_saved_document(store, enabled):
+    service = CanvasService(store)
+    board = service.create_board(enabled, name="Keep", actor="sahil")
+    plan = _plan_for(store, enabled, service, board)
+    docs = PlanDocumentService(store)
+    docs.update_steps(enabled, plan["plan_id"], steps=[{"title": "Owner step A"}, {"title": "Owner step B"}], actor="sahil")
+    again = docs.synthesise_plan(enabled, proposal_id=plan["proposal_id"], actor="sahil")
+    assert again["plan_id"] == plan["plan_id"]
+    assert [s["title"] for s in again["steps"]] == ["Owner step A", "Owner step B"]
+    docs.save_implementation_document(enabled, plan["plan_id"], "# doc", actor="sahil")
+    after_doc = docs.synthesise_plan(enabled, proposal_id=plan["proposal_id"], actor="sahil")
+    assert after_doc["status"] == "documented"
+    assert [s["title"] for s in after_doc["steps"]] == ["Owner step A", "Owner step B"]
+    with pytest.raises(ValueError, match="document"):
+        docs.update_steps(enabled, plan["plan_id"], steps=[{"title": "x"}], actor="sahil")
+
+
+@pytest.mark.parametrize("lock", ["completed", "archived"])
+def test_locked_board_refuses_decisions_synthesis_document_and_backlog(store, enabled, lock):
+    service = CanvasService(store)
+    board = service.create_board(enabled, name=f"Lock {lock}", actor="sahil")
+    _fill(service, enabled, board, FULL)
+    planning = CanvasPlanningService(store)
+    session = planning.start(enabled, canvas_id=board["canvas_id"], actor="sahil")
+    technical = next(p for p in session["proposals"] if p["kind"] == "technical_plan")
+    others = [p for p in session["proposals"] if p["proposal_id"] != technical["proposal_id"]]
+    planning.decide(technical["proposal_id"], approve=True, actor="sahil")
+    docs = PlanDocumentService(store)
+    plan = docs.synthesise_plan(enabled, proposal_id=technical["proposal_id"], actor="sahil")
+    before = docs.get_plan(enabled, plan["plan_id"])
+    if lock == "archived":
+        service.update_board(enabled, board["canvas_id"], status="archived", actor="sahil")
+    else:
+        service.update_board(enabled, board["canvas_id"], status="completed", actor="sahil")
+    with pytest.raises(CanvasLockedError):
+        docs.synthesise_plan(enabled, proposal_id=technical["proposal_id"], actor="sahil")
+    with pytest.raises(CanvasLockedError):
+        docs.save_implementation_document(enabled, plan["plan_id"], "# doc", actor="sahil")
+    if others:
+        with pytest.raises(CanvasLockedError):
+            planning.decide(others[0]["proposal_id"], approve=True, actor="sahil")
+    assert docs.get_plan(enabled, plan["plan_id"]) == before
+
+
+def test_locked_board_error_has_its_own_code(tmp_path):
+    client = _client(tmp_path)
+    cid = client.post(f"{B}/projects/p9/canvases", json={"name": "L"}).json()["canvas_id"]
+    board = client.get(f"{B}/projects/p9/canvases/{cid}").json()
+    client.patch(f"{B}/projects/p9/canvases/{cid}", json={"status": "submitted"})
+    client.patch(f"{B}/projects/p9/canvases/{cid}", json={"status": "planned"})
+    client.patch(f"{B}/projects/p9/canvases/{cid}", json={"status": "completed"})
+    locked = client.put(f"{B}/projects/p9/canvases/{cid}", json={"expected_revision": board["revision"], "objects": [], "connectors": []})
+    assert locked.status_code == 409
+    assert locked.json()["error"]["code"] == "board_locked"
+    client.patch(f"{B}/projects/p9/canvases/{cid}", json={"status": "planned"})
+    stale = client.put(f"{B}/projects/p9/canvases/{cid}", json={"expected_revision": board["revision"] - 1, "objects": [], "connectors": []})
+    assert stale.status_code == 409 and stale.json()["error"]["code"] == "conflict"
+
+
 
 # ------------------------------------------------ D20 sticker colour (palette) --
 def _one(colour=None, **extra):
@@ -763,3 +823,17 @@ def test_sticker_colour_survives_the_http_save_route(tmp_path):
         "expected_revision": saved.json()["revision"], "objects": [{**row, "colour": "red; x:y"}], "connectors": []})
     assert bad.status_code in (400, 409, 422), bad.text
     assert client.get(f"{B}/projects/p9/canvases/{cid}").json()["objects"][0]["colour"] == "pink"
+
+
+def test_proposal_decision_is_refused_for_another_project(tmp_path):
+    """QA M-4: a decision naming the wrong project reads as 'not found'."""
+    client = _client(tmp_path)
+    cid = client.post(f"{B}/projects/p9/canvases", json={"name": "Scoped"}).json()["canvas_id"]
+    rev = client.get(f"{B}/projects/p9/canvases/{cid}").json()["revision"]
+    client.put(f"{B}/projects/p9/canvases/{cid}", json={"expected_revision": rev, "objects": FULL, "connectors": []})
+    proposals = client.post(f"{B}/projects/p9/canvases/{cid}/sessions", json={}).json()["proposals"]
+    target = proposals[0]["proposal_id"]
+    wrong = client.post(f"{B}/canvas/proposals/{target}/decision", json={"approve": True, "project_id": "other"})
+    assert wrong.status_code == 404
+    right = client.post(f"{B}/canvas/proposals/{target}/decision", json={"approve": True, "project_id": "p9"})
+    assert right.status_code == 200 and right.json()["status"] == "approved"

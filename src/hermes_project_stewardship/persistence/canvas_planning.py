@@ -151,10 +151,15 @@ class CanvasPlanningService:
             self._store_proposals(session_id, current["project_id"], current["canvas_id"], canvas["revision"], result)
         return self.get(session_id)
 
-    def decide(self, proposal_id: str, *, approve: bool, actor: str) -> dict[str, Any]:
+    def decide(self, proposal_id: str, *, approve: bool, actor: str,
+               project_id: str | None = None) -> dict[str, Any]:
         row = self.store._conn.execute("SELECT * FROM canvas_proposals WHERE proposal_id=?", (proposal_id,)).fetchone()
-        if row is None:
+        # A proposal from another project reads exactly like a missing one.
+        if row is None or (project_id is not None and row["project_id"] != project_id):
             raise ValueError("unknown canvas proposal")
+        if row["canvas_id"]:
+            # Decisions on a completed/archived board's proposals are refused.
+            CanvasService(self.store).require_editable(row["project_id"], row["canvas_id"])
         status = "approved" if approve else "rejected"
         with self.store.tx() as cx:
             updated = cx.execute("UPDATE canvas_proposals SET status=?, decided_at=?, decided_by=? WHERE proposal_id=? AND status='pending'", (status, iso(self.store._clock()), actor, proposal_id)).rowcount

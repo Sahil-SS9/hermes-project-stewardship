@@ -33,6 +33,15 @@ import { PageHead } from '../lib/ui.js'
 import { WorkItemDetail } from '../work-item/detail.js'
 export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView }) {
   const [projectView, setProjectView] = useState(initialView || 'overview')
+  // QA M-7: leaving the Planning view with unsaved board edits asks first.
+  const [canvasDirty, setCanvasDirty] = useState(false)
+  const [pendingView, setPendingView] = useState(null)
+  const changeView = (key) => {
+    if (key === projectView) return
+    if (projectView === 'planning' && canvasDirty) { setPendingView(key); return }
+    setProjectView(key)
+  }
+  const onCanvasDirty = (dirty) => { setCanvasDirty(dirty); onProjectDirty?.(dirty) }
   const [selectedWorkItem, setSelectedWorkItem] = useState(null)
   const [workNotice, setWorkNotice] = useState(null)
   // Phase 4: the applied saved view drives the Work board's contents and
@@ -177,7 +186,7 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
   } else if (projectView === 'objectives') {
     panel = jsx(ObjectivesPanel, { project, settings: view.settings ?? {}, objectives: view.objectives ?? [], goals: view.goals ?? [], missionArchive: view.missionArchive ?? [], onRefresh }, project.id)
   } else if (projectView === 'planning') {
-    panel = jsx(PlanningCanvasPanel, { project, canvas: view.canvas, content: view.content ?? [], onRefresh }, project.id)
+    panel = jsx(PlanningCanvasPanel, { project, canvas: view.canvas, content: view.content ?? [], onRefresh, onDirty: onCanvasDirty }, project.id)
   } else if (projectView === 'workflows') {
     panel = jsx(ExecutableWorkflowsPanel, { project, workflows: view.workflows ?? [], onRefresh }, project.id)
   } else if (projectView === 'content') {
@@ -279,12 +288,22 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
           className: projectView === key ? 'active' : '',
           'data-project-view': key,
           'aria-pressed': projectView === key,
-          onClick: () => setProjectView(key),
+          onClick: () => changeView(key),
           children: label,
         }, key)),
       }),
     ]}),
     panel,
+    pendingView ? jsxs('section', { className: 'dockyard-modal-layer', 'data-view-switch-confirm': pendingView, children: [
+      jsxs('div', { className: 'dockyard-modal', role: 'alertdialog', 'aria-modal': true, 'aria-label': 'Unsaved planning board changes', children: [
+        jsx('h2', { children: 'Unsaved changes on this board' }),
+        jsx('p', { children: 'The planning board has edits that are not saved. Stay to save them, or discard them and leave.' }),
+        jsxs('div', { className: 'dockyard-modal-actions', children: [
+          jsx(Button, { action: 'view-switch-stay', onClick: () => setPendingView(null), children: 'Stay and save' }),
+          jsx(Button, { variant: 'danger', action: 'view-switch-discard', onClick: () => { const next = pendingView; setPendingView(null); setCanvasDirty(false); onProjectDirty?.(false); setProjectView(next) }, children: 'Discard and leave' }),
+        ]}),
+      ]}),
+    ]}) : null,
     jsx(WorkItemDetail, { item: selectedWorkItem, projectId: project.id, profiles: view.profiles ?? [], initiatives: view.initiatives ?? [], onClose: () => setSelectedWorkItem(null), onRefresh }),
   ]})
 }

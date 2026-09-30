@@ -25,7 +25,7 @@ export function buildDesktopBundle() {
     "import React from 'react';",
     "import { createRoot } from 'react-dom/client';",
     'const ctx = {',
-    "  rest: async (p, init = {}) => { const r = await fetch('/api' + p, { method: init.method || 'GET', headers: { 'content-type': 'application/json' }, body: init.method && init.method !== 'GET' ? JSON.stringify(init.body) : undefined }); if (!r.ok) { let detail = ''; try { detail = (await r.json())?.detail ?? ''; } catch {} throw Error(`${r.status}: ${detail}`); } return r.json(); },",
+    "  rest: async (p, init = {}) => { const r = await fetch('/api' + p, { method: init.method || 'GET', headers: { 'content-type': 'application/json' }, body: init.method && init.method !== 'GET' ? JSON.stringify(init.body) : undefined }); if (!r.ok) { let detail = ''; try { const j = await r.json(); detail = j?.detail ?? (j?.error ? `${j.error.code}: ${j.error.message}` : ''); if (typeof detail !== 'string') detail = JSON.stringify(detail); } catch {} throw Error(`${r.status}: ${detail}`); } return r.json(); },",
     '  os: { writeClipboard: async () => true },',
     '  registerMany(xs) { this.items = xs },',
     '};',

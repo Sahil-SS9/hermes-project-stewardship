@@ -27,6 +27,7 @@ import { test } from 'node:test';
 import { buildDesktopBundle, chromium } from './planning-canvas-test-bundle.mjs';
 
 const PROJECT = 'p1';
+const MODELS = { available: true, default: { provider: 'main', model: 'main-model' }, providers: [{ slug: 'openai-codex', name: 'Codex', models: ['gpt-5.6-sol'] }, { slug: 'local', name: 'Local', models: ['qwen-3'] }] };
 const MOVES = { draft: ['submitted'], submitted: ['draft', 'planned'], planned: ['submitted', 'completed'], completed: ['planned'] };
 const card = (id, kind, text, x, y) => ({ id, kind, content: { text }, x, y, width: 240, height: 140, tags: [], evidence_ref: null, work_ref: null });
 
@@ -49,7 +50,7 @@ function seedBoards() {
 
 function startHost(bundleCode) {
   const calls = [];
-  const state = { boards: seedBoards(), clock: 10, sessions: {}, proposals: {}, plans: {}, seq: 0, slowSessionFor: null, releaseSlow: null };
+  const state = { boards: seedBoards(), clock: 10, sessions: {}, proposals: {}, plans: {}, seq: 0, slowSessionFor: null, releaseSlow: null, slowDone: null, unexpected: [] };
   const clone = (v) => JSON.parse(JSON.stringify(v));
   const view = (b) => { const { updated, ...rest } = b; return clone(rest); };
   const find = (id) => state.boards.find((b) => b.canvas_id === id);
@@ -79,6 +80,10 @@ function startHost(bundleCode) {
       let status = 200;
       let payload = {};
       const reply = () => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(payload)); };
+      // Mirror the real server: errors use its envelope and codes.
+      const fail = (code, errCode, message) => { status = code; payload = { error: { code: errCode, message } }; };
+      const locked = (board) => ['completed', 'archived'].includes(board.status);
+      const lockedFail = (board) => fail(409, 'board_locked', `board is ${board.status} and read-only; reopen it to edit`);
       const m = (re) => path.match(re);
       try {
         let hit;
@@ -87,8 +92,8 @@ function startHost(bundleCode) {
           payload = { canvases: all.map((b) => ({ ...view(b), object_count: b.objects.length, objects: undefined, connectors: undefined, plan_count: 0, changed_since_plan: false })) };
         } else if (path === `/projects/${PROJECT}/canvases` && req.method === 'POST') {
           const name = String(body?.name ?? '').trim();
-          if (!name || name.length > 120) { status = 422; payload = { detail: 'board name must be 1-120 characters' }; }
-          else if (live().some((b) => b.name.toLowerCase() === name.toLowerCase())) { status = 409; payload = { detail: `a board named ${name} already exists` }; }
+          if (!name || name.length > 120) fail(422, 'validation_error', 'board name must be 1-120 characters');
+          else if (live().some((b) => b.name.toLowerCase() === name.toLowerCase())) fail(409, 'conflict', `a board named ${name} already exists`);
           else {
             state.seq += 1;
             const board = { canvas_id: `board-new-${state.seq}`, project_id: PROJECT, name, status: 'draft', archived_from: null, theme: null, model: null, revision: 1, objects: [], connectors: [], updated: 0 };
@@ -100,54 +105,111 @@ function startHost(bundleCode) {
           payload = view(board);
         } else if ((hit = m(/^\/projects\/p1\/canvases\/([^/]+)$/))) {
           const board = find(decodeURIComponent(hit[1]));
-          if (!board) { status = 404; payload = { detail: 'unknown canvas board' }; }
+          if (!board) fail(404, 'not_found', 'unknown canvas board');
           else if (req.method === 'GET') payload = view(board);
           else if (req.method === 'PUT') {
-            if (['completed', 'archived'].includes(board.status)) { status = 423; payload = { detail: `board is ${board.status} and read-only; reopen it to edit` }; }
-            else if (Number(body?.expected_revision) !== board.revision) { status = 409; payload = { detail: `canvas revision conflict: expected ${body?.expected_revision}, current ${board.revision}` }; }
+            if (locked(board)) lockedFail(board);
+            else if (Number(body?.expected_revision) !== board.revision) fail(409, 'conflict', `canvas revision conflict: expected ${body?.expected_revision}, current ${board.revision}`);
             else { board.revision += 1; board.objects = body.objects; board.connectors = body.connectors; touch(board); payload = view(board); }
           } else if (req.method === 'PATCH') {
-            if ('theme' in (body ?? {})) board.theme = body.theme;
-            if ('model' in (body ?? {})) board.model = body.model;
-            if ('name' in (body ?? {})) board.name = String(body.name).trim();
-            if ('status' in (body ?? {}) && body.status !== board.status) {
-              if (body.status === 'archived') { board.archived_from = board.status; board.status = 'archived'; }
-              else if (board.status === 'archived') { if (body.status !== board.archived_from) throw Object.assign(new Error('restore returns to archived_from'), { code: 422 }); board.status = body.status; board.archived_from = null; }
-              else if (!(MOVES[board.status] ?? []).includes(body.status)) throw Object.assign(new Error(`cannot move a board from ${board.status} to ${body.status}`), { code: 422 });
-              else board.status = body.status;
+            const b = body ?? {};
+            // Validate everything first, then apply (the real route is atomic).
+            if ('theme' in b && b.theme !== null && !['light', 'dark'].includes(b.theme)) throw Object.assign(new Error('theme must be light, dark or unset'), { code: 422 });
+            if ('model' in b && b.model !== null) {
+              const catalogue = MODELS.providers.find((pv) => pv.slug === b.model?.provider);
+              if (typeof b.model !== 'object' || !catalogue || !catalogue.models.includes(b.model.model)) throw Object.assign(new Error('model is not configured in Hermes'), { code: 422 });
             }
+            let name = board.name;
+            if ('name' in b) {
+              name = String(b.name ?? '').trim();
+              if (!name || name.length > 120) throw Object.assign(new Error('board name must be 1-120 characters'), { code: 422 });
+            }
+            let next = board.status; let from = board.archived_from;
+            if ('status' in b && b.status !== board.status) {
+              if (b.status === 'archived') {
+                from = board.status; next = 'archived';
+              } else if (board.status === 'archived') { if (b.status !== board.archived_from) throw Object.assign(new Error('restore returns to archived_from'), { code: 422 }); next = b.status; from = null; }
+              else if (!(MOVES[board.status] ?? []).includes(b.status)) throw Object.assign(new Error(`cannot move a board from ${board.status} to ${b.status}`), { code: 422 });
+              else next = b.status;
+            }
+            if (next !== 'archived' && live().some((o) => o.canvas_id !== board.canvas_id && o.name.toLowerCase() === name.toLowerCase())) throw Object.assign(new Error(`a board named ${name} already exists`), { code: 409, errCode: 'conflict' });
+            if ('theme' in b) board.theme = b.theme;
+            if ('model' in b) board.model = b.model;
+            board.name = name; board.status = next; board.archived_from = from;
             touch(board); payload = view(board);
+          } else fail(405, 'method_not_allowed', 'method not allowed');
+        } else if ((hit = m(/^\/projects\/p1\/canvases\/([^/]+)\/objects\/([^/]+)$/)) && req.method === 'DELETE') {
+          const board = find(decodeURIComponent(hit[1]));
+          const id = decodeURIComponent(hit[2]);
+          if (!board) fail(404, 'not_found', 'unknown canvas board');
+          else if (locked(board)) lockedFail(board);
+          else if (Number(url.searchParams.get('expected_revision')) !== board.revision) fail(409, 'conflict', 'canvas revision conflict');
+          else if (!board.objects.some((o) => o.id === id)) fail(422, 'validation_error', `unknown canvas object: ${id}`);
+          else {
+            board.objects = board.objects.filter((o) => o.id !== id);
+            board.connectors = board.connectors.filter((e) => e.source !== id && e.target !== id);
+            board.revision += 1; touch(board); payload = view(board);
           }
         } else if ((hit = m(/^\/projects\/p1\/canvases\/([^/]+)\/sessions$/)) && req.method === 'POST') {
           const board = find(decodeURIComponent(hit[1]));
-          if (state.slowSessionFor === board.canvas_id) await new Promise((resolve) => { state.releaseSlow = resolve; });
-          payload = sessionFor(board, body?.message ?? null);
+          if (!board) fail(404, 'not_found', 'unknown canvas board');
+          else if (locked(board)) lockedFail(board);
+          else {
+            if (state.slowSessionFor === board.canvas_id) await new Promise((resolve) => { state.releaseSlow = resolve; });
+            payload = sessionFor(board, body?.message ?? null);
+            state.slowDone?.();
+          }
         } else if ((hit = m(/^\/projects\/p1\/canvases\/([^/]+)\/curate$/)) && req.method === 'POST') {
           const board = find(decodeURIComponent(hit[1]));
+          if (!board) throw Object.assign(new Error('unknown canvas board'), { code: 404, errCode: 'not_found' });
           const count = (k) => board.objects.filter((o) => o.kind === k).length;
           payload = { canvas_id: board.canvas_id, canvas_revision: board.revision, summary: { evidence_count: count('evidence') + count('note'), claim_count: count('claim'), question_count: count('question'), plan_block_count: count('plan_block') }, proposals: [] };
         } else if ((hit = m(/^\/canvas\/sessions\/([^/]+)$/)) && req.method === 'GET') {
           payload = clone(state.sessions[decodeURIComponent(hit[1])]);
         } else if ((hit = m(/^\/canvas\/proposals\/([^/]+)\/decision$/)) && req.method === 'POST') {
           const proposal = state.proposals[decodeURIComponent(hit[1])];
+          const owner = proposal && find(proposal.canvas_id);
+          if (!proposal || (body?.project_id && body.project_id !== PROJECT)) throw Object.assign(new Error('unknown canvas proposal'), { code: 404, errCode: 'not_found' });
+          if (owner && locked(owner)) throw Object.assign(new Error(`board is ${owner.status} and read-only`), { code: 409, errCode: 'board_locked' });
+          if (proposal.status !== 'pending') throw Object.assign(new Error('canvas proposal is not pending'), { code: 422 });
           proposal.status = body?.approve ? 'approved' : 'rejected';
           for (const s of Object.values(state.sessions)) s.proposals = s.proposals.map((p) => (p.proposal_id === proposal.proposal_id ? clone(proposal) : p));
           payload = { proposal_id: proposal.proposal_id, status: proposal.status };
         } else if ((hit = m(/^\/canvas\/proposals\/([^/]+)\/plan$/)) && req.method === 'POST') {
           const proposal = state.proposals[decodeURIComponent(hit[1])];
+          if (!proposal) throw Object.assign(new Error('unknown canvas proposal'), { code: 404, errCode: 'not_found' });
+          const owner = find(proposal.canvas_id);
+          if (owner && locked(owner)) throw Object.assign(new Error(`board is ${owner.status} and read-only`), { code: 409, errCode: 'board_locked' });
+          const existing = state.plans[`plan-${proposal.proposal_id}`];
+          if (existing) { payload = clone(existing); reply(); return; }
           const plan = { plan_id: `plan-${proposal.proposal_id}`, proposal_id: proposal.proposal_id, canvas_id: proposal.canvas_id, status: 'draft', steps: [{ order: 1, title: 'Measure the funnel', source_object_ids: ['a-ev'] }, { order: 2, title: 'Ship the preview', source_object_ids: [] }] };
           state.plans[plan.plan_id] = plan; payload = clone(plan);
         } else if ((hit = m(/^\/projects\/p1\/plans\/([^/]+)$/)) && req.method === 'PATCH') {
           const plan = state.plans[decodeURIComponent(hit[1])];
+          if (!plan) throw Object.assign(new Error('unknown plan'), { code: 404, errCode: 'not_found' });
+          const owner = find(plan.canvas_id);
+          if (owner && locked(owner)) throw Object.assign(new Error(`board is ${owner.status} and read-only`), { code: 409, errCode: 'board_locked' });
+          if (plan.status !== 'draft') throw Object.assign(new Error('only a draft plan can be edited'), { code: 409, errCode: 'conflict' });
           const old = new Map(plan.steps.map((s) => [s.order, s]));
+          plan.edited_by = 'desktop';
           plan.steps = body.steps.map((s, i) => ({ order: i + 1, title: s.title, source_object_ids: s.order ? (old.get(s.order)?.source_object_ids ?? []) : [] }));
           payload = clone(plan);
         } else if (path === '/canvas/models') {
-          payload = { available: true, default: { provider: 'main', model: 'main-model' }, providers: [{ slug: 'openai-codex', name: 'Codex', models: ['gpt-5.6-sol'] }, { slug: 'local', name: 'Local', models: ['qwen-3'] }] };
+          payload = clone(MODELS);
         } else if (path === '/dashboard') payload = { projects: [{ id: PROJECT, name: 'P1', health: 'healthy', work: {} }], owed_decisions: 0, totals: {} };
         else if (path === '/onboard/discover') payload = { profiles: [] };
         else if (path.endsWith('/content')) payload = { content: [] };
-      } catch (error) { status = error.code ?? 500; payload = { detail: String(error.message ?? error) }; }
+        else if (req.method === 'GET' && !path.includes('/canvas') && !path.includes('/plans')) payload = {};
+        else {
+          // Any other canvas/plan route is unknown here: fail loudly (QA M-2),
+          // never "200 {}", so a missing or misspelt route breaks the suite.
+          state.unexpected.push(`${req.method} ${path}`);
+          fail(404, 'not_found', `fake host has no route for ${req.method} ${path}`);
+        }
+      } catch (error) {
+        const code = error.code ?? 500;
+        fail(code, error.errCode ?? (code === 422 ? 'validation_error' : 'error'), String(error.message ?? error));
+      }
       reply();
     });
   });
@@ -235,6 +297,7 @@ async function withPage(width, height, fn) {
     await openPlanning(page, host);
     await fn(page, host, errors);
     assert.deepEqual(errors, [], errors.join('\n'));
+    assert.deepEqual(host.state.unexpected, [], 'the UI only calls routes the real server has');
   } finally {
     await browser?.close();
     await host.close();
@@ -432,7 +495,22 @@ test('Planning boards: chat window drags, minimises, expands, picks a model and 
     await settle(page);
     assert.equal(host.find('board-a').model, null, 'back to the Hermes main model');
 
-    // Expand, then edit plan steps from an approved proposal.
+    // Expand = a large, readable chat (not a bare icon), with its own composer.
+    await canvas.locator('[data-action="pc-chat-expand"]').click();
+    const big = canvas.locator('[data-canvas-expanded="chat"] .dy-pc-overlay-card');
+    await big.waitFor();
+    const bigBox = await big.boundingBox();
+    assert.ok(bigBox.width >= 700 && bigBox.height >= 400, `large chat is large (${Math.round(bigBox.width)}x${Math.round(bigBox.height)})`);
+    for (const svg of await big.locator('svg').all()) {
+      const r = await svg.boundingBox();
+      if (r) assert.ok(r.width <= 24 && r.height <= 24, `icons stay icon-sized in the large view (${Math.round(r.width)}px)`);
+    }
+    assert.equal(await canvas.locator('[data-canvas-chat-input-large]').isVisible(), true, 'large view has a message box');
+    assert.equal(await page.evaluate(() => document.activeElement?.closest('[data-canvas-expanded]') !== null), true, 'focus moves into the large view');
+    await page.keyboard.press('Escape');
+    assert.equal(await canvas.locator('[data-canvas-expanded]').count(), 0, 'Escape closes the large view');
+
+    // Then edit plan steps from an approved proposal.
     await canvas.locator('[data-action="pc-curate"]').click();
     await page.waitForSelector('[data-canvas-proposals]');
     await canvas.locator('[data-action="approve-canvas-proposal"]').click();
@@ -455,6 +533,64 @@ test('Planning boards: chat window drags, minimises, expands, picks a model and 
     await canvas.locator('[data-action="pc-expanded-close"]').click();
     assert.equal(await canvas.locator('[data-canvas-expanded]').count(), 0);
     assert.match(await canvas.locator('[data-canvas-plan] .dy-pc-plan-steps').innerText(), /1\. Ship the safe preview\n2\. Measure the funnel\n3\. Tell the users/);
+  });
+});
+
+test('Planning boards: drag, scroll and arrow keys move around the board; Shift+drag selects', { timeout: 180000 }, async () => {
+  await withPage(1440, 900, async (page) => {
+    const canvas = root(page);
+    const world = canvas.locator('[data-pc-world]');
+    const stage = canvas.locator('[data-pc-stage]');
+    const pan = async () => (await world.getAttribute('data-canvas-pan')).split(',').map(Number);
+    await stage.scrollIntoViewIfNeeded();
+    const box = await stage.boundingBox();
+    const vh = page.viewportSize().height;
+    // Grab an empty, on-screen spot (bottom-left, away from the cards and the chat).
+    const sx = box.x + 40; const sy = Math.min(box.y + box.height, vh) - 40;
+    assert.match(await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.className ?? '', [sx, sy]), /dy-pc-(stage|world|svg)/, 'the grab point is empty board');
+    assert.equal(await stage.evaluate((el) => getComputedStyle(el).cursor), 'grab', 'the board shows a hand cursor');
+    const [x0, y0] = await pan();
+    await page.mouse.move(sx, sy); await page.mouse.down();
+    await page.mouse.move(sx + 150, sy - 120, { steps: 6 });
+    assert.equal(await stage.getAttribute('data-pc-panning'), 'true', 'dragging shows the grabbing state');
+    await page.mouse.up();
+    const [x1, y1] = await pan();
+    assert.ok(Math.abs(x1 - x0 - 150) <= 2 && Math.abs(y1 - y0 + 120) <= 2, `drag moves the board (${x0},${y0}) -> (${x1},${y1})`);
+    assert.equal(await canvas.locator('.dy-pc-obj.marquee-selected').count(), 0, 'a plain drag selects nothing');
+    assert.equal(await canvas.getAttribute('data-canvas-dirty'), 'false', 'moving around is not an edit');
+    // Scroll wheel / trackpad moves the board; the page does not scroll.
+    const pageY = await page.evaluate(() => scrollY);
+    await page.mouse.move(sx, sy);
+    await page.mouse.wheel(0, 200);
+    await settle(page);
+    const [, y2] = await pan();
+    assert.ok(y2 < y1, 'scrolling moves the board');
+    assert.equal(await page.evaluate(() => scrollY), pageY, 'the page itself does not scroll');
+    // Ctrl+scroll zooms.
+    const z0 = Number(await world.getAttribute('data-canvas-zoom'));
+    await page.keyboard.down('Control'); await page.mouse.wheel(0, -200); await page.keyboard.up('Control');
+    await settle(page);
+    assert.ok(Number(await world.getAttribute('data-canvas-zoom')) > z0, 'Ctrl+scroll zooms in');
+    // Arrow keys move the board when nothing is selected.
+    await stage.focus();
+    const [x3] = await pan();
+    await page.keyboard.press('ArrowRight');
+    const [x4] = await pan();
+    assert.ok(x4 < x3, 'ArrowRight moves the view right');
+    // Shift+drag draws a selection box instead of moving.
+    await canvas.locator('[data-action="pc-fit"]').click();
+    await settle(page);
+    const [px, py] = await pan();
+    await stage.scrollIntoViewIfNeeded();
+    const b2 = await stage.boundingBox();
+    const bottom = Math.min(b2.y + b2.height, page.viewportSize().height);
+    await page.keyboard.down('Shift');
+    await page.mouse.move(b2.x + 5, b2.y + 5); await page.mouse.down();
+    await page.mouse.move(b2.x + b2.width * 0.6, bottom - 10, { steps: 6 });
+    await page.mouse.up();
+    await page.keyboard.up('Shift');
+    assert.ok(await canvas.locator('.dy-pc-obj.marquee-selected').count() >= 1, 'Shift+drag selects cards');
+    assert.deepEqual(await pan(), [px, py], 'Shift+drag does not move the board');
   });
 });
 
@@ -482,19 +618,46 @@ test('Planning boards: board list create, rename, archive, restore, status and r
     // Unsaved edits block a switch.
     await canvas.locator('[data-canvas-draft]').fill('Unsaved sticker');
     await canvas.locator('[data-action="add-canvas-object"]').click();
+    // Unsaved edits: switching asks Save / Discard / Cancel.
+    const newId = await canvas.getAttribute('data-canvas-board');
     await canvas.locator('[data-canvas-board-row="board-a"] button.dy-pc-board-row').click();
-    await settle(page);
-    assert.match(await canvas.getAttribute('data-canvas-board'), /^board-new-/, 'switch refused while dirty');
-    assert.match(await page.locator('body').innerText(), /unsaved edits/i);
-    await canvas.locator('[data-action="pc-save"]').click();
-    await settle(page);
+    await page.waitForSelector('[data-canvas-unsaved-prompt]');
+    assert.equal(await canvas.getAttribute('data-canvas-board'), newId, 'nothing switches before a choice');
+    await canvas.locator('[data-action="pc-leave-cancel"]').click();
+    assert.equal(await canvas.locator('[data-canvas-unsaved-prompt]').count(), 0);
+    assert.equal(await canvas.getAttribute('data-canvas-dirty'), 'true', 'Cancel keeps the edit');
+    await canvas.locator('[data-canvas-board-row="board-a"] button.dy-pc-board-row').click();
+    await canvas.locator('[data-action="pc-leave-save"]').click();
+    await page.waitForSelector('[data-planning-canvas][data-canvas-board="board-a"]');
+    assert.equal(host.find(newId).objects.length, 1, 'Save and continue saved the edit first');
+    // Discard path: edit Alpha, switch back, discard.
+    await canvas.locator('[data-canvas-draft]').fill('Throwaway');
+    await canvas.locator('[data-action="add-canvas-object"]').click();
+    await canvas.locator(`[data-canvas-board-row="${newId}"] button.dy-pc-board-row`).click();
+    await canvas.locator('[data-action="pc-leave-discard"]').click();
+    await page.waitForSelector(`[data-planning-canvas][data-canvas-board="${newId}"]`);
+    assert.equal(host.find('board-a').objects.length, 3, 'Discard did not save');
+    assert.equal(await canvas.getAttribute('data-canvas-dirty'), 'false');
 
     // Status moves: draft -> submitted -> planned -> completed (read-only).
     const statusSel = canvas.locator('[data-canvas-board-status]');
+    // A dropdown pick only opens the confirmation; Cancel changes nothing.
+    await statusSel.selectOption('submitted');
+    await page.waitForSelector('[data-canvas-status-confirm="submitted"]');
+    await canvas.locator('[data-action="pc-status-cancel"]').click();
+    assert.equal(await canvas.getAttribute('data-canvas-status'), 'draft', 'cancel keeps the status');
+    assert.equal(host.calls.filter((c) => c.method === 'PATCH' && c.body && 'status' in c.body).length, 0, 'nothing sent before confirm');
     for (const next of ['submitted', 'planned', 'completed']) {
       await statusSel.selectOption(next);
+      await canvas.locator('[data-action="pc-status-confirm"]').click();
       await page.waitForSelector(`[data-canvas-status="${next}"]`);
     }
+    // Read-only board: the card details are view-only (QA H-5).
+    await canvas.locator('[data-canvas-object]').first().click();
+    assert.equal(await canvas.locator('[data-canvas-object-title]').isDisabled(), true, 'details are view-only');
+    assert.equal(await canvas.locator('[data-action="apply-canvas-object"]').count(), 0, 'no Apply on a read-only board');
+    await page.keyboard.press('Escape');
+    assert.equal(await canvas.getAttribute('data-canvas-dirty'), 'false');
     assert.equal(await canvas.locator('[data-action="pc-save"]').isDisabled(), true, 'completed board cannot be saved');
     assert.equal(await canvas.locator('[data-action="pc-curate"]').isDisabled(), true, 'completed board cannot be curated');
     assert.equal(await canvas.locator('[data-canvas-draft]').isDisabled(), true, 'completed board cannot take new stickers');
@@ -503,6 +666,7 @@ test('Planning boards: board list create, rename, archive, restore, status and r
     await page.mouse.move(box.x + 30, box.y + 20); await page.mouse.down(); await page.mouse.move(box.x + 200, box.y + 120, { steps: 5 }); await page.mouse.up();
     assert.equal(await canvas.locator('[data-canvas-object]').first().getAttribute('data-canvas-x'), cardBefore, 'completed board cards do not move');
     await statusSel.selectOption('planned');
+    await canvas.locator('[data-action="pc-status-confirm"]').click();
     await page.waitForSelector('[data-canvas-status="planned"]');
     assert.equal(await canvas.locator('[data-action="pc-curate"]').isDisabled(), false, 'reopened board is editable');
 
@@ -524,10 +688,23 @@ test('Planning boards: board list create, rename, archive, restore, status and r
     assert.equal(await canvas.locator('[data-canvas-board-archived]').count(), 0);
 
     // Collapse and re-open the list.
-    await canvas.locator('[data-action="pc-board-toggle"]').click();
+    const toggle = canvas.locator('[data-action="pc-board-toggle"]');
+    assert.equal(await toggle.getAttribute('aria-expanded'), 'true');
+    assert.equal(await toggle.getAttribute('data-canvas-board-toggle'), 'open', 'open list shows the up chevron');
+    await toggle.click();
     assert.equal(await canvas.locator('[data-canvas-board-row]').count(), 0);
-    await canvas.locator('[data-action="pc-board-toggle"]').click();
+    assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
+    assert.equal(await toggle.getAttribute('data-canvas-board-toggle'), 'closed', 'closed list shows the down chevron');
+    await toggle.click();
     assert.ok(await canvas.locator('[data-canvas-board-row]').count() >= 3);
+    // Actions sit above the board list, and the open board is marked.
+    const actionsY = (await canvas.locator('[data-action="pc-board-new"]').boundingBox()).y;
+    const listY = (await canvas.locator('.dy-pc-board-list').boundingBox()).y;
+    assert.ok(actionsY < listY, 'board actions are above the list');
+    const openRow = canvas.locator('[data-canvas-board-active="true"]');
+    assert.equal(await openRow.count(), 1, 'exactly one board is marked open');
+    assert.equal(await openRow.getAttribute('data-canvas-board-row'), await canvas.getAttribute('data-canvas-board'));
+    assert.equal(await openRow.locator('[data-canvas-board-open]').count(), 1, 'the open board has an Open tag');
   });
 });
 

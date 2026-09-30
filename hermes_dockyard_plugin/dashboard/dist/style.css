@@ -455,15 +455,24 @@ td.bad, .bad { color: var(--dy-bad); }
   color: #f3f5f7; color-scheme: dark;
 }
 /* Board switcher: compact on desktop and allowed to collapse on narrow screens. */
-.dy-pc-scope .dy-pc-board-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface); }
-.dy-pc-scope .dy-pc-board-title { display: flex; align-items: baseline; gap: 9px; min-width: 0; flex: 1 1 auto; }
+.dy-pc-scope .dy-pc-board-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface); }
+.dy-pc-scope .dy-pc-board-bar > .dockyard-button { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; padding: 5px; }
+.dy-pc-scope .dy-pc-board-title { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; min-width: 0; flex: 1 1 auto; }
+.dy-pc-scope .dy-pc-board-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border: 1px solid var(--dy-border); border-radius: 999px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; font-weight: 650; }
+.dy-pc-scope .dy-pc-board-moves { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dy-pc-scope .dy-pc-board-moves-label { color: var(--dy-text-3); font-size: 11px; }
+.dy-pc-scope .dy-pc-board-panel { display: grid; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface-subtle); }
+.dy-pc-scope .dy-pc-board-open { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: var(--dy-accent-text); color: var(--dy-surface); font-size: 10px; font-weight: 750; letter-spacing: .03em; }
 .dy-pc-scope .dy-pc-board-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dy-text); font-size: 13px; }
 .dy-pc-scope .dy-pc-board-count { color: var(--dy-text-3); font-size: 11px; }
 .dy-pc-scope .dy-pc-theme-toggle { display: flex; gap: 2px; border: 1px solid var(--dy-border); border-radius: 8px; padding: 2px; }
 .dy-pc-scope .dy-pc-theme-toggle .dockyard-button { min-width: 29px; padding: 5px; }
-.dy-pc-scope .dy-pc-board-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 6px; padding: 9px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface-subtle); }
+.dy-pc-scope .dy-pc-board-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
 .dy-pc-scope .dy-pc-board-row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 9px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); text-align: left; cursor: pointer; }
-.dy-pc-scope .dy-pc-board-row:hover, .dy-pc-scope .dy-pc-board-row.active { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
+.dy-pc-scope .dy-pc-board-row:hover { border-color: var(--dy-accent-border); }
+/* The open board is unmistakable: accent fill, 2px accent edge and an "Open" tag. */
+.dy-pc-scope .dy-pc-board-row.active { border-color: var(--dy-accent-text); background: var(--dy-accent-soft); box-shadow: inset 3px 0 0 var(--dy-accent-text); cursor: default; }
+.dy-pc-scope .dy-pc-board-row.active strong { color: var(--dy-accent-text); }
 .dy-pc-scope .dy-pc-board-row:disabled { cursor: wait; opacity: .65; }
 .dy-pc-scope .dy-pc-board-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 99px; background: var(--dy-success); }
 .dy-pc-scope .dy-pc-board-dot[data-status="submitted"] { background: var(--dy-warning); }
@@ -476,7 +485,9 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-pc-scope .dy-pc-board-item .dy-pc-board-row { flex: 1 1 auto; }
 .dy-pc-scope .dy-pc-board-item .dockyard-button { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; padding: 5px; }
 .dy-pc-scope .dy-pc-board-item .dockyard-button svg, .dy-pc-scope .dy-pc-board-bar .dockyard-button svg { width: 14px; height: 14px; }
-.dy-pc-scope .dy-pc-board-form { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; grid-column: 1 / -1; }
+.dy-pc-scope .dy-pc-board-form { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dy-pc-scope .dy-pc-board-form .dockyard-button { display: inline-flex; align-items: center; gap: 5px; }
+.dy-pc-scope .dy-pc-board-form .dockyard-button svg { width: 13px; height: 13px; }
 .dy-pc-scope .dy-pc-board-form input { flex: 1 1 180px; min-width: 0; padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
 .dy-pc-scope .dy-pc-board-status { display: inline-flex; align-items: center; gap: 6px; }
 .dy-pc-scope .dy-pc-board-status select { padding: 5px 8px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 11.5px; }
@@ -518,6 +529,9 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-pc-scope .dy-pc-readout { color: var(--dy-text-3); font-size: 11px; font-variant-numeric: tabular-nums; }
 /* Stage + world. The world is the scrollable/zoomable plane objects live on. */
 .dy-pc-scope .dy-pc-stage { position: relative; flex: 1 1 auto; min-height: 460px; height: 58vh; overflow: hidden; background-color: var(--dy-pc-stage-bg); background-image: radial-gradient(ellipse at 50% 0%, var(--dy-pc-glow), transparent 62%), linear-gradient(var(--dy-pc-grid) 1px, transparent 1px), linear-gradient(90deg, var(--dy-pc-grid) 1px, transparent 1px); background-size: 100% 100%, 28px 28px, 28px 28px; }
+.dy-pc-scope .dy-pc-stage { cursor: grab; overscroll-behavior: contain; touch-action: none; }
+.dy-pc-scope .dy-pc-stage[data-pc-panning="true"] { cursor: grabbing; }
+.dy-pc-scope .dy-pc-stage[data-pc-panning="true"] .dy-pc-world { user-select: none; }
 .dy-pc-scope .dy-pc-stage[data-pc-mode="connect"] { cursor: crosshair; }
 .dy-pc-scope .dy-pc-world { position: absolute; left: 0; top: 0; width: 2000px; height: 1400px; transform-origin: 0 0; }
 .dy-pc-scope .dy-pc-svg { position: absolute; left: 0; top: 0; width: 2000px; height: 1400px; overflow: visible; pointer-events: none; z-index: 1; }
@@ -570,12 +584,13 @@ td.bad, .bad { color: var(--dy-bad); }
 /* Frames are decorative group labels (v6's .pframe) — never controls. */
 .dy-pc-scope .dy-pc-frame { position: absolute; z-index: 0; border: 1px dashed var(--dy-border); border-radius: 10px; background: var(--dy-accent-soft); padding: 12px 14px; color: var(--dy-text-3); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 /* Assistant (curation) panel: docked, collapsible, bottom-right. */
-.dy-pc-scope .dy-pc-chat { position: absolute; right: 14px; bottom: 14px; z-index: 20; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 12px; background: var(--dy-pc-surface); box-shadow: 0 14px 44px rgba(0, 0, 0, .28); }
+.dy-pc-scope .dy-pc-chat { position: absolute; right: 14px; bottom: 14px; z-index: 35; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 12px; background: var(--dy-pc-surface); box-shadow: 0 14px 44px rgba(0, 0, 0, .28); }
 .dy-pc-scope .dy-pc-chat.closed { width: 268px; }
 .dy-pc-scope .dy-pc-chat.open { width: 360px; max-height: min(460px, calc(100% - 28px)); }
 .dy-pc-scope .dy-pc-chat.pill { width: auto; max-width: calc(100% - 28px); border-radius: 999px; }
 .dy-pc-scope .dy-pc-chat.pill .dy-pc-chat-b, .dy-pc-scope .dy-pc-chat.pill .dy-pc-chat-f, .dy-pc-scope .dy-pc-chat.pill .dy-pc-chat-model { display: none; }
 .dy-pc-scope .dy-pc-chat.dragging { transition: none; box-shadow: 0 22px 60px rgba(0, 0, 0, .36); }
+.dy-pc-scope .dy-pc-chat.behind-drawer { display: none; }
 .dy-pc-scope .dy-pc-chat-bar { display: flex; align-items: center; gap: 2px; padding-right: 6px; }
 .dy-pc-scope .dy-pc-chat-bar .dockyard-button { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; min-height: 26px; padding: 4px; }
 .dy-pc-scope .dy-pc-chat-bar .dockyard-button svg { width: 13px; height: 13px; }
@@ -586,10 +601,33 @@ td.bad, .bad { color: var(--dy-bad); }
 /* Closed = header bar only; the body, composer and model picker return on open. */
 .dy-pc-scope .dy-pc-chat.closed .dy-pc-chat-model, .dy-pc-scope .dy-pc-chat.closed .dy-pc-chat-b, .dy-pc-scope .dy-pc-chat.closed .dy-pc-chat-f { display: none; }
 .dy-pc-scope .dy-pc-overlay { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; padding: 18px; background: var(--dy-pc-backdrop); }
-.dy-pc-scope .dy-pc-overlay-card { display: flex; flex-direction: column; width: min(820px, 100%); max-height: 100%; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); box-shadow: 0 24px 70px rgba(0, 0, 0, .38); color: var(--dy-text); }
+.dy-pc-scope .dy-pc-overlay-card { display: flex; flex-direction: column; width: min(820px, 100%); max-height: 100%; min-height: 0; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); box-shadow: 0 24px 70px rgba(0, 0, 0, .38); color: var(--dy-text); }
+.dy-pc-scope .dy-pc-overlay-card.chat { width: min(900px, 100%); height: 100%; }
 .dy-pc-scope .dy-pc-overlay-h { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--dy-border); }
 .dy-pc-scope .dy-pc-overlay-h strong { flex: 1 1 auto; font-size: 14px; }
-.dy-pc-scope .dy-pc-overlay-b { display: grid; gap: 10px; overflow: auto; padding: 14px 16px; font-size: 12.5px; }
+/* Icons in the overlay are always icon-sized: an unsized svg fills its box. */
+.dy-pc-scope .dy-pc-overlay svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.dy-pc-scope .dy-pc-overlay-av { display: grid; place-items: center; flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px; background: var(--dy-accent-soft); color: var(--dy-accent-text); }
+.dy-pc-scope .dy-pc-overlay-av.warn { background: var(--dy-surface-subtle); color: var(--dy-warning); }
+.dy-pc-scope .dy-pc-overlay-title { display: grid; flex: 1 1 auto; min-width: 0; gap: 1px; }
+.dy-pc-scope .dy-pc-overlay-title span { overflow: hidden; color: var(--dy-text-3); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+.dy-pc-scope .dy-pc-overlay-h .dockyard-button { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; padding: 5px; }
+.dy-pc-scope .dy-pc-overlay-model { border-bottom: 1px solid var(--dy-border); padding: 8px 16px; }
+.dy-pc-scope .dy-pc-overlay-b { display: grid; flex: 1 1 auto; min-height: 0; gap: 12px; align-content: start; overflow: auto; padding: 16px 20px; font-size: 13.5px; }
+/* Large view = the same conversation at reading size. */
+.dy-pc-scope .dy-pc-overlay-card.chat .dy-pc-msg { max-width: 78%; padding: 11px 14px; font-size: 14px; line-height: 1.6; }
+.dy-pc-scope .dy-pc-overlay-card.chat .dy-pc-proposal { padding: 12px 14px; }
+.dy-pc-scope .dy-pc-overlay-card.chat .dy-pc-proposal strong { font-size: 13.5px; }
+.dy-pc-scope .dy-pc-overlay-card.chat .dy-pc-proposal small { font-size: 12px; }
+.dy-pc-scope .dy-pc-overlay-composer { display: grid; gap: 8px; }
+.dy-pc-scope .dy-pc-overlay-composer textarea { width: 100%; min-height: 72px; padding: 10px 12px; border: 1px solid var(--dy-control-border); border-radius: 9px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 13.5px; line-height: 1.5; resize: vertical; box-sizing: border-box; }
+.dy-pc-scope .dy-pc-overlay-actions { display: flex; justify-content: flex-end; gap: 7px; }
+.dy-pc-scope .dy-pc-overlay-actions .dockyard-button, .dy-pc-scope .dy-pc-overlay-f .dockyard-button { display: inline-flex; align-items: center; gap: 5px; }
+.dy-pc-scope .dy-pc-overlay-f .dockyard-button svg { width: 13px; height: 13px; }
+/* Unsaved-changes prompt: small, centred, above everything on the canvas. */
+.dy-pc-scope .dy-pc-leave { z-index: 60; }
+.dy-pc-scope .dy-pc-leave-card { width: min(440px, 100%); height: auto; }
+.dy-pc-scope .dy-pc-leave-body { margin: 0; padding: 14px 16px 4px; color: var(--dy-text); font-size: 13px; line-height: 1.5; }
 .dy-pc-scope .dy-pc-overlay-b ol { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .dy-pc-scope .dy-pc-overlay-b li { display: flex; align-items: center; gap: 7px; }
 .dy-pc-scope .dy-pc-overlay-b li > span { flex: 0 0 22px; color: var(--dy-text-3); font-variant-numeric: tabular-nums; text-align: right; }
@@ -651,6 +689,9 @@ td.bad, .bad { color: var(--dy-bad); }
   .dy-pc-scope .dy-pc-chat.closed { right: 8px; width: min(268px, calc(100% - 16px)); }
   .dy-pc-scope .dy-pc-board-bar { flex-wrap: wrap; }
   .dy-pc-scope .dy-pc-board-list { grid-template-columns: 1fr; }
+  .dy-pc-scope .dy-pc-board-moves { flex: 1 1 100%; }
+  .dy-pc-scope .dy-pc-overlay { padding: 8px; }
+  .dy-pc-scope .dy-pc-overlay-card.chat .dy-pc-msg { max-width: 92%; }
   .dy-pc-scope .dy-pc-linkbar select { min-width: 0; width: 100%; }
   .dy-pc-scope .dy-pc-linkbar label { flex: 1 1 100%; }
 }

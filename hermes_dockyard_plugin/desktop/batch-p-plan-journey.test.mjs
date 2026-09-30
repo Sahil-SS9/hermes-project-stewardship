@@ -50,10 +50,13 @@ test('Batch P rendered journey: undo/duplicate/marquee + plan doc + backlog conf
     // Marquee multi-select on empty stage.
     const stage = canvas.locator('[data-pc-stage]')
     const stageBox = await stage.boundingBox()
+    // Shift+drag = selection box (plain drag moves the board).
+    await page.keyboard.down('Shift')
     await page.mouse.move(stageBox.x + 5, stageBox.y + 5)
     await page.mouse.down()
     await page.mouse.move(stageBox.x + stageBox.width - 5, stageBox.y + Math.min(300, stageBox.height - 5), { steps: 5 })
     await page.mouse.up()
+    await page.keyboard.up('Shift')
     await page.waitForTimeout(200)
     const marqueeSelected = await canvas.locator('.dy-pc-obj.marquee-selected').count()
     assert.ok(marqueeSelected >= 1, 'marquee selected at least one card')

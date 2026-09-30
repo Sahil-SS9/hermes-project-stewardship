@@ -44,10 +44,14 @@ class PlanDocumentService:
     def save_plan(self, project_id: str, plan: dict[str, Any]) -> dict[str, Any]:
         plan_id = "canvas-plan-" + plan.get("plan_hash", "")[:16] or "canvas-plan"
         now = iso(self.store._clock())
+        # Re-synthesising the same proposal lands on the same plan_id. The
+        # stored plan wins: it may carry owner step edits or a saved document,
+        # and silently replacing it would lose both (QA H-1).
+        if self._conn().execute("SELECT 1 FROM canvas_plans WHERE plan_id=?", (plan_id,)).fetchone():
+            return self.get_plan(project_id, plan_id)
         with self.store.tx() as cx:
             cx.execute(
-                "INSERT INTO canvas_plans(plan_id, project_id, canvas_id, proposal_id, canvas_revision, plan_json, status, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?) "
-                "ON CONFLICT(plan_id) DO UPDATE SET plan_json=excluded.plan_json, status=excluded.status, updated_at=excluded.updated_at",
+                "INSERT INTO canvas_plans(plan_id, project_id, canvas_id, proposal_id, canvas_revision, plan_json, status, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
                 (plan_id, project_id, plan.get("canvas_id"), plan.get("proposal_id"), int(plan.get("canvas_revision") or 0),
                  json.dumps(plan, sort_keys=True), "draft", now, now),
             )
@@ -148,6 +152,10 @@ class PlanDocumentService:
         plan = self.get_plan(project_id, plan_id)
         if plan.get("status") not in {"draft", "documented"}:
             raise ValueError("implementation document requires an approved plan")
+        # Completed/archived boards are read-only end to end: document the
+        # plan and create backlog items first, then complete the board.
+        if plan.get("canvas_id"):
+            self.canvas.require_editable(project_id, plan["canvas_id"])
         existing = self._conn().execute(
             "SELECT doc_content_id FROM canvas_plans WHERE project_id=? AND plan_id=?",
             (project_id, plan_id),
@@ -207,6 +215,8 @@ class PlanDocumentService:
             raise ValueError(f"unknown canvas proposal: {proposal_id}")
         if row["status"] != "approved":
             raise ValueError("plan synthesis requires an approved technical_plan proposal")
+        if row["canvas_id"]:
+            self.canvas.require_editable(project_id, row["canvas_id"])
         proposal = json.loads(row["proposal_json"])
         if proposal.get("kind") != "technical_plan":
             raise ValueError("plan synthesis requires an approved technical_plan proposal")
@@ -406,6 +416,8 @@ class PlanDocumentService:
         plan = self.get_plan(project_id, plan_id)
         if plan.get("status") != "documented":
             raise ValueError("backlog items require the implementation document to be saved first")
+        if plan.get("canvas_id"):
+            self.canvas.require_editable(project_id, plan["canvas_id"])
         if work is None:
             raise ValueError("backlog creation requires the canonical work service")
         if not step_orders:

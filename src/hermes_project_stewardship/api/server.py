@@ -248,6 +248,9 @@ class CanvasSessionAnswerRequest(BaseModel):
 class CanvasProposalDecisionRequest(BaseModel):
     approve: bool
     actor: str = "system"
+    # QA M-4: when given, the proposal must belong to this project (404 if
+    # not). Optional so older callers keep working.
+    project_id: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class CanvasPlanSynthesisRequest(BaseModel):
@@ -1230,7 +1233,7 @@ def create_app(
                 actor=_principal_id(body.actor),
             )
         except CanvasConflictError as exc:
-            raise HTTPException(409, str(exc)) from exc
+            raise _board_error(exc) from exc
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
 
@@ -1243,14 +1246,18 @@ def create_app(
                 actor=_principal_id(actor),
             )
         except CanvasConflictError as exc:
-            raise HTTPException(409, str(exc)) from exc
+            raise _board_error(exc) from exc
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
 
     # ---- D14/D16/D19: several named boards per project ------------------
     def _board_error(exc: Exception):
-        from ..persistence.canvas_service import CanvasConflictError
+        from ..persistence.canvas_service import CanvasConflictError, CanvasLockedError
         message = str(exc)
+        if isinstance(exc, CanvasLockedError):
+            # Distinct code so the client never mistakes a locked board for
+            # a stale revision (QA M-1).
+            return HTTPException(409, {"code": "board_locked", "message": message})
         if isinstance(exc, CanvasConflictError):
             return HTTPException(409, message)
         if message.startswith("unknown project") or message.startswith("unknown canvas board"):
@@ -1342,7 +1349,7 @@ def create_app(
                 project_id, object_id, expected_revision=expected_revision,
                 actor=_principal_id(actor), canvas_id=canvas_id)
         except CanvasConflictError as exc:
-            raise HTTPException(409, str(exc)) from exc
+            raise _board_error(exc) from exc
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
 
@@ -1365,7 +1372,7 @@ def create_app(
             return PlanDocumentService(store).update_steps(
                 project_id, plan_id, steps=body.steps, actor=_principal_id(body.actor))
         except CanvasConflictError as exc:
-            raise HTTPException(409, str(exc)) from exc
+            raise _board_error(exc) from exc
         except ValueError as exc:
             if str(exc).startswith("unknown canvas plan"):
                 raise HTTPException(404, str(exc)) from exc
@@ -1397,7 +1404,7 @@ def create_app(
             return CanvasPlanningService(store, provider=provider).start(
                 project_id, actor=_principal_id(body.actor), message=body.message)
         except CanvasConflictError as exc:
-            raise HTTPException(409, str(exc)) from exc
+            raise _board_error(exc) from exc
         except ValueError as exc:
             message = str(exc)
             if "unknown" in message:
@@ -1425,15 +1432,19 @@ def create_app(
             board_model = json.loads(row[0]) if row and row[0] else None
             return CanvasPlanningService(store, provider=_canvas_provider(board_model)).answer(session_id, outcome=body.outcome, answer=body.answer, actor=_principal_id(body.actor))
         except CanvasConflictError as exc:
-            raise HTTPException(409, str(exc)) from exc
+            raise _board_error(exc) from exc
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
 
     @router.post("/canvas/proposals/{proposal_id}/decision")
     def decide_canvas_proposal(proposal_id: str, body: CanvasProposalDecisionRequest):
+        from ..persistence.canvas_service import CanvasConflictError
         from ..persistence.canvas_planning import CanvasPlanningService
         try:
-            return CanvasPlanningService(store).decide(proposal_id, approve=body.approve, actor=_principal_id(body.actor))
+            return CanvasPlanningService(store).decide(proposal_id, approve=body.approve, actor=_principal_id(body.actor),
+                                                       project_id=body.project_id)
+        except CanvasConflictError as exc:
+            raise _board_error(exc) from exc
         except ValueError as exc:
             message = str(exc)
             if "unknown" in message:
@@ -1442,6 +1453,7 @@ def create_app(
 
     @router.post("/canvas/proposals/{proposal_id}/plan")
     def synthesise_canvas_plan(proposal_id: str, body: CanvasPlanSynthesisRequest):
+        from ..persistence.canvas_service import CanvasConflictError
         from ..persistence.canvas_plan_document import PlanDocumentService
         # D16: the plan is written by the model chosen on the proposal's own
         # board (the default when none was chosen), never a different board's.
@@ -1453,6 +1465,8 @@ def create_app(
         try:
             return PlanDocumentService(store, provider=provider).synthesise_plan(
                 body.project_id, proposal_id=proposal_id, actor=_principal_id(body.actor))
+        except CanvasConflictError as exc:
+            raise _board_error(exc) from exc
         except ValueError as exc:
             message = str(exc)
             if "unknown" in message:
@@ -1486,6 +1500,7 @@ def create_app(
 
     @router.post("/projects/{project_id}/plans/{plan_id}/document/save")
     def save_canvas_plan_document(project_id: str, plan_id: str, body: CanvasPlanDocumentRequest):
+        from ..persistence.canvas_service import CanvasConflictError
         """D-P2: persist the implementation document into the project's
         Content tab (Markdown)."""
         from ..persistence.canvas_plan_document import PlanDocumentService
@@ -1494,6 +1509,8 @@ def create_app(
             service.save_implementation_document(
                 project_id, plan_id, service.build_implementation_document(project_id, plan_id),
                 actor=_principal_id(body.actor))
+        except CanvasConflictError as exc:
+            raise _board_error(exc) from exc
         except ValueError as exc:
             message = str(exc)
             if "unknown" in message:
@@ -1514,6 +1531,7 @@ def create_app(
 
     @router.post("/projects/{project_id}/plans/{plan_id}/backlog")
     def create_backlog_from_plan(project_id: str, plan_id: str, body: CanvasPlanBacklogRequest):
+        from ..persistence.canvas_service import CanvasConflictError
         from ..persistence.canvas_plan_document import PlanConflictError, PlanDocumentService
         try:
             return PlanDocumentService(store).create_backlog_items(
@@ -1521,6 +1539,8 @@ def create_app(
                 actor=_principal_id(body.actor), work=work)
         except PlanConflictError as exc:
             raise HTTPException(409, str(exc)) from exc
+        except CanvasConflictError as exc:
+            raise _board_error(exc) from exc
         except ValueError as exc:
             message = str(exc)
             if "unknown" in message:
