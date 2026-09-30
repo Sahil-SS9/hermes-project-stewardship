@@ -13,6 +13,7 @@ import { layoutFrames } from '../../planning-canvas-geometry.js'
 import { jsxs } from '../runtime/react.js'
 import { Button, Icon } from '../lib/ui.js'
 import { fileAsBase64 } from '../lib/ui.js'
+import { RichTextEditor } from './rich-text.js'
 import { useDialogFocusManager } from '../lib/ui.js'
 export const CANVAS_OBJECT_KINDS = Object.freeze(['evidence', 'claim', 'question', 'decision', 'plan_block', 'risk', 'assumption', 'note', 'link', 'media'])
 export const CANVAS_CONNECTOR_MEANINGS = Object.freeze(['supports', 'contradicts', 'derived_from', 'clarifies', 'depends_on', 'implements', 'raises_question'])
@@ -44,8 +45,9 @@ export const CANVAS_KIND_FIELDS = Object.freeze({
 export const canvasChoiceLabel = (value) => ({ todo: 'To do', in_progress: 'In progress' }[value] ?? (value ? value.charAt(0).toUpperCase() + value.slice(1) : ''))
 export const CANVAS_IMAGE_TYPES = Object.freeze({ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' })
 export const CANVAS_IMAGE_MAX = 5 * 1024 * 1024
-export const canvasSafeUrl = (value) => /^https?:\/\/\S{4,}$/i.test(String(value ?? '').trim())
-const linksOf = (content) => Array.isArray(content?.links) ? content.links : (content?.url ? [{ url: content.url }] : [])
+// Same rule as the server (_WEB_URL): scheme, a dotted host, no spaces.
+export const canvasSafeUrl = (value) => /^https?:\/\/[^\s/?#]+\.[^\s/?#]+(?:[/?#]\S*)?$/i.test(String(value ?? '').trim())
+const linksOf = (content) => (Array.isArray(content?.links) ? content.links : (content?.url ? [{ url: content.url }] : []))
 // One short line under the title: status, owner, links, checklist progress.
 export const canvasSummary = (item) => {
   const c = item?.content ?? {}
@@ -75,7 +77,14 @@ export function CanvasImage({ projectId, contentId, alt, className }) {
       if (!CANVAS_IMAGE_TYPES[result?.media_type] || typeof result?.data_base64 !== 'string') throw new Error('not an image')
       const url = `data:${result.media_type};base64,${result.data_base64}`
       imageCache.set(key, url)
-      if (imageCache.size > 40) imageCache.delete(imageCache.keys().next().value)
+      // Bound memory by total size (about 30 MB of data URLs), oldest out first.
+      let total = 0
+      for (const value of imageCache.values()) total += value.length
+      while (total > 30 * 1024 * 1024 && imageCache.size > 1) {
+        const oldest = imageCache.keys().next().value
+        total -= imageCache.get(oldest).length
+        imageCache.delete(oldest)
+      }
       setSrc(url)
     }).catch(() => { if (live) setFailed(true) })
     return () => { live = false }
@@ -151,7 +160,6 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   const [drawerKind, setDrawerKind] = useState('note')
   const [drawerFields, setDrawerFields] = useState({})
   const [members, setMembers] = useState([])
-  const [uploadedImages, setUploadedImages] = useState([])
   const [imageBusy, setImageBusy] = useState(false)
   const [linkSource, setLinkSource] = useState('')
   const [linkTarget, setLinkTarget] = useState('')
@@ -717,9 +725,9 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     setImageBusy(true)
     try {
       const created = await api(`/projects/${encodeURIComponent(project.id)}/content`, { method: 'POST', body: { filename: file.name, media_type: mediaType, content_base64: await fileAsBase64(file) } })
-      setUploadedImages((current) => [created, ...current])
       setField('content_id', created.content_id)
-      if (!drawerFields.alt) setField('alt', String(file.name).replace(/\.[a-z0-9]+$/i, '').slice(0, 300))
+      const guess = String(file.name).replace(/\.[a-z0-9]+$/i, '').slice(0, 300)
+      setDrawerFields((current) => (current.alt ? current : { ...current, alt: guess }))
       setNotice({ tone: 'ok', text: 'Image uploaded — Apply, then Save canvas, to place it on the card.' })
     } catch (failure) {
       setNotice({ tone: 'danger', text: `Image could not be uploaded: ${failureText(failure)}` })
@@ -740,7 +748,9 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
       ...(Array.isArray(drawerFields.alternatives) ? { alternatives: drawerFields.alternatives.map((v) => String(v).trim()).filter(Boolean) } : {}),
       ...(Array.isArray(drawerFields.checklist) ? { checklist: drawerFields.checklist.map((v) => ({ text: String(v.text ?? '').trim(), done: Boolean(v.done) })).filter((v) => v.text) } : {}),
     }
-    if (!fields.links.length) fields.links = ''
+    // Links are always stored as a list; a legacy single `url` moves into it,
+    // so removing that row really removes it.
+    if (typeof selected.content?.url === 'string' && !Array.isArray(selected.content?.links)) fields.url = ''
     const before = snapshot(objects, connectors)
     setObjects((current) => current.map((item) => item.id === selected.id ? { ...item, kind: drawerKind, content: { ...(item.content ?? {}), ...fields, text } } : item))
     setHistory((current) => [...current.slice(-49), before]); setFuture([])
@@ -1006,6 +1016,12 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   // Ctrl/Cmd+Shift+Z or Ctrl+Y redo, Ctrl/Cmd+D duplicate, Escape clears.
   const onStageKeyDown = (event) => {
     const key = event.key
+    // Typing in a field (title, description editor, links, chat) must never
+    // trigger board shortcuts: Delete/Backspace would remove the card and
+    // Ctrl+Z would undo the board instead of the text.
+    const target = event.target
+    if (target && target !== stageRef.current && (target.isContentEditable
+        || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return
     const meta = event.ctrlKey || event.metaKey
     if (key === 'Escape') { setSelectedId(null); setSelectedIds([]); setPendingConnect(null); return }
     // Arrow keys move around the board when nothing is selected.
@@ -1241,7 +1257,9 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     const f = drawerFields
     const off = readOnly
     const out = []
-    out.push(jsxs('label', { children: [jsx('span', { children: 'Description' }), jsx('textarea', { 'data-canvas-field': 'description', rows: 4, maxLength: 20000, value: f.description ?? '', readOnly: off, disabled: off, placeholder: 'Details, context, notes…', onChange: (event) => setField('description', event.target.value) })] }))
+    // Stage 2: Word-style formatted description. The server derives the plain
+    // `description` copy from `description_doc`, so the two never disagree.
+    out.push(jsx(RichTextEditor, { value: f.description_doc, fallbackText: f.description, readOnly: off, onChange: (doc, plain) => { setField('description_doc', plain ? doc : undefined); setField('description', plain || undefined) } }, `rt-${selected?.id}`))
     const links = f.links ?? []
     out.push(jsxs('fieldset', { className: 'dy-pc-fieldset', 'data-canvas-links': true, children: [
       jsx('legend', { children: `Links${links.length ? ` (${links.length})` : ''}` }),
@@ -1661,7 +1679,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
               ]}),
               selected ? jsxs('div', { className: 'dy-pc-drawer-b', children: [
                 readOnly ? jsx('p', { className: 'dy-pc-drawer-meta', 'data-canvas-drawer-readonly': true, children: `This board is ${CANVAS_BOARD_STATUS_LABELS[boardStatus]} — details are view-only.` }) : null,
-                jsxs('label', { children: [jsx('span', { children: 'Title' }), jsx('input', { 'data-canvas-object-title': true, value: drawerText, readOnly, disabled: readOnly, onChange: (event) => setDrawerText(event.target.value) })] }),
+                jsxs('label', { children: [jsx('span', { children: 'Title' }), jsx('input', { 'data-canvas-object-title': true, maxLength: 4000, value: drawerText, readOnly, disabled: readOnly, onChange: (event) => setDrawerText(event.target.value) })] }),
                 jsxs('label', { children: [jsx('span', { children: 'Kind' }), jsx('select', { 'data-canvas-object-kind': true, value: drawerKind, disabled: readOnly, onChange: (event) => setDrawerKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx('option', { value, children: CANVAS_KIND_LABELS[value] }, value)) })] }),
                 jsxs('label', { children: [jsx('span', { children: 'Sticker colour' }), jsx('select', { 'data-canvas-object-colour': true, value: selectedColour ?? '', disabled: readOnly, onChange: (event) => setSelectedColour(event.target.value || null), children: [jsx('option', { value: '', children: 'Default kind colour' }, 'default'), ...CANVAS_STICKER_COLOURS.map((value) => jsx('option', { value, children: CANVAS_STICKER_LABELS[value] }, value))] })] }),
                 ...renderFieldEditors(),

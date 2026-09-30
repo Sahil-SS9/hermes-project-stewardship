@@ -69,7 +69,7 @@ function buildDesktopBundle() {
   ].join('\n'))
   const nm = join(DASHBOARD, 'node_modules')
   execFileSync(join(nm, '.bin', 'esbuild'), [
-    entry, '--bundle', '--format=esm', `--outfile=${bundle}`, '--jsx=automatic',
+    entry, '--bundle', '--format=iife', `--outfile=${bundle}`, '--jsx=automatic',
     `--alias:@hermes/plugin-sdk=${sdk}`,
     `--alias:react=${join(nm, 'react')}`,
     `--alias:react/jsx-runtime=${join(nm, 'react', 'jsx-runtime.js')}`,

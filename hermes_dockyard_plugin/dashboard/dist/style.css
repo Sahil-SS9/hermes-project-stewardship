@@ -602,6 +602,34 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-pc-scope .dy-pc-upload input[type="file"] { font-size: 11.5px; }
 .dy-pc-scope .dy-pc-obj[data-canvas-kind="risk"] { border-left-color: var(--dy-pc-kind-risk); background: var(--dy-pc-fill-risk); }
 .dy-pc-scope .dy-pc-obj[data-canvas-kind="assumption"] { border-left-color: var(--dy-pc-kind-assumption); background: var(--dy-pc-fill-assumption); }
+.dy-pc-scope .dy-rt { display: grid; gap: 6px; min-width: 0; }
+.dy-pc-scope .dy-rt-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; padding: 5px; border: 1px solid var(--dy-border); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--dy-surface-2, var(--dy-surface)); }
+.dy-pc-scope .dy-rt-select { height: 28px; padding: 0 6px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 11.5px; }
+.dy-pc-scope .dy-rt-btn { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--dy-text); cursor: pointer; }
+.dy-pc-scope .dy-rt-btn:hover:not(:disabled) { background: var(--dy-hover, rgba(127,127,127,.14)); }
+.dy-pc-scope .dy-rt-btn.on { border-color: var(--dy-accent, #5b8def); background: color-mix(in srgb, var(--dy-accent, #5b8def) 18%, transparent); }
+.dy-pc-scope .dy-rt-btn:focus-visible, .dy-pc-scope .dy-rt-select:focus-visible { outline: 2px solid var(--dy-accent, #5b8def); outline-offset: 1px; }
+.dy-pc-scope .dy-rt-btn svg { width: 15px; height: 15px; }
+.dy-pc-scope .dy-rt-face { font-size: 13px; line-height: 1; }
+.dy-pc-scope .dy-rt-face-bold { font-weight: 800; }
+.dy-pc-scope .dy-rt-face-italic { font-style: italic; font-family: Georgia, serif; }
+.dy-pc-scope .dy-rt-face-underline { text-decoration: underline; }
+.dy-pc-scope .dy-rt-face-strike { text-decoration: line-through; }
+.dy-pc-scope .dy-rt-sep { width: 1px; height: 18px; margin: 0 3px; background: var(--dy-border); }
+.dy-pc-scope .dy-rt-host .dy-rt-body { min-height: 110px; max-height: 320px; overflow: auto; padding: 9px 11px; border: 1px solid var(--dy-control-border); border-radius: 0 0 8px 8px; background: var(--dy-surface); color: var(--dy-text); font-size: 12.5px; line-height: 1.5; outline: none; overflow-wrap: anywhere; }
+.dy-pc-scope .dy-rt-host.readonly .dy-rt-body { border-radius: 8px; }
+.dy-pc-scope .dy-rt-host .dy-rt-body:focus { border-color: var(--dy-accent, #5b8def); }
+.dy-pc-scope .dy-rt-body p { margin: 0 0 6px; }
+.dy-pc-scope .dy-rt-body h1 { margin: 4px 0 6px; font-size: 19px; line-height: 1.25; }
+.dy-pc-scope .dy-rt-body h2 { margin: 4px 0 6px; font-size: 16px; line-height: 1.3; }
+.dy-pc-scope .dy-rt-body h3 { margin: 4px 0 6px; font-size: 14px; line-height: 1.3; }
+.dy-pc-scope .dy-rt-body ul, .dy-pc-scope .dy-rt-body ol { margin: 0 0 6px; padding-left: 22px; }
+.dy-pc-scope .dy-rt-body ul { list-style: disc; }
+.dy-pc-scope .dy-rt-body ol { list-style: decimal; }
+.dy-pc-scope .dy-rt-body li p { margin: 0 0 2px; }
+.dy-pc-scope .dy-rt-small { font-size: .82em; }
+.dy-pc-scope .dy-rt-large { font-size: 1.3em; }
+.dy-pc-scope .dy-rt-huge { font-size: 1.7em; line-height: 1.2; }
 .dy-pc-scope .dy-pc-obj-meta { display: block; margin-top: 6px; color: var(--dy-pc-ink-2); font-size: 10px; }
 .dy-pc-scope .dy-pc-empty { position: absolute; left: 18px; top: 16px; margin: 0; color: var(--dy-text-3); font-size: 12px; }
 /* Frames are decorative group labels (v6's .pframe) — never controls. */
@@ -681,7 +709,7 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-pc-scope .dy-pc-proposal[data-pc-proposal-status="approved"] { border-style: solid; border-color: var(--dy-success); }
 .dy-pc-scope .dy-pc-proposal[data-pc-proposal-status="rejected"] { border-style: solid; border-color: var(--dy-border); background: var(--dy-surface-subtle); }
 /* Drawer: the selection editor (replaces a permanently-docked inspector). */
-.dy-pc-scope .dy-pc-drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 30; display: flex; flex-direction: column; width: min(360px, 92vw); border-left: 1px solid var(--dy-border); background: var(--dy-surface); transform: translateX(100%); transition: transform .18s ease; }
+.dy-pc-scope .dy-pc-drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 30; display: flex; flex-direction: column; width: min(360px, 100%); max-width: 100%; box-sizing: border-box; border-left: 1px solid var(--dy-border); background: var(--dy-surface); transform: translateX(100%); transition: transform .18s ease; }
 /* Closed = off-canvas AND inert: it must not catch clicks meant for cards at
    the stage edge, nor let Tab reach its hidden fields. visibility waits for
    the slide-out to finish. */

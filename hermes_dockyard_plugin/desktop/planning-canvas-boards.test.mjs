@@ -653,7 +653,8 @@ test('Planning cards: description, many links, per-type fields, member owners, i
     await risk.click();
     await drawer.waitFor();
     // Description + links with (+), including a blank line that is dropped.
-    await drawer.locator('[data-canvas-field="description"]').fill('Import can time out on big files.');
+    await drawer.locator('[data-canvas-rich-text]').click();
+    await page.keyboard.type('Import can time out on big files.');
     await drawer.locator('[data-action="pc-link-add"]').click();
     await drawer.locator('[data-canvas-link-url="0"]').fill('https://example.com/spec');
     await drawer.locator('[data-canvas-link-label="0"]').fill('Spec');
@@ -718,6 +719,113 @@ test('Planning cards: description, many links, per-type fields, member owners, i
     const box = await media.locator('img[data-canvas-image]').boundingBox();
     assert.ok(box.width > 100 && box.height > 60, 'thumbnail is visible on the card');
     assert.equal(await media.locator('img[data-canvas-image]').getAttribute('alt'), 'diagram');
+  });
+});
+
+test('Planning cards: Word-style description formatting saves as safe rich text', { timeout: 180000 }, async () => {
+  await withPage(1440, 900, async (page, host) => {
+    const canvas = root(page);
+    const drawer = canvas.locator('.dy-pc-drawer.open');
+    const card = canvas.locator('[data-canvas-object]').first();
+    const id = await card.getAttribute('data-canvas-object');
+    await card.click();
+    await drawer.waitFor();
+    const body = drawer.locator('[data-canvas-rich-text]');
+    const tool = (name) => drawer.locator(`[data-rt="${name}"]`);
+    // Every control in the formatting bar is there.
+    for (const name of ['style', 'size', 'bold', 'italic', 'underline', 'strike', 'bullets', 'numbers', 'left', 'center', 'right', 'justify', 'clear']) assert.equal(await tool(name).count(), 1, `tool ${name}`);
+    await body.click();
+    const cardsBefore = await canvas.locator('[data-canvas-object]').count();
+    await page.keyboard.press('Control+a');
+    await page.keyboard.press('Delete');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Control+z');
+    await page.keyboard.press('Control+a');
+    await page.keyboard.press('Delete');
+    assert.equal(await canvas.locator('[data-canvas-object]').count(), cardsBefore, 'typing Delete/Backspace/Ctrl+Z in a field never touches the board');
+    assert.equal(await drawer.count(), 1, 'details panel stays open while typing');
+    await tool('style').selectOption('h2');
+    await page.keyboard.type('Heading');
+    await tool('center').click();
+    assert.equal(await tool('center').getAttribute('aria-pressed'), 'true');
+    await page.keyboard.press('Enter');
+    await tool('style').selectOption('p');
+    await tool('left').click();
+    await tool('bold').click();
+    await page.keyboard.type('Bold');
+    await tool('bold').click();
+    await page.keyboard.type(' ');
+    await tool('size').selectOption('large');
+    await page.keyboard.type('big');
+    await tool('size').selectOption('normal');
+    await page.keyboard.press('Enter');
+    await tool('bullets').click();
+    await page.keyboard.type('one');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('two');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+    await tool('numbers').click();
+    await page.keyboard.type('first');
+    assert.equal(await body.locator('h2').count(), 1);
+    assert.equal(await body.locator('ul li').count(), 2);
+    assert.equal(await body.locator('ol li').count(), 1);
+    assert.equal(await body.locator('strong').innerText(), 'Bold');
+    assert.equal(await body.locator('.dy-rt-large').innerText(), 'big');
+    // Pasted HTML cannot smuggle links, images or scripts in.
+    await page.evaluate(() => {
+      const el = document.querySelector('[data-canvas-rich-text]');
+      const dt = new DataTransfer();
+      dt.setData('text/html', '<p><a href="javascript:alert(1)">bad</a><img src=x onerror="window.__pwned=1"><span style="color:red">red</span></p>');
+      el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    });
+    assert.equal(await body.locator('a, img, [style*="color"]').count(), 0, 'no links, images or inline styles');
+    assert.equal(await page.evaluate(() => window.__pwned ?? null), null);
+    await drawer.locator('[data-action="apply-canvas-object"]').click();
+    await drawer.locator('[data-action="pc-close-drawer"]').click();
+    await canvas.locator('[data-action="pc-save"]').click();
+    await page.waitForSelector('[data-planning-canvas][data-canvas-dirty="false"]');
+    const saved = host.find('board-a').objects.find((o) => o.id === id).content;
+    const doc = saved.description_doc;
+    assert.equal(doc.type, 'doc');
+    assert.deepEqual(doc.content[0].attrs, { level: 2, textAlign: 'center' });
+    const types = doc.content.map((n) => n.type);
+    assert.ok(types.includes('bulletList') && types.includes('orderedList'), `blocks ${types}`);
+    const json = JSON.stringify(doc);
+    assert.ok(!/javascript|onerror|<|style/.test(json), 'stored document holds no markup or scripts');
+    assert.match(json, /"fontSize","attrs":\{"size":"large"\}/);
+    // Reopening shows the formatting again.
+    await card.click();
+    await drawer.waitFor();
+    assert.equal(await drawer.locator('[data-canvas-rich-text] h2').innerText(), 'Heading');
+    assert.equal(await drawer.locator('[data-canvas-rich-text] ul li').count(), 2);
+  });
+});
+
+test('Planning cards on a phone: details panel fits the screen with formatting bar and fields', { timeout: 180000 }, async () => {
+  await withPage(390, 844, async (page) => {
+    const canvas = root(page);
+    await canvas.locator('[data-action="pc-add-menu"]').click();
+    await canvas.locator('[data-canvas-add-kind="risk"]').click();
+    const card = canvas.locator('.dy-pc-obj[data-canvas-kind="risk"]').last();
+    await card.scrollIntoViewIfNeeded();
+    await card.click();
+    const drawer = canvas.locator('.dy-pc-drawer.open');
+    await drawer.waitFor();
+    await drawer.locator('[data-action="pc-link-add"]').click();
+    const problems = await page.evaluate(() => {
+      const d = document.querySelector('.dy-pc-drawer.open');
+      const out = [];
+      const dr = d.getBoundingClientRect();
+      if (dr.left < -1 || dr.right > innerWidth + 1) out.push(`drawer ${Math.round(dr.left)}..${Math.round(dr.right)} of ${innerWidth}`);
+      for (const el of d.querySelectorAll('input, select, textarea, button, [data-canvas-rich-text]')) {
+        const r = el.getBoundingClientRect();
+        if (!r.width) continue;
+        if (r.left < dr.left - 1 || r.right > dr.right + 1) out.push(`${el.getAttribute('aria-label') || el.dataset.rt || el.dataset.canvasField || el.tagName} ${Math.round(r.left)}..${Math.round(r.right)}`);
+      }
+      return out;
+    });
+    assert.deepEqual(problems, [], 'nothing in the details panel is cut off at 390px');
   });
 });
 
@@ -841,6 +949,11 @@ test('Planning boards: board list create, rename, archive, restore, status and r
     await canvas.locator('[data-canvas-object]').first().click();
     assert.equal(await canvas.locator('[data-canvas-object-title]').isDisabled(), true, 'details are view-only');
     assert.equal(await canvas.locator('[data-action="apply-canvas-object"]').count(), 0, 'no Apply on a read-only board');
+    // Stage 1/2 controls are view-only too (Quan L-9).
+    const ro = canvas.locator('.dy-pc-drawer.open');
+    assert.equal(await ro.locator('[data-action="pc-link-add"], [data-canvas-image-upload], .dy-rt-bar').count(), 0, 'no add-link, upload or formatting bar');
+    assert.equal(await ro.locator('[data-canvas-rich-text]').getAttribute('contenteditable'), 'false', 'description is not editable');
+    for (const el of await ro.locator('select[data-canvas-field], input[data-canvas-field]').all()) assert.equal(await el.isDisabled(), true, 'field disabled');
     await page.keyboard.press('Escape');
     assert.equal(await canvas.getAttribute('data-canvas-dirty'), 'false');
     assert.equal(await canvas.locator('[data-action="pc-save"]').isDisabled(), true, 'completed board cannot be saved');
