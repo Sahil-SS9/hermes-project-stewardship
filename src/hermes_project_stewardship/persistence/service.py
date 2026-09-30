@@ -1759,6 +1759,8 @@ class StewardshipService:
             ("canonical_work", "dockyard_canonical_work_details", "item_id", ("evidence_refs_json",)),
             ("legacy_work", "dockyard_work_items", "ref", ("evidence_refs_json",)),
             ("initiative", "project_initiatives", "ref", ("validation_contract_json", "outcome_json")),
+            # A planning-canvas card showing this image blocks its removal.
+            ("canvas", "project_canvases", "canvas_id", ("objects_json",)),
         )
         for kind, table, id_column, json_columns in sources:
             selected = ",".join((id_column, *json_columns))

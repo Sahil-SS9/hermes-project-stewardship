@@ -133,3 +133,103 @@ def test_existing_text_only_boards_still_save(store, enabled):
     saved = _save(service, enabled, _board(service, enabled), {"text": "old", "title": "t", "url": "https://a.b"},
                   kind="link")
     assert saved["objects"][0]["content"]["url"] == "https://a.b"
+
+
+# --- Quan Stage 1 review fixes: stale stored data never blocks a save ------
+
+def _stored(store, board, objects):
+    import json as _json
+    with store.tx() as cx:
+        cx.execute("UPDATE project_canvases SET objects_json=? WHERE canvas_id=?",
+                   (_json.dumps(objects), board["canvas_id"]))
+
+
+def test_h1_image_on_a_card_cannot_be_removed(store, svc, enabled):
+    service = CanvasService(store)
+    board = _board(service, enabled)
+    image = svc.upload_project_content(enabled, filename="p.png", media_type="image/png", content=PNG)
+    _save(service, enabled, board, {"content_id": image["content_id"]}, kind="media")
+    deps = svc.project_content_dependencies(enabled, image["content_id"])
+    assert {"kind": "canvas", "ref": board["canvas_id"]} in deps
+    with pytest.raises(Exception):
+        svc.remove_project_content(enabled, image["content_id"], actor="sahil")
+
+
+def test_h1_board_with_a_dangling_image_still_saves_and_card_can_be_removed(store, enabled):
+    service = CanvasService(store)
+    board = _board(service, enabled)
+    _stored(store, board, [{"id": "o1", "kind": "media", "content": {"content_id": "CONTENT-" + "A" * 16}, "x": 0, "y": 0}])
+    current = service.get_board(enabled, board["canvas_id"])
+    saved = service.save(enabled, canvas_id=board["canvas_id"], expected_revision=current["revision"],
+                         objects=[*current["objects"], {"id": "o2", "kind": "note", "content": {"text": "new"}, "x": 5, "y": 5}],
+                         connectors=[], actor="sahil")
+    assert len(saved["objects"]) == 2
+    gone = service.remove_object(enabled, "o1", expected_revision=saved["revision"], actor="sahil",
+                                 canvas_id=board["canvas_id"])
+    assert [o["id"] for o in gone["objects"]] == ["o2"]
+    # But pointing a card at a missing image is still refused.
+    with pytest.raises(ValueError, match="uploaded image"):
+        service.save(enabled, canvas_id=board["canvas_id"], expected_revision=gone["revision"],
+                     objects=[{"id": "o3", "kind": "media", "content": {"content_id": "CONTENT-" + "B" * 16}, "x": 0, "y": 0}],
+                     connectors=[], actor="sahil")
+
+
+def test_h2_board_naming_a_former_member_still_saves(store, enabled):
+    service = CanvasService(store)
+    board = _board(service, enabled)
+    _stored(store, board, [{"id": "o1", "kind": "plan_block", "content": {"text": "S", "owner": "renamed-away"}, "x": 0, "y": 0}])
+    current = service.get_board(enabled, board["canvas_id"])
+    moved = [{**current["objects"][0], "x": 40}]
+    saved = service.save(enabled, canvas_id=board["canvas_id"], expected_revision=current["revision"],
+                         objects=moved, connectors=[], actor="sahil")
+    assert saved["objects"][0]["content"]["owner"] == "renamed-away"
+    with pytest.raises(ValueError, match="not a member"):
+        service.save(enabled, canvas_id=board["canvas_id"], expected_revision=saved["revision"],
+                     objects=[{**moved[0], "content": {"text": "S", "owner": "another-stranger"}}],
+                     connectors=[], actor="sahil")
+
+
+def test_h3_long_titles_save(store, enabled):
+    service = CanvasService(store)
+    got = _save(service, enabled, _board(service, enabled), {"text": "t" * 4000})
+    assert len(got["objects"][0]["content"]["text"]) == 4000
+    with pytest.raises(ValueError, match="4000"):
+        _save(service, enabled, service.create_board(enabled, name="Two", actor="s"), {"text": "t" * 4001})
+
+
+def test_m1_legacy_values_pass_through_until_edited(store, enabled):
+    service = CanvasService(store)
+    board = _board(service, enabled)
+    legacy = {"text": "old", "url": "www.example.com", "confidence": 0.8}
+    _stored(store, board, [{"id": "o1", "kind": "link", "content": legacy, "x": 0, "y": 0}])
+    current = service.get_board(enabled, board["canvas_id"])
+    saved = service.save(enabled, canvas_id=board["canvas_id"], expected_revision=current["revision"],
+                         objects=[{**current["objects"][0], "content": {**legacy, "text": "renamed"}}],
+                         connectors=[], actor="sahil")
+    assert saved["objects"][0]["content"]["confidence"] == 0.8
+    with pytest.raises(ValueError, match="http"):
+        service.save(enabled, canvas_id=board["canvas_id"], expected_revision=saved["revision"],
+                     objects=[{**current["objects"][0], "content": {**legacy, "url": "ftp://x.test"}}],
+                     connectors=[], actor="sahil")
+
+
+def test_m4_non_ascii_description_uses_real_byte_size(store, enabled):
+    service = CanvasService(store)
+    got = _save(service, enabled, _board(service, enabled), {"text": "t", "description": "é" * 20000})
+    assert len(got["objects"][0]["content"]["description"]) == 20000
+
+
+@pytest.mark.parametrize("content, message", [
+    ({"due_on": "2026-02-31"}, "real date"),
+    ({"links": [{"url": 5}]}, "must be text"),
+    ({"links": [{"url": "http://a.b"}]}, None),
+    ({"links": [{"url": "http://localhost"}]}, "http"),
+])
+def test_low_fixes(store, enabled, content, message):
+    service = CanvasService(store)
+    board = _board(service, enabled)
+    if message is None:
+        _save(service, enabled, board, content, kind="plan_block")
+    else:
+        with pytest.raises(ValueError, match=message):
+            _save(service, enabled, board, content, kind="plan_block")
