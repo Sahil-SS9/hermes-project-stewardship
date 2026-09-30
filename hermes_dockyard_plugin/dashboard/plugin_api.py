@@ -933,6 +933,13 @@ async def project_content_preview(project_id: str, content_id: str) -> dict:
     )
 
 
+@plugin_api.get("/projects/{project_id}/content/{content_id}/image")
+async def project_content_image(project_id: str, content_id: str) -> dict:
+    pid = quote(project_id, safe="")
+    cid = quote(content_id, safe="")
+    return await _proxy("GET", f"/stewardship/v1/projects/{pid}/content/{cid}/image")
+
+
 @plugin_api.get("/projects/{project_id}/content/{content_id}/dependencies")
 async def project_content_dependencies(project_id: str, content_id: str) -> dict:
     return await _proxy(

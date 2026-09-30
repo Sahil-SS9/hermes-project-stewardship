@@ -13,12 +13,14 @@ those records but never copy or delete them.
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from typing import Any
 
 from .store import Store, iso
 
-OBJECT_KINDS = frozenset({"evidence", "claim", "question", "decision", "plan_block", "note", "link", "media"})
+OBJECT_KINDS = frozenset({"evidence", "claim", "question", "decision", "plan_block", "note", "link", "media",
+                          "risk", "assumption"})
 CONNECTOR_MEANINGS = frozenset({"supports", "contradicts", "derived_from", "clarifies", "depends_on", "implements", "raises_question"})
 BOARD_STATUSES = ("draft", "submitted", "planned", "completed", "archived")
 BOARD_THEMES = frozenset({"light", "dark"})
@@ -26,6 +28,33 @@ BOARD_THEMES = frozenset({"light", "dark"})
 # key to a theme token, so a stored value can never inject a style.
 STICKER_COLOURS = frozenset({"yellow", "green", "blue", "pink", "purple", "orange"})
 DEFAULT_BOARD_NAME = "Main board"
+
+# Stage 1 card fields. Every field is validated by type and size. Fields are
+# kept whatever the card's current kind, so changing kind hides fields rather
+# than deleting them (owner decision 4a). Unknown legacy keys are kept too,
+# inside a total size cap, so old boards still save.
+_LEVELS = frozenset({"low", "medium", "high"})
+_TEXT_FIELDS = {  # name -> max characters
+    "text": 500, "title": 500, "description": 20000, "source": 300, "quote": 5000,
+    "answer": 5000, "rationale": 5000, "estimate": 50, "mitigation": 5000,
+    "test": 2000, "alt": 300, "caption": 500, "url": 2048,
+}
+_CHOICE_FIELDS = {
+    "confidence": _LEVELS, "likelihood": _LEVELS, "impact": _LEVELS,
+    "claim_status": frozenset({"unverified", "supported", "disputed", "refuted"}),
+    "question_status": frozenset({"open", "answered"}),
+    "decision_status": frozenset({"proposed", "accepted", "rejected", "superseded"}),
+    "plan_status": frozenset({"todo", "in_progress", "blocked", "done"}),
+    "risk_status": frozenset({"open", "mitigating", "closed"}),
+    "assumption_status": frozenset({"untested", "validated", "invalidated"}),
+}
+_DATE_FIELDS = frozenset({"observed_on", "decided_on", "due_on"})
+_MEMBER_FIELDS = frozenset({"owner", "decided_by"})
+MAX_LINKS = 20
+MAX_LIST_ITEMS = 50
+MAX_CONTENT_BYTES = 64 * 1024
+_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_CONTENT_ID = re.compile(r"^CONTENT-[0-9A-F]{16}$")
 MAX_NAME = 120
 _EDITABLE = frozenset({"draft", "submitted", "planned"})
 # Moves the lifecycle allows by hand. "planned" is normally reached by
@@ -135,9 +164,7 @@ class CanvasService:
                 raise ValueError("canvas object IDs must be non-empty and unique")
             if kind not in OBJECT_KINDS:
                 raise ValueError(f"unknown canvas object kind: {kind or '<empty>'}")
-            content = raw.get("content", {})
-            if not isinstance(content, dict):
-                raise ValueError("canvas object content must be an object")
+            content = CanvasService._normalise_content(raw.get("content", {}))
             colour = raw.get("colour")
             if colour in (None, ""):
                 colour = None
@@ -158,6 +185,98 @@ class CanvasService:
                 "work_ref": raw.get("work_ref"),
             })
         return result
+
+    @staticmethod
+    def _normalise_content(content: Any) -> dict[str, Any]:
+        if not isinstance(content, dict):
+            raise ValueError("canvas object content must be an object")
+        out: dict[str, Any] = {}
+        for key, value in content.items():
+            if not isinstance(key, str):
+                raise ValueError("canvas content keys must be strings")
+            if value is None or value == "":
+                continue  # empty = unset (e.g. "Unassigned")
+            if key in _TEXT_FIELDS:
+                if not isinstance(value, str) or len(value) > _TEXT_FIELDS[key]:
+                    raise ValueError(f"card field {key!r} must be text of at most {_TEXT_FIELDS[key]} characters")
+                if key == "url":
+                    CanvasService._check_url(value)
+            elif key in _CHOICE_FIELDS:
+                if value not in _CHOICE_FIELDS[key]:
+                    raise ValueError(f"card field {key!r} must be one of {sorted(_CHOICE_FIELDS[key])}")
+            elif key in _DATE_FIELDS:
+                if not isinstance(value, str) or not _DATE.match(value):
+                    raise ValueError(f"card field {key!r} must be a date (YYYY-MM-DD)")
+            elif key in _MEMBER_FIELDS:
+                if not isinstance(value, str) or not value.strip() or len(value) > 64:
+                    raise ValueError(f"card field {key!r} must be a project member")
+                value = value.strip()
+            elif key == "content_id":
+                if not isinstance(value, str) or not _CONTENT_ID.match(value):
+                    raise ValueError("card image must reference uploaded project content")
+            elif key == "links":
+                if not isinstance(value, list) or len(value) > MAX_LINKS:
+                    raise ValueError(f"a card holds at most {MAX_LINKS} links")
+                links = []
+                for link in value:
+                    if not isinstance(link, dict):
+                        raise ValueError("each link must be an object")
+                    url = link.get("url")
+                    label = link.get("label") or ""
+                    if not isinstance(url, str) or not url.strip():
+                        continue  # a blank new line is dropped, not an error
+                    url = url.strip()
+                    if len(url) > 2048 or not isinstance(label, str) or len(label) > 200:
+                        raise ValueError("a link is at most 2048 characters with a label of at most 200")
+                    CanvasService._check_url(url)
+                    links.append({"url": url, "label": label.strip()} if label.strip() else {"url": url})
+                value = links
+            elif key == "alternatives":
+                if not isinstance(value, list) or len(value) > MAX_LIST_ITEMS or not all(
+                        isinstance(item, str) and len(item) <= 500 for item in value):
+                    raise ValueError(f"alternatives must be at most {MAX_LIST_ITEMS} short texts")
+                value = [item.strip() for item in value if item.strip()]
+            elif key == "checklist":
+                if not isinstance(value, list) or len(value) > MAX_LIST_ITEMS:
+                    raise ValueError(f"a checklist holds at most {MAX_LIST_ITEMS} items")
+                items = []
+                for item in value:
+                    if not isinstance(item, dict) or not isinstance(item.get("text", ""), str) \
+                            or len(item.get("text", "")) > 300 or not isinstance(item.get("done", False), bool):
+                        raise ValueError("each checklist item is short text with a done flag")
+                    if item.get("text", "").strip():
+                        items.append({"text": item["text"].strip(), "done": bool(item.get("done", False))})
+                value = items
+            out[key] = value
+        if len(json.dumps(out)) > MAX_CONTENT_BYTES:
+            raise ValueError("a card holds at most 64 KB of content")
+        return out
+
+    @staticmethod
+    def _check_url(url: str) -> None:
+        # Only web links: never javascript:, data:, file: or similar.
+        lowered = url.strip().lower()
+        if not (lowered.startswith("https://") or lowered.startswith("http://")) or len(lowered) < 11 \
+                or any(ch.isspace() for ch in url.strip()):
+            raise ValueError("links must be http:// or https:// web addresses")
+
+    def _check_references(self, cx: Any, project_id: str, objects: list[dict[str, Any]]) -> None:
+        """Owners must be (current or former) project members; images must be
+        this project's uploaded images."""
+        members = {row["profile_slug"] for row in cx.execute(
+            "SELECT profile_slug FROM project_members WHERE project_id=?", (project_id,))}
+        for item in objects:
+            content = item["content"]
+            for field in _MEMBER_FIELDS:
+                if field in content and content[field] not in members:
+                    raise ValueError(f"{content[field]!r} is not a member of this project")
+            if "content_id" in content:
+                row = cx.execute(
+                    "SELECT media_type, removal_state FROM project_content WHERE project_id=? AND content_id=?",
+                    (project_id, content["content_id"])).fetchone()
+                if row is None or not str(row["media_type"]).startswith("image/") \
+                        or row["removal_state"] == "file_removed":
+                    raise ValueError("card image must reference an uploaded image in this project")
 
     @classmethod
     def _normalise_connectors(cls, connectors: list[dict[str, Any]], object_ids: set[str]) -> list[dict[str, Any]]:
@@ -331,6 +450,7 @@ class CanvasService:
             if int(row["revision"]) != int(expected_revision):
                 raise CanvasConflictError(
                     f"canvas revision conflict: expected {expected_revision}, current {row['revision']}")
+            self._check_references(cx, project_id, normal_objects)
             cx.execute(
                 "UPDATE project_canvases SET revision=revision+1, objects_json=?, connectors_json=?,"
                 " updated_at=?, updated_by=? WHERE canvas_id=?",

@@ -11,6 +11,7 @@ Fail-closed rules enforced here:
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import os
@@ -2218,6 +2219,34 @@ class StewardshipService:
             os.close(file_fd)
             os.close(parent_fd)
         return self._content_metadata(self._project_content_row(project_id, content_id))
+
+    def project_content_image(self, project_id: str, content_id: str) -> Dict[str, Any]:
+        """Stage 1 canvas images: return an uploaded image's bytes (base64)
+        after the same root-containment and integrity checks as preview.
+        Only PNG/JPEG/WebP are ever served; nothing else leaves this path."""
+        row = self._project_content_row(project_id, content_id)
+        if row["media_type"] not in ("image/png", "image/jpeg", "image/webp"):
+            raise ServiceError("project content is not an image")
+        if row["removal_state"] == "file_removed":
+            raise ServiceError("project content file is unavailable")
+        root = self._content_root()
+        try:
+            path = (root / row["stored_path"]).resolve(strict=True)
+            if root not in path.parents or not path.is_file():
+                raise FileNotFoundError("content path is outside its storage root")
+            raw = path.read_bytes()
+        except (OSError, RuntimeError) as error:
+            raise ServiceError("project content file is unavailable") from error
+        if len(raw) != row["size_bytes"] or hashlib.sha256(raw).hexdigest() != row["sha256"]:
+            raise ServiceError("project content failed its integrity check")
+        self._validate_content_bytes(row["media_type"], raw)
+        return {
+            "content_id": row["content_id"],
+            "media_type": row["media_type"],
+            "filename": row["filename"],
+            "size_bytes": row["size_bytes"],
+            "data_base64": base64.b64encode(raw).decode("ascii"),
+        }
 
     def project_content_preview(
         self, project_id: str, content_id: str

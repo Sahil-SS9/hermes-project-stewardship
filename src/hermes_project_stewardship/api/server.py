@@ -1576,6 +1576,14 @@ def create_app(
     def project_content_preview(project_id: str, content_id: str):
         return svc.project_content_preview(project_id, content_id)
 
+    @router.get("/projects/{project_id}/content/{content_id}/image")
+    def project_content_image(project_id: str, content_id: str):
+        try:
+            return svc.project_content_image(project_id, content_id)
+        except ServiceError as exc:
+            message = str(exc)
+            raise HTTPException(404 if "unknown" in message else 422, message) from exc
+
     @router.get("/projects/{project_id}/content/{content_id}/dependencies")
     def project_content_dependencies(project_id: str, content_id: str):
         return {"dependencies": svc.project_content_dependencies(project_id, content_id)}
