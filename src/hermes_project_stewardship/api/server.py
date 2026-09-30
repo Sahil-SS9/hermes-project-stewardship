@@ -196,6 +196,8 @@ class CanvasObjectRequest(BaseModel):
     tags: List[str] = Field(default_factory=list)
     evidence_ref: Optional[str] = None
     work_ref: Optional[str] = None
+    # D20 palette key; validated against STICKER_COLOURS in the service.
+    colour: Optional[str] = Field(default=None, max_length=32)
 
 
 class CanvasConnectorRequest(BaseModel):

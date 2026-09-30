@@ -742,3 +742,24 @@ def test_unknown_or_raw_css_sticker_colour_is_refused(store, enabled, colour):
 def test_sticker_palette_is_the_documented_set():
     from hermes_project_stewardship.persistence.canvas_service import STICKER_COLOURS
     assert STICKER_COLOURS == frozenset({"yellow", "green", "blue", "pink", "purple", "orange"})
+
+
+def test_sticker_colour_survives_the_http_save_route(tmp_path):
+    """Regression: the request model silently dropped ``colour`` so the real
+    API never persisted it (the service-level tests above bypass the route)."""
+    client = _client(tmp_path)
+    cid = client.post(f"{B}/projects/p9/canvases", json={"name": "Colours"}).json()["canvas_id"]
+    board = client.get(f"{B}/projects/p9/canvases/{cid}").json()
+    row = {"id": "s1", "kind": "note", "content": {"text": "hi"}, "x": 0, "y": 0, "colour": "pink"}
+    saved = client.put(f"{B}/projects/p9/canvases/{cid}", json={
+        "expected_revision": board["revision"], "objects": [row], "connectors": []})
+    assert saved.status_code == 200, saved.text
+    assert client.get(f"{B}/projects/p9/canvases/{cid}").json()["objects"][0]["colour"] == "pink"
+    # Legacy single-board route carries it too.
+    legacy = client.get(f"{B}/projects/p9/canvas").json()
+    assert legacy["objects"][0]["colour"] == "pink"
+    # An unknown colour is refused at the route, not stored.
+    bad = client.put(f"{B}/projects/p9/canvases/{cid}", json={
+        "expected_revision": saved.json()["revision"], "objects": [{**row, "colour": "red; x:y"}], "connectors": []})
+    assert bad.status_code in (400, 409, 422), bad.text
+    assert client.get(f"{B}/projects/p9/canvases/{cid}").json()["objects"][0]["colour"] == "pink"
