@@ -6,6 +6,7 @@ import { useEffect } from '../runtime/react.js'
 import { jsxs } from '../runtime/react.js'
 import { jsx } from '../runtime/react.js'
 import { Button } from '../lib/ui.js'
+import { useDialogFocusManager } from '../lib/ui.js'
 import { EmptyState } from '../lib/ui.js'
 import { healthDetails } from '../lib/ui.js'
 import { api } from '../runtime/context.js'
@@ -41,7 +42,20 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
     if (projectView === 'planning' && canvasDirty) { setPendingView(key); return }
     setProjectView(key)
   }
-  const onCanvasDirty = (dirty) => { setCanvasDirty(dirty); onProjectDirty?.(dirty) }
+  const canvasSaver = useRef(null)
+  const [viewSaving, setViewSaving] = useState(false)
+  const onCanvasDirty = (dirty, saver) => { setCanvasDirty(dirty); canvasSaver.current = dirty ? saver : null; onProjectDirty?.(dirty, dirty ? saver : null) }
+  useDialogFocusManager(pendingView ? '[data-view-switch-confirm] .dockyard-modal' : null)
+  const leaveView = (next) => { setPendingView(null); setCanvasDirty(false); canvasSaver.current = null; onProjectDirty?.(false); setProjectView(next) }
+  const saveThenLeave = async () => {
+    const next = pendingView
+    if (!next || !canvasSaver.current) return
+    setViewSaving(true)
+    const ok = await canvasSaver.current()
+    setViewSaving(false)
+    if (ok) leaveView(next)
+    else if (!canvasSaver.current) setPendingView(null)
+  }
   const [selectedWorkItem, setSelectedWorkItem] = useState(null)
   const [workNotice, setWorkNotice] = useState(null)
   // Phase 4: the applied saved view drives the Work board's contents and
@@ -295,12 +309,14 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
     ]}),
     panel,
     pendingView ? jsxs('section', { className: 'dockyard-modal-layer', 'data-view-switch-confirm': pendingView, children: [
-      jsxs('div', { className: 'dockyard-modal', role: 'alertdialog', 'aria-modal': true, 'aria-label': 'Unsaved planning board changes', children: [
+      jsxs('div', { className: 'dockyard-modal', role: 'alertdialog', 'aria-modal': true, 'aria-label': 'Unsaved planning board changes',
+        onKeyDown: (event) => { if (event.key === 'Escape' && !viewSaving) { event.stopPropagation(); setPendingView(null) } }, children: [
         jsx('h2', { children: 'Unsaved changes on this board' }),
-        jsx('p', { children: 'The planning board has edits that are not saved. Stay to save them, or discard them and leave.' }),
+        jsx('p', { children: 'The planning board has edits that are not saved. Save them before you leave, discard them, or cancel to keep editing.' }),
         jsxs('div', { className: 'dockyard-modal-actions', children: [
-          jsx(Button, { action: 'view-switch-stay', onClick: () => setPendingView(null), children: 'Stay and save' }),
-          jsx(Button, { variant: 'danger', action: 'view-switch-discard', onClick: () => { const next = pendingView; setPendingView(null); setCanvasDirty(false); onProjectDirty?.(false); setProjectView(next) }, children: 'Discard and leave' }),
+          jsx(Button, { action: 'view-switch-cancel', disabled: viewSaving, onClick: () => setPendingView(null), children: 'Cancel' }),
+          jsx(Button, { variant: 'danger', action: 'view-switch-discard', disabled: viewSaving, onClick: () => leaveView(pendingView), children: 'Discard' }),
+          jsx(Button, { variant: 'primary', action: 'view-switch-save', disabled: viewSaving || !canvasSaver.current, onClick: saveThenLeave, children: viewSaving ? 'Saving...' : 'Save and continue' }),
         ]}),
       ]}),
     ]}) : null,

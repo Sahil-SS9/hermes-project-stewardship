@@ -178,7 +178,9 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   }, [initialCanvas])
   // Unsaved edits are reported upwards (project switch / view change guard)
   // and protect the window from being closed without a prompt.
-  useEffect(() => { onDirty?.(dirty) }, [dirty])
+  // F-2: parents get a save handle so their prompts can offer Save too.
+  const saveRef = useRef(null)
+  useEffect(() => { onDirty?.(dirty, dirty ? () => saveRef.current?.() : null) }, [dirty])
   useEffect(() => () => onDirty?.(false), [])
   useEffect(() => {
     if (!dirty) return undefined
@@ -259,7 +261,8 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     const pending = pendingLeave
     if (!pending) return
     const ok = await save()
-    if (!ok) return
+    // F-4: a conflict reload leaves nothing unsaved; close the prompt then.
+    if (!ok) { if (!dirtyRef.current) setPendingLeave(null); return }
     setPendingLeave(null)
     await pending.action()
   }
@@ -303,7 +306,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
         await refreshBoards()
         setBoardBusy(false)
         // Opening the new board leaves this one: unsaved edits ask first.
-        guardUnsaved(`open the new board ${created.name}`, () => openBoard(created))
+        guardUnsaved(`open the new board ${created.name} (it has been created)`, () => openBoard(created))
         return
       }
       setBoardForm(null)
@@ -605,6 +608,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
       if (boardRef.current === at) setBusy(false)
     }
   }
+  saveRef.current = save
   const addObject = (objectKind, text) => {
     const body = String(text ?? '').trim()
     if (!body || readOnly) return null
@@ -1189,7 +1193,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   })
   const chatBody = () => [
     jsx('div', { className: 'dy-pc-msg bot', children: assistantSummary }, 'summary'),
-    jsx('div', { 'data-canvas-chat-log': true, children: (chatLog ?? []).map((message, index) => jsx('div', { className: `dy-pc-msg ${message.role}`, children: message.text }, `chat-${index}`)) }, 'log'),
+    jsx('div', { 'data-canvas-chat-log': true, ref: (node) => { if (node) node.lastElementChild?.scrollIntoView?.({ block: 'nearest' }) }, children: (chatLog ?? []).map((message, index) => jsx('div', { className: `dy-pc-msg ${message.role}`, children: message.text }, `chat-${index}`)) }, 'log'),
     questionBlock ? jsx('div', { children: questionBlock }, 'question') : null,
     review ? jsx('p', { className: 'dy-pc-drawer-meta', 'data-canvas-review': true, children: `Review: ${number(review.summary?.evidence_count)} evidence, ${number(review.summary?.claim_count)} claim, ${number(review.summary?.question_count)} question, ${number(review.summary?.plan_block_count)} plan block(s).` }, 'review') : null,
     proposalCards.length ? jsx('div', { 'data-canvas-proposals': true, children: proposalCards }, 'proposals') : null,

@@ -8277,8 +8277,9 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     setSelectedId(null);
     setTheme(next.theme ?? null);
   }, [initialCanvas]);
+  const saveRef = useRef(null);
   useEffect(() => {
-    onDirty?.(dirty);
+    onDirty?.(dirty, dirty ? () => saveRef.current?.() : null);
   }, [dirty]);
   useEffect(() => () => onDirty?.(false), []);
   useEffect(() => {
@@ -8388,7 +8389,10 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     const pending = pendingLeave;
     if (!pending) return;
     const ok = await save();
-    if (!ok) return;
+    if (!ok) {
+      if (!dirtyRef.current) setPendingLeave(null);
+      return;
+    }
     setPendingLeave(null);
     await pending.action();
   };
@@ -8439,7 +8443,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
         setBoardForm(null);
         await refreshBoards();
         setBoardBusy(false);
-        guardUnsaved(`open the new board ${created.name}`, () => openBoard(created));
+        guardUnsaved(`open the new board ${created.name} (it has been created)`, () => openBoard(created));
         return;
       }
       setBoardForm(null);
@@ -8780,6 +8784,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       if (boardRef.current === at) setBusy(false);
     }
   };
+  saveRef.current = save;
   const addObject = (objectKind, text) => {
     const body = String(text ?? "").trim();
     if (!body || readOnly) return null;
@@ -9410,7 +9415,9 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   });
   const chatBody = () => [
     jsx("div", { className: "dy-pc-msg bot", children: assistantSummary }, "summary"),
-    jsx("div", { "data-canvas-chat-log": true, children: (chatLog ?? []).map((message, index) => jsx("div", { className: `dy-pc-msg ${message.role}`, children: message.text }, `chat-${index}`)) }, "log"),
+    jsx("div", { "data-canvas-chat-log": true, ref: (node) => {
+      if (node) node.lastElementChild?.scrollIntoView?.({ block: "nearest" });
+    }, children: (chatLog ?? []).map((message, index) => jsx("div", { className: `dy-pc-msg ${message.role}`, children: message.text }, `chat-${index}`)) }, "log"),
     questionBlock ? jsx("div", { children: questionBlock }, "question") : null,
     review ? jsx("p", { className: "dy-pc-drawer-meta", "data-canvas-review": true, children: `Review: ${number(review.summary?.evidence_count)} evidence, ${number(review.summary?.claim_count)} claim, ${number(review.summary?.question_count)} question, ${number(review.summary?.plan_block_count)} plan block(s).` }, "review") : null,
     proposalCards.length ? jsx("div", { "data-canvas-proposals": true, children: proposalCards }, "proposals") : null,
@@ -13009,9 +13016,29 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
     }
     setProjectView(key);
   };
-  const onCanvasDirty = (dirty) => {
+  const canvasSaver = useRef(null);
+  const [viewSaving, setViewSaving] = useState(false);
+  const onCanvasDirty = (dirty, saver) => {
     setCanvasDirty(dirty);
-    onProjectDirty?.(dirty);
+    canvasSaver.current = dirty ? saver : null;
+    onProjectDirty?.(dirty, dirty ? saver : null);
+  };
+  useDialogFocusManager(pendingView ? "[data-view-switch-confirm] .dockyard-modal" : null);
+  const leaveView = (next) => {
+    setPendingView(null);
+    setCanvasDirty(false);
+    canvasSaver.current = null;
+    onProjectDirty?.(false);
+    setProjectView(next);
+  };
+  const saveThenLeave = async () => {
+    const next = pendingView;
+    if (!next || !canvasSaver.current) return;
+    setViewSaving(true);
+    const ok = await canvasSaver.current();
+    setViewSaving(false);
+    if (ok) leaveView(next);
+    else if (!canvasSaver.current) setPendingView(null);
   };
   const [selectedWorkItem, setSelectedWorkItem] = useState(null);
   const [workNotice, setWorkNotice] = useState(null);
@@ -13273,20 +13300,27 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
     ] }),
     panel,
     pendingView ? jsxs("section", { className: "dockyard-modal-layer", "data-view-switch-confirm": pendingView, children: [
-      jsxs("div", { className: "dockyard-modal", role: "alertdialog", "aria-modal": true, "aria-label": "Unsaved planning board changes", children: [
-        jsx("h2", { children: "Unsaved changes on this board" }),
-        jsx("p", { children: "The planning board has edits that are not saved. Stay to save them, or discard them and leave." }),
-        jsxs("div", { className: "dockyard-modal-actions", children: [
-          jsx(Button, { action: "view-switch-stay", onClick: () => setPendingView(null), children: "Stay and save" }),
-          jsx(Button, { variant: "danger", action: "view-switch-discard", onClick: () => {
-            const next = pendingView;
+      jsxs("div", {
+        className: "dockyard-modal",
+        role: "alertdialog",
+        "aria-modal": true,
+        "aria-label": "Unsaved planning board changes",
+        onKeyDown: (event) => {
+          if (event.key === "Escape" && !viewSaving) {
+            event.stopPropagation();
             setPendingView(null);
-            setCanvasDirty(false);
-            onProjectDirty?.(false);
-            setProjectView(next);
-          }, children: "Discard and leave" })
-        ] })
-      ] })
+          }
+        },
+        children: [
+          jsx("h2", { children: "Unsaved changes on this board" }),
+          jsx("p", { children: "The planning board has edits that are not saved. Save them before you leave, discard them, or cancel to keep editing." }),
+          jsxs("div", { className: "dockyard-modal-actions", children: [
+            jsx(Button, { action: "view-switch-cancel", disabled: viewSaving, onClick: () => setPendingView(null), children: "Cancel" }),
+            jsx(Button, { variant: "danger", action: "view-switch-discard", disabled: viewSaving, onClick: () => leaveView(pendingView), children: "Discard" }),
+            jsx(Button, { variant: "primary", action: "view-switch-save", disabled: viewSaving || !canvasSaver.current, onClick: saveThenLeave, children: viewSaving ? "Saving..." : "Save and continue" })
+          ] })
+        ]
+      })
     ] }) : null,
     jsx(WorkItemDetail, { item: selectedWorkItem, projectId: project.id, profiles: view.profiles ?? [], initiatives: view.initiatives ?? [], onClose: () => setSelectedWorkItem(null), onRefresh })
   ] });
@@ -13710,6 +13744,13 @@ function DashboardPage() {
   const loadSerial = useRef(0);
   const [dirtyProject, setDirtyProject] = useState(null);
   const [pendingProject, setPendingProject] = useState(null);
+  const [pendingTab, setPendingTab] = useState(null);
+  const dirtySaver = useRef(null);
+  const [navSaving, setNavSaving] = useState(false);
+  const markDirty = (projectId) => (dirty, saver) => {
+    setDirtyProject(dirty ? projectId : null);
+    dirtySaver.current = dirty ? saver ?? null : null;
+  };
   useEffect(() => {
     const timers = /* @__PURE__ */ new Map();
     const handleToast = (event) => {
@@ -13776,13 +13817,45 @@ function DashboardPage() {
     setSelectedProject(projectId);
     if (tab === "dashboard" || tab === "notifications" || tab === "inbox" || tab === "onboard") setTab("project");
   };
-  const discardProjectChange = () => {
-    const pending = pendingProject;
-    setPendingProject(null);
-    setDirtyProject(null);
-    setSelectedProject(pending);
-    if (tab === "dashboard" || tab === "notifications" || tab === "inbox" || tab === "onboard") setTab("project");
+  const goTab = (next) => {
+    if (next === "project") setProjectEntryView("overview");
+    if (next === "dashboard") setDashboardHomeVersion((value) => value + 1);
+    setTab(next);
   };
+  const requestTab = (next) => {
+    if (next !== tab && dirtyProject) {
+      setPendingTab(next);
+      return;
+    }
+    goTab(next);
+  };
+  const cancelNav = () => {
+    setPendingProject(null);
+    setPendingTab(null);
+  };
+  const continueNav = () => {
+    const project = pendingProject;
+    const nextTab = pendingTab;
+    setPendingProject(null);
+    setPendingTab(null);
+    setDirtyProject(null);
+    dirtySaver.current = null;
+    if (project) {
+      setSelectedProject(project);
+      if (tab === "dashboard" || tab === "notifications" || tab === "inbox" || tab === "onboard") setTab("project");
+    } else if (nextTab) goTab(nextTab);
+  };
+  const discardProjectChange = continueNav;
+  const saveThenNavigate = async () => {
+    if (!dirtySaver.current) return;
+    setNavSaving(true);
+    const ok = await dirtySaver.current();
+    setNavSaving(false);
+    if (ok) continueNav();
+    else if (!dirtySaver.current) cancelNav();
+  };
+  const navPending = pendingProject || pendingTab;
+  useDialogFocusManager(navPending ? "[data-project-switch-confirm] .dockyard-modal" : null);
   const dismissToast = (id) => setToasts((current) => current.filter((toast) => toast.id !== id));
   const completeOnboarding = (result) => {
     setOnboardingOpen(false);
@@ -13868,7 +13941,7 @@ function DashboardPage() {
       view: payload,
       initialView: projectEntryView,
       onSelectProject: selectProject,
-      onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
+      onProjectDirty: markDirty(payload.project?.id ?? null),
       onRefresh: refresh,
       pendingWorkRef,
       onPendingWorkConsumed: () => setPendingWorkRef(null),
@@ -13879,7 +13952,7 @@ function DashboardPage() {
       view: payload,
       initialView: "settings",
       onSelectProject: selectProject,
-      onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
+      onProjectDirty: markDirty(payload.project?.id ?? null),
       onRefresh: refresh,
       notice: deepLinkNotice
     }, `settings:${payload.project?.id ?? payload.missingProject ?? "none"}`);
@@ -13888,7 +13961,7 @@ function DashboardPage() {
       view: payload,
       initialView: "workflows",
       onSelectProject: selectProject,
-      onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
+      onProjectDirty: markDirty(payload.project?.id ?? null),
       onRefresh: refresh,
       notice: deepLinkNotice
     }, `workflows:${payload.project?.id ?? payload.missingProject ?? "none"}`);
@@ -13913,11 +13986,7 @@ function DashboardPage() {
         projects: projectOptions,
         selectedProject,
         onProjectChange: selectProject,
-        onTab: (next) => {
-          if (next === "project") setProjectEntryView("overview");
-          if (next === "dashboard") setDashboardHomeVersion((value) => value + 1);
-          setTab(next);
-        },
+        onTab: requestTab,
         onNewProject: () => setOnboardingOpen(true),
         onOpen: openDeepLink
       }),
@@ -13929,15 +13998,28 @@ function DashboardPage() {
       })
     ] }),
     jsx(ToastRegion, { toasts, onDismiss: dismissToast }),
-    pendingProject ? jsxs("section", { className: "dockyard-modal-layer", "data-project-switch-confirm": true, children: [
-      jsxs("div", { className: "dockyard-modal", role: "dialog", "aria-modal": true, children: [
-        jsx("h2", { children: "Discard unsaved changes?" }),
-        jsx("p", { children: "This project has unsaved changes. Choose Discard to switch projects or Cancel to keep editing." }),
-        jsxs("div", { className: "dockyard-modal-actions", children: [
-          jsx(Button, { onClick: () => setPendingProject(null), children: "Cancel" }),
-          jsx(Button, { variant: "danger", onClick: discardProjectChange, children: "Discard" })
-        ] })
-      ] })
+    navPending ? jsxs("section", { className: "dockyard-modal-layer", "data-project-switch-confirm": true, "data-nav-target": pendingProject ? `project:${pendingProject}` : `tab:${pendingTab}`, children: [
+      jsxs("div", {
+        className: "dockyard-modal",
+        role: "alertdialog",
+        "aria-modal": true,
+        "aria-label": "Unsaved changes",
+        onKeyDown: (event) => {
+          if (event.key === "Escape" && !navSaving) {
+            event.stopPropagation();
+            cancelNav();
+          }
+        },
+        children: [
+          jsx("h2", { children: "Unsaved changes" }),
+          jsx("p", { children: `This project has unsaved changes. ${dirtySaver.current ? "Save them and continue, discard them, or cancel to keep editing." : "Discard them to continue, or cancel to keep editing."}` }),
+          jsxs("div", { className: "dockyard-modal-actions", children: [
+            jsx(Button, { action: "nav-cancel", disabled: navSaving, onClick: cancelNav, children: "Cancel" }),
+            jsx(Button, { variant: "danger", action: "nav-discard", disabled: navSaving, onClick: discardProjectChange, children: "Discard" }),
+            dirtySaver.current ? jsx(Button, { variant: "primary", action: "nav-save", disabled: navSaving, onClick: saveThenNavigate, children: navSaving ? "Saving..." : "Save and continue" }) : null
+          ] })
+        ]
+      })
     ] }) : null,
     onboardingOpen ? jsx(OnboardingWizard, { onClose: () => setOnboardingOpen(false), onComplete: completeOnboarding }) : null
   ] });

@@ -22,6 +22,20 @@ async function apiGet(path) {
 }
 const boards = async (archived = false) => (await apiGet(`/projects/${PROJECT}/canvases${archived ? '?include_archived=true' : ''}`)).canvases
 const board = (id) => apiGet(`/projects/${PROJECT}/canvases/${encodeURIComponent(id)}`)
+// Poll the real server until a condition holds (no fixed sleeps, no text matching).
+async function until(read, ok, label, ms = 10000) {
+  const end = Date.now() + ms
+  let last
+  while (Date.now() < end) { last = await read(); if (ok(last)) return last; await new Promise((r) => setTimeout(r, 50)) }
+  assert.fail(`${label}: last value ${JSON.stringify(last)?.slice(0, 300)}`)
+}
+// Click Save and wait for the real PUT to answer and the board to be clean.
+async function saveBoard(page, canvas) {
+  const put = page.waitForResponse((r) => r.request().method() === 'PUT' && /\/canvases\//.test(r.url()))
+  await canvas.locator('[data-action="pc-save"]').click()
+  assert.ok((await put).ok(), 'the save PUT succeeded')
+  await page.waitForSelector('[data-planning-canvas][data-canvas-dirty="false"]')
+}
 
 test('Planning boards (real backend): theme, save, chat, plan steps and board list persist', { timeout: 240000 }, async () => {
   assert.ok(BASE && API, 'Run via run-browser-suite.mjs')
@@ -58,8 +72,7 @@ test('Planning boards (real backend): theme, save, chat, plan steps and board li
     await canvas.locator('[data-canvas-object]').last().click()
     await canvas.locator('[data-canvas-object-colour]').selectOption('pink')
     await page.keyboard.press('Escape')
-    await canvas.locator('[data-action="pc-save"]').click()
-    await page.waitForFunction(() => /saved/i.test(document.querySelector('[data-planning-canvas]').innerText))
+    await saveBoard(page, canvas)
     const saved = await board(first)
     assert.equal(saved.objects.length, 2, 'save reached the real board')
     assert.equal(saved.objects.filter((o) => o.colour === 'pink').length, 1, 'sticker colour persisted')
@@ -67,8 +80,7 @@ test('Planning boards (real backend): theme, save, chat, plan steps and board li
     // Theme: saved on the board by the real PATCH route.
     await canvas.locator('[data-action="pc-theme-dark"]').click()
     await page.waitForFunction(() => document.querySelector('[data-planning-canvas]').getAttribute('data-canvas-theme') === 'dark')
-    await page.waitForTimeout(300)
-    assert.equal((await board(first)).theme, 'dark', 'theme persisted on the real board')
+    await until(() => board(first), (b) => b.theme === 'dark', 'theme persisted on the real board')
 
     // Rename.
     await canvas.locator('[data-action="pc-board-rename"]').click()
@@ -89,8 +101,9 @@ test('Planning boards (real backend): theme, save, chat, plan steps and board li
     // A duplicate name is refused by the real server and the board does not switch.
     await canvas.locator('[data-action="pc-board-new"]').click()
     await canvas.locator('[data-canvas-board-form="create"]').fill('Real Alpha')
+    const refused = page.waitForResponse((r) => r.request().method() === 'POST' && /\/canvases$/.test(new URL(r.url()).pathname))
     await canvas.locator('[data-action="pc-board-form-save"]').click()
-    await page.waitForTimeout(400)
+    assert.equal((await refused).status(), 409, 'the real server refuses the duplicate')
     assert.equal(await canvas.getAttribute('data-canvas-board'), second, 'a refused create does not switch')
     assert.equal((await boards()).length, 2, 'the duplicate was not created')
     await canvas.locator('[data-action="pc-board-form-cancel"]').click()
@@ -99,8 +112,7 @@ test('Planning boards (real backend): theme, save, chat, plan steps and board li
     await canvas.locator('[data-canvas-draft]').fill('Beta only sticker')
     await canvas.locator('[data-action="add-canvas-object"]').click()
     await page.keyboard.press('Escape')
-    await canvas.locator('[data-action="pc-save"]').click()
-    await page.waitForFunction(() => /saved/i.test(document.querySelector('[data-planning-canvas]').innerText))
+    await saveBoard(page, canvas)
     await canvas.locator('[data-action="pc-chat-toggle"]').click()
     await canvas.locator('[data-canvas-chat-input]').fill('Plan the beta work')
     await canvas.locator('[data-action="pc-chat-send"]').click()
@@ -141,8 +153,7 @@ test('Planning boards (real backend): theme, save, chat, plan steps and board li
     assert.deepEqual((await boards()).map((b) => b.canvas_id), [first])
     await canvas.locator('[data-action="pc-board-show-archived"]').click()
     await canvas.locator(`[data-canvas-board-row="${second}"] [data-action="pc-board-restore"]`).click()
-    await page.waitForTimeout(400)
-    assert.equal((await board(second)).status, 'submitted', 'restore returns the real board to its previous status')
+    await until(() => board(second), (b) => b.status === 'submitted', 'restore returns the real board to its previous status')
     assert.equal((await boards()).length, 2)
 
     assert.deepEqual(errors, [], errors.join('\n'))

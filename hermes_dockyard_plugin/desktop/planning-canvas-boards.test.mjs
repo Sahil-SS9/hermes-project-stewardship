@@ -234,6 +234,14 @@ async function openPlanning(page, host) {
 
 const root = (page) => page.locator(`[data-planning-canvas="${PROJECT}"]`);
 const settle = (page) => page.waitForTimeout(150);
+// Release a held AI answer and wait until the browser has received it and
+// rendered two frames, so an "it must not appear" check is not a timing guess.
+async function answerDelivered(page, release) {
+  const reply = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().endsWith('/sessions'));
+  release();
+  await (await reply).finished();
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+}
 
 /** Every drawn connector must start and end within 1px of its own cards'
  *  rendered borders (screen space, so zoom and CSS box sizing both count). */
@@ -402,8 +410,7 @@ test('Planning boards: chat always talks to the open board and drops stale answe
     await canvas.locator('[data-canvas-board-row="board-b"] button.dy-pc-board-row').click();
     await page.waitForSelector('[data-canvas-board="board-b"]');
     host.state.slowSessionFor = null;
-    host.state.releaseSlow?.();
-    await page.waitForTimeout(400);
+    await answerDelivered(page, () => host.state.releaseSlow?.());
     assert.equal(await canvas.locator('[data-canvas-proposals]').count(), 0, 'Alpha\'s late answer must not appear on Beta');
     assert.equal(await canvas.locator('[data-canvas-chat-log] .dy-pc-msg').count(), 0, 'Beta starts with an empty chat');
 
@@ -426,8 +433,7 @@ test('Planning boards: chat always talks to the open board and drops stale answe
     await canvas.locator('[data-action="pc-chat-stop"]').click();
     const before = await canvas.locator('[data-canvas-proposals]').innerText();
     host.state.slowSessionFor = null;
-    host.state.releaseSlow?.();
-    await page.waitForTimeout(400);
+    await answerDelivered(page, () => host.state.releaseSlow?.());
     assert.equal(await canvas.locator('[data-canvas-proposals]').innerText(), before, 'an answer after Stop is dropped');
   });
 });
@@ -533,6 +539,82 @@ test('Planning boards: chat window drags, minimises, expands, picks a model and 
     await canvas.locator('[data-action="pc-expanded-close"]').click();
     assert.equal(await canvas.locator('[data-canvas-expanded]').count(), 0);
     assert.match(await canvas.locator('[data-canvas-plan] .dy-pc-plan-steps').innerText(), /1\. Ship the safe preview\n2\. Measure the funnel\n3\. Tell the users/);
+  });
+});
+
+test('Planning boards: leaving Planning or the project tab with unsaved edits offers Save, Discard and Cancel', { timeout: 180000 }, async () => {
+  await withPage(1440, 900, async (page, host) => {
+    const canvas = root(page);
+    const addSticker = async (text) => {
+      await canvas.locator('[data-canvas-draft]').fill(text);
+      await canvas.locator('[data-action="add-canvas-object"]').click();
+      await page.keyboard.press('Escape');
+      await page.waitForSelector('[data-planning-canvas][data-canvas-dirty="true"]');
+    };
+    const puts = () => host.calls.filter((c) => c.method === 'PUT').length;
+    const before = host.find('board-a').objects.length;
+
+    // 1. Project view switch (Planning -> Overview): Cancel keeps you and the edit.
+    await addSticker('View switch idea');
+    await page.click('[data-project-view="overview"]');
+    const viewPrompt = page.locator('[data-view-switch-confirm]');
+    await viewPrompt.waitFor();
+    assert.equal(await page.evaluate(() => Boolean(document.activeElement?.closest('[data-view-switch-confirm]'))), true, 'focus moves into the prompt');
+    await page.keyboard.press('Escape');
+    assert.equal(await viewPrompt.count(), 0, 'Escape = Cancel');
+    assert.equal(await canvas.getAttribute('data-canvas-dirty'), 'true', 'Cancel keeps the edit');
+    // Discard leaves without saving.
+    const putsBefore = puts();
+    await page.click('[data-project-view="overview"]');
+    await page.click('[data-action="view-switch-discard"]');
+    await page.waitForSelector('[data-project-view="overview"].active');
+    assert.equal(puts(), putsBefore, 'Discard sends no save');
+    assert.equal(host.find('board-a').objects.length, before, 'Discard did not save');
+    // Save and continue saves first, then leaves.
+    await page.click('[data-project-view="planning"]');
+    await page.waitForSelector('[data-planning-canvas][data-canvas-board="board-a"]');
+    await addSticker('Saved on the way out');
+    await page.click('[data-project-view="overview"]');
+    await page.click('[data-action="view-switch-save"]');
+    await page.waitForSelector('[data-project-view="overview"].active');
+    assert.equal(host.find('board-a').objects.length, before + 1, 'Save and continue saved the edit');
+    assert.ok(host.find('board-a').objects.some((o) => o.title === 'Saved on the way out' || o.body === 'Saved on the way out' || JSON.stringify(o).includes('Saved on the way out')));
+
+    // 2. Top console tab (Planning -> Dashboard): guarded too (QA F-1).
+    await page.click('[data-project-view="planning"]');
+    await page.waitForSelector('[data-planning-canvas][data-canvas-board="board-a"]');
+    await addSticker('Top tab idea');
+    await page.click('[data-tab="dashboard"]');
+    const navPrompt = page.locator('[data-project-switch-confirm]');
+    await navPrompt.waitFor();
+    assert.equal(await navPrompt.getAttribute('data-nav-target'), 'tab:dashboard');
+    assert.equal(await canvas.count(), 1, 'the board is still mounted while the prompt is open');
+    await page.click('[data-action="nav-cancel"]');
+    assert.equal(await navPrompt.count(), 0);
+    assert.equal(await canvas.getAttribute('data-canvas-dirty'), 'true', 'Cancel keeps the edit');
+    const savedCount = host.find('board-a').objects.length;
+    await page.click('[data-tab="dashboard"]');
+    await page.click('[data-action="nav-save"]');
+    await page.waitForSelector('[data-tab="dashboard"][aria-selected="true"], [data-tab="dashboard"].active', { timeout: 20000 }).catch(() => {});
+    await page.waitForFunction(() => !document.querySelector('[data-planning-canvas]'));
+    assert.equal(host.find('board-a').objects.length, savedCount + 1, 'Save and continue saved before leaving');
+    // Back to Planning, edit, then Discard via the top tab.
+    await page.click('[data-tab="project"]');
+    await page.click('[data-project-view="planning"]');
+    await page.waitForSelector('[data-planning-canvas][data-canvas-board="board-a"]');
+    await addSticker('Thrown away');
+    const putsBeforeDiscard = puts();
+    await page.click('[data-tab="dashboard"]');
+    await page.click('[data-action="nav-discard"]');
+    await page.waitForFunction(() => !document.querySelector('[data-planning-canvas]'));
+    assert.equal(puts(), putsBeforeDiscard, 'Discard sends no save');
+    // A clean board leaves with no prompt at all.
+    await page.click('[data-tab="project"]');
+    await page.click('[data-project-view="planning"]');
+    await page.waitForSelector('[data-planning-canvas][data-canvas-dirty="false"]');
+    await page.click('[data-tab="dashboard"]');
+    await page.waitForFunction(() => !document.querySelector('[data-planning-canvas]'));
+    assert.equal(await page.locator('[data-project-switch-confirm]').count(), 0, 'no prompt when nothing is unsaved');
   });
 });
 
