@@ -22,6 +22,9 @@ OBJECT_KINDS = frozenset({"evidence", "claim", "question", "decision", "plan_blo
 CONNECTOR_MEANINGS = frozenset({"supports", "contradicts", "derived_from", "clarifies", "depends_on", "implements", "raises_question"})
 BOARD_STATUSES = ("draft", "submitted", "planned", "completed", "archived")
 BOARD_THEMES = frozenset({"light", "dark"})
+# D20: sticker colours are palette KEYS, never raw CSS. The desktop maps each
+# key to a theme token, so a stored value can never inject a style.
+STICKER_COLOURS = frozenset({"yellow", "green", "blue", "pink", "purple", "orange"})
 DEFAULT_BOARD_NAME = "Main board"
 MAX_NAME = 120
 _EDITABLE = frozenset({"draft", "submitted", "planned"})
@@ -135,11 +138,17 @@ class CanvasService:
             content = raw.get("content", {})
             if not isinstance(content, dict):
                 raise ValueError("canvas object content must be an object")
+            colour = raw.get("colour")
+            if colour in (None, ""):
+                colour = None
+            elif not isinstance(colour, str) or colour not in STICKER_COLOURS:
+                raise ValueError(f"unknown sticker colour: {colour!r}")
             seen.add(object_id)
             result.append({
                 "id": object_id,
                 "kind": kind,
                 "content": content,
+                "colour": colour,
                 "x": float(raw.get("x", 0)),
                 "y": float(raw.get("y", 0)),
                 "width": float(raw.get("width", 240)),

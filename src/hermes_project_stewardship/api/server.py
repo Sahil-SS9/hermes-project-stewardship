@@ -213,6 +213,8 @@ class CanvasSaveRequest(BaseModel):
 
 
 class CanvasSessionStartRequest(BaseModel):
+    # D15: the chat box text. Bounded again in the service (4000 chars).
+    message: Optional[str] = Field(default=None, max_length=4000)
     actor: str = "system"
 
 
@@ -257,6 +259,12 @@ class CanvasPlanDocumentRequest(BaseModel):
 
 class CanvasPlanBacklogRequest(BaseModel):
     step_orders: List[int]
+    actor: str = "system"
+
+
+class CanvasPlanStepsRequest(BaseModel):
+    """D15: edit a draft plan's steps from the expanded overlay."""
+    steps: Any
     actor: str = "system"
 
 
@@ -1314,9 +1322,52 @@ def create_app(
         try:
             board = CanvasService(store).get_board(project_id, canvas_id)
             return CanvasPlanningService(store, provider=_canvas_provider(board.get("model"))).start(
-                project_id, canvas_id=canvas_id, actor=_principal_id(body.actor))
+                project_id, canvas_id=canvas_id, actor=_principal_id(body.actor), message=body.message)
         except (CanvasConflictError, ValueError) as exc:
             raise _board_error(exc) from exc
+
+    @router.delete("/projects/{project_id}/canvases/{canvas_id}/objects/{object_id}")
+    def remove_canvas_board_object(project_id: str, canvas_id: str, object_id: str,
+                                   expected_revision: int, actor: str = "system"):
+        """Board-scoped delete: never falls back to "the most recent board"."""
+        from ..persistence.canvas_service import CanvasConflictError, CanvasService
+        try:
+            CanvasService(store).get_board(project_id, canvas_id)
+        except ValueError as exc:
+            raise _board_error(exc) from exc
+        try:
+            return CanvasService(store).remove_object(
+                project_id, object_id, expected_revision=expected_revision,
+                actor=_principal_id(actor), canvas_id=canvas_id)
+        except CanvasConflictError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @router.post("/projects/{project_id}/canvases/{canvas_id}/curate")
+    def curate_canvas_board(project_id: str, canvas_id: str):
+        """Read-only review of one board (no provider, no writes)."""
+        from ..persistence.canvas_curation import CanvasCurationService
+        from ..persistence.canvas_service import CanvasService
+        try:
+            board = CanvasService(store).get_board(project_id, canvas_id)
+        except ValueError as exc:
+            raise _board_error(exc) from exc
+        return CanvasCurationService().curate(board)
+
+    @router.patch("/projects/{project_id}/plans/{plan_id}")
+    def update_canvas_plan_steps(project_id: str, plan_id: str, body: CanvasPlanStepsRequest):
+        from ..persistence.canvas_plan_document import PlanDocumentService
+        from ..persistence.canvas_service import CanvasConflictError
+        try:
+            return PlanDocumentService(store).update_steps(
+                project_id, plan_id, steps=body.steps, actor=_principal_id(body.actor))
+        except CanvasConflictError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except ValueError as exc:
+            if str(exc).startswith("unknown canvas plan"):
+                raise HTTPException(404, str(exc)) from exc
+            raise HTTPException(422, str(exc)) from exc
 
     @router.get("/projects/{project_id}/canvases/{canvas_id}/plans")
     def list_canvas_board_plans(project_id: str, canvas_id: str):
@@ -1341,7 +1392,8 @@ def create_app(
         from ..persistence.canvas_service import CanvasConflictError
         provider = _canvas_provider()
         try:
-            return CanvasPlanningService(store, provider=provider).start(project_id, actor=_principal_id(body.actor))
+            return CanvasPlanningService(store, provider=provider).start(
+                project_id, actor=_principal_id(body.actor), message=body.message)
         except CanvasConflictError as exc:
             raise HTTPException(409, str(exc)) from exc
         except ValueError as exc:
@@ -1363,7 +1415,13 @@ def create_app(
         from ..persistence.canvas_planning import CanvasPlanningService
         from ..persistence.canvas_service import CanvasConflictError
         try:
-            return CanvasPlanningService(store, provider=_canvas_provider()).answer(session_id, outcome=body.outcome, answer=body.answer, actor=_principal_id(body.actor))
+            # The board's chosen model answers its own chat (D19); a legacy
+            # session with no board, or a board with no choice, uses the default.
+            row = store._conn.execute(
+                "SELECT c.model_json FROM canvas_sessions s LEFT JOIN project_canvases c ON c.canvas_id = s.canvas_id "
+                "WHERE s.session_id=?", (session_id,)).fetchone()
+            board_model = json.loads(row[0]) if row and row[0] else None
+            return CanvasPlanningService(store, provider=_canvas_provider(board_model)).answer(session_id, outcome=body.outcome, answer=body.answer, actor=_principal_id(body.actor))
         except CanvasConflictError as exc:
             raise HTTPException(409, str(exc)) from exc
         except ValueError as exc:

@@ -14,6 +14,17 @@ OUTCOME_SKIP = "skip"
 OUTCOME_DEFER = "defer"
 OUTCOME_STOP = "stop"
 _OUTCOMES = {OUTCOME_ANSWER, OUTCOME_SKIP, OUTCOME_DEFER, OUTCOME_STOP}
+# D15: a free-text chat message is recorded in the ledger as its own outcome.
+# It is context for the AI only: it never closes a clarification gap.
+OUTCOME_MESSAGE = "message"
+MAX_MESSAGE = 4000
+
+
+def _clean_message(message: str | None) -> str:
+    text = str(message or "").strip()
+    if len(text) > MAX_MESSAGE:
+        raise ValueError(f"chat message must be at most {MAX_MESSAGE} characters")
+    return text
 
 
 class CanvasPlanningService:
@@ -55,13 +66,16 @@ class CanvasPlanningService:
             return None
         return self.get(rows[-1]["session_id"])
 
-    def start(self, project_id: str, *, actor: str, canvas_id: str | None = None) -> dict[str, Any]:
+    def start(self, project_id: str, *, actor: str, canvas_id: str | None = None,
+              message: str | None = None) -> dict[str, Any]:
+        text = _clean_message(message)
         current = self.canvas.get(project_id, canvas_id)
         canvas_id = current["canvas_id"]
         self.canvas.require_editable(project_id, canvas_id)
-        ledger = self._ledger_answers(canvas_id)
+        note = {"outcome": OUTCOME_MESSAGE, "answer": text, "actor": actor} if text else None
+        ledger = self._ledger_answers(canvas_id) + ([note] if note else [])
         existing = self._session_at_revision(canvas_id, current["revision"])
-        result = CanvasCurationService(self.provider).curate(current, clarifications=ledger)
+        result = CanvasCurationService(self.provider).curate(current, clarifications=ledger, message=text or None)
         questions = result.get("clarifying_questions", [])
         question = questions[0] if questions else None
         status = "active" if question else "complete"
@@ -70,12 +84,16 @@ class CanvasPlanningService:
             # crashing on the UNIQUE(project_id, canvas_revision) constraint.
             # Already-decided proposals stay decided — a re-run never
             # resurrects a rejected proposal.
+            answers = [*existing["answers"], note] if note else existing["answers"]
             with self.store.tx() as cx:
                 cx.execute(
-                    "UPDATE canvas_sessions SET status=?, current_question_json=?, updated_at=? WHERE session_id=?",
-                    (status, json.dumps(question) if question else None, iso(self.store._clock()), existing["session_id"]),
+                    "UPDATE canvas_sessions SET status=?, current_question_json=?, answers_json=?, updated_at=? WHERE session_id=?",
+                    (status, json.dumps(question) if question else None, json.dumps(answers, sort_keys=True),
+                     iso(self.store._clock()), existing["session_id"]),
                 )
-            if status == "complete" and not existing["proposals"]:
+            # A new message asks for fresh advice, so its proposals are kept
+            # alongside earlier (already decided or pending) ones.
+            if status == "complete" and (note or not existing["proposals"]):
                 self._store_proposals(existing["session_id"], project_id, canvas_id, current["revision"], result)
             return self.get(existing["session_id"])
         session_id = "canvas-session-" + uuid.uuid4().hex[:16]
@@ -83,7 +101,8 @@ class CanvasPlanningService:
         with self.store.tx() as cx:
             cx.execute(
                 "INSERT INTO canvas_sessions(session_id, project_id, canvas_id, canvas_revision, status, current_question_json, answers_json, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
-                (session_id, project_id, canvas_id, current["revision"], status, json.dumps(question) if question else None, "[]", now, now),
+                (session_id, project_id, canvas_id, current["revision"], status, json.dumps(question) if question else None,
+                 json.dumps([note] if note else []), now, now),
             )
         # First AI run submits a draft board; later states are never rewound.
         self.canvas.advance(canvas_id, "submitted", only_from=("draft",))

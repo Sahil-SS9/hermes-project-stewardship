@@ -841,6 +841,29 @@ async def start_canvas_board_session(project_id: str, canvas_id: str, body: dict
     )
 
 
+@plugin_api.delete("/projects/{project_id}/canvases/{canvas_id}/objects/{object_id}")
+async def remove_canvas_board_object(project_id: str, canvas_id: str, object_id: str, expected_revision: int) -> dict:
+    return await _proxy(
+        "DELETE",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases/{quote(canvas_id, safe='')}/objects/{quote(object_id, safe='')}",
+        params={"expected_revision": expected_revision, "actor": _ACTOR_ID},
+    )
+
+
+@plugin_api.post("/projects/{project_id}/canvases/{canvas_id}/curate")
+async def curate_canvas_board(project_id: str, canvas_id: str) -> dict:
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases/{quote(canvas_id, safe='')}/curate", {})
+
+
+@plugin_api.patch("/projects/{project_id}/plans/{plan_id}")
+async def update_canvas_plan_steps(project_id: str, plan_id: str, body: dict) -> dict:
+    return await _proxy(
+        "PATCH", f"/stewardship/v1/projects/{quote(project_id, safe='')}/plans/{quote(plan_id, safe='')}",
+        {**body, "actor": _ACTOR_ID},
+    )
+
+
 @plugin_api.get("/projects/{project_id}/canvases/{canvas_id}/plans")
 async def list_canvas_board_plans(project_id: str, canvas_id: str) -> dict:
     return await _proxy(

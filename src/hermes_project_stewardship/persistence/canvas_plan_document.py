@@ -21,6 +21,8 @@ from .store import Store, iso
 
 PLAN_KINDS = frozenset({"synthesis", "user_journey", "edge_case", "technical_plan"})
 IMPL_KINDS = frozenset({"technical_plan", "user_journey", "edge_case"})
+MAX_PLAN_STEPS = 50
+MAX_STEP_TITLE = 500
 
 
 class PlanConflictError(ValueError):
@@ -77,6 +79,64 @@ class PlanDocumentService:
         plan["status"] = row["status"]
         plan["updated_at"] = row["updated_at"]
         return plan
+
+    def update_steps(self, project_id: str, plan_id: str, *, steps: Any, actor: str) -> dict[str, Any]:
+        """D15: the owner edits a DRAFT plan's steps from the expanded view.
+
+        Each row is {title, order?}. A row with an ``order`` keeps that
+        existing step's provenance (source objects, criteria, dependencies);
+        a row without one is a new owner-written step with no sources. Steps
+        are renumbered 1..n in the given order. Refused once the document is
+        saved (the Content-tab copy would silently diverge) or when the board
+        is completed/archived.
+        """
+        plan = self.get_plan(project_id, plan_id)
+        if plan.get("status") != "draft":
+            raise ValueError("plan steps are fixed once the implementation document is saved")
+        if plan.get("canvas_id"):
+            self.canvas.require_editable(project_id, plan["canvas_id"])
+        if not isinstance(steps, list):
+            raise ValueError("steps must be a list")
+        if not steps:
+            raise ValueError("a plan needs at least one step")
+        if len(steps) > MAX_PLAN_STEPS:
+            raise ValueError(f"a plan can have at most {MAX_PLAN_STEPS} steps")
+        by_order = {int(step["order"]): step for step in plan.get("steps") or []}
+        seen: set[str] = set()
+        edited: list[dict[str, Any]] = []
+        for raw in steps:
+            if not isinstance(raw, dict):
+                raise ValueError("each step must be an object with a title")
+            title = " ".join(str(raw.get("title") or "").split())
+            if not title:
+                raise ValueError("a step title cannot be empty")
+            if len(title) > MAX_STEP_TITLE:
+                raise ValueError(f"a step title must be at most {MAX_STEP_TITLE} characters")
+            if title.lower() in seen:
+                raise ValueError(f"duplicate step title: {title}")
+            seen.add(title.lower())
+            base: dict[str, Any] = {"source_object_ids": [], "acceptance_criteria": [], "depends_on": []}
+            if raw.get("order") is not None:
+                try:
+                    key = int(raw["order"])
+                except (TypeError, ValueError) as exc:
+                    raise ValueError("step order must be a number") from exc
+                if key not in by_order:
+                    raise ValueError(f"unknown step order: {key}")
+                base = by_order[key]
+            edited.append({**base, "title": title, "order": len(edited) + 1})
+        # Dependencies pointed at old orders; drop any that no longer exist.
+        valid = {step["order"] for step in edited}
+        for step in edited:
+            step["depends_on"] = [dep for dep in step.get("depends_on") or [] if dep in valid]
+        stored = {key: value for key, value in plan.items() if key not in {"plan_id", "status", "updated_at"}}
+        stored.update(steps=edited, edited_by=actor)
+        with self.store.tx() as cx:
+            cx.execute(
+                "UPDATE canvas_plans SET plan_json=?, updated_at=? WHERE project_id=? AND plan_id=? AND status='draft'",
+                (json.dumps(stored, sort_keys=True), iso(self.store._clock()), project_id, plan_id),
+            )
+        return self.get_plan(project_id, plan_id)
 
     def save_implementation_document(self, project_id: str, plan_id: str, document: str, *, actor: str) -> dict[str, Any]:
         """Persist the implementation doc through the existing content

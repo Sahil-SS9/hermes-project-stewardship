@@ -467,3 +467,243 @@ def test_v33_round_trip_is_lossless_and_downgrade_refuses_multi_board_loss(tmp_p
         assert len(CanvasService(store).list_boards("legacy")) == 2, "a refused downgrade loses nothing"
     finally:
         store.close()
+
+
+# ------------------------------------------------ D16 board model in chat --
+def test_board_answer_uses_the_boards_chosen_model(tmp_path, monkeypatch):
+    import hermes_project_stewardship.api.server as server
+    import hermes_project_stewardship.persistence.hermes_curation_provider as hcp
+    monkeypatch.setattr(hcp, "list_hermes_models", lambda: {
+        "available": True, "default": None,
+        "providers": [{"slug": "openai-codex", "name": "Codex", "models": ["gpt-5.6-sol"], "is_current": True}]})
+    seen = []
+    real = server._canvas_provider
+    monkeypatch.setattr(server, "_canvas_provider", lambda board_model=None: (seen.append(board_model), real(None))[1])
+    monkeypatch.setenv("HPS_CANVAS_PROVIDER", "none")
+    client = _client(tmp_path)
+    cid = client.post(f"{B}/projects/p9/canvases", json={"name": "Chat"}).json()["canvas_id"]
+    choice = {"provider": "openai-codex", "model": "gpt-5.6-sol"}
+    assert client.patch(f"{B}/projects/p9/canvases/{cid}", json={"model": choice}).status_code == 200
+    session = client.post(f"{B}/projects/p9/canvases/{cid}/sessions", json={})
+    assert session.status_code == 200, session.text
+    seen.clear()
+    answered = client.post(f"{B}/canvas/sessions/{session.json()['session_id']}/answer",
+                           json={"outcome": "answer", "answer": "Users need a safe preview"})
+    assert answered.status_code == 200, answered.text
+    assert seen == [choice], seen
+
+
+
+# ------------------------------------------- D15 chat message reaches the AI --
+class _Recorder:
+    provider_id = "rec"
+    model_id = "rec-model"
+
+    def __init__(self):
+        self.contexts = []
+
+    def propose(self, context):
+        self.contexts.append(context)
+        return {"proposals": [{"kind": "technical_plan", "title": "Plan", "body": {"steps": ["Preview before commit"]}}]}
+
+
+def test_chat_message_is_passed_to_the_ai_and_kept_in_the_ledger(store, enabled):
+    service = CanvasService(store)
+    board = service.create_board(enabled, name="Chat", actor="sahil")
+    _fill(service, enabled, board, FULL)
+    rec = _Recorder()
+    planning = CanvasPlanningService(store, provider=rec)
+    session = planning.start(enabled, canvas_id=board["canvas_id"], actor="sahil",
+                             message="  Focus on the import preview  ")
+    assert rec.contexts[-1]["user_message"] == "Focus on the import preview"
+    assert rec.contexts[-1]["untrusted_content"] is True
+    notes = [row for row in session["answers"] if row["outcome"] == "message"]
+    assert [row["answer"] for row in notes] == ["Focus on the import preview"]
+    # A second message at the same revision reuses the session and is kept too.
+    again = planning.start(enabled, canvas_id=board["canvas_id"], actor="sahil", message="And billing")
+    assert again["session_id"] == session["session_id"]
+    assert [row["answer"] for row in again["answers"] if row["outcome"] == "message"] == [
+        "Focus on the import preview", "And billing"]
+    assert rec.contexts[-1]["user_message"] == "And billing"
+
+
+def test_chat_message_is_bounded_and_blank_is_ignored(store, enabled):
+    service = CanvasService(store)
+    board = service.create_board(enabled, name="Bounds", actor="sahil")
+    _fill(service, enabled, board, FULL)
+    rec = _Recorder()
+    planning = CanvasPlanningService(store, provider=rec)
+    with pytest.raises(ValueError, match="at most"):
+        planning.start(enabled, canvas_id=board["canvas_id"], actor="sahil", message="x" * 4001)
+    session = planning.start(enabled, canvas_id=board["canvas_id"], actor="sahil", message="   ")
+    assert "user_message" not in rec.contexts[-1]
+    assert not [row for row in session["answers"] if row["outcome"] == "message"]
+
+
+def test_message_never_closes_a_clarification_gap(store, enabled):
+    service = CanvasService(store)
+    board = service.create_board(enabled, name="Gap", actor="sahil")
+    _fill(service, enabled, board, GAP)
+    planning = CanvasPlanningService(store)
+    session = planning.start(enabled, canvas_id=board["canvas_id"], actor="sahil", message="just chatting")
+    assert session["status"] == "active" and session["current_question"]
+
+
+def test_session_route_forwards_the_message(tmp_path):
+    client = _client(tmp_path)
+    cid = client.post(f"{B}/projects/p9/canvases", json={"name": "Route"}).json()["canvas_id"]
+    board = client.get(f"{B}/projects/p9/canvases/{cid}").json()
+    client.put(f"{B}/projects/p9/canvases/{cid}", json={"expected_revision": board["revision"], "objects": FULL, "connectors": []})
+    started = client.post(f"{B}/projects/p9/canvases/{cid}/sessions", json={"message": "Keep it small"})
+    assert started.status_code == 200, started.text
+    assert [row["answer"] for row in started.json()["answers"] if row["outcome"] == "message"] == ["Keep it small"]
+    too_long = client.post(f"{B}/projects/p9/canvases/{cid}/sessions", json={"message": "x" * 4001})
+    assert too_long.status_code == 422
+
+
+# ------------------------------------- board-scoped delete + review routes --
+def test_board_scoped_delete_and_review_never_touch_another_board(tmp_path):
+    client = _client(tmp_path)
+    a = client.post(f"{B}/projects/p9/canvases", json={"name": "A"}).json()["canvas_id"]
+    b = client.post(f"{B}/projects/p9/canvases", json={"name": "B"}).json()["canvas_id"]
+    for cid in (a, b):
+        board = client.get(f"{B}/projects/p9/canvases/{cid}").json()
+        client.put(f"{B}/projects/p9/canvases/{cid}", json={"expected_revision": board["revision"], "objects": FULL, "connectors": []})
+    # b is now the most recently updated board; delete on a must still hit a.
+    rev_a = client.get(f"{B}/projects/p9/canvases/{a}").json()["revision"]
+    gone = client.delete(f"{B}/projects/p9/canvases/{a}/objects/e1", params={"expected_revision": rev_a})
+    assert gone.status_code == 200, gone.text
+    assert [o["id"] for o in gone.json()["objects"]] == ["c1", "p1"]
+    assert len(client.get(f"{B}/projects/p9/canvases/{b}").json()["objects"]) == 3
+    stale = client.delete(f"{B}/projects/p9/canvases/{a}/objects/c1", params={"expected_revision": rev_a})
+    assert stale.status_code == 409
+    missing = client.delete(f"{B}/projects/p9/canvases/{a}/objects/nope", params={"expected_revision": rev_a + 1})
+    assert missing.status_code == 422
+    review = client.post(f"{B}/projects/p9/canvases/{a}/curate")
+    assert review.status_code == 200 and review.json()["summary"]["evidence_count"] == 0
+    assert client.post(f"{B}/projects/p9/canvases/ghost/curate").status_code == 404
+    client.patch(f"{B}/projects/p9/canvases/{a}", json={"status": "archived"})
+    locked = client.delete(f"{B}/projects/p9/canvases/{a}/objects/c1", params={"expected_revision": rev_a + 1})
+    assert locked.status_code == 409
+
+
+# ----------------------------------------------- D15 edit a plan's steps --
+def _plan_for(store, enabled, service, board):
+    _fill(service, enabled, board, FULL)
+    planning = CanvasPlanningService(store)
+    session = planning.start(enabled, canvas_id=board["canvas_id"], actor="sahil")
+    proposal = next(p for p in session["proposals"] if p["kind"] == "technical_plan")
+    planning.decide(proposal["proposal_id"], approve=True, actor="sahil")
+    return PlanDocumentService(store).synthesise_plan(enabled, proposal_id=proposal["proposal_id"], actor="sahil")
+
+
+def test_plan_steps_can_be_edited_while_draft(store, enabled):
+    service = CanvasService(store)
+    board = service.create_board(enabled, name="Edit", actor="sahil")
+    plan = _plan_for(store, enabled, service, board)
+    docs = PlanDocumentService(store)
+    first = plan["steps"][0]
+    edited = docs.update_steps(enabled, plan["plan_id"], steps=[
+        {"order": first["order"], "title": "  Ship the preview first  "},
+        {"title": "Write the rollback note"},
+    ], actor="sahil")
+    assert edited["plan_id"] == plan["plan_id"]
+    assert [(s["order"], s["title"]) for s in edited["steps"]] == [(1, "Ship the preview first"), (2, "Write the rollback note")]
+    assert edited["steps"][0]["source_object_ids"] == first["source_object_ids"]
+    assert edited["steps"][1]["source_object_ids"] == []
+    assert docs.get_plan(enabled, plan["plan_id"])["steps"] == edited["steps"]
+
+
+@pytest.mark.parametrize("steps, match", [
+    ([], "at least one"),
+    ([{"title": "   "}], "empty"),
+    ([{"title": "a"}, {"title": "A"}], "duplicate"),
+    ([{"title": "x" * 501}], "at most"),
+    ([{"title": "ok", "order": 99}], "unknown step"),
+    ([{"title": f"s{i}"} for i in range(51)], "at most 50"),
+    ("nope", "list"),
+])
+def test_plan_step_edits_are_validated(store, enabled, steps, match):
+    service = CanvasService(store)
+    board = service.create_board(enabled, name="Bad", actor="sahil")
+    plan = _plan_for(store, enabled, service, board)
+    with pytest.raises(ValueError, match=match):
+        PlanDocumentService(store).update_steps(enabled, plan["plan_id"], steps=steps, actor="sahil")
+    assert PlanDocumentService(store).get_plan(enabled, plan["plan_id"])["steps"] == plan["steps"]
+
+
+def test_documented_plan_and_locked_board_refuse_step_edits(store, enabled):
+    service = CanvasService(store)
+    board = service.create_board(enabled, name="Doc", actor="sahil")
+    plan = _plan_for(store, enabled, service, board)
+    docs = PlanDocumentService(store)
+    service.update_board(enabled, board["canvas_id"], status="completed", actor="sahil")
+    with pytest.raises(CanvasLockedError):
+        docs.update_steps(enabled, plan["plan_id"], steps=[{"title": "x"}], actor="sahil")
+    service.update_board(enabled, board["canvas_id"], status="planned", actor="sahil")
+    docs.save_implementation_document(enabled, plan["plan_id"], "# doc", actor="sahil")
+    with pytest.raises(ValueError, match="document"):
+        docs.update_steps(enabled, plan["plan_id"], steps=[{"title": "x"}], actor="sahil")
+
+
+def test_plan_step_route(tmp_path):
+    client = _client(tmp_path)
+    cid = client.post(f"{B}/projects/p9/canvases", json={"name": "R"}).json()["canvas_id"]
+    board = client.get(f"{B}/projects/p9/canvases/{cid}").json()
+    client.put(f"{B}/projects/p9/canvases/{cid}", json={"expected_revision": board["revision"], "objects": FULL, "connectors": []})
+    session = client.post(f"{B}/projects/p9/canvases/{cid}/sessions", json={}).json()
+    proposal = next(p for p in session["proposals"] if p["kind"] == "technical_plan")
+    client.post(f"{B}/canvas/proposals/{proposal['proposal_id']}/decision", json={"approve": True})
+    plan = client.post(f"{B}/canvas/proposals/{proposal['proposal_id']}/plan", json={"project_id": "p9"}).json()
+    ok = client.patch(f"{B}/projects/p9/plans/{plan['plan_id']}", json={"steps": [{"title": "Only step"}]})
+    assert ok.status_code == 200, ok.text and ok.json()["steps"][0]["title"] == "Only step"
+    assert client.patch(f"{B}/projects/p9/plans/{plan['plan_id']}", json={"steps": []}).status_code == 422
+    assert client.patch(f"{B}/projects/p9/plans/ghost", json={"steps": [{"title": "x"}]}).status_code == 404
+
+
+
+# ------------------------------------------------ D20 sticker colour (palette) --
+def _one(colour=None, **extra):
+    row = {"id": "s1", "kind": "note", "content": {"text": "hi"}, "x": 1, "y": 2}
+    if colour is not _MISSING:
+        row["colour"] = colour
+    row.update(extra)
+    return row
+
+
+_MISSING = object()
+
+
+def test_sticker_colour_is_a_palette_key_and_round_trips(store, enabled):
+    svc = CanvasService(store)
+    board = svc.create_board(enabled, name="Colours", actor="sahil")
+    saved = svc.save(enabled, canvas_id=board["canvas_id"], expected_revision=board["revision"],
+                           objects=[_one("pink")], connectors=[], actor="sahil")
+    assert saved["objects"][0]["colour"] == "pink"
+    again = svc.get_board(enabled, board["canvas_id"])
+    assert again["objects"][0]["colour"] == "pink"
+
+
+@pytest.mark.parametrize("colour", [None, "", _MISSING])
+def test_missing_or_blank_sticker_colour_means_default(store, enabled, colour):
+    svc = CanvasService(store)
+    board = svc.create_board(enabled, name="Plain", actor="sahil")
+    row = _one(colour) if colour is not _MISSING else {"id": "s1", "kind": "note", "content": {}, "x": 0, "y": 0}
+    saved = svc.save(enabled, canvas_id=board["canvas_id"], expected_revision=board["revision"],
+                           objects=[row], connectors=[], actor="sahil")
+    assert saved["objects"][0]["colour"] is None
+
+
+@pytest.mark.parametrize("colour", ["#ff0000", "red; background:url(x)", "PINK ", 7, ["pink"], "teal"])
+def test_unknown_or_raw_css_sticker_colour_is_refused(store, enabled, colour):
+    svc = CanvasService(store)
+    board = svc.create_board(enabled, name="Bad", actor="sahil")
+    with pytest.raises(ValueError, match="sticker colour"):
+        svc.save(enabled, canvas_id=board["canvas_id"], expected_revision=board["revision"],
+                       objects=[_one(colour)], connectors=[], actor="sahil")
+    assert svc.get_board(enabled, board["canvas_id"])["revision"] == board["revision"]
+
+
+def test_sticker_palette_is_the_documented_set():
+    from hermes_project_stewardship.persistence.canvas_service import STICKER_COLOURS
+    assert STICKER_COLOURS == frozenset({"yellow", "green", "blue", "pink", "purple", "orange"})
