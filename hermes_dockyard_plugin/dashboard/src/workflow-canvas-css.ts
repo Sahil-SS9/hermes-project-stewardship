@@ -207,7 +207,8 @@ export const WORKFLOW_CANVAS_CSS = `
    overrides under the theme attribute the Desktop host actually flips
    (.dockyard-root[data-theme="dark"]). The reserved --dy-edge-plan-* means now
    live here (they were declared tokens-only for this surface). */
-.dy-pc-scope {
+.dy-pc-scope,
+.dy-pc-scope .dy-pc[data-canvas-theme="light"] {
   --dy-pc-kind-evidence: #1f7a55;   --dy-pc-kind-claim: #6b4bbd;
   --dy-pc-kind-question: #9a6206;   --dy-pc-kind-decision: #2f4bb5;
   --dy-pc-kind-plan_block: #1d6480; --dy-pc-kind-note: #5b6472;
@@ -217,6 +218,22 @@ export const WORKFLOW_CANVAS_CSS = `
   --dy-pc-grid: rgba(31, 42, 68, .10);
   --dy-pc-backdrop: rgba(15, 18, 23, .26);
   --dy-pc-danger-text: #a72a2a;
+  /* D20: every kind is a full sticker. Light canvas = pastel paper with dark
+     ink; all fills keep ink and ink-2 at WCAG AA (>= 4.5:1), asserted in
+     dashboard/tests/canvas-sticker-contrast.test.mjs. */
+  --dy-pc-ink: #15171c;               --dy-pc-ink-2: #3a4250;
+  --dy-pc-fill-evidence: #d9f4dd;     --dy-pc-fill-claim: #e7defc;
+  --dy-pc-fill-question: #ffe2c4;     --dy-pc-fill-decision: #dde3ff;
+  --dy-pc-fill-plan_block: #d2efec;   --dy-pc-fill-note: #fff1a6;
+  --dy-pc-fill-link: #d3ebfb;         --dy-pc-fill-media: #fbdcec;
+  --dy-pc-sticker-yellow: #fff1a6;    --dy-pc-sticker-green: #d3f4dc;
+  --dy-pc-sticker-blue: #d3e6fd;      --dy-pc-sticker-pink: #fcd9e7;
+  --dy-pc-sticker-purple: #e7defc;    --dy-pc-sticker-orange: #ffdfc0;
+  --dy-pc-card-edge: rgba(21, 23, 28, .14);
+  /* D18: the canvas frame. */
+  --dy-pc-frame: #3654c7;             --dy-pc-frame-halo: rgba(54, 84, 199, .16);
+  --dy-pc-glow: rgba(54, 84, 199, .10);
+  --dy-pc-stage-bg: #f4f6fa;
   /* Connector meanings (reserved vocabulary, now drawn here). */
   --dy-edge-plan-supports: #1f7a55;         --dy-edge-plan-supports-active: #17603f;
   --dy-edge-plan-contradicts: #b3352c;      --dy-edge-plan-contradicts-active: #8d2721;
@@ -226,7 +243,8 @@ export const WORKFLOW_CANVAS_CSS = `
   --dy-edge-plan-raises_question: #a8275f;  --dy-edge-plan-raises_question-active: #861e4b;
   --dy-edge-plan-depends_on: #4a5a7a;       --dy-edge-plan-depends_on-active: #3a4763;
 }
-.dockyard-root[data-theme="dark"] .dy-pc-scope {
+.dockyard-root[data-theme="dark"] .dy-pc-scope,
+.dy-pc-scope .dy-pc[data-canvas-theme="dark"] {
   --dy-pc-kind-evidence: #57d39b;   --dy-pc-kind-claim: #b99cf5;
   --dy-pc-kind-question: #f0c04a;   --dy-pc-kind-decision: #9db3ff;
   --dy-pc-kind-plan_block: #79cbe0; --dy-pc-kind-note: #a9b6c6;
@@ -235,6 +253,19 @@ export const WORKFLOW_CANVAS_CSS = `
   --dy-pc-grid: rgba(182, 190, 202, .12);
   --dy-pc-backdrop: rgba(0, 0, 0, .42);
   --dy-pc-danger-text: #ff9d97;
+  /* Dark canvas = deep glowing stickers with light ink (AA both inks). */
+  --dy-pc-ink: #f3f5f7;               --dy-pc-ink-2: #c9d1dc;
+  --dy-pc-fill-evidence: #173d2a;     --dy-pc-fill-claim: #2e2552;
+  --dy-pc-fill-question: #4a2d12;     --dy-pc-fill-decision: #1f2b5c;
+  --dy-pc-fill-plan_block: #123d40;   --dy-pc-fill-note: #463c0e;
+  --dy-pc-fill-link: #123a52;         --dy-pc-fill-media: #4a1d3c;
+  --dy-pc-sticker-yellow: #463c0e;    --dy-pc-sticker-green: #173d2a;
+  --dy-pc-sticker-blue: #16345a;      --dy-pc-sticker-pink: #4d1c33;
+  --dy-pc-sticker-purple: #2e2552;    --dy-pc-sticker-orange: #4a2d12;
+  --dy-pc-card-edge: rgba(243, 245, 247, .16);
+  --dy-pc-frame: #7c8cff;             --dy-pc-frame-halo: rgba(124, 140, 255, .32);
+  --dy-pc-glow: rgba(124, 140, 255, .26);
+  --dy-pc-stage-bg: #0d1018;
   --dy-edge-plan-supports: #4fc08d;         --dy-edge-plan-supports-active: #79e0ab;
   --dy-edge-plan-contradicts: #ff8a80;      --dy-edge-plan-contradicts-active: #ffb3ab;
   --dy-edge-plan-derived_from: #c792ea;     --dy-edge-plan-derived_from-active: #e0bcf7;
@@ -242,6 +273,27 @@ export const WORKFLOW_CANVAS_CSS = `
   --dy-edge-plan-implements: #ffb86c;       --dy-edge-plan-implements-active: #ffd0a0;
   --dy-edge-plan-raises_question: #ff6ea9;  --dy-edge-plan-raises_question-active: #ff9cc4;
   --dy-edge-plan-depends_on: #8fa3c8;       --dy-edge-plan-depends_on-active: #9cc4ff;
+}
+/* D19: the canvas light/dark toggle. Only the canvas area (.dy-pc) re-declares
+   the plugin tokens its own controls read, so the board bar and the rest of
+   the plugin keep the host theme. Values mirror desktop/src/styles/tokens.js. */
+.dy-pc-scope .dy-pc[data-canvas-theme="light"] {
+  --dy-surface: #ffffff; --dy-surface-subtle: #f0f2f5; --dy-text: #15171c;
+  --dy-text-2: #515968; --dy-text-3: #626c7b; --dy-border: #d7dce4;
+  --dy-control-border: #87909d; --dy-accent-text: #293f9e; --dy-accent-soft: #eef1ff;
+  --dy-accent-border: #b8c4f0; --dy-shadow: 0 10px 28px rgba(31, 42, 68, 0.08);
+  --dy-success: #136c4a; --dy-warning: #805200; --dy-danger-bg: #ffeded; --dy-focus: #3654c7;
+  --dy-pc-surface: rgba(255, 255, 255, .96); --dy-pc-grid: rgba(31, 42, 68, .10);
+  color: #15171c; color-scheme: light;
+}
+.dy-pc-scope .dy-pc[data-canvas-theme="dark"] {
+  --dy-surface: #171b22; --dy-surface-subtle: #1d222b; --dy-text: #f3f5f7;
+  --dy-text-2: #b6beca; --dy-text-3: #949eac; --dy-border: #2e3541;
+  --dy-control-border: #5f6977; --dy-accent-text: #c2cbff; --dy-accent-soft: #232c4f;
+  --dy-accent-border: #46558f; --dy-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+  --dy-success: #72cda2; --dy-warning: #f0bd64; --dy-danger-bg: #40201f; --dy-focus: #8fa2ff;
+  --dy-pc-surface: rgba(23, 27, 34, .96); --dy-pc-grid: rgba(124, 140, 255, .10);
+  color: #f3f5f7; color-scheme: dark;
 }
 /* Board switcher: compact on desktop and allowed to collapse on narrow screens. */
 .dy-pc-scope .dy-pc-board-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface); }
@@ -261,8 +313,17 @@ export const WORKFLOW_CANVAS_CSS = `
 .dy-pc-scope .dy-pc-board-row-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
 .dy-pc-scope .dy-pc-board-row-copy small { color: var(--dy-text-3); font-size: 10px; }
 .dy-pc-scope .dy-pc-board-warning { margin-left: auto; color: var(--dy-warning); font-weight: 800; }
+.dy-pc-scope .dy-pc-board-item { display: flex; align-items: stretch; gap: 4px; min-width: 0; }
+.dy-pc-scope .dy-pc-board-item .dy-pc-board-row { flex: 1 1 auto; }
+.dy-pc-scope .dy-pc-board-item .dockyard-button { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; padding: 5px; }
+.dy-pc-scope .dy-pc-board-item .dockyard-button svg, .dy-pc-scope .dy-pc-board-bar .dockyard-button svg { width: 14px; height: 14px; }
+.dy-pc-scope .dy-pc-board-form { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; grid-column: 1 / -1; }
+.dy-pc-scope .dy-pc-board-form input { flex: 1 1 180px; min-width: 0; padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
+.dy-pc-scope .dy-pc-board-status { display: inline-flex; align-items: center; gap: 6px; }
+.dy-pc-scope .dy-pc-board-status select { padding: 5px 8px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 11.5px; }
+.dy-pc-scope .dy-pc-board-archived { grid-column: 1 / -1; color: var(--dy-text-3); font-size: 11px; }
 
-.dy-pc-scope .dy-pc { position: relative; display: flex; flex-direction: column; min-height: 0; margin-top: 14px; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); }
+.dy-pc-scope .dy-pc { position: relative; display: flex; flex-direction: column; min-height: 0; margin-top: 14px; overflow: hidden; border: 2px solid var(--dy-pc-frame); border-radius: 14px; background: var(--dy-surface); color: var(--dy-text); box-shadow: 0 0 0 4px var(--dy-pc-frame-halo), 0 18px 48px var(--dy-pc-glow); }
 .dy-pc-scope .dy-pc-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 9px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface-subtle); }
 .dy-pc-scope .dy-pc-seg { display: flex; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 8px; }
 .dy-pc-scope .dy-pc-seg button { padding: 6px 11px; border: 0; border-radius: 0; background: transparent; color: var(--dy-text-2); font-size: 11.5px; font-weight: 600; cursor: pointer; }
@@ -272,6 +333,23 @@ export const WORKFLOW_CANVAS_CSS = `
 .dy-pc-scope .dy-pc-add input { min-width: 190px; max-width: 320px; padding: 6px 8px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
 .dy-pc-scope .dy-pc-add select { padding: 6px 8px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
 .dy-pc-scope .dy-pc-spacer { flex: 1 1 auto; }
+/* D17: grouped toolbar (Edit / Add / View / AI / Save) of icon buttons. Each
+   group carries a small caption; each button a tooltip (name + one line). */
+.dy-pc-scope .dy-pc-group { display: flex; align-items: center; gap: 3px; padding: 2px 4px 2px 6px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface); }
+.dy-pc-scope .dy-pc-group-label { margin-right: 3px; color: var(--dy-text-3); font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.dy-pc-scope .dy-pc-tool { position: relative; display: inline-flex; }
+.dy-pc-scope .dy-pc-tool .dockyard-button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 30px; min-height: 30px; padding: 5px 7px; }
+.dy-pc-scope .dy-pc-tool .dockyard-button svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.dy-pc-scope .dy-pc-tip { position: absolute; top: calc(100% + 7px); left: 50%; z-index: 60; display: grid; gap: 2px; width: max-content; max-width: 220px; padding: 7px 9px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); box-shadow: var(--dy-shadow); color: var(--dy-text); font-size: 11px; line-height: 1.35; text-align: left; opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(-2px); transition: opacity .12s ease, transform .12s ease; }
+.dy-pc-scope .dy-pc-tip strong { font-size: 11.5px; font-weight: 650; }
+.dy-pc-scope .dy-pc-tip span { color: var(--dy-text-2); }
+.dy-pc-scope .dy-pc-tool:hover .dy-pc-tip, .dy-pc-scope .dy-pc-tool:focus-within .dy-pc-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
+.dy-pc-scope .dy-pc-addmenu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 55; display: grid; gap: 2px; min-width: 190px; padding: 5px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); box-shadow: var(--dy-shadow); }
+.dy-pc-scope .dy-pc-addmenu[hidden] { display: none; }
+.dy-pc-scope .dy-pc-addmenu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 9px; border: 0; border-radius: 7px; background: transparent; color: var(--dy-text); font-size: 12px; text-align: left; cursor: pointer; }
+.dy-pc-scope .dy-pc-addmenu button:hover, .dy-pc-scope .dy-pc-addmenu button:focus-visible { background: var(--dy-accent-soft); color: var(--dy-accent-text); }
+.dy-pc-scope .dy-pc-addmenu button svg { width: 14px; height: 14px; }
+.dy-pc-scope .dy-pc-addmenu .swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--dy-pc-card-edge); }
 /* Connector editor bar: the explicit fallback for a real meaning, beside the
    toolbar so it is reachable without a gesture. */
 .dy-pc-scope .dy-pc-linkbar { display: flex; flex-wrap: wrap; align-items: end; gap: 9px; padding: 10px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface); }
@@ -280,7 +358,7 @@ export const WORKFLOW_CANVAS_CSS = `
 .dy-pc-scope .dy-pc-edge-label { fill: var(--dy-text-3); font: 600 9.5px system-ui, sans-serif; letter-spacing: .02em; pointer-events: none; }
 .dy-pc-scope .dy-pc-readout { color: var(--dy-text-3); font-size: 11px; font-variant-numeric: tabular-nums; }
 /* Stage + world. The world is the scrollable/zoomable plane objects live on. */
-.dy-pc-scope .dy-pc-stage { position: relative; flex: 1 1 auto; min-height: 460px; height: 58vh; overflow: hidden; background-color: var(--dy-surface-subtle); background-image: linear-gradient(var(--dy-pc-grid) 1px, transparent 1px), linear-gradient(90deg, var(--dy-pc-grid) 1px, transparent 1px); background-size: 28px 28px; }
+.dy-pc-scope .dy-pc-stage { position: relative; flex: 1 1 auto; min-height: 460px; height: 58vh; overflow: hidden; background-color: var(--dy-pc-stage-bg); background-image: radial-gradient(ellipse at 50% 0%, var(--dy-pc-glow), transparent 62%), linear-gradient(var(--dy-pc-grid) 1px, transparent 1px), linear-gradient(90deg, var(--dy-pc-grid) 1px, transparent 1px); background-size: 100% 100%, 28px 28px, 28px 28px; }
 .dy-pc-scope .dy-pc-stage[data-pc-mode="connect"] { cursor: crosshair; }
 .dy-pc-scope .dy-pc-world { position: absolute; left: 0; top: 0; width: 2000px; height: 1400px; transform-origin: 0 0; }
 .dy-pc-scope .dy-pc-svg { position: absolute; left: 0; top: 0; width: 2000px; height: 1400px; overflow: visible; pointer-events: none; z-index: 1; }
@@ -297,43 +375,69 @@ export const WORKFLOW_CANVAS_CSS = `
 .dy-pc-scope .dy-pc-svg .dy-pc-arrowhead { fill: var(--dy-text-3); }
 .dy-pc-scope .dy-pc-svg circle { fill: var(--dy-surface); }
 /* Objects: one real kind each, kind carried by an edge stripe (v6's cue). */
-.dy-pc-scope .dy-pc-obj { position: absolute; z-index: 2; min-width: 180px; max-width: 260px; padding: 11px 13px; border: 1px solid var(--dy-border); border-left: 3px solid var(--dy-pc-kind-note); border-radius: 10px; background: var(--dy-pc-surface); box-shadow: var(--dy-shadow); color: var(--dy-text); text-align: left; cursor: grab; user-select: none; touch-action: none; overflow: hidden; }
+/* The inline width/height set from the stored rect are authoritative (no
+   min/max clamp), so connector anchors always sit on the drawn card edge. */
+.dy-pc-scope .dy-pc-obj { position: absolute; z-index: 2; padding: 11px 13px; border: 1px solid var(--dy-pc-card-edge); border-left: 4px solid var(--dy-pc-kind-note); border-radius: 10px; background: var(--dy-pc-fill-note); box-shadow: var(--dy-shadow); color: var(--dy-pc-ink); text-align: left; cursor: grab; user-select: none; touch-action: none; overflow: hidden; }
 /* B9: the stored rect drives the rendered box — the inline height style set by
    canvas.js is authoritative (attr() is not reliably parsed with units here),
    so connector anchors and de-overlap match what was persisted. */
-.dy-pc-scope .dy-pc-obj .dy-pc-obj-kind-icon { position: absolute; top: 9px; right: 10px; color: var(--dy-text-3); display: inline-flex; pointer-events: none; }
+.dy-pc-scope .dy-pc-obj .dy-pc-obj-kind-icon { position: absolute; top: 9px; right: 10px; color: var(--dy-pc-ink-2); display: inline-flex; pointer-events: none; }
 .dy-pc-scope .dy-pc-obj .dy-pc-obj-kind-icon svg { width: 13px; height: 13px; }
 .dy-pc-scope .dy-pc-obj.marquee-selected { box-shadow: 0 0 0 2px var(--dy-accent-soft), 0 0 0 1px var(--dy-accent-border), var(--dy-shadow); }
 .dy-pc-scope .dy-pc-marquee { position: absolute; z-index: 5; border: 1px dashed var(--dy-accent-border); background: var(--dy-accent-soft); pointer-events: none; }
 .dy-pc-scope .dy-pc-chat input[data-canvas-chat-input] { flex: 1 1 auto; min-width: 0; }
 .dy-pc-scope .dy-pc-obj:active { cursor: grabbing; }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="evidence"] { border-left-color: var(--dy-pc-kind-evidence); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="claim"] { border-left-color: var(--dy-pc-kind-claim); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="question"] { border-left-color: var(--dy-pc-kind-question); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="decision"] { border-left-color: var(--dy-pc-kind-decision); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="plan_block"] { border-left-color: var(--dy-pc-kind-plan_block); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="note"] { border-left-color: var(--dy-pc-kind-note); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="link"] { border-left-color: var(--dy-pc-kind-link); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="media"] { border-left-color: var(--dy-pc-kind-media); }
-.dy-pc-scope .dy-pc-obj[data-canvas-colour="yellow"] { border-top-color: #9a6206; }
-.dy-pc-scope .dy-pc-obj[data-canvas-colour="green"] { border-top-color: #1f7a55; }
-.dy-pc-scope .dy-pc-obj[data-canvas-colour="blue"] { border-top-color: #2f4bb5; }
-.dy-pc-scope .dy-pc-obj[data-canvas-colour="pink"] { border-top-color: #a8275f; }
-.dy-pc-scope .dy-pc-obj[data-canvas-colour="purple"] { border-top-color: #6b4bbd; }
-.dy-pc-scope .dy-pc-obj[data-canvas-colour="orange"] { border-top-color: #a4520b; }
-.dy-pc-scope .dy-pc-obj:hover { border-top-color: var(--dy-accent-border); border-right-color: var(--dy-accent-border); border-bottom-color: var(--dy-accent-border); }
-.dy-pc-scope .dy-pc-obj.selected { border-top-color: var(--dy-accent-border); border-right-color: var(--dy-accent-border); border-bottom-color: var(--dy-accent-border); box-shadow: 0 0 0 2px var(--dy-accent-soft), var(--dy-shadow); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="evidence"] { border-left-color: var(--dy-pc-kind-evidence); background: var(--dy-pc-fill-evidence); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="claim"] { border-left-color: var(--dy-pc-kind-claim); background: var(--dy-pc-fill-claim); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="question"] { border-left-color: var(--dy-pc-kind-question); background: var(--dy-pc-fill-question); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="decision"] { border-left-color: var(--dy-pc-kind-decision); background: var(--dy-pc-fill-decision); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="plan_block"] { border-left-color: var(--dy-pc-kind-plan_block); background: var(--dy-pc-fill-plan_block); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="note"] { border-left-color: var(--dy-pc-kind-note); background: var(--dy-pc-fill-note); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="link"] { border-left-color: var(--dy-pc-kind-link); background: var(--dy-pc-fill-link); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="media"] { border-left-color: var(--dy-pc-kind-media); background: var(--dy-pc-fill-media); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="yellow"] { background: var(--dy-pc-sticker-yellow); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="green"] { background: var(--dy-pc-sticker-green); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="blue"] { background: var(--dy-pc-sticker-blue); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="pink"] { background: var(--dy-pc-sticker-pink); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="purple"] { background: var(--dy-pc-sticker-purple); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="orange"] { background: var(--dy-pc-sticker-orange); }
+.dy-pc-scope .dy-pc-obj:hover { box-shadow: 0 0 0 1px var(--dy-accent-border), var(--dy-shadow); }
+.dy-pc-scope .dy-pc-obj.selected { box-shadow: 0 0 0 2px var(--dy-focus), 0 0 18px var(--dy-pc-glow), var(--dy-shadow); }
 .dy-pc-scope .dy-pc-obj:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
-.dy-pc-scope .dy-pc-obj small { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--dy-text-3); }
-.dy-pc-scope .dy-pc-obj strong { display: block; margin-top: 5px; font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--dy-text); }
-.dy-pc-scope .dy-pc-obj-meta { display: block; margin-top: 6px; color: var(--dy-text-3); font-size: 10px; }
+.dy-pc-scope .dy-pc-obj small { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--dy-pc-ink-2); }
+.dy-pc-scope .dy-pc-obj strong { display: block; margin-top: 5px; font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--dy-pc-ink); }
+.dy-pc-scope .dy-pc-obj-meta { display: block; margin-top: 6px; color: var(--dy-pc-ink-2); font-size: 10px; }
 .dy-pc-scope .dy-pc-empty { position: absolute; left: 18px; top: 16px; margin: 0; color: var(--dy-text-3); font-size: 12px; }
 /* Frames are decorative group labels (v6's .pframe) — never controls. */
 .dy-pc-scope .dy-pc-frame { position: absolute; z-index: 0; border: 1px dashed var(--dy-border); border-radius: 10px; background: var(--dy-accent-soft); padding: 12px 14px; color: var(--dy-text-3); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 /* Assistant (curation) panel: docked, collapsible, bottom-right. */
 .dy-pc-scope .dy-pc-chat { position: absolute; right: 14px; bottom: 14px; z-index: 20; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 12px; background: var(--dy-pc-surface); box-shadow: 0 14px 44px rgba(0, 0, 0, .28); }
 .dy-pc-scope .dy-pc-chat.closed { width: 268px; }
-.dy-pc-scope .dy-pc-chat.open { width: 360px; max-height: 460px; }
+.dy-pc-scope .dy-pc-chat.open { width: 360px; max-height: min(460px, calc(100% - 28px)); }
+.dy-pc-scope .dy-pc-chat.pill { width: auto; max-width: calc(100% - 28px); border-radius: 999px; }
+.dy-pc-scope .dy-pc-chat.pill .dy-pc-chat-b, .dy-pc-scope .dy-pc-chat.pill .dy-pc-chat-f, .dy-pc-scope .dy-pc-chat.pill .dy-pc-chat-model { display: none; }
+.dy-pc-scope .dy-pc-chat.dragging { transition: none; box-shadow: 0 22px 60px rgba(0, 0, 0, .36); }
+.dy-pc-scope .dy-pc-chat-bar { display: flex; align-items: center; gap: 2px; padding-right: 6px; }
+.dy-pc-scope .dy-pc-chat-bar .dockyard-button { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; min-height: 26px; padding: 4px; }
+.dy-pc-scope .dy-pc-chat-bar .dockyard-button svg { width: 13px; height: 13px; }
+.dy-pc-scope .dy-pc-chat-grip { display: inline-flex; align-items: center; padding: 0 2px 0 9px; color: var(--dy-text-3); cursor: grab; touch-action: none; }
+.dy-pc-scope .dy-pc-chat-grip svg { width: 14px; height: 14px; }
+.dy-pc-scope .dy-pc-chat-model { display: flex; align-items: center; gap: 6px; padding: 6px 13px; border-bottom: 1px solid var(--dy-border); color: var(--dy-text-2); font-size: 10.5px; }
+.dy-pc-scope .dy-pc-chat-model select { flex: 1 1 auto; min-width: 0; padding: 4px 6px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 11px; }
+/* Closed = header bar only; the body, composer and model picker return on open. */
+.dy-pc-scope .dy-pc-chat.closed .dy-pc-chat-model, .dy-pc-scope .dy-pc-chat.closed .dy-pc-chat-b, .dy-pc-scope .dy-pc-chat.closed .dy-pc-chat-f { display: none; }
+.dy-pc-scope .dy-pc-overlay { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; padding: 18px; background: var(--dy-pc-backdrop); }
+.dy-pc-scope .dy-pc-overlay-card { display: flex; flex-direction: column; width: min(820px, 100%); max-height: 100%; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); box-shadow: 0 24px 70px rgba(0, 0, 0, .38); color: var(--dy-text); }
+.dy-pc-scope .dy-pc-overlay-h { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--dy-border); }
+.dy-pc-scope .dy-pc-overlay-h strong { flex: 1 1 auto; font-size: 14px; }
+.dy-pc-scope .dy-pc-overlay-b { display: grid; gap: 10px; overflow: auto; padding: 14px 16px; font-size: 12.5px; }
+.dy-pc-scope .dy-pc-overlay-b ol { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.dy-pc-scope .dy-pc-overlay-b li { display: flex; align-items: center; gap: 7px; }
+.dy-pc-scope .dy-pc-overlay-b li > span { flex: 0 0 22px; color: var(--dy-text-3); font-variant-numeric: tabular-nums; text-align: right; }
+.dy-pc-scope .dy-pc-overlay-b li input { flex: 1 1 auto; min-width: 0; padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12.5px; }
+.dy-pc-scope .dy-pc-overlay-b li .dockyard-button { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; padding: 5px; }
+.dy-pc-scope .dy-pc-overlay-b li .dockyard-button svg { width: 13px; height: 13px; }
+.dy-pc-scope .dy-pc-overlay-f { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; padding: 11px 16px; border-top: 1px solid var(--dy-border); }
 .dy-pc-scope .dy-pc-chat-h { display: flex; align-items: center; gap: 9px; width: 100%; padding: 10px 13px; border: 0; background: transparent; color: var(--dy-text); text-align: left; cursor: pointer; }
 .dy-pc-scope .dy-pc-chat.open .dy-pc-chat-h { border-bottom: 1px solid var(--dy-border); }
 .dy-pc-scope .dy-pc-chat-h .av { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: var(--dy-accent-soft); color: var(--dy-accent-text); font-size: 10px; font-weight: 700; }
@@ -347,6 +451,8 @@ export const WORKFLOW_CANVAS_CSS = `
 .dy-pc-scope .dy-pc-chat-f { display: flex; flex-wrap: wrap; gap: 6px; padding: 9px; border-top: 1px solid var(--dy-border); }
 .dy-pc-scope .dy-pc-chat-f textarea { flex: 1 1 100%; min-height: 54px; padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; resize: vertical; }
 .dy-pc-scope .dy-pc-chat-f .dockyard-button { flex: 0 0 auto; }
+.dy-pc-scope .dy-pc-chat-f input { padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
+.dy-pc-scope .dy-pc-chat-f .dy-pc-readout { flex: 1 1 100%; }
 /* Proposals: scratch + suggested only. Nothing on this surface auto-applies. */
 .dy-pc-scope .dy-pc-proposal { display: grid; gap: 6px; padding: 9px 10px; border: 1px dashed var(--dy-accent-border); border-radius: 9px; background: var(--dy-accent-soft); }
 .dy-pc-scope .dy-pc-proposal strong { font-size: 12px; }
@@ -356,7 +462,11 @@ export const WORKFLOW_CANVAS_CSS = `
 .dy-pc-scope .dy-pc-proposal[data-pc-proposal-status="rejected"] { border-style: solid; border-color: var(--dy-border); background: var(--dy-surface-subtle); }
 /* Drawer: the selection editor (replaces a permanently-docked inspector). */
 .dy-pc-scope .dy-pc-drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 30; display: flex; flex-direction: column; width: min(360px, 92vw); border-left: 1px solid var(--dy-border); background: var(--dy-surface); transform: translateX(100%); transition: transform .18s ease; }
-.dy-pc-scope .dy-pc-drawer.open { transform: none; }
+/* Closed = off-canvas AND inert: it must not catch clicks meant for cards at
+   the stage edge, nor let Tab reach its hidden fields. visibility waits for
+   the slide-out to finish. */
+.dy-pc-scope .dy-pc-drawer:not(.open) { visibility: hidden; pointer-events: none; transition: transform .18s ease, visibility 0s linear .18s; }
+.dy-pc-scope .dy-pc-drawer.open { transform: none; visibility: visible; }
 .dy-pc-scope .dy-pc-drawer-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--dy-border); }
 .dy-pc-scope .dy-pc-drawer-h strong { font-size: 13px; font-weight: 600; }
 .dy-pc-scope .dy-pc-drawer-b { flex: 1 1 auto; display: grid; gap: 11px; align-content: start; overflow: auto; padding: 14px; }
@@ -375,5 +485,14 @@ export const WORKFLOW_CANVAS_CSS = `
 @media (max-width: 640px) {
   .dy-pc-scope .dy-pc-add { flex-wrap: wrap; flex: 1 1 100%; }
   .dy-pc-scope .dy-pc-add input { min-width: 0; flex: 1 1 140px; }
+  .dy-pc-scope .dy-pc-group { flex-wrap: wrap; }
+  .dy-pc-scope .dy-pc-group-label { display: none; }
+  .dy-pc-scope .dy-pc-tip { display: none; }
+  .dy-pc-scope .dy-pc-chat.open { left: 8px; right: 8px; width: auto; }
+  .dy-pc-scope .dy-pc-chat.closed { right: 8px; width: min(268px, calc(100% - 16px)); }
+  .dy-pc-scope .dy-pc-board-bar { flex-wrap: wrap; }
+  .dy-pc-scope .dy-pc-board-list { grid-template-columns: 1fr; }
+  .dy-pc-scope .dy-pc-linkbar select { min-width: 0; width: 100%; }
+  .dy-pc-scope .dy-pc-linkbar label { flex: 1 1 100%; }
 }
 `

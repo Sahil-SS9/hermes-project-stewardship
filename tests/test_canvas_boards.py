@@ -493,6 +493,41 @@ def test_board_answer_uses_the_boards_chosen_model(tmp_path, monkeypatch):
     assert seen == [choice], seen
 
 
+def test_plan_synthesis_uses_the_proposals_own_board_model(tmp_path, monkeypatch):
+    """Two boards with different models: making a plan from board B's
+    proposal must ask board B's model, never the default or board A's."""
+    import hermes_project_stewardship.api.server as server
+    import hermes_project_stewardship.persistence.hermes_curation_provider as hcp
+    monkeypatch.setattr(hcp, "list_hermes_models", lambda: {
+        "available": True, "default": None,
+        "providers": [{"slug": "p", "name": "P", "models": ["model-a", "model-b"], "is_current": True}]})
+    seen = []
+    monkeypatch.setattr(server, "_canvas_provider", lambda board_model=None: (seen.append(board_model), None)[1])
+    client = _client(tmp_path)
+    ids = {}
+    for name, model in (("A", "model-a"), ("B", "model-b")):
+        ids[name] = client.post(f"{B}/projects/p9/canvases", json={"name": name}).json()["canvas_id"]
+        assert client.patch(f"{B}/projects/p9/canvases/{ids[name]}",
+                            json={"model": {"provider": "p", "model": model}}).status_code == 200
+    store = client.app.state.store if hasattr(client.app.state, "store") else None
+    # A proposal row that belongs to board B, inserted as the planner would.
+    from hermes_project_stewardship.persistence.store import Store
+    db = store or Store(tmp_path / "boards.db")
+    with db.tx() as cx:
+        cx.execute(
+            "INSERT INTO canvas_proposals (proposal_id, project_id, session_id, canvas_revision, proposal_json, status, created_at, canvas_id)"
+            " VALUES ('prop-b', 'p9', NULL, 1, ?, 'approved', '2026-09-30T00:00:00+00:00', ?)",
+            ('{"kind": "technical_plan", "title": "Plan", "body": {"steps": ["One"]}}', ids["B"]))
+    seen.clear()
+    client.post(f"{B}/canvas/proposals/prop-b/plan", json={"project_id": "p9"})
+    assert seen == [{"provider": "p", "model": "model-b"}], seen
+    # An unknown proposal still resolves to the default, then 404s as before.
+    seen.clear()
+    missing = client.post(f"{B}/canvas/proposals/nope/plan", json={"project_id": "p9"})
+    assert missing.status_code == 404
+    assert seen == [None]
+
+
 
 # ------------------------------------------- D15 chat message reaches the AI --
 class _Recorder:

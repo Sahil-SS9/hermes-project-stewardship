@@ -107,7 +107,7 @@ export const layoutConnectors = (objects, connectors, labelFor = (m) => m, world
     const pick = candidates.find((c) => free(c.box)) ?? candidates[0]
     placed.push(pick.box)
     out.push({
-      id: edge.id, meaning: edge.meaning, ...line, label: text,
+      id: edge.id, meaning: edge.meaning, source: edge.source, target: edge.target, ...line, label: text,
       labelBox: pick.box,
       anchor: { x: pick.ax, y: pick.ay },
       // A label pushed away from its line gets a short leader so it is still

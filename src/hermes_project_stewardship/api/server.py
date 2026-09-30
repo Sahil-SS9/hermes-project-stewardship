@@ -1441,7 +1441,13 @@ def create_app(
     @router.post("/canvas/proposals/{proposal_id}/plan")
     def synthesise_canvas_plan(proposal_id: str, body: CanvasPlanSynthesisRequest):
         from ..persistence.canvas_plan_document import PlanDocumentService
-        provider = _canvas_provider()
+        # D16: the plan is written by the model chosen on the proposal's own
+        # board (the default when none was chosen), never a different board's.
+        row = store._conn.execute(
+            "SELECT c.model_json FROM canvas_proposals p LEFT JOIN project_canvases c ON c.canvas_id = p.canvas_id "
+            "WHERE p.proposal_id=? AND p.project_id=?", (proposal_id, body.project_id)).fetchone()
+        board_model = json.loads(row[0]) if row and row[0] else None
+        provider = _canvas_provider(board_model)
         try:
             return PlanDocumentService(store, provider=provider).synthesise_plan(
                 body.project_id, proposal_id=proposal_id, actor=_principal_id(body.actor))

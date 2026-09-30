@@ -18,6 +18,11 @@ const names = [
   'rotate-cw', 'scroll-text', 'search', 'shield-alert', 'square-check-big',
   'square-dashed', 'sticky-note', 'target', 'triangle-alert', 'undo-2',
   'upload', 'user', 'workflow', 'x', 'zap',
+  // Planning canvas board/toolbar/chat controls.
+  'archive', 'archive-restore', 'bot', 'chevrons-left', 'chevrons-right',
+  'grip-horizontal', 'maximize-2', 'minimize-2', 'minus', 'moon', 'mouse-pointer-2',
+  'plus', 'refresh-cw', 'save', 'scan', 'send', 'sparkles', 'spline', 'square',
+  'square-pen', 'sun', 'trash-2', 'zoom-in', 'zoom-out',
 ];
 const tags = new Set(['path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse']);
 const attribute = (name) => name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());

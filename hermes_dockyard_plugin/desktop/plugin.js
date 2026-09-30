@@ -2403,7 +2403,8 @@ var workflow_canvas_css_default = `
    overrides under the theme attribute the Desktop host actually flips
    (.dockyard-root[data-theme="dark"]). The reserved --dy-edge-plan-* means now
    live here (they were declared tokens-only for this surface). */
-.dy-pc-scope {
+.dy-pc-scope,
+.dy-pc-scope .dy-pc[data-canvas-theme="light"] {
   --dy-pc-kind-evidence: #1f7a55;   --dy-pc-kind-claim: #6b4bbd;
   --dy-pc-kind-question: #9a6206;   --dy-pc-kind-decision: #2f4bb5;
   --dy-pc-kind-plan_block: #1d6480; --dy-pc-kind-note: #5b6472;
@@ -2413,6 +2414,22 @@ var workflow_canvas_css_default = `
   --dy-pc-grid: rgba(31, 42, 68, .10);
   --dy-pc-backdrop: rgba(15, 18, 23, .26);
   --dy-pc-danger-text: #a72a2a;
+  /* D20: every kind is a full sticker. Light canvas = pastel paper with dark
+     ink; all fills keep ink and ink-2 at WCAG AA (>= 4.5:1), asserted in
+     dashboard/tests/canvas-sticker-contrast.test.mjs. */
+  --dy-pc-ink: #15171c;               --dy-pc-ink-2: #3a4250;
+  --dy-pc-fill-evidence: #d9f4dd;     --dy-pc-fill-claim: #e7defc;
+  --dy-pc-fill-question: #ffe2c4;     --dy-pc-fill-decision: #dde3ff;
+  --dy-pc-fill-plan_block: #d2efec;   --dy-pc-fill-note: #fff1a6;
+  --dy-pc-fill-link: #d3ebfb;         --dy-pc-fill-media: #fbdcec;
+  --dy-pc-sticker-yellow: #fff1a6;    --dy-pc-sticker-green: #d3f4dc;
+  --dy-pc-sticker-blue: #d3e6fd;      --dy-pc-sticker-pink: #fcd9e7;
+  --dy-pc-sticker-purple: #e7defc;    --dy-pc-sticker-orange: #ffdfc0;
+  --dy-pc-card-edge: rgba(21, 23, 28, .14);
+  /* D18: the canvas frame. */
+  --dy-pc-frame: #3654c7;             --dy-pc-frame-halo: rgba(54, 84, 199, .16);
+  --dy-pc-glow: rgba(54, 84, 199, .10);
+  --dy-pc-stage-bg: #f4f6fa;
   /* Connector meanings (reserved vocabulary, now drawn here). */
   --dy-edge-plan-supports: #1f7a55;         --dy-edge-plan-supports-active: #17603f;
   --dy-edge-plan-contradicts: #b3352c;      --dy-edge-plan-contradicts-active: #8d2721;
@@ -2422,7 +2439,8 @@ var workflow_canvas_css_default = `
   --dy-edge-plan-raises_question: #a8275f;  --dy-edge-plan-raises_question-active: #861e4b;
   --dy-edge-plan-depends_on: #4a5a7a;       --dy-edge-plan-depends_on-active: #3a4763;
 }
-.dockyard-root[data-theme="dark"] .dy-pc-scope {
+.dockyard-root[data-theme="dark"] .dy-pc-scope,
+.dy-pc-scope .dy-pc[data-canvas-theme="dark"] {
   --dy-pc-kind-evidence: #57d39b;   --dy-pc-kind-claim: #b99cf5;
   --dy-pc-kind-question: #f0c04a;   --dy-pc-kind-decision: #9db3ff;
   --dy-pc-kind-plan_block: #79cbe0; --dy-pc-kind-note: #a9b6c6;
@@ -2431,6 +2449,19 @@ var workflow_canvas_css_default = `
   --dy-pc-grid: rgba(182, 190, 202, .12);
   --dy-pc-backdrop: rgba(0, 0, 0, .42);
   --dy-pc-danger-text: #ff9d97;
+  /* Dark canvas = deep glowing stickers with light ink (AA both inks). */
+  --dy-pc-ink: #f3f5f7;               --dy-pc-ink-2: #c9d1dc;
+  --dy-pc-fill-evidence: #173d2a;     --dy-pc-fill-claim: #2e2552;
+  --dy-pc-fill-question: #4a2d12;     --dy-pc-fill-decision: #1f2b5c;
+  --dy-pc-fill-plan_block: #123d40;   --dy-pc-fill-note: #463c0e;
+  --dy-pc-fill-link: #123a52;         --dy-pc-fill-media: #4a1d3c;
+  --dy-pc-sticker-yellow: #463c0e;    --dy-pc-sticker-green: #173d2a;
+  --dy-pc-sticker-blue: #16345a;      --dy-pc-sticker-pink: #4d1c33;
+  --dy-pc-sticker-purple: #2e2552;    --dy-pc-sticker-orange: #4a2d12;
+  --dy-pc-card-edge: rgba(243, 245, 247, .16);
+  --dy-pc-frame: #7c8cff;             --dy-pc-frame-halo: rgba(124, 140, 255, .32);
+  --dy-pc-glow: rgba(124, 140, 255, .26);
+  --dy-pc-stage-bg: #0d1018;
   --dy-edge-plan-supports: #4fc08d;         --dy-edge-plan-supports-active: #79e0ab;
   --dy-edge-plan-contradicts: #ff8a80;      --dy-edge-plan-contradicts-active: #ffb3ab;
   --dy-edge-plan-derived_from: #c792ea;     --dy-edge-plan-derived_from-active: #e0bcf7;
@@ -2438,6 +2469,27 @@ var workflow_canvas_css_default = `
   --dy-edge-plan-implements: #ffb86c;       --dy-edge-plan-implements-active: #ffd0a0;
   --dy-edge-plan-raises_question: #ff6ea9;  --dy-edge-plan-raises_question-active: #ff9cc4;
   --dy-edge-plan-depends_on: #8fa3c8;       --dy-edge-plan-depends_on-active: #9cc4ff;
+}
+/* D19: the canvas light/dark toggle. Only the canvas area (.dy-pc) re-declares
+   the plugin tokens its own controls read, so the board bar and the rest of
+   the plugin keep the host theme. Values mirror desktop/src/styles/tokens.js. */
+.dy-pc-scope .dy-pc[data-canvas-theme="light"] {
+  --dy-surface: #ffffff; --dy-surface-subtle: #f0f2f5; --dy-text: #15171c;
+  --dy-text-2: #515968; --dy-text-3: #626c7b; --dy-border: #d7dce4;
+  --dy-control-border: #87909d; --dy-accent-text: #293f9e; --dy-accent-soft: #eef1ff;
+  --dy-accent-border: #b8c4f0; --dy-shadow: 0 10px 28px rgba(31, 42, 68, 0.08);
+  --dy-success: #136c4a; --dy-warning: #805200; --dy-danger-bg: #ffeded; --dy-focus: #3654c7;
+  --dy-pc-surface: rgba(255, 255, 255, .96); --dy-pc-grid: rgba(31, 42, 68, .10);
+  color: #15171c; color-scheme: light;
+}
+.dy-pc-scope .dy-pc[data-canvas-theme="dark"] {
+  --dy-surface: #171b22; --dy-surface-subtle: #1d222b; --dy-text: #f3f5f7;
+  --dy-text-2: #b6beca; --dy-text-3: #949eac; --dy-border: #2e3541;
+  --dy-control-border: #5f6977; --dy-accent-text: #c2cbff; --dy-accent-soft: #232c4f;
+  --dy-accent-border: #46558f; --dy-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+  --dy-success: #72cda2; --dy-warning: #f0bd64; --dy-danger-bg: #40201f; --dy-focus: #8fa2ff;
+  --dy-pc-surface: rgba(23, 27, 34, .96); --dy-pc-grid: rgba(124, 140, 255, .10);
+  color: #f3f5f7; color-scheme: dark;
 }
 /* Board switcher: compact on desktop and allowed to collapse on narrow screens. */
 .dy-pc-scope .dy-pc-board-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface); }
@@ -2457,8 +2509,17 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-board-row-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
 .dy-pc-scope .dy-pc-board-row-copy small { color: var(--dy-text-3); font-size: 10px; }
 .dy-pc-scope .dy-pc-board-warning { margin-left: auto; color: var(--dy-warning); font-weight: 800; }
+.dy-pc-scope .dy-pc-board-item { display: flex; align-items: stretch; gap: 4px; min-width: 0; }
+.dy-pc-scope .dy-pc-board-item .dy-pc-board-row { flex: 1 1 auto; }
+.dy-pc-scope .dy-pc-board-item .dockyard-button { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; padding: 5px; }
+.dy-pc-scope .dy-pc-board-item .dockyard-button svg, .dy-pc-scope .dy-pc-board-bar .dockyard-button svg { width: 14px; height: 14px; }
+.dy-pc-scope .dy-pc-board-form { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; grid-column: 1 / -1; }
+.dy-pc-scope .dy-pc-board-form input { flex: 1 1 180px; min-width: 0; padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
+.dy-pc-scope .dy-pc-board-status { display: inline-flex; align-items: center; gap: 6px; }
+.dy-pc-scope .dy-pc-board-status select { padding: 5px 8px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 11.5px; }
+.dy-pc-scope .dy-pc-board-archived { grid-column: 1 / -1; color: var(--dy-text-3); font-size: 11px; }
 
-.dy-pc-scope .dy-pc { position: relative; display: flex; flex-direction: column; min-height: 0; margin-top: 14px; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); }
+.dy-pc-scope .dy-pc { position: relative; display: flex; flex-direction: column; min-height: 0; margin-top: 14px; overflow: hidden; border: 2px solid var(--dy-pc-frame); border-radius: 14px; background: var(--dy-surface); color: var(--dy-text); box-shadow: 0 0 0 4px var(--dy-pc-frame-halo), 0 18px 48px var(--dy-pc-glow); }
 .dy-pc-scope .dy-pc-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 9px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface-subtle); }
 .dy-pc-scope .dy-pc-seg { display: flex; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 8px; }
 .dy-pc-scope .dy-pc-seg button { padding: 6px 11px; border: 0; border-radius: 0; background: transparent; color: var(--dy-text-2); font-size: 11.5px; font-weight: 600; cursor: pointer; }
@@ -2468,6 +2529,23 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-add input { min-width: 190px; max-width: 320px; padding: 6px 8px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
 .dy-pc-scope .dy-pc-add select { padding: 6px 8px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
 .dy-pc-scope .dy-pc-spacer { flex: 1 1 auto; }
+/* D17: grouped toolbar (Edit / Add / View / AI / Save) of icon buttons. Each
+   group carries a small caption; each button a tooltip (name + one line). */
+.dy-pc-scope .dy-pc-group { display: flex; align-items: center; gap: 3px; padding: 2px 4px 2px 6px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface); }
+.dy-pc-scope .dy-pc-group-label { margin-right: 3px; color: var(--dy-text-3); font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.dy-pc-scope .dy-pc-tool { position: relative; display: inline-flex; }
+.dy-pc-scope .dy-pc-tool .dockyard-button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 30px; min-height: 30px; padding: 5px 7px; }
+.dy-pc-scope .dy-pc-tool .dockyard-button svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.dy-pc-scope .dy-pc-tip { position: absolute; top: calc(100% + 7px); left: 50%; z-index: 60; display: grid; gap: 2px; width: max-content; max-width: 220px; padding: 7px 9px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); box-shadow: var(--dy-shadow); color: var(--dy-text); font-size: 11px; line-height: 1.35; text-align: left; opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(-2px); transition: opacity .12s ease, transform .12s ease; }
+.dy-pc-scope .dy-pc-tip strong { font-size: 11.5px; font-weight: 650; }
+.dy-pc-scope .dy-pc-tip span { color: var(--dy-text-2); }
+.dy-pc-scope .dy-pc-tool:hover .dy-pc-tip, .dy-pc-scope .dy-pc-tool:focus-within .dy-pc-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
+.dy-pc-scope .dy-pc-addmenu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 55; display: grid; gap: 2px; min-width: 190px; padding: 5px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); box-shadow: var(--dy-shadow); }
+.dy-pc-scope .dy-pc-addmenu[hidden] { display: none; }
+.dy-pc-scope .dy-pc-addmenu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 9px; border: 0; border-radius: 7px; background: transparent; color: var(--dy-text); font-size: 12px; text-align: left; cursor: pointer; }
+.dy-pc-scope .dy-pc-addmenu button:hover, .dy-pc-scope .dy-pc-addmenu button:focus-visible { background: var(--dy-accent-soft); color: var(--dy-accent-text); }
+.dy-pc-scope .dy-pc-addmenu button svg { width: 14px; height: 14px; }
+.dy-pc-scope .dy-pc-addmenu .swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--dy-pc-card-edge); }
 /* Connector editor bar: the explicit fallback for a real meaning, beside the
    toolbar so it is reachable without a gesture. */
 .dy-pc-scope .dy-pc-linkbar { display: flex; flex-wrap: wrap; align-items: end; gap: 9px; padding: 10px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface); }
@@ -2476,7 +2554,7 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-edge-label { fill: var(--dy-text-3); font: 600 9.5px system-ui, sans-serif; letter-spacing: .02em; pointer-events: none; }
 .dy-pc-scope .dy-pc-readout { color: var(--dy-text-3); font-size: 11px; font-variant-numeric: tabular-nums; }
 /* Stage + world. The world is the scrollable/zoomable plane objects live on. */
-.dy-pc-scope .dy-pc-stage { position: relative; flex: 1 1 auto; min-height: 460px; height: 58vh; overflow: hidden; background-color: var(--dy-surface-subtle); background-image: linear-gradient(var(--dy-pc-grid) 1px, transparent 1px), linear-gradient(90deg, var(--dy-pc-grid) 1px, transparent 1px); background-size: 28px 28px; }
+.dy-pc-scope .dy-pc-stage { position: relative; flex: 1 1 auto; min-height: 460px; height: 58vh; overflow: hidden; background-color: var(--dy-pc-stage-bg); background-image: radial-gradient(ellipse at 50% 0%, var(--dy-pc-glow), transparent 62%), linear-gradient(var(--dy-pc-grid) 1px, transparent 1px), linear-gradient(90deg, var(--dy-pc-grid) 1px, transparent 1px); background-size: 100% 100%, 28px 28px, 28px 28px; }
 .dy-pc-scope .dy-pc-stage[data-pc-mode="connect"] { cursor: crosshair; }
 .dy-pc-scope .dy-pc-world { position: absolute; left: 0; top: 0; width: 2000px; height: 1400px; transform-origin: 0 0; }
 .dy-pc-scope .dy-pc-svg { position: absolute; left: 0; top: 0; width: 2000px; height: 1400px; overflow: visible; pointer-events: none; z-index: 1; }
@@ -2493,43 +2571,69 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-svg .dy-pc-arrowhead { fill: var(--dy-text-3); }
 .dy-pc-scope .dy-pc-svg circle { fill: var(--dy-surface); }
 /* Objects: one real kind each, kind carried by an edge stripe (v6's cue). */
-.dy-pc-scope .dy-pc-obj { position: absolute; z-index: 2; min-width: 180px; max-width: 260px; padding: 11px 13px; border: 1px solid var(--dy-border); border-left: 3px solid var(--dy-pc-kind-note); border-radius: 10px; background: var(--dy-pc-surface); box-shadow: var(--dy-shadow); color: var(--dy-text); text-align: left; cursor: grab; user-select: none; touch-action: none; overflow: hidden; }
+/* The inline width/height set from the stored rect are authoritative (no
+   min/max clamp), so connector anchors always sit on the drawn card edge. */
+.dy-pc-scope .dy-pc-obj { position: absolute; z-index: 2; padding: 11px 13px; border: 1px solid var(--dy-pc-card-edge); border-left: 4px solid var(--dy-pc-kind-note); border-radius: 10px; background: var(--dy-pc-fill-note); box-shadow: var(--dy-shadow); color: var(--dy-pc-ink); text-align: left; cursor: grab; user-select: none; touch-action: none; overflow: hidden; }
 /* B9: the stored rect drives the rendered box \u2014 the inline height style set by
    canvas.js is authoritative (attr() is not reliably parsed with units here),
    so connector anchors and de-overlap match what was persisted. */
-.dy-pc-scope .dy-pc-obj .dy-pc-obj-kind-icon { position: absolute; top: 9px; right: 10px; color: var(--dy-text-3); display: inline-flex; pointer-events: none; }
+.dy-pc-scope .dy-pc-obj .dy-pc-obj-kind-icon { position: absolute; top: 9px; right: 10px; color: var(--dy-pc-ink-2); display: inline-flex; pointer-events: none; }
 .dy-pc-scope .dy-pc-obj .dy-pc-obj-kind-icon svg { width: 13px; height: 13px; }
 .dy-pc-scope .dy-pc-obj.marquee-selected { box-shadow: 0 0 0 2px var(--dy-accent-soft), 0 0 0 1px var(--dy-accent-border), var(--dy-shadow); }
 .dy-pc-scope .dy-pc-marquee { position: absolute; z-index: 5; border: 1px dashed var(--dy-accent-border); background: var(--dy-accent-soft); pointer-events: none; }
 .dy-pc-scope .dy-pc-chat input[data-canvas-chat-input] { flex: 1 1 auto; min-width: 0; }
 .dy-pc-scope .dy-pc-obj:active { cursor: grabbing; }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="evidence"] { border-left-color: var(--dy-pc-kind-evidence); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="claim"] { border-left-color: var(--dy-pc-kind-claim); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="question"] { border-left-color: var(--dy-pc-kind-question); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="decision"] { border-left-color: var(--dy-pc-kind-decision); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="plan_block"] { border-left-color: var(--dy-pc-kind-plan_block); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="note"] { border-left-color: var(--dy-pc-kind-note); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="link"] { border-left-color: var(--dy-pc-kind-link); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="media"] { border-left-color: var(--dy-pc-kind-media); }
-.dy-pc-scope .dy-pc-obj[data-canvas-colour="yellow"] { border-top-color: #9a6206; }
-.dy-pc-scope .dy-pc-obj[data-canvas-colour="green"] { border-top-color: #1f7a55; }
-.dy-pc-scope .dy-pc-obj[data-canvas-colour="blue"] { border-top-color: #2f4bb5; }
-.dy-pc-scope .dy-pc-obj[data-canvas-colour="pink"] { border-top-color: #a8275f; }
-.dy-pc-scope .dy-pc-obj[data-canvas-colour="purple"] { border-top-color: #6b4bbd; }
-.dy-pc-scope .dy-pc-obj[data-canvas-colour="orange"] { border-top-color: #a4520b; }
-.dy-pc-scope .dy-pc-obj:hover { border-top-color: var(--dy-accent-border); border-right-color: var(--dy-accent-border); border-bottom-color: var(--dy-accent-border); }
-.dy-pc-scope .dy-pc-obj.selected { border-top-color: var(--dy-accent-border); border-right-color: var(--dy-accent-border); border-bottom-color: var(--dy-accent-border); box-shadow: 0 0 0 2px var(--dy-accent-soft), var(--dy-shadow); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="evidence"] { border-left-color: var(--dy-pc-kind-evidence); background: var(--dy-pc-fill-evidence); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="claim"] { border-left-color: var(--dy-pc-kind-claim); background: var(--dy-pc-fill-claim); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="question"] { border-left-color: var(--dy-pc-kind-question); background: var(--dy-pc-fill-question); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="decision"] { border-left-color: var(--dy-pc-kind-decision); background: var(--dy-pc-fill-decision); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="plan_block"] { border-left-color: var(--dy-pc-kind-plan_block); background: var(--dy-pc-fill-plan_block); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="note"] { border-left-color: var(--dy-pc-kind-note); background: var(--dy-pc-fill-note); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="link"] { border-left-color: var(--dy-pc-kind-link); background: var(--dy-pc-fill-link); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="media"] { border-left-color: var(--dy-pc-kind-media); background: var(--dy-pc-fill-media); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="yellow"] { background: var(--dy-pc-sticker-yellow); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="green"] { background: var(--dy-pc-sticker-green); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="blue"] { background: var(--dy-pc-sticker-blue); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="pink"] { background: var(--dy-pc-sticker-pink); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="purple"] { background: var(--dy-pc-sticker-purple); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="orange"] { background: var(--dy-pc-sticker-orange); }
+.dy-pc-scope .dy-pc-obj:hover { box-shadow: 0 0 0 1px var(--dy-accent-border), var(--dy-shadow); }
+.dy-pc-scope .dy-pc-obj.selected { box-shadow: 0 0 0 2px var(--dy-focus), 0 0 18px var(--dy-pc-glow), var(--dy-shadow); }
 .dy-pc-scope .dy-pc-obj:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
-.dy-pc-scope .dy-pc-obj small { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--dy-text-3); }
-.dy-pc-scope .dy-pc-obj strong { display: block; margin-top: 5px; font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--dy-text); }
-.dy-pc-scope .dy-pc-obj-meta { display: block; margin-top: 6px; color: var(--dy-text-3); font-size: 10px; }
+.dy-pc-scope .dy-pc-obj small { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--dy-pc-ink-2); }
+.dy-pc-scope .dy-pc-obj strong { display: block; margin-top: 5px; font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--dy-pc-ink); }
+.dy-pc-scope .dy-pc-obj-meta { display: block; margin-top: 6px; color: var(--dy-pc-ink-2); font-size: 10px; }
 .dy-pc-scope .dy-pc-empty { position: absolute; left: 18px; top: 16px; margin: 0; color: var(--dy-text-3); font-size: 12px; }
 /* Frames are decorative group labels (v6's .pframe) \u2014 never controls. */
 .dy-pc-scope .dy-pc-frame { position: absolute; z-index: 0; border: 1px dashed var(--dy-border); border-radius: 10px; background: var(--dy-accent-soft); padding: 12px 14px; color: var(--dy-text-3); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 /* Assistant (curation) panel: docked, collapsible, bottom-right. */
 .dy-pc-scope .dy-pc-chat { position: absolute; right: 14px; bottom: 14px; z-index: 20; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 12px; background: var(--dy-pc-surface); box-shadow: 0 14px 44px rgba(0, 0, 0, .28); }
 .dy-pc-scope .dy-pc-chat.closed { width: 268px; }
-.dy-pc-scope .dy-pc-chat.open { width: 360px; max-height: 460px; }
+.dy-pc-scope .dy-pc-chat.open { width: 360px; max-height: min(460px, calc(100% - 28px)); }
+.dy-pc-scope .dy-pc-chat.pill { width: auto; max-width: calc(100% - 28px); border-radius: 999px; }
+.dy-pc-scope .dy-pc-chat.pill .dy-pc-chat-b, .dy-pc-scope .dy-pc-chat.pill .dy-pc-chat-f, .dy-pc-scope .dy-pc-chat.pill .dy-pc-chat-model { display: none; }
+.dy-pc-scope .dy-pc-chat.dragging { transition: none; box-shadow: 0 22px 60px rgba(0, 0, 0, .36); }
+.dy-pc-scope .dy-pc-chat-bar { display: flex; align-items: center; gap: 2px; padding-right: 6px; }
+.dy-pc-scope .dy-pc-chat-bar .dockyard-button { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; min-height: 26px; padding: 4px; }
+.dy-pc-scope .dy-pc-chat-bar .dockyard-button svg { width: 13px; height: 13px; }
+.dy-pc-scope .dy-pc-chat-grip { display: inline-flex; align-items: center; padding: 0 2px 0 9px; color: var(--dy-text-3); cursor: grab; touch-action: none; }
+.dy-pc-scope .dy-pc-chat-grip svg { width: 14px; height: 14px; }
+.dy-pc-scope .dy-pc-chat-model { display: flex; align-items: center; gap: 6px; padding: 6px 13px; border-bottom: 1px solid var(--dy-border); color: var(--dy-text-2); font-size: 10.5px; }
+.dy-pc-scope .dy-pc-chat-model select { flex: 1 1 auto; min-width: 0; padding: 4px 6px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 11px; }
+/* Closed = header bar only; the body, composer and model picker return on open. */
+.dy-pc-scope .dy-pc-chat.closed .dy-pc-chat-model, .dy-pc-scope .dy-pc-chat.closed .dy-pc-chat-b, .dy-pc-scope .dy-pc-chat.closed .dy-pc-chat-f { display: none; }
+.dy-pc-scope .dy-pc-overlay { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; padding: 18px; background: var(--dy-pc-backdrop); }
+.dy-pc-scope .dy-pc-overlay-card { display: flex; flex-direction: column; width: min(820px, 100%); max-height: 100%; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); box-shadow: 0 24px 70px rgba(0, 0, 0, .38); color: var(--dy-text); }
+.dy-pc-scope .dy-pc-overlay-h { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--dy-border); }
+.dy-pc-scope .dy-pc-overlay-h strong { flex: 1 1 auto; font-size: 14px; }
+.dy-pc-scope .dy-pc-overlay-b { display: grid; gap: 10px; overflow: auto; padding: 14px 16px; font-size: 12.5px; }
+.dy-pc-scope .dy-pc-overlay-b ol { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.dy-pc-scope .dy-pc-overlay-b li { display: flex; align-items: center; gap: 7px; }
+.dy-pc-scope .dy-pc-overlay-b li > span { flex: 0 0 22px; color: var(--dy-text-3); font-variant-numeric: tabular-nums; text-align: right; }
+.dy-pc-scope .dy-pc-overlay-b li input { flex: 1 1 auto; min-width: 0; padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12.5px; }
+.dy-pc-scope .dy-pc-overlay-b li .dockyard-button { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; padding: 5px; }
+.dy-pc-scope .dy-pc-overlay-b li .dockyard-button svg { width: 13px; height: 13px; }
+.dy-pc-scope .dy-pc-overlay-f { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; padding: 11px 16px; border-top: 1px solid var(--dy-border); }
 .dy-pc-scope .dy-pc-chat-h { display: flex; align-items: center; gap: 9px; width: 100%; padding: 10px 13px; border: 0; background: transparent; color: var(--dy-text); text-align: left; cursor: pointer; }
 .dy-pc-scope .dy-pc-chat.open .dy-pc-chat-h { border-bottom: 1px solid var(--dy-border); }
 .dy-pc-scope .dy-pc-chat-h .av { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: var(--dy-accent-soft); color: var(--dy-accent-text); font-size: 10px; font-weight: 700; }
@@ -2543,6 +2647,8 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-chat-f { display: flex; flex-wrap: wrap; gap: 6px; padding: 9px; border-top: 1px solid var(--dy-border); }
 .dy-pc-scope .dy-pc-chat-f textarea { flex: 1 1 100%; min-height: 54px; padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; resize: vertical; }
 .dy-pc-scope .dy-pc-chat-f .dockyard-button { flex: 0 0 auto; }
+.dy-pc-scope .dy-pc-chat-f input { padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
+.dy-pc-scope .dy-pc-chat-f .dy-pc-readout { flex: 1 1 100%; }
 /* Proposals: scratch + suggested only. Nothing on this surface auto-applies. */
 .dy-pc-scope .dy-pc-proposal { display: grid; gap: 6px; padding: 9px 10px; border: 1px dashed var(--dy-accent-border); border-radius: 9px; background: var(--dy-accent-soft); }
 .dy-pc-scope .dy-pc-proposal strong { font-size: 12px; }
@@ -2552,7 +2658,11 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-proposal[data-pc-proposal-status="rejected"] { border-style: solid; border-color: var(--dy-border); background: var(--dy-surface-subtle); }
 /* Drawer: the selection editor (replaces a permanently-docked inspector). */
 .dy-pc-scope .dy-pc-drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 30; display: flex; flex-direction: column; width: min(360px, 92vw); border-left: 1px solid var(--dy-border); background: var(--dy-surface); transform: translateX(100%); transition: transform .18s ease; }
-.dy-pc-scope .dy-pc-drawer.open { transform: none; }
+/* Closed = off-canvas AND inert: it must not catch clicks meant for cards at
+   the stage edge, nor let Tab reach its hidden fields. visibility waits for
+   the slide-out to finish. */
+.dy-pc-scope .dy-pc-drawer:not(.open) { visibility: hidden; pointer-events: none; transition: transform .18s ease, visibility 0s linear .18s; }
+.dy-pc-scope .dy-pc-drawer.open { transform: none; visibility: visible; }
 .dy-pc-scope .dy-pc-drawer-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--dy-border); }
 .dy-pc-scope .dy-pc-drawer-h strong { font-size: 13px; font-weight: 600; }
 .dy-pc-scope .dy-pc-drawer-b { flex: 1 1 auto; display: grid; gap: 11px; align-content: start; overflow: auto; padding: 14px; }
@@ -2571,6 +2681,15 @@ var workflow_canvas_css_default = `
 @media (max-width: 640px) {
   .dy-pc-scope .dy-pc-add { flex-wrap: wrap; flex: 1 1 100%; }
   .dy-pc-scope .dy-pc-add input { min-width: 0; flex: 1 1 140px; }
+  .dy-pc-scope .dy-pc-group { flex-wrap: wrap; }
+  .dy-pc-scope .dy-pc-group-label { display: none; }
+  .dy-pc-scope .dy-pc-tip { display: none; }
+  .dy-pc-scope .dy-pc-chat.open { left: 8px; right: 8px; width: auto; }
+  .dy-pc-scope .dy-pc-chat.closed { right: 8px; width: min(268px, calc(100% - 16px)); }
+  .dy-pc-scope .dy-pc-board-bar { flex-wrap: wrap; }
+  .dy-pc-scope .dy-pc-board-list { grid-template-columns: 1fr; }
+  .dy-pc-scope .dy-pc-linkbar select { min-width: 0; width: 100%; }
+  .dy-pc-scope .dy-pc-linkbar label { flex: 1 1 100%; }
 }
 `;
 
@@ -3707,6 +3826,595 @@ var LUCIDE_ICON_NODES = {
       "path",
       {
         "d": "M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"
+      }
+    ]
+  ],
+  "archive": [
+    [
+      "rect",
+      {
+        "width": "20",
+        "height": "5",
+        "x": "2",
+        "y": "3",
+        "rx": "1"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M10 12h4"
+      }
+    ]
+  ],
+  "archive-restore": [
+    [
+      "rect",
+      {
+        "width": "20",
+        "height": "5",
+        "x": "2",
+        "y": "3",
+        "rx": "1"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M4 8v11a2 2 0 0 0 2 2h2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M20 8v11a2 2 0 0 1-2 2h-2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m9 15 3-3 3 3"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M12 12v9"
+      }
+    ]
+  ],
+  "bot": [
+    [
+      "path",
+      {
+        "d": "M12 8V4H8"
+      }
+    ],
+    [
+      "rect",
+      {
+        "width": "16",
+        "height": "12",
+        "x": "4",
+        "y": "8",
+        "rx": "2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M2 14h2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M20 14h2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M15 13v2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M9 13v2"
+      }
+    ]
+  ],
+  "chevrons-left": [
+    [
+      "path",
+      {
+        "d": "m11 17-5-5 5-5"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m18 17-5-5 5-5"
+      }
+    ]
+  ],
+  "chevrons-right": [
+    [
+      "path",
+      {
+        "d": "m6 17 5-5-5-5"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m13 17 5-5-5-5"
+      }
+    ]
+  ],
+  "grip-horizontal": [
+    [
+      "circle",
+      {
+        "cx": "12",
+        "cy": "9",
+        "r": "1"
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": "19",
+        "cy": "9",
+        "r": "1"
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": "5",
+        "cy": "9",
+        "r": "1"
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": "12",
+        "cy": "15",
+        "r": "1"
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": "19",
+        "cy": "15",
+        "r": "1"
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": "5",
+        "cy": "15",
+        "r": "1"
+      }
+    ]
+  ],
+  "maximize-2": [
+    [
+      "path",
+      {
+        "d": "M15 3h6v6"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m21 3-7 7"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m3 21 7-7"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M9 21H3v-6"
+      }
+    ]
+  ],
+  "minimize-2": [
+    [
+      "path",
+      {
+        "d": "m14 10 7-7"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M20 10h-6V4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m3 21 7-7"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M4 14h6v6"
+      }
+    ]
+  ],
+  "minus": [
+    [
+      "path",
+      {
+        "d": "M5 12h14"
+      }
+    ]
+  ],
+  "moon": [
+    [
+      "path",
+      {
+        "d": "M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"
+      }
+    ]
+  ],
+  "mouse-pointer-2": [
+    [
+      "path",
+      {
+        "d": "M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"
+      }
+    ]
+  ],
+  "plus": [
+    [
+      "path",
+      {
+        "d": "M5 12h14"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M12 5v14"
+      }
+    ]
+  ],
+  "refresh-cw": [
+    [
+      "path",
+      {
+        "d": "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M21 3v5h-5"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M8 16H3v5"
+      }
+    ]
+  ],
+  "save": [
+    [
+      "path",
+      {
+        "d": "M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M7 3v4a1 1 0 0 0 1 1h7"
+      }
+    ]
+  ],
+  "scan": [
+    [
+      "path",
+      {
+        "d": "M3 7V5a2 2 0 0 1 2-2h2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M17 3h2a2 2 0 0 1 2 2v2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M21 17v2a2 2 0 0 1-2 2h-2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M7 21H5a2 2 0 0 1-2-2v-2"
+      }
+    ]
+  ],
+  "send": [
+    [
+      "path",
+      {
+        "d": "M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m21.854 2.147-10.94 10.939"
+      }
+    ]
+  ],
+  "sparkles": [
+    [
+      "path",
+      {
+        "d": "M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M20 2v4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M22 4h-4"
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": "4",
+        "cy": "20",
+        "r": "2"
+      }
+    ]
+  ],
+  "spline": [
+    [
+      "circle",
+      {
+        "cx": "19",
+        "cy": "5",
+        "r": "2"
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": "5",
+        "cy": "19",
+        "r": "2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M5 17A12 12 0 0 1 17 5"
+      }
+    ]
+  ],
+  "square": [
+    [
+      "rect",
+      {
+        "width": "18",
+        "height": "18",
+        "x": "3",
+        "y": "3",
+        "rx": "2"
+      }
+    ]
+  ],
+  "square-pen": [
+    [
+      "path",
+      {
+        "d": "M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"
+      }
+    ]
+  ],
+  "sun": [
+    [
+      "circle",
+      {
+        "cx": "12",
+        "cy": "12",
+        "r": "4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M12 2v2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M12 20v2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m4.93 4.93 1.41 1.41"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m17.66 17.66 1.41 1.41"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M2 12h2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M20 12h2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m6.34 17.66-1.41 1.41"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m19.07 4.93-1.41 1.41"
+      }
+    ]
+  ],
+  "trash-2": [
+    [
+      "path",
+      {
+        "d": "M10 11v6"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M14 11v6"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M3 6h18"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+      }
+    ]
+  ],
+  "zoom-in": [
+    [
+      "circle",
+      {
+        "cx": "11",
+        "cy": "11",
+        "r": "8"
+      }
+    ],
+    [
+      "line",
+      {
+        "x1": "21",
+        "x2": "16.65",
+        "y1": "21",
+        "y2": "16.65"
+      }
+    ],
+    [
+      "line",
+      {
+        "x1": "11",
+        "x2": "11",
+        "y1": "8",
+        "y2": "14"
+      }
+    ],
+    [
+      "line",
+      {
+        "x1": "8",
+        "x2": "14",
+        "y1": "11",
+        "y2": "11"
+      }
+    ]
+  ],
+  "zoom-out": [
+    [
+      "circle",
+      {
+        "cx": "11",
+        "cy": "11",
+        "r": "8"
+      }
+    ],
+    [
+      "line",
+      {
+        "x1": "21",
+        "x2": "16.65",
+        "y1": "21",
+        "y2": "16.65"
+      }
+    ],
+    [
+      "line",
+      {
+        "x1": "8",
+        "x2": "14",
+        "y1": "11",
+        "y2": "11"
       }
     ]
   ]
@@ -7310,6 +8018,8 @@ var layoutConnectors = (objects, connectors, labelFor = (m) => m, world = { widt
     out.push({
       id: edge.id,
       meaning: edge.meaning,
+      source: edge.source,
+      target: edge.target,
       ...line,
       label: text,
       labelBox: pick.box,
@@ -7358,6 +8068,9 @@ var CANVAS_KIND_ICONS = Object.freeze({
   link: "link",
   media: "image"
 });
+var CANVAS_BOARD_STATUS_LABELS = Object.freeze({ draft: "Draft", submitted: "Submitted", planned: "Plan made", completed: "Completed", archived: "Archived" });
+var CANVAS_BOARD_MOVES = Object.freeze({ draft: ["submitted"], submitted: ["draft", "planned"], planned: ["submitted", "completed"], completed: ["planned"] });
+var CANVAS_READ_ONLY = Object.freeze(["completed", "archived"]);
 var CANVAS_MEANING_LABELS = Object.freeze({ supports: "supports", contradicts: "contradicts", derived_from: "derived from", clarifies: "clarifies", depends_on: "depends on", implements: "implements", raises_question: "raises a question" });
 var CANVAS_WORLD = Object.freeze({ width: 2e3, height: 1400 });
 var CANVAS_CARD = Object.freeze({ width: 240, height: 140 });
@@ -7436,14 +8149,33 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   const [boards, setBoards] = useState([]);
   const [boardListOpen, setBoardListOpen] = useState(true);
   const [boardBusy, setBoardBusy] = useState(false);
-  const [theme, setTheme] = useState(initialCanvas?.theme ?? "dark");
+  const [theme, setTheme] = useState(initialCanvas?.theme ?? null);
+  const [hostTheme, setHostTheme] = useState("light");
   const [modelOptions, setModelOptions] = useState(null);
-  const [boardScoped, setBoardScoped] = useState(false);
+  const [boardsApi, setBoardsApi] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [boardForm, setBoardForm] = useState(null);
+  const [chatPill, setChatPill] = useState(false);
+  const [chatPos, setChatPos] = useState(null);
+  const [chatDragging, setChatDragging] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [stepsDraft, setStepsDraft] = useState(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const stageRef = useRef(null);
+  const chatRef = useRef(null);
+  const addMenuRef = useRef(null);
+  const boardRef = useRef(initialCanvas?.canvas_id ?? null);
+  const chatToken = useRef(0);
   const encoded = encodeURIComponent(project.id);
   const revision = Number(canvas?.revision ?? 0);
   const selected = objects.find((item) => item.id === selectedId) ?? null;
-  const canvasRoute = boardScoped && canvas?.canvas_id && canvas?.name ? `/projects/${encoded}/canvases/${encodeURIComponent(canvas.canvas_id)}` : `/projects/${encoded}/canvas`;
+  const boardPath = (id) => `/projects/${encoded}/canvases/${encodeURIComponent(id)}`;
+  const boardScoped = boardsApi && Boolean(canvas?.canvas_id);
+  const canvasRoute = boardScoped ? boardPath(canvas.canvas_id) : `/projects/${encoded}/canvas`;
+  const boardStatus = canvas?.status ?? "draft";
+  const readOnly = CANVAS_READ_ONLY.includes(boardStatus);
+  boardRef.current = canvas?.canvas_id ?? null;
+  const failureText = (failure) => String(failure?.message ?? failure);
   useEffect(() => {
     const next = initialCanvas ?? { revision: 0, objects: [], connectors: [] };
     setCanvas(next);
@@ -7454,11 +8186,24 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     setFuture([]);
     setSelectedIds([]);
     setSelectedId(null);
+    setTheme(next.theme ?? null);
   }, [initialCanvas]);
+  useEffect(() => {
+    const root = stageRef.current?.closest?.(".dockyard-root");
+    if (!root) return void 0;
+    const read = () => setHostTheme(root.getAttribute("data-theme") === "dark" ? "dark" : "light");
+    read();
+    const watcher = new MutationObserver(read);
+    watcher.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => watcher.disconnect();
+  }, []);
   useEffect(() => {
     let live = true;
     api(`/projects/${encoded}/canvases`).then((result) => {
-      if (live) setBoards(result.canvases ?? []);
+      if (live && Array.isArray(result?.canvases)) {
+        setBoards(result.canvases);
+        setBoardsApi(true);
+      }
     }).catch(() => {
     });
     api("/canvas/models").then((result) => {
@@ -7469,46 +8214,270 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       live = false;
     };
   }, [encoded]);
+  const refreshBoards = async (withArchived = showArchived) => {
+    try {
+      const result = await api(`/projects/${encoded}/canvases${withArchived ? "?include_archived=true" : ""}`);
+      if (Array.isArray(result?.canvases)) {
+        setBoards(result.canvases);
+        setBoardsApi(true);
+        return result.canvases;
+      }
+    } catch (failure) {
+    }
+    return null;
+  };
+  const resetBoardState = () => {
+    chatToken.current += 1;
+    setSession(null);
+    setReview(null);
+    setChatLog([]);
+    setPlanPanel(null);
+    setBacklogConfirm(null);
+    setAnswer("");
+    setChatBusy(false);
+    setBusy(false);
+    setExpanded(false);
+    setStepsDraft(null);
+    setDirty(false);
+    setSelectedId(null);
+    setSelectedIds([]);
+    setPendingConnect(null);
+    setHistory([]);
+    setFuture([]);
+    setMarquee(null);
+    setLinkSource("");
+    setLinkTarget("");
+  };
+  const loadBoard = (fresh) => {
+    resetBoardState();
+    boardRef.current = fresh?.canvas_id ?? null;
+    setCanvas(fresh);
+    setObjects(fresh?.objects ?? []);
+    setConnectors(fresh?.connectors ?? []);
+    setTheme(fresh?.theme ?? null);
+  };
+  const mergeMeta = (fresh) => setCanvas((current) => ({
+    ...current ?? {},
+    name: fresh.name,
+    status: fresh.status,
+    archived_from: fresh.archived_from ?? null,
+    theme: fresh.theme ?? null,
+    model: fresh.model ?? null
+  }));
+  const unsavedGuard = (what) => {
+    if (!dirty) return false;
+    setNotice({ tone: "danger", text: `This board has unsaved edits \u2014 Save canvas or Reload before ${what}.` });
+    return true;
+  };
   const selectBoard = async (board) => {
     if (!board?.canvas_id || board.canvas_id === canvas?.canvas_id) return;
+    if (unsavedGuard("switching boards")) return;
     setBoardBusy(true);
     try {
-      const fresh = await api(`/projects/${encoded}/canvases/${encodeURIComponent(board.canvas_id)}`);
-      setCanvas(fresh);
-      setObjects(fresh.objects ?? []);
-      setConnectors(fresh.connectors ?? []);
-      setBoardScoped(true);
-      setTheme(fresh.theme ?? "dark");
-      setDirty(false);
-      setSelectedId(null);
-      setSelectedIds([]);
+      const fresh = await api(boardPath(board.canvas_id));
+      loadBoard(fresh);
       setNotice({ tone: "ok", text: `Opened ${fresh.name} at revision ${fresh.revision}.` });
     } catch (failure) {
-      setNotice({ tone: "danger", text: `Board could not be opened: ${String(failure?.message ?? failure)}` });
+      setNotice({ tone: "danger", text: `Board could not be opened: ${failureText(failure)}` });
     }
     setBoardBusy(false);
   };
-  const setBoardTheme = async (nextTheme) => {
-    setTheme(nextTheme);
-    if (!canvas?.canvas_id) return;
-    try {
-      const fresh = await api(`/projects/${encoded}/canvases/${encodeURIComponent(canvas.canvas_id)}`, { method: "PATCH", body: { theme: nextTheme } });
-      setCanvas((current) => ({ ...current ?? {}, ...fresh, theme: nextTheme }));
-    } catch (failure) {
-      setNotice({ tone: "danger", text: `Theme could not be saved: ${String(failure?.message ?? failure)}` });
+  const submitBoardForm = async () => {
+    const name = String(boardForm?.name ?? "").trim();
+    if (!name) {
+      setNotice({ tone: "danger", text: "A board needs a name." });
+      return;
     }
+    setBoardBusy(true);
+    try {
+      if (boardForm.mode === "rename") {
+        const fresh = await api(boardPath(canvas.canvas_id), { method: "PATCH", body: { name } });
+        mergeMeta(fresh);
+        setNotice({ tone: "ok", text: `Board renamed to ${fresh.name}.` });
+      } else {
+        const created = await api(`/projects/${encoded}/canvases`, { method: "POST", body: { name } });
+        if (dirty) setNotice({ tone: "ok", text: `Board ${created.name} created \u2014 save this board before opening it.` });
+        else {
+          const fresh = await api(boardPath(created.canvas_id));
+          loadBoard(fresh);
+          setNotice({ tone: "ok", text: `Board ${fresh.name} created and opened.` });
+        }
+      }
+      setBoardForm(null);
+      await refreshBoards();
+    } catch (failure) {
+      setNotice({ tone: "danger", text: `Board could not be saved: ${failureText(failure)}` });
+    }
+    setBoardBusy(false);
+  };
+  const changeBoardStatus = async (status) => {
+    if (!boardScoped || !status || status === boardStatus) return;
+    if (unsavedGuard("changing the board status")) return;
+    setBoardBusy(true);
+    try {
+      const fresh = await api(boardPath(canvas.canvas_id), { method: "PATCH", body: { status } });
+      mergeMeta(fresh);
+      await refreshBoards();
+      setNotice({ tone: "ok", text: `Board is now ${CANVAS_BOARD_STATUS_LABELS[fresh.status] ?? fresh.status}.` });
+    } catch (failure) {
+      setNotice({ tone: "danger", text: `Status could not change: ${failureText(failure)}` });
+    }
+    setBoardBusy(false);
+  };
+  const archiveBoard = async (board) => {
+    const active = board.canvas_id === canvas?.canvas_id;
+    if (active && unsavedGuard("archiving this board")) return;
+    setBoardBusy(true);
+    try {
+      await api(boardPath(board.canvas_id), { method: "PATCH", body: { status: "archived" } });
+      const list = await refreshBoards();
+      if (active) {
+        const next = (list ?? []).find((row) => row.status !== "archived" && row.canvas_id !== board.canvas_id);
+        const fresh = next ? await api(boardPath(next.canvas_id)) : await api(`/projects/${encoded}/canvas`);
+        loadBoard(fresh);
+        if (!next) await refreshBoards();
+      }
+      setNotice({ tone: "ok", text: `Board ${board.name} archived \u2014 restore it from Show archived.` });
+    } catch (failure) {
+      setNotice({ tone: "danger", text: `Board could not be archived: ${failureText(failure)}` });
+    }
+    setBoardBusy(false);
+  };
+  const restoreBoard = async (board) => {
+    setBoardBusy(true);
+    try {
+      const fresh = await api(boardPath(board.canvas_id), { method: "PATCH", body: { status: board.archived_from ?? "draft" } });
+      await refreshBoards();
+      setNotice({ tone: "ok", text: `Board ${fresh.name} restored as ${CANVAS_BOARD_STATUS_LABELS[fresh.status] ?? fresh.status}.` });
+    } catch (failure) {
+      setNotice({ tone: "danger", text: `Board could not be restored: ${failureText(failure)}` });
+    }
+    setBoardBusy(false);
+  };
+  const toggleArchived = async () => {
+    const next = !showArchived;
+    setShowArchived(next);
+    await refreshBoards(next);
+  };
+  const setBoardTheme = async (picked) => {
+    const previous = theme;
+    const nextTheme = picked === theme ? null : picked;
+    setTheme(nextTheme);
+    if (!boardScoped) return;
+    try {
+      const fresh = await api(boardPath(canvas.canvas_id), { method: "PATCH", body: { theme: nextTheme } });
+      mergeMeta(fresh);
+    } catch (failure) {
+      setTheme(previous);
+      setNotice({ tone: "danger", text: `Theme could not be saved: ${failureText(failure)}` });
+    }
+  };
+  const modelKey = (model) => model?.provider && model?.model ? `${model.provider}::${model.model}` : "";
+  const setBoardModel = async (value) => {
+    if (!boardScoped) return;
+    const [provider, ...rest] = String(value || "").split("::");
+    const model = value ? { provider, model: rest.join("::") } : null;
+    setBoardBusy(true);
+    try {
+      const fresh = await api(boardPath(canvas.canvas_id), { method: "PATCH", body: { model } });
+      mergeMeta(fresh);
+      setNotice({ tone: "ok", text: model ? `This board now asks ${model.model}.` : "This board now uses the Hermes main model." });
+    } catch (failure) {
+      setNotice({ tone: "danger", text: `Model could not be set: ${failureText(failure)}` });
+    }
+    setBoardBusy(false);
   };
   const selectedColour = selected?.colour ?? null;
   const setSelectedColour = (colour) => {
-    if (!selected) return;
+    if (!selected || readOnly) return;
     const before = snapshot(objects, connectors);
     setObjects((current) => current.map((item) => item.id === selected.id ? { ...item, colour: colour || null } : item));
     setHistory((current) => [...current.slice(-49), before]);
     setFuture([]);
     setDirty(true);
   };
+  const clampChat = (x, y) => {
+    const stage = stageRef.current;
+    const chat = chatRef.current;
+    if (!stage || !chat) return { x, y };
+    return {
+      x: canvasClamp(x, 0, Math.max(0, stage.clientWidth - chat.offsetWidth)),
+      y: canvasClamp(y, 0, Math.max(0, stage.clientHeight - chat.offsetHeight))
+    };
+  };
+  useEffect(() => {
+    if (!chatPos) return void 0;
+    const fix = () => setChatPos((current) => {
+      if (!current) return current;
+      const next = clampChat(current.x, current.y);
+      return next.x === current.x && next.y === current.y ? current : next;
+    });
+    fix();
+    window.addEventListener("resize", fix);
+    return () => window.removeEventListener("resize", fix);
+  }, [chatPos, chatOpen, chatPill]);
+  const beginChatDrag = (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const stage = stageRef.current;
+    const chat = chatRef.current;
+    if (!stage || !chat) return;
+    const stageBox = stage.getBoundingClientRect();
+    const chatBox = chat.getBoundingClientRect();
+    const offsetX = event.clientX - chatBox.left;
+    const offsetY = event.clientY - chatBox.top;
+    setChatDragging(true);
+    const move = (moveEvent) => setChatPos(clampChat(moveEvent.clientX - stageBox.left - offsetX, moveEvent.clientY - stageBox.top - offsetY));
+    const finish = () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", finish);
+      setChatDragging(false);
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", finish);
+  };
+  const nudgeChat = (event) => {
+    const chat = chatRef.current;
+    if (!chat) return;
+    if (event.key === "Home") {
+      event.preventDefault();
+      setChatPos(null);
+      return;
+    }
+    const step = event.shiftKey ? 48 : 16;
+    const delta = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[event.key];
+    if (!delta) return;
+    event.preventDefault();
+    setChatPos(clampChat(chat.offsetLeft + delta[0], chat.offsetTop + delta[1]));
+  };
+  const minimiseChat = () => {
+    setChatPill(true);
+    setChatOpen(false);
+  };
+  const toggleChat = () => {
+    if (chatPill) {
+      setChatPill(false);
+      setChatOpen(true);
+      return;
+    }
+    setChatOpen((current) => !current);
+  };
+  const openExpanded = () => {
+    setExpanded(true);
+    setChatPill(false);
+  };
+  useEffect(() => {
+    if (!addMenuOpen) return void 0;
+    const close = (event) => {
+      if (!addMenuRef.current?.contains(event.target)) setAddMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [addMenuOpen]);
   const snapshot = (currentObjects, currentConnectors) => ({ objects: currentObjects.map((row) => ({ ...row })), connectors: currentConnectors.map((row) => ({ ...row })) });
   const undo = () => {
+    if (readOnly) return;
     setHistory((current) => {
       if (!current.length) return current;
       const before = current[current.length - 1];
@@ -7520,6 +8489,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     });
   };
   const redo = () => {
+    if (readOnly) return;
     setFuture((current) => {
       if (!current.length) return current;
       const after = current[current.length - 1];
@@ -7531,6 +8501,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     });
   };
   const duplicateSelection = () => {
+    if (readOnly) return;
     const ids = selectedIds.length ? selectedIds : selectedId ? [selectedId] : [];
     if (!ids.length) return;
     const before = snapshot(objects, connectors);
@@ -7577,8 +8548,10 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   };
   const reload = async () => {
     setBusy(true);
+    const at = boardRef.current;
     try {
       const fresh = await api(canvasRoute);
+      if (boardRef.current !== at) return;
       const discarded = dirty;
       setCanvas(fresh);
       setObjects(fresh.objects ?? []);
@@ -7595,6 +8568,10 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     setBusy(false);
   };
   const save = async () => {
+    if (readOnly) {
+      setNotice({ tone: "danger", text: `This board is ${CANVAS_BOARD_STATUS_LABELS[boardStatus]} and read-only \u2014 move it back to Plan made to edit.` });
+      return;
+    }
     setBusy(true);
     try {
       const rows = persistableObjects();
@@ -7604,6 +8581,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       setObjects(saved.objects ?? []);
       setConnectors(saved.connectors ?? []);
       setDirty(false);
+      refreshBoards();
       setNotice({ tone: "ok", text: `Canvas saved \u2014 revision ${saved.revision} with ${(saved.objects ?? []).length} object(s) and ${(saved.connectors ?? []).length} connector(s).` });
       onRefresh?.();
     } catch (failure) {
@@ -7627,7 +8605,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   };
   const addObject = (objectKind, text) => {
     const body = String(text ?? "").trim();
-    if (!body) return null;
+    if (!body || readOnly) return null;
     const before = snapshot(objects, connectors);
     const position = canvasPlaced(objects);
     canvasObjectSeq += 1;
@@ -7671,7 +8649,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     setNotice({ tone: "ok", text: "Object updated \u2014 Save canvas to persist the change." });
   };
   const removeSelected = async () => {
-    if (!selected) return;
+    if (!selected || readOnly) return;
     const before = snapshot(objects, connectors);
     const persistable = new Set((canvas?.objects ?? []).map((row) => row.id));
     if (!persistable.has(selected.id) || dirty) {
@@ -7722,6 +8700,10 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   const beginObjectDrag = (event, item) => {
     if (event.button !== 0) return;
     event.preventDefault();
+    if (readOnly) {
+      openDrawer(item);
+      return;
+    }
     if (mode === "connect") {
       if (!pendingConnect) {
         setPendingConnect(item.id);
@@ -7846,11 +8828,13 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     const minY = Math.min(...rects.map((rect) => rect.y));
     const maxX = Math.max(...rects.map((rect) => rect.x + rect.width));
     const maxY = Math.max(...rects.map((rect) => rect.y + rect.height));
-    const next = Number(canvasClamp(Math.min((box.width - 80) / Math.max(1, maxX - minX), (box.height - 80) / Math.max(1, maxY - minY)), CANVAS_ZOOM.min, CANVAS_ZOOM.max).toFixed(2));
+    const reserve = !chatPos && chatRef.current ? chatRef.current.offsetHeight + 14 : 0;
+    const next = Number(canvasClamp(Math.min((box.width - 80) / Math.max(1, maxX - minX), (box.height - 80 - reserve) / Math.max(1, maxY - minY)), CANVAS_ZOOM.min, CANVAS_ZOOM.max).toFixed(2));
     setZoom(next);
     setPan({ x: 40 - minX * next, y: 40 - minY * next });
   };
   const tidy = () => {
+    if (readOnly) return;
     const before = snapshot(objects, connectors);
     setObjects((current) => current.map((item, index) => ({ ...item, ...gridSlot(index, 3) })));
     setHistory((current) => [...current.slice(-49), before]);
@@ -7867,6 +8851,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       setPendingConnect(null);
       return;
     }
+    if (readOnly) return;
     if (meta && key.toLowerCase() === "z") {
       event.preventDefault();
       if (event.shiftKey) redo();
@@ -7899,25 +8884,37 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     }
   };
   const curate = async (message = null) => {
+    if (readOnly) {
+      setNotice({ tone: "danger", text: `This board is ${CANVAS_BOARD_STATUS_LABELS[boardStatus]} \u2014 reopen it to ask the steward.` });
+      return;
+    }
+    const at = boardRef.current;
+    const token = ++chatToken.current;
     setBusy(true);
     setChatOpen(true);
+    setChatPill(false);
     setChatBusy(true);
     try {
-      const result = await api(`/projects/${encoded}/canvas/sessions`, { method: "POST", body: message ? { message } : {} });
+      const result = await api(`${canvasRoute}/sessions`, { method: "POST", body: message ? { message } : {} });
+      if (token !== chatToken.current || boardRef.current !== at) return;
       setSession(result);
       const proposals = (result.proposals ?? []).length;
       setNotice(result.status === "active" && result.current_question ? { tone: "ok", text: `Question: ${result.current_question.question}` } : { tone: "ok", text: `${number(proposals)} proposal(s) ready for review \u2014 nothing is applied automatically.` });
     } catch (failure) {
-      setNotice({ tone: "danger", text: `Curation failed: ${String(failure?.message ?? failure)}` });
+      if (token !== chatToken.current || boardRef.current !== at) return;
+      setNotice({ tone: "danger", text: `Curation failed: ${failureText(failure)}` });
     }
     setBusy(false);
     setChatBusy(false);
   };
   const reviewCanvas = async () => {
+    const at = boardRef.current;
     setBusy(true);
     setChatOpen(true);
+    setChatPill(false);
     try {
       const result = await api(`${canvasRoute}/curate`, { method: "POST", body: {} });
+      if (boardRef.current !== at) return;
       setReview(result);
       const summary = result.summary ?? {};
       const questions = (result.clarifying_questions ?? []).length;
@@ -7929,9 +8926,11 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   };
   const answerQuestion = async (outcome) => {
     if (!session?.session_id) return;
+    const at = boardRef.current;
     setBusy(true);
     try {
       const result = await api(`/canvas/sessions/${encodeURIComponent(session.session_id)}/answer`, { method: "POST", body: { outcome, answer } });
+      if (boardRef.current !== at) return;
       setSession(result);
       setAnswer("");
       const proposals = (result.proposals ?? []).length;
@@ -7951,6 +8950,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     await curate(text);
   };
   const stopChat = () => {
+    chatToken.current += 1;
     setChatBusy(false);
     setBusy(false);
     setNotice({ tone: "ok", text: "Assistant stopped \u2014 nothing runs after Stop." });
@@ -7998,6 +8998,46 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     }
     setPlanBusy(false);
   };
+  const planEditable = Boolean(planPanel?.plan_id) && (planPanel?.status ?? "draft") === "draft" && !readOnly;
+  const startStepEdit = () => {
+    canvasObjectSeq += 1;
+    setStepsDraft((planPanel?.steps ?? []).map((step) => ({ key: `s${step.order}-${canvasObjectSeq}`, order: step.order, title: step.title ?? "" })));
+    openExpanded();
+  };
+  const editStep = (index, patch) => setStepsDraft((current) => current.map((row, at) => at === index ? { ...row, ...patch } : row));
+  const moveStep = (index, delta) => setStepsDraft((current) => {
+    const to = index + delta;
+    if (to < 0 || to >= current.length) return current;
+    const next = [...current];
+    const [row] = next.splice(index, 1);
+    next.splice(to, 0, row);
+    return next;
+  });
+  const addStep = () => {
+    canvasObjectSeq += 1;
+    setStepsDraft((current) => [...current ?? [], { key: `new-${canvasObjectSeq}`, order: null, title: "" }]);
+  };
+  const removeStep = (index) => setStepsDraft((current) => current.length > 1 ? current.filter((_, at) => at !== index) : current);
+  const saveSteps = async () => {
+    if (!planPanel?.plan_id || !stepsDraft?.length) return;
+    if (stepsDraft.some((row) => !row.title.trim())) {
+      setNotice({ tone: "danger", text: "Every step needs a title \u2014 remove empty steps before saving." });
+      return;
+    }
+    setPlanBusy(true);
+    try {
+      const saved = await api(`/projects/${encoded}/plans/${encodeURIComponent(planPanel.plan_id)}`, {
+        method: "PATCH",
+        body: { steps: stepsDraft.map((row) => row.order ? { order: row.order, title: row.title.trim() } : { title: row.title.trim() }) }
+      });
+      setPlanPanel((current) => ({ ...current ?? {}, ...saved }));
+      setStepsDraft(null);
+      setNotice({ tone: "ok", text: `Plan steps saved \u2014 ${number((saved.steps ?? []).length)} step(s).` });
+    } catch (failure) {
+      setNotice({ tone: "danger", text: `Plan steps could not be saved: ${failureText(failure)}` });
+    }
+    setPlanBusy(false);
+  };
   const planDocSaved = planPanel?.status === "documented";
   const createdOrders = new Set((planPanel?.backlog_created ?? []).map((row) => row.order));
   const pendingSteps = (planPanel?.steps ?? []).map((step) => step.order).filter((order) => !createdOrders.has(order));
@@ -8023,7 +9063,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     ];
     laid.forEach((edge) => {
       const box = edge.labelBox;
-      lines.push(jsx("line", { "data-canvas-connector": edge.id, "data-canvas-meaning": edge.meaning, x1: edge.x1, y1: edge.y1, x2: edge.x2, y2: edge.y2, markerEnd: "url(#dy-pc-arrow)" }, edge.id));
+      lines.push(jsx("line", { "data-canvas-connector": edge.id, "data-canvas-meaning": edge.meaning, "data-canvas-source": edge.source, "data-canvas-target": edge.target, x1: edge.x1, y1: edge.y1, x2: edge.x2, y2: edge.y2, markerEnd: "url(#dy-pc-arrow)" }, edge.id));
       if (edge.leader) lines.push(jsx("line", { className: "dy-pc-leader", x1: edge.anchor.x, y1: edge.anchor.y, x2: box.x + box.width / 2, y2: box.y + box.height / 2 }, `${edge.id}:leader`));
       lines.push(jsx("rect", { className: "dy-pc-edge-chip", "data-canvas-meaning": edge.meaning, x: box.x, y: box.y, width: box.width, height: box.height, rx: box.height / 2 }, `${edge.id}:chip`));
       lines.push(jsx("text", { className: "dy-pc-edge-label", "data-canvas-edge-label": edge.id, x: box.x + box.width / 2, y: box.y + box.height / 2, textAnchor: "middle", dominantBaseline: "central", children: edge.label }, `${edge.id}:label`));
@@ -8086,83 +9126,179 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       ] }) : status === "approved" && proposal.kind === "technical_plan" ? jsx(Button, { small: true, action: "plan-from-proposal", disabled: planBusy, onClick: () => synthesizePlan(proposal), children: "Plan from proposal" }) : jsx("small", { children: "Decision recorded \u2014 this proposal can no longer be decided again." })
     ] }, proposal.proposal_id);
   });
+  const chatBody = () => [
+    jsx("div", { className: "dy-pc-msg bot", children: assistantSummary }, "summary"),
+    jsx("div", { "data-canvas-chat-log": true, children: (chatLog ?? []).map((message, index) => jsx("div", { className: `dy-pc-msg ${message.role}`, children: message.text }, `chat-${index}`)) }, "log"),
+    questionBlock ? jsx("div", { children: questionBlock }, "question") : null,
+    review ? jsx("p", { className: "dy-pc-drawer-meta", "data-canvas-review": true, children: `Review: ${number(review.summary?.evidence_count)} evidence, ${number(review.summary?.claim_count)} claim, ${number(review.summary?.question_count)} question, ${number(review.summary?.plan_block_count)} plan block(s).` }, "review") : null,
+    proposalCards.length ? jsx("div", { "data-canvas-proposals": true, children: proposalCards }, "proposals") : null,
+    session?.answers?.length ? jsx("div", { className: "dy-pc-msg me", children: `${number(session.answers.length)} clarification answer(s) recorded.` }, "answers") : null,
+    planPanel ? jsxs("div", { className: "dy-pc-proposal", "data-canvas-plan": planPanel.plan_id, children: [
+      jsx("strong", { children: "Plan ready for review" }),
+      jsx("small", { children: `${number((planPanel.steps ?? []).length)} step(s) \xB7 from proposal ${planPanel.proposal_id} \xB7 nothing applied to the board.` }),
+      jsx("pre", { className: "dy-pc-plan-steps", children: (planPanel.steps ?? []).map((step) => `${step.order}. ${step.title}`).join("\n") }),
+      jsxs("div", { className: "dockyard-form-actions", children: [
+        planEditable ? jsx(Button, { small: true, action: "pc-steps-edit", disabled: planBusy, onClick: startStepEdit, children: "Edit steps" }) : null,
+        jsx(Button, { small: true, variant: planDocSaved ? "" : "primary", action: "save-plan-document", disabled: planBusy || planDocSaved, onClick: savePlanDocument, children: planDocSaved ? "Doc saved to Content" : "Save doc to Content" }),
+        jsx(Button, { small: true, variant: planDocSaved && pendingSteps.length ? "primary" : "", action: "backlog-from-plan", disabled: planBusy || !planDocSaved || !pendingSteps.length || Boolean(backlogConfirm?.length), onClick: () => setBacklogConfirm(pendingSteps), children: planDocSaved && !pendingSteps.length ? "Backlog items created" : "Create backlog items" })
+      ] }),
+      backlogConfirm?.length ? jsxs("div", { className: "dy-pc-proposal", "data-canvas-backlog-confirm": true, children: [
+        jsx("small", { children: `Create ${number(backlogConfirm.length)} backlog item(s)? One confirm per batch, nothing auto-runs.` }),
+        jsx(Button, { small: true, variant: "primary", action: "confirm-backlog-from-plan", disabled: planBusy, onClick: createBacklogItems, children: "Confirm create" }),
+        jsx(Button, { small: true, action: "cancel-backlog-from-plan", disabled: planBusy, onClick: () => setBacklogConfirm(null), children: "Cancel" })
+      ] }) : null
+    ] }, "plan") : null
+  ];
+  const tool = ({ action, icon, name, tip, onClick, disabled = false, variant = "", label = null, data = {} }) => jsxs("span", { className: "dy-pc-tool", children: [
+    jsx(Button, { small: true, variant, action, ariaLabel: name, disabled, onClick, data: { title: `${name} \u2014 ${tip}`, ...data }, children: label ? [jsx(Icon, { name: icon }, "i"), jsx("span", { children: label }, "l")] : jsx(Icon, { name: icon }) }),
+    jsxs("span", { className: "dy-pc-tip", role: "tooltip", "aria-hidden": true, children: [jsx("strong", { children: name }), jsx("span", { children: tip })] })
+  ] }, action);
+  const group = (label, children) => jsxs("div", { className: "dy-pc-group", role: "group", "aria-label": label, "data-pc-group": label.toLowerCase(), children: [jsx("span", { className: "dy-pc-group-label", "aria-hidden": true, children: label }), ...children] });
+  const liveBoards = boards.filter((board) => board.status !== "archived");
+  const archivedBoards = boards.filter((board) => board.status === "archived");
+  const listed = boardsApi ? liveBoards : [canvas].filter(Boolean);
+  const statusMoves = CANVAS_BOARD_MOVES[boardStatus] ?? [];
+  const modelValue = modelKey(canvas?.model);
+  const modelChoices = (modelOptions?.providers ?? []).flatMap((provider) => (provider.models ?? []).map((model) => ({ value: `${provider.slug}::${model}`, label: `${provider.name ?? provider.slug} \xB7 ${model}` })));
+  if (modelValue && !modelChoices.some((choice) => choice.value === modelValue)) modelChoices.unshift({ value: modelValue, label: `${canvas.model.provider} \xB7 ${canvas.model.model} (not configured)` });
+  const defaultModelLabel = modelOptions?.default?.model ? `Hermes main model (${modelOptions.default.model})` : "Hermes main model";
+  const effectiveTheme = theme ?? hostTheme;
+  const chatState = chatPill ? "pill" : chatOpen ? "open" : "closed";
+  const chatStyle = chatPos ? { left: `${chatPos.x}px`, top: `${chatPos.y}px`, right: "auto", bottom: "auto" } : void 0;
   return jsxs("section", {
     className: "dockyard-feature-card dy-pc-scope",
     "data-planning-canvas": project.id,
     "data-canvas-revision": String(revision),
     "data-canvas-dirty": dirty ? "true" : "false",
-    "data-canvas-theme": theme,
+    "data-canvas-theme": effectiveTheme,
+    "data-canvas-theme-source": theme ? "board" : "app",
+    "data-canvas-board": canvas?.canvas_id ?? "",
+    "data-canvas-status": boardStatus,
+    onKeyDown: (event) => {
+      if (event.key !== "Escape" || event.defaultPrevented || expanded || boardForm) return;
+      if (addMenuOpen) {
+        setAddMenuOpen(false);
+        return;
+      }
+      if (selectedId || selectedIds.length) {
+        setSelectedId(null);
+        setSelectedIds([]);
+        setPendingConnect(null);
+      }
+    },
     children: [
       jsxs("div", { className: `dy-pc-board-bar${boardListOpen ? " open" : " collapsed"}`, children: [
         jsxs("div", { className: "dy-pc-board-title", children: [
           jsx("span", { className: "dockyard-card-label", children: "BOARDS" }),
-          jsx("strong", { children: canvas?.name ?? "Planning board" }),
-          jsx("span", { className: "dy-pc-board-count", children: `${boards.length || 1} board${(boards.length || 1) === 1 ? "" : "s"}` })
+          jsx("strong", { "data-canvas-board-name": true, children: canvas?.name ?? "Planning board" }),
+          jsx("span", { className: "dy-pc-board-count", children: `${listed.length || 1} board${(listed.length || 1) === 1 ? "" : "s"}` })
         ] }),
-        jsx(Button, { small: true, action: "pc-board-toggle", ariaLabel: boardListOpen ? "Collapse board list" : "Expand board list", onClick: () => setBoardListOpen((value) => !value), children: jsx(Icon, { name: boardListOpen ? "chevrons-left" : "chevrons-right" }) }),
-        jsxs("div", { className: "dy-pc-theme-toggle", role: "group", "aria-label": "Canvas theme", children: [
-          jsx(Button, { small: true, variant: theme === "light" ? "primary" : "", action: "pc-theme-light", ariaLabel: "Light canvas theme", onClick: () => setBoardTheme("light"), children: jsx(Icon, { name: "sun" }) }),
-          jsx(Button, { small: true, variant: theme === "dark" ? "primary" : "", action: "pc-theme-dark", ariaLabel: "Dark canvas theme", onClick: () => setBoardTheme("dark"), children: jsx(Icon, { name: "moon" }) })
-        ] })
+        boardScoped ? jsxs("label", { className: "dy-pc-board-status", children: [
+          jsx("span", { className: "dy-pc-board-dot", "data-status": boardStatus }),
+          jsxs("select", { "data-canvas-board-status": true, "aria-label": "Board status", value: boardStatus, disabled: boardBusy || boardStatus === "archived", onChange: (event) => changeBoardStatus(event.target.value), children: [
+            jsx("option", { value: boardStatus, children: CANVAS_BOARD_STATUS_LABELS[boardStatus] ?? boardStatus }, boardStatus),
+            ...statusMoves.map((status) => jsx("option", { value: status, children: `Move to ${CANVAS_BOARD_STATUS_LABELS[status]}` }, status))
+          ] })
+        ] }) : null,
+        jsx(Button, { small: true, action: "pc-board-toggle", ariaLabel: boardListOpen ? "Collapse board list" : "Expand board list", data: { title: boardListOpen ? "Collapse board list" : "Expand board list" }, onClick: () => setBoardListOpen((value) => !value), children: jsx(Icon, { name: boardListOpen ? "chevrons-left" : "chevrons-right" }) })
       ] }),
-      boardListOpen ? jsxs("nav", { className: "dy-pc-board-list", "aria-label": "Planning boards", children: (boards.length ? boards : [canvas]).filter(Boolean).map((board) => jsx("button", { type: "button", className: `dy-pc-board-row${board.canvas_id === canvas?.canvas_id ? " active" : ""}`, disabled: boardBusy, onClick: () => selectBoard(board), children: [
-        jsx("span", { className: "dy-pc-board-dot", "data-status": board.status ?? "draft" }),
-        jsxs("span", { className: "dy-pc-board-row-copy", children: [jsx("strong", { children: board.name ?? "Main board" }), jsx("small", { children: `${board.status ?? "draft"} \xB7 ${number(board.object_count ?? board.objects?.length ?? 0)} objects` })] }),
-        board.changed_since_plan ? jsx("span", { className: "dy-pc-board-warning", title: "Board changed since plan", children: "!" }) : null
-      ] }, board.canvas_id ?? board.name)) }) : null,
+      boardListOpen ? jsxs("nav", { className: "dy-pc-board-list", "aria-label": "Planning boards", children: [
+        ...listed.map((board) => jsxs("div", { className: "dy-pc-board-item", "data-canvas-board-row": board.canvas_id ?? "legacy", children: [
+          jsxs("button", { type: "button", className: `dy-pc-board-row${board.canvas_id === canvas?.canvas_id ? " active" : ""}`, "aria-current": board.canvas_id === canvas?.canvas_id ? "true" : void 0, disabled: boardBusy, onClick: () => selectBoard(board), children: [
+            jsx("span", { className: "dy-pc-board-dot", "data-status": board.status ?? "draft" }),
+            jsxs("span", { className: "dy-pc-board-row-copy", children: [jsx("strong", { children: board.name ?? "Main board" }), jsx("small", { children: `${CANVAS_BOARD_STATUS_LABELS[board.status ?? "draft"] ?? board.status} \xB7 ${number(board.object_count ?? board.objects?.length ?? 0)} objects` })] }),
+            board.changed_since_plan ? jsx("span", { className: "dy-pc-board-warning", title: "Board changed since its plan was made", "aria-label": "Changed since plan", children: "!" }) : null
+          ] }),
+          boardsApi && board.canvas_id ? jsx(Button, { small: true, action: "pc-board-archive", ariaLabel: `Archive ${board.name}`, data: { title: `Archive ${board.name}` }, disabled: boardBusy, onClick: () => archiveBoard(board), children: jsx(Icon, { name: "archive" }) }) : null
+        ] }, board.canvas_id ?? "legacy")),
+        boardsApi && showArchived ? archivedBoards.length ? archivedBoards.map((board) => jsxs("div", { className: "dy-pc-board-item", "data-canvas-board-row": board.canvas_id, "data-canvas-board-archived": true, children: [
+          jsxs("span", { className: "dy-pc-board-row", children: [jsx("span", { className: "dy-pc-board-dot", "data-status": "archived" }), jsxs("span", { className: "dy-pc-board-row-copy", children: [jsx("strong", { children: board.name }), jsx("small", { children: `Archived \xB7 was ${CANVAS_BOARD_STATUS_LABELS[board.archived_from] ?? "Draft"}` })] })] }),
+          jsx(Button, { small: true, action: "pc-board-restore", ariaLabel: `Restore ${board.name}`, data: { title: `Restore ${board.name}` }, disabled: boardBusy, onClick: () => restoreBoard(board), children: jsx(Icon, { name: "archive-restore" }) })
+        ] }, board.canvas_id)) : [jsx("p", { className: "dy-pc-board-archived", children: "No archived boards." }, "none")] : null,
+        boardsApi ? boardForm ? jsxs("div", { className: "dy-pc-board-form", children: [
+          jsx("input", { "data-canvas-board-form": boardForm.mode, "aria-label": boardForm.mode === "rename" ? "New board name" : "Board name", maxLength: 120, value: boardForm.name, placeholder: "Board name", autoFocus: true, onChange: (event) => setBoardForm({ ...boardForm, name: event.target.value }), onKeyDown: (event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              submitBoardForm();
+            }
+            if (event.key === "Escape") setBoardForm(null);
+          } }),
+          jsx(Button, { small: true, variant: "primary", action: "pc-board-form-save", disabled: boardBusy || !String(boardForm.name ?? "").trim(), onClick: submitBoardForm, children: boardForm.mode === "rename" ? "Rename" : "Create board" }),
+          jsx(Button, { small: true, action: "pc-board-form-cancel", onClick: () => setBoardForm(null), children: "Cancel" })
+        ] }) : jsxs("div", { className: "dy-pc-board-form", children: [
+          jsx(Button, { small: true, action: "pc-board-new", disabled: boardBusy, onClick: () => setBoardForm({ mode: "create", name: "" }), children: [jsx(Icon, { name: "plus" }, "i"), "New board"] }),
+          jsx(Button, { small: true, action: "pc-board-rename", disabled: boardBusy || !boardScoped, onClick: () => setBoardForm({ mode: "rename", name: canvas?.name ?? "" }), children: [jsx(Icon, { name: "square-pen" }, "i"), "Rename"] }),
+          jsx(Button, { small: true, action: "pc-board-show-archived", disabled: boardBusy, onClick: toggleArchived, children: showArchived ? "Hide archived" : "Show archived" })
+        ] }) : null
+      ] }) : null,
       jsxs("div", { className: "dockyard-section-head", children: [
         jsxs("div", { children: [
           jsx("span", { className: "dockyard-card-label", children: "PLANNING CANVAS" }),
           jsx("h2", { children: "Evidence to plan" }),
-          jsx("p", { children: `One canvas per project: ${number(objects.length)} object(s), ${number(connectors.length)} connector(s), revision ${number(revision)}${dirty ? " \xB7 unsaved edits" : " \xB7 saved"}. Curation only proposes \u2014 every proposal lands as scratch and nothing is applied automatically.` }),
+          jsx("p", { children: `${number(objects.length)} object(s), ${number(connectors.length)} connector(s), revision ${number(revision)}${dirty ? " \xB7 unsaved edits" : " \xB7 saved"}${readOnly ? ` \xB7 ${CANVAS_BOARD_STATUS_LABELS[boardStatus]} (read-only)` : ""}. The steward only proposes; nothing is applied automatically.` }),
           content.length ? jsx("p", { className: "dockyard-meta", children: `${number(content.length)} project content item(s) available to reference.` }) : null
         ] })
       ] }),
-      jsxs("div", { className: "dy-pc", children: [
+      jsxs("div", { className: "dy-pc", "data-canvas-theme": theme ?? void 0, children: [
         jsxs("div", { className: "dy-pc-toolbar", role: "toolbar", "aria-label": "Planning canvas tools", children: [
-          jsxs("div", { className: "dy-pc-seg", role: "group", "aria-label": "Canvas mode", children: [
-            jsx(Button, { small: true, variant: mode === "select" ? "primary" : "", action: "pc-mode-select", onClick: () => {
+          group("Edit", [
+            tool({ action: "pc-mode-select", icon: "mouse-pointer-2", name: "Select", tip: "Click to edit, drag to move, drag empty space to multi-select.", variant: mode === "select" ? "primary" : "", onClick: () => {
               setMode("select");
               setPendingConnect(null);
-            }, children: "Select" }),
-            jsx(Button, { small: true, variant: mode === "connect" ? "primary" : "", action: "pc-mode-connect", onClick: () => {
+            } }),
+            tool({ action: "pc-mode-connect", icon: "spline", name: "Connect", tip: "Click two stickers to link them with the chosen meaning.", variant: mode === "connect" ? "primary" : "", disabled: readOnly, onClick: () => {
               setMode("connect");
               setPendingConnect(null);
-            }, children: "Connect" })
-          ] }),
-          jsx(Button, { small: true, action: "pc-undo", disabled: !history.length, onClick: undo, children: "Undo" }),
-          jsx(Button, { small: true, action: "pc-redo", disabled: !future.length, onClick: redo, children: "Redo" }),
-          jsx(Button, { small: true, action: "pc-duplicate", disabled: !(selectedIds.length || selectedId), onClick: duplicateSelection, children: "Duplicate" }),
-          jsx("span", { className: "dy-pc-sep", "aria-hidden": true }),
-          jsxs("div", { className: "dy-pc-add", children: [
-            jsx("select", { "data-canvas-kind-picker": true, "aria-label": "Object kind", value: kind, onChange: (event) => setKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx("option", { value, children: CANVAS_KIND_LABELS[value] }, value)) }),
-            jsx("input", { "data-canvas-draft": true, "aria-label": "New object text", value: draft, placeholder: "Capture a note, observation, question or link...", onChange: (event) => setDraft(event.target.value) }),
-            jsx(Button, { small: true, variant: "primary", action: "add-canvas-object", disabled: !draft.trim(), onClick: addFromDraft, children: "Add object" })
-          ] }),
-          jsx("span", { className: "dy-pc-sep", "aria-hidden": true }),
-          ...CANVAS_OBJECT_KINDS.map((value) => jsx(Button, {
-            small: true,
-            action: `add-canvas-${value}`,
-            data: { "data-canvas-add-kind": value },
-            onClick: () => addObject(value, `New ${CANVAS_KIND_LABELS[value]}`),
-            children: `\uFF0B ${CANVAS_KIND_LABELS[value]}`
-          }, `add-${value}`)),
-          jsx("span", { className: "dy-pc-spacer" }),
-          jsx(Button, { small: true, action: "pc-tidy", disabled: !objects.length, onClick: tidy, children: "Tidy" }),
-          jsx(Button, { small: true, action: "pc-review", disabled: busy, onClick: reviewCanvas, children: "Review" }),
-          jsx("span", { className: "dy-pc-sep", "aria-hidden": true }),
-          jsxs("div", { className: "dy-pc-seg", role: "group", "aria-label": "Zoom", children: [
-            jsx(Button, { small: true, action: "pc-zoom-out", ariaLabel: "Zoom out", onClick: () => zoomBy(-CANVAS_ZOOM.step), children: "\u2212" }),
-            jsx("span", { className: "dy-pc-readout", "data-canvas-zoom-readout": String(Math.round(zoom * 100)), children: `${Math.round(zoom * 100)}%` }),
-            jsx(Button, { small: true, action: "pc-zoom-in", ariaLabel: "Zoom in", onClick: () => zoomBy(CANVAS_ZOOM.step), children: "\uFF0B" }),
-            jsx(Button, { small: true, action: "pc-fit", onClick: fit, children: "Fit" })
-          ] }),
-          jsx("span", { className: "dy-pc-sep", "aria-hidden": true }),
-          jsx(Button, { small: true, action: "pc-reload", disabled: busy, onClick: reload, children: "Reload" }),
-          jsx(Button, { small: true, action: "pc-curate", disabled: busy, onClick: () => curate(), children: "Curate" }),
-          jsx(Button, { small: true, variant: "primary", action: "pc-save", disabled: busy, onClick: save, children: busy ? "Working..." : "Save canvas" })
+            } }),
+            tool({ action: "pc-undo", icon: "undo-2", name: "Undo", tip: "Step back one board edit (Ctrl+Z).", disabled: !history.length || readOnly, onClick: undo }),
+            tool({ action: "pc-redo", icon: "redo-2", name: "Redo", tip: "Re-apply the edit you undid (Ctrl+Shift+Z).", disabled: !future.length || readOnly, onClick: redo }),
+            tool({ action: "pc-duplicate", icon: "copy-plus", name: "Duplicate", tip: "Copy the selected sticker(s) (Ctrl+D).", disabled: !(selectedIds.length || selectedId) || readOnly, onClick: duplicateSelection }),
+            tool({ action: "pc-tidy", icon: "layout-dashboard", name: "Tidy", tip: "Line every sticker up on a grid.", disabled: !objects.length || readOnly, onClick: tidy })
+          ]),
+          group("Add", [
+            jsxs("div", { className: "dy-pc-add", children: [
+              jsx("select", { "data-canvas-kind-picker": true, "aria-label": "Object kind", value: kind, disabled: readOnly, onChange: (event) => setKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx("option", { value, children: CANVAS_KIND_LABELS[value] }, value)) }),
+              jsx("input", { "data-canvas-draft": true, "aria-label": "New object text", value: draft, disabled: readOnly, maxLength: 4e3, placeholder: "Capture a note, observation, question or link...", onChange: (event) => setDraft(event.target.value), onKeyDown: (event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  addFromDraft();
+                }
+              } }),
+              tool({ action: "add-canvas-object", icon: "plus", name: "Add object", tip: "Add the text above as a sticker of the chosen kind.", variant: "primary", disabled: !draft.trim() || readOnly, onClick: addFromDraft })
+            ] }),
+            jsxs("div", { className: "dy-pc-tool", ref: addMenuRef, children: [
+              jsx(Button, { small: true, action: "pc-add-menu", ariaLabel: "Add sticker", disabled: readOnly, data: { title: "Add sticker \u2014 pick a kind to drop a blank sticker", "aria-haspopup": "menu", "aria-expanded": addMenuOpen ? "true" : "false" }, onClick: () => setAddMenuOpen((value) => !value), children: [jsx(Icon, { name: "sticky-note" }, "i"), jsx(Icon, { name: "chevron-down" }, "c")] }),
+              jsx("div", { className: "dy-pc-addmenu", role: "menu", "aria-label": "Add sticker", hidden: !addMenuOpen, children: CANVAS_OBJECT_KINDS.map((value) => jsxs("button", {
+                type: "button",
+                role: "menuitem",
+                "data-action": `add-canvas-${value}`,
+                "data-canvas-add-kind": value,
+                onClick: () => {
+                  addObject(value, `New ${CANVAS_KIND_LABELS[value]}`);
+                  setAddMenuOpen(false);
+                },
+                children: [jsx("span", { className: "swatch", style: { background: `var(--dy-pc-fill-${value})`, borderLeft: `3px solid var(--dy-pc-kind-${value})` } }, "s"), jsx(Icon, { name: CANVAS_KIND_ICONS[value] }, "i"), CANVAS_KIND_LABELS[value]]
+              }, `add-${value}`)) })
+            ] })
+          ]),
+          group("View", [
+            tool({ action: "pc-zoom-out", icon: "zoom-out", name: "Zoom out", tip: "Shrink the board view.", onClick: () => zoomBy(-CANVAS_ZOOM.step) }),
+            jsx("span", { className: "dy-pc-readout", "data-canvas-zoom-readout": String(Math.round(zoom * 100)), children: `${Math.round(zoom * 100)}%` }, "zoom"),
+            tool({ action: "pc-zoom-in", icon: "zoom-in", name: "Zoom in", tip: "Enlarge the board view.", onClick: () => zoomBy(CANVAS_ZOOM.step) }),
+            tool({ action: "pc-fit", icon: "scan", name: "Fit", tip: "Fit every sticker in view.", onClick: fit }),
+            tool({ action: "pc-theme-light", icon: "sun", name: "Light canvas", tip: "Light canvas for this board only. Click again to follow the app.", variant: effectiveTheme === "light" ? "primary" : "", onClick: () => setBoardTheme("light"), data: { "aria-pressed": effectiveTheme === "light" ? "true" : "false" } }),
+            tool({ action: "pc-theme-dark", icon: "moon", name: "Dark canvas", tip: "Dark glowing canvas for this board only. Click again to follow the app.", variant: effectiveTheme === "dark" ? "primary" : "", onClick: () => setBoardTheme("dark"), data: { "aria-pressed": effectiveTheme === "dark" ? "true" : "false" } })
+          ]),
+          group("AI", [
+            tool({ action: "pc-curate", icon: "sparkles", name: "Curate", tip: "Ask the steward to turn this board into proposals.", disabled: busy || readOnly, onClick: () => curate() }),
+            tool({ action: "pc-review", icon: "list-checks", name: "Review", tip: "Count what is on this board; nothing is sent to AI.", disabled: busy, onClick: reviewCanvas })
+          ]),
+          group("Save", [
+            tool({ action: "pc-reload", icon: "refresh-cw", name: "Reload", tip: "Re-read the saved board; discards unsaved edits.", disabled: busy, onClick: reload }),
+            tool({ action: "pc-save", icon: "save", name: "Save canvas", tip: "Save this board as a new revision.", variant: "primary", label: busy ? "Working..." : "Save", disabled: busy || readOnly, onClick: save })
+          ])
         ] }),
-        objects.length >= 2 ? jsxs("div", { className: "dy-pc-linkbar", "data-canvas-connector-editor": true, children: [
+        objects.length >= 2 && !readOnly ? jsxs("div", { className: "dy-pc-linkbar", "data-canvas-connector-editor": true, children: [
           jsxs("label", { children: [jsx("span", { children: "From" }), jsx("select", { value: linkSource, onChange: (event) => setLinkSource(event.target.value), children: [jsx("option", { value: "", children: "Choose source" }, "none"), ...objects.map((item) => jsx("option", { value: item.id, children: canvasText(item) || item.id }, item.id))] })] }),
           jsxs("label", { children: [jsx("span", { children: "Relationship" }), jsx("select", { value: linkMeaning, onChange: (event) => setLinkMeaning(event.target.value), children: CANVAS_CONNECTOR_MEANINGS.map((value) => jsx("option", { value, children: value }, value)) })] }),
           jsxs("label", { children: [jsx("span", { children: "To" }), jsx("select", { value: linkTarget, onChange: (event) => setLinkTarget(event.target.value), children: [jsx("option", { value: "", children: "Choose target" }, "none"), ...objects.map((item) => jsx("option", { value: item.id, children: canvasText(item) || item.id }, item.id))] })] }),
@@ -8194,50 +9330,79 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
               ]
             }),
             jsx("div", { className: `dy-pc-backdrop${selected ? " open" : ""}`, "data-pc-backdrop": true, onClick: () => setSelectedId(null) }),
-            jsxs("aside", { className: `dy-pc-chat ${chatOpen ? "open" : "closed"}`, "data-canvas-assistant": true, children: [
-              jsxs("button", { type: "button", className: "dy-pc-chat-h", "data-action": "pc-chat-toggle", onClick: () => setChatOpen((current) => !current), children: [
-                jsx("span", { className: "av", "aria-hidden": true, children: "AI" }),
-                jsxs("span", { style: { flex: "1 1 auto" }, children: [
-                  jsx("strong", { children: "Steward" }),
-                  jsx("span", { className: "sub", children: session?.current_question ? "clarification in progress \xB7 nothing applied" : `${number(pendingProposals)} proposal(s) waiting \xB7 nothing applied` })
-                ] }),
-                jsx("span", { className: "tog", "aria-hidden": true, children: chatOpen ? "\u25BC" : "\u25B2" })
-              ] }),
-              jsxs("div", { className: "dy-pc-chat-b", children: [
-                jsx("div", { className: "dy-pc-msg bot", children: assistantSummary }),
-                jsx("div", { "data-canvas-chat-log": true, children: (chatLog ?? []).map((message, index) => jsx("div", { className: `dy-pc-msg ${message.role}`, children: message.text }, `chat-${index}`)) }),
-                questionBlock,
-                review ? jsx("p", { className: "dy-pc-drawer-meta", "data-canvas-review": true, children: `Review: ${number(review.summary?.evidence_count)} evidence, ${number(review.summary?.claim_count)} claim, ${number(review.summary?.question_count)} question, ${number(review.summary?.plan_block_count)} plan block(s).` }) : null,
-                proposalCards.length ? jsx("div", { "data-canvas-proposals": true, children: proposalCards }) : null,
-                session?.answers?.length ? jsx("div", { className: "dy-pc-msg me", children: `${number(session.answers.length)} clarification answer(s) recorded.` }) : null,
-                planPanel ? jsxs("div", { className: "dy-pc-proposal", "data-canvas-plan": planPanel.plan_id, children: [
-                  jsx("strong", { children: "Plan ready for review" }),
-                  jsx("small", { children: `${number((planPanel.steps ?? []).length)} step(s) \xB7 from proposal ${planPanel.proposal_id} \xB7 nothing applied to the board.` }),
-                  jsx("pre", { className: "dy-pc-plan-steps", children: (planPanel.steps ?? []).map((step) => `${step.order}. ${step.title}`).join("\n") }),
-                  jsxs("div", { className: "dockyard-form-actions", children: [
-                    jsx(Button, { small: true, variant: planDocSaved ? "" : "primary", action: "save-plan-document", disabled: planBusy || planDocSaved, onClick: savePlanDocument, children: planDocSaved ? "Doc saved to Content" : "Save doc to Content" }),
-                    jsx(Button, { small: true, variant: planDocSaved && pendingSteps.length ? "primary" : "", action: "backlog-from-plan", disabled: planBusy || !planDocSaved || !pendingSteps.length || Boolean(backlogConfirm?.length), onClick: () => setBacklogConfirm(pendingSteps), children: planDocSaved && !pendingSteps.length ? "Backlog items created" : "Create backlog items" })
+            jsxs("aside", { ref: chatRef, className: `dy-pc-chat ${chatState}${chatDragging ? " dragging" : ""}`, "data-canvas-assistant": true, "data-canvas-chat-state": chatState, style: chatStyle, "aria-label": "Steward chat", children: [
+              jsxs("div", { className: "dy-pc-chat-bar", children: [
+                jsx("span", { className: "dy-pc-chat-grip", "data-canvas-chat-grip": true, role: "button", tabIndex: 0, "aria-label": "Move chat window (arrow keys; Home resets)", title: "Drag to move \xB7 arrow keys move \xB7 Home resets", onPointerDown: beginChatDrag, onKeyDown: nudgeChat, children: jsx(Icon, { name: "grip-horizontal" }) }),
+                jsxs("button", { type: "button", className: "dy-pc-chat-h", "data-action": "pc-chat-toggle", "aria-expanded": chatOpen && !chatPill ? "true" : "false", onClick: toggleChat, children: [
+                  jsx("span", { className: "av", "aria-hidden": true, children: jsx(Icon, { name: "bot" }) }),
+                  jsxs("span", { style: { flex: "1 1 auto", minWidth: 0 }, children: [
+                    jsx("strong", { children: "Steward" }),
+                    chatPill ? null : jsx("span", { className: "sub", children: session?.current_question ? "clarification in progress \xB7 nothing applied" : `${number(pendingProposals)} proposal(s) waiting \xB7 nothing applied` })
                   ] }),
-                  backlogConfirm?.length ? jsxs("div", { className: "dy-pc-proposal", "data-canvas-backlog-confirm": true, children: [
-                    jsx("small", { children: `Create ${number(backlogConfirm.length)} backlog item(s)? One confirm per batch, nothing auto-runs.` }),
-                    jsx(Button, { small: true, variant: "primary", action: "confirm-backlog-from-plan", disabled: planBusy, onClick: createBacklogItems, children: "Confirm create" }),
-                    jsx(Button, { small: true, action: "cancel-backlog-from-plan", disabled: planBusy, onClick: () => setBacklogConfirm(null), children: "Cancel" })
-                  ] }) : null
-                ] }) : null
+                  chatPill ? null : jsx("span", { className: "tog", "aria-hidden": true, children: chatOpen ? "\u25BC" : "\u25B2" })
+                ] }),
+                chatPill ? null : jsx(Button, { small: true, action: "pc-chat-minimise", ariaLabel: "Minimise chat to a pill", data: { title: "Minimise to a pill" }, onClick: minimiseChat, children: jsx(Icon, { name: "minimize-2" }) }),
+                chatPill ? null : jsx(Button, { small: true, action: "pc-chat-expand", ariaLabel: "Expand chat into a large view", data: { title: "Expand for reading and editing plans" }, onClick: openExpanded, children: jsx(Icon, { name: "maximize-2" }) })
               ] }),
+              boardScoped ? jsxs("label", { className: "dy-pc-chat-model", children: [
+                jsx("span", { children: "Model" }),
+                jsxs("select", { "data-canvas-model": true, "aria-label": "Model for this board", value: modelValue, disabled: boardBusy || readOnly, onChange: (event) => setBoardModel(event.target.value), children: [
+                  jsx("option", { value: "", children: defaultModelLabel }, "default"),
+                  ...modelChoices.map((choice) => jsx("option", { value: choice.value, children: choice.label }, choice.value))
+                ] })
+              ] }) : null,
+              jsxs("div", { className: "dy-pc-chat-b", children: chatBody() }),
               jsxs("div", { className: "dy-pc-chat-f", children: [
-                jsx("span", { className: "dy-pc-readout", children: "Approval contract: scratch + suggested only." }),
-                jsx("input", { "data-canvas-chat-input": true, "aria-label": "Message the steward", value: chatDraft, placeholder: "Ask the steward about this board...", onChange: (event) => setChatDraft(event.target.value), onKeyDown: (event) => {
+                jsx("span", { className: "dy-pc-readout", children: readOnly ? `Board is ${CANVAS_BOARD_STATUS_LABELS[boardStatus]} \u2014 reopen it to chat.` : "Approval contract: scratch + suggested only." }),
+                jsx("input", { "data-canvas-chat-input": true, "aria-label": "Message the steward", value: chatDraft, maxLength: 4e3, disabled: readOnly, placeholder: "Ask the steward about this board...", onChange: (event) => setChatDraft(event.target.value), onKeyDown: (event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
                     sendChat();
                   }
                 } }),
-                jsx(Button, { small: true, action: "pc-chat-send", disabled: chatBusy || !chatDraft.trim(), onClick: sendChat, children: "Send" }),
-                jsx(Button, { small: true, action: "pc-chat-stop", disabled: !chatBusy, onClick: stopChat, children: "Stop" })
+                jsx(Button, { small: true, action: "pc-chat-send", ariaLabel: "Send", disabled: chatBusy || !chatDraft.trim() || readOnly, onClick: sendChat, children: [jsx(Icon, { name: "send" }, "i"), "Send"] }),
+                jsx(Button, { small: true, action: "pc-chat-stop", ariaLabel: "Stop", disabled: !chatBusy, onClick: stopChat, children: [jsx(Icon, { name: "square" }, "i"), "Stop"] })
               ] })
             ] }),
-            jsxs("aside", { className: `dy-pc-drawer${selected ? " open" : ""}`, "data-canvas-drawer": selected?.id ?? "none", children: [
+            expanded ? jsx("div", { className: "dy-pc-overlay", "data-canvas-expanded": true, onPointerDown: (event) => {
+              if (event.target === event.currentTarget) setExpanded(false);
+            }, onKeyDown: (event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                setExpanded(false);
+              }
+            }, children: jsxs("div", { className: "dy-pc-overlay-card", role: "dialog", "aria-modal": "true", "aria-label": "Steward \u2014 expanded view", children: [
+              jsxs("div", { className: "dy-pc-overlay-h", children: [
+                jsx(Icon, { name: "bot" }),
+                jsx("strong", { children: `Steward \xB7 ${canvas?.name ?? "Planning board"}` }),
+                jsx(Button, { small: true, action: "pc-expanded-close", ariaLabel: "Close expanded view", onClick: () => setExpanded(false), children: jsx(Icon, { name: "x" }) })
+              ] }),
+              jsxs("div", { className: "dy-pc-overlay-b", children: [
+                ...stepsDraft ? [] : chatBody(),
+                stepsDraft ? jsxs("div", { "data-canvas-steps-editor": planPanel?.plan_id ?? true, children: [
+                  jsx("p", { className: "dy-pc-drawer-meta", children: "Edit, reorder, add or remove steps. Steps you keep keep their sources; new steps start with none." }),
+                  jsx("ol", { children: stepsDraft.map((row, index) => jsxs("li", { children: [
+                    jsx("span", { children: `${index + 1}.` }),
+                    jsx("input", { "data-canvas-step-title": index, "aria-label": `Step ${index + 1} title`, maxLength: 400, value: row.title, onChange: (event) => editStep(index, { title: event.target.value }) }),
+                    jsx(Button, { small: true, action: "pc-step-up", ariaLabel: `Move step ${index + 1} up`, disabled: index === 0, onClick: () => moveStep(index, -1), children: "\u2191" }),
+                    jsx(Button, { small: true, action: "pc-step-down", ariaLabel: `Move step ${index + 1} down`, disabled: index === stepsDraft.length - 1, onClick: () => moveStep(index, 1), children: "\u2193" }),
+                    jsx(Button, { small: true, action: "pc-step-remove", ariaLabel: `Remove step ${index + 1}`, disabled: stepsDraft.length === 1, onClick: () => removeStep(index), children: jsx(Icon, { name: "trash-2" }) })
+                  ] }, row.key)) })
+                ] }) : null
+              ] }),
+              stepsDraft ? jsxs("div", { className: "dy-pc-overlay-f", children: [
+                jsx(Button, { small: true, action: "pc-step-add", onClick: addStep, disabled: stepsDraft.length >= 50, children: [jsx(Icon, { name: "plus" }, "i"), "Add step"] }),
+                jsx(Button, { small: true, action: "pc-steps-cancel", onClick: () => setStepsDraft(null), children: "Cancel" }),
+                jsx(Button, { small: true, variant: "primary", action: "pc-steps-save", disabled: planBusy, onClick: saveSteps, children: "Save steps" })
+              ] }) : null
+            ] }) }) : null,
+            jsxs("aside", { className: `dy-pc-drawer${selected ? " open" : ""}`, "data-canvas-drawer": selected?.id ?? "none", "aria-hidden": selected ? void 0 : "true", onKeyDown: (event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                setSelectedId(null);
+                setSelectedIds([]);
+              }
+            }, children: [
               jsxs("div", { className: "dy-pc-drawer-h", children: [
                 jsxs("div", { children: [
                   jsx("strong", { children: selected ? `${CANVAS_KIND_LABELS[selected.kind] ?? selected.kind} \xB7 selected` : "Selected object" }),
@@ -8248,7 +9413,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
               selected ? jsxs("div", { className: "dy-pc-drawer-b", children: [
                 jsxs("label", { children: [jsx("span", { children: "Title" }), jsx("input", { "data-canvas-object-title": true, value: drawerText, onChange: (event) => setDrawerText(event.target.value) })] }),
                 jsxs("label", { children: [jsx("span", { children: "Kind" }), jsx("select", { "data-canvas-object-kind": true, value: drawerKind, onChange: (event) => setDrawerKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx("option", { value, children: CANVAS_KIND_LABELS[value] }, value)) })] }),
-                jsxs("label", { children: [jsx("span", { children: "Sticker colour" }), jsx("select", { "data-canvas-object-colour": true, value: selectedColour ?? "", onChange: (event) => setSelectedColour(event.target.value || null), children: [jsx("option", { value: "", children: "Default kind colour" }), ...CANVAS_STICKER_COLOURS.map((value) => jsx("option", { value, children: CANVAS_STICKER_LABELS[value] }, value))] })] }),
+                jsxs("label", { children: [jsx("span", { children: "Sticker colour" }), jsx("select", { "data-canvas-object-colour": true, value: selectedColour ?? "", onChange: (event) => setSelectedColour(event.target.value || null), children: [jsx("option", { value: "", children: "Default kind colour" }, "default"), ...CANVAS_STICKER_COLOURS.map((value) => jsx("option", { value, children: CANVAS_STICKER_LABELS[value] }, value))] })] }),
                 jsx("p", { className: "dy-pc-drawer-meta", children: selected.evidence_ref ? `Evidence reference: ${selected.evidence_ref}` : "No evidence reference on this object." }),
                 jsxs("div", { className: "dockyard-form-actions", children: [
                   jsx(Button, { small: true, variant: "danger", action: "remove-canvas-object", disabled: busy, onClick: removeSelected, children: "Remove object" }),
