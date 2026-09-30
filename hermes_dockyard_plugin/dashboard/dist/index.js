@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // dashboard/src/api.ts
+  // src/api.ts
   var BASE = "/api/plugins/hermes-dockyard";
   function createApi(sdk) {
     const get = (path) => sdk.fetchJSON(`${BASE}${path}`);
@@ -140,7 +140,7 @@
     return sdk;
   }
 
-  // dashboard/src/objective-evidence.ts
+  // src/objective-evidence.ts
   async function renderObjectiveEvidence(root, api, project) {
     const text = (tag, value) => {
       const node = document.createElement(tag);
@@ -225,7 +225,7 @@
     }
   }
 
-  // dashboard/src/components/live-detail.ts
+  // src/components/live-detail.ts
   function buildActivityThread(items, opts = {}) {
     const max = opts.max ?? 8;
     const wrap = document.createElement("div");
@@ -307,7 +307,7 @@
     return wrap;
   }
 
-  // dashboard/src/workflow-canvas.ts
+  // src/workflow-canvas.ts
   function validateConnection(nodes, from, to) {
     if (!from || !to) return "Both source and target are required";
     if (from === to) return "A node cannot depend on itself";
@@ -1612,7 +1612,7 @@
     };
   }
 
-  // dashboard/src/app.ts
+  // src/app.ts
   function applyFleetDeepLink({ link, s, tabs, go }) {
     const sep = link.indexOf(":");
     if (sep <= 0) return;
@@ -3191,7 +3191,7 @@
     return el;
   }
 
-  // dashboard/src/index.ts
+  // src/index.ts
   function whenReady() {
     if (document.readyState !== "loading") return Promise.resolve();
     return new Promise(

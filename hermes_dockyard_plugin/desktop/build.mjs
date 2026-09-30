@@ -36,9 +36,6 @@ const result = await build({
   // Keep the runtime seam exact: jsx-dev-runtime is allowed by the loader
   // contract but is not emitted by this source graph.
   external: ['react', 'react/jsx-runtime', '@hermes/plugin-sdk'],
-  // Third-party UI packages (TipTap rich text) are installed with the
-  // dashboard toolchain; resolve them from there and bundle them in.
-  nodePaths: [join(DESKTOP, '..', 'dashboard', 'node_modules')],
   banner: {
     js: '// GENERATED — edit desktop/src/, then run node hermes_dockyard_plugin/desktop/build.mjs',
   },

@@ -17,9 +17,9 @@ def _doc(*blocks):
     return {"type": "doc", "content": list(blocks)}
 
 
-def _save(store, project, doc, extra=None):
+def _save(store, project, doc, extra=None, name="RT"):
     service = CanvasService(store)
-    board = service.create_board(project, name="RT", actor="sahil")
+    board = service.create_board(project, name=name, actor="sahil")
     content = {"text": "Card", "description_doc": doc, **(extra or {})}
     saved = service.save(project, canvas_id=board["canvas_id"], expected_revision=board["revision"],
                          objects=[{"id": "o1", "kind": "note", "content": content, "x": 0, "y": 0}],
@@ -88,3 +88,29 @@ def test_deep_nesting_is_refused(store, enabled):
         node = {"type": "bulletList", "content": [{"type": "listItem", "content": [node]}]}
     with pytest.raises(ValueError, match="deeply nested"):
         _save(store, enabled, _doc(node))
+
+
+# --- Quan re-check (Stage 1+2) -------------------------------------------
+
+def test_heading_level_true_is_refused(store, enabled):
+    """L1: True == 1 in Python; a boolean level must not be stored."""
+    doc = _doc({"type": "heading", "attrs": {"level": True}, "content": [{"type": "text", "text": "x"}]})
+    with pytest.raises(ValueError, match="level"):
+        _save(store, enabled, doc)
+
+
+@pytest.mark.parametrize("char", ["\u00e9", "\u6f22"])
+def test_twenty_thousand_multibyte_characters_fit(store, enabled, char):
+    """M2: the derived plain copy is not counted against the 64 KB card cap."""
+    text = char * 20000
+    got = _save(store, enabled, _doc(_p(text)))
+    assert got["description"] == text
+    assert got["description_doc"]["content"][0]["content"][0]["text"] == text
+
+
+def test_saved_doc_round_trips_unchanged(store, enabled):
+    """Saving the stored form again changes nothing (idempotent allow-list)."""
+    first = _save(store, enabled, RICH)
+    second = _save(store, enabled, first["description_doc"], name="RT again")
+    assert second["description_doc"] == first["description_doc"]
+    assert second["description"] == first["description"]

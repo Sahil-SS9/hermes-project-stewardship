@@ -294,7 +294,11 @@ class CanvasService:
             else:  # an empty editor means no description at all
                 out.pop("description", None)
                 out.pop("description_doc", None)
-        if len(json.dumps(out, ensure_ascii=False).encode("utf-8")) > MAX_CONTENT_BYTES:
+        # The plain description is re-derived from description_doc, so it is
+        # not counted twice: 20,000 accented or CJK characters must still fit
+        # (Quan re-check M2).
+        counted = {k: v for k, v in out.items() if not (k == "description" and "description_doc" in out)}
+        if len(json.dumps(counted, ensure_ascii=False).encode("utf-8")) > MAX_CONTENT_BYTES:
             raise ValueError("a card holds at most 64 KB of content")
         return out
 
@@ -315,7 +319,7 @@ class CanvasService:
                     raise ValueError(f"rich text {what} does not allow {name!r}")
                 if name == "textAlign" and val not in _RT_ALIGN:
                     raise ValueError("text alignment must be left, center, right or justify")
-                if name == "level" and val not in (1, 2, 3):
+                if name == "level" and (isinstance(val, bool) or val not in (1, 2, 3)):
                     raise ValueError("headings are level 1, 2 or 3")
                 if name == "start" and (not isinstance(val, int) or isinstance(val, bool) or not 1 <= val <= 9999):
                     raise ValueError("a numbered list starts between 1 and 9999")

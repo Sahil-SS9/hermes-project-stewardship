@@ -156,6 +156,81 @@ test('Planning boards (real backend): theme, save, chat, plan steps and board li
     await until(() => board(second), (b) => b.status === 'submitted', 'restore returns the real board to its previous status')
     assert.equal((await boards()).length, 2)
 
+    // Rich text through the REAL save route (Quan H-B): every allowed
+    // format, saved, read back, saved again unchanged.
+    const alpha = canvas.locator('[data-canvas-object]').first()
+    const alphaId = await alpha.getAttribute('data-canvas-object')
+    await alpha.click()
+    const drawer = canvas.locator('.dy-pc-drawer.open')
+    await drawer.waitFor()
+    await drawer.locator('[data-canvas-rich-text]').click()
+    await page.keyboard.press('Control+a')
+    await page.keyboard.press('Delete')
+    await page.evaluate(() => {
+      const el = document.querySelector('[data-canvas-rich-text]')
+      const dt = new DataTransfer()
+      dt.setData('text/html', [
+        '<h1>One</h1><h2 style="text-align:center">Two</h2><h3 style="text-align:right">Three</h3>',
+        '<p style="text-align:justify"><strong>b</strong><em>i</em><u>u</u><s>s</s>',
+        '<span data-size="small">sm</span><span data-size="large">lg</span><span data-size="huge">hg</span>line<br>break</p>',
+        '<ul><li>bullet<ol start="3" type="a"><li>nested</li></ol></li></ul><ol start="5"><li>five</li></ol>',
+      ].join(''))
+      el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+    })
+    await drawer.locator('[data-action="apply-canvas-object"]').click()
+    await drawer.locator('[data-action="pc-close-drawer"]').click()
+    await saveBoard(page, canvas)
+    const stored = (await board(first)).objects.find((o) => o.id === alphaId)
+    const doc = stored.content.description_doc
+    const flat = JSON.stringify(doc)
+    for (const piece of ['"level":1', '"level":2', '"level":3', '"textAlign":"center"', '"textAlign":"right"', '"textAlign":"justify"',
+      '"type":"bold"', '"type":"italic"', '"type":"underline"', '"type":"strike"', '"size":"small"', '"size":"large"', '"size":"huge"',
+      '"type":"hardBreak"', '"type":"bulletList"', '"start":3', '"type":"a"', '"start":5']) {
+      assert.ok(flat.includes(piece), `real server kept ${piece}`)
+    }
+    assert.equal(stored.content.description, 'One\nTwo\nThree\nbiussmlghgline\nbreak\n- bullet\n  3. nested\n5. five', 'plain copy derived by the server')
+    // Save the stored form again through the real PUT: nothing changes.
+    const fresh = await board(first)
+    const put = await fetch(`${API}/projects/${PROJECT}/canvases/${encodeURIComponent(first)}`, {
+      method: 'PUT', headers: { ...TOKEN, 'content-type': 'application/json' },
+      body: JSON.stringify({ expected_revision: fresh.revision, objects: fresh.objects, connectors: fresh.connectors }),
+    })
+    assert.ok(put.ok, `re-save PUT -> ${put.status} ${await put.text()}`)
+    const again = (await board(first)).objects.find((o) => o.id === alphaId).content
+    assert.deepEqual(again.description_doc, doc, 'doc identical after a second real save')
+    assert.equal(again.description, stored.content.description)
+    // Reload the page: the editor shows the saved formatting.
+    await page.reload({ waitUntil: 'load' })
+    await page.waitForSelector('[data-tab="dashboard"]', { timeout: 20000 })
+    if (!(await canvas.count())) {
+      await page.locator('[data-tab="project"]').click()
+      await page.locator('[data-project-view="planning"]').click()
+    }
+    await canvas.waitFor()
+    await canvas.locator(`[data-canvas-object="${alphaId}"]`).click()
+    await drawer.waitFor()
+    const body = drawer.locator('[data-canvas-rich-text]')
+    assert.equal(await body.locator('h1, h2, h3').count(), 3)
+    assert.equal(await body.locator('ol[start="3"][type="a"] li').innerText(), 'nested')
+    await drawer.locator('[data-action="pc-close-drawer"]').click()
+
+    // A completed board is read-only on the real backend: no formatting
+    // bar, body not editable, typing changes nothing.
+    for (const status of ['submitted', 'planned', 'completed']) {
+      await canvas.locator('[data-canvas-board-status]').selectOption(status)
+      await canvas.locator('[data-action="pc-status-confirm"]').click()
+      await page.waitForSelector(`[data-canvas-status="${status}"]`)
+    }
+    assert.equal((await board(first)).status, 'completed')
+    await canvas.locator(`[data-canvas-object="${alphaId}"]`).click()
+    await drawer.waitFor()
+    assert.equal(await drawer.locator('.dy-rt-bar').count(), 0, 'no formatting bar on a completed board')
+    assert.equal(await drawer.locator('[data-canvas-rich-text]').getAttribute('contenteditable'), 'false')
+    await drawer.locator('[data-canvas-rich-text]').click()
+    await page.keyboard.type('should not appear')
+    assert.doesNotMatch(await drawer.locator('[data-canvas-rich-text]').innerText(), /should not appear/)
+    assert.equal(await page.locator('[data-planning-canvas][data-canvas-dirty="true"]').count(), 0)
+
     assert.deepEqual(errors, [], errors.join('\n'))
   } finally {
     await browser?.close()

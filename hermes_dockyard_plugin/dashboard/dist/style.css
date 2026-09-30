@@ -618,6 +618,7 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-pc-scope .dy-rt-sep { width: 1px; height: 18px; margin: 0 3px; background: var(--dy-border); }
 .dy-pc-scope .dy-rt-host .dy-rt-body { min-height: 110px; max-height: 320px; overflow: auto; padding: 9px 11px; border: 1px solid var(--dy-control-border); border-radius: 0 0 8px 8px; background: var(--dy-surface); color: var(--dy-text); font-size: 12.5px; line-height: 1.5; outline: none; overflow-wrap: anywhere; }
 .dy-pc-scope .dy-rt-host.readonly .dy-rt-body { border-radius: 8px; }
+.dy-pc-scope .dy-rt-body:empty::before { content: ''; }
 .dy-pc-scope .dy-rt-host .dy-rt-body:focus { border-color: var(--dy-accent, #5b8def); }
 .dy-pc-scope .dy-rt-body p { margin: 0 0 6px; }
 .dy-pc-scope .dy-rt-body h1 { margin: 4px 0 6px; font-size: 19px; line-height: 1.25; }
@@ -745,4 +746,6 @@ td.bad, .bad { color: var(--dy-bad); }
   .dy-pc-scope .dy-pc-overlay-card.chat .dy-pc-msg { max-width: 92%; }
   .dy-pc-scope .dy-pc-linkbar select { min-width: 0; width: 100%; }
   .dy-pc-scope .dy-pc-linkbar label { flex: 1 1 100%; }
+  .dy-pc-scope .dy-rt-btn { width: 44px; height: 44px; }
+  .dy-pc-scope .dy-rt-select { height: 44px; }
 }

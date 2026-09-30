@@ -802,6 +802,72 @@ test('Planning cards: Word-style description formatting saves as safe rich text'
   });
 });
 
+test('Planning cards: keys pressed on drawer and toolbar buttons never touch the board (Quan H1)', { timeout: 180000 }, async () => {
+  await withPage(1440, 900, async (page) => {
+    const canvas = root(page);
+    const drawer = canvas.locator('.dy-pc-drawer.open');
+    const cards = canvas.locator('[data-canvas-object]');
+    const before = await cards.count();
+    await cards.first().click();
+    await drawer.waitFor();
+    const targets = ['[data-rt="bold"]', '[data-rt="bullets"]', '[data-rt="center"]', '[data-rt="clear"]', '[data-action="pc-link-add"]', '[data-action="apply-canvas-object"]', '[data-action="pc-close-drawer"]'];
+    for (const sel of targets) {
+      const el = drawer.locator(sel).first();
+      if (!(await el.count())) continue;
+      for (const key of ['Delete', 'Backspace', 'Control+z', 'Control+d']) {
+        await el.focus();
+        await page.keyboard.press(key);
+        assert.equal(await cards.count(), before, `${key} on ${sel} left the cards alone`);
+        assert.equal(await drawer.count(), 1, `${key} on ${sel} kept the drawer open`);
+      }
+    }
+    assert.equal(await page.locator('[data-planning-canvas][data-canvas-dirty="true"]').count(), 0, 'board not marked changed');
+    // A focused card itself still deletes with Delete (board shortcut kept).
+    await drawer.locator('[data-action="pc-close-drawer"]').click();
+    await cards.first().focus();
+    await cards.first().click();
+    await cards.first().focus();
+    await page.keyboard.press('Delete');
+    assert.equal(await cards.count(), before - 1, 'Delete on a focused card still removes it');
+  });
+});
+
+test('Planning cards: pasted lists are clamped to what the server stores (Quan M1)', { timeout: 180000 }, async () => {
+  await withPage(1440, 900, async (page, host) => {
+    const canvas = root(page);
+    const drawer = canvas.locator('.dy-pc-drawer.open');
+    const card = canvas.locator('[data-canvas-object]').first();
+    const id = await card.getAttribute('data-canvas-object');
+    await card.click();
+    await drawer.waitFor();
+    const body = drawer.locator('[data-canvas-rich-text]');
+    await body.click();
+    await page.keyboard.press('Control+a');
+    await page.keyboard.press('Delete');
+    let deep = '<li>deep</li>';
+    for (let i = 0; i < 9; i += 1) deep = `<li>level ${9 - i}<ul>${deep}</ul></li>`;
+    await page.evaluate((html) => {
+      const el = document.querySelector('[data-canvas-rich-text]');
+      const dt = new DataTransfer();
+      dt.setData('text/html', html);
+      el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    }, `<ol start="0" type="disc"><li>zero</li></ol><ol start="20000"><li>big</li></ol><ol start="7" type="a"><li>seven</li></ol><ul>${deep}</ul>`);
+    await drawer.locator('[data-action="apply-canvas-object"]').click();
+    await drawer.locator('[data-action="pc-close-drawer"]').click();
+    await canvas.locator('[data-action="pc-save"]').click();
+    await page.waitForSelector('[data-planning-canvas][data-canvas-dirty="false"]');
+    const doc = host.find('board-a').objects.find((o) => o.id === id).content.description_doc;
+    const lists = doc.content.filter((n) => n.type === 'orderedList');
+    assert.deepEqual(lists.map((l) => l.attrs ?? null), [null, { start: 9999 }, { start: 7, type: 'a' }], 'start clamped to 1..9999, unknown type dropped');
+    // Nesting never exceeds five list levels (server depth limit 12).
+    let depth = 0;
+    const walk = (node, d) => { if (node.type === 'bulletList' || node.type === 'orderedList') { d += 1; depth = Math.max(depth, d); } for (const c of node.content || []) walk(c, d); };
+    walk(doc, 0);
+    assert.ok(depth <= 5, `nesting ${depth} levels`);
+    assert.match(JSON.stringify(doc), /"deep"/, 'over-deep items are kept, lifted to the deepest allowed level');
+  });
+});
+
 test('Planning cards on a phone: details panel fits the screen with formatting bar and fields', { timeout: 180000 }, async () => {
   await withPage(390, 844, async (page) => {
     const canvas = root(page);

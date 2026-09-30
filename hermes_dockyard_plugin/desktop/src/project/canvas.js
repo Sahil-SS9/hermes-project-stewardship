@@ -1019,9 +1019,16 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     // Typing in a field (title, description editor, links, chat) must never
     // trigger board shortcuts: Delete/Backspace would remove the card and
     // Ctrl+Z would undo the board instead of the text.
+    // The same goes for any button, link or toolbar with focus, and for
+    // anything inside the details drawer, chat, overlays or link bar (Quan
+    // re-check H1: Delete on a focused Bold button removed the open card).
     const target = event.target
     if (target && target !== stageRef.current && (target.isContentEditable
-        || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return
+        || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(target.tagName)
+        || target.closest?.('.dy-pc-drawer, .dy-pc-chat, .dy-pc-overlay, .dy-pc-linkbar, [role="toolbar"]'))) {
+      // Cards are buttons too: Delete on a focused card still removes it.
+      if (!target.closest?.('.dy-pc-obj')) return
+    }
     const meta = event.ctrlKey || event.metaKey
     if (key === 'Escape') { setSelectedId(null); setSelectedIds([]); setPendingConnect(null); return }
     // Arrow keys move around the board when nothing is selected.
