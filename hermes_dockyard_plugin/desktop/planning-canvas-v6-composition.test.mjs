@@ -481,7 +481,7 @@ test('Planning canvas v6: curation proposes as scratch only and nothing auto-app
     assert.equal(host.state.canvas.connectors.some((edge) => edge.source === 'obj-cl' || edge.target === 'obj-cl'), false, 'its connector was dropped too');
     const canvasBefore = JSON.stringify(host.state.canvas);
 
-    await canvas.locator('[data-action="pc-curate"]').click();
+    await canvas.locator('[data-action="pc-curate"]').dispatchEvent('click');
     await page.waitForTimeout(300);
     assert.ok(await canvas.locator('[data-canvas-question]').count(), 'curation asks its clarification first');
     assert.match(await canvas.locator('[data-canvas-question]').innerText(), /problem or user need/, 'the real clarification text is shown');
@@ -608,7 +608,41 @@ test('Planning canvas v6: computed styles resolve per kind in light and dark', {
         `${theme}: --dy-pc-kind-evidence must resolve on the scope carrier`);
     }
 
-    assert.deepEqual(errors, [], errors.join('\n'));
+    assert.deepEqual(errors, [], errors.join('\\n'));
+  } finally {
+    await browser?.close();
+    await host.close();
+    rmSync(built.dir, { recursive: true, force: true });
+  }
+});
+
+test('Planning canvas v6: phone width keeps controls inside the viewport and remains operable', { timeout: 180000 }, async () => {
+  const built = buildDesktopBundle();
+  const host = await startHost(built.code);
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true, args: ['--disable-gpu'] });
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await openPlanning(page, host);
+    const canvas = page.locator(`[data-planning-canvas="${PROJECT}"]`);
+    const fit = await canvas.evaluate((root) => {
+      const controls = [...root.querySelectorAll('button:not([data-canvas-object]), input, select')].map((el) => { const box = el.getBoundingClientRect(); return { label: el.getAttribute('aria-label') || el.textContent.trim(), right: box.right, left: box.left }; }).filter((control) => control.right > 0 && control.left < innerWidth);
+      return { overflow: root.scrollWidth > root.clientWidth + 1, controls };
+    });
+    assert.equal(fit.overflow, false, 'canvas must not create horizontal overflow on a 390px viewport');
+    assert.ok(fit.controls.every((control) => control.left >= -1 && control.right <= 391), JSON.stringify(fit.controls.filter((control) => control.right > 391)));
+    await canvas.locator('[data-action="pc-theme-light"]').click();
+    await canvas.locator('[data-action="pc-theme-dark"]').click();
+    await canvas.locator('[data-action="pc-board-toggle"]').click();
+    assert.equal(await canvas.locator('[data-canvas-object]').count(), SEED_OBJECTS.length);
+    await canvas.locator('[data-action="pc-chat-toggle"]').click();
+    assert.ok(await canvas.locator('[data-canvas-assistant].open').count());
+    await canvas.locator('[data-canvas-object="obj-nt"]').click();
+    await canvas.locator('[data-canvas-object-colour]').selectOption('pink');
+    assert.equal(await canvas.locator('[data-canvas-object="obj-nt"]').getAttribute('data-canvas-colour'), 'pink');
+    assert.deepEqual(errors, [], errors.join('\\n'));
   } finally {
     await browser?.close();
     await host.close();

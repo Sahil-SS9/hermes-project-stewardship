@@ -243,7 +243,25 @@ export const WORKFLOW_CANVAS_CSS = `
   --dy-edge-plan-raises_question: #ff6ea9;  --dy-edge-plan-raises_question-active: #ff9cc4;
   --dy-edge-plan-depends_on: #8fa3c8;       --dy-edge-plan-depends_on-active: #9cc4ff;
 }
-/* Frame: toolbar + stage + overlay slots. */
+/* Board switcher: compact on desktop and allowed to collapse on narrow screens. */
+.dy-pc-scope .dy-pc-board-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface); }
+.dy-pc-scope .dy-pc-board-title { display: flex; align-items: baseline; gap: 9px; min-width: 0; flex: 1 1 auto; }
+.dy-pc-scope .dy-pc-board-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dy-text); font-size: 13px; }
+.dy-pc-scope .dy-pc-board-count { color: var(--dy-text-3); font-size: 11px; }
+.dy-pc-scope .dy-pc-theme-toggle { display: flex; gap: 2px; border: 1px solid var(--dy-border); border-radius: 8px; padding: 2px; }
+.dy-pc-scope .dy-pc-theme-toggle .dockyard-button { min-width: 29px; padding: 5px; }
+.dy-pc-scope .dy-pc-board-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 6px; padding: 9px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface-subtle); }
+.dy-pc-scope .dy-pc-board-row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 9px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); text-align: left; cursor: pointer; }
+.dy-pc-scope .dy-pc-board-row:hover, .dy-pc-scope .dy-pc-board-row.active { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
+.dy-pc-scope .dy-pc-board-row:disabled { cursor: wait; opacity: .65; }
+.dy-pc-scope .dy-pc-board-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 99px; background: var(--dy-success); }
+.dy-pc-scope .dy-pc-board-dot[data-status="submitted"] { background: var(--dy-warning); }
+.dy-pc-scope .dy-pc-board-dot[data-status="completed"], .dy-pc-scope .dy-pc-board-dot[data-status="archived"] { background: var(--dy-text-3); }
+.dy-pc-scope .dy-pc-board-row-copy { display: grid; min-width: 0; gap: 2px; }
+.dy-pc-scope .dy-pc-board-row-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
+.dy-pc-scope .dy-pc-board-row-copy small { color: var(--dy-text-3); font-size: 10px; }
+.dy-pc-scope .dy-pc-board-warning { margin-left: auto; color: var(--dy-warning); font-weight: 800; }
+
 .dy-pc-scope .dy-pc { position: relative; display: flex; flex-direction: column; min-height: 0; margin-top: 14px; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); }
 .dy-pc-scope .dy-pc-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 9px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface-subtle); }
 .dy-pc-scope .dy-pc-seg { display: flex; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 8px; }
@@ -297,6 +315,12 @@ export const WORKFLOW_CANVAS_CSS = `
 .dy-pc-scope .dy-pc-obj[data-canvas-kind="note"] { border-left-color: var(--dy-pc-kind-note); }
 .dy-pc-scope .dy-pc-obj[data-canvas-kind="link"] { border-left-color: var(--dy-pc-kind-link); }
 .dy-pc-scope .dy-pc-obj[data-canvas-kind="media"] { border-left-color: var(--dy-pc-kind-media); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="yellow"] { border-top-color: #9a6206; }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="green"] { border-top-color: #1f7a55; }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="blue"] { border-top-color: #2f4bb5; }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="pink"] { border-top-color: #a8275f; }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="purple"] { border-top-color: #6b4bbd; }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="orange"] { border-top-color: #a4520b; }
 .dy-pc-scope .dy-pc-obj:hover { border-top-color: var(--dy-accent-border); border-right-color: var(--dy-accent-border); border-bottom-color: var(--dy-accent-border); }
 .dy-pc-scope .dy-pc-obj.selected { border-top-color: var(--dy-accent-border); border-right-color: var(--dy-accent-border); border-bottom-color: var(--dy-accent-border); box-shadow: 0 0 0 2px var(--dy-accent-soft), var(--dy-shadow); }
 .dy-pc-scope .dy-pc-obj:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }

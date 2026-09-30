@@ -15,6 +15,8 @@ import { Button, Icon } from '../lib/ui.js'
 export const CANVAS_OBJECT_KINDS = Object.freeze(['evidence', 'claim', 'question', 'decision', 'plan_block', 'note', 'link', 'media'])
 export const CANVAS_CONNECTOR_MEANINGS = Object.freeze(['supports', 'contradicts', 'derived_from', 'clarifies', 'depends_on', 'implements', 'raises_question'])
 export const CANVAS_KIND_LABELS = Object.freeze({ evidence: 'Evidence', claim: 'Claim', question: 'Question', decision: 'Decision', plan_block: 'Plan block', note: 'Note', link: 'Link', media: 'Media' })
+export const CANVAS_STICKER_COLOURS = Object.freeze(['yellow', 'green', 'blue', 'pink', 'purple', 'orange'])
+export const CANVAS_STICKER_LABELS = Object.freeze({ yellow: 'Sun', green: 'Mint', blue: 'Sky', pink: 'Rose', purple: 'Violet', orange: 'Amber' })
 // D-P1 a11y: each kind carries its own Lucide icon so it is never identified
 // by colour alone. Names must exist in the generated lucide-icons.js subset.
 export const CANVAS_KIND_ICONS = Object.freeze({
@@ -105,15 +107,60 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   const [planPanel, setPlanPanel] = useState(null)
   const [planBusy, setPlanBusy] = useState(false)
   const [backlogConfirm, setBacklogConfirm] = useState(null)
+  const [boards, setBoards] = useState([])
+  const [boardListOpen, setBoardListOpen] = useState(true)
+  const [boardBusy, setBoardBusy] = useState(false)
+  const [theme, setTheme] = useState(initialCanvas?.theme ?? 'dark')
+  const [modelOptions, setModelOptions] = useState(null)
+  const [boardScoped, setBoardScoped] = useState(false)
   const stageRef = useRef(null)
   const encoded = encodeURIComponent(project.id)
   const revision = Number(canvas?.revision ?? 0)
+  const selected = objects.find((item) => item.id === selectedId) ?? null
+  const canvasRoute = boardScoped && canvas?.canvas_id && canvas?.name
+    ? `/projects/${encoded}/canvases/${encodeURIComponent(canvas.canvas_id)}`
+    : `/projects/${encoded}/canvas`
   useEffect(() => {
     const next = initialCanvas ?? { revision: 0, objects: [], connectors: [] }
     setCanvas(next); setObjects(next.objects ?? []); setConnectors(next.connectors ?? []); setDirty(false)
     setHistory([]); setFuture([]); setSelectedIds([]); setSelectedId(null)
   }, [initialCanvas])
-  const selected = objects.find((item) => item.id === selectedId) ?? null
+  useEffect(() => {
+    let live = true
+    api(`/projects/${encoded}/canvases`).then((result) => {
+      if (live) setBoards(result.canvases ?? [])
+    }).catch(() => {})
+    api('/canvas/models').then((result) => { if (live) setModelOptions(result) }).catch(() => {})
+    return () => { live = false }
+  }, [encoded])
+  const selectBoard = async (board) => {
+    if (!board?.canvas_id || board.canvas_id === canvas?.canvas_id) return
+    setBoardBusy(true)
+    try {
+      const fresh = await api(`/projects/${encoded}/canvases/${encodeURIComponent(board.canvas_id)}`)
+      setCanvas(fresh); setObjects(fresh.objects ?? []); setConnectors(fresh.connectors ?? [])
+      setBoardScoped(true)
+      setTheme(fresh.theme ?? 'dark'); setDirty(false); setSelectedId(null); setSelectedIds([])
+      setNotice({ tone: 'ok', text: `Opened ${fresh.name} at revision ${fresh.revision}.` })
+    } catch (failure) { setNotice({ tone: 'danger', text: `Board could not be opened: ${String(failure?.message ?? failure)}` }) }
+    setBoardBusy(false)
+  }
+  const setBoardTheme = async (nextTheme) => {
+    setTheme(nextTheme)
+    if (!canvas?.canvas_id) return
+    try {
+      const fresh = await api(`/projects/${encoded}/canvases/${encodeURIComponent(canvas.canvas_id)}`, { method: 'PATCH', body: { theme: nextTheme } })
+      setCanvas((current) => ({ ...(current ?? {}), ...fresh, theme: nextTheme }))
+    } catch (failure) { setNotice({ tone: 'danger', text: `Theme could not be saved: ${String(failure?.message ?? failure)}` }) }
+  }
+  const selectedColour = selected?.colour ?? null
+  const setSelectedColour = (colour) => {
+    if (!selected) return
+    const before = snapshot(objects, connectors)
+    setObjects((current) => current.map((item) => item.id === selected.id ? { ...item, colour: colour || null } : item))
+    setHistory((current) => [...current.slice(-49), before]); setFuture([]); setDirty(true)
+  }
+
   const snapshot = (currentObjects, currentConnectors) => ({ objects: currentObjects.map((row) => ({ ...row })), connectors: currentConnectors.map((row) => ({ ...row })) })
   const undo = () => {
     setHistory((current) => {
@@ -166,6 +213,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     width: canvasNumber(item.width) || CANVAS_CARD.width, height: canvasNumber(item.height) || CANVAS_CARD.height,
     tags: Array.isArray(item.tags) ? item.tags : [],
     evidence_ref: item.evidence_ref ?? null, work_ref: item.work_ref ?? null,
+    colour: CANVAS_STICKER_COLOURS.includes(item.colour) ? item.colour : null,
   }))
   const persistableConnectors = (rows) => {
     const ids = new Set(rows.map((item) => item.id))
@@ -176,7 +224,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   const reload = async () => {
     setBusy(true)
     try {
-      const fresh = await api(`/projects/${encoded}/canvas`)
+      const fresh = await api(canvasRoute)
       const discarded = dirty
       setCanvas(fresh); setObjects(fresh.objects ?? []); setConnectors(fresh.connectors ?? [])
       setDirty(false); setSelectedId(null); setHistory([]); setFuture([]); setSelectedIds([])
@@ -191,7 +239,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     try {
       const rows = persistableObjects()
       const edges = persistableConnectors(rows)
-      const saved = await api(`/projects/${encoded}/canvas`, { method: 'PUT', body: { expected_revision: revision, objects: rows, connectors: edges } })
+      const saved = await api(canvasRoute, { method: 'PUT', body: { expected_revision: revision, objects: rows, connectors: edges } })
       setCanvas(saved); setObjects(saved.objects ?? []); setConnectors(saved.connectors ?? []); setDirty(false)
       setNotice({ tone: 'ok', text: `Canvas saved — revision ${saved.revision} with ${(saved.objects ?? []).length} object(s) and ${(saved.connectors ?? []).length} connector(s).` })
       onRefresh?.()
@@ -201,7 +249,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
         // Stale revision: never overwrite silently. Re-read the canonical
         // canvas, state the conflict, and keep the unsaved edit out of it.
         try {
-          const fresh = await api(`/projects/${encoded}/canvas`)
+          const fresh = await api(canvasRoute)
           setCanvas(fresh); setObjects(fresh.objects ?? []); setConnectors(fresh.connectors ?? []); setDirty(false)
           setNotice({ tone: 'danger', text: `Revision conflict — this canvas changed elsewhere and was reloaded at revision ${fresh.revision}. Your unsaved edit was not applied.` })
         } catch (reloadFailure) { setNotice({ tone: 'danger', text: `Canvas save failed: ${message}` }) }
@@ -266,7 +314,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     }
     setBusy(true)
     try {
-      const saved = await api(`/projects/${encoded}/canvas/objects/${encodeURIComponent(selected.id)}?expected_revision=${revision}`, { method: 'DELETE' })
+      const saved = await api(`${canvasRoute}/objects/${encodeURIComponent(selected.id)}?expected_revision=${revision}`, { method: 'DELETE' })
       setCanvas(saved); setObjects(saved.objects ?? []); setConnectors(saved.connectors ?? []); setDirty(false); setSelectedId(null)
       setNotice({ tone: 'ok', text: `Object removed — revision ${saved.revision} with ${(saved.objects ?? []).length} object(s).` })
       onRefresh?.()
@@ -442,10 +490,10 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
       setNotice({ tone: 'ok', text: `Removed ${ids.length} object(s) locally — Save canvas to persist.` })
     }
   }
-  const curate = async () => {
+  const curate = async (message = null) => {
     setBusy(true); setChatOpen(true); setChatBusy(true)
     try {
-      const result = await api(`/projects/${encoded}/canvas/sessions`, { method: 'POST', body: {} })
+      const result = await api(`/projects/${encoded}/canvas/sessions`, { method: 'POST', body: message ? { message } : {} })
       setSession(result)
       const proposals = (result.proposals ?? []).length
       setNotice(result.status === 'active' && result.current_question
@@ -457,7 +505,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   const reviewCanvas = async () => {
     setBusy(true); setChatOpen(true)
     try {
-      const result = await api(`/projects/${encoded}/canvas/curate`, { method: 'POST', body: {} })
+      const result = await api(`${canvasRoute}/curate`, { method: 'POST', body: {} })
       setReview(result)
       const summary = result.summary ?? {}
       const questions = (result.clarifying_questions ?? []).length
@@ -485,7 +533,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     if (!text || chatBusy) return
     setChatLog((current) => [...current, { role: 'me', text }])
     setChatDraft('')
-    await curate()
+    await curate(text)
   }
   const stopChat = () => {
     setChatBusy(false)
@@ -583,6 +631,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
       className: `dy-pc-obj${selectedId === item.id ? ' selected' : ''}${pendingConnect === item.id ? ' pending' : ''}${multiSelected ? ' marquee-selected' : ''}`,
       'data-canvas-object': item.id,
       'data-canvas-kind': item.kind,
+      'data-canvas-colour': item.colour ?? '',
       'data-canvas-x': String(Math.round(rect.x)),
       'data-canvas-y': String(Math.round(rect.y)),
       style: { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` },
@@ -633,7 +682,26 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     'data-planning-canvas': project.id,
     'data-canvas-revision': String(revision),
     'data-canvas-dirty': dirty ? 'true' : 'false',
+    'data-canvas-theme': theme,
     children: [
+      jsxs('div', { className: `dy-pc-board-bar${boardListOpen ? ' open' : ' collapsed'}`, children: [
+        jsxs('div', { className: 'dy-pc-board-title', children: [
+          jsx('span', { className: 'dockyard-card-label', children: 'BOARDS' }),
+          jsx('strong', { children: canvas?.name ?? 'Planning board' }),
+          jsx('span', { className: 'dy-pc-board-count', children: `${boards.length || 1} board${(boards.length || 1) === 1 ? '' : 's'}` }),
+        ]}),
+        jsx(Button, { small: true, action: 'pc-board-toggle', ariaLabel: boardListOpen ? 'Collapse board list' : 'Expand board list', onClick: () => setBoardListOpen((value) => !value), children: jsx(Icon, { name: boardListOpen ? 'chevrons-left' : 'chevrons-right' }) }),
+        jsxs('div', { className: 'dy-pc-theme-toggle', role: 'group', 'aria-label': 'Canvas theme', children: [
+          jsx(Button, { small: true, variant: theme === 'light' ? 'primary' : '', action: 'pc-theme-light', ariaLabel: 'Light canvas theme', onClick: () => setBoardTheme('light'), children: jsx(Icon, { name: 'sun' }) }),
+          jsx(Button, { small: true, variant: theme === 'dark' ? 'primary' : '', action: 'pc-theme-dark', ariaLabel: 'Dark canvas theme', onClick: () => setBoardTheme('dark'), children: jsx(Icon, { name: 'moon' }) }),
+        ]}),
+      ]}),
+      boardListOpen ? jsxs('nav', { className: 'dy-pc-board-list', 'aria-label': 'Planning boards', children: (boards.length ? boards : [canvas]).filter(Boolean).map((board) =>
+        jsx('button', { type: 'button', className: `dy-pc-board-row${board.canvas_id === canvas?.canvas_id ? ' active' : ''}`, disabled: boardBusy, onClick: () => selectBoard(board), children: [
+          jsx('span', { className: 'dy-pc-board-dot', 'data-status': board.status ?? 'draft' }),
+          jsxs('span', { className: 'dy-pc-board-row-copy', children: [jsx('strong', { children: board.name ?? 'Main board' }), jsx('small', { children: `${board.status ?? 'draft'} · ${number(board.object_count ?? board.objects?.length ?? 0)} objects` })] }),
+          board.changed_since_plan ? jsx('span', { className: 'dy-pc-board-warning', title: 'Board changed since plan', children: '!' }) : null,
+        ]}, board.canvas_id ?? board.name)) }) : null,
       jsxs('div', { className: 'dockyard-section-head', children: [
         jsxs('div', { children: [
           jsx('span', { className: 'dockyard-card-label', children: 'PLANNING CANVAS' }),
@@ -677,7 +745,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
           ]}),
           jsx('span', { className: 'dy-pc-sep', 'aria-hidden': true }),
           jsx(Button, { small: true, action: 'pc-reload', disabled: busy, onClick: reload, children: 'Reload' }),
-          jsx(Button, { small: true, action: 'pc-curate', disabled: busy, onClick: curate, children: 'Curate' }),
+          jsx(Button, { small: true, action: 'pc-curate', disabled: busy, onClick: () => curate(), children: 'Curate' }),
           jsx(Button, { small: true, variant: 'primary', action: 'pc-save', disabled: busy, onClick: save, children: busy ? 'Working...' : 'Save canvas' }),
         ]}),
         objects.length >= 2 ? jsxs('div', { className: 'dy-pc-linkbar', 'data-canvas-connector-editor': true, children: [
@@ -761,6 +829,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
               selected ? jsxs('div', { className: 'dy-pc-drawer-b', children: [
                 jsxs('label', { children: [jsx('span', { children: 'Title' }), jsx('input', { 'data-canvas-object-title': true, value: drawerText, onChange: (event) => setDrawerText(event.target.value) })] }),
                 jsxs('label', { children: [jsx('span', { children: 'Kind' }), jsx('select', { 'data-canvas-object-kind': true, value: drawerKind, onChange: (event) => setDrawerKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx('option', { value, children: CANVAS_KIND_LABELS[value] }, value)) })] }),
+                jsxs('label', { children: [jsx('span', { children: 'Sticker colour' }), jsx('select', { 'data-canvas-object-colour': true, value: selectedColour ?? '', onChange: (event) => setSelectedColour(event.target.value || null), children: [jsx('option', { value: '', children: 'Default kind colour' }), ...CANVAS_STICKER_COLOURS.map((value) => jsx('option', { value, children: CANVAS_STICKER_LABELS[value] }, value))] })] }),
                 jsx('p', { className: 'dy-pc-drawer-meta', children: selected.evidence_ref ? `Evidence reference: ${selected.evidence_ref}` : 'No evidence reference on this object.' }),
                 jsxs('div', { className: 'dockyard-form-actions', children: [
                   jsx(Button, { small: true, variant: 'danger', action: 'remove-canvas-object', disabled: busy, onClick: removeSelected, children: 'Remove object' }),
