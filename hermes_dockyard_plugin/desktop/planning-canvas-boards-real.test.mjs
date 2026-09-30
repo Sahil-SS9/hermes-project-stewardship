@@ -230,6 +230,18 @@ test('Planning boards (real backend): theme, save, chat, plan steps and board li
     await page.keyboard.type('should not appear')
     assert.doesNotMatch(await drawer.locator('[data-canvas-rich-text]').innerText(), /should not appear/)
     assert.equal(await page.locator('[data-planning-canvas][data-canvas-dirty="true"]').count(), 0)
+    await drawer.locator('[data-action="pc-close-drawer"]').click()
+
+    // An archived board is read-only too (Quan L3): archive the completed
+    // board through the real route; the server then refuses edits.
+    const archived = await fetch(`${API}/projects/${PROJECT}/canvases/${encodeURIComponent(first)}`, { method: 'PATCH', headers: { ...TOKEN, 'content-type': 'application/json' }, body: JSON.stringify({ status: 'archived' }) })
+    assert.ok(archived.ok, `archive -> ${archived.status} ${await archived.text()}`)
+    assert.equal((await board(first)).status, 'archived')
+    const stale = await fetch(`${API}/projects/${PROJECT}/canvases/${encodeURIComponent(first)}`, {
+      method: 'PUT', headers: { ...TOKEN, 'content-type': 'application/json' },
+      body: JSON.stringify({ expected_revision: (await board(first)).revision, objects: fresh.objects, connectors: fresh.connectors }),
+    })
+    assert.equal(stale.status, 409, 'the real server refuses edits to an archived board')
 
     assert.deepEqual(errors, [], errors.join('\n'))
   } finally {

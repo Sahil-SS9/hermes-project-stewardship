@@ -2665,6 +2665,8 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-rt-body ul { list-style: disc; }
 .dy-pc-scope .dy-rt-body ol { list-style: decimal; }
 .dy-pc-scope .dy-rt-body li p { margin: 0 0 2px; }
+.dy-pc-scope .dy-rt-problem { margin: 0; padding: 6px 9px; border-radius: 6px; background: var(--dy-danger-bg); color: var(--dy-pc-danger-text); font-size: 12px; }
+.dy-pc-scope .dy-rt-btn:disabled { opacity: .45; cursor: not-allowed; }
 .dy-pc-scope .dy-rt-small { font-size: .82em; }
 .dy-pc-scope .dy-rt-large { font-size: 1.3em; }
 .dy-pc-scope .dy-rt-huge { font-size: 1.7em; line-height: 1.2; }
@@ -8397,6 +8399,7 @@ var ALIGNS = ["left", "center", "right", "justify"];
 var LIST_TYPES = ["1", "a", "A", "i", "I"];
 var MAX_LIST_LEVELS = 5;
 var MARK_ORDER = ["bold", "italic", "underline", "strike", "fontSize"];
+var RICH_TEXT_LIMITS = Object.freeze({ chars: 2e4, nodes: 3e3, bytes: 60 * 1024 });
 var ZWSP = /\u200B/g;
 var plainToDoc = (text) => ({
   type: "doc",
@@ -8437,14 +8440,12 @@ function pushText(inline, text, marks) {
 function readBlocks(parent, ctx, makeBlock = () => ({ type: "paragraph" })) {
   const blocks = [];
   let inline = [];
-  let alignHint = null;
   const flush = () => {
     const trimmed = inline;
     if (trimmed.length && trimmed[trimmed.length - 1].type === "hardBreak") trimmed.pop();
     const hasText = trimmed.some((n) => n.type === "text" && n.text.trim());
     if (hasText || trimmed.some((n) => n.type === "hardBreak")) {
       const block = makeBlock();
-      if (alignHint && block.type !== "heading") block.attrs = { ...block.attrs || {}, textAlign: alignHint };
       block.content = trimmed;
       blocks.push(block);
     }
@@ -8572,6 +8573,22 @@ function docToPlain(doc) {
   for (const node of doc?.content || []) block(node);
   return lines.join("\n").trim();
 }
+function docProblem(doc) {
+  let nodes = 0;
+  const count = (node) => {
+    for (const child of node.content || []) {
+      nodes += 1;
+      count(child);
+    }
+  };
+  count(doc);
+  const chars = docToPlain(doc).length;
+  const bytes = new TextEncoder().encode(JSON.stringify(doc)).length;
+  if (chars > RICH_TEXT_LIMITS.chars) return `Too long: ${chars.toLocaleString("en-GB")} of ${RICH_TEXT_LIMITS.chars.toLocaleString("en-GB")} characters. Shorten it before applying.`;
+  if (nodes > RICH_TEXT_LIMITS.nodes) return `Too much formatting: ${nodes.toLocaleString("en-GB")} of ${RICH_TEXT_LIMITS.nodes.toLocaleString("en-GB")} pieces. Remove some paragraphs or formatting before applying.`;
+  if (bytes > RICH_TEXT_LIMITS.bytes) return "This description is too large to save. Remove some text or formatting before applying.";
+  return null;
+}
 function renderInline(parent, nodes) {
   for (const node of nodes || []) {
     if (node.type === "hardBreak") {
@@ -8684,6 +8701,10 @@ function normaliseDom(host2) {
       changed = true;
     }
   }
+  for (const el of [...host2.querySelectorAll("ul, ol")]) if (!el.querySelector("li")) {
+    el.remove();
+    changed = true;
+  }
   for (let guard = 0; guard < 200; guard += 1) {
     const outer = [...host2.querySelectorAll("p, h1, h2, h3")].find((el) => [...el.children].some((c) => INNER_BLOCKS.has(c.tagName)));
     if (!outer) break;
@@ -8729,6 +8750,147 @@ var TOOLS = [
   ["right", "Align right", { icon: "align-right" }, () => exec("justifyRight"), (s) => s.align === "right"],
   ["justify", "Justify", { icon: "align-justify" }, () => exec("justifyFull"), (s) => s.align === "justify"]
 ];
+var POS_BLOCKS = /* @__PURE__ */ new Set(["P", "H1", "H2", "H3", "LI"]);
+function measure(host2, target, targetOffset) {
+  let n = 0;
+  const go = (el) => {
+    if (el.nodeType === 3) {
+      if (el === target) return n + Math.min(targetOffset, el.nodeValue.length);
+      n += el.nodeValue.length;
+      return null;
+    }
+    if (el.nodeType !== 1) return null;
+    if (el !== host2 && POS_BLOCKS.has(el.tagName)) n += 1;
+    if (el.tagName === "BR") n += 1;
+    const kids = el.childNodes;
+    for (let i = 0; i < kids.length; i += 1) {
+      if (el === target && i === targetOffset) return n;
+      const found2 = go(kids[i]);
+      if (found2 !== null) return found2;
+    }
+    return el === target ? n : null;
+  };
+  const found = go(host2);
+  return found === null ? n : found;
+}
+function locate(host2, pos) {
+  let n = 0;
+  let last = [host2, 0];
+  const go = (el) => {
+    if (el.nodeType === 3) {
+      const len = el.nodeValue.length;
+      if (pos <= n + len) return [el, pos - n];
+      n += len;
+      last = [el, len];
+      return null;
+    }
+    if (el.nodeType !== 1) return null;
+    if (el !== host2 && POS_BLOCKS.has(el.tagName)) {
+      n += 1;
+      if (n >= pos && !el.querySelector("li")) return [el, 0];
+    }
+    if (el.tagName === "BR") {
+      n += 1;
+      if (n >= pos) return [el.parentNode, [...el.parentNode.childNodes].indexOf(el) + 1];
+    }
+    for (const child of el.childNodes) {
+      const found = go(child);
+      if (found) return found;
+    }
+    return null;
+  };
+  return go(host2) || last;
+}
+var MARK_TAGS = /* @__PURE__ */ new Set(["STRONG", "B", "EM", "I", "U", "S", "STRIKE", "DEL"]);
+var isMark = (el) => MARK_TAGS.has(el.tagName) || el.hasAttribute?.("data-size");
+function selectedTexts(host2) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return [];
+  const range = sel.getRangeAt(0);
+  if (range.collapsed || !host2.contains(range.commonAncestorContainer)) return [];
+  const { endContainer: ec, endOffset: eo } = range;
+  if (ec.nodeType === 3 && eo > 0 && eo < ec.nodeValue.length) ec.splitText(eo);
+  const { startContainer: sc, startOffset: so } = range;
+  let first = null;
+  if (sc.nodeType === 3 && so > 0 && so < sc.nodeValue.length) first = sc.splitText(so);
+  const out = [];
+  const walker = document.createTreeWalker(host2, 4);
+  for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+    if (!text.nodeValue || !range.intersectsNode(text)) continue;
+    if (text === sc && !first && so >= text.nodeValue.length) continue;
+    if (text === ec && eo === 0 && text !== first) continue;
+    if (first && text === sc) continue;
+    out.push(text);
+  }
+  return out;
+}
+var reselect = (texts) => {
+  if (!texts.length) return;
+  const last = texts[texts.length - 1];
+  window.getSelection().setBaseAndExtent(texts[0], 0, last, last.nodeValue.length);
+};
+function splitAround(outer, node) {
+  const before = document.createRange();
+  before.setStart(outer, 0);
+  before.setEndBefore(node);
+  const head = outer.cloneNode(false);
+  head.appendChild(before.extractContents());
+  const after = document.createRange();
+  after.setStartAfter(node);
+  after.setEnd(outer, outer.childNodes.length);
+  const tail = outer.cloneNode(false);
+  tail.appendChild(after.extractContents());
+  if (head.textContent) outer.before(head);
+  if (tail.textContent) outer.after(tail);
+}
+function liftOut(host2, node, test) {
+  for (let guard = 0; guard < 20; guard += 1) {
+    const outer = closestIn(host2, node, test);
+    if (!outer || POS_BLOCKS.has(outer.tagName)) return;
+    splitAround(outer, node);
+    outer.replaceWith(...outer.childNodes);
+  }
+}
+var sizeSpan = (size) => {
+  const span = document.createElement("span");
+  span.setAttribute("data-size", size);
+  span.className = `dy-rt-${size}`;
+  return span;
+};
+var blocksIn = (host2) => {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return [];
+  const range = sel.getRangeAt(0);
+  const caretBlock = blockOf(host2, range.startContainer);
+  const all = [...host2.querySelectorAll("p, h1, h2, h3, li")].filter((el) => range.intersectsNode(el));
+  return all.length ? all : caretBlock ? [caretBlock] : [];
+};
+function setBlockStyle(host2, style) {
+  const sel = window.getSelection();
+  if (style !== "p" && sel.rangeCount) {
+    for (let guard = 0; guard < MAX_LIST_LEVELS + 1; guard += 1) {
+      if (!closestIn(host2, sel.anchorNode, (el) => el.tagName === "LI")) break;
+      exec("outdent");
+    }
+  }
+  exec("formatBlock", style);
+}
+function clearFormatting(host2) {
+  const texts = selectedTexts(host2);
+  const blocks = blocksIn(host2);
+  for (const text of texts) liftOut(host2, text, isMark);
+  for (const block of blocks) {
+    block.style.removeProperty("text-align");
+    if (!block.getAttribute("style")) block.removeAttribute("style");
+    block.removeAttribute("align");
+    if (/^H[1-3]$/.test(block.tagName)) {
+      const p = document.createElement("p");
+      p.append(...block.childNodes);
+      block.replaceWith(p);
+    }
+  }
+  reselect(texts);
+}
 function stateAt(host2) {
   const empty = { style: "p", size: "normal", align: "left", list: null, bold: false, italic: false, underline: false, strike: false };
   const sel = typeof window !== "undefined" ? window.getSelection() : null;
@@ -8738,7 +8900,7 @@ function stateAt(host2) {
   const sized = closestIn(host2, node, (el) => el.hasAttribute("data-size"));
   const list = closestIn(host2, node, (el) => el.tagName === "UL" || el.tagName === "OL");
   const block = blockOf(host2, node);
-  const align = block && (alignOf(block) || block.tagName === "LI" && closestIn(host2, block.parentElement, (el) => alignOf(el)) && alignOf(closestIn(host2, block.parentElement, (el) => alignOf(el)))) || "left";
+  const align = !list && block && alignOf(block) || "left";
   const q = (c) => {
     try {
       return document.queryCommandState(c);
@@ -8746,15 +8908,16 @@ function stateAt(host2) {
       return false;
     }
   };
+  const has = (tags) => Boolean(closestIn(host2, node, (el) => tags.includes(el.tagName)));
   return {
     style: heading ? heading.tagName.toLowerCase() : "p",
     size: sized && RICH_TEXT_SIZES.includes(sized.getAttribute("data-size")) ? sized.getAttribute("data-size") : "normal",
     align,
     list: list ? list.tagName : null,
-    bold: q("bold"),
-    italic: q("italic"),
-    underline: q("underline"),
-    strike: q("strikeThrough")
+    bold: has(["STRONG", "B"]) || !heading && q("bold"),
+    italic: has(["EM", "I"]) || q("italic"),
+    underline: has(["U"]) || q("underline"),
+    strike: has(["S", "STRIKE", "DEL"]) || q("strikeThrough")
   };
 }
 function applySize(host2, size) {
@@ -8768,9 +8931,7 @@ function applySize(host2, size) {
       if (!current) return;
       current.parentNode.insertBefore(marker, current.nextSibling);
     } else {
-      const span = document.createElement("span");
-      span.setAttribute("data-size", size);
-      span.className = `dy-rt-${size}`;
+      const span = sizeSpan(size);
       span.appendChild(marker);
       if (current) current.parentNode.insertBefore(span, current.nextSibling);
       else range.insertNode(span);
@@ -8782,53 +8943,87 @@ function applySize(host2, size) {
     sel.addRange(caret);
     return;
   }
-  exec("styleWithCSS", false);
-  exec("fontSize", "7");
-  for (const font of [...host2.querySelectorAll('font[size="7"]')]) {
-    for (const inner of [...font.querySelectorAll("[data-size]")]) inner.replaceWith(...inner.childNodes);
-    if (size === "normal") {
-      const outer = font.parentElement && font.parentElement !== host2 ? closestIn(host2, font.parentElement, (el) => el.hasAttribute("data-size")) : null;
-      if (outer) {
-        const before = document.createRange();
-        before.setStartBefore(outer.firstChild);
-        before.setEndBefore(font);
-        const after = document.createRange();
-        after.setStartAfter(font);
-        after.setEndAfter(outer.lastChild);
-        const head = outer.cloneNode(false);
-        head.appendChild(before.extractContents());
-        const tail = outer.cloneNode(false);
-        tail.appendChild(after.extractContents());
-        outer.replaceWith(...[head.textContent ? head : null, ...font.childNodes, tail.textContent ? tail : null].filter(Boolean));
-        font.remove();
-      } else font.replaceWith(...font.childNodes);
-    } else {
-      const span = document.createElement("span");
-      span.setAttribute("data-size", size);
-      span.className = `dy-rt-${size}`;
-      span.append(...font.childNodes);
-      font.replaceWith(span);
+  const texts = selectedTexts(host2);
+  for (const text of texts) {
+    liftOut(host2, text, (el) => el.hasAttribute("data-size"));
+    if (size !== "normal") {
+      const span = sizeSpan(size);
+      text.before(span);
+      span.appendChild(text);
     }
   }
+  reselect(texts);
 }
-function RichTextEditor({ value, fallbackText, onChange, readOnly, label = "Description" }) {
+function RichTextEditor({ value, fallbackText, onChange, onProblem, readOnly, label = "Description" }) {
   const host2 = useRef(null);
   const saved = useRef(null);
   const changeRef = useRef(onChange);
+  const problemRef = useRef(onProblem);
+  const history = useRef({ stack: [], index: -1 });
+  const dragging = useRef(false);
   const [state, setState] = useState(stateAt(null));
+  const [problem, setProblem] = useState(null);
   changeRef.current = onChange;
+  problemRef.current = onProblem;
   const refresh = () => {
     const el = host2.current;
     const sel = window.getSelection();
     if (el && sel.rangeCount && el.contains(sel.anchorNode)) saved.current = sel.getRangeAt(0).cloneRange();
     setState(stateAt(el));
   };
-  const emit = () => {
+  const caretNow = () => {
+    const el = host2.current;
+    const sel = window.getSelection();
+    if (!el || !sel.rangeCount || !el.contains(sel.anchorNode)) return [0, 0];
+    return [measure(el, sel.anchorNode, sel.anchorOffset), measure(el, sel.focusNode, sel.focusOffset)];
+  };
+  const report = (doc) => {
+    const found = docProblem(doc);
+    setProblem(found);
+    problemRef.current?.(found);
+  };
+  const record = (doc, typing) => {
+    const h = history.current;
+    const json = JSON.stringify(doc);
+    const top = h.stack[h.index];
+    if (top && top.json === json) {
+      top.caret = caretNow();
+      return;
+    }
+    const entry = { doc, json, caret: caretNow(), typing, at: Date.now() };
+    if (typing && top && top.typing && entry.at - top.at < 1e3 && h.index > 0) h.stack[h.index] = entry;
+    else {
+      h.stack = [...h.stack.slice(0, h.index + 1), entry].slice(-200);
+      h.index = h.stack.length - 1;
+    }
+  };
+  const emit = (typing = false) => {
     const el = host2.current;
     if (!el) return;
     normaliseDom(el);
     const doc = domToDoc(el);
+    record(doc, typing);
     changeRef.current?.(doc, docToPlain(doc));
+    report(doc);
+    refresh();
+  };
+  const travel = (step) => {
+    const el = host2.current;
+    const h = history.current;
+    const next = h.index + step;
+    if (!el || readOnly || next < 0 || next >= h.stack.length) return;
+    h.index = next;
+    const { doc, caret } = h.stack[next];
+    renderDoc(el, doc);
+    el.focus();
+    const [a, ao] = locate(el, caret[0]);
+    const [f, fo] = locate(el, caret[1]);
+    try {
+      window.getSelection().setBaseAndExtent(a, ao, f, fo);
+    } catch {
+    }
+    changeRef.current?.(doc, docToPlain(doc));
+    report(doc);
     refresh();
   };
   useEffect(() => {
@@ -8839,11 +9034,24 @@ function RichTextEditor({ value, fallbackText, onChange, readOnly, label = "Desc
       exec("styleWithCSS", false);
     } catch {
     }
+    const first = domToDoc(el);
+    history.current = { stack: [{ doc: first, json: JSON.stringify(first), caret: [0, 0], typing: false, at: 0 }], index: 0 };
+    report(first);
     const onSelection = () => {
       if (document.activeElement === el) refresh();
     };
+    const onBeforeInput = (event) => {
+      if (event.inputType === "historyUndo" || event.inputType === "historyRedo") {
+        event.preventDefault();
+        travel(event.inputType === "historyUndo" ? -1 : 1);
+      }
+    };
     document.addEventListener("selectionchange", onSelection);
-    return () => document.removeEventListener("selectionchange", onSelection);
+    el.addEventListener("beforeinput", onBeforeInput);
+    return () => {
+      document.removeEventListener("selectionchange", onSelection);
+      el.removeEventListener("beforeinput", onBeforeInput);
+    };
   }, []);
   const run = (act) => {
     const el = host2.current;
@@ -8859,6 +9067,13 @@ function RichTextEditor({ value, fallbackText, onChange, readOnly, label = "Desc
   };
   const onKeyDown = (event) => {
     if (readOnly) return;
+    const mod = event.ctrlKey || event.metaKey;
+    const key = event.key.toLowerCase();
+    if (mod && !event.altKey && (key === "z" || key === "y")) {
+      event.preventDefault();
+      travel(key === "y" || event.shiftKey ? 1 : -1);
+      return;
+    }
     if (event.key === "Tab") {
       const sel = window.getSelection();
       const li = sel.rangeCount ? closestIn(host2.current, sel.anchorNode, (n) => n.tagName === "LI") : null;
@@ -8869,24 +9084,21 @@ function RichTextEditor({ value, fallbackText, onChange, readOnly, label = "Desc
       emit();
     }
   };
-  const onPaste = (event) => {
-    if (readOnly) return;
-    const data = event.clipboardData;
-    if (!data) return;
-    event.preventDefault();
+  const insertData = (data, range) => {
     const html = data.getData("text/html");
     const doc = html ? domToDoc(new DOMParser().parseFromString(html, "text/html").body) : plainToDoc(data.getData("text/plain"));
     const scratch = document.createElement("div");
     renderDoc(scratch, doc);
     const sel = window.getSelection();
-    if (!sel.rangeCount || !host2.current.contains(sel.anchorNode)) return;
-    const range = sel.getRangeAt(0);
     range.deleteContents();
     const frag = document.createDocumentFragment();
     if (scratch.childNodes.length === 1 && scratch.firstChild.tagName === "P") frag.append(...scratch.firstChild.childNodes);
     else frag.append(...scratch.childNodes);
     const last = frag.lastChild;
-    range.insertNode(frag);
+    const line = blockOf(host2.current, range.startContainer);
+    const blocks = frag.firstChild && frag.firstChild.nodeType === 1 && /^(P|H[1-3]|UL|OL)$/.test(frag.firstChild.tagName);
+    if (blocks && line && line.parentNode === host2.current && !line.textContent.replace(ZWSP, "")) line.replaceWith(frag);
+    else range.insertNode(frag);
     if (last) {
       const caret = document.createRange();
       caret.setStartAfter(last);
@@ -8896,6 +9108,37 @@ function RichTextEditor({ value, fallbackText, onChange, readOnly, label = "Desc
     }
     emit();
   };
+  const onPaste = (event) => {
+    if (readOnly) return;
+    const data = event.clipboardData;
+    if (!data) return;
+    event.preventDefault();
+    const sel = window.getSelection();
+    if (!sel.rangeCount || !host2.current.contains(sel.anchorNode)) return;
+    insertData(data, sel.getRangeAt(0));
+  };
+  const onDrop = (event) => {
+    if (readOnly) {
+      event.preventDefault();
+      return;
+    }
+    if (dragging.current) return;
+    event.preventDefault();
+    const data = event.dataTransfer;
+    if (!data) return;
+    const at = document.caretRangeFromPoint ? document.caretRangeFromPoint(event.clientX, event.clientY) : null;
+    const range = at && host2.current.contains(at.startContainer) ? at : (() => {
+      const r = document.createRange();
+      r.selectNodeContents(host2.current);
+      r.collapse(false);
+      return r;
+    })();
+    host2.current.focus();
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    insertData(data, range);
+  };
   const button = (tool) => {
     const [id, title, face, act, active] = tool;
     const on = Boolean(active(state));
@@ -8903,10 +9146,11 @@ function RichTextEditor({ value, fallbackText, onChange, readOnly, label = "Desc
       type: "button",
       className: `dy-rt-btn${on ? " on" : ""}`,
       "data-rt": id,
-      title,
+      title: ALIGNS.includes(id) && state.list ? `${title} (not available in lists)` : title,
       "aria-label": title,
       "aria-pressed": on ? "true" : "false",
-      disabled: readOnly,
+      // Alignment is not stored on list items (Quan re-check L1).
+      disabled: readOnly || ALIGNS.includes(id) && Boolean(state.list),
       onMouseDown: (event) => event.preventDefault(),
       onClick: () => run(act),
       children: typeof face === "string" ? jsx("span", { className: `dy-rt-face dy-rt-face-${id}`, children: face }) : jsx(Icon, { name: face.icon })
@@ -8922,7 +9166,7 @@ function RichTextEditor({ value, fallbackText, onChange, readOnly, label = "Desc
         value: state.style,
         onChange: (event) => {
           const v = event.target.value;
-          run(() => exec("formatBlock", v === "p" ? "p" : v));
+          run((el) => setBlockStyle(el, v));
         },
         children: [["p", "Normal text"], ["h1", "Heading 1"], ["h2", "Heading 2"], ["h3", "Heading 3"]].map(([v, t]) => jsx("option", { value: v, children: t }, v))
       }),
@@ -8946,14 +9190,11 @@ function RichTextEditor({ value, fallbackText, onChange, readOnly, label = "Desc
         "aria-label": "Clear formatting",
         disabled: readOnly,
         onMouseDown: (event) => event.preventDefault(),
-        onClick: () => run((el) => {
-          exec("removeFormat");
-          exec("formatBlock", "p");
-          applySize(el, "normal");
-        }),
+        onClick: () => run((el) => clearFormatting(el)),
         children: jsx(Icon, { name: "remove-formatting" })
       })
     ] }),
+    problem ? jsx("p", { className: "dy-rt-problem", role: "alert", "data-canvas-rich-problem": true, children: problem }) : null,
     jsx("div", { className: `dy-rt-host${readOnly ? " readonly" : ""}`, children: jsx("div", {
       ref: host2,
       className: "dy-rt-body",
@@ -8964,9 +9205,19 @@ function RichTextEditor({ value, fallbackText, onChange, readOnly, label = "Desc
       contentEditable: readOnly ? "false" : "true",
       suppressContentEditableWarning: true,
       spellCheck: true,
-      onInput: emit,
+      onInput: (event) => emit(String(event.nativeEvent?.inputType || "").startsWith("insertText")),
       onKeyDown,
       onPaste,
+      onDrop,
+      onDragOver: (event) => {
+        if (!dragging.current) event.preventDefault();
+      },
+      onDragStart: () => {
+        dragging.current = true;
+      },
+      onDragEnd: () => {
+        dragging.current = false;
+      },
       onKeyUp: refresh,
       onMouseUp: refresh,
       onFocus: refresh
@@ -9119,6 +9370,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   const [drawerText, setDrawerText] = useState("");
   const [drawerKind, setDrawerKind] = useState("note");
   const [drawerFields, setDrawerFields] = useState({});
+  const [richProblem, setRichProblem] = useState(null);
   const [members, setMembers] = useState([]);
   const [imageBusy, setImageBusy] = useState(false);
   const [linkSource, setLinkSource] = useState("");
@@ -9782,6 +10034,10 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     if (!selected || readOnly) return;
     const text = drawerText.trim();
     if (!text) return;
+    if (richProblem) {
+      setNotice({ tone: "danger", text: richProblem });
+      return;
+    }
     const links = (drawerFields.links ?? []).map((link) => ({ url: String(link.url ?? "").trim(), label: String(link.label ?? "").trim() })).filter((link) => link.url);
     const bad = links.find((link) => !canvasSafeUrl(link.url));
     if (bad) {
@@ -10352,7 +10608,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     out.push(jsx(RichTextEditor, { value: f.description_doc, fallbackText: f.description, readOnly: off, onChange: (doc, plain) => {
       setField("description_doc", plain ? doc : void 0);
       setField("description", plain || void 0);
-    } }, `rt-${selected?.id}`));
+    }, onProblem: setRichProblem }, `rt-${selected?.id}`));
     const links = f.links ?? [];
     out.push(jsxs("fieldset", { className: "dy-pc-fieldset", "data-canvas-links": true, children: [
       jsx("legend", { children: `Links${links.length ? ` (${links.length})` : ""}` }),
@@ -10842,7 +11098,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
                 jsx("p", { className: "dy-pc-drawer-meta", children: selected.evidence_ref ? `Evidence reference: ${selected.evidence_ref}` : "No evidence reference on this object." }),
                 readOnly ? null : jsxs("div", { className: "dockyard-form-actions", children: [
                   jsx(Button, { small: true, variant: "danger", action: "remove-canvas-object", disabled: busy, onClick: removeSelected, children: "Remove object" }),
-                  jsx(Button, { small: true, variant: "primary", action: "apply-canvas-object", disabled: busy || !drawerText.trim(), onClick: applyDrawer, children: "Apply" })
+                  jsx(Button, { small: true, variant: "primary", action: "apply-canvas-object", disabled: busy || !drawerText.trim() || Boolean(richProblem), onClick: applyDrawer, children: "Apply" })
                 ] })
               ] }) : jsx("p", { className: "dy-pc-drawer-meta", children: "Select an object on the canvas to edit its title, kind or removal." })
             ] })

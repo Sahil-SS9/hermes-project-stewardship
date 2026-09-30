@@ -868,6 +868,235 @@ test('Planning cards: pasted lists are clamped to what the server stores (Quan M
   });
 });
 
+// Quan Stage 2 editor re-check: undo, size on a selection, Clear, drop,
+// limits, lists. Helpers work on the open card's description editor.
+const openEditor = async (page) => {
+  const canvas = root(page);
+  const drawer = canvas.locator('.dy-pc-drawer.open');
+  const card = canvas.locator('[data-canvas-object]').first();
+  const id = await card.getAttribute('data-canvas-object');
+  await card.click();
+  await drawer.waitFor();
+  const body = drawer.locator('[data-canvas-rich-text]');
+  const tool = (name) => drawer.locator(`[data-rt="${name}"]`);
+  await body.click();
+  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Delete');
+  return { canvas, drawer, body, tool, id };
+};
+const pasteHtml = (page, html) => page.evaluate((h) => {
+  const el = document.querySelector('[data-canvas-rich-text]');
+  const dt = new DataTransfer();
+  dt.setData('text/html', h);
+  el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+}, html);
+const selectText = (page, needle) => page.evaluate((n) => {
+  const el = document.querySelector('[data-canvas-rich-text]');
+  const walker = document.createTreeWalker(el, 4);
+  for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+    const i = t.nodeValue.indexOf(n);
+    if (i >= 0) { el.focus(); window.getSelection().setBaseAndExtent(t, i, t, i + n.length); document.dispatchEvent(new Event('selectionchange')); return true; }
+  }
+  return false;
+}, needle);
+const selectAll = (page) => page.evaluate(() => { const el = document.querySelector('[data-canvas-rich-text]'); el.focus(); const r = document.createRange(); r.selectNodeContents(el); window.getSelection().removeAllRanges(); window.getSelection().addRange(r); document.dispatchEvent(new Event('selectionchange')); });
+const saveDoc = async (page, host, ctx) => {
+  await ctx.drawer.locator('[data-action="apply-canvas-object"]').click();
+  await ctx.drawer.locator('[data-action="pc-close-drawer"]').click();
+  await ctx.canvas.locator('[data-action="pc-save"]').click();
+  await page.waitForSelector('[data-planning-canvas][data-canvas-dirty="false"]');
+  return host.find('board-a').objects.find((o) => o.id === ctx.id).content;
+};
+
+test('Rich text: undo and redo step back through toolbar actions, paste and typing without losing text (Quan H1)', { timeout: 180000 }, async () => {
+  await withPage(1440, 900, async (page) => {
+    const ctx = await openEditor(page);
+    const { body, tool } = ctx;
+    const html = () => body.innerHTML();
+    await page.keyboard.type('alpha beta');
+    const typed = await html();
+    await tool('bullets').click();
+    assert.equal(await body.locator('ul li').count(), 1);
+    await page.keyboard.press('Control+z');
+    assert.equal(await html(), typed, 'undo bullets restores the paragraph');
+    assert.match(await body.innerText(), /alpha beta/);
+    await page.keyboard.press('Control+Shift+z');
+    assert.equal(await body.locator('ul li').count(), 1, 'redo brings the list back');
+    await page.keyboard.press('Control+z');
+    await tool('numbers').click();
+    await page.keyboard.press('Control+z');
+    assert.equal(await html(), typed, 'undo numbers');
+    await selectText(page, 'beta');
+    await tool('bold').click();
+    assert.equal(await body.locator('strong').innerText(), 'beta');
+    await page.keyboard.press('Control+z');
+    assert.equal(await html(), typed, 'undo bold');
+    await selectText(page, 'alpha');
+    await tool('size').selectOption('huge');
+    assert.equal(await body.locator('[data-size="huge"]').innerText(), 'alpha');
+    await page.keyboard.press('Control+z');
+    assert.equal(await html(), typed, 'undo size');
+    await selectText(page, 'beta');
+    await page.keyboard.press('End');
+    await pasteHtml(page, '<p> MID</p>');
+    assert.match(await body.innerText(), /alpha beta MID/);
+    await page.keyboard.press('Control+z');
+    assert.equal(await html(), typed, 'undo paste');
+    await page.keyboard.press('Control+y');
+    assert.match(await body.innerText(), /alpha beta MID/, 'Ctrl+Y redoes');
+    // Undo all the way back never goes past the loaded text, and never
+    // leaves an empty or scrambled description.
+    for (let i = 0; i < 30; i += 1) await page.keyboard.press('Control+z');
+    assert.equal((await body.innerText()).trim(), '', 'first state is the (cleared) start');
+    for (let i = 0; i < 30; i += 1) await page.keyboard.press('Control+Shift+z');
+    assert.match(await body.innerText(), /alpha beta MID/);
+  });
+});
+
+test('Rich text: undo on a card that already had text never wipes it, and Tab indent undoes (Quan H1)', { timeout: 180000 }, async () => {
+  await withPage(1440, 900, async (page, host) => {
+    const canvas = root(page);
+    const drawer = canvas.locator('.dy-pc-drawer.open');
+    const card = canvas.locator('[data-canvas-object]').first();
+    const id = await card.getAttribute('data-canvas-object');
+    await card.click();
+    await drawer.waitFor();
+    const body = drawer.locator('[data-canvas-rich-text]');
+    const tool = (name) => drawer.locator(`[data-rt="${name}"]`);
+    await body.click();
+    await page.keyboard.press('Control+a');
+    await page.keyboard.press('Delete');
+    await page.keyboard.type('kept text');
+    await drawer.locator('[data-action="apply-canvas-object"]').click();
+    await drawer.locator('[data-action="pc-close-drawer"]').click();
+    // Reopen: the loaded text is the first undo state.
+    await card.click();
+    await drawer.waitFor();
+    const loaded = await body.innerHTML();
+    await body.click();
+    await tool('bullets').click();
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('second');
+    await page.keyboard.press('Tab');
+    assert.equal(await body.locator('ul ul li').count(), 1, 'Tab nests');
+    await page.keyboard.press('Control+z');
+    assert.equal(await body.locator('ul ul').count(), 0, 'undo un-nests');
+    for (let i = 0; i < 20; i += 1) await page.keyboard.press('Control+z');
+    assert.equal(await body.innerHTML(), loaded, 'undo stops at the loaded text');
+    assert.match(await body.innerText(), /kept text/);
+    await drawer.locator('[data-action="apply-canvas-object"]').click();
+    await drawer.locator('[data-action="pc-close-drawer"]').click();
+    await canvas.locator('[data-action="pc-save"]').click();
+    await page.waitForSelector('[data-planning-canvas][data-canvas-dirty="false"]');
+    assert.equal(host.find('board-a').objects.find((o) => o.id === id).content.description, 'kept text');
+  });
+});
+
+test('Rich text: size and Clear work on a selection and keep the structure (Quan H2, M3, L4)', { timeout: 180000 }, async (t) => {
+  await withPage(1440, 900, async (page, host) => {
+    const ctx = await openEditor(page);
+    const { body, tool } = ctx;
+    await pasteHtml(page, '<h1>Head one</h1><h2 style="text-align:center">Head two</h2><p style="text-align:right">plain <strong>gamma</strong> delta</p><ol start="4"><li>n1</li><li>n2<ul><li>deep</li></ul></li></ol>');
+    // L4: in a heading Bold is not shown as pressed.
+    await selectText(page, 'Head one');
+    assert.equal(await tool('bold').getAttribute('aria-pressed'), 'false', 'heading weight is not a Bold mark');
+    for (const size of ['small', 'large', 'huge']) {
+      await selectText(page, 'gamma');
+      await tool('size').selectOption(size);
+      assert.equal(await body.locator(`[data-size="${size}"]`).innerText(), 'gamma', `size ${size} on a selection`);
+      assert.equal(await body.locator('[data-size]').count(), 1, 'one size span, not nested');
+    }
+    assert.equal(await body.locator('strong [data-size], [data-size] strong').count(), 1, 'bold kept under the size');
+    await selectText(page, 'gamma');
+    await tool('size').selectOption('normal');
+    assert.equal(await body.locator('[data-size]').count(), 0, 'normal size removes it');
+    await selectText(page, 'delta');
+    await tool('size').selectOption('huge');
+    await selectText(page, 'elt');
+    await tool('size').selectOption('normal');
+    assert.deepEqual(await body.locator('[data-size="huge"]').allInnerTexts(), ['d', 'a'], 'normal inside a sized word splits it');
+    // Clear over everything: marks and sizes gone, headings become
+    // paragraphs, alignment gone, lists and numbering untouched.
+    await selectAll(page);
+    await tool('clear').click();
+    assert.equal(await body.locator('strong, em, u, s, [data-size], h1, h2, h3, [style]').count(), 0, 'no formatting left');
+    assert.equal(await body.locator(':scope > p').count(), 3, 'three paragraphs stay three paragraphs');
+    assert.equal(await body.locator('ol[start="4"] > li').count(), 2, 'numbered list kept with its start');
+    assert.equal(await body.locator('ol ul li').innerText(), 'deep', 'nested bullet kept');
+    const saved = await saveDoc(page, host, ctx);
+    assert.equal(saved.description, 'Head one\nHead two\nplain gamma delta\n4. n1\n5. n2\n  - deep');
+  });
+});
+
+test('Rich text: dropped content is sanitised like a paste (Quan M1)', { timeout: 180000 }, async () => {
+  await withPage(1440, 900, async (page) => {
+    const ctx = await openEditor(page);
+    const requests = [];
+    page.on('request', (r) => { if (r.url().includes('evil.example')) requests.push(r.url()); });
+    await page.keyboard.type('start ');
+    const box = await ctx.body.boundingBox();
+    await page.evaluate(({ x, y }) => {
+      const el = document.querySelector('[data-canvas-rich-text]');
+      const dt = new DataTransfer();
+      dt.setData('text/html', '<p>dropped <img src="http://evil.example/t.png?dropped"><a href="http://evil.example/">link</a><b onclick="window.__pwned=1">bold</b></p>');
+      dt.setData('text/plain', 'dropped link bold');
+      el.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: x, clientY: y }));
+      el.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: x, clientY: y }));
+    }, { x: box.x + box.width - 10, y: box.y + 12 });
+    await page.waitForTimeout(300);
+    assert.equal(await ctx.body.locator('img, a, [onclick]').count(), 0, 'no image, link or handler in the editor');
+    assert.match(await ctx.body.innerText(), /dropped linkbold/);
+    assert.equal(await ctx.body.locator('strong').innerText(), 'bold', 'allowed formatting kept');
+    assert.deepEqual(requests, [], 'nothing was fetched');
+  });
+});
+
+test('Rich text: over the server size limits the editor warns and Apply is disabled (Quan M2)', { timeout: 180000 }, async () => {
+  await withPage(1440, 900, async (page) => {
+    const ctx = await openEditor(page);
+    const apply = ctx.drawer.locator('[data-action="apply-canvas-object"]');
+    await page.evaluate(() => {
+      const el = document.querySelector('[data-canvas-rich-text]');
+      const dt = new DataTransfer();
+      dt.setData('text/plain', 'x'.repeat(25000));
+      el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    });
+    const problem = ctx.drawer.locator('[data-canvas-rich-problem]');
+    await problem.waitFor();
+    assert.match(await problem.innerText(), /25,000 of 20,000 characters/);
+    assert.equal(await apply.isDisabled(), true, 'Apply disabled while too long');
+    await page.keyboard.press('Control+z');
+    assert.equal(await problem.count(), 0, 'undo clears the warning');
+    assert.equal(await apply.isDisabled(), false);
+    await pasteHtml(page, Array.from({ length: 1600 }, (_, i) => `<p><b>p${i}</b></p>`).join(''));
+    await problem.waitFor();
+    assert.match(await problem.innerText(), /Too much formatting/);
+    assert.equal(await apply.isDisabled(), true);
+  });
+});
+
+test('Rich text: lists - alignment is off inside lists and a heading leaves the list cleanly (Quan L1, L2)', { timeout: 180000 }, async () => {
+  await withPage(1440, 900, async (page, host) => {
+    const ctx = await openEditor(page);
+    const { body, tool } = ctx;
+    await page.keyboard.type('intro');
+    await page.keyboard.press('Enter');
+    await tool('bullets').click();
+    await page.keyboard.type('item one');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('item two');
+    for (const a of ['left', 'center', 'right', 'justify']) assert.equal(await tool(a).isDisabled(), true, `${a} disabled in a list`);
+    await tool('style').selectOption('h1');
+    assert.equal(await body.locator('h1').innerText(), 'item two');
+    assert.equal(await body.locator('li h1, ul:empty, ol:empty').count(), 0, 'no heading in a list, no empty lists');
+    assert.equal(await body.locator('ul > li').count(), 1);
+    assert.equal(await tool('center').isDisabled(), false, 'alignment back outside the list');
+    const saved = await saveDoc(page, host, ctx);
+    assert.equal(saved.description, 'intro\n- item one\nitem two');
+  });
+});
+
 test('Planning cards on a phone: details panel fits the screen with formatting bar and fields', { timeout: 180000 }, async () => {
   await withPage(390, 844, async (page) => {
     const canvas = root(page);

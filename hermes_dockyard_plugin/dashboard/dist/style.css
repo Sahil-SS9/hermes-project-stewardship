@@ -628,6 +628,8 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-pc-scope .dy-rt-body ul { list-style: disc; }
 .dy-pc-scope .dy-rt-body ol { list-style: decimal; }
 .dy-pc-scope .dy-rt-body li p { margin: 0 0 2px; }
+.dy-pc-scope .dy-rt-problem { margin: 0; padding: 6px 9px; border-radius: 6px; background: var(--dy-danger-bg); color: var(--dy-pc-danger-text); font-size: 12px; }
+.dy-pc-scope .dy-rt-btn:disabled { opacity: .45; cursor: not-allowed; }
 .dy-pc-scope .dy-rt-small { font-size: .82em; }
 .dy-pc-scope .dy-rt-large { font-size: 1.3em; }
 .dy-pc-scope .dy-rt-huge { font-size: 1.7em; line-height: 1.2; }

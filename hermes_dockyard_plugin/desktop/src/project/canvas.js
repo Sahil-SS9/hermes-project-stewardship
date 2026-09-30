@@ -159,6 +159,9 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   const [drawerText, setDrawerText] = useState('')
   const [drawerKind, setDrawerKind] = useState('note')
   const [drawerFields, setDrawerFields] = useState({})
+  // Set by the description editor when it is over the server's size limits;
+  // Apply stays disabled until it is fixed (Quan re-check M2).
+  const [richProblem, setRichProblem] = useState(null)
   const [members, setMembers] = useState([])
   const [imageBusy, setImageBusy] = useState(false)
   const [linkSource, setLinkSource] = useState('')
@@ -738,6 +741,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     if (!selected || readOnly) return
     const text = drawerText.trim()
     if (!text) return
+    if (richProblem) { setNotice({ tone: 'danger', text: richProblem }); return }
     const links = (drawerFields.links ?? []).map((link) => ({ url: String(link.url ?? '').trim(), label: String(link.label ?? '').trim() })).filter((link) => link.url)
     const bad = links.find((link) => !canvasSafeUrl(link.url))
     if (bad) { setNotice({ tone: 'danger', text: `"${bad.url.slice(0, 60)}" is not a web link. Links must start with http:// or https://.` }); return }
@@ -1266,7 +1270,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     const out = []
     // Stage 2: Word-style formatted description. The server derives the plain
     // `description` copy from `description_doc`, so the two never disagree.
-    out.push(jsx(RichTextEditor, { value: f.description_doc, fallbackText: f.description, readOnly: off, onChange: (doc, plain) => { setField('description_doc', plain ? doc : undefined); setField('description', plain || undefined) } }, `rt-${selected?.id}`))
+    out.push(jsx(RichTextEditor, { value: f.description_doc, fallbackText: f.description, readOnly: off, onChange: (doc, plain) => { setField('description_doc', plain ? doc : undefined); setField('description', plain || undefined) }, onProblem: setRichProblem }, `rt-${selected?.id}`))
     const links = f.links ?? []
     out.push(jsxs('fieldset', { className: 'dy-pc-fieldset', 'data-canvas-links': true, children: [
       jsx('legend', { children: `Links${links.length ? ` (${links.length})` : ''}` }),
@@ -1693,7 +1697,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
                 jsx('p', { className: 'dy-pc-drawer-meta', children: selected.evidence_ref ? `Evidence reference: ${selected.evidence_ref}` : 'No evidence reference on this object.' }),
                 readOnly ? null : jsxs('div', { className: 'dockyard-form-actions', children: [
                   jsx(Button, { small: true, variant: 'danger', action: 'remove-canvas-object', disabled: busy, onClick: removeSelected, children: 'Remove object' }),
-                  jsx(Button, { small: true, variant: 'primary', action: 'apply-canvas-object', disabled: busy || !drawerText.trim(), onClick: applyDrawer, children: 'Apply' }),
+                  jsx(Button, { small: true, variant: 'primary', action: 'apply-canvas-object', disabled: busy || !drawerText.trim() || Boolean(richProblem), onClick: applyDrawer, children: 'Apply' }),
                 ]}),
               ]}) : jsx('p', { className: 'dy-pc-drawer-meta', children: 'Select an object on the canvas to edit its title, kind or removal.' }),
             ]}),
