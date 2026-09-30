@@ -12,10 +12,11 @@ import { jsx } from '../runtime/react.js'
 import { layoutFrames } from '../../planning-canvas-geometry.js'
 import { jsxs } from '../runtime/react.js'
 import { Button, Icon } from '../lib/ui.js'
+import { fileAsBase64 } from '../lib/ui.js'
 import { useDialogFocusManager } from '../lib/ui.js'
-export const CANVAS_OBJECT_KINDS = Object.freeze(['evidence', 'claim', 'question', 'decision', 'plan_block', 'note', 'link', 'media'])
+export const CANVAS_OBJECT_KINDS = Object.freeze(['evidence', 'claim', 'question', 'decision', 'plan_block', 'risk', 'assumption', 'note', 'link', 'media'])
 export const CANVAS_CONNECTOR_MEANINGS = Object.freeze(['supports', 'contradicts', 'derived_from', 'clarifies', 'depends_on', 'implements', 'raises_question'])
-export const CANVAS_KIND_LABELS = Object.freeze({ evidence: 'Evidence', claim: 'Claim', question: 'Question', decision: 'Decision', plan_block: 'Plan block', note: 'Note', link: 'Link', media: 'Media' })
+export const CANVAS_KIND_LABELS = Object.freeze({ evidence: 'Evidence', claim: 'Claim', question: 'Question', decision: 'Decision', plan_block: 'Plan block', risk: 'Risk', assumption: 'Assumption', note: 'Note', link: 'Link', media: 'Media' })
 export const CANVAS_STICKER_COLOURS = Object.freeze(['yellow', 'green', 'blue', 'pink', 'purple', 'orange'])
 export const CANVAS_STICKER_LABELS = Object.freeze({ yellow: 'Sun', green: 'Mint', blue: 'Sky', pink: 'Rose', purple: 'Violet', orange: 'Amber' })
 // D-P1 a11y: each kind carries its own Lucide icon so it is never identified
@@ -23,8 +24,66 @@ export const CANVAS_STICKER_LABELS = Object.freeze({ yellow: 'Sun', green: 'Mint
 export const CANVAS_KIND_ICONS = Object.freeze({
   evidence: 'file-text', claim: 'message-square', question: 'lightbulb',
   decision: 'flag', plan_block: 'list-checks', note: 'sticky-note',
-  link: 'link', media: 'image',
+  link: 'link', media: 'image', risk: 'shield-alert', assumption: 'circle-help',
 })
+// Stage 1 card fields (owner 30/09). Mirrors canvas_service field rules; the
+// server stays the authority. Fields a kind does not list are kept, hidden.
+// [field, input, label, choices?, maxLength?]
+const LEVELS = ['low', 'medium', 'high']
+export const CANVAS_KIND_FIELDS = Object.freeze({
+  evidence: [['source', 'text', 'Source', null, 300], ['observed_on', 'date', 'Date observed'], ['confidence', 'choice', 'Confidence', LEVELS], ['quote', 'area', 'Quote', null, 5000]],
+  claim: [['claim_status', 'choice', 'Status', ['unverified', 'supported', 'disputed', 'refuted']], ['confidence', 'choice', 'Confidence', LEVELS]],
+  question: [['question_status', 'choice', 'Status', ['open', 'answered']], ['owner', 'member', 'Owner'], ['answer', 'area', 'Answer', null, 5000]],
+  decision: [['decision_status', 'choice', 'Status', ['proposed', 'accepted', 'rejected', 'superseded']], ['decided_by', 'member', 'Decided by'], ['decided_on', 'date', 'Decided on'], ['rationale', 'area', 'Rationale', null, 5000], ['alternatives', 'list', 'Alternatives considered']],
+  plan_block: [['plan_status', 'choice', 'Status', ['todo', 'in_progress', 'blocked', 'done']], ['owner', 'member', 'Owner'], ['due_on', 'date', 'Due'], ['estimate', 'text', 'Estimate', null, 50], ['checklist', 'checklist', 'Checklist']],
+  risk: [['risk_status', 'choice', 'Status', ['open', 'mitigating', 'closed']], ['likelihood', 'choice', 'Likelihood', LEVELS], ['impact', 'choice', 'Impact', LEVELS], ['owner', 'member', 'Owner'], ['mitigation', 'area', 'Mitigation', null, 5000]],
+  assumption: [['assumption_status', 'choice', 'Status', ['untested', 'validated', 'invalidated']], ['confidence', 'choice', 'Confidence', LEVELS], ['test', 'area', 'How we will test it', null, 2000]],
+  media: [['content_id', 'image', 'Image'], ['alt', 'text', 'Alt text (describes the image)', null, 300], ['caption', 'text', 'Caption', null, 500]],
+  link: [], note: [],
+})
+export const canvasChoiceLabel = (value) => ({ todo: 'To do', in_progress: 'In progress' }[value] ?? (value ? value.charAt(0).toUpperCase() + value.slice(1) : ''))
+export const CANVAS_IMAGE_TYPES = Object.freeze({ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' })
+export const CANVAS_IMAGE_MAX = 5 * 1024 * 1024
+export const canvasSafeUrl = (value) => /^https?:\/\/\S{4,}$/i.test(String(value ?? '').trim())
+const linksOf = (content) => Array.isArray(content?.links) ? content.links : (content?.url ? [{ url: content.url }] : [])
+// One short line under the title: status, owner, links, checklist progress.
+export const canvasSummary = (item) => {
+  const c = item?.content ?? {}
+  const parts = []
+  const status = (CANVAS_KIND_FIELDS[item?.kind] ?? []).find(([, input]) => input === 'choice')
+  if (status && c[status[0]]) parts.push(canvasChoiceLabel(c[status[0]]))
+  const who = c.owner ?? c.decided_by
+  if (who && (CANVAS_KIND_FIELDS[item?.kind] ?? []).some(([f]) => f === 'owner' || f === 'decided_by')) parts.push(who)
+  if (item?.kind === 'plan_block' && Array.isArray(c.checklist) && c.checklist.length) parts.push(`${c.checklist.filter((x) => x.done).length}/${c.checklist.length} done`)
+  const links = linksOf(c).length
+  if (links) parts.push(`${links} link${links === 1 ? '' : 's'}`)
+  return parts.join(' · ')
+}
+// Verified image bytes come back as base64 from the server (PNG/JPEG/WebP
+// only, checked by content, never SVG). Small bounded cache per session.
+const imageCache = new Map()
+export function CanvasImage({ projectId, contentId, alt, className }) {
+  const key = `${projectId}/${contentId}`
+  const [src, setSrc] = useState(() => imageCache.get(key) ?? null)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    let live = true
+    if (imageCache.has(key)) { setSrc(imageCache.get(key)); setFailed(false); return undefined }
+    setSrc(null); setFailed(false)
+    api(`/projects/${encodeURIComponent(projectId)}/content/${encodeURIComponent(contentId)}/image`).then((result) => {
+      if (!live) return
+      if (!CANVAS_IMAGE_TYPES[result?.media_type] || typeof result?.data_base64 !== 'string') throw new Error('not an image')
+      const url = `data:${result.media_type};base64,${result.data_base64}`
+      imageCache.set(key, url)
+      if (imageCache.size > 40) imageCache.delete(imageCache.keys().next().value)
+      setSrc(url)
+    }).catch(() => { if (live) setFailed(true) })
+    return () => { live = false }
+  }, [key])
+  if (failed) return jsx('span', { className: 'dy-pc-img-note', 'data-canvas-image-missing': contentId, children: 'Image unavailable' })
+  if (!src) return jsx('span', { className: 'dy-pc-img-note', children: 'Loading image…' })
+  return jsx('img', { className, src, alt: alt || '', draggable: false, 'data-canvas-image': contentId })
+}
 // D14: board lifecycle. Mirrors canvas_service._MOVES; the server stays the
 // authority and refuses any other move.
 export const CANVAS_BOARD_STATUS_LABELS = Object.freeze({ draft: 'Draft', submitted: 'Submitted', planned: 'Plan made', completed: 'Completed', archived: 'Archived' })
@@ -90,6 +149,10 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   const [selectedIds, setSelectedIds] = useState([])
   const [drawerText, setDrawerText] = useState('')
   const [drawerKind, setDrawerKind] = useState('note')
+  const [drawerFields, setDrawerFields] = useState({})
+  const [members, setMembers] = useState([])
+  const [uploadedImages, setUploadedImages] = useState([])
+  const [imageBusy, setImageBusy] = useState(false)
   const [linkSource, setLinkSource] = useState('')
   const [linkTarget, setLinkTarget] = useState('')
   const [linkMeaning, setLinkMeaning] = useState('supports')
@@ -152,6 +215,13 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   const encoded = encodeURIComponent(project.id)
   const revision = Number(canvas?.revision ?? 0)
   const selected = objects.find((item) => item.id === selectedId) ?? null
+  useEffect(() => {
+    let live = true
+    api(`/projects/${encodeURIComponent(project.id)}/members`).then((result) => {
+      if (live) setMembers((result?.members ?? []).filter((m) => m && m.state !== 'departed').map((m) => String(m.profile_slug)))
+    }).catch(() => { if (live) setMembers([]) })
+    return () => { live = false }
+  }, [project.id])
   const boardPath = (id) => `/projects/${encoded}/canvases/${encodeURIComponent(id)}`
   const boardScoped = boardsApi && Boolean(canvas?.canvas_id)
   const canvasRoute = boardScoped ? boardPath(canvas.canvas_id) : `/projects/${encoded}/canvas`
@@ -617,6 +687,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     canvasObjectSeq += 1
     const item = {
       id: `canvas-obj-${Date.now()}-${canvasObjectSeq}`, kind: objectKind, content: { text: body },
+      ...(objectKind === 'media' ? { height: 230 } : {}),
       x: position.x, y: position.y, width: CANVAS_CARD.width, height: CANVAS_CARD.height,
       tags: [], evidence_ref: null, work_ref: null,
     }
@@ -634,14 +705,44 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     setSelectedId(item.id)
     setDrawerText(canvasText(item))
     setDrawerKind(item.kind)
+    const { text: _text, ...rest } = item.content ?? {}
+    setDrawerFields({ ...rest, links: linksOf(item.content ?? {}).map((link) => ({ url: link.url ?? '', label: link.label ?? '' })) })
+  }
+  const setField = (field, value) => setDrawerFields((current) => ({ ...current, [field]: value }))
+  const uploadImage = async (file) => {
+    if (!file || readOnly) return
+    const mediaType = CANVAS_IMAGE_TYPES[file.type] ? file.type : null
+    if (!mediaType) { setNotice({ tone: 'danger', text: 'Choose a PNG, JPEG or WebP image. Video comes in a later stage.' }); return }
+    if (file.size <= 0 || file.size > CANVAS_IMAGE_MAX) { setNotice({ tone: 'danger', text: 'Images must be under 5 MB.' }); return }
+    setImageBusy(true)
+    try {
+      const created = await api(`/projects/${encodeURIComponent(project.id)}/content`, { method: 'POST', body: { filename: file.name, media_type: mediaType, content_base64: await fileAsBase64(file) } })
+      setUploadedImages((current) => [created, ...current])
+      setField('content_id', created.content_id)
+      if (!drawerFields.alt) setField('alt', String(file.name).replace(/\.[a-z0-9]+$/i, '').slice(0, 300))
+      setNotice({ tone: 'ok', text: 'Image uploaded — Apply, then Save canvas, to place it on the card.' })
+    } catch (failure) {
+      setNotice({ tone: 'danger', text: `Image could not be uploaded: ${failureText(failure)}` })
+    } finally { setImageBusy(false) }
   }
   const applyDrawer = () => {
     // QA H-5: a read-only board shows details but never becomes dirty.
     if (!selected || readOnly) return
     const text = drawerText.trim()
     if (!text) return
+    const links = (drawerFields.links ?? []).map((link) => ({ url: String(link.url ?? '').trim(), label: String(link.label ?? '').trim() })).filter((link) => link.url)
+    const bad = links.find((link) => !canvasSafeUrl(link.url))
+    if (bad) { setNotice({ tone: 'danger', text: `"${bad.url.slice(0, 60)}" is not a web link. Links must start with http:// or https://.` }); return }
+    if (links.length > 20) { setNotice({ tone: 'danger', text: 'A card holds at most 20 links.' }); return }
+    const fields = {
+      ...drawerFields,
+      links: links.map((link) => (link.label ? link : { url: link.url })),
+      ...(Array.isArray(drawerFields.alternatives) ? { alternatives: drawerFields.alternatives.map((v) => String(v).trim()).filter(Boolean) } : {}),
+      ...(Array.isArray(drawerFields.checklist) ? { checklist: drawerFields.checklist.map((v) => ({ text: String(v.text ?? '').trim(), done: Boolean(v.done) })).filter((v) => v.text) } : {}),
+    }
+    if (!fields.links.length) fields.links = ''
     const before = snapshot(objects, connectors)
-    setObjects((current) => current.map((item) => item.id === selected.id ? { ...item, kind: drawerKind, content: { ...(item.content ?? {}), text } } : item))
+    setObjects((current) => current.map((item) => item.id === selected.id ? { ...item, kind: drawerKind, content: { ...(item.content ?? {}), ...fields, text } } : item))
     setHistory((current) => [...current.slice(-49), before]); setFuture([])
     setDirty(true)
     setNotice({ tone: 'ok', text: 'Object updated — Save canvas to persist the change.' })
@@ -1135,6 +1236,76 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   }
   const renderFrames = () => layoutFrames(objects.map((item) => ({ ...item, ...canvasRect(item) })), CANVAS_WORLD).map((frame) =>
     jsx('div', { className: 'dy-pc-frame', 'data-canvas-frame': frame.tag, style: { left: `${frame.x}px`, top: `${frame.y}px`, width: `${frame.width}px`, height: `${frame.height}px` }, children: frame.tag }, frame.tag))
+  // Stage 1 details panel: description, links (+), then this kind's own fields.
+  const renderFieldEditors = () => {
+    const f = drawerFields
+    const off = readOnly
+    const out = []
+    out.push(jsxs('label', { children: [jsx('span', { children: 'Description' }), jsx('textarea', { 'data-canvas-field': 'description', rows: 4, maxLength: 20000, value: f.description ?? '', readOnly: off, disabled: off, placeholder: 'Details, context, notes…', onChange: (event) => setField('description', event.target.value) })] }))
+    const links = f.links ?? []
+    out.push(jsxs('fieldset', { className: 'dy-pc-fieldset', 'data-canvas-links': true, children: [
+      jsx('legend', { children: `Links${links.length ? ` (${links.length})` : ''}` }),
+      ...links.map((link, index) => jsxs('div', { className: 'dy-pc-row', 'data-canvas-link-row': index, children: [
+        jsx('input', { 'data-canvas-link-url': index, type: 'url', inputMode: 'url', placeholder: 'https://…', maxLength: 2048, value: link.url, disabled: off, 'aria-label': `Link ${index + 1} address`, 'aria-invalid': link.url && !canvasSafeUrl(link.url) ? 'true' : undefined, onChange: (event) => setField('links', links.map((l, i) => (i === index ? { ...l, url: event.target.value } : l))) }),
+        jsx('input', { 'data-canvas-link-label': index, placeholder: 'Label (optional)', maxLength: 200, value: link.label, disabled: off, 'aria-label': `Link ${index + 1} label`, onChange: (event) => setField('links', links.map((l, i) => (i === index ? { ...l, label: event.target.value } : l))) }),
+        canvasSafeUrl(link.url) ? jsx('a', { className: 'dy-pc-open', href: link.url.trim(), target: '_blank', rel: 'noopener noreferrer nofollow', title: 'Open link', 'aria-label': `Open link ${index + 1}`, children: jsx(Icon, { name: 'arrow-up-right' }) }) : null,
+        off ? null : jsx(Button, { small: true, action: 'pc-link-remove', ariaLabel: `Remove link ${index + 1}`, onClick: () => setField('links', links.filter((_, i) => i !== index)), children: jsx(Icon, { name: 'x' }) }),
+      ]}, `link-${index}`)),
+      off ? null : jsx(Button, { small: true, action: 'pc-link-add', disabled: links.length >= 20, onClick: () => setField('links', [...links, { url: '', label: '' }]), children: [jsx(Icon, { name: 'plus' }, 'i'), 'Add link'] }),
+    ]}))
+    for (const [field, input, label, choices, max] of CANVAS_KIND_FIELDS[drawerKind] ?? []) {
+      const value = f[field]
+      let control
+      if (input === 'choice') control = jsx('select', { 'data-canvas-field': field, value: value ?? '', disabled: off, onChange: (event) => setField(field, event.target.value), children: [jsx('option', { value: '', children: 'Not set' }, ''), ...choices.map((c) => jsx('option', { value: c, children: canvasChoiceLabel(c) }, c))] })
+      else if (input === 'member') {
+        const known = members.includes(value)
+        control = jsx('select', { 'data-canvas-field': field, value: value ?? '', disabled: off, onChange: (event) => setField(field, event.target.value), children: [
+          jsx('option', { value: '', children: 'Unassigned' }, ''),
+          ...members.map((m) => jsx('option', { value: m, children: m }, m)),
+          value && !known ? jsx('option', { value, children: `${value} (no longer a member)` }, 'former') : null,
+        ] })
+      } else if (input === 'date') control = jsx('input', { type: 'date', 'data-canvas-field': field, value: value ?? '', disabled: off, onChange: (event) => setField(field, event.target.value) })
+      else if (input === 'area') control = jsx('textarea', { 'data-canvas-field': field, rows: 3, maxLength: max, value: value ?? '', readOnly: off, disabled: off, onChange: (event) => setField(field, event.target.value) })
+      else if (input === 'text') control = jsx('input', { 'data-canvas-field': field, maxLength: max, value: value ?? '', readOnly: off, disabled: off, onChange: (event) => setField(field, event.target.value) })
+      else if (input === 'list') {
+        const rows = Array.isArray(value) ? value : []
+        out.push(jsxs('fieldset', { className: 'dy-pc-fieldset', 'data-canvas-field': field, children: [
+          jsx('legend', { children: label }),
+          ...rows.map((row, index) => jsxs('div', { className: 'dy-pc-row', children: [
+            jsx('input', { maxLength: 500, value: row, disabled: off, 'aria-label': `${label} ${index + 1}`, onChange: (event) => setField(field, rows.map((r, i) => (i === index ? event.target.value : r))) }),
+            off ? null : jsx(Button, { small: true, ariaLabel: `Remove ${label} ${index + 1}`, onClick: () => setField(field, rows.filter((_, i) => i !== index)), children: jsx(Icon, { name: 'x' }) }),
+          ]}, index)),
+          off ? null : jsx(Button, { small: true, action: `pc-${field}-add`, disabled: rows.length >= 50, onClick: () => setField(field, [...rows, '']), children: [jsx(Icon, { name: 'plus' }, 'i'), 'Add'] }),
+        ]}))
+        continue
+      } else if (input === 'checklist') {
+        const rows = Array.isArray(value) ? value : []
+        out.push(jsxs('fieldset', { className: 'dy-pc-fieldset', 'data-canvas-field': field, children: [
+          jsx('legend', { children: `${label}${rows.length ? ` (${rows.filter((r) => r.done).length}/${rows.length})` : ''}` }),
+          ...rows.map((row, index) => jsxs('div', { className: 'dy-pc-row', children: [
+            jsx('input', { type: 'checkbox', checked: Boolean(row.done), disabled: off, 'aria-label': `Done: ${row.text || `item ${index + 1}`}`, onChange: (event) => setField(field, rows.map((r, i) => (i === index ? { ...r, done: event.target.checked } : r))) }),
+            jsx('input', { maxLength: 300, value: row.text ?? '', disabled: off, 'aria-label': `Checklist item ${index + 1}`, onChange: (event) => setField(field, rows.map((r, i) => (i === index ? { ...r, text: event.target.value } : r))) }),
+            off ? null : jsx(Button, { small: true, ariaLabel: `Remove checklist item ${index + 1}`, onClick: () => setField(field, rows.filter((_, i) => i !== index)), children: jsx(Icon, { name: 'x' }) }),
+          ]}, index)),
+          off ? null : jsx(Button, { small: true, action: 'pc-checklist-add', disabled: rows.length >= 50, onClick: () => setField(field, [...rows, { text: '', done: false }]), children: [jsx(Icon, { name: 'plus' }, 'i'), 'Add item'] }),
+        ]}))
+        continue
+      } else if (input === 'image') {
+        out.push(jsxs('div', { className: 'dy-pc-fieldset', 'data-canvas-image-field': true, children: [
+          jsx('span', { className: 'dy-pc-field-label', children: label }),
+          value ? jsx('span', { className: 'dy-pc-drawer-thumb', children: jsx(CanvasImage, { projectId: project.id, contentId: value, alt: f.alt }) }) : jsx('p', { className: 'dy-pc-drawer-meta', children: 'No image yet.' }),
+          off ? null : jsxs('label', { className: 'dy-pc-upload', children: [
+            jsx('span', { children: imageBusy ? 'Uploading…' : (value ? 'Replace image' : 'Upload image (PNG, JPEG or WebP, up to 5 MB)') }),
+            jsx('input', { type: 'file', 'data-canvas-image-upload': true, accept: 'image/png,image/jpeg,image/webp', disabled: imageBusy, onChange: (event) => { const file = event.target.files?.[0]; event.target.value = ''; uploadImage(file) } }),
+          ]}),
+          off || !value ? null : jsx(Button, { small: true, action: 'pc-image-clear', onClick: () => setField('content_id', ''), children: 'Remove image from card' }),
+        ]}))
+        continue
+      }
+      out.push(jsxs('label', { children: [jsx('span', { children: label }), control] }))
+    }
+    return out
+  }
   const renderObject = (item) => {
     const rect = canvasRect(item)
     const tag = (Array.isArray(item.tags) ? item.tags : [])[0]
@@ -1156,6 +1327,9 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
         jsx('small', { children: `${label}${tag ? ` · ${tag}` : ''}` }),
         jsx('span', { className: 'dy-pc-obj-kind-icon', 'aria-hidden': true, children: jsx(Icon, { name: CANVAS_KIND_ICONS[item.kind] ?? 'sticky-note' }) }),
         jsx('strong', { children: canvasText(item) || 'Untitled object' }),
+        item.kind === 'media' && item.content?.content_id ? jsx('span', { className: 'dy-pc-obj-thumb', children: jsx(CanvasImage, { projectId: project.id, contentId: item.content.content_id, alt: item.content.alt }) }) : null,
+        canvasSummary(item) ? jsx('span', { className: 'dy-pc-obj-sub', 'data-canvas-summary': true, children: canvasSummary(item) }) : null,
+        item.content?.description ? jsx('span', { className: 'dy-pc-obj-desc', children: item.content.description }) : null,
         jsx('span', { className: 'dy-pc-obj-meta', children: `${item.evidence_ref ? `evidence ${item.evidence_ref}` : 'no evidence reference'}${item.work_ref ? ` · work ${item.work_ref}` : ''}` }),
       ],
     }, item.id)
@@ -1490,6 +1664,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
                 jsxs('label', { children: [jsx('span', { children: 'Title' }), jsx('input', { 'data-canvas-object-title': true, value: drawerText, readOnly, disabled: readOnly, onChange: (event) => setDrawerText(event.target.value) })] }),
                 jsxs('label', { children: [jsx('span', { children: 'Kind' }), jsx('select', { 'data-canvas-object-kind': true, value: drawerKind, disabled: readOnly, onChange: (event) => setDrawerKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx('option', { value, children: CANVAS_KIND_LABELS[value] }, value)) })] }),
                 jsxs('label', { children: [jsx('span', { children: 'Sticker colour' }), jsx('select', { 'data-canvas-object-colour': true, value: selectedColour ?? '', disabled: readOnly, onChange: (event) => setSelectedColour(event.target.value || null), children: [jsx('option', { value: '', children: 'Default kind colour' }, 'default'), ...CANVAS_STICKER_COLOURS.map((value) => jsx('option', { value, children: CANVAS_STICKER_LABELS[value] }, value))] })] }),
+                ...renderFieldEditors(),
                 jsx('p', { className: 'dy-pc-drawer-meta', children: selected.evidence_ref ? `Evidence reference: ${selected.evidence_ref}` : 'No evidence reference on this object.' }),
                 readOnly ? null : jsxs('div', { className: 'dockyard-form-actions', children: [
                   jsx(Button, { small: true, variant: 'danger', action: 'remove-canvas-object', disabled: busy, onClick: removeSelected, children: 'Remove object' }),

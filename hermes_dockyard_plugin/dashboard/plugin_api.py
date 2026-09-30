@@ -496,6 +496,12 @@ async def project_team(project_id: str) -> dict:
     return await _proxy("GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/team")
 
 
+@plugin_api.get("/projects/{project_id}/members")
+async def list_project_members(project_id: str) -> dict:
+    # Read-only: the planning canvas owner pickers list current members.
+    return await _proxy("GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/members")
+
+
 @plugin_api.post("/projects/{project_id}/members")
 async def add_project_member(project_id: str, body: MemberBody) -> dict:
     return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/members", body.model_dump())

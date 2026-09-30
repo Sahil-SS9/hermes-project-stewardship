@@ -194,6 +194,17 @@ function startHost(bundleCode) {
           plan.edited_by = 'desktop';
           plan.steps = body.steps.map((s, i) => ({ order: i + 1, title: s.title, source_object_ids: s.order ? (old.get(s.order)?.source_object_ids ?? []) : [] }));
           payload = clone(plan);
+        } else if (path === `/projects/${PROJECT}/members` && req.method === 'GET') {
+          payload = { members: [{ profile_slug: 'octacon', role: 'lead', state: 'active' }, { profile_slug: 'quan', role: 'member', state: 'active' }, { profile_slug: 'gone', role: 'member', state: 'departed' }] };
+        } else if (path === `/projects/${PROJECT}/content` && req.method === 'POST') {
+          state.seq += 1;
+          const id = `CONTENT-${String(state.seq).padStart(16, '0')}`;
+          state.images = { ...(state.images ?? {}), [id]: { media_type: body.media_type, data_base64: body.content_base64 } };
+          payload = { content_id: id, filename: body.filename, media_type: body.media_type, size_bytes: 1 };
+        } else if ((hit = m(/^\/projects\/p1\/content\/([^/]+)\/image$/)) && req.method === 'GET') {
+          const image = state.images?.[decodeURIComponent(hit[1])];
+          if (!image) fail(404, 'not_found', 'unknown project content');
+          else payload = { content_id: decodeURIComponent(hit[1]), ...image };
         } else if (path === '/canvas/models') {
           payload = clone(MODELS);
         } else if (path === '/dashboard') payload = { projects: [{ id: PROJECT, name: 'P1', health: 'healthy', work: {} }], owed_decisions: 0, totals: {} };
@@ -615,6 +626,98 @@ test('Planning boards: leaving Planning or the project tab with unsaved edits of
     await page.click('[data-tab="dashboard"]');
     await page.waitForFunction(() => !document.querySelector('[data-planning-canvas]'));
     assert.equal(await page.locator('[data-project-switch-confirm]').count(), 0, 'no prompt when nothing is unsaved');
+  });
+});
+
+test('Planning cards: description, many links, per-type fields, member owners, image thumbnail, hidden fields kept', { timeout: 180000 }, async () => {
+  await withPage(1440, 900, async (page, host) => {
+    const canvas = root(page);
+    const drawer = canvas.locator('.dy-pc-drawer.open');
+    const closeDrawer = async () => {
+      if (await drawer.count()) await drawer.locator('[data-action="pc-close-drawer"]').click();
+      await page.waitForSelector('.dy-pc-drawer.open', { state: 'detached' });
+    };
+    const saveAndRead = async (id) => {
+      await closeDrawer();
+      await canvas.locator('[data-action="pc-save"]').click();
+      await page.waitForSelector('[data-planning-canvas][data-canvas-dirty="false"]');
+      return host.find('board-a').objects.find((o) => o.id === id);
+    };
+    // New kinds are in the Add menu.
+    await canvas.locator('[data-action="pc-add-menu"]').click();
+    assert.equal(await canvas.locator('[data-canvas-add-kind="risk"]').count(), 1);
+    assert.equal(await canvas.locator('[data-canvas-add-kind="assumption"]').count(), 1);
+    await canvas.locator('[data-canvas-add-kind="risk"]').click();
+    const risk = canvas.locator('.dy-pc-obj[data-canvas-kind="risk"]').last();
+    const riskId = await risk.getAttribute('data-canvas-object');
+    await risk.click();
+    await drawer.waitFor();
+    // Description + links with (+), including a blank line that is dropped.
+    await drawer.locator('[data-canvas-field="description"]').fill('Import can time out on big files.');
+    await drawer.locator('[data-action="pc-link-add"]').click();
+    await drawer.locator('[data-canvas-link-url="0"]').fill('https://example.com/spec');
+    await drawer.locator('[data-canvas-link-label="0"]').fill('Spec');
+    await drawer.locator('[data-action="pc-link-add"]').click();
+    await drawer.locator('[data-canvas-link-url="1"]').fill('javascript:alert(1)');
+    await drawer.locator('[data-action="pc-link-add"]').click();
+    assert.equal(await drawer.locator('[data-canvas-link-row]').count(), 3, 'each (+) adds a new line');
+    // Unsafe link is refused before anything changes.
+    await drawer.locator('[data-action="apply-canvas-object"]').click();
+    assert.match(await canvas.locator('[data-canvas-notice], .dy-pc-notice').first().innerText(), /not a web link/);
+    await drawer.locator('[data-canvas-link-url="1"]').fill('https://example.com/ticket');
+    // Risk fields + owner picker lists active members and Unassigned only.
+    await drawer.locator('[data-canvas-field="likelihood"]').selectOption('high');
+    await drawer.locator('[data-canvas-field="impact"]').selectOption('medium');
+    const owners = await drawer.locator('select[data-canvas-field="owner"] option').allInnerTexts();
+    assert.deepEqual(owners, ['Unassigned', 'octacon', 'quan'], 'departed members are not offered');
+    await drawer.locator('select[data-canvas-field="owner"]').selectOption('quan');
+    await drawer.locator('[data-action="apply-canvas-object"]').click();
+    let saved = await saveAndRead(riskId);
+    assert.equal(saved.content.description, 'Import can time out on big files.');
+    assert.deepEqual(saved.content.links, [{ url: 'https://example.com/spec', label: 'Spec' }, { url: 'https://example.com/ticket' }], 'blank link line dropped');
+    assert.equal(saved.content.owner, 'quan');
+    assert.equal(saved.content.likelihood, 'high');
+    assert.match(await risk.locator('[data-canvas-summary]').innerText(), /quan · 2 links/);
+    // Unassign again.
+    await risk.click();
+    await drawer.locator('select[data-canvas-field="owner"]').selectOption('');
+    await drawer.locator('[data-action="apply-canvas-object"]').click();
+    saved = await saveAndRead(riskId);
+    assert.ok(!('owner' in saved.content) || saved.content.owner === '', 'Unassigned clears the owner');
+    // Change kind: risk fields are hidden, not lost; changing back restores them.
+    await risk.click();
+    await drawer.locator('[data-canvas-object-kind]').selectOption('note');
+    assert.equal(await drawer.locator('[data-canvas-field="likelihood"]').count(), 0, 'note does not show risk fields');
+    await drawer.locator('[data-action="apply-canvas-object"]').click();
+    saved = await saveAndRead(riskId);
+    assert.equal(saved.kind, 'note');
+    assert.equal(saved.content.likelihood, 'high', 'hidden field kept');
+    await canvas.locator(`[data-canvas-object="${riskId}"]`).click();
+    await drawer.locator('[data-canvas-object-kind]').selectOption('risk');
+    assert.equal(await drawer.locator('[data-canvas-field="likelihood"]').inputValue(), 'high', 'changing back restores it');
+    await closeDrawer();
+
+    // Image card: upload shows a real thumbnail on the card.
+    await canvas.locator('[data-action="pc-add-menu"]').click();
+    await canvas.locator('[data-canvas-add-kind="media"]').click();
+    const media = canvas.locator('.dy-pc-obj[data-canvas-kind="media"]').last();
+    const mediaId = await media.getAttribute('data-canvas-object');
+    await media.click();
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    await drawer.locator('[data-canvas-image-upload]').setInputFiles({ name: 'diagram.png', mimeType: 'image/png', buffer: png });
+    await drawer.locator('[data-canvas-image-field] img[data-canvas-image]').waitFor();
+    assert.equal(await drawer.locator('[data-canvas-field="alt"]').inputValue(), 'diagram', 'alt text prefilled from the file name');
+    // A non-image is refused client-side, nothing uploaded.
+    const posts = host.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/content')).length;
+    await drawer.locator('[data-canvas-image-upload]').setInputFiles({ name: 'evil.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg onload="alert(1)"/>') });
+    assert.equal(host.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/content')).length, posts, 'SVG never uploaded');
+    await drawer.locator('[data-action="apply-canvas-object"]').click();
+    saved = await saveAndRead(mediaId);
+    assert.match(saved.content.content_id, /^CONTENT-/);
+    await media.locator('img[data-canvas-image]').waitFor();
+    const box = await media.locator('img[data-canvas-image]').boundingBox();
+    assert.ok(box.width > 100 && box.height > 60, 'thumbnail is visible on the card');
+    assert.equal(await media.locator('img[data-canvas-image]').getAttribute('alt'), 'diagram');
   });
 });
 

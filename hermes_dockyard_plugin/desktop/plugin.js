@@ -2408,6 +2408,7 @@ var workflow_canvas_css_default = `
   --dy-pc-kind-evidence: #1f7a55;   --dy-pc-kind-claim: #6b4bbd;
   --dy-pc-kind-question: #9a6206;   --dy-pc-kind-decision: #2f4bb5;
   --dy-pc-kind-plan_block: #1d6480; --dy-pc-kind-note: #5b6472;
+  --dy-pc-kind-risk: #a8321f; --dy-pc-kind-assumption: #6b5a12;
   --dy-pc-kind-link: #0f6f7a;       --dy-pc-kind-media: #8a3a76;
   --dy-pc-edge-support: #1f7a55;
   --dy-pc-surface: rgba(255, 255, 255, .96);
@@ -2421,6 +2422,7 @@ var workflow_canvas_css_default = `
   --dy-pc-fill-evidence: #d9f4dd;     --dy-pc-fill-claim: #e7defc;
   --dy-pc-fill-question: #ffe2c4;     --dy-pc-fill-decision: #dde3ff;
   --dy-pc-fill-plan_block: #d2efec;   --dy-pc-fill-note: #fff1a6;
+  --dy-pc-fill-risk: #fde0da; --dy-pc-fill-assumption: #f3ecc8;
   --dy-pc-fill-link: #d3ebfb;         --dy-pc-fill-media: #fbdcec;
   --dy-pc-sticker-yellow: #fff1a6;    --dy-pc-sticker-green: #d3f4dc;
   --dy-pc-sticker-blue: #d3e6fd;      --dy-pc-sticker-pink: #fcd9e7;
@@ -2444,6 +2446,7 @@ var workflow_canvas_css_default = `
   --dy-pc-kind-evidence: #57d39b;   --dy-pc-kind-claim: #b99cf5;
   --dy-pc-kind-question: #f0c04a;   --dy-pc-kind-decision: #9db3ff;
   --dy-pc-kind-plan_block: #79cbe0; --dy-pc-kind-note: #a9b6c6;
+  --dy-pc-kind-risk: #ff9b87; --dy-pc-kind-assumption: #e0cf7a;
   --dy-pc-kind-link: #6fd8e0;       --dy-pc-kind-media: #e3a0d3;
   --dy-pc-surface: rgba(23, 27, 34, .96);
   --dy-pc-grid: rgba(182, 190, 202, .12);
@@ -2454,6 +2457,7 @@ var workflow_canvas_css_default = `
   --dy-pc-fill-evidence: #173d2a;     --dy-pc-fill-claim: #2e2552;
   --dy-pc-fill-question: #4a2d12;     --dy-pc-fill-decision: #1f2b5c;
   --dy-pc-fill-plan_block: #123d40;   --dy-pc-fill-note: #463c0e;
+  --dy-pc-fill-risk: #4a1c15; --dy-pc-fill-assumption: #3a3310;
   --dy-pc-fill-link: #123a52;         --dy-pc-fill-media: #4a1d3c;
   --dy-pc-sticker-yellow: #463c0e;    --dy-pc-sticker-green: #173d2a;
   --dy-pc-sticker-blue: #16345a;      --dy-pc-sticker-pink: #4d1c33;
@@ -2616,6 +2620,25 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-obj:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
 .dy-pc-scope .dy-pc-obj small { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--dy-pc-ink-2); }
 .dy-pc-scope .dy-pc-obj strong { display: block; margin-top: 5px; font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--dy-pc-ink); }
+.dy-pc-scope .dy-pc-obj-sub { display: block; margin-top: 4px; color: var(--dy-pc-ink-2); font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dy-pc-scope .dy-pc-obj-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 4px; color: var(--dy-pc-ink-2); font-size: 11px; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dy-pc-scope .dy-pc-obj-thumb { display: block; margin-top: 6px; height: 110px; border-radius: 6px; overflow: hidden; background: rgba(0,0,0,.08); }
+.dy-pc-scope .dy-pc-obj-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.dy-pc-scope .dy-pc-img-note { display: grid; place-items: center; height: 100%; min-height: 40px; color: var(--dy-pc-ink-2); font-size: 11px; }
+.dy-pc-scope .dy-pc-drawer-b textarea { width: 100%; min-width: 0; resize: vertical; padding: 9px 10px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12.5px; line-height: 1.45; }
+.dy-pc-scope .dy-pc-fieldset { display: grid; gap: 6px; margin: 0; padding: 10px; border: 1px solid var(--dy-border); border-radius: 8px; min-width: 0; }
+.dy-pc-scope .dy-pc-fieldset legend, .dy-pc-scope .dy-pc-field-label { padding: 0 4px; color: var(--dy-text-2); font-size: 10px; font-weight: 730; }
+.dy-pc-scope .dy-pc-row { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.dy-pc-scope .dy-pc-row input:not([type="checkbox"]) { flex: 1 1 0; min-width: 0; padding: 7px 8px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
+.dy-pc-scope .dy-pc-row input[aria-invalid="true"] { border-color: var(--dy-danger, #c0392b); }
+.dy-pc-scope .dy-pc-open { display: inline-flex; color: var(--dy-accent, inherit); }
+.dy-pc-scope .dy-pc-open svg { width: 14px; height: 14px; }
+.dy-pc-scope .dy-pc-drawer-thumb { display: block; max-height: 220px; border-radius: 8px; overflow: hidden; }
+.dy-pc-scope .dy-pc-drawer-thumb img { display: block; width: 100%; max-height: 220px; object-fit: contain; background: rgba(0,0,0,.06); }
+.dy-pc-scope .dy-pc-upload { cursor: pointer; }
+.dy-pc-scope .dy-pc-upload input[type="file"] { font-size: 11.5px; }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="risk"] { border-left-color: var(--dy-pc-kind-risk); background: var(--dy-pc-fill-risk); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="assumption"] { border-left-color: var(--dy-pc-kind-assumption); background: var(--dy-pc-fill-assumption); }
 .dy-pc-scope .dy-pc-obj-meta { display: block; margin-top: 6px; color: var(--dy-pc-ink-2); font-size: 10px; }
 .dy-pc-scope .dy-pc-empty { position: absolute; left: 18px; top: 16px; margin: 0; color: var(--dy-text-3); font-size: 12px; }
 /* Frames are decorative group labels (v6's .pframe) \u2014 never controls. */
@@ -3977,6 +4000,28 @@ var LUCIDE_ICON_NODES = {
       "path",
       {
         "d": "m18 15-6-6-6 6"
+      }
+    ]
+  ],
+  "circle-help": [
+    [
+      "circle",
+      {
+        "cx": "12",
+        "cy": "12",
+        "r": "10"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M12 17h.01"
       }
     ]
   ],
@@ -8128,9 +8173,9 @@ var gridSlot = (index, cols) => ({
 });
 
 // hermes_dockyard_plugin/desktop/src/project/canvas.js
-var CANVAS_OBJECT_KINDS = Object.freeze(["evidence", "claim", "question", "decision", "plan_block", "note", "link", "media"]);
+var CANVAS_OBJECT_KINDS = Object.freeze(["evidence", "claim", "question", "decision", "plan_block", "risk", "assumption", "note", "link", "media"]);
 var CANVAS_CONNECTOR_MEANINGS = Object.freeze(["supports", "contradicts", "derived_from", "clarifies", "depends_on", "implements", "raises_question"]);
-var CANVAS_KIND_LABELS = Object.freeze({ evidence: "Evidence", claim: "Claim", question: "Question", decision: "Decision", plan_block: "Plan block", note: "Note", link: "Link", media: "Media" });
+var CANVAS_KIND_LABELS = Object.freeze({ evidence: "Evidence", claim: "Claim", question: "Question", decision: "Decision", plan_block: "Plan block", risk: "Risk", assumption: "Assumption", note: "Note", link: "Link", media: "Media" });
 var CANVAS_STICKER_COLOURS = Object.freeze(["yellow", "green", "blue", "pink", "purple", "orange"]);
 var CANVAS_STICKER_LABELS = Object.freeze({ yellow: "Sun", green: "Mint", blue: "Sky", pink: "Rose", purple: "Violet", orange: "Amber" });
 var CANVAS_KIND_ICONS = Object.freeze({
@@ -8141,8 +8186,72 @@ var CANVAS_KIND_ICONS = Object.freeze({
   plan_block: "list-checks",
   note: "sticky-note",
   link: "link",
-  media: "image"
+  media: "image",
+  risk: "shield-alert",
+  assumption: "circle-help"
 });
+var LEVELS = ["low", "medium", "high"];
+var CANVAS_KIND_FIELDS = Object.freeze({
+  evidence: [["source", "text", "Source", null, 300], ["observed_on", "date", "Date observed"], ["confidence", "choice", "Confidence", LEVELS], ["quote", "area", "Quote", null, 5e3]],
+  claim: [["claim_status", "choice", "Status", ["unverified", "supported", "disputed", "refuted"]], ["confidence", "choice", "Confidence", LEVELS]],
+  question: [["question_status", "choice", "Status", ["open", "answered"]], ["owner", "member", "Owner"], ["answer", "area", "Answer", null, 5e3]],
+  decision: [["decision_status", "choice", "Status", ["proposed", "accepted", "rejected", "superseded"]], ["decided_by", "member", "Decided by"], ["decided_on", "date", "Decided on"], ["rationale", "area", "Rationale", null, 5e3], ["alternatives", "list", "Alternatives considered"]],
+  plan_block: [["plan_status", "choice", "Status", ["todo", "in_progress", "blocked", "done"]], ["owner", "member", "Owner"], ["due_on", "date", "Due"], ["estimate", "text", "Estimate", null, 50], ["checklist", "checklist", "Checklist"]],
+  risk: [["risk_status", "choice", "Status", ["open", "mitigating", "closed"]], ["likelihood", "choice", "Likelihood", LEVELS], ["impact", "choice", "Impact", LEVELS], ["owner", "member", "Owner"], ["mitigation", "area", "Mitigation", null, 5e3]],
+  assumption: [["assumption_status", "choice", "Status", ["untested", "validated", "invalidated"]], ["confidence", "choice", "Confidence", LEVELS], ["test", "area", "How we will test it", null, 2e3]],
+  media: [["content_id", "image", "Image"], ["alt", "text", "Alt text (describes the image)", null, 300], ["caption", "text", "Caption", null, 500]],
+  link: [],
+  note: []
+});
+var canvasChoiceLabel = (value) => ({ todo: "To do", in_progress: "In progress" })[value] ?? (value ? value.charAt(0).toUpperCase() + value.slice(1) : "");
+var CANVAS_IMAGE_TYPES = Object.freeze({ "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" });
+var CANVAS_IMAGE_MAX = 5 * 1024 * 1024;
+var canvasSafeUrl = (value) => /^https?:\/\/\S{4,}$/i.test(String(value ?? "").trim());
+var linksOf = (content) => Array.isArray(content?.links) ? content.links : content?.url ? [{ url: content.url }] : [];
+var canvasSummary = (item) => {
+  const c = item?.content ?? {};
+  const parts = [];
+  const status = (CANVAS_KIND_FIELDS[item?.kind] ?? []).find(([, input]) => input === "choice");
+  if (status && c[status[0]]) parts.push(canvasChoiceLabel(c[status[0]]));
+  const who = c.owner ?? c.decided_by;
+  if (who && (CANVAS_KIND_FIELDS[item?.kind] ?? []).some(([f]) => f === "owner" || f === "decided_by")) parts.push(who);
+  if (item?.kind === "plan_block" && Array.isArray(c.checklist) && c.checklist.length) parts.push(`${c.checklist.filter((x) => x.done).length}/${c.checklist.length} done`);
+  const links = linksOf(c).length;
+  if (links) parts.push(`${links} link${links === 1 ? "" : "s"}`);
+  return parts.join(" \xB7 ");
+};
+var imageCache = /* @__PURE__ */ new Map();
+function CanvasImage({ projectId, contentId, alt, className }) {
+  const key = `${projectId}/${contentId}`;
+  const [src, setSrc] = useState(() => imageCache.get(key) ?? null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    if (imageCache.has(key)) {
+      setSrc(imageCache.get(key));
+      setFailed(false);
+      return void 0;
+    }
+    setSrc(null);
+    setFailed(false);
+    api(`/projects/${encodeURIComponent(projectId)}/content/${encodeURIComponent(contentId)}/image`).then((result) => {
+      if (!live) return;
+      if (!CANVAS_IMAGE_TYPES[result?.media_type] || typeof result?.data_base64 !== "string") throw new Error("not an image");
+      const url = `data:${result.media_type};base64,${result.data_base64}`;
+      imageCache.set(key, url);
+      if (imageCache.size > 40) imageCache.delete(imageCache.keys().next().value);
+      setSrc(url);
+    }).catch(() => {
+      if (live) setFailed(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [key]);
+  if (failed) return jsx("span", { className: "dy-pc-img-note", "data-canvas-image-missing": contentId, children: "Image unavailable" });
+  if (!src) return jsx("span", { className: "dy-pc-img-note", children: "Loading image\u2026" });
+  return jsx("img", { className, src, alt: alt || "", draggable: false, "data-canvas-image": contentId });
+}
 var CANVAS_BOARD_STATUS_LABELS = Object.freeze({ draft: "Draft", submitted: "Submitted", planned: "Plan made", completed: "Completed", archived: "Archived" });
 var CANVAS_BOARD_MOVES = Object.freeze({ draft: ["submitted"], submitted: ["draft", "planned"], planned: ["submitted", "completed"], completed: ["planned"] });
 var CANVAS_READ_ONLY = Object.freeze(["completed", "archived"]);
@@ -8201,6 +8310,10 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   const [selectedIds, setSelectedIds] = useState([]);
   const [drawerText, setDrawerText] = useState("");
   const [drawerKind, setDrawerKind] = useState("note");
+  const [drawerFields, setDrawerFields] = useState({});
+  const [members, setMembers] = useState([]);
+  const [uploadedImages, setUploadedImages] = useState([]);
+  const [imageBusy, setImageBusy] = useState(false);
   const [linkSource, setLinkSource] = useState("");
   const [linkTarget, setLinkTarget] = useState("");
   const [linkMeaning, setLinkMeaning] = useState("supports");
@@ -8252,6 +8365,17 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   const encoded = encodeURIComponent(project.id);
   const revision = Number(canvas?.revision ?? 0);
   const selected = objects.find((item) => item.id === selectedId) ?? null;
+  useEffect(() => {
+    let live = true;
+    api(`/projects/${encodeURIComponent(project.id)}/members`).then((result) => {
+      if (live) setMembers((result?.members ?? []).filter((m) => m && m.state !== "departed").map((m) => String(m.profile_slug)));
+    }).catch(() => {
+      if (live) setMembers([]);
+    });
+    return () => {
+      live = false;
+    };
+  }, [project.id]);
   const boardPath = (id) => `/projects/${encoded}/canvases/${encodeURIComponent(id)}`;
   const boardScoped = boardsApi && Boolean(canvas?.canvas_id);
   const canvasRoute = boardScoped ? boardPath(canvas.canvas_id) : `/projects/${encoded}/canvas`;
@@ -8795,6 +8919,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       id: `canvas-obj-${Date.now()}-${canvasObjectSeq}`,
       kind: objectKind,
       content: { text: body },
+      ...objectKind === "media" ? { height: 230 } : {},
       x: position.x,
       y: position.y,
       width: CANVAS_CARD.width,
@@ -8818,13 +8943,57 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     setSelectedId(item.id);
     setDrawerText(canvasText(item));
     setDrawerKind(item.kind);
+    const { text: _text, ...rest } = item.content ?? {};
+    setDrawerFields({ ...rest, links: linksOf(item.content ?? {}).map((link) => ({ url: link.url ?? "", label: link.label ?? "" })) });
+  };
+  const setField = (field, value) => setDrawerFields((current) => ({ ...current, [field]: value }));
+  const uploadImage = async (file) => {
+    if (!file || readOnly) return;
+    const mediaType = CANVAS_IMAGE_TYPES[file.type] ? file.type : null;
+    if (!mediaType) {
+      setNotice({ tone: "danger", text: "Choose a PNG, JPEG or WebP image. Video comes in a later stage." });
+      return;
+    }
+    if (file.size <= 0 || file.size > CANVAS_IMAGE_MAX) {
+      setNotice({ tone: "danger", text: "Images must be under 5 MB." });
+      return;
+    }
+    setImageBusy(true);
+    try {
+      const created = await api(`/projects/${encodeURIComponent(project.id)}/content`, { method: "POST", body: { filename: file.name, media_type: mediaType, content_base64: await fileAsBase64(file) } });
+      setUploadedImages((current) => [created, ...current]);
+      setField("content_id", created.content_id);
+      if (!drawerFields.alt) setField("alt", String(file.name).replace(/\.[a-z0-9]+$/i, "").slice(0, 300));
+      setNotice({ tone: "ok", text: "Image uploaded \u2014 Apply, then Save canvas, to place it on the card." });
+    } catch (failure) {
+      setNotice({ tone: "danger", text: `Image could not be uploaded: ${failureText(failure)}` });
+    } finally {
+      setImageBusy(false);
+    }
   };
   const applyDrawer = () => {
     if (!selected || readOnly) return;
     const text = drawerText.trim();
     if (!text) return;
+    const links = (drawerFields.links ?? []).map((link) => ({ url: String(link.url ?? "").trim(), label: String(link.label ?? "").trim() })).filter((link) => link.url);
+    const bad = links.find((link) => !canvasSafeUrl(link.url));
+    if (bad) {
+      setNotice({ tone: "danger", text: `"${bad.url.slice(0, 60)}" is not a web link. Links must start with http:// or https://.` });
+      return;
+    }
+    if (links.length > 20) {
+      setNotice({ tone: "danger", text: "A card holds at most 20 links." });
+      return;
+    }
+    const fields = {
+      ...drawerFields,
+      links: links.map((link) => link.label ? link : { url: link.url }),
+      ...Array.isArray(drawerFields.alternatives) ? { alternatives: drawerFields.alternatives.map((v) => String(v).trim()).filter(Boolean) } : {},
+      ...Array.isArray(drawerFields.checklist) ? { checklist: drawerFields.checklist.map((v) => ({ text: String(v.text ?? "").trim(), done: Boolean(v.done) })).filter((v) => v.text) } : {}
+    };
+    if (!fields.links.length) fields.links = "";
     const before = snapshot(objects, connectors);
-    setObjects((current) => current.map((item) => item.id === selected.id ? { ...item, kind: drawerKind, content: { ...item.content ?? {}, text } } : item));
+    setObjects((current) => current.map((item) => item.id === selected.id ? { ...item, kind: drawerKind, content: { ...item.content ?? {}, ...fields, text } } : item));
     setHistory((current) => [...current.slice(-49), before]);
     setFuture([]);
     setDirty(true);
@@ -9365,6 +9534,79 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     return lines;
   };
   const renderFrames = () => layoutFrames(objects.map((item) => ({ ...item, ...canvasRect(item) })), CANVAS_WORLD).map((frame) => jsx("div", { className: "dy-pc-frame", "data-canvas-frame": frame.tag, style: { left: `${frame.x}px`, top: `${frame.y}px`, width: `${frame.width}px`, height: `${frame.height}px` }, children: frame.tag }, frame.tag));
+  const renderFieldEditors = () => {
+    const f = drawerFields;
+    const off = readOnly;
+    const out = [];
+    out.push(jsxs("label", { children: [jsx("span", { children: "Description" }), jsx("textarea", { "data-canvas-field": "description", rows: 4, maxLength: 2e4, value: f.description ?? "", readOnly: off, disabled: off, placeholder: "Details, context, notes\u2026", onChange: (event) => setField("description", event.target.value) })] }));
+    const links = f.links ?? [];
+    out.push(jsxs("fieldset", { className: "dy-pc-fieldset", "data-canvas-links": true, children: [
+      jsx("legend", { children: `Links${links.length ? ` (${links.length})` : ""}` }),
+      ...links.map((link, index) => jsxs("div", { className: "dy-pc-row", "data-canvas-link-row": index, children: [
+        jsx("input", { "data-canvas-link-url": index, type: "url", inputMode: "url", placeholder: "https://\u2026", maxLength: 2048, value: link.url, disabled: off, "aria-label": `Link ${index + 1} address`, "aria-invalid": link.url && !canvasSafeUrl(link.url) ? "true" : void 0, onChange: (event) => setField("links", links.map((l, i) => i === index ? { ...l, url: event.target.value } : l)) }),
+        jsx("input", { "data-canvas-link-label": index, placeholder: "Label (optional)", maxLength: 200, value: link.label, disabled: off, "aria-label": `Link ${index + 1} label`, onChange: (event) => setField("links", links.map((l, i) => i === index ? { ...l, label: event.target.value } : l)) }),
+        canvasSafeUrl(link.url) ? jsx("a", { className: "dy-pc-open", href: link.url.trim(), target: "_blank", rel: "noopener noreferrer nofollow", title: "Open link", "aria-label": `Open link ${index + 1}`, children: jsx(Icon, { name: "arrow-up-right" }) }) : null,
+        off ? null : jsx(Button, { small: true, action: "pc-link-remove", ariaLabel: `Remove link ${index + 1}`, onClick: () => setField("links", links.filter((_, i) => i !== index)), children: jsx(Icon, { name: "x" }) })
+      ] }, `link-${index}`)),
+      off ? null : jsx(Button, { small: true, action: "pc-link-add", disabled: links.length >= 20, onClick: () => setField("links", [...links, { url: "", label: "" }]), children: [jsx(Icon, { name: "plus" }, "i"), "Add link"] })
+    ] }));
+    for (const [field, input, label, choices, max] of CANVAS_KIND_FIELDS[drawerKind] ?? []) {
+      const value = f[field];
+      let control;
+      if (input === "choice") control = jsx("select", { "data-canvas-field": field, value: value ?? "", disabled: off, onChange: (event) => setField(field, event.target.value), children: [jsx("option", { value: "", children: "Not set" }, ""), ...choices.map((c) => jsx("option", { value: c, children: canvasChoiceLabel(c) }, c))] });
+      else if (input === "member") {
+        const known = members.includes(value);
+        control = jsx("select", { "data-canvas-field": field, value: value ?? "", disabled: off, onChange: (event) => setField(field, event.target.value), children: [
+          jsx("option", { value: "", children: "Unassigned" }, ""),
+          ...members.map((m) => jsx("option", { value: m, children: m }, m)),
+          value && !known ? jsx("option", { value, children: `${value} (no longer a member)` }, "former") : null
+        ] });
+      } else if (input === "date") control = jsx("input", { type: "date", "data-canvas-field": field, value: value ?? "", disabled: off, onChange: (event) => setField(field, event.target.value) });
+      else if (input === "area") control = jsx("textarea", { "data-canvas-field": field, rows: 3, maxLength: max, value: value ?? "", readOnly: off, disabled: off, onChange: (event) => setField(field, event.target.value) });
+      else if (input === "text") control = jsx("input", { "data-canvas-field": field, maxLength: max, value: value ?? "", readOnly: off, disabled: off, onChange: (event) => setField(field, event.target.value) });
+      else if (input === "list") {
+        const rows = Array.isArray(value) ? value : [];
+        out.push(jsxs("fieldset", { className: "dy-pc-fieldset", "data-canvas-field": field, children: [
+          jsx("legend", { children: label }),
+          ...rows.map((row, index) => jsxs("div", { className: "dy-pc-row", children: [
+            jsx("input", { maxLength: 500, value: row, disabled: off, "aria-label": `${label} ${index + 1}`, onChange: (event) => setField(field, rows.map((r, i) => i === index ? event.target.value : r)) }),
+            off ? null : jsx(Button, { small: true, ariaLabel: `Remove ${label} ${index + 1}`, onClick: () => setField(field, rows.filter((_, i) => i !== index)), children: jsx(Icon, { name: "x" }) })
+          ] }, index)),
+          off ? null : jsx(Button, { small: true, action: `pc-${field}-add`, disabled: rows.length >= 50, onClick: () => setField(field, [...rows, ""]), children: [jsx(Icon, { name: "plus" }, "i"), "Add"] })
+        ] }));
+        continue;
+      } else if (input === "checklist") {
+        const rows = Array.isArray(value) ? value : [];
+        out.push(jsxs("fieldset", { className: "dy-pc-fieldset", "data-canvas-field": field, children: [
+          jsx("legend", { children: `${label}${rows.length ? ` (${rows.filter((r) => r.done).length}/${rows.length})` : ""}` }),
+          ...rows.map((row, index) => jsxs("div", { className: "dy-pc-row", children: [
+            jsx("input", { type: "checkbox", checked: Boolean(row.done), disabled: off, "aria-label": `Done: ${row.text || `item ${index + 1}`}`, onChange: (event) => setField(field, rows.map((r, i) => i === index ? { ...r, done: event.target.checked } : r)) }),
+            jsx("input", { maxLength: 300, value: row.text ?? "", disabled: off, "aria-label": `Checklist item ${index + 1}`, onChange: (event) => setField(field, rows.map((r, i) => i === index ? { ...r, text: event.target.value } : r)) }),
+            off ? null : jsx(Button, { small: true, ariaLabel: `Remove checklist item ${index + 1}`, onClick: () => setField(field, rows.filter((_, i) => i !== index)), children: jsx(Icon, { name: "x" }) })
+          ] }, index)),
+          off ? null : jsx(Button, { small: true, action: "pc-checklist-add", disabled: rows.length >= 50, onClick: () => setField(field, [...rows, { text: "", done: false }]), children: [jsx(Icon, { name: "plus" }, "i"), "Add item"] })
+        ] }));
+        continue;
+      } else if (input === "image") {
+        out.push(jsxs("div", { className: "dy-pc-fieldset", "data-canvas-image-field": true, children: [
+          jsx("span", { className: "dy-pc-field-label", children: label }),
+          value ? jsx("span", { className: "dy-pc-drawer-thumb", children: jsx(CanvasImage, { projectId: project.id, contentId: value, alt: f.alt }) }) : jsx("p", { className: "dy-pc-drawer-meta", children: "No image yet." }),
+          off ? null : jsxs("label", { className: "dy-pc-upload", children: [
+            jsx("span", { children: imageBusy ? "Uploading\u2026" : value ? "Replace image" : "Upload image (PNG, JPEG or WebP, up to 5 MB)" }),
+            jsx("input", { type: "file", "data-canvas-image-upload": true, accept: "image/png,image/jpeg,image/webp", disabled: imageBusy, onChange: (event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              uploadImage(file);
+            } })
+          ] }),
+          off || !value ? null : jsx(Button, { small: true, action: "pc-image-clear", onClick: () => setField("content_id", ""), children: "Remove image from card" })
+        ] }));
+        continue;
+      }
+      out.push(jsxs("label", { children: [jsx("span", { children: label }), control] }));
+    }
+    return out;
+  };
   const renderObject = (item) => {
     const rect = canvasRect(item);
     const tag = (Array.isArray(item.tags) ? item.tags : [])[0];
@@ -9386,6 +9628,9 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
         jsx("small", { children: `${label}${tag ? ` \xB7 ${tag}` : ""}` }),
         jsx("span", { className: "dy-pc-obj-kind-icon", "aria-hidden": true, children: jsx(Icon, { name: CANVAS_KIND_ICONS[item.kind] ?? "sticky-note" }) }),
         jsx("strong", { children: canvasText(item) || "Untitled object" }),
+        item.kind === "media" && item.content?.content_id ? jsx("span", { className: "dy-pc-obj-thumb", children: jsx(CanvasImage, { projectId: project.id, contentId: item.content.content_id, alt: item.content.alt }) }) : null,
+        canvasSummary(item) ? jsx("span", { className: "dy-pc-obj-sub", "data-canvas-summary": true, children: canvasSummary(item) }) : null,
+        item.content?.description ? jsx("span", { className: "dy-pc-obj-desc", children: item.content.description }) : null,
         jsx("span", { className: "dy-pc-obj-meta", children: `${item.evidence_ref ? `evidence ${item.evidence_ref}` : "no evidence reference"}${item.work_ref ? ` \xB7 work ${item.work_ref}` : ""}` })
       ]
     }, item.id);
@@ -9779,6 +10024,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
                 jsxs("label", { children: [jsx("span", { children: "Title" }), jsx("input", { "data-canvas-object-title": true, value: drawerText, readOnly, disabled: readOnly, onChange: (event) => setDrawerText(event.target.value) })] }),
                 jsxs("label", { children: [jsx("span", { children: "Kind" }), jsx("select", { "data-canvas-object-kind": true, value: drawerKind, disabled: readOnly, onChange: (event) => setDrawerKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx("option", { value, children: CANVAS_KIND_LABELS[value] }, value)) })] }),
                 jsxs("label", { children: [jsx("span", { children: "Sticker colour" }), jsx("select", { "data-canvas-object-colour": true, value: selectedColour ?? "", disabled: readOnly, onChange: (event) => setSelectedColour(event.target.value || null), children: [jsx("option", { value: "", children: "Default kind colour" }, "default"), ...CANVAS_STICKER_COLOURS.map((value) => jsx("option", { value, children: CANVAS_STICKER_LABELS[value] }, value))] })] }),
+                ...renderFieldEditors(),
                 jsx("p", { className: "dy-pc-drawer-meta", children: selected.evidence_ref ? `Evidence reference: ${selected.evidence_ref}` : "No evidence reference on this object." }),
                 readOnly ? null : jsxs("div", { className: "dockyard-form-actions", children: [
                   jsx(Button, { small: true, variant: "danger", action: "remove-canvas-object", disabled: busy, onClick: removeSelected, children: "Remove object" }),

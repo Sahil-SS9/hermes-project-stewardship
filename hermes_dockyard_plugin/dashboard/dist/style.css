@@ -371,6 +371,7 @@ td.bad, .bad { color: var(--dy-bad); }
   --dy-pc-kind-evidence: #1f7a55;   --dy-pc-kind-claim: #6b4bbd;
   --dy-pc-kind-question: #9a6206;   --dy-pc-kind-decision: #2f4bb5;
   --dy-pc-kind-plan_block: #1d6480; --dy-pc-kind-note: #5b6472;
+  --dy-pc-kind-risk: #a8321f; --dy-pc-kind-assumption: #6b5a12;
   --dy-pc-kind-link: #0f6f7a;       --dy-pc-kind-media: #8a3a76;
   --dy-pc-edge-support: #1f7a55;
   --dy-pc-surface: rgba(255, 255, 255, .96);
@@ -384,6 +385,7 @@ td.bad, .bad { color: var(--dy-bad); }
   --dy-pc-fill-evidence: #d9f4dd;     --dy-pc-fill-claim: #e7defc;
   --dy-pc-fill-question: #ffe2c4;     --dy-pc-fill-decision: #dde3ff;
   --dy-pc-fill-plan_block: #d2efec;   --dy-pc-fill-note: #fff1a6;
+  --dy-pc-fill-risk: #fde0da; --dy-pc-fill-assumption: #f3ecc8;
   --dy-pc-fill-link: #d3ebfb;         --dy-pc-fill-media: #fbdcec;
   --dy-pc-sticker-yellow: #fff1a6;    --dy-pc-sticker-green: #d3f4dc;
   --dy-pc-sticker-blue: #d3e6fd;      --dy-pc-sticker-pink: #fcd9e7;
@@ -407,6 +409,7 @@ td.bad, .bad { color: var(--dy-bad); }
   --dy-pc-kind-evidence: #57d39b;   --dy-pc-kind-claim: #b99cf5;
   --dy-pc-kind-question: #f0c04a;   --dy-pc-kind-decision: #9db3ff;
   --dy-pc-kind-plan_block: #79cbe0; --dy-pc-kind-note: #a9b6c6;
+  --dy-pc-kind-risk: #ff9b87; --dy-pc-kind-assumption: #e0cf7a;
   --dy-pc-kind-link: #6fd8e0;       --dy-pc-kind-media: #e3a0d3;
   --dy-pc-surface: rgba(23, 27, 34, .96);
   --dy-pc-grid: rgba(182, 190, 202, .12);
@@ -417,6 +420,7 @@ td.bad, .bad { color: var(--dy-bad); }
   --dy-pc-fill-evidence: #173d2a;     --dy-pc-fill-claim: #2e2552;
   --dy-pc-fill-question: #4a2d12;     --dy-pc-fill-decision: #1f2b5c;
   --dy-pc-fill-plan_block: #123d40;   --dy-pc-fill-note: #463c0e;
+  --dy-pc-fill-risk: #4a1c15; --dy-pc-fill-assumption: #3a3310;
   --dy-pc-fill-link: #123a52;         --dy-pc-fill-media: #4a1d3c;
   --dy-pc-sticker-yellow: #463c0e;    --dy-pc-sticker-green: #173d2a;
   --dy-pc-sticker-blue: #16345a;      --dy-pc-sticker-pink: #4d1c33;
@@ -579,6 +583,25 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-pc-scope .dy-pc-obj:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
 .dy-pc-scope .dy-pc-obj small { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--dy-pc-ink-2); }
 .dy-pc-scope .dy-pc-obj strong { display: block; margin-top: 5px; font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--dy-pc-ink); }
+.dy-pc-scope .dy-pc-obj-sub { display: block; margin-top: 4px; color: var(--dy-pc-ink-2); font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dy-pc-scope .dy-pc-obj-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 4px; color: var(--dy-pc-ink-2); font-size: 11px; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dy-pc-scope .dy-pc-obj-thumb { display: block; margin-top: 6px; height: 110px; border-radius: 6px; overflow: hidden; background: rgba(0,0,0,.08); }
+.dy-pc-scope .dy-pc-obj-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.dy-pc-scope .dy-pc-img-note { display: grid; place-items: center; height: 100%; min-height: 40px; color: var(--dy-pc-ink-2); font-size: 11px; }
+.dy-pc-scope .dy-pc-drawer-b textarea { width: 100%; min-width: 0; resize: vertical; padding: 9px 10px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12.5px; line-height: 1.45; }
+.dy-pc-scope .dy-pc-fieldset { display: grid; gap: 6px; margin: 0; padding: 10px; border: 1px solid var(--dy-border); border-radius: 8px; min-width: 0; }
+.dy-pc-scope .dy-pc-fieldset legend, .dy-pc-scope .dy-pc-field-label { padding: 0 4px; color: var(--dy-text-2); font-size: 10px; font-weight: 730; }
+.dy-pc-scope .dy-pc-row { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.dy-pc-scope .dy-pc-row input:not([type="checkbox"]) { flex: 1 1 0; min-width: 0; padding: 7px 8px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
+.dy-pc-scope .dy-pc-row input[aria-invalid="true"] { border-color: var(--dy-danger, #c0392b); }
+.dy-pc-scope .dy-pc-open { display: inline-flex; color: var(--dy-accent, inherit); }
+.dy-pc-scope .dy-pc-open svg { width: 14px; height: 14px; }
+.dy-pc-scope .dy-pc-drawer-thumb { display: block; max-height: 220px; border-radius: 8px; overflow: hidden; }
+.dy-pc-scope .dy-pc-drawer-thumb img { display: block; width: 100%; max-height: 220px; object-fit: contain; background: rgba(0,0,0,.06); }
+.dy-pc-scope .dy-pc-upload { cursor: pointer; }
+.dy-pc-scope .dy-pc-upload input[type="file"] { font-size: 11.5px; }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="risk"] { border-left-color: var(--dy-pc-kind-risk); background: var(--dy-pc-fill-risk); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="assumption"] { border-left-color: var(--dy-pc-kind-assumption); background: var(--dy-pc-fill-assumption); }
 .dy-pc-scope .dy-pc-obj-meta { display: block; margin-top: 6px; color: var(--dy-pc-ink-2); font-size: 10px; }
 .dy-pc-scope .dy-pc-empty { position: absolute; left: 18px; top: 16px; margin: 0; color: var(--dy-text-3); font-size: 12px; }
 /* Frames are decorative group labels (v6's .pframe) — never controls. */
