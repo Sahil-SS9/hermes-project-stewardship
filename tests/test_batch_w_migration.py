@@ -48,7 +48,11 @@ def test_v30_v31_v30_v31_roundtrip_preserves_legacy_data_and_name_clash(tmp_path
     whole_before = _whole_v30_snapshot(cx)
     legacy.close()
 
-    upgraded = Store(db)
+    # Later lanes' migrations (P v32-v34) are not part of W's round trip.
+    only_w = [m for m in migrations.MIGRATIONS if m.version <= 31]
+    with monkeypatch.context() as context:
+        context.setattr(store_module, "MIGRATIONS", only_w)
+        upgraded = Store(db)
     assert upgraded.schema_version == 31
     assert upgraded._conn.execute("SELECT count(*) FROM dockyard_global_workflows WHERE name='clash'").fetchone()[0] == 2
     assert [tuple(row) for row in upgraded._conn.execute("SELECT project_id,name,version,scope,owner_project_id FROM dockyard_workflows ORDER BY version")] == [
@@ -60,7 +64,9 @@ def test_v30_v31_v30_v31_roundtrip_preserves_legacy_data_and_name_clash(tmp_path
     upgraded._conn.execute("DELETE FROM schema_migrations WHERE version=31")
     assert _snapshot(upgraded._conn) == before
     assert _whole_v30_snapshot(upgraded._conn) == whole_before
-    upgraded.migrate()
+    with monkeypatch.context() as context:
+        context.setattr(store_module, "MIGRATIONS", only_w)
+        upgraded.migrate()
     assert upgraded.schema_version == 31
     assert upgraded._conn.execute("SELECT count(*) FROM dockyard_global_workflows WHERE name='clash'").fetchone()[0] == 2
     upgraded.close()

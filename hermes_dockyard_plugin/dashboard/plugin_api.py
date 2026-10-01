@@ -23,6 +23,8 @@ from pydantic import BaseModel, ConfigDict
 logger = logging.getLogger(__name__)
 
 from hermes_project_stewardship.persistence.dockyard_store import DockyardStore  # noqa: E402
+from hermes_project_stewardship.persistence.schema_guard import SchemaDriftError  # noqa: E402
+from hermes_project_stewardship.persistence.store import NewerSchemaError  # noqa: E402
 from hermes_project_stewardship.runtime import (  # noqa: E402
     StateSelectionError,
     open_store,
@@ -70,8 +72,7 @@ _store = None
 _app = None
 _dockyard = None
 try:
-    # Deferred import: api.server has a module-level `app = create_app()`
-    # that would otherwise run before the guard below (Phase1 F2).
+    # Deferred import keeps the guard below in charge of every startup error.
     from hermes_project_stewardship.api.server import create_app
 
     _DB = _default_db_path()
@@ -91,10 +92,10 @@ try:
         auth_principal_is_human=os.environ.get("STEWARD_RPC_PRINCIPAL_KIND") == "human",
         capabilities=_rpc_capabilities,
     )
-except StateSelectionError as exc:
-    # Fail closed: no data moved, no alternate database chosen. The host
-    # keeps loading; proxied routes return 503 until an operator selects
-    # state explicitly (STEWARD_DB_PATH / --db).
+except (StateSelectionError, SchemaDriftError, NewerSchemaError) as exc:
+    # Fail closed: no data moved, no alternate database chosen, nothing
+    # migrated. The host keeps loading; proxied routes return 503 with the
+    # reason until an operator selects or repairs state (P addendum fix 3).
     _startup_error = str(exc)
     logger.error("Dockyard plugin startup degraded: %s", exc)
 
@@ -120,8 +121,9 @@ def _degraded_503() -> HTTPException:
     return HTTPException(
         503,
         "Dockyard plugin did not start: " + (_startup_error or "unknown startup error")
-        + " Set STEWARD_DB_PATH (or --db) to select the authoritative database, "
-        "then restart the dashboard host.",
+        + " Set STEWARD_DB_PATH (or --db) to select the authoritative database,"
+        " or repair it with `stewardctl db repair` on a copy, then restart the"
+        " dashboard host.",
     )
 
 

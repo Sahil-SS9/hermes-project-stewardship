@@ -3285,12 +3285,10 @@ def create_app(
     return app
 
 
-# Module-level app so `uvicorn hermes_project_stewardship.api.server:app`
-# works as documented in the README. Uses ./stewardship.db by default.
-app = create_app()
-
-
+# P addendum fix 1: no database is opened at import time. Run the server with
+# the factory flag so uvicorn calls create_app() itself:
+#   uvicorn --factory hermes_project_stewardship.api.server:create_app --host 127.0.0.1 --port 9310
 if __name__ == "__main__":  # pragma: no cover
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=9310)
+    uvicorn.run("hermes_project_stewardship.api.server:create_app", factory=True, host="127.0.0.1", port=9310)

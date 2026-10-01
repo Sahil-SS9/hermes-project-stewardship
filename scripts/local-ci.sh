@@ -108,7 +108,7 @@ fi
 
 # --- Gate 4: api-extra import (mirrors ci.yml api-extra job).
 run_gate "api-extra-import" "rpc-ok" \
-  "$PY" -c "from hermes_project_stewardship.api.server import app; print('rpc-ok')"
+  "$PY" -c "from hermes_project_stewardship.api.server import create_app; import hermes_project_stewardship.api.server as srv; assert not hasattr(srv, 'app'), 'module-level app must be gone (P addendum fix 1)'; print('rpc-ok')"
 
 # --- Optional JS gates: dashboard + desktop harnesses.
 if [ "$WITH_NODE" -eq 1 ]; then

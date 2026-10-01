@@ -21,7 +21,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
-from .migrations import MIGRATIONS, SCHEMA_VERSION
+from .migrations import MIGRATIONS
+from .migrations import SCHEMA_VERSION  # noqa: F401  (re-exported)
+from .schema_guard import SchemaDriftError, fail_closed  # noqa: F401  (re-exported)
 
 
 class NewerSchemaError(RuntimeError):
@@ -60,6 +62,11 @@ class Store:
         self._local = threading.local()
         self._registry: Dict[int, sqlite3.Connection] = {}
         self._reg_lock = threading.Lock()
+        # P addendum fix 3: check an existing database through a read-only
+        # connection BEFORE the writable one is opened (that one switches the
+        # journal mode, which already writes the file).
+        if self.db_path.exists() and self.db_path.stat().st_size > 0:
+            self._check_read_only()
         self.migrate()
 
     # ------------------------------------------------------------------ #
@@ -133,22 +140,48 @@ class Store:
         finally:
             self._secure_database_files()
 
-    def migrate(self) -> None:
-        with self.tx() as cx:
-            cx.execute(
-                "CREATE TABLE IF NOT EXISTS schema_migrations ("
-                " version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
-            )
-        current = self._conn.execute(
-            "SELECT COALESCE(MAX(version),0) AS v FROM schema_migrations"
-        ).fetchone()["v"]
+    def _check_read_only(self) -> None:
+        conn = sqlite3.connect(f"{self.db_path.resolve().as_uri()}?mode=ro", uri=True)
+        conn.row_factory = sqlite3.Row
+        try:
+            self._refuse_if_unsafe(conn)
+        finally:
+            conn.close()
+
+    def _refuse_if_unsafe(self, conn: sqlite3.Connection) -> None:
+        """Read-only: raise NewerSchemaError/SchemaDriftError, never write."""
+        has_ledger = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'"
+        ).fetchone() is not None
+        current = 0
+        if has_ledger:
+            current = conn.execute(
+                "SELECT COALESCE(MAX(version),0) FROM schema_migrations"
+            ).fetchone()[0]
         if current > max((m.version for m in MIGRATIONS), default=0):
             raise NewerSchemaError(
                 f"database schema version {current} is newer than this binary"
                 f" supports (max {SCHEMA_VERSION}); refusing to open a"
                 " database migrated by a newer Hermes build"
             )
-        pending = [m for m in MIGRATIONS if m.version > current]
+        fail_closed(conn, has_ledger=has_ledger)
+
+    def migrate(self) -> None:
+        # Every check is read-only: a refused database is never written.
+        self._refuse_if_unsafe(self._conn)
+        with self.tx() as cx:
+            cx.execute(
+                "CREATE TABLE IF NOT EXISTS schema_migrations ("
+                " version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
+            )
+        # The check has proven the ledger is a gap-free prefix 1..current
+        # whose DDL matches this binary, so the pending set is exactly the
+        # versions above it, applied in ascending order.
+        current = self._conn.execute(
+            "SELECT COALESCE(MAX(version),0) AS v FROM schema_migrations"
+        ).fetchone()["v"]
+        pending = sorted((m for m in MIGRATIONS if m.version > current),
+                         key=lambda m: m.version)
         if not pending:
             return
         # SQLite's table-rebuild procedure (CREATE new, copy, DROP old, RENAME)

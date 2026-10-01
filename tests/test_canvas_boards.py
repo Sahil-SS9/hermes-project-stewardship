@@ -401,6 +401,18 @@ def _v32_db(path):
         m.MIGRATIONS[:] = original
 
 
+def _open_at_v33(path):
+    """Open with migrations capped at v33 so the v33 step is tested on its own."""
+    from hermes_project_stewardship.persistence import migrations as m
+    from hermes_project_stewardship.persistence.store import Store
+    original = list(m.MIGRATIONS)
+    m.MIGRATIONS[:] = [x for x in original if x.version <= 33]
+    try:
+        return Store(path)
+    finally:
+        m.MIGRATIONS[:] = original
+
+
 def _rows(path, sql):
     cx = sqlite3.connect(path)
     try:
@@ -413,7 +425,7 @@ def test_v33_upgrade_keeps_the_legacy_board_and_links_its_history(tmp_path):
     from hermes_project_stewardship.persistence.store import Store
     db = tmp_path / "legacy.db"
     _v32_db(db)
-    store = Store(db)
+    store = _open_at_v33(db)
     try:
         assert store.schema_version == 33
         board = CanvasService(store).get_board("legacy", "canvas-old")
@@ -448,7 +460,7 @@ def test_v33_round_trip_is_lossless_and_downgrade_refuses_multi_board_loss(tmp_p
         store._conn.commit()
 
     for _cycle in range(2):
-        store = Store(db)
+        store = _open_at_v33(db)
         try:
             assert store.schema_version == 33
             downgrade(store)
@@ -458,7 +470,7 @@ def test_v33_round_trip_is_lossless_and_downgrade_refuses_multi_board_loss(tmp_p
         assert legacy() == before
         assert _rows(db, "PRAGMA foreign_key_check") == []
 
-    store = Store(db)
+    store = _open_at_v33(db)
     try:
         CanvasService(store).create_board("legacy", name="Second", actor="sahil")
         with pytest.raises(sqlite3.IntegrityError):

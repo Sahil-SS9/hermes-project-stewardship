@@ -10,10 +10,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-# Schema numbers: W owns v31, Batch P owns v32-v34. Later lanes take the next
+# Schema numbers: W owns v31, Batch P owns v32-v34 (v34 = forward fix for
+# the edited v3). Later lanes take the next
 # free number when they merge. Never edit a released migration (v1-v17 shipped
 # in v0.3.0); fix forward with a new version instead.
-SCHEMA_VERSION = 33
+SCHEMA_VERSION = 34
 
 
 @dataclass(frozen=True)
@@ -271,7 +272,7 @@ MIGRATIONS: List[Migration] = [
             project_id     TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
             ref            TEXT NOT NULL UNIQUE,
             type           TEXT NOT NULL CHECK (type IN
-                           ('epic','feature','task','subtask','bug','spike','initiative')),
+                           ('epic','task','subtask','bug','spike','initiative')),
             title          TEXT NOT NULL,
             parent_id      INTEGER REFERENCES dockyard_work_items(id) ON DELETE SET NULL,
             status         TEXT NOT NULL DEFAULT 'backlog' CHECK (status IN
@@ -1096,6 +1097,37 @@ MIGRATIONS: List[Migration] = [
         downgrade_sql="DROP INDEX IF EXISTS idx_project_canvases_project; DROP TABLE IF EXISTS project_canvases;",
     ),
     Migration(
+        version=29,
+        name="phase 8 clarification ledger and plan proposals",
+        upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS canvas_sessions (
+            session_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            canvas_revision INTEGER NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('active','complete','stopped')),
+            current_question_json TEXT,
+            answers_json TEXT NOT NULL DEFAULT '[]',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(project_id, canvas_revision)
+        );
+        CREATE TABLE IF NOT EXISTS canvas_proposals (
+            proposal_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            session_id TEXT REFERENCES canvas_sessions(session_id) ON DELETE SET NULL,
+            canvas_revision INTEGER NOT NULL,
+            proposal_json TEXT NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('pending','approved','rejected','promoted','stale')),
+            created_at TEXT NOT NULL,
+            decided_at TEXT,
+            decided_by TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_canvas_sessions_project ON canvas_sessions(project_id);
+        CREATE INDEX IF NOT EXISTS idx_canvas_proposals_project ON canvas_proposals(project_id);
+        """,
+        downgrade_sql="DROP INDEX IF EXISTS idx_canvas_proposals_project; DROP INDEX IF EXISTS idx_canvas_sessions_project; DROP TABLE IF EXISTS canvas_proposals; DROP TABLE IF EXISTS canvas_sessions;",
+    ),
+    Migration(
         version=30,
         name="audited request-changes and initiative comments",
         upgrade_sql="""
@@ -1228,37 +1260,6 @@ MIGRATIONS: List[Migration] = [
         DROP TABLE project_initiatives;
         ALTER TABLE project_initiatives_v29_down RENAME TO project_initiatives;
         """,
-    ),
-    Migration(
-        version=29,
-        name="phase 8 clarification ledger and plan proposals",
-        upgrade_sql="""
-        CREATE TABLE IF NOT EXISTS canvas_sessions (
-            session_id TEXT PRIMARY KEY,
-            project_id TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
-            canvas_revision INTEGER NOT NULL,
-            status TEXT NOT NULL CHECK(status IN ('active','complete','stopped')),
-            current_question_json TEXT,
-            answers_json TEXT NOT NULL DEFAULT '[]',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            UNIQUE(project_id, canvas_revision)
-        );
-        CREATE TABLE IF NOT EXISTS canvas_proposals (
-            proposal_id TEXT PRIMARY KEY,
-            project_id TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
-            session_id TEXT REFERENCES canvas_sessions(session_id) ON DELETE SET NULL,
-            canvas_revision INTEGER NOT NULL,
-            proposal_json TEXT NOT NULL,
-            status TEXT NOT NULL CHECK(status IN ('pending','approved','rejected','promoted','stale')),
-            created_at TEXT NOT NULL,
-            decided_at TEXT,
-            decided_by TEXT
-        );
-        CREATE INDEX IF NOT EXISTS idx_canvas_sessions_project ON canvas_sessions(project_id);
-        CREATE INDEX IF NOT EXISTS idx_canvas_proposals_project ON canvas_proposals(project_id);
-        """,
-        downgrade_sql="DROP INDEX IF EXISTS idx_canvas_proposals_project; DROP INDEX IF EXISTS idx_canvas_sessions_project; DROP TABLE IF EXISTS canvas_proposals; DROP TABLE IF EXISTS canvas_sessions;",
     ),
     Migration(
         version=31,
@@ -1465,6 +1466,83 @@ MIGRATIONS: List[Migration] = [
         CREATE INDEX IF NOT EXISTS idx_project_canvases_project ON project_canvases(project_id);
         COMMIT;
         PRAGMA foreign_keys=ON;
+        """,
+    ),
+
+    Migration(
+        version=34,
+        name="work item type includes feature (forward fix for edited v3)",
+        upgrade_sql="""
+        CREATE TABLE dockyard_work_items_v34 (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id     TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            ref            TEXT NOT NULL UNIQUE,
+            type           TEXT NOT NULL CHECK (type IN
+                           ('epic','feature','task','subtask','bug','spike','initiative')),
+            title          TEXT NOT NULL,
+            parent_id      INTEGER REFERENCES dockyard_work_items(id) ON DELETE SET NULL,
+            status         TEXT NOT NULL DEFAULT 'backlog' CHECK (status IN
+                           ('backlog','in_progress','in_review','done','blocked')),
+            assignee_id    TEXT,
+            assignee_kind  TEXT CHECK (assignee_kind IN ('human','bot')),
+            created_by_id  TEXT,
+            created_by_kind TEXT CHECK (created_by_kind IN ('human','bot')),
+            priority_rank  INTEGER,
+            labels_json    TEXT NOT NULL DEFAULT '[]',
+            blocked_by_json TEXT NOT NULL DEFAULT '[]',
+            estimate_days  REAL,
+            due            TEXT,
+            evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+            created_at     TEXT NOT NULL,
+            updated_at     TEXT NOT NULL,
+            initiative_ref TEXT
+                REFERENCES project_initiatives(ref)
+                ON DELETE SET NULL
+        );
+        INSERT INTO dockyard_work_items_v34 (id, project_id, ref, type, title, parent_id, status, assignee_id, assignee_kind, created_by_id, created_by_kind, priority_rank, labels_json, blocked_by_json, estimate_days, due, evidence_refs_json, created_at, updated_at, initiative_ref)
+            SELECT id, project_id, ref, type, title, parent_id, status, assignee_id, assignee_kind, created_by_id, created_by_kind, priority_rank, labels_json, blocked_by_json, estimate_days, due, evidence_refs_json, created_at, updated_at, initiative_ref FROM dockyard_work_items;
+        DROP TABLE dockyard_work_items;
+        ALTER TABLE dockyard_work_items_v34 RENAME TO dockyard_work_items;
+        CREATE INDEX IF NOT EXISTS idx_dwi_project_status ON dockyard_work_items(project_id, status);
+        CREATE INDEX IF NOT EXISTS idx_dwi_parent ON dockyard_work_items(parent_id);
+        CREATE INDEX IF NOT EXISTS idx_dwi_initiative ON dockyard_work_items(initiative_ref);
+        """,
+        # Restores the released list. A 'feature' row fails the copy's CHECK,
+        # so the downgrade refuses (IntegrityError) instead of losing data.
+        downgrade_sql="""
+        CREATE TABLE dockyard_work_items_v34 (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id     TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            ref            TEXT NOT NULL UNIQUE,
+            type           TEXT NOT NULL CHECK (type IN
+                           ('epic','task','subtask','bug','spike','initiative')),
+            title          TEXT NOT NULL,
+            parent_id      INTEGER REFERENCES dockyard_work_items(id) ON DELETE SET NULL,
+            status         TEXT NOT NULL DEFAULT 'backlog' CHECK (status IN
+                           ('backlog','in_progress','in_review','done','blocked')),
+            assignee_id    TEXT,
+            assignee_kind  TEXT CHECK (assignee_kind IN ('human','bot')),
+            created_by_id  TEXT,
+            created_by_kind TEXT CHECK (created_by_kind IN ('human','bot')),
+            priority_rank  INTEGER,
+            labels_json    TEXT NOT NULL DEFAULT '[]',
+            blocked_by_json TEXT NOT NULL DEFAULT '[]',
+            estimate_days  REAL,
+            due            TEXT,
+            evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+            created_at     TEXT NOT NULL,
+            updated_at     TEXT NOT NULL,
+            initiative_ref TEXT
+                REFERENCES project_initiatives(ref)
+                ON DELETE SET NULL
+        );
+        INSERT INTO dockyard_work_items_v34 (id, project_id, ref, type, title, parent_id, status, assignee_id, assignee_kind, created_by_id, created_by_kind, priority_rank, labels_json, blocked_by_json, estimate_days, due, evidence_refs_json, created_at, updated_at, initiative_ref)
+            SELECT id, project_id, ref, type, title, parent_id, status, assignee_id, assignee_kind, created_by_id, created_by_kind, priority_rank, labels_json, blocked_by_json, estimate_days, due, evidence_refs_json, created_at, updated_at, initiative_ref FROM dockyard_work_items;
+        DROP TABLE dockyard_work_items;
+        ALTER TABLE dockyard_work_items_v34 RENAME TO dockyard_work_items;
+        CREATE INDEX IF NOT EXISTS idx_dwi_project_status ON dockyard_work_items(project_id, status);
+        CREATE INDEX IF NOT EXISTS idx_dwi_parent ON dockyard_work_items(parent_id);
+        CREATE INDEX IF NOT EXISTS idx_dwi_initiative ON dockyard_work_items(initiative_ref);
         """,
     ),
 ]
