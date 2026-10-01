@@ -526,6 +526,7 @@ export const WORKFLOW_CANVAS_CSS = `
 /* Full screen (owner 01/10): the frame takes the window; the stage grows. */
 .dy-pc-scope .dy-pc.dy-pc-full { position: fixed; inset: 8px; z-index: 900; margin: 0; }
 .dy-pc-scope .dy-pc.dy-pc-full .dy-pc-stage { flex: 1 1 auto; height: auto; min-height: 0; }
+.dy-pc-scope[data-canvas-fullscreen-active="true"] > :not(.dy-pc) { visibility: hidden; }
 /* Connect mode: stickers are click targets, the board does not drag. */
 .dy-pc-scope .dy-pc-stage[data-pc-mode="connect"] .dy-pc-obj { cursor: pointer; }
 .dy-pc-scope .dy-pc-svg line[data-canvas-connect-preview] { stroke: var(--dy-focus); stroke-width: 2; }
@@ -716,6 +717,10 @@ export const WORKFLOW_CANVAS_CSS = `
   .dy-pc-scope .dy-pc-overlay-card.chat .dy-pc-msg { max-width: 92%; }
   .dy-pc-scope .dy-pc-linkbar select { min-width: 0; width: 100%; }
   .dy-pc-scope .dy-pc-linkbar label { flex: 1 1 100%; }
+  /* Phone full screen (Quan F1): the tool rows would leave the board ~190px.
+     The frame scrolls instead and the stage keeps most of the window. */
+  .dy-pc-scope .dy-pc.dy-pc-full { overflow-y: auto; }
+  .dy-pc-scope .dy-pc.dy-pc-full .dy-pc-stage { flex: 0 0 auto; height: calc(100vh - 96px); min-height: 360px; }
   .dy-pc-scope .dy-rt-btn { width: 44px; height: 44px; }
   .dy-pc-scope .dy-rt-select { min-height: 44px; }
 }

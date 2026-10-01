@@ -1259,6 +1259,34 @@ test('Planning cards on a phone: details panel fits the screen with formatting b
   });
 });
 
+test('Planning boards on a phone: full screen has no overlap and the board gets most of the screen (Quan F1)', { timeout: 180000 }, async () => {
+  await withPage(390, 844, async (page) => {
+    const canvas = root(page);
+    await canvas.locator('[data-action="pc-fullscreen"]').click();
+    await settle(page);
+    assert.equal(await canvas.locator('.dy-pc').getAttribute('data-canvas-fullscreen'), 'true');
+    assert.deepEqual(await layoutProblems(page), [], 'no control overlaps or is cut off in phone full screen');
+    const hidden = await page.evaluate(() => [...document.querySelectorAll('.dy-pc-scope > :not(.dy-pc)')]
+      .map((el) => getComputedStyle(el).visibility));
+    assert.ok(hidden.length && hidden.every((v) => v === 'hidden'), 'the page behind the full-screen board cannot be hit');
+    const stage = await canvas.locator('[data-pc-stage]').boundingBox();
+    assert.ok(stage.height >= 0.6 * 844, `board area is ${Math.round(stage.height)}px tall, at least 60% of the screen`);
+    for (const action of ['pc-mode-select', 'pc-fullscreen']) {
+      const box = await canvas.locator(`[data-action="${action}"]`).boundingBox();
+      const hit = await page.evaluate(([x, y, a]) => { const el = document.elementFromPoint(x, y); return !!el && !!el.closest(`[data-action="${a}"]`); },
+        [box.x + box.width / 2, box.y + box.height / 2, action]);
+      assert.ok(hit, `${action} is clickable in phone full screen`);
+    }
+    await canvas.locator('[data-action="pc-fullscreen"]').click();
+    await settle(page);
+    assert.equal(await canvas.locator('.dy-pc').getAttribute('data-canvas-fullscreen'), 'false');
+    const back = await page.evaluate(() => [...document.querySelectorAll('.dy-pc-scope > :not(.dy-pc)')]
+      .map((el) => getComputedStyle(el).visibility));
+    assert.ok(back.every((v) => v !== 'hidden'), 'leaving full screen shows the board bar again');
+    assert.deepEqual(await layoutProblems(page), [], 'no overlap after leaving full screen');
+  });
+});
+
 test('Planning boards: drag, scroll and arrow keys move around the board; Shift+drag selects', { timeout: 180000 }, async () => {
   await withPage(1440, 900, async (page) => {
     const canvas = root(page);

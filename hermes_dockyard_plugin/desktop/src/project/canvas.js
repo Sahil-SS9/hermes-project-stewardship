@@ -1465,6 +1465,9 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     'data-canvas-dirty': dirty ? 'true' : 'false',
     'data-canvas-theme': effectiveTheme,
     'data-canvas-theme-source': theme ? 'board' : 'app',
+    // Full screen: the page under the fixed frame is hidden (not just covered)
+    // so its controls cannot be focused or hit-tested through the frame.
+    'data-canvas-fullscreen-active': fullscreen ? 'true' : 'false',
     'data-canvas-board': canvas?.canvas_id ?? '',
     'data-canvas-status': boardStatus,
     onKeyDown: (event) => {

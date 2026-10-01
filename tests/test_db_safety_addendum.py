@@ -318,6 +318,15 @@ def test_fix4a_v1_to_v17_match_released_v0_3_0():
             (old.name, old.upgrade_sql, old.downgrade_sql), f"v{old.version} was edited"
 
 
+V0_3_0_MIGRATIONS_SHA256 = "f8996e4b051600b9db66188848185a214cbcc0c9c86a38e07b7b0fa3cb95d92d"
+
+
+def test_fix4a_fixture_hash_is_pinned():
+    """Runs even where the v0.3.0 tag is absent (CI clones without tags; Quan D5)."""
+    import hashlib
+    assert hashlib.sha256(FIXTURE.read_bytes()).hexdigest() == V0_3_0_MIGRATIONS_SHA256
+
+
 def test_fix4a_fixture_is_the_tagged_release():
     tagged = subprocess.run(
         ["git", "show", "v0.3.0:src/hermes_project_stewardship/persistence/migrations.py"],
