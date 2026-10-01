@@ -29,7 +29,7 @@ desktop-panel = ["fastapi", "uvicorn"]
 plugin = ["fastapi", "uvicorn", "httpx2"]
 dev = [
   "pytest>=7", "pytest-timeout", "pytest-cov",
-  "httpx2", "ruff==0.15.10", "ty==0.0.21", "pip-audit>=2.9",
+  "httpx2", "ruff>=0.15.10", "ty>=0.0.21,<0.1", "pip-audit>=2.9",
   "tomli>=2; python_version < '3.11'",
 ]
 
