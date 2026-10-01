@@ -103,6 +103,86 @@ def test_canvas_writes_use_trusted_actor_not_client_body(tmp_path, monkeypatch):
     assert saved.json()["updated_by"] == module._ACTOR_ID == "trusted-desktop"
 
 
+def test_board_routes_proxy_with_trusted_actor(tmp_path, monkeypatch):
+    """D14/D16/D19: every multi-board route is reachable through the plugin
+    proxy, and writes are attributed to the trusted principal, never a
+    client-supplied actor."""
+    module, _adapter, client = _load_proxy(tmp_path, monkeypatch, auth=False)
+    created = client.post("/api/projects/p1/canvases", headers=HEADERS,
+                          json={"name": "Import", "actor": "forged"})
+    assert created.status_code == 200, created.text
+    board = created.json()
+    assert board["updated_by"] == module._ACTOR_ID
+    cid = board["canvas_id"]
+    dup = client.post("/api/projects/p1/canvases", headers=HEADERS, json={"name": "IMPORT"})
+    assert dup.status_code == 409, dup.text
+    saved = client.put(f"/api/projects/p1/canvases/{cid}", headers=HEADERS, json={
+        "expected_revision": board["revision"], "connectors": [], "actor": "forged",
+        "objects": [{"id": "e1", "kind": "evidence", "content": {"text": "x"}}]})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["updated_by"] == module._ACTOR_ID
+    patched = client.patch(f"/api/projects/p1/canvases/{cid}", headers=HEADERS,
+                           json={"theme": "dark", "actor": "forged"})
+    assert patched.status_code == 200 and patched.json()["theme"] == "dark"
+    assert patched.json()["updated_by"] == module._ACTOR_ID
+    cleared = client.patch(f"/api/projects/p1/canvases/{cid}", headers=HEADERS, json={"theme": None})
+    assert cleared.status_code == 200 and cleared.json()["theme"] is None
+    assert client.get(f"/api/projects/p1/canvases/{cid}", headers=HEADERS).json()["name"] == "Import"
+    session = client.post(f"/api/projects/p1/canvases/{cid}/sessions", headers=HEADERS, json={})
+    assert session.status_code == 200 and session.json()["canvas_id"] == cid
+    listed = client.get("/api/projects/p1/canvases", headers=HEADERS).json()["canvases"]
+    assert [row["canvas_id"] for row in listed] == [cid]
+    plans = client.get(f"/api/projects/p1/canvases/{cid}/plans", headers=HEADERS)
+    assert plans.status_code == 200 and plans.json()["plans"] == []
+    client.patch(f"/api/projects/p1/canvases/{cid}", headers=HEADERS, json={"status": "archived"})
+    assert client.get("/api/projects/p1/canvases", headers=HEADERS).json()["canvases"] == []
+    archived = client.get("/api/projects/p1/canvases?include_archived=true", headers=HEADERS).json()
+    assert [row["status"] for row in archived["canvases"]] == ["archived"]
+    models = client.get("/api/canvas/models", headers=HEADERS)
+    assert models.status_code == 200 and "available" in models.json()
+    # A board from another project is invisible through the proxy too.
+    other = client.post("/api/projects/p2/canvases", headers=HEADERS, json={"name": "Theirs"}).json()
+    assert client.get(f"/api/projects/p1/canvases/{other['canvas_id']}", headers=HEADERS).status_code == 404
+
+
+def test_board_delete_review_message_and_plan_edit_proxy(tmp_path, monkeypatch):
+    """D15: board-scoped delete/review, chat message and plan-step edits all
+    pass the proxy with the trusted principal."""
+    module, _adapter, client = _load_proxy(tmp_path, monkeypatch, auth=False)
+    objects = [
+        {"id": "e1", "kind": "evidence", "content": {"text": "Users stall at import"}},
+        {"id": "c1", "kind": "claim", "content": {"text": "Import feels unsafe"}},
+        {"id": "p1", "kind": "plan_block", "content": {"text": "Preview before commit"}},
+    ]
+    board = client.post("/api/projects/p1/canvases", headers=HEADERS, json={"name": "Flow"}).json()
+    cid = board["canvas_id"]
+    saved = client.put(f"/api/projects/p1/canvases/{cid}", headers=HEADERS,
+                       json={"expected_revision": board["revision"], "objects": objects, "connectors": []})
+    assert saved.status_code == 200, saved.text
+    review = client.post(f"/api/projects/p1/canvases/{cid}/curate", headers=HEADERS)
+    assert review.status_code == 200 and review.json()["summary"]["claim_count"] == 1
+    session = client.post(f"/api/projects/p1/canvases/{cid}/sessions", headers=HEADERS,
+                          json={"message": "Keep it small", "actor": "forged"})
+    assert session.status_code == 200, session.text
+    notes = [row for row in session.json()["answers"] if row["outcome"] == "message"]
+    assert [(row["answer"], row["actor"]) for row in notes] == [("Keep it small", module._ACTOR_ID)]
+    proposal = next(p for p in session.json()["proposals"] if p["kind"] == "technical_plan")
+    client.post(f"/api/canvas/proposals/{proposal['proposal_id']}/decision", headers=HEADERS, json={"approve": True})
+    plan = client.post(f"/api/canvas/proposals/{proposal['proposal_id']}/plan", headers=HEADERS,
+                       json={"project_id": "p1"}).json()
+    edited = client.patch(f"/api/projects/p1/plans/{plan['plan_id']}", headers=HEADERS,
+                          json={"steps": [{"title": "Only step"}], "actor": "forged"})
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["steps"][0]["title"] == "Only step"
+    assert edited.json()["edited_by"] == module._ACTOR_ID
+    revision = client.get(f"/api/projects/p1/canvases/{cid}", headers=HEADERS).json()["revision"]
+    gone = client.delete(f"/api/projects/p1/canvases/{cid}/objects/e1", headers=HEADERS,
+                         params={"expected_revision": revision})
+    assert gone.status_code == 200, gone.text
+    assert gone.json()["updated_by"] == module._ACTOR_ID
+    assert [o["id"] for o in gone.json()["objects"]] == ["c1", "p1"]
+
+
 def test_bot_groups_list_exposes_stable_id(tmp_path, monkeypatch):
     _module, _adapter, client = _load_proxy(tmp_path, monkeypatch)
     created = client.post("/api/bot-groups", headers=HEADERS, json={

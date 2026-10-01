@@ -24,11 +24,12 @@ class CanvasCurationService:
     def __init__(self, provider: CurationProvider | None = None) -> None:
         self.provider = provider
 
-    def curate(self, canvas: dict[str, Any], *, clarifications: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    def curate(self, canvas: dict[str, Any], *, clarifications: list[dict[str, Any]] | None = None,
+               message: str | None = None) -> dict[str, Any]:
         objects = list(canvas.get("objects", []))
         clarifications = list(clarifications or [])
         resolved_question_ids = {
-            str(item.get("question", {}).get("id") or "")
+            str((item.get("question") or {}).get("id") or "")
             for item in clarifications
             if item.get("outcome") in {"answer", "skip"}
         }
@@ -45,9 +46,12 @@ class CanvasCurationService:
             if required and gap_id not in resolved_question_ids:
                 missing.append({"id": gap_id, "question": question})
         context_fingerprint = sha256(json.dumps(canvas, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        if self.provider is not None and not missing:
+        if self.provider is not None and objects:
             try:
-                provider_result = self.provider.propose({"canvas": canvas, "untrusted_content": True})
+                context = {"canvas": canvas, "untrusted_content": True, "clarifications": clarifications}
+                if message:
+                    context["user_message"] = message
+                provider_result = self.provider.propose(context)
                 if not isinstance(provider_result, dict) or not isinstance(provider_result.get("proposals", []), list):
                     raise ValueError("provider returned malformed curation output")
             except Exception as exc:  # provider failures are explicit, never simulated success
@@ -71,10 +75,14 @@ class CanvasCurationService:
                     ("technical_plan", "Technical implementation plan"),
                 )
             ] if objects and not missing else [])
+        provider_id = getattr(self.provider, "provider_id", "provider-neutral")
+        model_id = getattr(self.provider, "model_id", "provider-neutral")
         for proposal in proposals:
             proposal.setdefault("requires_approval", True)
             proposal.setdefault("context_fingerprint", context_fingerprint)
             proposal.setdefault("source_object_ids", [o["id"] for o in objects])
+            proposal.setdefault("provider_id", provider_id)
+            proposal.setdefault("model_id", model_id)
         return {
             "canvas_revision": canvas.get("revision"),
             "status": "needs_clarification" if missing else "ready_for_review",

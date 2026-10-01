@@ -26,10 +26,20 @@ def run_surface(tmp_path, code, **overrides):
                           capture_output=True, text=True, timeout=40)
 
 
+
+@pytest.fixture
+def as_host(monkeypatch):
+    """Fix 2: the profile default is reserved for the Hermes host; act as it."""
+    import types
+    monkeypatch.setitem(sys.modules, "hermes_cli", types.ModuleType("hermes_cli"))
+
+
 def test_default_surfaces_observe_the_same_project(tmp_path):
     result = run_surface(tmp_path, f'''
-import sys, importlib, json, io, contextlib
+import sys, importlib, json, io, contextlib, types
 sys.modules["httpx"] = importlib.import_module("httpx2")
+# Fix 2: only the Hermes host may use the profile default; act as the host.
+sys.modules["hermes_cli"] = types.ModuleType("hermes_cli")
 from hermes_project_stewardship.plugin import PluginState, tool_steward_status
 from hermes_project_stewardship.cli.app import main
 from hermes_project_stewardship.api.server import create_app
@@ -121,7 +131,7 @@ PluginState.reset()
     assert not (tmp_path / "env.db").exists()
 
 
-def test_resolver_boundaries_do_not_hide_or_change_data(tmp_path, monkeypatch):
+def test_resolver_boundaries_do_not_hide_or_change_data(tmp_path, monkeypatch, as_host):
     from hermes_project_stewardship.runtime import StateSelectionError, resolve_db_path
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profile"))
@@ -153,7 +163,7 @@ def test_resolver_boundaries_do_not_hide_or_change_data(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX permissions")
-def test_factory_secures_managed_directory_but_preserves_explicit_parent(tmp_path, monkeypatch):
+def test_factory_secures_managed_directory_but_preserves_explicit_parent(tmp_path, monkeypatch, as_host):
     from hermes_project_stewardship.runtime import open_store
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profile"))
@@ -173,7 +183,7 @@ def test_factory_secures_managed_directory_but_preserves_explicit_parent(tmp_pat
     assert explicit.stat().st_mode & 0o777 == 0o755
 
 
-def test_distinct_profiles_remain_isolated(tmp_path, monkeypatch):
+def test_distinct_profiles_remain_isolated(tmp_path, monkeypatch, as_host):
     from hermes_project_stewardship.runtime import open_store
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("DOCKYARD_PLUGIN_DB", raising=False)
@@ -188,7 +198,7 @@ def test_distinct_profiles_remain_isolated(tmp_path, monkeypatch):
         store.close()
 
 
-def test_conflicting_stores_are_preserved_and_restore_is_rehearsable(tmp_path, monkeypatch):
+def test_conflicting_stores_are_preserved_and_restore_is_rehearsable(tmp_path, monkeypatch, as_host):
     from hermes_project_stewardship.persistence.backup import export_store, restore_store
     from hermes_project_stewardship.runtime import StateSelectionError, open_store
     monkeypatch.chdir(tmp_path)

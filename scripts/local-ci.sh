@@ -53,6 +53,11 @@ export HERMES_KANBAN_HOME="$EVIDENCE/hermes-home"
 export COVERAGE_FILE="$EVIDENCE/.coverage"
 export PYTHONDONTWRITEBYTECODE=1
 unset STEWARD_DB_PATH DOCKYARD_PLUGIN_DB STEWARD_RPC_TOKEN DOCKYARD_PLUGIN_URL DOCKYARD_ACTOR_ID
+# Hermetic interpreter: an inherited PYTHONPATH (e.g. a live Hermes checkout)
+# would put foreign packages on sys.path, so the suite and the dependency
+# audit would judge libraries this project never installs. Drop it, and let
+# the audit gate below prove sys.path holds only the candidate venv.
+unset PYTHONPATH PYTHONHOME PYTHONSTARTUP
 echo "evidence: $EVIDENCE"
 "$PY" -c 'from pathlib import Path; import hermes_project_stewardship as p; print("candidate import:", p.__file__); assert Path(p.__file__).resolve().is_relative_to(Path.cwd() / "src")' || exit 1
 
@@ -103,7 +108,7 @@ fi
 
 # --- Gate 4: api-extra import (mirrors ci.yml api-extra job).
 run_gate "api-extra-import" "rpc-ok" \
-  "$PY" -c "from hermes_project_stewardship.api.server import app; print('rpc-ok')"
+  "$PY" -c "from hermes_project_stewardship.api.server import create_app; import hermes_project_stewardship.api.server as srv; assert not hasattr(srv, 'app'), 'module-level app must be gone (P addendum fix 1)'; print('rpc-ok')"
 
 # --- Optional JS gates: dashboard + desktop harnesses.
 if [ "$WITH_NODE" -eq 1 ]; then

@@ -170,6 +170,8 @@ def test_default_plugin_database_is_durable_and_private(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_HOME", str(hermes_home))
     monkeypatch.delenv("DOCKYARD_PLUGIN_DB", raising=False)
     monkeypatch.delenv("STEWARD_DB_PATH", raising=False)
+    # Fix 2: the default is reserved for the host; simulate its module name.
+    monkeypatch.setitem(sys.modules, "hermes_dashboard_plugin_hermes-dockyard", plugin_api)
 
     default_path = plugin_api._default_db_path()
 

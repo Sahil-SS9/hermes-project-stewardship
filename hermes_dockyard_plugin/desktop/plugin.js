@@ -2539,16 +2539,38 @@ var workflow_canvas_css_default = `
    overrides under the theme attribute the Desktop host actually flips
    (.dockyard-root[data-theme="dark"]). The reserved --dy-edge-plan-* means now
    live here (they were declared tokens-only for this surface). */
-.dy-pc-scope {
+.dy-pc-scope,
+.dy-pc-scope .dy-pc[data-canvas-theme="light"] {
   --dy-pc-kind-evidence: #1f7a55;   --dy-pc-kind-claim: #6b4bbd;
   --dy-pc-kind-question: #9a6206;   --dy-pc-kind-decision: #2f4bb5;
   --dy-pc-kind-plan_block: #1d6480; --dy-pc-kind-note: #5b6472;
+  --dy-pc-kind-risk: #a8321f; --dy-pc-kind-assumption: #6b5a12;
   --dy-pc-kind-link: #0f6f7a;       --dy-pc-kind-media: #8a3a76;
   --dy-pc-edge-support: #1f7a55;
   --dy-pc-surface: rgba(255, 255, 255, .96);
   --dy-pc-grid: rgba(31, 42, 68, .10);
   --dy-pc-backdrop: rgba(15, 18, 23, .26);
   --dy-pc-danger-text: #a72a2a;
+  /* D20: every kind is a full sticker. Light canvas = pastel paper with dark
+     ink; all fills keep ink and ink-2 at WCAG AA (>= 4.5:1), asserted in
+     dashboard/tests/canvas-sticker-contrast.test.mjs. */
+  --dy-pc-ink: #15171c;               --dy-pc-ink-2: #3a4250;
+  --dy-pc-fill-evidence: #d9f4dd;     --dy-pc-fill-claim: #e7defc;
+  --dy-pc-fill-question: #ffe2c4;     --dy-pc-fill-decision: #dde3ff;
+  --dy-pc-fill-plan_block: #d2efec;   --dy-pc-fill-note: #fff1a6;
+  --dy-pc-fill-risk: #fde0da; --dy-pc-fill-assumption: #f3ecc8;
+  --dy-pc-fill-link: #d3ebfb;         --dy-pc-fill-media: #fbdcec;
+  --dy-pc-sticker-yellow: #fff1a6;    --dy-pc-sticker-green: #d3f4dc;
+  --dy-pc-sticker-blue: #d3e6fd;      --dy-pc-sticker-pink: #fcd9e7;
+  --dy-pc-sticker-purple: #e7defc;    --dy-pc-sticker-orange: #ffdfc0;
+  --dy-pc-sticker-coral: #ffc4bd;     --dy-pc-sticker-teal: #bfeee6;
+  --dy-pc-sticker-lime: #e3f7b8;      --dy-pc-sticker-clay: #e6d2bf;
+  --dy-pc-sticker-slate: #e2e6eb;     --dy-pc-sticker-indigo: #c9cffa;
+  --dy-pc-card-edge: rgba(21, 23, 28, .14);
+  /* D18: the canvas frame. */
+  --dy-pc-frame: #3654c7;             --dy-pc-frame-halo: rgba(54, 84, 199, .16);
+  --dy-pc-glow: rgba(54, 84, 199, .10);
+  --dy-pc-stage-bg: #f4f6fa;
   /* Connector meanings (reserved vocabulary, now drawn here). */
   --dy-edge-plan-supports: #1f7a55;         --dy-edge-plan-supports-active: #17603f;
   --dy-edge-plan-contradicts: #b3352c;      --dy-edge-plan-contradicts-active: #8d2721;
@@ -2558,15 +2580,34 @@ var workflow_canvas_css_default = `
   --dy-edge-plan-raises_question: #a8275f;  --dy-edge-plan-raises_question-active: #861e4b;
   --dy-edge-plan-depends_on: #4a5a7a;       --dy-edge-plan-depends_on-active: #3a4763;
 }
-.dockyard-root[data-theme="dark"] .dy-pc-scope {
+.dockyard-root[data-theme="dark"] .dy-pc-scope,
+.dy-pc-scope .dy-pc[data-canvas-theme="dark"] {
   --dy-pc-kind-evidence: #57d39b;   --dy-pc-kind-claim: #b99cf5;
   --dy-pc-kind-question: #f0c04a;   --dy-pc-kind-decision: #9db3ff;
   --dy-pc-kind-plan_block: #79cbe0; --dy-pc-kind-note: #a9b6c6;
+  --dy-pc-kind-risk: #ff9b87; --dy-pc-kind-assumption: #e0cf7a;
   --dy-pc-kind-link: #6fd8e0;       --dy-pc-kind-media: #e3a0d3;
   --dy-pc-surface: rgba(23, 27, 34, .96);
   --dy-pc-grid: rgba(182, 190, 202, .12);
   --dy-pc-backdrop: rgba(0, 0, 0, .42);
   --dy-pc-danger-text: #ff9d97;
+  /* Dark canvas = deep glowing stickers with light ink (AA both inks). */
+  --dy-pc-ink: #f3f5f7;               --dy-pc-ink-2: #c9d1dc;
+  --dy-pc-fill-evidence: #173d2a;     --dy-pc-fill-claim: #2e2552;
+  --dy-pc-fill-question: #4a2d12;     --dy-pc-fill-decision: #1f2b5c;
+  --dy-pc-fill-plan_block: #123d40;   --dy-pc-fill-note: #463c0e;
+  --dy-pc-fill-risk: #4a1c15; --dy-pc-fill-assumption: #3a3310;
+  --dy-pc-fill-link: #123a52;         --dy-pc-fill-media: #4a1d3c;
+  --dy-pc-sticker-yellow: #463c0e;    --dy-pc-sticker-green: #173d2a;
+  --dy-pc-sticker-blue: #16345a;      --dy-pc-sticker-pink: #4d1c33;
+  --dy-pc-sticker-purple: #2e2552;    --dy-pc-sticker-orange: #4a2d12;
+  --dy-pc-sticker-coral: #5a1a17;     --dy-pc-sticker-teal: #0c3f3b;
+  --dy-pc-sticker-lime: #2f3d0a;      --dy-pc-sticker-clay: #3a2e27;
+  --dy-pc-sticker-slate: #2b3139;     --dy-pc-sticker-indigo: #22286e;
+  --dy-pc-card-edge: rgba(243, 245, 247, .16);
+  --dy-pc-frame: #7c8cff;             --dy-pc-frame-halo: rgba(124, 140, 255, .32);
+  --dy-pc-glow: rgba(124, 140, 255, .26);
+  --dy-pc-stage-bg: #0d1018;
   --dy-edge-plan-supports: #4fc08d;         --dy-edge-plan-supports-active: #79e0ab;
   --dy-edge-plan-contradicts: #ff8a80;      --dy-edge-plan-contradicts-active: #ffb3ab;
   --dy-edge-plan-derived_from: #c792ea;     --dy-edge-plan-derived_from-active: #e0bcf7;
@@ -2575,8 +2616,67 @@ var workflow_canvas_css_default = `
   --dy-edge-plan-raises_question: #ff6ea9;  --dy-edge-plan-raises_question-active: #ff9cc4;
   --dy-edge-plan-depends_on: #8fa3c8;       --dy-edge-plan-depends_on-active: #9cc4ff;
 }
-/* Frame: toolbar + stage + overlay slots. */
-.dy-pc-scope .dy-pc { position: relative; display: flex; flex-direction: column; min-height: 0; margin-top: 14px; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); }
+/* D19: the canvas light/dark toggle. Only the canvas area (.dy-pc) re-declares
+   the plugin tokens its own controls read, so the board bar and the rest of
+   the plugin keep the host theme. Values mirror desktop/src/styles/tokens.js. */
+.dy-pc-scope .dy-pc[data-canvas-theme="light"] {
+  --dy-surface: #ffffff; --dy-surface-subtle: #f0f2f5; --dy-text: #15171c;
+  --dy-text-2: #515968; --dy-text-3: #626c7b; --dy-border: #d7dce4;
+  --dy-control-border: #87909d; --dy-accent-text: #293f9e; --dy-accent-soft: #eef1ff;
+  --dy-accent-border: #b8c4f0; --dy-shadow: 0 10px 28px rgba(31, 42, 68, 0.08);
+  --dy-success: #136c4a; --dy-warning: #805200; --dy-danger-bg: #ffeded; --dy-focus: #3654c7;
+  --dy-pc-surface: rgba(255, 255, 255, .96); --dy-pc-grid: rgba(31, 42, 68, .10);
+  color: #15171c; color-scheme: light;
+}
+.dy-pc-scope .dy-pc[data-canvas-theme="dark"] {
+  --dy-surface: #171b22; --dy-surface-subtle: #1d222b; --dy-text: #f3f5f7;
+  --dy-text-2: #b6beca; --dy-text-3: #949eac; --dy-border: #2e3541;
+  --dy-control-border: #5f6977; --dy-accent-text: #c2cbff; --dy-accent-soft: #232c4f;
+  --dy-accent-border: #46558f; --dy-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+  --dy-success: #72cda2; --dy-warning: #f0bd64; --dy-danger-bg: #40201f; --dy-focus: #8fa2ff;
+  --dy-pc-surface: rgba(23, 27, 34, .96); --dy-pc-grid: rgba(124, 140, 255, .10);
+  color: #f3f5f7; color-scheme: dark;
+}
+/* Board switcher: compact on desktop and allowed to collapse on narrow screens. */
+.dy-pc-scope .dy-pc-board-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface); }
+.dy-pc-scope .dy-pc-board-bar > .dockyard-button { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; padding: 5px; }
+.dy-pc-scope .dy-pc-board-title { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; min-width: 0; flex: 1 1 auto; }
+.dy-pc-scope .dy-pc-board-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border: 1px solid var(--dy-border); border-radius: 999px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; font-weight: 650; }
+.dy-pc-scope .dy-pc-board-moves { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dy-pc-scope .dy-pc-board-moves-label { color: var(--dy-text-3); font-size: 11px; }
+.dy-pc-scope .dy-pc-board-panel { display: grid; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface-subtle); }
+.dy-pc-scope .dy-pc-board-open { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: var(--dy-accent-text); color: var(--dy-surface); font-size: 10px; font-weight: 750; letter-spacing: .03em; }
+.dy-pc-scope .dy-pc-board-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dy-text); font-size: 13px; }
+.dy-pc-scope .dy-pc-board-count { color: var(--dy-text-3); font-size: 11px; }
+.dy-pc-scope .dy-pc-theme-toggle { display: flex; gap: 2px; border: 1px solid var(--dy-border); border-radius: 8px; padding: 2px; }
+.dy-pc-scope .dy-pc-theme-toggle .dockyard-button { min-width: 29px; padding: 5px; }
+.dy-pc-scope .dy-pc-board-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.dy-pc-scope .dy-pc-board-row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 9px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); text-align: left; cursor: pointer; }
+.dy-pc-scope .dy-pc-board-row:hover { border-color: var(--dy-accent-border); }
+/* The open board is unmistakable: accent fill, 2px accent edge and an "Open" tag. */
+.dy-pc-scope .dy-pc-board-row.active { border-color: var(--dy-accent-text); background: var(--dy-accent-soft); box-shadow: inset 3px 0 0 var(--dy-accent-text); cursor: default; }
+.dy-pc-scope .dy-pc-board-row.active strong { color: var(--dy-accent-text); }
+.dy-pc-scope .dy-pc-board-row:disabled { cursor: wait; opacity: .65; }
+.dy-pc-scope .dy-pc-board-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 99px; background: var(--dy-success); }
+.dy-pc-scope .dy-pc-board-dot[data-status="submitted"] { background: var(--dy-warning); }
+.dy-pc-scope .dy-pc-board-dot[data-status="completed"], .dy-pc-scope .dy-pc-board-dot[data-status="archived"] { background: var(--dy-text-3); }
+.dy-pc-scope .dy-pc-board-row-copy { display: grid; min-width: 0; gap: 2px; }
+.dy-pc-scope .dy-pc-board-row-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
+.dy-pc-scope .dy-pc-board-row-copy small { color: var(--dy-text-3); font-size: 10px; }
+.dy-pc-scope .dy-pc-board-warning { margin-left: auto; color: var(--dy-warning); font-weight: 800; }
+.dy-pc-scope .dy-pc-board-item { display: flex; align-items: stretch; gap: 4px; min-width: 0; }
+.dy-pc-scope .dy-pc-board-item .dy-pc-board-row { flex: 1 1 auto; }
+.dy-pc-scope .dy-pc-board-item .dockyard-button { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; padding: 5px; }
+.dy-pc-scope .dy-pc-board-item .dockyard-button svg, .dy-pc-scope .dy-pc-board-bar .dockyard-button svg { width: 14px; height: 14px; }
+.dy-pc-scope .dy-pc-board-form { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dy-pc-scope .dy-pc-board-form .dockyard-button { display: inline-flex; align-items: center; gap: 5px; }
+.dy-pc-scope .dy-pc-board-form .dockyard-button svg { width: 13px; height: 13px; }
+.dy-pc-scope .dy-pc-board-form input { flex: 1 1 180px; min-width: 0; padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
+.dy-pc-scope .dy-pc-board-status { display: inline-flex; align-items: center; gap: 6px; }
+.dy-pc-scope .dy-pc-board-status select { padding: 5px 8px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 11.5px; }
+.dy-pc-scope .dy-pc-board-archived { grid-column: 1 / -1; color: var(--dy-text-3); font-size: 11px; }
+
+.dy-pc-scope .dy-pc { position: relative; display: flex; flex-direction: column; min-height: 0; margin-top: 14px; overflow: hidden; border: 2px solid var(--dy-pc-frame); border-radius: 14px; background: var(--dy-surface); color: var(--dy-text); box-shadow: 0 0 0 4px var(--dy-pc-frame-halo), 0 18px 48px var(--dy-pc-glow); }
 .dy-pc-scope .dy-pc-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 9px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface-subtle); }
 .dy-pc-scope .dy-pc-seg { display: flex; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 8px; }
 .dy-pc-scope .dy-pc-seg button { padding: 6px 11px; border: 0; border-radius: 0; background: transparent; color: var(--dy-text-2); font-size: 11.5px; font-weight: 600; cursor: pointer; }
@@ -2586,6 +2686,39 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-add input { min-width: 190px; max-width: 320px; padding: 6px 8px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
 .dy-pc-scope .dy-pc-add select { padding: 6px 8px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
 .dy-pc-scope .dy-pc-spacer { flex: 1 1 auto; }
+/* D17: grouped toolbar (Edit / Add / View / AI / Save) of icon buttons. Each
+   group carries a small caption; each button a tooltip (name + one line). */
+/* Stage 3 ribbon (owner 30/09): one title strip spans the whole toolbar with
+   the group names; each group's tools sit directly beneath its name, groups
+   split by thin dividers, Save pinned right. Groups grow to fill their row,
+   so the strip stays continuous when groups wrap onto a second row. */
+.dy-pc-scope .dy-pc-toolbar.dy-pc-ribbon { gap: 0; padding: 0; align-items: stretch; }
+.dy-pc-scope .dy-pc-group { display: flex; flex: 1 0 auto; flex-direction: column; min-width: 0; border-left: 1px solid var(--dy-border); }
+.dy-pc-scope .dy-pc-ribbon > .dy-pc-group:first-child { border-left: 0; }
+.dy-pc-scope .dy-pc-group-label { display: block; height: 22px; padding: 0 10px; border-bottom: 1px solid var(--dy-border); background: var(--dy-pc-ribbon-band); color: var(--dy-text-2); font-size: 9.5px; font-weight: 700; letter-spacing: .1em; line-height: 22px; text-align: center; text-transform: uppercase; white-space: nowrap; }
+.dy-pc-scope .dy-pc-group-tools { display: flex; flex: 1 1 auto; align-items: center; justify-content: center; gap: 3px; padding: 6px 8px; }
+.dy-pc-scope .dy-pc-ribbon-fill { flex: 1 1 0; min-width: 0; background: linear-gradient(var(--dy-pc-ribbon-band) 0 22px, var(--dy-border) 22px 23px, transparent 23px); }
+/* Declared on .dy-pc, where the canvas theme tokens live, so a dark board in
+   a light app gets a dark band (Quan Stage 3 review, H1). */
+.dy-pc-scope .dy-pc { --dy-pc-ribbon-band: color-mix(in srgb, var(--dy-surface-subtle) 55%, var(--dy-border)); }
+.dy-pc-scope .dy-pc-tool { position: relative; display: inline-flex; }
+.dy-pc-scope .dy-pc-tool .dockyard-button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 30px; min-height: 30px; padding: 5px 7px; }
+.dy-pc-scope .dy-pc-tool .dockyard-button svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.dy-pc-scope .dy-pc-tip { position: absolute; top: calc(100% + 7px); left: 50%; z-index: 60; display: grid; gap: 2px; width: max-content; max-width: 220px; padding: 7px 9px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); box-shadow: var(--dy-shadow); color: var(--dy-text); font-size: 11px; line-height: 1.35; text-align: left; opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(-2px); transition: opacity .12s ease, transform .12s ease; }
+.dy-pc-scope .dy-pc-tip strong { font-size: 11.5px; font-weight: 650; }
+.dy-pc-scope .dy-pc-tip span { color: var(--dy-text-2); }
+.dy-pc-scope .dy-pc-tool:hover .dy-pc-tip, .dy-pc-scope .dy-pc-tool:focus-within .dy-pc-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
+/* Tips at the frame edges anchor to that edge so the frame does not cut
+   them off (Quan Stage 3 review, M1/L3). */
+.dy-pc-scope .dy-pc-group[data-pc-group="save"] .dy-pc-tip, .dy-pc-scope .dy-pc-group[data-pc-group="save"] .dy-pc-tool:is(:hover, :focus-within) .dy-pc-tip { left: auto; right: 0; transform: none; }
+.dy-pc-scope .dy-pc-group[data-pc-group="edit"] .dy-pc-tip, .dy-pc-scope .dy-pc-group[data-pc-group="edit"] .dy-pc-tool:is(:hover, :focus-within) .dy-pc-tip { left: 0; transform: none; }
+/* The add menu opens leftwards from its button above phone width (M2). */
+.dy-pc-scope .dy-pc-addmenu { position: absolute; top: calc(100% + 6px); left: auto; right: 0; z-index: 55; display: grid; gap: 2px; min-width: 190px; padding: 5px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); box-shadow: var(--dy-shadow); }
+.dy-pc-scope .dy-pc-addmenu[hidden] { display: none; }
+.dy-pc-scope .dy-pc-addmenu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 9px; border: 0; border-radius: 7px; background: transparent; color: var(--dy-text); font-size: 12px; text-align: left; cursor: pointer; }
+.dy-pc-scope .dy-pc-addmenu button:hover, .dy-pc-scope .dy-pc-addmenu button:focus-visible { background: var(--dy-accent-soft); color: var(--dy-accent-text); }
+.dy-pc-scope .dy-pc-addmenu button svg { width: 14px; height: 14px; }
+.dy-pc-scope .dy-pc-addmenu .swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--dy-pc-card-edge); }
 /* Connector editor bar: the explicit fallback for a real meaning, beside the
    toolbar so it is reachable without a gesture. */
 .dy-pc-scope .dy-pc-linkbar { display: flex; flex-wrap: wrap; align-items: end; gap: 9px; padding: 10px 12px; border-bottom: 1px solid var(--dy-border); background: var(--dy-surface); }
@@ -2594,7 +2727,10 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-edge-label { fill: var(--dy-text-3); font: 600 9.5px system-ui, sans-serif; letter-spacing: .02em; pointer-events: none; }
 .dy-pc-scope .dy-pc-readout { color: var(--dy-text-3); font-size: 11px; font-variant-numeric: tabular-nums; }
 /* Stage + world. The world is the scrollable/zoomable plane objects live on. */
-.dy-pc-scope .dy-pc-stage { position: relative; flex: 1 1 auto; min-height: 460px; height: 58vh; overflow: hidden; background-color: var(--dy-surface-subtle); background-image: linear-gradient(var(--dy-pc-grid) 1px, transparent 1px), linear-gradient(90deg, var(--dy-pc-grid) 1px, transparent 1px); background-size: 28px 28px; }
+.dy-pc-scope .dy-pc-stage { position: relative; flex: 1 1 auto; min-height: 460px; height: 58vh; overflow: hidden; background-color: var(--dy-pc-stage-bg); background-image: radial-gradient(ellipse at 50% 0%, var(--dy-pc-glow), transparent 62%), linear-gradient(var(--dy-pc-grid) 1px, transparent 1px), linear-gradient(90deg, var(--dy-pc-grid) 1px, transparent 1px); background-size: 100% 100%, 28px 28px, 28px 28px; }
+.dy-pc-scope .dy-pc-stage { cursor: grab; overscroll-behavior: contain; touch-action: none; }
+.dy-pc-scope .dy-pc-stage[data-pc-panning="true"] { cursor: grabbing; }
+.dy-pc-scope .dy-pc-stage[data-pc-panning="true"] .dy-pc-world { user-select: none; }
 .dy-pc-scope .dy-pc-stage[data-pc-mode="connect"] { cursor: crosshair; }
 .dy-pc-scope .dy-pc-world { position: absolute; left: 0; top: 0; width: 2000px; height: 1400px; transform-origin: 0 0; }
 .dy-pc-scope .dy-pc-svg { position: absolute; left: 0; top: 0; width: 2000px; height: 1400px; overflow: visible; pointer-events: none; z-index: 1; }
@@ -2611,29 +2747,173 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-svg .dy-pc-arrowhead { fill: var(--dy-text-3); }
 .dy-pc-scope .dy-pc-svg circle { fill: var(--dy-surface); }
 /* Objects: one real kind each, kind carried by an edge stripe (v6's cue). */
-.dy-pc-scope .dy-pc-obj { position: absolute; z-index: 2; min-width: 180px; max-width: 260px; padding: 11px 13px; border: 1px solid var(--dy-border); border-left: 3px solid var(--dy-pc-kind-note); border-radius: 10px; background: var(--dy-pc-surface); box-shadow: var(--dy-shadow); color: var(--dy-text); text-align: left; cursor: grab; user-select: none; touch-action: none; }
+/* The inline width/height set from the stored rect are authoritative (no
+   min/max clamp), so connector anchors always sit on the drawn card edge. */
+.dy-pc-scope .dy-pc-obj { position: absolute; z-index: 2; padding: 11px 13px; border: 1px solid var(--dy-pc-card-edge); border-left: 4px solid var(--dy-pc-kind-note); border-radius: 10px; background: var(--dy-pc-fill-note); box-shadow: var(--dy-shadow); color: var(--dy-pc-ink); text-align: left; cursor: grab; user-select: none; touch-action: none; overflow: hidden; }
+/* B9: the stored rect drives the rendered box \u2014 the inline height style set by
+   canvas.js is authoritative (attr() is not reliably parsed with units here),
+   so connector anchors and de-overlap match what was persisted. */
+.dy-pc-scope .dy-pc-obj .dy-pc-obj-kind-icon { position: absolute; top: 9px; right: 10px; color: var(--dy-pc-ink-2); display: inline-flex; pointer-events: none; }
+.dy-pc-scope .dy-pc-obj .dy-pc-obj-kind-icon svg { width: 13px; height: 13px; }
+.dy-pc-scope .dy-pc-obj.marquee-selected { box-shadow: 0 0 0 2px var(--dy-accent-soft), 0 0 0 1px var(--dy-accent-border), var(--dy-shadow); }
+.dy-pc-scope .dy-pc-marquee { position: absolute; z-index: 5; border: 1px dashed var(--dy-accent-border); background: var(--dy-accent-soft); pointer-events: none; }
+.dy-pc-scope .dy-pc-chat input[data-canvas-chat-input] { flex: 1 1 auto; min-width: 0; }
 .dy-pc-scope .dy-pc-obj:active { cursor: grabbing; }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="evidence"] { border-left-color: var(--dy-pc-kind-evidence); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="claim"] { border-left-color: var(--dy-pc-kind-claim); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="question"] { border-left-color: var(--dy-pc-kind-question); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="decision"] { border-left-color: var(--dy-pc-kind-decision); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="plan_block"] { border-left-color: var(--dy-pc-kind-plan_block); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="note"] { border-left-color: var(--dy-pc-kind-note); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="link"] { border-left-color: var(--dy-pc-kind-link); }
-.dy-pc-scope .dy-pc-obj[data-canvas-kind="media"] { border-left-color: var(--dy-pc-kind-media); }
-.dy-pc-scope .dy-pc-obj:hover { border-top-color: var(--dy-accent-border); border-right-color: var(--dy-accent-border); border-bottom-color: var(--dy-accent-border); }
-.dy-pc-scope .dy-pc-obj.selected { border-top-color: var(--dy-accent-border); border-right-color: var(--dy-accent-border); border-bottom-color: var(--dy-accent-border); box-shadow: 0 0 0 2px var(--dy-accent-soft), var(--dy-shadow); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="evidence"] { border-left-color: var(--dy-pc-kind-evidence); background: var(--dy-pc-fill-evidence); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="claim"] { border-left-color: var(--dy-pc-kind-claim); background: var(--dy-pc-fill-claim); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="question"] { border-left-color: var(--dy-pc-kind-question); background: var(--dy-pc-fill-question); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="decision"] { border-left-color: var(--dy-pc-kind-decision); background: var(--dy-pc-fill-decision); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="plan_block"] { border-left-color: var(--dy-pc-kind-plan_block); background: var(--dy-pc-fill-plan_block); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="note"] { border-left-color: var(--dy-pc-kind-note); background: var(--dy-pc-fill-note); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="link"] { border-left-color: var(--dy-pc-kind-link); background: var(--dy-pc-fill-link); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="media"] { border-left-color: var(--dy-pc-kind-media); background: var(--dy-pc-fill-media); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="yellow"] { background: var(--dy-pc-sticker-yellow); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="green"] { background: var(--dy-pc-sticker-green); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="blue"] { background: var(--dy-pc-sticker-blue); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="pink"] { background: var(--dy-pc-sticker-pink); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="purple"] { background: var(--dy-pc-sticker-purple); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="orange"] { background: var(--dy-pc-sticker-orange); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="coral"] { background: var(--dy-pc-sticker-coral); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="teal"] { background: var(--dy-pc-sticker-teal); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="lime"] { background: var(--dy-pc-sticker-lime); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="clay"] { background: var(--dy-pc-sticker-clay); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="slate"] { background: var(--dy-pc-sticker-slate); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="indigo"] { background: var(--dy-pc-sticker-indigo); }
+/* Colour picker: one dot per choice, ringed when picked. */
+.dy-pc-scope .dy-pc-colours-field { display: grid; gap: 6px; }
+.dy-pc-scope .dy-pc-colours { display: flex; flex-wrap: wrap; gap: 6px; }
+.dy-pc-scope .dy-pc-colour { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 2px solid transparent; border-radius: 50%; background: transparent; cursor: pointer; }
+.dy-pc-scope .dy-pc-colour:hover:not(:disabled) { border-color: var(--dy-control-border); }
+.dy-pc-scope .dy-pc-colour[aria-pressed="true"] { border-color: var(--dy-focus); }
+.dy-pc-scope .dy-pc-colour:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
+.dy-pc-scope .dy-pc-colour:disabled { cursor: not-allowed; opacity: .6; }
+.dy-pc-scope .dy-pc-colour-dot { width: 20px; height: 20px; border: 1px solid var(--dy-control-border); border-radius: 50%; }
+.dy-pc-scope .dy-pc-colour-dot.default { background-image: linear-gradient(135deg, transparent 45%, var(--dy-control-border) 45% 55%, transparent 55%) !important; }
+/* Full screen (owner 01/10): the frame takes the window; the stage grows. */
+.dy-pc-scope .dy-pc.dy-pc-full { position: fixed; inset: 8px; z-index: 900; margin: 0; }
+.dy-pc-scope .dy-pc.dy-pc-full .dy-pc-stage { flex: 1 1 auto; height: auto; min-height: 0; }
+.dy-pc-scope[data-canvas-fullscreen-active="true"] > :not(.dy-pc) { visibility: hidden; }
+/* Connect mode: stickers are click targets, the board does not drag. */
+.dy-pc-scope .dy-pc-stage[data-pc-mode="connect"] .dy-pc-obj { cursor: pointer; }
+.dy-pc-scope .dy-pc-svg line[data-canvas-connect-preview] { stroke: var(--dy-focus); stroke-width: 2; }
+.dy-pc-scope .dy-pc-obj:hover { box-shadow: 0 0 0 1px var(--dy-accent-border), var(--dy-shadow); }
+.dy-pc-scope .dy-pc-obj.selected { box-shadow: 0 0 0 2px var(--dy-focus), 0 0 18px var(--dy-pc-glow), var(--dy-shadow); }
 .dy-pc-scope .dy-pc-obj:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
-.dy-pc-scope .dy-pc-obj small { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--dy-text-3); }
-.dy-pc-scope .dy-pc-obj strong { display: block; margin-top: 5px; font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--dy-text); }
-.dy-pc-scope .dy-pc-obj-meta { display: block; margin-top: 6px; color: var(--dy-text-3); font-size: 10px; }
+.dy-pc-scope .dy-pc-obj small { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--dy-pc-ink-2); }
+.dy-pc-scope .dy-pc-obj strong { display: block; margin-top: 5px; font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--dy-pc-ink); }
+.dy-pc-scope .dy-pc-obj-sub { display: block; margin-top: 4px; color: var(--dy-pc-ink-2); font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dy-pc-scope .dy-pc-obj-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 4px; color: var(--dy-pc-ink-2); font-size: 11px; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dy-pc-scope .dy-pc-obj-thumb { display: block; margin-top: 6px; height: 110px; border-radius: 6px; overflow: hidden; background: rgba(0,0,0,.08); }
+.dy-pc-scope .dy-pc-obj-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.dy-pc-scope .dy-pc-img-note { display: grid; place-items: center; height: 100%; min-height: 40px; color: var(--dy-pc-ink-2); font-size: 11px; }
+.dy-pc-scope .dy-pc-drawer-b textarea { width: 100%; min-width: 0; resize: vertical; padding: 9px 10px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12.5px; line-height: 1.45; }
+.dy-pc-scope .dy-pc-fieldset { display: grid; gap: 6px; margin: 0; padding: 10px; border: 1px solid var(--dy-border); border-radius: 8px; min-width: 0; }
+.dy-pc-scope .dy-pc-fieldset legend, .dy-pc-scope .dy-pc-field-label { padding: 0 4px; color: var(--dy-text-2); font-size: 10px; font-weight: 730; }
+.dy-pc-scope .dy-pc-row { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.dy-pc-scope .dy-pc-row input:not([type="checkbox"]) { flex: 1 1 0; min-width: 0; padding: 7px 8px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
+.dy-pc-scope .dy-pc-drawer-b .dy-pc-row input[type="checkbox"] { flex: 0 0 auto; width: 16px; height: 16px; margin: 0 2px; padding: 0; }
+.dy-pc-scope .dy-pc-row input[aria-invalid="true"] { border-color: var(--dy-danger, #c0392b); }
+.dy-pc-scope .dy-pc-open { display: inline-flex; color: var(--dy-accent, inherit); }
+.dy-pc-scope .dy-pc-open svg { width: 14px; height: 14px; }
+.dy-pc-scope .dy-pc-drawer-thumb { display: block; max-height: 220px; border-radius: 8px; overflow: hidden; }
+.dy-pc-scope .dy-pc-drawer-thumb img { display: block; width: 100%; max-height: 220px; object-fit: contain; background: rgba(0,0,0,.06); }
+.dy-pc-scope .dy-pc-upload { cursor: pointer; }
+.dy-pc-scope .dy-pc-upload input[type="file"] { font-size: 11.5px; }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="risk"] { border-left-color: var(--dy-pc-kind-risk); background: var(--dy-pc-fill-risk); }
+.dy-pc-scope .dy-pc-obj[data-canvas-kind="assumption"] { border-left-color: var(--dy-pc-kind-assumption); background: var(--dy-pc-fill-assumption); }
+.dy-pc-scope .dy-rt { display: grid; gap: 6px; min-width: 0; }
+.dy-pc-scope .dy-rt-bar { display: grid; gap: 4px; padding: 5px; border: 1px solid var(--dy-border); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--dy-surface-2, var(--dy-surface)); }
+.dy-pc-scope .dy-rt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; min-width: 0; }
+.dy-pc-scope .dy-rt-row-sel { flex-wrap: nowrap; gap: 4px; }
+.dy-pc-scope .dy-rt-row-sel .dy-rt-select { flex: 1 1 0; min-width: 120px; }
+/* Owner 01/10: room for the text - no fixed height, so letters are never clipped. */
+.dy-pc-scope .dy-rt-select { box-sizing: border-box; height: auto; min-height: 34px; min-width: 120px; line-height: 1.4; padding: 6px 28px 6px 9px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 11.5px; }
+.dy-pc-scope .dy-rt-btn { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--dy-text); cursor: pointer; }
+.dy-pc-scope .dy-rt-btn:hover:not(:disabled) { background: var(--dy-hover, rgba(127,127,127,.14)); }
+.dy-pc-scope .dy-rt-btn.on { border-color: var(--dy-accent, #5b8def); background: color-mix(in srgb, var(--dy-accent, #5b8def) 18%, transparent); }
+.dy-pc-scope .dy-rt-btn:focus-visible, .dy-pc-scope .dy-rt-select:focus-visible { outline: 2px solid var(--dy-accent, #5b8def); outline-offset: 1px; }
+.dy-pc-scope .dy-rt-btn svg { width: 15px; height: 15px; }
+.dy-pc-scope .dy-rt-face { font-size: 13px; line-height: 1; }
+.dy-pc-scope .dy-rt-face-bold { font-weight: 800; }
+.dy-pc-scope .dy-rt-face-italic { font-style: italic; font-family: Georgia, serif; }
+.dy-pc-scope .dy-rt-face-underline { text-decoration: underline; }
+.dy-pc-scope .dy-rt-face-strike { text-decoration: line-through; }
+.dy-pc-scope .dy-rt-sep { width: 1px; height: 18px; margin: 0 3px; background: var(--dy-border); }
+.dy-pc-scope .dy-rt-host .dy-rt-body { min-height: 110px; max-height: 320px; overflow: auto; padding: 9px 11px; border: 1px solid var(--dy-control-border); border-radius: 0 0 8px 8px; background: var(--dy-surface); color: var(--dy-text); font-size: 12.5px; line-height: 1.5; outline: none; overflow-wrap: anywhere; }
+.dy-pc-scope .dy-rt-host.readonly .dy-rt-body { border-radius: 8px; }
+.dy-pc-scope .dy-rt-body:empty::before { content: ''; }
+.dy-pc-scope .dy-rt-host .dy-rt-body:focus { border-color: var(--dy-accent, #5b8def); }
+.dy-pc-scope .dy-rt-body p { margin: 0 0 4px; }
+.dy-pc-scope .dy-rt-body > :first-child { margin-top: 0; }
+.dy-pc-scope .dy-rt-body > :last-child { margin-bottom: 0; }
+.dy-pc-scope .dy-rt-body h1 { margin: 4px 0 6px; font-size: 19px; line-height: 1.25; }
+.dy-pc-scope .dy-rt-body h2 { margin: 4px 0 6px; font-size: 16px; line-height: 1.3; }
+.dy-pc-scope .dy-rt-body h3 { margin: 4px 0 6px; font-size: 14px; line-height: 1.3; }
+.dy-pc-scope .dy-rt-body ul, .dy-pc-scope .dy-rt-body ol { margin: 0 0 6px; padding-left: 22px; }
+.dy-pc-scope .dy-rt-body ul { list-style: disc; }
+.dy-pc-scope .dy-rt-body ol { list-style: decimal; }
+.dy-pc-scope .dy-rt-body li p { margin: 0; }
+.dy-pc-scope .dy-rt-problem { margin: 0; padding: 6px 9px; border-radius: 6px; background: var(--dy-danger-bg); color: var(--dy-pc-danger-text); font-size: 12px; }
+.dy-pc-scope .dy-rt-btn:disabled { opacity: .45; cursor: not-allowed; }
+.dy-pc-scope .dy-rt-small { font-size: .82em; }
+.dy-pc-scope .dy-rt-large { font-size: 1.3em; }
+.dy-pc-scope .dy-rt-huge { font-size: 1.7em; line-height: 1.2; }
+.dy-pc-scope .dy-pc-obj-meta { display: block; margin-top: 6px; color: var(--dy-pc-ink-2); font-size: 10px; }
 .dy-pc-scope .dy-pc-empty { position: absolute; left: 18px; top: 16px; margin: 0; color: var(--dy-text-3); font-size: 12px; }
 /* Frames are decorative group labels (v6's .pframe) \u2014 never controls. */
 .dy-pc-scope .dy-pc-frame { position: absolute; z-index: 0; border: 1px dashed var(--dy-border); border-radius: 10px; background: var(--dy-accent-soft); padding: 12px 14px; color: var(--dy-text-3); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 /* Assistant (curation) panel: docked, collapsible, bottom-right. */
-.dy-pc-scope .dy-pc-chat { position: absolute; right: 14px; bottom: 14px; z-index: 20; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 12px; background: var(--dy-pc-surface); box-shadow: 0 14px 44px rgba(0, 0, 0, .28); }
+.dy-pc-scope .dy-pc-chat { position: absolute; right: 14px; bottom: 14px; z-index: 35; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 12px; background: var(--dy-pc-surface); box-shadow: 0 14px 44px rgba(0, 0, 0, .28); }
 .dy-pc-scope .dy-pc-chat.closed { width: 268px; }
-.dy-pc-scope .dy-pc-chat.open { width: 360px; max-height: 460px; }
+.dy-pc-scope .dy-pc-chat.open { width: 360px; max-height: min(460px, calc(100% - 28px)); }
+.dy-pc-scope .dy-pc-chat.pill { width: auto; max-width: calc(100% - 28px); border-radius: 999px; }
+.dy-pc-scope .dy-pc-chat.pill .dy-pc-chat-b, .dy-pc-scope .dy-pc-chat.pill .dy-pc-chat-f, .dy-pc-scope .dy-pc-chat.pill .dy-pc-chat-model { display: none; }
+.dy-pc-scope .dy-pc-chat.dragging { transition: none; box-shadow: 0 22px 60px rgba(0, 0, 0, .36); }
+.dy-pc-scope .dy-pc-chat.behind-drawer { display: none; }
+.dy-pc-scope .dy-pc-chat-bar { display: flex; align-items: center; gap: 2px; padding-right: 6px; }
+.dy-pc-scope .dy-pc-chat-bar .dockyard-button { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; min-height: 26px; padding: 4px; }
+.dy-pc-scope .dy-pc-chat-bar .dockyard-button svg { width: 13px; height: 13px; }
+.dy-pc-scope .dy-pc-chat-grip { display: inline-flex; align-items: center; padding: 0 2px 0 9px; color: var(--dy-text-3); cursor: grab; touch-action: none; }
+.dy-pc-scope .dy-pc-chat-grip svg { width: 14px; height: 14px; }
+.dy-pc-scope .dy-pc-chat-model { display: flex; align-items: center; gap: 6px; padding: 6px 13px; border-bottom: 1px solid var(--dy-border); color: var(--dy-text-2); font-size: 10.5px; }
+.dy-pc-scope .dy-pc-chat-model select { flex: 1 1 auto; min-width: 0; padding: 4px 6px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 11px; }
+/* Closed = header bar only; the body, composer and model picker return on open. */
+.dy-pc-scope .dy-pc-chat.closed .dy-pc-chat-model, .dy-pc-scope .dy-pc-chat.closed .dy-pc-chat-b, .dy-pc-scope .dy-pc-chat.closed .dy-pc-chat-f { display: none; }
+.dy-pc-scope .dy-pc-overlay { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; padding: 18px; background: var(--dy-pc-backdrop); }
+.dy-pc-scope .dy-pc-overlay-card { display: flex; flex-direction: column; width: min(820px, 100%); max-height: 100%; min-height: 0; overflow: hidden; border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); box-shadow: 0 24px 70px rgba(0, 0, 0, .38); color: var(--dy-text); }
+.dy-pc-scope .dy-pc-overlay-card.chat { width: min(900px, 100%); height: 100%; }
+.dy-pc-scope .dy-pc-overlay-h { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--dy-border); }
+.dy-pc-scope .dy-pc-overlay-h strong { flex: 1 1 auto; font-size: 14px; }
+/* Icons in the overlay are always icon-sized: an unsized svg fills its box. */
+.dy-pc-scope .dy-pc-overlay svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.dy-pc-scope .dy-pc-overlay-av { display: grid; place-items: center; flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px; background: var(--dy-accent-soft); color: var(--dy-accent-text); }
+.dy-pc-scope .dy-pc-overlay-av.warn { background: var(--dy-surface-subtle); color: var(--dy-warning); }
+.dy-pc-scope .dy-pc-overlay-title { display: grid; flex: 1 1 auto; min-width: 0; gap: 1px; }
+.dy-pc-scope .dy-pc-overlay-title span { overflow: hidden; color: var(--dy-text-3); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+.dy-pc-scope .dy-pc-overlay-h .dockyard-button { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; padding: 5px; }
+.dy-pc-scope .dy-pc-overlay-model { border-bottom: 1px solid var(--dy-border); padding: 8px 16px; }
+.dy-pc-scope .dy-pc-overlay-b { display: grid; flex: 1 1 auto; min-height: 0; gap: 12px; align-content: start; overflow: auto; padding: 16px 20px; font-size: 13.5px; }
+/* Large view = the same conversation at reading size. */
+.dy-pc-scope .dy-pc-overlay-card.chat .dy-pc-msg { max-width: 78%; padding: 11px 14px; font-size: 14px; line-height: 1.6; }
+.dy-pc-scope .dy-pc-overlay-card.chat .dy-pc-proposal { padding: 12px 14px; }
+.dy-pc-scope .dy-pc-overlay-card.chat .dy-pc-proposal strong { font-size: 13.5px; }
+.dy-pc-scope .dy-pc-overlay-card.chat .dy-pc-proposal small { font-size: 12px; }
+.dy-pc-scope .dy-pc-overlay-composer { display: grid; gap: 8px; }
+.dy-pc-scope .dy-pc-overlay-composer textarea { width: 100%; min-height: 72px; padding: 10px 12px; border: 1px solid var(--dy-control-border); border-radius: 9px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 13.5px; line-height: 1.5; resize: vertical; box-sizing: border-box; }
+.dy-pc-scope .dy-pc-overlay-actions { display: flex; justify-content: flex-end; gap: 7px; }
+.dy-pc-scope .dy-pc-overlay-actions .dockyard-button, .dy-pc-scope .dy-pc-overlay-f .dockyard-button { display: inline-flex; align-items: center; gap: 5px; }
+.dy-pc-scope .dy-pc-overlay-f .dockyard-button svg { width: 13px; height: 13px; }
+/* Unsaved-changes prompt: small, centred, above everything on the canvas. */
+.dy-pc-scope .dy-pc-leave { z-index: 60; }
+.dy-pc-scope .dy-pc-leave-card { width: min(440px, 100%); height: auto; }
+.dy-pc-scope .dy-pc-leave-body { margin: 0; padding: 14px 16px 4px; color: var(--dy-text); font-size: 13px; line-height: 1.5; }
+.dy-pc-scope .dy-pc-overlay-b ol { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.dy-pc-scope .dy-pc-overlay-b li { display: flex; align-items: center; gap: 7px; }
+.dy-pc-scope .dy-pc-overlay-b li > span { flex: 0 0 22px; color: var(--dy-text-3); font-variant-numeric: tabular-nums; text-align: right; }
+.dy-pc-scope .dy-pc-overlay-b li input { flex: 1 1 auto; min-width: 0; padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12.5px; }
+.dy-pc-scope .dy-pc-overlay-b li .dockyard-button { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; padding: 5px; }
+.dy-pc-scope .dy-pc-overlay-b li .dockyard-button svg { width: 13px; height: 13px; }
+.dy-pc-scope .dy-pc-overlay-f { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; padding: 11px 16px; border-top: 1px solid var(--dy-border); }
 .dy-pc-scope .dy-pc-chat-h { display: flex; align-items: center; gap: 9px; width: 100%; padding: 10px 13px; border: 0; background: transparent; color: var(--dy-text); text-align: left; cursor: pointer; }
 .dy-pc-scope .dy-pc-chat.open .dy-pc-chat-h { border-bottom: 1px solid var(--dy-border); }
 .dy-pc-scope .dy-pc-chat-h .av { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: var(--dy-accent-soft); color: var(--dy-accent-text); font-size: 10px; font-weight: 700; }
@@ -2647,6 +2927,8 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-chat-f { display: flex; flex-wrap: wrap; gap: 6px; padding: 9px; border-top: 1px solid var(--dy-border); }
 .dy-pc-scope .dy-pc-chat-f textarea { flex: 1 1 100%; min-height: 54px; padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; resize: vertical; }
 .dy-pc-scope .dy-pc-chat-f .dockyard-button { flex: 0 0 auto; }
+.dy-pc-scope .dy-pc-chat-f input { padding: 7px 9px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
+.dy-pc-scope .dy-pc-chat-f .dy-pc-readout { flex: 1 1 100%; }
 /* Proposals: scratch + suggested only. Nothing on this surface auto-applies. */
 .dy-pc-scope .dy-pc-proposal { display: grid; gap: 6px; padding: 9px 10px; border: 1px dashed var(--dy-accent-border); border-radius: 9px; background: var(--dy-accent-soft); }
 .dy-pc-scope .dy-pc-proposal strong { font-size: 12px; }
@@ -2655,8 +2937,12 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-proposal[data-pc-proposal-status="approved"] { border-style: solid; border-color: var(--dy-success); }
 .dy-pc-scope .dy-pc-proposal[data-pc-proposal-status="rejected"] { border-style: solid; border-color: var(--dy-border); background: var(--dy-surface-subtle); }
 /* Drawer: the selection editor (replaces a permanently-docked inspector). */
-.dy-pc-scope .dy-pc-drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 30; display: flex; flex-direction: column; width: min(360px, 92vw); border-left: 1px solid var(--dy-border); background: var(--dy-surface); transform: translateX(100%); transition: transform .18s ease; }
-.dy-pc-scope .dy-pc-drawer.open { transform: none; }
+.dy-pc-scope .dy-pc-drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 30; display: flex; flex-direction: column; width: min(420px, 100%); max-width: 100%; box-sizing: border-box; border-left: 1px solid var(--dy-border); background: var(--dy-surface); transform: translateX(100%); transition: transform .18s ease; }
+/* Closed = off-canvas AND inert: it must not catch clicks meant for cards at
+   the stage edge, nor let Tab reach its hidden fields. visibility waits for
+   the slide-out to finish. */
+.dy-pc-scope .dy-pc-drawer:not(.open) { visibility: hidden; pointer-events: none; transition: transform .18s ease, visibility 0s linear .18s; }
+.dy-pc-scope .dy-pc-drawer.open { transform: none; visibility: visible; }
 .dy-pc-scope .dy-pc-drawer-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--dy-border); }
 .dy-pc-scope .dy-pc-drawer-h strong { font-size: 13px; font-weight: 600; }
 .dy-pc-scope .dy-pc-drawer-b { flex: 1 1 auto; display: grid; gap: 11px; align-content: start; overflow: auto; padding: 14px; }
@@ -2669,6 +2955,40 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-notice[data-pc-tone="danger"] { background: var(--dy-danger-bg); color: var(--dy-pc-danger-text); }
 @media (max-width: 1100px) {
   .dy-pc-scope .dy-pc-chat.open { width: 320px; }
+}
+/* Narrow screens: the add row wraps and the draft input may shrink, so the
+   Add object button stays on screen (was clipped at 390px). */
+@media (max-width: 640px) {
+  .dy-pc-scope .dy-pc-add { flex-wrap: wrap; flex: 1 1 100%; }
+  .dy-pc-scope .dy-pc-add input { min-width: 0; flex: 1 1 140px; }
+  /* Phone: groups wrap onto rows, each keeps its name strip on top; tools
+     wrap and get 40px touch targets. */
+  .dy-pc-scope .dy-pc-group { flex: 1 1 auto; border-bottom: 1px solid var(--dy-border); }
+  .dy-pc-scope .dy-pc-group[data-pc-group="add"] { flex-basis: 100%; border-left: 0; }
+  .dy-pc-scope .dy-pc-group-tools { flex-wrap: wrap; justify-content: flex-start; }
+  .dy-pc-scope .dy-pc-tool .dockyard-button { min-width: 40px; min-height: 40px; }
+  .dy-pc-scope .dy-pc-add select, .dy-pc-scope .dy-pc-add input { min-height: 40px; }
+  /* The draft box takes its own full row so the hint text is not cut off. */
+  .dy-pc-scope .dy-pc-add input { flex: 1 1 100%; order: -1; }
+  .dy-pc-scope .dy-pc-group-label { text-align: left; }
+  .dy-pc-scope .dy-pc-ribbon-fill { display: none; }
+  .dy-pc-scope .dy-pc-tip { display: none; }
+  .dy-pc-scope .dy-pc-addmenu { left: 0; right: auto; }
+  .dy-pc-scope .dy-pc-chat.open { left: 8px; right: 8px; width: auto; }
+  .dy-pc-scope .dy-pc-chat.closed { right: 8px; width: min(268px, calc(100% - 16px)); }
+  .dy-pc-scope .dy-pc-board-bar { flex-wrap: wrap; }
+  .dy-pc-scope .dy-pc-board-list { grid-template-columns: 1fr; }
+  .dy-pc-scope .dy-pc-board-moves { flex: 1 1 100%; }
+  .dy-pc-scope .dy-pc-overlay { padding: 8px; }
+  .dy-pc-scope .dy-pc-overlay-card.chat .dy-pc-msg { max-width: 92%; }
+  .dy-pc-scope .dy-pc-linkbar select { min-width: 0; width: 100%; }
+  .dy-pc-scope .dy-pc-linkbar label { flex: 1 1 100%; }
+  /* Phone full screen (Quan F1): the tool rows would leave the board ~190px.
+     The frame scrolls instead and the stage keeps most of the window. */
+  .dy-pc-scope .dy-pc.dy-pc-full { overflow-y: auto; }
+  .dy-pc-scope .dy-pc.dy-pc-full .dy-pc-stage { flex: 0 0 auto; height: calc(100vh - 96px); min-height: 360px; }
+  .dy-pc-scope .dy-rt-btn { width: 44px; height: 44px; }
+  .dy-pc-scope .dy-rt-select { min-height: 44px; }
 }
 `;
 
@@ -3035,6 +3355,43 @@ var LUCIDE_ICON_NODES = {
       }
     ]
   ],
+  "copy-plus": [
+    [
+      "line",
+      {
+        "x1": "15",
+        "x2": "15",
+        "y1": "12",
+        "y2": "18"
+      }
+    ],
+    [
+      "line",
+      {
+        "x1": "12",
+        "x2": "18",
+        "y1": "15",
+        "y2": "15"
+      }
+    ],
+    [
+      "rect",
+      {
+        "width": "14",
+        "height": "14",
+        "x": "8",
+        "y": "8",
+        "rx": "2",
+        "ry": "2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
+      }
+    ]
+  ],
   "download": [
     [
       "path",
@@ -3187,6 +3544,33 @@ var LUCIDE_ICON_NODES = {
       }
     ]
   ],
+  "image": [
+    [
+      "rect",
+      {
+        "width": "18",
+        "height": "18",
+        "x": "3",
+        "y": "3",
+        "rx": "2",
+        "ry": "2"
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": "9",
+        "cy": "9",
+        "r": "2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"
+      }
+    ]
+  ],
   "layers": [
     [
       "path",
@@ -3246,6 +3630,26 @@ var LUCIDE_ICON_NODES = {
         "x": "3",
         "y": "16",
         "rx": "1"
+      }
+    ]
+  ],
+  "lightbulb": [
+    [
+      "path",
+      {
+        "d": "M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M9 18h6"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M10 22h4"
       }
     ]
   ],
@@ -3323,6 +3727,48 @@ var LUCIDE_ICON_NODES = {
       }
     ]
   ],
+  "notebook": [
+    [
+      "path",
+      {
+        "d": "M2 6h4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M2 10h4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M2 14h4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M2 18h4"
+      }
+    ],
+    [
+      "rect",
+      {
+        "width": "16",
+        "height": "20",
+        "x": "4",
+        "y": "2",
+        "rx": "2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M16 2v20"
+      }
+    ]
+  ],
   "paperclip": [
     [
       "path",
@@ -3345,6 +3791,20 @@ var LUCIDE_ICON_NODES = {
       }
     ]
   ],
+  "redo-2": [
+    [
+      "path",
+      {
+        "d": "m15 14 5-5-5-5"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13"
+      }
+    ]
+  ],
   "rotate-cw": [
     [
       "path",
@@ -3356,6 +3816,32 @@ var LUCIDE_ICON_NODES = {
       "path",
       {
         "d": "M21 3v5h-5"
+      }
+    ]
+  ],
+  "scroll-text": [
+    [
+      "path",
+      {
+        "d": "M15 12h-5"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M15 8h-5"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M19 17V5a2 2 0 0 0-2-2H4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"
       }
     ]
   ],
@@ -3406,6 +3892,80 @@ var LUCIDE_ICON_NODES = {
       "path",
       {
         "d": "m9 11 3 3L22 4"
+      }
+    ]
+  ],
+  "square-dashed": [
+    [
+      "path",
+      {
+        "d": "M5 3a2 2 0 0 0-2 2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M19 3a2 2 0 0 1 2 2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M21 19a2 2 0 0 1-2 2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M5 21a2 2 0 0 1-2-2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M9 3h1"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M9 21h1"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M14 3h1"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M14 21h1"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M3 9v1"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M21 9v1"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M3 14v1"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M21 14v1"
       }
     ]
   ],
@@ -3466,6 +4026,20 @@ var LUCIDE_ICON_NODES = {
       "path",
       {
         "d": "M12 17h.01"
+      }
+    ]
+  ],
+  "undo-2": [
+    [
+      "path",
+      {
+        "d": "M9 14 4 9l5-5"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"
       }
     ]
   ],
@@ -3552,6 +4126,839 @@ var LUCIDE_ICON_NODES = {
       "path",
       {
         "d": "M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"
+      }
+    ]
+  ],
+  "archive": [
+    [
+      "rect",
+      {
+        "width": "20",
+        "height": "5",
+        "x": "2",
+        "y": "3",
+        "rx": "1"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M10 12h4"
+      }
+    ]
+  ],
+  "archive-restore": [
+    [
+      "rect",
+      {
+        "width": "20",
+        "height": "5",
+        "x": "2",
+        "y": "3",
+        "rx": "1"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M4 8v11a2 2 0 0 0 2 2h2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M20 8v11a2 2 0 0 1-2 2h-2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m9 15 3-3 3 3"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M12 12v9"
+      }
+    ]
+  ],
+  "bot": [
+    [
+      "path",
+      {
+        "d": "M12 8V4H8"
+      }
+    ],
+    [
+      "rect",
+      {
+        "width": "16",
+        "height": "12",
+        "x": "4",
+        "y": "8",
+        "rx": "2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M2 14h2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M20 14h2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M15 13v2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M9 13v2"
+      }
+    ]
+  ],
+  "chevron-up": [
+    [
+      "path",
+      {
+        "d": "m18 15-6-6-6 6"
+      }
+    ]
+  ],
+  "circle-help": [
+    [
+      "circle",
+      {
+        "cx": "12",
+        "cy": "12",
+        "r": "10"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M12 17h.01"
+      }
+    ]
+  ],
+  "list": [
+    [
+      "path",
+      {
+        "d": "M3 5h.01"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M3 12h.01"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M3 19h.01"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M8 5h13"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M8 12h13"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M8 19h13"
+      }
+    ]
+  ],
+  "list-ordered": [
+    [
+      "path",
+      {
+        "d": "M11 5h10"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M11 12h10"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M11 19h10"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M4 4h1v5"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M4 9h2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M6.5 20H3.4c0-1 2.6-1.925 2.6-3.5a1.5 1.5 0 0 0-2.6-1.02"
+      }
+    ]
+  ],
+  "align-left": [
+    [
+      "path",
+      {
+        "d": "M21 5H3"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M15 12H3"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M17 19H3"
+      }
+    ]
+  ],
+  "align-center": [
+    [
+      "path",
+      {
+        "d": "M21 5H3"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M17 12H7"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M19 19H5"
+      }
+    ]
+  ],
+  "align-right": [
+    [
+      "path",
+      {
+        "d": "M21 5H3"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M21 12H9"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M21 19H7"
+      }
+    ]
+  ],
+  "align-justify": [
+    [
+      "path",
+      {
+        "d": "M3 5h18"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M3 12h18"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M3 19h18"
+      }
+    ]
+  ],
+  "remove-formatting": [
+    [
+      "path",
+      {
+        "d": "M4 7V4h16v3"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M5 20h6"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M13 4 8 20"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m15 15 5 5"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m20 15-5 5"
+      }
+    ]
+  ],
+  "chevrons-left": [
+    [
+      "path",
+      {
+        "d": "m11 17-5-5 5-5"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m18 17-5-5 5-5"
+      }
+    ]
+  ],
+  "chevrons-right": [
+    [
+      "path",
+      {
+        "d": "m6 17 5-5-5-5"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m13 17 5-5-5-5"
+      }
+    ]
+  ],
+  "hand": [
+    [
+      "path",
+      {
+        "d": "M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"
+      }
+    ]
+  ],
+  "grip-horizontal": [
+    [
+      "circle",
+      {
+        "cx": "12",
+        "cy": "9",
+        "r": "1"
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": "19",
+        "cy": "9",
+        "r": "1"
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": "5",
+        "cy": "9",
+        "r": "1"
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": "12",
+        "cy": "15",
+        "r": "1"
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": "19",
+        "cy": "15",
+        "r": "1"
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": "5",
+        "cy": "15",
+        "r": "1"
+      }
+    ]
+  ],
+  "maximize-2": [
+    [
+      "path",
+      {
+        "d": "M15 3h6v6"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m21 3-7 7"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m3 21 7-7"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M9 21H3v-6"
+      }
+    ]
+  ],
+  "minimize-2": [
+    [
+      "path",
+      {
+        "d": "m14 10 7-7"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M20 10h-6V4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m3 21 7-7"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M4 14h6v6"
+      }
+    ]
+  ],
+  "minus": [
+    [
+      "path",
+      {
+        "d": "M5 12h14"
+      }
+    ]
+  ],
+  "moon": [
+    [
+      "path",
+      {
+        "d": "M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"
+      }
+    ]
+  ],
+  "mouse-pointer-2": [
+    [
+      "path",
+      {
+        "d": "M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"
+      }
+    ]
+  ],
+  "plus": [
+    [
+      "path",
+      {
+        "d": "M5 12h14"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M12 5v14"
+      }
+    ]
+  ],
+  "refresh-cw": [
+    [
+      "path",
+      {
+        "d": "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M21 3v5h-5"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M8 16H3v5"
+      }
+    ]
+  ],
+  "save": [
+    [
+      "path",
+      {
+        "d": "M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M7 3v4a1 1 0 0 0 1 1h7"
+      }
+    ]
+  ],
+  "scan": [
+    [
+      "path",
+      {
+        "d": "M3 7V5a2 2 0 0 1 2-2h2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M17 3h2a2 2 0 0 1 2 2v2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M21 17v2a2 2 0 0 1-2 2h-2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M7 21H5a2 2 0 0 1-2-2v-2"
+      }
+    ]
+  ],
+  "send": [
+    [
+      "path",
+      {
+        "d": "M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m21.854 2.147-10.94 10.939"
+      }
+    ]
+  ],
+  "sparkles": [
+    [
+      "path",
+      {
+        "d": "M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M20 2v4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M22 4h-4"
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": "4",
+        "cy": "20",
+        "r": "2"
+      }
+    ]
+  ],
+  "spline": [
+    [
+      "circle",
+      {
+        "cx": "19",
+        "cy": "5",
+        "r": "2"
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": "5",
+        "cy": "19",
+        "r": "2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M5 17A12 12 0 0 1 17 5"
+      }
+    ]
+  ],
+  "square": [
+    [
+      "rect",
+      {
+        "width": "18",
+        "height": "18",
+        "x": "3",
+        "y": "3",
+        "rx": "2"
+      }
+    ]
+  ],
+  "square-pen": [
+    [
+      "path",
+      {
+        "d": "M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"
+      }
+    ]
+  ],
+  "sun": [
+    [
+      "circle",
+      {
+        "cx": "12",
+        "cy": "12",
+        "r": "4"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M12 2v2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M12 20v2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m4.93 4.93 1.41 1.41"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m17.66 17.66 1.41 1.41"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M2 12h2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M20 12h2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m6.34 17.66-1.41 1.41"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m19.07 4.93-1.41 1.41"
+      }
+    ]
+  ],
+  "trash-2": [
+    [
+      "path",
+      {
+        "d": "M10 11v6"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M14 11v6"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M3 6h18"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+      }
+    ]
+  ],
+  "zoom-in": [
+    [
+      "circle",
+      {
+        "cx": "11",
+        "cy": "11",
+        "r": "8"
+      }
+    ],
+    [
+      "line",
+      {
+        "x1": "21",
+        "x2": "16.65",
+        "y1": "21",
+        "y2": "16.65"
+      }
+    ],
+    [
+      "line",
+      {
+        "x1": "11",
+        "x2": "11",
+        "y1": "8",
+        "y2": "14"
+      }
+    ],
+    [
+      "line",
+      {
+        "x1": "8",
+        "x2": "14",
+        "y1": "11",
+        "y2": "11"
+      }
+    ]
+  ],
+  "zoom-out": [
+    [
+      "circle",
+      {
+        "cx": "11",
+        "cy": "11",
+        "r": "8"
+      }
+    ],
+    [
+      "line",
+      {
+        "x1": "21",
+        "x2": "16.65",
+        "y1": "21",
+        "y2": "16.65"
+      }
+    ],
+    [
+      "line",
+      {
+        "x1": "8",
+        "x2": "14",
+        "y1": "11",
+        "y2": "11"
       }
     ]
   ]
@@ -7155,6 +8562,8 @@ var layoutConnectors = (objects, connectors, labelFor = (m) => m, world = { widt
     out.push({
       id: edge.id,
       meaning: edge.meaning,
+      source: edge.source,
+      target: edge.target,
       ...line,
       label: text,
       labelBox: pick.box,
@@ -7187,10 +8596,999 @@ var gridSlot = (index, cols) => ({
   y: CANVAS_GRID.originY + Math.floor(index / cols) * CANVAS_GRID.stepY
 });
 
+// hermes_dockyard_plugin/desktop/src/project/rich-text.js
+var RICH_TEXT_SIZES = Object.freeze(["small", "large", "huge"]);
+var ALIGNS = ["left", "center", "right", "justify"];
+var LIST_TYPES = ["1", "a", "A", "i", "I"];
+var MAX_LIST_LEVELS = 5;
+var MARK_ORDER = ["bold", "italic", "underline", "strike", "fontSize"];
+var RICH_TEXT_LIMITS = Object.freeze({ chars: 2e4, nodes: 3e3, bytes: 64 * 1024 });
+var ZWSP = /\u200B/g;
+var plainToDoc = (text) => ({
+  type: "doc",
+  content: String(text ?? "").split("\n").map((line) => line ? { type: "paragraph", content: [{ type: "text", text: line }] } : { type: "paragraph" })
+});
+var alignOf = (el) => {
+  const raw = String(el.style?.textAlign || el.getAttribute?.("align") || "").toLowerCase();
+  const value = raw === "start" ? "left" : raw === "end" ? "right" : raw;
+  return ALIGNS.includes(value) && value !== "left" ? value : null;
+};
+var marksFor = (el, marks) => {
+  const tag = el.tagName;
+  const next = { ...marks };
+  if (tag === "B" || tag === "STRONG" || Number(el.style?.fontWeight) >= 600 || el.style?.fontWeight === "bold") next.bold = true;
+  if (tag === "I" || tag === "EM" || el.style?.fontStyle === "italic") next.italic = true;
+  const deco = String(el.style?.textDecorationLine || el.style?.textDecoration || "");
+  if (tag === "U" || deco.includes("underline")) next.underline = true;
+  if (tag === "S" || tag === "STRIKE" || tag === "DEL" || deco.includes("line-through")) next.strike = true;
+  const size = el.getAttribute?.("data-size");
+  if (size !== null && size !== void 0) next.fontSize = RICH_TEXT_SIZES.includes(size) ? size : null;
+  return next;
+};
+var markList = (marks) => MARK_ORDER.filter((m) => marks[m]).map((m) => m === "fontSize" ? { type: "fontSize", attrs: { size: marks.fontSize } } : { type: m });
+var sameMarks = (a = [], b = []) => JSON.stringify(a) === JSON.stringify(b);
+var BLOCK_TAGS = /* @__PURE__ */ new Set(["P", "DIV", "H1", "H2", "H3", "H4", "H5", "H6", "UL", "OL", "LI", "BLOCKQUOTE", "PRE", "TABLE", "THEAD", "TBODY", "TR", "TD", "TH", "SECTION", "ARTICLE", "HEADER", "FOOTER", "FIGURE", "DL", "DT", "DD"]);
+var SKIP_TAGS = /* @__PURE__ */ new Set(["SCRIPT", "STYLE", "TEMPLATE", "NOSCRIPT", "IFRAME", "OBJECT", "EMBED", "IMG", "SVG", "VIDEO", "AUDIO", "CANVAS", "HEAD", "TITLE", "META", "LINK", "BUTTON", "INPUT", "SELECT", "TEXTAREA"]);
+function pushText(inline, text, marks) {
+  const clean = text.replace(ZWSP, "").replace(/[\r\n\t\u00A0]+/g, " ");
+  if (!clean) return;
+  const m = markList(marks);
+  const last = inline[inline.length - 1];
+  if (last && last.type === "text" && sameMarks(last.marks, m.length ? m : void 0)) {
+    last.text += clean;
+    return;
+  }
+  inline.push(m.length ? { type: "text", text: clean, marks: m } : { type: "text", text: clean });
+}
+function readBlocks(parent, ctx, makeBlock = () => ({ type: "paragraph" })) {
+  const blocks = [];
+  let inline = [];
+  const flush = () => {
+    const trimmed = inline;
+    if (trimmed.length && trimmed[trimmed.length - 1].type === "hardBreak") trimmed.pop();
+    const hasText2 = trimmed.some((n) => n.type === "text" && n.text.trim());
+    if (hasText2 || trimmed.some((n) => n.type === "hardBreak")) {
+      const block = makeBlock();
+      block.content = trimmed;
+      blocks.push(block);
+    }
+    inline = [];
+  };
+  const readInline = (node, marks) => {
+    if (node.nodeType === 3) {
+      pushText(inline, node.nodeValue || "", marks);
+      return;
+    }
+    if (node.nodeType !== 1 || SKIP_TAGS.has(node.tagName)) return;
+    if (node.tagName === "BR") {
+      inline.push({ type: "hardBreak" });
+      return;
+    }
+    if (BLOCK_TAGS.has(node.tagName)) {
+      flush();
+      blocks.push(...readBlock(node, ctx));
+      return;
+    }
+    const next = marksFor(node, marks);
+    for (const child of node.childNodes) readInline(child, next);
+  };
+  for (const child of parent.childNodes) readInline(child, ctx.marks || {});
+  flush();
+  return blocks;
+}
+function readList(el, ctx) {
+  const level = ctx.level + 1;
+  const items = [];
+  for (const child of el.childNodes) {
+    if (child.nodeType === 1 && child.tagName === "LI") {
+      const kids = readBlocks(child, { ...ctx, level });
+      const content = kids.length ? kids : [{ type: "paragraph" }];
+      if (content[0].type !== "paragraph" && content[0].type !== "heading") content.unshift({ type: "paragraph" });
+      items.push({ type: "listItem", content: content.map((b) => b.type === "heading" ? { ...b, type: "paragraph", attrs: b.attrs?.textAlign ? { textAlign: b.attrs.textAlign } : void 0 } : b).map(stripUndefined) });
+    } else if (child.nodeType === 1 && (child.tagName === "UL" || child.tagName === "OL")) {
+      const nested = readList(child, { ...ctx, level });
+      if (!nested.length) continue;
+      if (items.length && level < MAX_LIST_LEVELS) items[items.length - 1].content.push(...nested);
+      else items.push(...nested.flatMap((list2) => list2.content || []));
+    } else {
+      const loose = readBlocks({ childNodes: [child] }, { ...ctx, level });
+      for (const b of loose) {
+        if (b.type === "bulletList" || b.type === "orderedList") {
+          if (items.length) items[items.length - 1].content.push(b);
+          else items.push(...b.content || []);
+        } else items.push({ type: "listItem", content: [b] });
+      }
+    }
+  }
+  if (!items.length) return [];
+  const lifted = [];
+  for (const item of items) {
+    const keep = [];
+    const extra = [];
+    for (const b of item.content) {
+      if (b.type === "__lift") extra.push(...b.content);
+      else keep.push(b);
+    }
+    lifted.push({ ...item, content: keep.length ? keep : [{ type: "paragraph" }] }, ...extra);
+  }
+  if (level > MAX_LIST_LEVELS) {
+    return [{ type: "__lift", content: lifted }];
+  }
+  const list = { type: el.tagName === "OL" ? "orderedList" : "bulletList", content: lifted };
+  if (el.tagName === "OL") {
+    const attrs = {};
+    const start = Number.parseInt(el.getAttribute("start") ?? "1", 10);
+    if (Number.isFinite(start) && start !== 1) attrs.start = Math.min(9999, Math.max(1, start));
+    if (attrs.start === 1) delete attrs.start;
+    const kind = el.getAttribute("type");
+    if (kind && LIST_TYPES.includes(kind) && kind !== "1") attrs.type = kind;
+    if (Object.keys(attrs).length) list.attrs = attrs;
+  }
+  return [list];
+}
+var stripUndefined = (node) => {
+  if (node.attrs === void 0) delete node.attrs;
+  return node;
+};
+function readBlock(el, ctx) {
+  const tag = el.tagName;
+  if (tag === "UL" || tag === "OL") return readList(el, ctx).map((b) => b.type === "__lift" && ctx.level === 0 ? { type: el.tagName === "OL" ? "orderedList" : "bulletList", content: b.content } : b);
+  const align = alignOf(el);
+  if (tag === "H1" || tag === "H2" || tag === "H3") {
+    const level = Number(tag[1]);
+    const inner2 = readBlocks(el, ctx, () => ({ type: "heading", attrs: align ? { level, textAlign: align } : { level } }));
+    if (!inner2.length) return [{ type: "heading", attrs: align ? { level, textAlign: align } : { level } }];
+    return inner2;
+  }
+  const inner = readBlocks(el, ctx, () => align ? { type: "paragraph", attrs: { textAlign: align } } : { type: "paragraph" });
+  if (!inner.length && (tag === "P" || tag === "DIV")) return [align ? { type: "paragraph", attrs: { textAlign: align } } : { type: "paragraph" }];
+  return inner;
+}
+var tidy = (node) => {
+  if (node.content) {
+    node.content = node.content.map(tidy);
+    if (!node.content.length) delete node.content;
+  }
+  if (node.attrs && !Object.keys(node.attrs).length) delete node.attrs;
+  return node;
+};
+var hasText = (node) => node.type === "text" ? Boolean(node.text.trim()) : (node.content || []).some(hasText);
+var dropEmptyLists = (nodes) => nodes.filter((n) => !((n.type === "bulletList" || n.type === "orderedList") && !hasText(n))).map((n) => n.content && n.type !== "paragraph" && n.type !== "heading" ? { ...n, content: dropEmptyLists(n.content) } : n);
+function domToDoc(root) {
+  const blocks = readBlocks(root, { level: 0, marks: {} });
+  const content = dropEmptyLists(blocks.flatMap((b) => b.type === "__lift" ? [{ type: "bulletList", content: b.content }] : [b]));
+  return tidy({ type: "doc", content: content.length ? content : [{ type: "paragraph" }] });
+}
+function docToPlain(doc) {
+  const lines = [];
+  const inline = (node) => (node.content || []).map((k) => k.type === "text" ? k.text : "\n").join("");
+  const block = (node, prefix = "", indent = 0) => {
+    if (node.type === "paragraph" || node.type === "heading") lines.push("  ".repeat(indent) + prefix + inline(node));
+    else if (node.type === "bulletList" || node.type === "orderedList") {
+      const start = node.attrs?.start ?? 1;
+      (node.content || []).forEach((item, i) => {
+        const marker = node.type === "bulletList" ? "- " : `${start + i}. `;
+        (item.content || []).forEach((child, j) => {
+          if (child.type === "bulletList" || child.type === "orderedList") block(child, "", indent + 1);
+          else block(child, j === 0 ? marker : "", indent);
+        });
+      });
+    }
+  };
+  for (const node of doc?.content || []) block(node);
+  return lines.join("\n").trim();
+}
+function serverJsonBytes(value) {
+  const enc = new TextEncoder();
+  const size = (v, top = false) => {
+    if (Array.isArray(v)) return 2 + v.reduce((n, x) => n + size(x), 0) + Math.max(0, v.length - 1) * 2;
+    if (v && typeof v === "object") {
+      const keys = Object.keys(v).filter((k) => v[k] !== void 0 && (!top || v[k] !== null && v[k] !== ""));
+      return 2 + keys.reduce((n, k) => n + enc.encode(JSON.stringify(k)).length + 2 + size(v[k]), 0) + Math.max(0, keys.length - 1) * 2;
+    }
+    return enc.encode(JSON.stringify(v ?? null)).length;
+  };
+  return size(value, true);
+}
+function docProblem(doc, rest = {}) {
+  let nodes = 0;
+  const count = (node) => {
+    for (const child of node.content || []) {
+      nodes += 1;
+      count(child);
+    }
+  };
+  count(doc);
+  const chars = [...docToPlain(doc)].length;
+  const counted = { ...rest, description_doc: doc };
+  delete counted.description;
+  const bytes = serverJsonBytes(counted);
+  if (chars > RICH_TEXT_LIMITS.chars) return `Too long: ${chars.toLocaleString("en-GB")} of ${RICH_TEXT_LIMITS.chars.toLocaleString("en-GB")} characters. Shorten it before applying.`;
+  if (nodes > RICH_TEXT_LIMITS.nodes) return `Too much formatting: ${nodes.toLocaleString("en-GB")} of ${RICH_TEXT_LIMITS.nodes.toLocaleString("en-GB")} pieces. Remove some paragraphs or formatting before applying.`;
+  if (bytes > RICH_TEXT_LIMITS.bytes) return "This card is too large to save. Remove some text or formatting before applying.";
+  return null;
+}
+function renderInline(parent, nodes) {
+  for (const node of nodes || []) {
+    if (node.type === "hardBreak") {
+      parent.appendChild(document.createElement("br"));
+      continue;
+    }
+    if (node.type !== "text" || typeof node.text !== "string") continue;
+    let el = document.createTextNode(node.text);
+    for (const mark of [...node.marks || []].reverse()) {
+      const tag = { bold: "strong", italic: "em", underline: "u", strike: "s" }[mark.type];
+      let wrap = null;
+      if (tag) wrap = document.createElement(tag);
+      else if (mark.type === "fontSize" && RICH_TEXT_SIZES.includes(mark.attrs?.size)) {
+        wrap = document.createElement("span");
+        wrap.setAttribute("data-size", mark.attrs.size);
+        wrap.className = `dy-rt-${mark.attrs.size}`;
+      }
+      if (wrap) {
+        wrap.appendChild(el);
+        el = wrap;
+      }
+    }
+    parent.appendChild(el);
+  }
+}
+function renderBlock(node) {
+  let el;
+  if (node.type === "heading") el = document.createElement(`h${[1, 2, 3].includes(node.attrs?.level) ? node.attrs.level : 2}`);
+  else if (node.type === "bulletList" || node.type === "orderedList") {
+    el = document.createElement(node.type === "bulletList" ? "ul" : "ol");
+    if (node.type === "orderedList" && Number.isInteger(node.attrs?.start)) el.setAttribute("start", String(node.attrs.start));
+    if (node.type === "orderedList" && LIST_TYPES.includes(node.attrs?.type)) el.setAttribute("type", node.attrs.type);
+    for (const item of node.content || []) {
+      const li = document.createElement("li");
+      for (const child of item.content || []) li.appendChild(renderBlock(child));
+      el.appendChild(li);
+    }
+    return el;
+  } else el = document.createElement("p");
+  if (ALIGNS.includes(node.attrs?.textAlign) && node.attrs.textAlign !== "left") el.style.textAlign = node.attrs.textAlign;
+  renderInline(el, node.content);
+  if (!el.childNodes.length) el.appendChild(document.createElement("br"));
+  return el;
+}
+function renderDoc(target, doc) {
+  while (target.firstChild) target.removeChild(target.firstChild);
+  const blocks = doc && doc.type === "doc" && Array.isArray(doc.content) && doc.content.length ? doc.content : [{ type: "paragraph" }];
+  for (const node of blocks) target.appendChild(renderBlock(node));
+}
+var closestIn = (host2, node, test) => {
+  let el = node && node.nodeType === 3 ? node.parentElement : node;
+  while (el && el !== host2) {
+    if (test(el)) return el;
+    el = el.parentElement;
+  }
+  return null;
+};
+var blockOf = (host2, node) => closestIn(host2, node, (el) => /^(P|DIV|H[1-6]|LI)$/.test(el.tagName));
+var listDepth = (host2, node) => {
+  let n = 0;
+  let el = node && node.nodeType === 3 ? node.parentElement : node;
+  while (el && el !== host2) {
+    if (el.tagName === "UL" || el.tagName === "OL") n += 1;
+    el = el.parentElement;
+  }
+  return n;
+};
+var exec = (command, value) => document.execCommand(command, false, value);
+var RENAME = { B: "strong", I: "em", STRIKE: "s", DEL: "s" };
+var INNER_BLOCKS = /* @__PURE__ */ new Set(["P", "DIV", "H1", "H2", "H3", "UL", "OL"]);
+function normaliseDom(host2, { afterDelete = false } = {}) {
+  const sel = window.getSelection();
+  const keep = sel.rangeCount && host2.contains(sel.anchorNode) ? [sel.anchorNode, sel.anchorOffset, sel.focusNode, sel.focusOffset] : null;
+  const swap = (el, tag) => {
+    const next = document.createElement(tag);
+    for (const attr of el.attributes) if (attr.name === "style" || attr.name === "data-size" || attr.name === "class" || attr.name === "start" || attr.name === "type") next.setAttribute(attr.name, attr.value);
+    while (el.firstChild) next.appendChild(el.firstChild);
+    el.replaceWith(next);
+    return next;
+  };
+  let changed = false;
+  const unwrap = (el) => {
+    el.replaceWith(...el.childNodes);
+    changed = true;
+  };
+  const walker = document.createTreeWalker(host2, 4);
+  for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+    const value = text.nodeValue || "";
+    if (!value.includes("\u200B") || value.replace(ZWSP, "") === "") continue;
+    if (keep) {
+      for (const i of [0, 2]) {
+        if (keep[i] === text) keep[i + 1] -= (value.slice(0, keep[i + 1]).match(ZWSP) || []).length;
+      }
+    }
+    text.nodeValue = value.replace(ZWSP, "");
+    changed = true;
+  }
+  for (const el of [...host2.querySelectorAll("b, i, strike, del")]) {
+    swap(el, RENAME[el.tagName]);
+    changed = true;
+  }
+  for (const el of [...host2.children]) if (el.tagName === "DIV") {
+    swap(el, "p");
+    changed = true;
+  }
+  for (const el of [...host2.querySelectorAll("font, span:not([data-size])")]) unwrap(el);
+  for (const el of [...host2.querySelectorAll("strong, em, u, s, [data-size]")]) {
+    if (el.style && el.style.length) {
+      el.removeAttribute("style");
+      changed = true;
+    }
+  }
+  for (const el of [...host2.querySelectorAll("ul, ol")]) if (!el.querySelector("li")) {
+    el.remove();
+    changed = true;
+  }
+  if (afterDelete && !host2.textContent.replace(ZWSP, "").trim() && host2.querySelector("ul, ol")) {
+    while (host2.firstChild) host2.removeChild(host2.firstChild);
+    const p = document.createElement("p");
+    p.appendChild(document.createElement("br"));
+    host2.appendChild(p);
+    if (keep) {
+      keep[0] = p;
+      keep[1] = 0;
+      keep[2] = p;
+      keep[3] = 0;
+    }
+    changed = true;
+  }
+  for (const el of [...host2.querySelectorAll("li[style], li > p[style], li > h1[style], li > h2[style], li > h3[style]")]) {
+    if (el.style.textAlign) {
+      el.style.removeProperty("text-align");
+      if (!el.getAttribute("style")) el.removeAttribute("style");
+      changed = true;
+    }
+  }
+  for (let guard = 0; guard < 200; guard += 1) {
+    const outer = [...host2.querySelectorAll("p, h1, h2, h3")].find((el) => [...el.children].some((c) => INNER_BLOCKS.has(c.tagName)));
+    if (!outer) break;
+    let anchor = outer;
+    let run = null;
+    for (const child of [...outer.childNodes]) {
+      const isBlock = child.nodeType === 1 && INNER_BLOCKS.has(child.tagName);
+      if (!isBlock && child === outer.firstChild) continue;
+      if (isBlock) {
+        anchor.after(child);
+        anchor = child;
+        run = null;
+      } else if (anchor !== outer) {
+        if (!run) {
+          run = outer.cloneNode(false);
+          anchor.after(run);
+          anchor = run;
+        }
+        run.appendChild(child);
+      }
+    }
+    if (!outer.childNodes.length) outer.remove();
+    changed = true;
+  }
+  if (changed && keep && keep[0].isConnected && keep[2].isConnected) {
+    try {
+      sel.setBaseAndExtent(keep[0], keep[1], keep[2], keep[3]);
+    } catch {
+    }
+  }
+}
+var TOOLS = [
+  ["bold", "Bold (Ctrl+B)", "B", () => exec("bold"), (s) => s.bold],
+  ["italic", "Italic (Ctrl+I)", "I", () => exec("italic"), (s) => s.italic],
+  ["underline", "Underline (Ctrl+U)", "U", () => exec("underline"), (s) => s.underline],
+  ["strike", "Strikethrough", "S", () => exec("strikeThrough"), (s) => s.strike],
+  null,
+  ["bullets", "Bullet list", { icon: "list" }, () => exec("insertUnorderedList"), (s) => s.list === "UL"],
+  ["numbers", "Numbered list", { icon: "list-ordered" }, () => exec("insertOrderedList"), (s) => s.list === "OL"],
+  null,
+  ["left", "Align left", { icon: "align-left" }, () => exec("justifyLeft"), (s) => s.align === "left"],
+  ["center", "Align centre", { icon: "align-center" }, () => exec("justifyCenter"), (s) => s.align === "center"],
+  ["right", "Align right", { icon: "align-right" }, () => exec("justifyRight"), (s) => s.align === "right"],
+  ["justify", "Justify", { icon: "align-justify" }, () => exec("justifyFull"), (s) => s.align === "justify"]
+];
+var POS_BLOCKS = /* @__PURE__ */ new Set(["P", "H1", "H2", "H3", "LI"]);
+function measure(host2, target, targetOffset) {
+  let n = 0;
+  const go = (el) => {
+    if (el.nodeType === 3) {
+      if (el === target) return n + Math.min(targetOffset, el.nodeValue.length);
+      n += el.nodeValue.length;
+      return null;
+    }
+    if (el.nodeType !== 1) return null;
+    if (el !== host2 && POS_BLOCKS.has(el.tagName) && !(el.tagName === "P" && el.parentElement?.tagName === "LI")) n += 1;
+    if (el.tagName === "BR") n += 1;
+    const kids = el.childNodes;
+    for (let i = 0; i < kids.length; i += 1) {
+      if (el === target && i === targetOffset) return n;
+      const found2 = go(kids[i]);
+      if (found2 !== null) return found2;
+    }
+    return el === target ? n : null;
+  };
+  const found = go(host2);
+  return found === null ? n : found;
+}
+function locate(host2, pos) {
+  let n = 0;
+  let last = [host2, 0];
+  const go = (el) => {
+    if (el.nodeType === 3) {
+      const len = el.nodeValue.length;
+      if (pos <= n + len) return [el, pos - n];
+      n += len;
+      last = [el, len];
+      return null;
+    }
+    if (el.nodeType !== 1) return null;
+    if (el !== host2 && POS_BLOCKS.has(el.tagName) && !(el.tagName === "P" && el.parentElement?.tagName === "LI")) {
+      n += 1;
+      if (n >= pos && !el.querySelector("li")) return [el, 0];
+    }
+    if (el.tagName === "BR") {
+      n += 1;
+      if (n >= pos) return [el.parentNode, [...el.parentNode.childNodes].indexOf(el) + 1];
+    }
+    for (const child of el.childNodes) {
+      const found = go(child);
+      if (found) return found;
+    }
+    return null;
+  };
+  return go(host2) || last;
+}
+var MARK_TAGS = /* @__PURE__ */ new Set(["STRONG", "B", "EM", "I", "U", "S", "STRIKE", "DEL"]);
+var isMark = (el) => MARK_TAGS.has(el.tagName) || el.hasAttribute?.("data-size");
+function selectedTexts(host2) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return [];
+  const range = sel.getRangeAt(0);
+  if (range.collapsed || !host2.contains(range.commonAncestorContainer)) return [];
+  const { endContainer: ec, endOffset: eo } = range;
+  if (ec.nodeType === 3 && eo > 0 && eo < ec.nodeValue.length) ec.splitText(eo);
+  const { startContainer: sc, startOffset: so } = range;
+  let first = null;
+  if (sc.nodeType === 3 && so > 0 && so < sc.nodeValue.length) first = sc.splitText(so);
+  const out = [];
+  const walker = document.createTreeWalker(host2, 4);
+  for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+    if (!text.nodeValue || !range.intersectsNode(text)) continue;
+    if (text === sc && !first && so >= text.nodeValue.length) continue;
+    if (text === ec && eo === 0 && text !== first) continue;
+    if (first && text === sc) continue;
+    out.push(text);
+  }
+  return out;
+}
+var reselect = (texts) => {
+  if (!texts.length) return;
+  const last = texts[texts.length - 1];
+  window.getSelection().setBaseAndExtent(texts[0], 0, last, last.nodeValue.length);
+};
+function splitAround(outer, node) {
+  const before = document.createRange();
+  before.setStart(outer, 0);
+  before.setEndBefore(node);
+  const head = outer.cloneNode(false);
+  head.appendChild(before.extractContents());
+  const after = document.createRange();
+  after.setStartAfter(node);
+  after.setEnd(outer, outer.childNodes.length);
+  const tail = outer.cloneNode(false);
+  tail.appendChild(after.extractContents());
+  if (head.textContent) outer.before(head);
+  if (tail.textContent) outer.after(tail);
+}
+function liftOut(host2, node, test) {
+  for (let guard = 0; guard < 20; guard += 1) {
+    const outer = closestIn(host2, node, test);
+    if (!outer || POS_BLOCKS.has(outer.tagName)) return;
+    splitAround(outer, node);
+    outer.replaceWith(...outer.childNodes);
+  }
+}
+var sizeSpan = (size) => {
+  const span = document.createElement("span");
+  span.setAttribute("data-size", size);
+  span.className = `dy-rt-${size}`;
+  return span;
+};
+var blocksIn = (host2) => {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return [];
+  const range = sel.getRangeAt(0);
+  const caretBlock = blockOf(host2, range.startContainer);
+  const endBlock = blockOf(host2, range.endContainer);
+  let skip = null;
+  if (endBlock && endBlock !== caretBlock) {
+    const head = document.createRange();
+    head.setStart(endBlock, 0);
+    head.setEnd(range.endContainer, range.endOffset);
+    if (head.toString() === "") skip = endBlock;
+  }
+  const all = [...host2.querySelectorAll("p, h1, h2, h3, li")].filter((el) => el !== skip && range.intersectsNode(el) && !(skip && skip.contains(el)));
+  return all.length ? all : caretBlock ? [caretBlock] : [];
+};
+function setBlockStyle(host2, style) {
+  const sel = window.getSelection();
+  if (style !== "p" && sel.rangeCount) {
+    for (let guard = 0; guard < MAX_LIST_LEVELS + 1; guard += 1) {
+      if (!closestIn(host2, sel.anchorNode, (el) => el.tagName === "LI")) break;
+      exec("outdent");
+    }
+  }
+  exec("formatBlock", style);
+}
+function clearFormatting(host2) {
+  const texts = selectedTexts(host2);
+  const blocks = blocksIn(host2);
+  for (const text of texts) liftOut(host2, text, isMark);
+  for (const block of blocks) {
+    block.style.removeProperty("text-align");
+    if (!block.getAttribute("style")) block.removeAttribute("style");
+    block.removeAttribute("align");
+    if (/^H[1-3]$/.test(block.tagName)) {
+      const p = document.createElement("p");
+      p.append(...block.childNodes);
+      block.replaceWith(p);
+    }
+  }
+  reselect(texts);
+}
+function stateAt(host2) {
+  const empty = { style: "p", size: "normal", align: "left", list: null, bold: false, italic: false, underline: false, strike: false };
+  const sel = typeof window !== "undefined" ? window.getSelection() : null;
+  if (!host2 || !sel || !sel.rangeCount || !host2.contains(sel.anchorNode)) return empty;
+  const node = sel.anchorNode;
+  const heading = closestIn(host2, node, (el) => /^H[1-3]$/.test(el.tagName));
+  const sized = closestIn(host2, node, (el) => el.hasAttribute("data-size"));
+  const list = closestIn(host2, node, (el) => el.tagName === "UL" || el.tagName === "OL");
+  const block = blockOf(host2, node);
+  const align = !list && block && alignOf(block) || "left";
+  const q = (c) => {
+    try {
+      return document.queryCommandState(c);
+    } catch {
+      return false;
+    }
+  };
+  const has = (tags) => Boolean(closestIn(host2, node, (el) => tags.includes(el.tagName)));
+  return {
+    style: heading ? heading.tagName.toLowerCase() : "p",
+    size: sized && RICH_TEXT_SIZES.includes(sized.getAttribute("data-size")) ? sized.getAttribute("data-size") : "normal",
+    align,
+    list: list ? list.tagName : null,
+    anyList: Boolean(list) || blocksIn(host2).some((b) => closestIn(host2, b, (el) => el.tagName === "UL" || el.tagName === "OL")),
+    bold: has(["STRONG", "B"]) || !heading && q("bold"),
+    italic: has(["EM", "I"]) || q("italic"),
+    underline: has(["U"]) || q("underline"),
+    strike: has(["S", "STRIKE", "DEL"]) || q("strikeThrough")
+  };
+}
+function applySize(host2, size) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  if (range.collapsed) {
+    const current = closestIn(host2, range.startContainer, (el) => el.hasAttribute("data-size"));
+    const marker = document.createTextNode("\u200B");
+    if (size === "normal") {
+      if (!current) return;
+      current.parentNode.insertBefore(marker, current.nextSibling);
+    } else {
+      const span = sizeSpan(size);
+      span.appendChild(marker);
+      if (current) current.parentNode.insertBefore(span, current.nextSibling);
+      else range.insertNode(span);
+    }
+    const caret = document.createRange();
+    caret.setStart(marker, 1);
+    caret.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caret);
+    return;
+  }
+  const texts = selectedTexts(host2);
+  for (const text of texts) {
+    liftOut(host2, text, (el) => el.hasAttribute("data-size"));
+    if (size !== "normal") {
+      const span = sizeSpan(size);
+      text.before(span);
+      span.appendChild(text);
+    }
+  }
+  reselect(texts);
+}
+function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOnly, label = "Description" }) {
+  const host2 = useRef(null);
+  const saved = useRef(null);
+  const changeRef = useRef(onChange);
+  const problemRef = useRef(onProblem);
+  const restRef = useRef(rest);
+  restRef.current = rest;
+  const history = useRef({ stack: [], index: -1 });
+  const dragging = useRef(false);
+  const [state, setState] = useState(stateAt(null));
+  const [problem, setProblem] = useState(null);
+  const restSize = serverJsonBytes(rest ?? {});
+  changeRef.current = onChange;
+  problemRef.current = onProblem;
+  const refresh = () => {
+    const el = host2.current;
+    const sel = window.getSelection();
+    if (el && sel.rangeCount && el.contains(sel.anchorNode)) saved.current = sel.getRangeAt(0).cloneRange();
+    setState(stateAt(el));
+  };
+  const caretNow = () => {
+    const el = host2.current;
+    const sel = window.getSelection();
+    if (!el || !sel.rangeCount || !el.contains(sel.anchorNode)) return [0, 0];
+    return [measure(el, sel.anchorNode, sel.anchorOffset), measure(el, sel.focusNode, sel.focusOffset)];
+  };
+  const report = (doc) => {
+    const found = docProblem(doc, restRef.current || {});
+    setProblem(found);
+    problemRef.current?.(found);
+  };
+  const pendingBefore = useRef(null);
+  const markBefore = () => {
+    if (!pendingBefore.current) pendingBefore.current = caretNow();
+  };
+  const record = (doc, typing) => {
+    const h = history.current;
+    const json = JSON.stringify(doc);
+    const top = h.stack[h.index];
+    const before = pendingBefore.current || (top ? top.caret : [0, 0]);
+    pendingBefore.current = null;
+    if (top && top.json === json) {
+      top.caret = caretNow();
+      return;
+    }
+    const entry = { doc, json, caret: caretNow(), before, typing, at: Date.now() };
+    if (typing && top && top.typing === typing && entry.at - top.at < 1e3 && h.index > 0 && h.index === h.stack.length - 1) h.stack[h.index] = { ...entry, before: top.before };
+    else {
+      h.stack = [...h.stack.slice(0, h.index + 1), entry].slice(-200);
+      h.index = h.stack.length - 1;
+    }
+  };
+  const emit = (typing = false) => {
+    const el = host2.current;
+    if (!el) return;
+    normaliseDom(el, { afterDelete: typing === "delete" });
+    const doc = domToDoc(el);
+    record(doc, typing);
+    changeRef.current?.(doc, docToPlain(doc));
+    report(doc);
+    refresh();
+  };
+  const travel = (step) => {
+    const el = host2.current;
+    const h = history.current;
+    const next = h.index + step;
+    if (!el || readOnly || next < 0 || next >= h.stack.length) return;
+    const caret = step < 0 ? h.stack[h.index].before || h.stack[next].caret : h.stack[next].caret;
+    h.index = next;
+    const { doc } = h.stack[next];
+    renderDoc(el, doc);
+    el.focus();
+    const [a, ao] = locate(el, caret[0]);
+    const [f, fo] = locate(el, caret[1]);
+    try {
+      window.getSelection().setBaseAndExtent(a, ao, f, fo);
+    } catch {
+    }
+    changeRef.current?.(doc, docToPlain(doc));
+    report(doc);
+    refresh();
+  };
+  useEffect(() => {
+    const el = host2.current;
+    renderDoc(el, value && value.type === "doc" ? value : plainToDoc(fallbackText));
+    try {
+      exec("defaultParagraphSeparator", "p");
+      exec("styleWithCSS", false);
+    } catch {
+    }
+    const first = domToDoc(el);
+    history.current = { stack: [{ doc: first, json: JSON.stringify(first), caret: [0, 0], typing: false, at: 0 }], index: 0 };
+    report(first);
+    const onSelection = () => {
+      if (document.activeElement === el) refresh();
+    };
+    const onBeforeInput = (event) => {
+      if (event.inputType === "historyUndo" || event.inputType === "historyRedo") {
+        event.preventDefault();
+        travel(event.inputType === "historyUndo" ? -1 : 1);
+        return;
+      }
+      markBefore();
+    };
+    document.addEventListener("selectionchange", onSelection);
+    el.addEventListener("beforeinput", onBeforeInput);
+    return () => {
+      document.removeEventListener("selectionchange", onSelection);
+      el.removeEventListener("beforeinput", onBeforeInput);
+    };
+  }, []);
+  useEffect(() => {
+    if (host2.current && history.current.stack.length) report(domToDoc(host2.current));
+  }, [restSize]);
+  const run = (act) => {
+    const el = host2.current;
+    if (!el || readOnly) return;
+    el.focus();
+    if (saved.current) {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(saved.current);
+    }
+    markBefore();
+    act(el);
+    emit();
+  };
+  const onKeyDown = (event) => {
+    if (readOnly) return;
+    const mod = event.ctrlKey || event.metaKey;
+    const key = event.key.toLowerCase();
+    if (mod && !event.altKey && (key === "z" || key === "y")) {
+      event.preventDefault();
+      travel(key === "y" || event.shiftKey ? 1 : -1);
+      return;
+    }
+    if (event.key === "Tab") {
+      const sel = window.getSelection();
+      const li = sel.rangeCount ? closestIn(host2.current, sel.anchorNode, (n) => n.tagName === "LI") : null;
+      if (!li) return;
+      event.preventDefault();
+      if (event.shiftKey) exec("outdent");
+      else if (listDepth(host2.current, li) < MAX_LIST_LEVELS) exec("indent");
+      emit();
+    }
+  };
+  const insertData = (data, range) => {
+    markBefore();
+    const html = data.getData("text/html");
+    if (!html && !data.getData("text/plain")) return;
+    const doc = html ? domToDoc(new DOMParser().parseFromString(html, "text/html").body) : plainToDoc(data.getData("text/plain"));
+    const scratch = document.createElement("div");
+    renderDoc(scratch, doc);
+    const sel = window.getSelection();
+    range.deleteContents();
+    const frag = document.createDocumentFragment();
+    if (scratch.childNodes.length === 1 && scratch.firstChild.tagName === "P") frag.append(...scratch.firstChild.childNodes);
+    else frag.append(...scratch.childNodes);
+    const last = frag.lastChild;
+    const line = blockOf(host2.current, range.startContainer);
+    const blocks = frag.firstChild && frag.firstChild.nodeType === 1 && /^(P|H[1-3]|UL|OL)$/.test(frag.firstChild.tagName);
+    if (blocks && line && line.parentNode === host2.current && !line.textContent.replace(ZWSP, "")) line.replaceWith(frag);
+    else range.insertNode(frag);
+    if (last) {
+      const caret = document.createRange();
+      caret.setStartAfter(last);
+      caret.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(caret);
+    }
+    emit();
+  };
+  const onPaste = (event) => {
+    if (readOnly) return;
+    const data = event.clipboardData;
+    if (!data) return;
+    event.preventDefault();
+    const sel = window.getSelection();
+    if (!sel.rangeCount || !host2.current.contains(sel.anchorNode)) return;
+    insertData(data, sel.getRangeAt(0));
+  };
+  const onDrop = (event) => {
+    if (readOnly) {
+      event.preventDefault();
+      return;
+    }
+    if (dragging.current) return;
+    event.preventDefault();
+    const data = event.dataTransfer;
+    if (!data) return;
+    const at = document.caretRangeFromPoint ? document.caretRangeFromPoint(event.clientX, event.clientY) : null;
+    const range = at && host2.current.contains(at.startContainer) ? at : (() => {
+      const r = document.createRange();
+      r.selectNodeContents(host2.current);
+      r.collapse(false);
+      return r;
+    })();
+    host2.current.focus();
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    insertData(data, range);
+  };
+  const button = (tool) => {
+    const [id, title, face, act, active] = tool;
+    const on = Boolean(active(state));
+    return jsx("button", {
+      type: "button",
+      className: `dy-rt-btn${on ? " on" : ""}`,
+      "data-rt": id,
+      title: ALIGNS.includes(id) && state.anyList ? `${title} (not available in lists)` : title,
+      "aria-label": title,
+      "aria-pressed": on ? "true" : "false",
+      // Alignment is not stored on list items (Quan re-check L1).
+      disabled: readOnly || ALIGNS.includes(id) && Boolean(state.anyList),
+      onMouseDown: (event) => event.preventDefault(),
+      onClick: () => run(act),
+      children: typeof face === "string" ? jsx("span", { className: `dy-rt-face dy-rt-face-${id}`, children: face }) : jsx(Icon, { name: face.icon })
+    }, id);
+  };
+  return jsxs("div", { className: "dy-rt", "data-canvas-rich-editor": true, children: [
+    jsx("span", { className: "dy-pc-field-label", children: label }),
+    // Owner 01/10: two tidy rows (style + size, then the buttons) instead of
+    // letting everything wrap into a ragged five-row stack.
+    readOnly ? null : jsxs("div", { className: "dy-rt-bar", role: "toolbar", "aria-label": "Text formatting", children: [
+      jsxs("div", { className: "dy-rt-row dy-rt-row-sel", children: [
+        jsxs("select", {
+          className: "dy-rt-select",
+          "data-rt": "style",
+          "aria-label": "Text style",
+          value: state.style,
+          onChange: (event) => {
+            const v = event.target.value;
+            run((el) => setBlockStyle(el, v));
+          },
+          children: [["p", "Normal text"], ["h1", "Heading 1"], ["h2", "Heading 2"], ["h3", "Heading 3"]].map(([v, t]) => jsx("option", { value: v, children: t }, v))
+        }),
+        jsxs("select", {
+          className: "dy-rt-select",
+          "data-rt": "size",
+          "aria-label": "Text size",
+          value: state.size,
+          onChange: (event) => {
+            const v = event.target.value;
+            run((el) => applySize(el, v));
+          },
+          children: [["small", "Small"], ["normal", "Normal size"], ["large", "Large"], ["huge", "Huge"]].map(([v, t]) => jsx("option", { value: v, children: t }, v))
+        })
+      ] }, "sel"),
+      jsxs("div", { className: "dy-rt-row", children: [
+        ...TOOLS.map((tool, i) => tool ? button(tool) : jsx("span", { className: "dy-rt-sep", "aria-hidden": "true" }, `sep-${i}`)),
+        jsx("button", {
+          type: "button",
+          className: "dy-rt-btn",
+          "data-rt": "clear",
+          title: "Clear formatting",
+          "aria-label": "Clear formatting",
+          disabled: readOnly,
+          onMouseDown: (event) => event.preventDefault(),
+          onClick: () => run((el) => clearFormatting(el)),
+          children: jsx(Icon, { name: "remove-formatting" })
+        }, "clear")
+      ] }, "btns")
+    ] }),
+    problem ? jsx("p", { className: "dy-rt-problem", role: "alert", "data-canvas-rich-problem": true, children: problem }) : null,
+    jsx("div", { className: `dy-rt-host${readOnly ? " readonly" : ""}`, children: jsx("div", {
+      ref: host2,
+      className: "dy-rt-body",
+      "data-canvas-rich-text": "true",
+      role: "textbox",
+      "aria-multiline": "true",
+      "aria-label": label,
+      contentEditable: readOnly ? "false" : "true",
+      suppressContentEditableWarning: true,
+      spellCheck: true,
+      onInput: (event) => {
+        const kind = String(event.nativeEvent?.inputType || "");
+        emit(kind.startsWith("insertText") ? "insert" : kind.startsWith("delete") ? "delete" : false);
+      },
+      onKeyDown,
+      onPaste,
+      onDrop,
+      onDragOver: (event) => {
+        if (!dragging.current) event.preventDefault();
+      },
+      onDragStart: () => {
+        dragging.current = true;
+      },
+      onDragEnd: () => {
+        dragging.current = false;
+      },
+      onKeyUp: refresh,
+      onMouseUp: refresh,
+      onFocus: refresh
+    }) })
+  ] });
+}
+
 // hermes_dockyard_plugin/desktop/src/project/canvas.js
-var CANVAS_OBJECT_KINDS = Object.freeze(["evidence", "claim", "question", "decision", "plan_block", "note", "link", "media"]);
+var CANVAS_OBJECT_KINDS = Object.freeze(["evidence", "claim", "question", "decision", "plan_block", "risk", "assumption", "note", "link", "media"]);
 var CANVAS_CONNECTOR_MEANINGS = Object.freeze(["supports", "contradicts", "derived_from", "clarifies", "depends_on", "implements", "raises_question"]);
-var CANVAS_KIND_LABELS = Object.freeze({ evidence: "Evidence", claim: "Claim", question: "Question", decision: "Decision", plan_block: "Plan block", note: "Note", link: "Link", media: "Media" });
+var CANVAS_KIND_LABELS = Object.freeze({ evidence: "Evidence", claim: "Claim", question: "Question", decision: "Decision", plan_block: "Plan block", risk: "Risk", assumption: "Assumption", note: "Note", link: "Link", media: "Media" });
+var CANVAS_STICKER_COLOURS = Object.freeze(["yellow", "orange", "coral", "pink", "purple", "indigo", "blue", "teal", "green", "lime", "clay", "slate"]);
+var CANVAS_STICKER_LABELS = Object.freeze({ yellow: "Sun", green: "Mint", blue: "Sky", pink: "Rose", purple: "Violet", orange: "Amber", coral: "Coral", teal: "Teal", lime: "Lime", clay: "Clay", slate: "Slate", indigo: "Indigo" });
+var CANVAS_KIND_ICONS = Object.freeze({
+  evidence: "file-text",
+  claim: "message-square",
+  question: "lightbulb",
+  decision: "flag",
+  plan_block: "list-checks",
+  note: "sticky-note",
+  link: "link",
+  media: "image",
+  risk: "shield-alert",
+  assumption: "circle-help"
+});
+var LEVELS = ["low", "medium", "high"];
+var CANVAS_KIND_FIELDS = Object.freeze({
+  evidence: [["source", "text", "Source", null, 300], ["observed_on", "date", "Date observed"], ["confidence", "choice", "Confidence", LEVELS], ["quote", "area", "Quote", null, 5e3]],
+  claim: [["claim_status", "choice", "Status", ["unverified", "supported", "disputed", "refuted"]], ["confidence", "choice", "Confidence", LEVELS]],
+  question: [["question_status", "choice", "Status", ["open", "answered"]], ["owner", "member", "Owner"], ["answer", "area", "Answer", null, 5e3]],
+  decision: [["decision_status", "choice", "Status", ["proposed", "accepted", "rejected", "superseded"]], ["decided_by", "member", "Decided by"], ["decided_on", "date", "Decided on"], ["rationale", "area", "Rationale", null, 5e3], ["alternatives", "list", "Alternatives considered"]],
+  plan_block: [["plan_status", "choice", "Status", ["todo", "in_progress", "blocked", "done"]], ["owner", "member", "Owner"], ["due_on", "date", "Due"], ["estimate", "text", "Estimate", null, 50], ["checklist", "checklist", "Checklist"]],
+  risk: [["risk_status", "choice", "Status", ["open", "mitigating", "closed"]], ["likelihood", "choice", "Likelihood", LEVELS], ["impact", "choice", "Impact", LEVELS], ["owner", "member", "Owner"], ["mitigation", "area", "Mitigation", null, 5e3]],
+  assumption: [["assumption_status", "choice", "Status", ["untested", "validated", "invalidated"]], ["confidence", "choice", "Confidence", LEVELS], ["test", "area", "How we will test it", null, 2e3]],
+  media: [["content_id", "image", "Image"], ["alt", "text", "Alt text (describes the image)", null, 300], ["caption", "text", "Caption", null, 500]],
+  link: [],
+  note: []
+});
+var canvasChoiceLabel = (value) => ({ todo: "To do", in_progress: "In progress" })[value] ?? (value ? value.charAt(0).toUpperCase() + value.slice(1) : "");
+var CANVAS_IMAGE_TYPES = Object.freeze({ "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" });
+var CANVAS_IMAGE_MAX = 5 * 1024 * 1024;
+var canvasSafeUrl = (value) => /^https?:\/\/[^\s/?#]+\.[^\s/?#]+(?:[/?#]\S*)?$/i.test(String(value ?? "").trim());
+var linksOf = (content) => Array.isArray(content?.links) ? content.links : content?.url ? [{ url: content.url }] : [];
+var canvasSummary = (item) => {
+  const c = item?.content ?? {};
+  const parts = [];
+  const status = (CANVAS_KIND_FIELDS[item?.kind] ?? []).find(([, input]) => input === "choice");
+  if (status && c[status[0]]) parts.push(canvasChoiceLabel(c[status[0]]));
+  const who = c.owner ?? c.decided_by;
+  if (who && (CANVAS_KIND_FIELDS[item?.kind] ?? []).some(([f]) => f === "owner" || f === "decided_by")) parts.push(who);
+  if (item?.kind === "plan_block" && Array.isArray(c.checklist) && c.checklist.length) parts.push(`${c.checklist.filter((x) => x.done).length}/${c.checklist.length} done`);
+  const links = linksOf(c).length;
+  if (links) parts.push(`${links} link${links === 1 ? "" : "s"}`);
+  return parts.join(" \xB7 ");
+};
+var imageCache = /* @__PURE__ */ new Map();
+function CanvasImage({ projectId, contentId, alt, className }) {
+  const key = `${projectId}/${contentId}`;
+  const [src, setSrc] = useState(() => imageCache.get(key) ?? null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    if (imageCache.has(key)) {
+      setSrc(imageCache.get(key));
+      setFailed(false);
+      return void 0;
+    }
+    setSrc(null);
+    setFailed(false);
+    api(`/projects/${encodeURIComponent(projectId)}/content/${encodeURIComponent(contentId)}/image`).then((result) => {
+      if (!live) return;
+      if (!CANVAS_IMAGE_TYPES[result?.media_type] || typeof result?.data_base64 !== "string") throw new Error("not an image");
+      const url = `data:${result.media_type};base64,${result.data_base64}`;
+      imageCache.set(key, url);
+      let total = 0;
+      for (const value of imageCache.values()) total += value.length;
+      while (total > 30 * 1024 * 1024 && imageCache.size > 1) {
+        const oldest = imageCache.keys().next().value;
+        total -= imageCache.get(oldest).length;
+        imageCache.delete(oldest);
+      }
+      setSrc(url);
+    }).catch(() => {
+      if (live) setFailed(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [key]);
+  if (failed) return jsx("span", { className: "dy-pc-img-note", "data-canvas-image-missing": contentId, children: "Image unavailable" });
+  if (!src) return jsx("span", { className: "dy-pc-img-note", children: "Loading image\u2026" });
+  return jsx("img", { className, src, alt: alt || "", draggable: false, "data-canvas-image": contentId });
+}
+var CANVAS_BOARD_STATUS_LABELS = Object.freeze({ draft: "Draft", submitted: "Submitted", planned: "Plan made", completed: "Completed", archived: "Archived" });
+var CANVAS_BOARD_MOVES = Object.freeze({ draft: ["submitted"], submitted: ["draft", "planned"], planned: ["submitted", "completed"], completed: ["planned"] });
+var CANVAS_READ_ONLY = Object.freeze(["completed", "archived"]);
 var CANVAS_MEANING_LABELS = Object.freeze({ supports: "supports", contradicts: "contradicts", derived_from: "derived from", clarifies: "clarifies", depends_on: "depends on", implements: "implements", raises_question: "raises a question" });
 var CANVAS_WORLD = Object.freeze({ width: 2e3, height: 1400 });
 var CANVAS_CARD = Object.freeze({ width: 240, height: 140 });
@@ -7218,7 +9616,22 @@ var canvasPlaced = (objects) => {
   }
   return { x: 60, y: 60 };
 };
-function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onRefresh }) {
+var canvasDeOverlap = (objects, movedId) => {
+  const moved = objects.find((item) => item.id === movedId);
+  if (!moved) return objects;
+  const rect = canvasRect(moved);
+  let x = rect.x;
+  const y = rect.y;
+  const others = objects.filter((item) => item.id !== movedId).map(canvasRect);
+  for (let guard = 0; guard < 64; guard += 1) {
+    const hit = others.find((other) => x < other.x + other.width && x + rect.width > other.x && y < other.y + other.height && y + rect.height > other.y);
+    if (!hit) break;
+    x = hit.x + hit.width + 20;
+  }
+  if (x === rect.x) return objects;
+  return objects.map((item) => item.id === movedId ? { ...item, x } : item);
+};
+function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onRefresh, onDirty }) {
   const [canvas, setCanvas] = useState(initialCanvas ?? null);
   const [objects, setObjects] = useState(initialCanvas?.objects ?? []);
   const [connectors, setConnectors] = useState(initialCanvas?.connectors ?? []);
@@ -7228,8 +9641,13 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   const [mode, setMode] = useState("select");
   const [pendingConnect, setPendingConnect] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
   const [drawerText, setDrawerText] = useState("");
   const [drawerKind, setDrawerKind] = useState("note");
+  const [drawerFields, setDrawerFields] = useState({});
+  const [richProblem, setRichProblem] = useState(null);
+  const [members, setMembers] = useState([]);
+  const [imageBusy, setImageBusy] = useState(false);
   const [linkSource, setLinkSource] = useState("");
   const [linkTarget, setLinkTarget] = useState("");
   const [linkMeaning, setLinkMeaning] = useState("supports");
@@ -7241,17 +9659,505 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   const [review, setReview] = useState(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [future, setFuture] = useState([]);
+  const [marquee, setMarquee] = useState(null);
+  const [chatDraft, setChatDraft] = useState("");
+  const [chatLog, setChatLog] = useState([]);
+  const [chatBusy, setChatBusy] = useState(false);
+  const [planPanel, setPlanPanel] = useState(null);
+  const [planBusy, setPlanBusy] = useState(false);
+  const [backlogConfirm, setBacklogConfirm] = useState(null);
+  const [boards, setBoards] = useState([]);
+  const [boardListOpen, setBoardListOpen] = useState(true);
+  const [boardBusy, setBoardBusy] = useState(false);
+  const [theme, setTheme] = useState(initialCanvas?.theme ?? null);
+  const [hostTheme, setHostTheme] = useState("light");
+  const [modelOptions, setModelOptions] = useState(null);
+  const [boardsApi, setBoardsApi] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [boardForm, setBoardForm] = useState(null);
+  const [chatPill, setChatPill] = useState(false);
+  const [chatPos, setChatPos] = useState(null);
+  const [chatDragging, setChatDragging] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [stepsDraft, setStepsDraft] = useState(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [connectPointer, setConnectPointer] = useState(null);
+  const [pendingLeave, setPendingLeave] = useState(null);
+  const [pendingStatus, setPendingStatus] = useState(null);
+  const [panning, setPanning] = useState(false);
+  const [fitTick, setFitTick] = useState(0);
   const stageRef = useRef(null);
+  const chatRef = useRef(null);
+  const addMenuRef = useRef(null);
+  const boardRef = useRef(initialCanvas?.canvas_id ?? null);
+  const chatToken = useRef(0);
+  const dirtyRef = useRef(false);
+  const boardsApiRef = useRef(false);
+  const zoomRef = useRef(1);
+  const panRef = useRef({ x: 0, y: 0 });
   const encoded = encodeURIComponent(project.id);
   const revision = Number(canvas?.revision ?? 0);
+  const selected = objects.find((item) => item.id === selectedId) ?? null;
   useEffect(() => {
+    let live = true;
+    api(`/projects/${encodeURIComponent(project.id)}/members`).then((result) => {
+      if (live) setMembers((result?.members ?? []).filter((m) => m && m.state !== "departed").map((m) => String(m.profile_slug)));
+    }).catch(() => {
+      if (live) setMembers([]);
+    });
+    return () => {
+      live = false;
+    };
+  }, [project.id]);
+  const boardPath = (id) => `/projects/${encoded}/canvases/${encodeURIComponent(id)}`;
+  const boardScoped = boardsApi && Boolean(canvas?.canvas_id);
+  const canvasRoute = boardScoped ? boardPath(canvas.canvas_id) : `/projects/${encoded}/canvas`;
+  const boardStatus = canvas?.status ?? "draft";
+  const readOnly = CANVAS_READ_ONLY.includes(boardStatus);
+  boardRef.current = canvas?.canvas_id ?? null;
+  useDialogFocusManager(pendingLeave ? "[data-canvas-unsaved-prompt] .dy-pc-overlay-card" : pendingStatus ? "[data-canvas-status-confirm] .dy-pc-overlay-card" : expanded ? "[data-canvas-expanded] .dy-pc-overlay-card" : null);
+  dirtyRef.current = dirty;
+  boardsApiRef.current = boardsApi;
+  useEffect(() => {
+    if (!pendingConnect) setConnectPointer(null);
+  }, [pendingConnect]);
+  zoomRef.current = zoom;
+  panRef.current = pan;
+  const failureText = (failure) => String(failure?.message ?? failure);
+  useEffect(() => {
+    if (boardsApiRef.current || dirtyRef.current) return;
     const next = initialCanvas ?? { revision: 0, objects: [], connectors: [] };
     setCanvas(next);
     setObjects(next.objects ?? []);
     setConnectors(next.connectors ?? []);
     setDirty(false);
+    setHistory([]);
+    setFuture([]);
+    setSelectedIds([]);
+    setSelectedId(null);
+    setTheme(next.theme ?? null);
   }, [initialCanvas]);
-  const selected = objects.find((item) => item.id === selectedId) ?? null;
+  const saveRef = useRef(null);
+  useEffect(() => {
+    onDirty?.(dirty, dirty ? () => saveRef.current?.() : null);
+  }, [dirty]);
+  useEffect(() => () => onDirty?.(false), []);
+  useEffect(() => {
+    if (!dirty) return void 0;
+    const warn = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+  useEffect(() => {
+    const root = stageRef.current?.closest?.(".dockyard-root");
+    if (!root) return void 0;
+    const read = () => setHostTheme(root.getAttribute("data-theme") === "dark" ? "dark" : "light");
+    read();
+    const watcher = new MutationObserver(read);
+    watcher.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => watcher.disconnect();
+  }, []);
+  useEffect(() => {
+    let live = true;
+    api(`/projects/${encoded}/canvases`).then((result) => {
+      if (live && Array.isArray(result?.canvases)) {
+        setBoards(result.canvases);
+        setBoardsApi(true);
+      }
+    }).catch(() => {
+    });
+    api("/canvas/models").then((result) => {
+      if (live) setModelOptions(result);
+    }).catch(() => {
+    });
+    return () => {
+      live = false;
+    };
+  }, [encoded]);
+  const refreshBoards = async (withArchived = showArchived) => {
+    try {
+      const result = await api(`/projects/${encoded}/canvases${withArchived ? "?include_archived=true" : ""}`);
+      if (Array.isArray(result?.canvases)) {
+        setBoards(result.canvases);
+        setBoardsApi(true);
+        return result.canvases;
+      }
+    } catch (failure) {
+    }
+    return null;
+  };
+  const resetBoardState = () => {
+    chatToken.current += 1;
+    setSession(null);
+    setReview(null);
+    setChatLog([]);
+    setPlanPanel(null);
+    setBacklogConfirm(null);
+    setAnswer("");
+    setChatBusy(false);
+    setBusy(false);
+    setPlanBusy(false);
+    setExpanded(false);
+    setStepsDraft(null);
+    setDirty(false);
+    setSelectedId(null);
+    setSelectedIds([]);
+    setPendingConnect(null);
+    setHistory([]);
+    setFuture([]);
+    setMarquee(null);
+    setLinkSource("");
+    setLinkTarget("");
+  };
+  const loadBoard = (fresh) => {
+    resetBoardState();
+    boardRef.current = fresh?.canvas_id ?? null;
+    setCanvas(fresh);
+    setObjects(fresh?.objects ?? []);
+    setConnectors(fresh?.connectors ?? []);
+    setTheme(fresh?.theme ?? null);
+    setPan({ x: 0, y: 0 });
+    setZoom(1);
+    setFitTick((tick) => Math.max(2, tick + 1));
+  };
+  const mergeMeta = (fresh) => setCanvas((current) => current?.canvas_id && fresh?.canvas_id && current.canvas_id !== fresh.canvas_id ? current : {
+    ...current ?? {},
+    name: fresh.name,
+    status: fresh.status,
+    archived_from: fresh.archived_from ?? null,
+    theme: fresh.theme ?? null,
+    model: fresh.model ?? null
+  });
+  const refreshMeta = async (at) => {
+    if (!boardsApiRef.current || !at) return;
+    try {
+      const fresh = await api(boardPath(at));
+      if (boardRef.current === at) mergeMeta(fresh);
+    } catch (failure) {
+    }
+    refreshBoards();
+  };
+  const guardUnsaved = (label, action) => {
+    if (!dirtyRef.current) return action();
+    setPendingLeave({ label, action });
+    return null;
+  };
+  const leaveSaving = async () => {
+    const pending = pendingLeave;
+    if (!pending) return;
+    const ok = await save();
+    if (!ok) {
+      if (!dirtyRef.current) setPendingLeave(null);
+      return;
+    }
+    setPendingLeave(null);
+    await pending.action();
+  };
+  const leaveDiscarding = async () => {
+    const pending = pendingLeave;
+    if (!pending) return;
+    setPendingLeave(null);
+    dirtyRef.current = false;
+    setDirty(false);
+    setHistory([]);
+    setFuture([]);
+    setObjects(canvas?.objects ?? []);
+    setConnectors(canvas?.connectors ?? []);
+    await pending.action();
+  };
+  const openBoard = async (board) => {
+    setBoardBusy(true);
+    try {
+      const fresh = await api(boardPath(board.canvas_id));
+      loadBoard(fresh);
+      setNotice({ tone: "ok", text: `Opened ${fresh.name} at revision ${fresh.revision}.` });
+    } catch (failure) {
+      setNotice({ tone: "danger", text: `Board could not be opened: ${failureText(failure)}` });
+    }
+    setBoardBusy(false);
+  };
+  const selectBoard = (board) => {
+    if (!board?.canvas_id || board.canvas_id === canvas?.canvas_id) return null;
+    return guardUnsaved(`open ${board.name ?? "that board"}`, () => openBoard(board));
+  };
+  const submitBoardForm = async () => {
+    const name = String(boardForm?.name ?? "").trim();
+    if (!name) {
+      setNotice({ tone: "danger", text: "A board needs a name." });
+      return;
+    }
+    setBoardBusy(true);
+    try {
+      if (boardForm.mode === "rename") {
+        const at = boardRef.current;
+        const fresh = await api(boardPath(at), { method: "PATCH", body: { name } });
+        if (boardRef.current === at) {
+          mergeMeta(fresh);
+          setNotice({ tone: "ok", text: `Board renamed to ${fresh.name}.` });
+        }
+      } else {
+        const created = await api(`/projects/${encoded}/canvases`, { method: "POST", body: { name } });
+        setBoardForm(null);
+        await refreshBoards();
+        setBoardBusy(false);
+        guardUnsaved(`open the new board ${created.name} (it has been created)`, () => openBoard(created));
+        return;
+      }
+      setBoardForm(null);
+      await refreshBoards();
+    } catch (failure) {
+      setNotice({ tone: "danger", text: `Board could not be saved: ${failureText(failure)}` });
+    }
+    setBoardBusy(false);
+  };
+  const moveBoardStatus = async (status) => {
+    const at = boardRef.current;
+    setBoardBusy(true);
+    try {
+      const fresh = await api(boardPath(at), { method: "PATCH", body: { status } });
+      if (boardRef.current !== at) return;
+      mergeMeta(fresh);
+      await refreshBoards();
+      setNotice({ tone: "ok", text: `Board is now ${CANVAS_BOARD_STATUS_LABELS[fresh.status] ?? fresh.status}.` });
+    } catch (failure) {
+      if (boardRef.current === at) setNotice({ tone: "danger", text: `Status could not change: ${failureText(failure)}` });
+    } finally {
+      setBoardBusy(false);
+    }
+  };
+  const changeBoardStatus = (status) => {
+    if (!boardScoped || !status || status === boardStatus) return null;
+    setPendingStatus(status);
+    return null;
+  };
+  const confirmBoardStatus = () => {
+    const status = pendingStatus;
+    setPendingStatus(null);
+    if (!status || status === boardStatus) return null;
+    if (CANVAS_READ_ONLY.includes(status)) return guardUnsaved(`move this board to ${CANVAS_BOARD_STATUS_LABELS[status] ?? status}`, () => moveBoardStatus(status));
+    return moveBoardStatus(status);
+  };
+  const archiveBoard = (board) => {
+    if (board.canvas_id === canvas?.canvas_id) return guardUnsaved(`archive ${board.name}`, () => archiveNow(board));
+    return archiveNow(board);
+  };
+  const archiveNow = async (board) => {
+    const active = board.canvas_id === canvas?.canvas_id;
+    setBoardBusy(true);
+    try {
+      await api(boardPath(board.canvas_id), { method: "PATCH", body: { status: "archived" } });
+      const list = await refreshBoards();
+      if (active) {
+        const next = (list ?? []).find((row) => row.status !== "archived" && row.canvas_id !== board.canvas_id);
+        const fresh = next ? await api(boardPath(next.canvas_id)) : await api(`/projects/${encoded}/canvas`);
+        loadBoard(fresh);
+        if (!next) await refreshBoards();
+      }
+      setNotice({ tone: "ok", text: `Board ${board.name} archived \u2014 restore it from Show archived.` });
+    } catch (failure) {
+      setNotice({ tone: "danger", text: `Board could not be archived: ${failureText(failure)}` });
+    }
+    setBoardBusy(false);
+  };
+  const restoreBoard = async (board) => {
+    setBoardBusy(true);
+    try {
+      const fresh = await api(boardPath(board.canvas_id), { method: "PATCH", body: { status: board.archived_from ?? "draft" } });
+      await refreshBoards();
+      setNotice({ tone: "ok", text: `Board ${fresh.name} restored as ${CANVAS_BOARD_STATUS_LABELS[fresh.status] ?? fresh.status}.` });
+    } catch (failure) {
+      setNotice({ tone: "danger", text: `Board could not be restored: ${failureText(failure)}` });
+    }
+    setBoardBusy(false);
+  };
+  const toggleArchived = async () => {
+    const next = !showArchived;
+    setShowArchived(next);
+    await refreshBoards(next);
+  };
+  const setBoardTheme = async (picked) => {
+    const previous = theme;
+    const nextTheme = picked === theme ? null : picked;
+    setTheme(nextTheme);
+    if (!boardScoped) return;
+    const at = boardRef.current;
+    try {
+      const fresh = await api(boardPath(at), { method: "PATCH", body: { theme: nextTheme } });
+      if (boardRef.current === at) mergeMeta(fresh);
+    } catch (failure) {
+      if (boardRef.current !== at) return;
+      setTheme(previous);
+      setNotice({ tone: "danger", text: `Theme could not be saved: ${failureText(failure)}` });
+    }
+  };
+  const modelKey = (model) => model?.provider && model?.model ? `${model.provider}::${model.model}` : "";
+  const setBoardModel = async (value) => {
+    if (!boardScoped) return;
+    const [provider, ...rest] = String(value || "").split("::");
+    const model = value ? { provider, model: rest.join("::") } : null;
+    const at = boardRef.current;
+    setBoardBusy(true);
+    try {
+      const fresh = await api(boardPath(at), { method: "PATCH", body: { model } });
+      if (boardRef.current !== at) return;
+      mergeMeta(fresh);
+      setNotice({ tone: "ok", text: model ? `This board now asks ${model.model}.` : "This board now uses the Hermes main model." });
+    } catch (failure) {
+      if (boardRef.current === at) setNotice({ tone: "danger", text: `Model could not be set: ${failureText(failure)}` });
+    } finally {
+      setBoardBusy(false);
+    }
+  };
+  const selectedColour = selected?.colour ?? null;
+  const setSelectedColour = (colour) => {
+    if (!selected || readOnly) return;
+    const before = snapshot(objects, connectors);
+    setObjects((current) => current.map((item) => item.id === selected.id ? { ...item, colour: colour || null } : item));
+    setHistory((current) => [...current.slice(-49), before]);
+    setFuture([]);
+    setDirty(true);
+  };
+  const clampChat = (x, y) => {
+    const stage = stageRef.current;
+    const chat = chatRef.current;
+    if (!stage || !chat) return { x, y };
+    return {
+      x: canvasClamp(x, 0, Math.max(0, stage.clientWidth - chat.offsetWidth)),
+      // A normal drag may lift the window partly above the stage; an
+      // extreme pointer jump (e.g. to -2000,-2000) snaps it back inside.
+      y: canvasClamp(y < -stage.clientHeight ? 0 : y, -Math.max(0, chat.offsetHeight - 40), Math.max(0, stage.clientHeight - chat.offsetHeight))
+    };
+  };
+  useEffect(() => {
+    if (!chatPos) return void 0;
+    const fix = () => setChatPos((current) => {
+      if (!current) return current;
+      const next = clampChat(current.x, current.y);
+      return next.x === current.x && next.y === current.y ? current : next;
+    });
+    fix();
+    window.addEventListener("resize", fix);
+    return () => window.removeEventListener("resize", fix);
+  }, [chatPos, chatOpen, chatPill]);
+  const beginChatDrag = (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const stage = stageRef.current;
+    const chat = chatRef.current;
+    if (!stage || !chat) return;
+    const stageBox = stage.getBoundingClientRect();
+    const chatBox = chat.getBoundingClientRect();
+    const offsetX = event.clientX - chatBox.left;
+    const offsetY = event.clientY - chatBox.top;
+    setChatDragging(true);
+    const move = (moveEvent) => setChatPos(clampChat(moveEvent.clientX - stageBox.left - offsetX, moveEvent.clientY - stageBox.top - offsetY));
+    const finish = () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", finish);
+      setChatDragging(false);
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", finish);
+  };
+  const nudgeChat = (event) => {
+    const chat = chatRef.current;
+    if (!chat) return;
+    if (event.key === "Home") {
+      event.preventDefault();
+      setChatPos(null);
+      return;
+    }
+    const step = event.shiftKey ? 48 : 16;
+    const delta = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[event.key];
+    if (!delta) return;
+    event.preventDefault();
+    setChatPos(clampChat(chat.offsetLeft + delta[0], chat.offsetTop + delta[1]));
+  };
+  const minimiseChat = () => {
+    setChatPill(true);
+    setChatOpen(false);
+  };
+  const toggleChat = () => {
+    if (chatPill) {
+      setChatPill(false);
+      setChatOpen(true);
+      return;
+    }
+    setChatOpen((current) => !current);
+  };
+  const openExpanded = () => {
+    setExpanded(true);
+    setChatPill(false);
+  };
+  useEffect(() => {
+    if (!addMenuOpen) return void 0;
+    const close = (event) => {
+      if (!addMenuRef.current?.contains(event.target)) setAddMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [addMenuOpen]);
+  const snapshot = (currentObjects, currentConnectors) => ({ objects: currentObjects.map((row) => ({ ...row })), connectors: currentConnectors.map((row) => ({ ...row })) });
+  const undo = () => {
+    if (readOnly) return;
+    setHistory((current) => {
+      if (!current.length) return current;
+      const before = current[current.length - 1];
+      setFuture((next) => [...next, snapshot(objects, connectors)]);
+      setObjects(before.objects);
+      setConnectors(before.connectors);
+      setDirty(true);
+      return current.slice(0, -1);
+    });
+  };
+  const redo = () => {
+    if (readOnly) return;
+    setFuture((current) => {
+      if (!current.length) return current;
+      const after = current[current.length - 1];
+      setHistory((next) => [...next, snapshot(objects, connectors)]);
+      setObjects(after.objects);
+      setConnectors(after.connectors);
+      setDirty(true);
+      return current.slice(0, -1);
+    });
+  };
+  const duplicateSelection = () => {
+    if (readOnly) return;
+    const ids = selectedIds.length ? selectedIds : selectedId ? [selectedId] : [];
+    if (!ids.length) return;
+    const before = snapshot(objects, connectors);
+    const stamp = Date.now();
+    setObjects((current) => {
+      const next = [...current];
+      ids.forEach((id) => {
+        const origin = current.find((row) => row.id === id);
+        if (!origin) return;
+        canvasObjectSeq += 1;
+        const rect = canvasRect(origin);
+        next.push({
+          ...origin,
+          id: `canvas-obj-${stamp}-${canvasObjectSeq}`,
+          content: { ...origin.content ?? {} },
+          tags: [...origin.tags ?? []],
+          x: canvasClamp(rect.x + 24, CANVAS_MIN_POS.x, CANVAS_WORLD.width - CANVAS_CARD.width - CANVAS_MIN_POS.x),
+          y: canvasClamp(rect.y + 24, CANVAS_MIN_POS.y, CANVAS_WORLD.height - CANVAS_CARD.height - CANVAS_MIN_POS.y)
+        });
+      });
+      return next;
+    });
+    setHistory((current) => [...current.slice(-49), before]);
+    setFuture([]);
+    setDirty(true);
+    setNotice({ tone: "ok", text: `Duplicated ${ids.length} object(s) \u2014 Save canvas to persist the copies.` });
+  };
   const persistableObjects = () => objects.map((item) => ({
     id: item.id,
     kind: item.kind,
@@ -7262,7 +10168,8 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     height: canvasNumber(item.height) || CANVAS_CARD.height,
     tags: Array.isArray(item.tags) ? item.tags : [],
     evidence_ref: item.evidence_ref ?? null,
-    work_ref: item.work_ref ?? null
+    work_ref: item.work_ref ?? null,
+    colour: CANVAS_STICKER_COLOURS.includes(item.colour) ? item.colour : null
   }));
   const persistableConnectors = (rows) => {
     const ids = new Set(rows.map((item) => item.id));
@@ -7270,60 +10177,88 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   };
   const reload = async () => {
     setBusy(true);
+    const at = boardRef.current;
     try {
-      const fresh = await api(`/projects/${encoded}/canvas`);
+      const fresh = await api(canvasRoute);
+      if (boardRef.current !== at) return;
       const discarded = dirty;
       setCanvas(fresh);
       setObjects(fresh.objects ?? []);
       setConnectors(fresh.connectors ?? []);
       setDirty(false);
       setSelectedId(null);
+      setHistory([]);
+      setFuture([]);
+      setSelectedIds([]);
       setNotice(discarded ? { tone: "danger", text: `Canvas reloaded at revision ${fresh.revision} \u2014 unsaved edits were discarded, not applied.` } : { tone: "ok", text: `Canvas reloaded at revision ${fresh.revision}.` });
     } catch (failure) {
-      setNotice({ tone: "danger", text: `Reload failed: ${String(failure?.message ?? failure)}` });
+      if (boardRef.current === at) setNotice({ tone: "danger", text: `Reload failed: ${failureText(failure)}` });
     }
     setBusy(false);
   };
   const save = async () => {
+    if (readOnly) {
+      setNotice({ tone: "danger", text: `This board is ${CANVAS_BOARD_STATUS_LABELS[boardStatus]} and read-only \u2014 move it back to Plan made to edit.` });
+      return false;
+    }
+    const at = boardRef.current;
     setBusy(true);
     try {
       const rows = persistableObjects();
       const edges = persistableConnectors(rows);
-      const saved = await api(`/projects/${encoded}/canvas`, { method: "PUT", body: { expected_revision: revision, objects: rows, connectors: edges } });
+      const saved = await api(canvasRoute, { method: "PUT", body: { expected_revision: revision, objects: rows, connectors: edges } });
+      if (boardRef.current !== at) return false;
+      dirtyRef.current = false;
       setCanvas(saved);
       setObjects(saved.objects ?? []);
       setConnectors(saved.connectors ?? []);
       setDirty(false);
+      refreshBoards();
       setNotice({ tone: "ok", text: `Canvas saved \u2014 revision ${saved.revision} with ${(saved.objects ?? []).length} object(s) and ${(saved.connectors ?? []).length} connector(s).` });
       onRefresh?.();
+      return true;
     } catch (failure) {
-      const message = String(failure?.message ?? failure);
-      if (/\b409\b|conflict/i.test(message)) {
+      if (boardRef.current !== at) return false;
+      const message = failureText(failure);
+      if (/\b409\b|conflict|board_locked|read-only/i.test(message)) {
         try {
-          const fresh = await api(`/projects/${encoded}/canvas`);
-          setCanvas(fresh);
-          setObjects(fresh.objects ?? []);
-          setConnectors(fresh.connectors ?? []);
-          setDirty(false);
-          setNotice({ tone: "danger", text: `Revision conflict \u2014 this canvas changed elsewhere and was reloaded at revision ${fresh.revision}. Your unsaved edit was not applied.` });
+          const fresh = await api(canvasRoute);
+          if (boardRef.current !== at) return false;
+          if (CANVAS_READ_ONLY.includes(fresh.status ?? "draft") || /board_locked|read-only/i.test(message)) {
+            mergeMeta(fresh);
+            refreshBoards();
+            setNotice({ tone: "danger", text: `Not saved \u2014 this board is now ${CANVAS_BOARD_STATUS_LABELS[fresh.status] ?? fresh.status} and read-only. Your edits are still here: move the board back to Plan made (or restore it), then Save.` });
+          } else {
+            dirtyRef.current = false;
+            setCanvas(fresh);
+            setObjects(fresh.objects ?? []);
+            setConnectors(fresh.connectors ?? []);
+            setDirty(false);
+            setNotice({ tone: "danger", text: `Revision conflict \u2014 this canvas changed elsewhere and was reloaded at revision ${fresh.revision}. Your unsaved edit was not applied.` });
+          }
         } catch (reloadFailure) {
           setNotice({ tone: "danger", text: `Canvas save failed: ${message}` });
         }
       } else {
         setNotice({ tone: "danger", text: `Canvas save failed: ${message}` });
       }
+      return false;
+    } finally {
+      if (boardRef.current === at) setBusy(false);
     }
-    setBusy(false);
   };
+  saveRef.current = save;
   const addObject = (objectKind, text) => {
     const body = String(text ?? "").trim();
-    if (!body) return null;
+    if (!body || readOnly) return null;
+    const before = snapshot(objects, connectors);
     const position = canvasPlaced(objects);
     canvasObjectSeq += 1;
     const item = {
       id: `canvas-obj-${Date.now()}-${canvasObjectSeq}`,
       kind: objectKind,
       content: { text: body },
+      ...objectKind === "media" ? { height: 230 } : {},
       x: position.x,
       y: position.y,
       width: CANVAS_CARD.width,
@@ -7333,6 +10268,8 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       work_ref: null
     };
     setObjects((current) => [...current, item]);
+    setHistory((current) => [...current.slice(-49), before]);
+    setFuture([]);
     setDirty(true);
     setNotice({ tone: "ok", text: `${CANVAS_KIND_LABELS[objectKind] ?? objectKind} added as scratch \u2014 Save canvas to persist it.` });
     return item;
@@ -7345,31 +10282,87 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     setSelectedId(item.id);
     setDrawerText(canvasText(item));
     setDrawerKind(item.kind);
+    const { text: _text, ...rest } = item.content ?? {};
+    setDrawerFields({ ...rest, links: linksOf(item.content ?? {}).map((link) => ({ url: link.url ?? "", label: link.label ?? "" })) });
+  };
+  const setField = (field, value) => setDrawerFields((current) => ({ ...current, [field]: value }));
+  const uploadImage = async (file) => {
+    if (!file || readOnly) return;
+    const mediaType = CANVAS_IMAGE_TYPES[file.type] ? file.type : null;
+    if (!mediaType) {
+      setNotice({ tone: "danger", text: "Choose a PNG, JPEG or WebP image. Video comes in a later stage." });
+      return;
+    }
+    if (file.size <= 0 || file.size > CANVAS_IMAGE_MAX) {
+      setNotice({ tone: "danger", text: "Images must be under 5 MB." });
+      return;
+    }
+    setImageBusy(true);
+    try {
+      const created = await api(`/projects/${encodeURIComponent(project.id)}/content`, { method: "POST", body: { filename: file.name, media_type: mediaType, content_base64: await fileAsBase64(file) } });
+      setField("content_id", created.content_id);
+      const guess = String(file.name).replace(/\.[a-z0-9]+$/i, "").slice(0, 300);
+      setDrawerFields((current) => current.alt ? current : { ...current, alt: guess });
+      setNotice({ tone: "ok", text: "Image uploaded \u2014 Apply, then Save canvas, to place it on the card." });
+    } catch (failure) {
+      setNotice({ tone: "danger", text: `Image could not be uploaded: ${failureText(failure)}` });
+    } finally {
+      setImageBusy(false);
+    }
   };
   const applyDrawer = () => {
-    if (!selected) return;
+    if (!selected || readOnly) return;
     const text = drawerText.trim();
     if (!text) return;
-    setObjects((current) => current.map((item) => item.id === selected.id ? { ...item, kind: drawerKind, content: { ...item.content ?? {}, text } } : item));
+    if (richProblem) {
+      setNotice({ tone: "danger", text: richProblem });
+      return;
+    }
+    const links = (drawerFields.links ?? []).map((link) => ({ url: String(link.url ?? "").trim(), label: String(link.label ?? "").trim() })).filter((link) => link.url);
+    const bad = links.find((link) => !canvasSafeUrl(link.url));
+    if (bad) {
+      setNotice({ tone: "danger", text: `"${bad.url.slice(0, 60)}" is not a web link. Links must start with http:// or https://.` });
+      return;
+    }
+    if (links.length > 20) {
+      setNotice({ tone: "danger", text: "A card holds at most 20 links." });
+      return;
+    }
+    const fields = {
+      ...drawerFields,
+      links: links.map((link) => link.label ? link : { url: link.url }),
+      ...Array.isArray(drawerFields.alternatives) ? { alternatives: drawerFields.alternatives.map((v) => String(v).trim()).filter(Boolean) } : {},
+      ...Array.isArray(drawerFields.checklist) ? { checklist: drawerFields.checklist.map((v) => ({ text: String(v.text ?? "").trim(), done: Boolean(v.done) })).filter((v) => v.text) } : {}
+    };
+    if (typeof selected.content?.url === "string" && !Array.isArray(selected.content?.links)) fields.url = "";
+    const before = snapshot(objects, connectors);
+    setObjects((current) => current.map((item) => item.id === selected.id ? { ...item, kind: drawerKind, content: { ...item.content ?? {}, ...fields, text } } : item));
+    setHistory((current) => [...current.slice(-49), before]);
+    setFuture([]);
     setDirty(true);
     setNotice({ tone: "ok", text: "Object updated \u2014 Save canvas to persist the change." });
   };
   const removeSelected = async () => {
-    if (!selected) return;
+    if (!selected || readOnly) return;
+    const before = snapshot(objects, connectors);
     const persistable = new Set((canvas?.objects ?? []).map((row) => row.id));
     if (!persistable.has(selected.id) || dirty) {
       const wasPersisted = persistable.has(selected.id);
       const removedId = selected.id;
       setObjects((current) => current.filter((row) => row.id !== removedId));
       setConnectors((current) => current.filter((edge) => edge.source !== removedId && edge.target !== removedId));
+      setHistory((current) => [...current.slice(-49), before]);
+      setFuture([]);
       setDirty(true);
       setSelectedId(null);
       setNotice({ tone: "ok", text: wasPersisted ? "Removed locally \u2014 Save canvas to persist the removal." : "Scratch object removed \u2014 it was never saved." });
       return;
     }
+    const at = boardRef.current;
     setBusy(true);
     try {
-      const saved = await api(`/projects/${encoded}/canvas/objects/${encodeURIComponent(selected.id)}?expected_revision=${revision}`, { method: "DELETE" });
+      const saved = await api(`${canvasRoute}/objects/${encodeURIComponent(selected.id)}?expected_revision=${revision}`, { method: "DELETE" });
+      if (boardRef.current !== at) return;
       setCanvas(saved);
       setObjects(saved.objects ?? []);
       setConnectors(saved.connectors ?? []);
@@ -7378,9 +10371,10 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       setNotice({ tone: "ok", text: `Object removed \u2014 revision ${saved.revision} with ${(saved.objects ?? []).length} object(s).` });
       onRefresh?.();
     } catch (failure) {
-      setNotice({ tone: "danger", text: `Remove failed: ${String(failure?.message ?? failure)}` });
+      if (boardRef.current === at) setNotice({ tone: "danger", text: `Remove failed: ${failureText(failure)}` });
+    } finally {
+      if (boardRef.current === at) setBusy(false);
     }
-    setBusy(false);
   };
   const addConnector = (source, target, meaning) => {
     if (!source || !target || source === target) {
@@ -7391,8 +10385,11 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       setNotice({ tone: "danger", text: `Already linked: these two objects already carry a "${meaning}" connector.` });
       return;
     }
+    const before = snapshot(objects, connectors);
     canvasEdgeSeq += 1;
     setConnectors((current) => [...current, { id: `canvas-edge-${Date.now()}-${canvasEdgeSeq}`, source, target, meaning }]);
+    setHistory((current) => [...current.slice(-49), before]);
+    setFuture([]);
     setDirty(true);
     setNotice({ tone: "ok", text: `Connector added (${CANVAS_MEANING_LABELS[meaning] ?? meaning}) \u2014 Save canvas to persist it.` });
   };
@@ -7400,6 +10397,10 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   const beginObjectDrag = (event, item) => {
     if (event.button !== 0) return;
     event.preventDefault();
+    if (readOnly) {
+      openDrawer(item);
+      return;
+    }
     if (mode === "connect") {
       if (!pendingConnect) {
         setPendingConnect(item.id);
@@ -7427,45 +10428,140 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       setObjects((current) => current.map((row) => row.id === item.id ? {
         ...row,
         x: canvasClamp(origin.x + dx / zoom, CANVAS_MIN_POS.x, CANVAS_WORLD.width - CANVAS_CARD.width - CANVAS_MIN_POS.x),
-        y: canvasClamp(origin.y + dy / zoom, CANVAS_MIN_POS.y, CANVAS_WORLD.height - CANVAS_CARD.height - CANVAS_MIN_POS.x)
+        y: canvasClamp(origin.y + dy / zoom, CANVAS_MIN_POS.y, CANVAS_WORLD.height - CANVAS_CARD.height - CANVAS_MIN_POS.y)
       } : row));
       setDirty(true);
     };
     const finish = () => {
       document.removeEventListener("pointermove", move);
       document.removeEventListener("pointerup", finish);
-      if (moved) setNotice({ tone: "ok", text: "Moved \u2014 Save canvas to persist the new position." });
-      else openDrawer(item);
+      if (moved) {
+        setObjects((current) => canvasDeOverlap(current, item.id));
+        setNotice({ tone: "ok", text: "Moved \u2014 Save canvas to persist the new position." });
+      } else openDrawer(item);
     };
     document.addEventListener("pointermove", move);
     document.addEventListener("pointerup", finish);
   };
+  const clampPan = (x, y, scale = zoomRef.current) => {
+    const stage = stageRef.current;
+    if (!stage) return { x, y };
+    const margin = 160;
+    const minX = Math.min(0, stage.clientWidth - CANVAS_WORLD.width * scale) - margin;
+    const minY = Math.min(0, stage.clientHeight - CANVAS_WORLD.height * scale) - margin;
+    return { x: canvasClamp(x, minX, margin), y: canvasClamp(y, minY, margin) };
+  };
   const beginPan = (event) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 && event.button !== 1) return;
     const target = event.target;
-    if (target?.closest?.(".dy-pc-obj") || target?.closest?.(".dy-pc-drawer") || target?.closest?.(".dy-pc-chat")) return;
+    if (target?.closest?.(".dy-pc-obj") || target?.closest?.(".dy-pc-drawer") || target?.closest?.(".dy-pc-chat") || target?.closest?.(".dy-pc-overlay")) return;
+    if (mode === "connect" && event.button === 0) {
+      event.preventDefault();
+      if (pendingConnect) {
+        setPendingConnect(null);
+        setConnectPointer(null);
+        setNotice({ tone: "ok", text: "Connect: link cancelled. Click a sticker to start again." });
+      }
+      return;
+    }
+    const stageBox = stageRef.current?.getBoundingClientRect();
+    if (!stageBox) return;
     const startX = event.clientX;
     const startY = event.clientY;
-    const origin = { x: pan.x, y: pan.y };
+    const originPan = { ...panRef.current };
     let moved = false;
+    if (mode === "select" && event.shiftKey && event.button === 0) {
+      const band = { x: startX - stageBox.x, y: startY - stageBox.y, width: 0, height: 0 };
+      const marqueeMove = (moveEvent) => {
+        const dx = moveEvent.clientX - startX;
+        const dy = moveEvent.clientY - startY;
+        if (!moved && Math.abs(dx) <= 3 && Math.abs(dy) <= 3) return;
+        moved = true;
+        band.x = dx < 0 ? startX - stageBox.x + dx : startX - stageBox.x;
+        band.y = dy < 0 ? startY - stageBox.y + dy : startY - stageBox.y;
+        band.width = Math.abs(dx);
+        band.height = Math.abs(dy);
+        setMarquee({ ...band });
+      };
+      const marqueeFinish = (moveEvent) => {
+        document.removeEventListener("pointermove", marqueeMove);
+        document.removeEventListener("pointerup", marqueeFinish);
+        setMarquee(null);
+        if (!moved) {
+          setSelectedId(null);
+          setPendingConnect(null);
+          setSelectedIds([]);
+          return;
+        }
+        const scale = zoomRef.current;
+        const offset = panRef.current;
+        const x1 = (Math.min(startX, moveEvent.clientX) - stageBox.x - offset.x) / scale;
+        const y1 = (Math.min(startY, moveEvent.clientY) - stageBox.y - offset.y) / scale;
+        const x2 = (Math.max(startX, moveEvent.clientX) - stageBox.x - offset.x) / scale;
+        const y2 = (Math.max(startY, moveEvent.clientY) - stageBox.y - offset.y) / scale;
+        const hits = [];
+        objects.forEach((row) => {
+          const rect = canvasRect(row);
+          if (rect.x < x2 && rect.x + rect.width > x1 && rect.y < y2 && rect.y + rect.height > y1) hits.push(row.id);
+        });
+        setSelectedIds(hits);
+        if (hits.length) setNotice({ tone: "ok", text: `Marquee selected ${hits.length} object(s).` });
+      };
+      document.addEventListener("pointermove", marqueeMove);
+      document.addEventListener("pointerup", marqueeFinish);
+      return;
+    }
+    if (event.button === 1) event.preventDefault();
     const move = (moveEvent) => {
       const dx = moveEvent.clientX - startX;
       const dy = moveEvent.clientY - startY;
       if (!moved && Math.abs(dx) <= 3 && Math.abs(dy) <= 3) return;
+      if (!moved) setPanning(true);
       moved = true;
-      setPan({ x: origin.x + dx, y: origin.y + dy });
+      setPan(clampPan(originPan.x + dx, originPan.y + dy));
     };
     const finish = () => {
       document.removeEventListener("pointermove", move);
       document.removeEventListener("pointerup", finish);
+      setPanning(false);
       if (!moved) {
         setSelectedId(null);
         setPendingConnect(null);
+        setSelectedIds([]);
       }
     };
     document.addEventListener("pointermove", move);
     document.addEventListener("pointerup", finish);
   };
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return void 0;
+    const onWheel = (event) => {
+      if (event.target?.closest?.(".dy-pc-chat, .dy-pc-drawer, .dy-pc-overlay")) return;
+      event.preventDefault();
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? stage.clientHeight : 1;
+      const current = zoomRef.current;
+      const offset = panRef.current;
+      if (event.ctrlKey || event.metaKey) {
+        const box = stage.getBoundingClientRect();
+        const px = event.clientX - box.left;
+        const py = event.clientY - box.top;
+        const next = Number(canvasClamp(current * (event.deltaY < 0 ? 1.1 : 1 / 1.1), CANVAS_ZOOM.min, CANVAS_ZOOM.max).toFixed(2));
+        if (next === current) return;
+        const wx = (px - offset.x) / current;
+        const wy = (py - offset.y) / current;
+        setZoom(next);
+        setPan(clampPan(px - wx * next, py - wy * next, next));
+        return;
+      }
+      const sideways = event.shiftKey && !event.deltaX;
+      const dx = (sideways ? event.deltaY : event.deltaX) * unit;
+      const dy = (sideways ? 0 : event.deltaY) * unit;
+      setPan(clampPan(offset.x - dx, offset.y - dy));
+    };
+    stage.addEventListener("wheel", onWheel, { passive: false });
+    return () => stage.removeEventListener("wheel", onWheel);
+  }, []);
   const zoomBy = (delta) => setZoom((current) => canvasClamp(Number((current + delta).toFixed(2)), CANVAS_ZOOM.min, CANVAS_ZOOM.max));
   const fit = () => {
     const stage = stageRef.current;
@@ -7480,47 +10576,154 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     const minY = Math.min(...rects.map((rect) => rect.y));
     const maxX = Math.max(...rects.map((rect) => rect.x + rect.width));
     const maxY = Math.max(...rects.map((rect) => rect.y + rect.height));
-    const next = Number(canvasClamp(Math.min((box.width - 80) / Math.max(1, maxX - minX), (box.height - 80) / Math.max(1, maxY - minY)), CANVAS_ZOOM.min, CANVAS_ZOOM.max).toFixed(2));
+    const chat = chatRef.current;
+    const docked = !chatPos && chat;
+    const reserveRight = docked && box.width >= 760 && chatOpen && !chatPill ? chat.offsetWidth + 28 : 0;
+    const reserveBottom = docked && !reserveRight ? chat.offsetHeight + 14 : 0;
+    const next = Number(canvasClamp(Math.min((box.width - 80 - reserveRight) / Math.max(1, maxX - minX), (box.height - 80 - reserveBottom) / Math.max(1, maxY - minY)), CANVAS_ZOOM.min, CANVAS_ZOOM.max).toFixed(2));
     setZoom(next);
     setPan({ x: 40 - minX * next, y: 40 - minY * next });
   };
-  const tidy = () => {
+  const cardsObstructed = () => {
+    const stage = stageRef.current;
+    if (!stage) return false;
+    const box = stage.getBoundingClientRect();
+    const chat = !chatPos && chatRef.current ? chatRef.current.getBoundingClientRect() : null;
+    return [...stage.querySelectorAll(".dy-pc-obj")].some((el) => {
+      const r = el.getBoundingClientRect();
+      const outside = r.left < box.left - 1 || r.right > box.right + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1;
+      const underChat = Boolean(chat) && r.left < chat.right && r.right > chat.left && r.top < chat.bottom && r.bottom > chat.top;
+      return outside || underChat;
+    });
+  };
+  useEffect(() => {
+    if (fitTick < 2) return void 0;
+    const frame = requestAnimationFrame(() => {
+      if (cardsObstructed()) fit();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [fitTick]);
+  useEffect(() => {
+    if (!chatOpen || chatPill || chatPos) return void 0;
+    const frame = requestAnimationFrame(() => {
+      if ((stageRef.current?.clientWidth ?? 0) >= 760 && cardsObstructed()) fit();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [chatOpen, chatPill]);
+  const tidy2 = () => {
+    if (readOnly) return;
+    const before = snapshot(objects, connectors);
     setObjects((current) => current.map((item, index) => ({ ...item, ...gridSlot(index, 3) })));
+    setHistory((current) => [...current.slice(-49), before]);
+    setFuture([]);
     setDirty(true);
     setNotice({ tone: "ok", text: "Tidied into a grid \u2014 Save canvas to persist the new positions." });
   };
-  const curate = async () => {
+  const onStageKeyDown = (event) => {
+    const key = event.key;
+    const target = event.target;
+    if (target && target !== stageRef.current && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT", "BUTTON", "A"].includes(target.tagName) || target.closest?.('.dy-pc-drawer, .dy-pc-chat, .dy-pc-overlay, .dy-pc-linkbar, [role="toolbar"]'))) {
+      if (!target.closest?.(".dy-pc-obj")) return;
+    }
+    const meta = event.ctrlKey || event.metaKey;
+    if (key === "Escape") {
+      setSelectedId(null);
+      setSelectedIds([]);
+      setPendingConnect(null);
+      return;
+    }
+    const arrow = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[key];
+    if (arrow && !selectedId && !selectedIds.length && event.target === stageRef.current) {
+      event.preventDefault();
+      const step = event.shiftKey ? 240 : 80;
+      setPan(clampPan(panRef.current.x + arrow[0] * step, panRef.current.y + arrow[1] * step));
+      return;
+    }
+    if (readOnly) return;
+    if (meta && key.toLowerCase() === "z") {
+      event.preventDefault();
+      if (event.shiftKey) redo();
+      else undo();
+      return;
+    }
+    if (meta && key.toLowerCase() === "y") {
+      event.preventDefault();
+      redo();
+      return;
+    }
+    if (meta && key.toLowerCase() === "d") {
+      event.preventDefault();
+      duplicateSelection();
+      return;
+    }
+    if (key === "Delete" || key === "Backspace") {
+      const ids = selectedIds.length ? selectedIds : selectedId ? [selectedId] : [];
+      if (!ids.length) return;
+      event.preventDefault();
+      const before = snapshot(objects, connectors);
+      setObjects((current) => current.filter((row) => !ids.includes(row.id)));
+      setConnectors((current) => current.filter((edge) => !ids.includes(edge.source) && !ids.includes(edge.target)));
+      setHistory((current) => [...current.slice(-49), before]);
+      setFuture([]);
+      setDirty(true);
+      setSelectedId(null);
+      setSelectedIds([]);
+      setNotice({ tone: "ok", text: `Removed ${ids.length} object(s) locally \u2014 Save canvas to persist.` });
+    }
+  };
+  const curate = async (message = null) => {
+    if (readOnly) {
+      setNotice({ tone: "danger", text: `This board is ${CANVAS_BOARD_STATUS_LABELS[boardStatus]} \u2014 reopen it to ask the steward.` });
+      return;
+    }
+    const at = boardRef.current;
+    const token = ++chatToken.current;
+    setSelectedId(null);
+    setSelectedIds([]);
     setBusy(true);
     setChatOpen(true);
+    setChatPill(false);
+    setChatBusy(true);
     try {
-      const result = await api(`/projects/${encoded}/canvas/sessions`, { method: "POST", body: {} });
+      const result = await api(`${canvasRoute}/sessions`, { method: "POST", body: message ? { message } : {} });
+      if (token !== chatToken.current || boardRef.current !== at) return;
       setSession(result);
+      refreshMeta(at);
       const proposals = (result.proposals ?? []).length;
       setNotice(result.status === "active" && result.current_question ? { tone: "ok", text: `Question: ${result.current_question.question}` } : { tone: "ok", text: `${number(proposals)} proposal(s) ready for review \u2014 nothing is applied automatically.` });
     } catch (failure) {
-      setNotice({ tone: "danger", text: `Curation failed: ${String(failure?.message ?? failure)}` });
+      if (token !== chatToken.current || boardRef.current !== at) return;
+      setNotice({ tone: "danger", text: `Curation failed: ${failureText(failure)}` });
     }
-    setBusy(false);
+    if (token === chatToken.current && boardRef.current === at) {
+      setBusy(false);
+      setChatBusy(false);
+    }
   };
   const reviewCanvas = async () => {
+    const at = boardRef.current;
     setBusy(true);
     setChatOpen(true);
+    setChatPill(false);
     try {
-      const result = await api(`/projects/${encoded}/canvas/curate`, { method: "POST", body: {} });
+      const result = await api(`${canvasRoute}/curate`, { method: "POST", body: {} });
+      if (boardRef.current !== at) return;
       setReview(result);
       const summary = result.summary ?? {};
       const questions = (result.clarifying_questions ?? []).length;
       setNotice({ tone: "ok", text: `Review: ${number(summary.evidence_count)} evidence, ${number(summary.claim_count)} claim, ${number(summary.question_count)} question, ${number(summary.plan_block_count)} plan block \u2014 ${questions ? `${number(questions)} question(s) outstanding` : "no questions outstanding"}.` });
     } catch (failure) {
-      setNotice({ tone: "danger", text: `Review failed: ${String(failure?.message ?? failure)}` });
+      if (boardRef.current === at) setNotice({ tone: "danger", text: `Review failed: ${failureText(failure)}` });
     }
-    setBusy(false);
+    if (boardRef.current === at) setBusy(false);
   };
   const answerQuestion = async (outcome) => {
     if (!session?.session_id) return;
+    const at = boardRef.current;
     setBusy(true);
     try {
       const result = await api(`/canvas/sessions/${encodeURIComponent(session.session_id)}/answer`, { method: "POST", body: { outcome, answer } });
+      if (boardRef.current !== at) return;
       setSession(result);
       setAnswer("");
       const proposals = (result.proposals ?? []).length;
@@ -7528,17 +10731,33 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       else if (outcome === "stop") setNotice({ tone: "ok", text: `Session stopped \u2014 ${number(proposals)} proposal(s) kept as scratch.` });
       else setNotice({ tone: "ok", text: `${number(proposals)} proposal(s) ready for review \u2014 approve or reject each one.` });
     } catch (failure) {
-      setNotice({ tone: "danger", text: `Answer failed: ${String(failure?.message ?? failure)}` });
+      if (boardRef.current === at) setNotice({ tone: "danger", text: `Answer failed: ${failureText(failure)}` });
     }
+    if (boardRef.current === at) setBusy(false);
+  };
+  const sendChat = async () => {
+    const text = chatDraft.trim();
+    if (!text || chatBusy) return;
+    setChatLog((current) => [...current, { role: "me", text }]);
+    setChatDraft("");
+    await curate(text);
+  };
+  const stopChat = () => {
+    chatToken.current += 1;
+    setChatBusy(false);
     setBusy(false);
+    setNotice({ tone: "ok", text: "Stopped \u2014 this answer will be ignored here. The steward may still finish and record it; nothing is ever applied to the board without your approval." });
   };
   const decideProposal = async (proposal, approve) => {
+    const at = boardRef.current;
     setBusy(true);
     try {
-      const result = await api(`/canvas/proposals/${encodeURIComponent(proposal.proposal_id)}/decision`, { method: "POST", body: { approve } });
+      const result = await api(`/canvas/proposals/${encodeURIComponent(proposal.proposal_id)}/decision`, { method: "POST", body: { approve, project_id: project.id } });
+      if (boardRef.current !== at) return;
       if (session?.session_id) {
         try {
           const fresh = await api(`/canvas/sessions/${encodeURIComponent(session.session_id)}`);
+          if (boardRef.current !== at) return;
           setSession(fresh);
         } catch (readFailure) {
           setSession((current) => current ? { ...current, proposals: (current.proposals ?? []).map((row) => row.proposal_id === result.proposal_id ? { ...row, status: result.status } : row) } : current);
@@ -7546,9 +10765,107 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       }
       setNotice({ tone: "ok", text: `Proposal ${result.status} \u2014 recorded only; the canvas is unchanged until you save an edit.` });
     } catch (failure) {
-      setNotice({ tone: "danger", text: `Decision failed: ${String(failure?.message ?? failure)}` });
+      if (boardRef.current === at) setNotice({ tone: "danger", text: `Decision failed: ${failureText(failure)}` });
+    } finally {
+      if (boardRef.current === at) setBusy(false);
     }
-    setBusy(false);
+  };
+  const synthesizePlan = async (proposal) => {
+    const at = boardRef.current;
+    setPlanBusy(true);
+    try {
+      const plan = await api(`/canvas/proposals/${encodeURIComponent(proposal.proposal_id)}/plan`, { method: "POST", body: { project_id: project.id }, suppressErrorToast: true });
+      if (boardRef.current !== at) return;
+      setPlanPanel(plan);
+      refreshMeta(at);
+      const edited = plan.edited_by || (plan.status ?? "draft") !== "draft";
+      setNotice({ tone: "ok", text: edited ? `This proposal already has a plan (${plan.status ?? "draft"}) \u2014 showing it unchanged, your edits are kept.` : `Plan drafted from the approved proposal \u2014 ${number((plan.steps ?? []).length)} step(s), nothing applied to the board.` });
+    } catch (failure) {
+      if (boardRef.current !== at) return;
+      setPlanPanel(null);
+      setNotice({ tone: "danger", text: `Plan synthesis failed: ${failureText(failure)}` });
+    } finally {
+      if (boardRef.current === at) setPlanBusy(false);
+    }
+  };
+  const savePlanDocument = async () => {
+    if (!planPanel?.plan_id) return;
+    const at = boardRef.current;
+    setPlanBusy(true);
+    try {
+      const saved = await api(`/projects/${encoded}/plans/${encodeURIComponent(planPanel.plan_id)}/document/save`, { method: "POST", body: {} });
+      if (boardRef.current !== at) return;
+      setPlanPanel((current) => ({ ...current ?? {}, ...saved }));
+      setNotice({ tone: "ok", text: "Implementation document saved to the Content tab as Markdown." });
+      onRefresh?.();
+    } catch (failure) {
+      if (boardRef.current === at) setNotice({ tone: "danger", text: `Document save failed: ${failureText(failure)}` });
+    } finally {
+      if (boardRef.current === at) setPlanBusy(false);
+    }
+  };
+  const planEditable = Boolean(planPanel?.plan_id) && (planPanel?.status ?? "draft") === "draft" && !readOnly;
+  const startStepEdit = () => {
+    canvasObjectSeq += 1;
+    setStepsDraft((planPanel?.steps ?? []).map((step) => ({ key: `s${step.order}-${canvasObjectSeq}`, order: step.order, title: step.title ?? "" })));
+    openExpanded();
+  };
+  const editStep = (index, patch) => setStepsDraft((current) => current.map((row, at) => at === index ? { ...row, ...patch } : row));
+  const moveStep = (index, delta) => setStepsDraft((current) => {
+    const to = index + delta;
+    if (to < 0 || to >= current.length) return current;
+    const next = [...current];
+    const [row] = next.splice(index, 1);
+    next.splice(to, 0, row);
+    return next;
+  });
+  const addStep = () => {
+    canvasObjectSeq += 1;
+    setStepsDraft((current) => [...current ?? [], { key: `new-${canvasObjectSeq}`, order: null, title: "" }]);
+  };
+  const removeStep = (index) => setStepsDraft((current) => current.length > 1 ? current.filter((_, at) => at !== index) : current);
+  const saveSteps = async () => {
+    if (!planPanel?.plan_id || !stepsDraft?.length) return;
+    if (stepsDraft.some((row) => !row.title.trim())) {
+      setNotice({ tone: "danger", text: "Every step needs a title \u2014 remove empty steps before saving." });
+      return;
+    }
+    const at = boardRef.current;
+    setPlanBusy(true);
+    try {
+      const saved = await api(`/projects/${encoded}/plans/${encodeURIComponent(planPanel.plan_id)}`, {
+        method: "PATCH",
+        body: { steps: stepsDraft.map((row) => row.order ? { order: row.order, title: row.title.trim() } : { title: row.title.trim() }) }
+      });
+      if (boardRef.current !== at) return;
+      setPlanPanel((current) => ({ ...current ?? {}, ...saved }));
+      setStepsDraft(null);
+      setNotice({ tone: "ok", text: `Plan steps saved \u2014 ${number((saved.steps ?? []).length)} step(s).` });
+    } catch (failure) {
+      if (boardRef.current === at) setNotice({ tone: "danger", text: `Plan steps could not be saved: ${failureText(failure)}` });
+    } finally {
+      if (boardRef.current === at) setPlanBusy(false);
+    }
+  };
+  const planDocSaved = planPanel?.status === "documented";
+  const createdOrders = new Set((planPanel?.backlog_created ?? []).map((row) => row.order));
+  const pendingSteps = (planPanel?.steps ?? []).map((step) => step.order).filter((order) => !createdOrders.has(order));
+  const createBacklogItems = async () => {
+    if (!planPanel?.plan_id || !backlogConfirm?.length) return;
+    const at = boardRef.current;
+    setPlanBusy(true);
+    try {
+      const result = await api(`/projects/${encoded}/plans/${encodeURIComponent(planPanel.plan_id)}/backlog`, { method: "POST", body: { step_orders: backlogConfirm } });
+      if (boardRef.current !== at) return;
+      setPlanPanel((current) => ({ ...current ?? {}, backlog_created: result.backlog_created ?? [] }));
+      setNotice({ tone: "ok", text: `${number((result.created ?? []).length)} backlog item(s) created: ${(result.created ?? []).map((row) => row.ref).join(", ")}.` });
+      setBacklogConfirm(null);
+      onRefresh?.();
+    } catch (failure) {
+      if (boardRef.current === at) setNotice({ tone: "danger", text: `Backlog creation failed: ${failureText(failure)}` });
+    } finally {
+      if (boardRef.current === at) setPlanBusy(false);
+    }
   };
   const renderConnectors = () => {
     const byId = new Map(objects.map((item) => [item.id, item]));
@@ -7558,7 +10875,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     ];
     laid.forEach((edge) => {
       const box = edge.labelBox;
-      lines.push(jsx("line", { "data-canvas-connector": edge.id, "data-canvas-meaning": edge.meaning, x1: edge.x1, y1: edge.y1, x2: edge.x2, y2: edge.y2, markerEnd: "url(#dy-pc-arrow)" }, edge.id));
+      lines.push(jsx("line", { "data-canvas-connector": edge.id, "data-canvas-meaning": edge.meaning, "data-canvas-source": edge.source, "data-canvas-target": edge.target, x1: edge.x1, y1: edge.y1, x2: edge.x2, y2: edge.y2, markerEnd: "url(#dy-pc-arrow)" }, edge.id));
       if (edge.leader) lines.push(jsx("line", { className: "dy-pc-leader", x1: edge.anchor.x, y1: edge.anchor.y, x2: box.x + box.width / 2, y2: box.y + box.height / 2 }, `${edge.id}:leader`));
       lines.push(jsx("rect", { className: "dy-pc-edge-chip", "data-canvas-meaning": edge.meaning, x: box.x, y: box.y, width: box.width, height: box.height, rx: box.height / 2 }, `${edge.id}:chip`));
       lines.push(jsx("text", { className: "dy-pc-edge-label", "data-canvas-edge-label": edge.id, x: box.x + box.width / 2, y: box.y + box.height / 2, textAnchor: "middle", dominantBaseline: "central", children: edge.label }, `${edge.id}:label`));
@@ -7567,29 +10884,113 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       const pending = byId.get(pendingConnect);
       if (pending) {
         const rect = canvasRect(pending);
+        if (connectPointer) lines.push(jsx("line", { "data-pc-pending": "true", "data-canvas-connect-preview": pendingConnect, x1: rect.x + rect.width / 2, y1: rect.y + rect.height / 2, x2: connectPointer.x, y2: connectPointer.y }, "pending-line"));
         lines.push(jsx("circle", { "data-canvas-pending": pendingConnect, cx: rect.x + rect.width / 2, cy: rect.y + rect.height / 2, r: 7 }, "pending"));
       }
     }
     return lines;
   };
   const renderFrames = () => layoutFrames(objects.map((item) => ({ ...item, ...canvasRect(item) })), CANVAS_WORLD).map((frame) => jsx("div", { className: "dy-pc-frame", "data-canvas-frame": frame.tag, style: { left: `${frame.x}px`, top: `${frame.y}px`, width: `${frame.width}px`, height: `${frame.height}px` }, children: frame.tag }, frame.tag));
+  const renderFieldEditors = () => {
+    const f = drawerFields;
+    const off = readOnly;
+    const out = [];
+    out.push(jsx(RichTextEditor, { value: f.description_doc, fallbackText: f.description, readOnly: off, onChange: (doc, plain) => {
+      setField("description_doc", plain ? doc : void 0);
+      setField("description", plain || void 0);
+    }, onProblem: setRichProblem, rest: { ...f, text: drawerText } }, `rt-${selected?.id}`));
+    const links = f.links ?? [];
+    out.push(jsxs("fieldset", { className: "dy-pc-fieldset", "data-canvas-links": true, children: [
+      jsx("legend", { children: `Links${links.length ? ` (${links.length})` : ""}` }),
+      ...links.map((link, index) => jsxs("div", { className: "dy-pc-row", "data-canvas-link-row": index, children: [
+        jsx("input", { "data-canvas-link-url": index, type: "url", inputMode: "url", placeholder: "https://\u2026", maxLength: 2048, value: link.url, disabled: off, "aria-label": `Link ${index + 1} address`, "aria-invalid": link.url && !canvasSafeUrl(link.url) ? "true" : void 0, onChange: (event) => setField("links", links.map((l, i) => i === index ? { ...l, url: event.target.value } : l)) }),
+        jsx("input", { "data-canvas-link-label": index, placeholder: "Label (optional)", maxLength: 200, value: link.label, disabled: off, "aria-label": `Link ${index + 1} label`, onChange: (event) => setField("links", links.map((l, i) => i === index ? { ...l, label: event.target.value } : l)) }),
+        canvasSafeUrl(link.url) ? jsx("a", { className: "dy-pc-open", href: link.url.trim(), target: "_blank", rel: "noopener noreferrer nofollow", title: "Open link", "aria-label": `Open link ${index + 1}`, children: jsx(Icon, { name: "arrow-up-right" }) }) : null,
+        off ? null : jsx(Button, { small: true, action: "pc-link-remove", ariaLabel: `Remove link ${index + 1}`, onClick: () => setField("links", links.filter((_, i) => i !== index)), children: jsx(Icon, { name: "x" }) })
+      ] }, `link-${index}`)),
+      off ? null : jsx(Button, { small: true, action: "pc-link-add", disabled: links.length >= 20, onClick: () => setField("links", [...links, { url: "", label: "" }]), children: [jsx(Icon, { name: "plus" }, "i"), "Add link"] })
+    ] }));
+    for (const [field, input, label, choices, max] of CANVAS_KIND_FIELDS[drawerKind] ?? []) {
+      const value = f[field];
+      let control;
+      if (input === "choice") control = jsx("select", { "data-canvas-field": field, value: value ?? "", disabled: off, onChange: (event) => setField(field, event.target.value), children: [jsx("option", { value: "", children: "Not set" }, ""), ...choices.map((c) => jsx("option", { value: c, children: canvasChoiceLabel(c) }, c))] });
+      else if (input === "member") {
+        const known = members.includes(value);
+        control = jsx("select", { "data-canvas-field": field, value: value ?? "", disabled: off, onChange: (event) => setField(field, event.target.value), children: [
+          jsx("option", { value: "", children: "Unassigned" }, ""),
+          ...members.map((m) => jsx("option", { value: m, children: m }, m)),
+          value && !known ? jsx("option", { value, children: `${value} (no longer a member)` }, "former") : null
+        ] });
+      } else if (input === "date") control = jsx("input", { type: "date", "data-canvas-field": field, value: value ?? "", disabled: off, onChange: (event) => setField(field, event.target.value) });
+      else if (input === "area") control = jsx("textarea", { "data-canvas-field": field, rows: 3, maxLength: max, value: value ?? "", readOnly: off, disabled: off, onChange: (event) => setField(field, event.target.value) });
+      else if (input === "text") control = jsx("input", { "data-canvas-field": field, maxLength: max, value: value ?? "", readOnly: off, disabled: off, onChange: (event) => setField(field, event.target.value) });
+      else if (input === "list") {
+        const rows = Array.isArray(value) ? value : [];
+        out.push(jsxs("fieldset", { className: "dy-pc-fieldset", "data-canvas-field": field, children: [
+          jsx("legend", { children: label }),
+          ...rows.map((row, index) => jsxs("div", { className: "dy-pc-row", children: [
+            jsx("input", { maxLength: 500, value: row, disabled: off, "aria-label": `${label} ${index + 1}`, onChange: (event) => setField(field, rows.map((r, i) => i === index ? event.target.value : r)) }),
+            off ? null : jsx(Button, { small: true, ariaLabel: `Remove ${label} ${index + 1}`, onClick: () => setField(field, rows.filter((_, i) => i !== index)), children: jsx(Icon, { name: "x" }) })
+          ] }, index)),
+          off ? null : jsx(Button, { small: true, action: `pc-${field}-add`, disabled: rows.length >= 50, onClick: () => setField(field, [...rows, ""]), children: [jsx(Icon, { name: "plus" }, "i"), "Add"] })
+        ] }));
+        continue;
+      } else if (input === "checklist") {
+        const rows = Array.isArray(value) ? value : [];
+        out.push(jsxs("fieldset", { className: "dy-pc-fieldset", "data-canvas-field": field, children: [
+          jsx("legend", { children: `${label}${rows.length ? ` (${rows.filter((r) => r.done).length}/${rows.length})` : ""}` }),
+          ...rows.map((row, index) => jsxs("div", { className: "dy-pc-row", children: [
+            jsx("input", { type: "checkbox", checked: Boolean(row.done), disabled: off, "aria-label": `Done: ${row.text || `item ${index + 1}`}`, onChange: (event) => setField(field, rows.map((r, i) => i === index ? { ...r, done: event.target.checked } : r)) }),
+            jsx("input", { maxLength: 300, value: row.text ?? "", disabled: off, "aria-label": `Checklist item ${index + 1}`, onChange: (event) => setField(field, rows.map((r, i) => i === index ? { ...r, text: event.target.value } : r)) }),
+            off ? null : jsx(Button, { small: true, ariaLabel: `Remove checklist item ${index + 1}`, onClick: () => setField(field, rows.filter((_, i) => i !== index)), children: jsx(Icon, { name: "x" }) })
+          ] }, index)),
+          off ? null : jsx(Button, { small: true, action: "pc-checklist-add", disabled: rows.length >= 50, onClick: () => setField(field, [...rows, { text: "", done: false }]), children: [jsx(Icon, { name: "plus" }, "i"), "Add item"] })
+        ] }));
+        continue;
+      } else if (input === "image") {
+        out.push(jsxs("div", { className: "dy-pc-fieldset", "data-canvas-image-field": true, children: [
+          jsx("span", { className: "dy-pc-field-label", children: label }),
+          value ? jsx("span", { className: "dy-pc-drawer-thumb", children: jsx(CanvasImage, { projectId: project.id, contentId: value, alt: f.alt }) }) : jsx("p", { className: "dy-pc-drawer-meta", children: "No image yet." }),
+          off ? null : jsxs("label", { className: "dy-pc-upload", children: [
+            jsx("span", { children: imageBusy ? "Uploading\u2026" : value ? "Replace image" : "Upload image (PNG, JPEG or WebP, up to 5 MB)" }),
+            jsx("input", { type: "file", "data-canvas-image-upload": true, accept: "image/png,image/jpeg,image/webp", disabled: imageBusy, onChange: (event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              uploadImage(file);
+            } })
+          ] }),
+          off || !value ? null : jsx(Button, { small: true, action: "pc-image-clear", onClick: () => setField("content_id", ""), children: "Remove image from card" })
+        ] }));
+        continue;
+      }
+      out.push(jsxs("label", { children: [jsx("span", { children: label }), control] }));
+    }
+    return out;
+  };
   const renderObject = (item) => {
     const rect = canvasRect(item);
     const tag = (Array.isArray(item.tags) ? item.tags : [])[0];
     const label = CANVAS_KIND_LABELS[item.kind] ?? item.kind;
+    const multiSelected = selectedIds.includes(item.id);
     return jsxs("button", {
       type: "button",
-      className: `dy-pc-obj${selectedId === item.id ? " selected" : ""}${pendingConnect === item.id ? " pending" : ""}`,
+      className: `dy-pc-obj${selectedId === item.id ? " selected" : ""}${pendingConnect === item.id ? " pending" : ""}${multiSelected ? " marquee-selected" : ""}`,
       "data-canvas-object": item.id,
       "data-canvas-kind": item.kind,
+      "data-canvas-colour": item.colour ?? "",
       "data-canvas-x": String(Math.round(rect.x)),
       "data-canvas-y": String(Math.round(rect.y)),
-      style: { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px` },
+      style: { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` },
+      "data-canvas-height": String(Math.round(rect.height)),
       "aria-label": `${label}: ${canvasText(item) || "untitled"}`,
       onPointerDown: (event) => beginObjectDrag(event, item),
       children: [
-        jsx("small", { children: tag ? `${label} \xB7 ${tag}` : label }),
+        jsx("small", { children: `${label}${tag ? ` \xB7 ${tag}` : ""}` }),
+        jsx("span", { className: "dy-pc-obj-kind-icon", "aria-hidden": true, children: jsx(Icon, { name: CANVAS_KIND_ICONS[item.kind] ?? "sticky-note" }) }),
         jsx("strong", { children: canvasText(item) || "Untitled object" }),
+        item.kind === "media" && item.content?.content_id ? jsx("span", { className: "dy-pc-obj-thumb", children: jsx(CanvasImage, { projectId: project.id, contentId: item.content.content_id, alt: item.content.alt }) }) : null,
+        canvasSummary(item) ? jsx("span", { className: "dy-pc-obj-sub", "data-canvas-summary": true, children: canvasSummary(item) }) : null,
+        item.content?.description ? jsx("span", { className: "dy-pc-obj-desc", children: item.content.description }) : null,
         jsx("span", { className: "dy-pc-obj-meta", children: `${item.evidence_ref ? `evidence ${item.evidence_ref}` : "no evidence reference"}${item.work_ref ? ` \xB7 work ${item.work_ref}` : ""}` })
       ]
     }, item.id);
@@ -7614,65 +11015,219 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       status === "pending" ? jsxs("div", { className: "dockyard-form-actions", children: [
         jsx(Button, { small: true, action: "dismiss-canvas-proposal", disabled: busy, onClick: () => decideProposal(proposal, false), children: "Dismiss" }),
         jsx(Button, { small: true, variant: "primary", action: "approve-canvas-proposal", disabled: busy, onClick: () => decideProposal(proposal, true), children: "Approve" })
-      ] }) : jsx("small", { children: "Decision recorded \u2014 this proposal can no longer be decided again." })
+      ] }) : status === "approved" && proposal.kind === "technical_plan" ? jsx(Button, { small: true, action: "plan-from-proposal", disabled: planBusy, onClick: () => synthesizePlan(proposal), children: "Plan from proposal" }) : jsx("small", { children: "Decision recorded \u2014 this proposal can no longer be decided again." })
     ] }, proposal.proposal_id);
   });
+  const chatBody = () => [
+    jsx("div", { className: "dy-pc-msg bot", children: assistantSummary }, "summary"),
+    jsx("div", { "data-canvas-chat-log": true, ref: (node) => {
+      if (node) node.lastElementChild?.scrollIntoView?.({ block: "nearest" });
+    }, children: (chatLog ?? []).map((message, index) => jsx("div", { className: `dy-pc-msg ${message.role}`, children: message.text }, `chat-${index}`)) }, "log"),
+    questionBlock ? jsx("div", { children: questionBlock }, "question") : null,
+    review ? jsx("p", { className: "dy-pc-drawer-meta", "data-canvas-review": true, children: `Review: ${number(review.summary?.evidence_count)} evidence, ${number(review.summary?.claim_count)} claim, ${number(review.summary?.question_count)} question, ${number(review.summary?.plan_block_count)} plan block(s).` }, "review") : null,
+    proposalCards.length ? jsx("div", { "data-canvas-proposals": true, children: proposalCards }, "proposals") : null,
+    session?.answers?.length ? jsx("div", { className: "dy-pc-msg me", children: `${number(session.answers.length)} clarification answer(s) recorded.` }, "answers") : null,
+    planPanel ? jsxs("div", { className: "dy-pc-proposal", "data-canvas-plan": planPanel.plan_id, children: [
+      jsx("strong", { children: "Plan ready for review" }),
+      jsx("small", { children: `${number((planPanel.steps ?? []).length)} step(s) \xB7 from proposal ${planPanel.proposal_id} \xB7 nothing applied to the board.` }),
+      jsx("pre", { className: "dy-pc-plan-steps", children: (planPanel.steps ?? []).map((step) => `${step.order}. ${step.title}`).join("\n") }),
+      jsxs("div", { className: "dockyard-form-actions", children: [
+        planEditable ? jsx(Button, { small: true, action: "pc-steps-edit", disabled: planBusy, onClick: startStepEdit, children: "Edit steps" }) : null,
+        jsx(Button, { small: true, variant: planDocSaved ? "" : "primary", action: "save-plan-document", disabled: planBusy || planDocSaved, onClick: savePlanDocument, children: planDocSaved ? "Doc saved to Content" : "Save doc to Content" }),
+        jsx(Button, { small: true, variant: planDocSaved && pendingSteps.length ? "primary" : "", action: "backlog-from-plan", disabled: planBusy || !planDocSaved || !pendingSteps.length || Boolean(backlogConfirm?.length), onClick: () => setBacklogConfirm(pendingSteps), children: planDocSaved && !pendingSteps.length ? "Backlog items created" : "Create backlog items" })
+      ] }),
+      backlogConfirm?.length ? jsxs("div", { className: "dy-pc-proposal", "data-canvas-backlog-confirm": true, children: [
+        jsx("small", { children: `Create ${number(backlogConfirm.length)} backlog item(s)? One confirm per batch, nothing auto-runs.` }),
+        jsx(Button, { small: true, variant: "primary", action: "confirm-backlog-from-plan", disabled: planBusy, onClick: createBacklogItems, children: "Confirm create" }),
+        jsx(Button, { small: true, action: "cancel-backlog-from-plan", disabled: planBusy, onClick: () => setBacklogConfirm(null), children: "Cancel" })
+      ] }) : null
+    ] }, "plan") : null
+  ];
+  const tool = ({ action, icon, name, tip, onClick, disabled = false, variant = "", label = null, data = {} }) => jsxs("span", { className: "dy-pc-tool", children: [
+    jsx(Button, { small: true, variant, action, ariaLabel: name, disabled, onClick, data: { title: `${name} \u2014 ${tip}`, ...data }, children: label ? [jsx(Icon, { name: icon }, "i"), jsx("span", { children: label }, "l")] : jsx(Icon, { name: icon }) }),
+    jsxs("span", { className: "dy-pc-tip", role: "tooltip", "aria-hidden": true, children: [jsx("strong", { children: name }), jsx("span", { children: tip })] })
+  ] }, action);
+  const group = (label, children) => jsxs("div", { className: "dy-pc-group", role: "group", "aria-label": label, "data-pc-group": label.toLowerCase(), children: [
+    jsx("span", { className: "dy-pc-group-label", "aria-hidden": true, children: label }, "label"),
+    jsxs("div", { className: "dy-pc-group-tools", children }, "tools")
+  ] });
+  const liveBoards = boards.filter((board) => board.status !== "archived");
+  const archivedBoards = boards.filter((board) => board.status === "archived");
+  const listed = boardsApi ? liveBoards : [canvas].filter(Boolean);
+  const statusMoves = CANVAS_BOARD_MOVES[boardStatus] ?? [];
+  const modelValue = modelKey(canvas?.model);
+  const modelChoices = (modelOptions?.providers ?? []).flatMap((provider) => (provider.models ?? []).map((model) => ({ value: `${provider.slug}::${model}`, label: `${provider.name ?? provider.slug} \xB7 ${model}` })));
+  if (modelValue && !modelChoices.some((choice) => choice.value === modelValue)) modelChoices.unshift({ value: modelValue, label: `${canvas.model.provider} \xB7 ${canvas.model.model} (not configured)` });
+  const defaultModelLabel = modelOptions?.default?.model ? `Hermes main model (${modelOptions.default.model})` : "Hermes main model";
+  const effectiveTheme = theme ?? hostTheme;
+  const chatState = chatPill ? "pill" : chatOpen ? "open" : "closed";
+  const chatStyle = chatPos ? { left: `${chatPos.x}px`, top: `${chatPos.y}px`, right: "auto", bottom: "auto" } : void 0;
   return jsxs("section", {
     className: "dockyard-feature-card dy-pc-scope",
     "data-planning-canvas": project.id,
     "data-canvas-revision": String(revision),
     "data-canvas-dirty": dirty ? "true" : "false",
+    "data-canvas-theme": effectiveTheme,
+    "data-canvas-theme-source": theme ? "board" : "app",
+    // Full screen: the page under the fixed frame is hidden (not just covered)
+    // so its controls cannot be focused or hit-tested through the frame.
+    "data-canvas-fullscreen-active": fullscreen ? "true" : "false",
+    "data-canvas-board": canvas?.canvas_id ?? "",
+    "data-canvas-status": boardStatus,
+    onKeyDown: (event) => {
+      if (event.key !== "Escape" || event.defaultPrevented || boardForm) return;
+      if (pendingLeave) {
+        setPendingLeave(null);
+        return;
+      }
+      if (pendingStatus) {
+        setPendingStatus(null);
+        return;
+      }
+      if (expanded) {
+        setExpanded(false);
+        return;
+      }
+      if (addMenuOpen) {
+        setAddMenuOpen(false);
+        return;
+      }
+      if (selectedId || selectedIds.length) {
+        setSelectedId(null);
+        setSelectedIds([]);
+        setPendingConnect(null);
+        return;
+      }
+      if (pendingConnect) {
+        setPendingConnect(null);
+        return;
+      }
+      if (fullscreen) setFullscreen(false);
+    },
     children: [
+      jsxs("div", { className: `dy-pc-board-bar${boardListOpen ? " open" : " collapsed"}`, children: [
+        jsx(Button, { small: true, action: "pc-board-toggle", ariaLabel: boardListOpen ? "Hide board list" : "Show board list", data: { title: boardListOpen ? "Hide board list" : "Show board list", "aria-expanded": boardListOpen ? "true" : "false", "data-canvas-board-toggle": boardListOpen ? "open" : "closed" }, onClick: () => setBoardListOpen((value) => !value), children: jsx(Icon, { name: boardListOpen ? "chevron-up" : "chevron-down" }) }),
+        jsxs("div", { className: "dy-pc-board-title", children: [
+          jsx("span", { className: "dockyard-card-label", children: "OPEN BOARD" }),
+          jsx("strong", { "data-canvas-board-name": true, children: canvas?.name ?? "Planning board" }),
+          jsxs("span", { className: "dy-pc-board-chip", "data-canvas-board-chip": boardStatus, children: [jsx("span", { className: "dy-pc-board-dot", "data-status": boardStatus }, "d"), CANVAS_BOARD_STATUS_LABELS[boardStatus] ?? boardStatus, readOnly ? " \xB7 read-only" : ""] }),
+          jsx("span", { className: "dy-pc-board-count", children: `${listed.length || 1} board${(listed.length || 1) === 1 ? "" : "s"}` })
+        ] }),
+        boardScoped ? jsxs("label", { className: "dy-pc-board-status", children: [
+          jsx("span", { className: "dy-pc-board-dot", "data-status": boardStatus }),
+          jsxs("select", { "data-canvas-board-status": true, "aria-label": "Board status", value: boardStatus, disabled: boardBusy || boardStatus === "archived", onChange: (event) => changeBoardStatus(event.target.value), children: [
+            jsx("option", { value: boardStatus, children: CANVAS_BOARD_STATUS_LABELS[boardStatus] ?? boardStatus }, boardStatus),
+            ...statusMoves.map((status) => jsx("option", { value: status, children: `Move to ${CANVAS_BOARD_STATUS_LABELS[status]}` }, status))
+          ] })
+        ] }) : null
+      ] }),
+      boardListOpen ? jsxs("div", { className: "dy-pc-board-panel", children: [
+        // Actions sit ABOVE the list so they are found first.
+        boardsApi ? boardForm ? jsxs("div", { className: "dy-pc-board-form", children: [
+          jsx("input", { "data-canvas-board-form": boardForm.mode, "aria-label": boardForm.mode === "rename" ? "New board name" : "Board name", maxLength: 120, value: boardForm.name, placeholder: "Board name", autoFocus: true, onChange: (event) => setBoardForm({ ...boardForm, name: event.target.value }), onKeyDown: (event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              submitBoardForm();
+            }
+            if (event.key === "Escape") setBoardForm(null);
+          } }),
+          jsx(Button, { small: true, variant: "primary", action: "pc-board-form-save", disabled: boardBusy || !String(boardForm.name ?? "").trim(), onClick: submitBoardForm, children: boardForm.mode === "rename" ? "Rename" : "Create board" }),
+          jsx(Button, { small: true, action: "pc-board-form-cancel", onClick: () => setBoardForm(null), children: "Cancel" })
+        ] }) : jsxs("div", { className: "dy-pc-board-form", children: [
+          jsx(Button, { small: true, variant: "primary", action: "pc-board-new", disabled: boardBusy, onClick: () => setBoardForm({ mode: "create", name: "" }), children: [jsx(Icon, { name: "plus" }, "i"), "New board"] }),
+          jsx(Button, { small: true, action: "pc-board-rename", disabled: boardBusy || !boardScoped, onClick: () => setBoardForm({ mode: "rename", name: canvas?.name ?? "" }), children: [jsx(Icon, { name: "square-pen" }, "i"), "Rename open board"] }),
+          jsx(Button, { small: true, action: "pc-board-show-archived", disabled: boardBusy, data: { "aria-pressed": showArchived ? "true" : "false" }, onClick: toggleArchived, children: [jsx(Icon, { name: "archive" }, "i"), showArchived ? "Hide archived" : "Show archived"] })
+        ] }) : null,
+        jsxs("nav", { className: "dy-pc-board-list", "aria-label": "Planning boards", children: [
+          ...listed.map((board) => {
+            const active = board.canvas_id === canvas?.canvas_id;
+            return jsxs("div", { className: `dy-pc-board-item${active ? " active" : ""}`, "data-canvas-board-row": board.canvas_id ?? "legacy", "data-canvas-board-active": active ? "true" : "false", children: [
+              jsxs("button", { type: "button", className: `dy-pc-board-row${active ? " active" : ""}`, "aria-current": active ? "true" : void 0, "aria-label": active ? `${board.name ?? "Main board"} (open)` : `Open ${board.name ?? "board"}`, disabled: boardBusy, onClick: () => selectBoard(board), children: [
+                jsx("span", { className: "dy-pc-board-dot", "data-status": board.status ?? "draft" }),
+                jsxs("span", { className: "dy-pc-board-row-copy", children: [jsx("strong", { children: board.name ?? "Main board" }), jsx("small", { children: `${CANVAS_BOARD_STATUS_LABELS[board.status ?? "draft"] ?? board.status} \xB7 ${number(board.object_count ?? board.objects?.length ?? 0)} objects` })] }),
+                active ? jsx("span", { className: "dy-pc-board-open", "data-canvas-board-open": true, children: "Open" }) : null,
+                board.changed_since_plan ? jsx("span", { className: "dy-pc-board-warning", title: "Board changed since its plan was made", "aria-label": "Changed since plan", children: "!" }) : null
+              ] }),
+              boardsApi && board.canvas_id ? jsx(Button, { small: true, action: "pc-board-archive", ariaLabel: `Archive ${board.name}`, data: { title: liveBoards.length > 1 ? `Archive ${board.name}` : "The last live board cannot be archived \u2014 create another board first" }, disabled: boardBusy || liveBoards.length <= 1, onClick: () => archiveBoard(board), children: jsx(Icon, { name: "archive" }) }) : null
+            ] }, board.canvas_id ?? "legacy");
+          }),
+          boardsApi && showArchived ? archivedBoards.length ? archivedBoards.map((board) => jsxs("div", { className: "dy-pc-board-item archived", "data-canvas-board-row": board.canvas_id, "data-canvas-board-archived": true, children: [
+            jsxs("span", { className: "dy-pc-board-row", children: [jsx("span", { className: "dy-pc-board-dot", "data-status": "archived" }), jsxs("span", { className: "dy-pc-board-row-copy", children: [jsx("strong", { children: board.name }), jsx("small", { children: `Archived \xB7 was ${CANVAS_BOARD_STATUS_LABELS[board.archived_from] ?? "Draft"}` })] })] }),
+            jsx(Button, { small: true, action: "pc-board-restore", ariaLabel: `Restore ${board.name}`, data: { title: `Restore ${board.name}` }, disabled: boardBusy, onClick: () => restoreBoard(board), children: jsx(Icon, { name: "archive-restore" }) })
+          ] }, board.canvas_id)) : [jsx("p", { className: "dy-pc-board-archived", children: "No archived boards." }, "none")] : null
+        ] })
+      ] }) : null,
       jsxs("div", { className: "dockyard-section-head", children: [
         jsxs("div", { children: [
           jsx("span", { className: "dockyard-card-label", children: "PLANNING CANVAS" }),
           jsx("h2", { children: "Evidence to plan" }),
-          jsx("p", { children: `One canvas per project: ${number(objects.length)} object(s), ${number(connectors.length)} connector(s), revision ${number(revision)}${dirty ? " \xB7 unsaved edits" : " \xB7 saved"}. Curation only proposes \u2014 every proposal lands as scratch and nothing is applied automatically.` }),
+          jsx("p", { children: `${number(objects.length)} object(s), ${number(connectors.length)} connector(s), revision ${number(revision)}${dirty ? " \xB7 unsaved edits" : " \xB7 saved"}${readOnly ? ` \xB7 ${CANVAS_BOARD_STATUS_LABELS[boardStatus]} (read-only)` : ""}. The steward only proposes; nothing is applied automatically.` }),
           content.length ? jsx("p", { className: "dockyard-meta", children: `${number(content.length)} project content item(s) available to reference.` }) : null
         ] })
       ] }),
-      jsxs("div", { className: "dy-pc", children: [
-        jsxs("div", { className: "dy-pc-toolbar", role: "toolbar", "aria-label": "Planning canvas tools", children: [
-          jsxs("div", { className: "dy-pc-seg", role: "group", "aria-label": "Canvas mode", children: [
-            jsx(Button, { small: true, variant: mode === "select" ? "primary" : "", action: "pc-mode-select", onClick: () => {
+      jsxs("div", { className: `dy-pc${fullscreen ? " dy-pc-full" : ""}`, "data-canvas-theme": theme ?? void 0, "data-canvas-fullscreen": fullscreen ? "true" : "false", children: [
+        jsxs("div", { className: "dy-pc-toolbar dy-pc-ribbon", role: "toolbar", "aria-label": "Planning canvas tools", children: [
+          group("Edit", [
+            tool({ action: "pc-mode-select", icon: "mouse-pointer-2", name: "Select", tip: "Click to edit, drag a sticker to move it. Drag empty space or scroll to move around; Shift+drag to multi-select; Ctrl+scroll zooms.", variant: mode === "select" ? "primary" : "", onClick: () => {
               setMode("select");
               setPendingConnect(null);
-            }, children: "Select" }),
-            jsx(Button, { small: true, variant: mode === "connect" ? "primary" : "", action: "pc-mode-connect", onClick: () => {
+            } }),
+            tool({ action: "pc-mode-connect", icon: "spline", name: "Connect", tip: "Click two stickers to link them with the chosen meaning.", variant: mode === "connect" ? "primary" : "", disabled: readOnly, onClick: () => {
               setMode("connect");
               setPendingConnect(null);
-            }, children: "Connect" })
-          ] }),
-          jsx("span", { className: "dy-pc-sep", "aria-hidden": true }),
-          jsxs("div", { className: "dy-pc-add", children: [
-            jsx("select", { "data-canvas-kind-picker": true, "aria-label": "Object kind", value: kind, onChange: (event) => setKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx("option", { value, children: CANVAS_KIND_LABELS[value] }, value)) }),
-            jsx("input", { "data-canvas-draft": true, "aria-label": "New object text", value: draft, placeholder: "Capture a note, observation, question or link...", onChange: (event) => setDraft(event.target.value) }),
-            jsx(Button, { small: true, variant: "primary", action: "add-canvas-object", disabled: !draft.trim(), onClick: addFromDraft, children: "Add object" })
-          ] }),
-          jsx("span", { className: "dy-pc-sep", "aria-hidden": true }),
-          ...CANVAS_OBJECT_KINDS.map((value) => jsx(Button, {
-            small: true,
-            action: `add-canvas-${value}`,
-            data: { "data-canvas-add-kind": value },
-            onClick: () => addObject(value, `New ${CANVAS_KIND_LABELS[value]}`),
-            children: `\uFF0B ${CANVAS_KIND_LABELS[value]}`
-          }, `add-${value}`)),
-          jsx("span", { className: "dy-pc-spacer" }),
-          jsx(Button, { small: true, action: "pc-tidy", disabled: !objects.length, onClick: tidy, children: "Tidy" }),
-          jsx(Button, { small: true, action: "pc-review", disabled: busy, onClick: reviewCanvas, children: "Review" }),
-          jsx("span", { className: "dy-pc-sep", "aria-hidden": true }),
-          jsxs("div", { className: "dy-pc-seg", role: "group", "aria-label": "Zoom", children: [
-            jsx(Button, { small: true, action: "pc-zoom-out", ariaLabel: "Zoom out", onClick: () => zoomBy(-CANVAS_ZOOM.step), children: "\u2212" }),
-            jsx("span", { className: "dy-pc-readout", "data-canvas-zoom-readout": String(Math.round(zoom * 100)), children: `${Math.round(zoom * 100)}%` }),
-            jsx(Button, { small: true, action: "pc-zoom-in", ariaLabel: "Zoom in", onClick: () => zoomBy(CANVAS_ZOOM.step), children: "\uFF0B" }),
-            jsx(Button, { small: true, action: "pc-fit", onClick: fit, children: "Fit" })
-          ] }),
-          jsx("span", { className: "dy-pc-sep", "aria-hidden": true }),
-          jsx(Button, { small: true, action: "pc-reload", disabled: busy, onClick: reload, children: "Reload" }),
-          jsx(Button, { small: true, action: "pc-curate", disabled: busy, onClick: curate, children: "Curate" }),
-          jsx(Button, { small: true, variant: "primary", action: "pc-save", disabled: busy, onClick: save, children: busy ? "Working..." : "Save canvas" })
+              setNotice({ tone: "ok", text: "Connect mode: click a sticker, then the sticker to link it to. Dragging is off while connecting; scroll to move around, Esc cancels." });
+            } }),
+            tool({ action: "pc-undo", icon: "undo-2", name: "Undo", tip: "Step back one board edit (Ctrl+Z).", disabled: !history.length || readOnly, onClick: undo }),
+            tool({ action: "pc-redo", icon: "redo-2", name: "Redo", tip: "Re-apply the edit you undid (Ctrl+Shift+Z).", disabled: !future.length || readOnly, onClick: redo }),
+            tool({ action: "pc-duplicate", icon: "copy-plus", name: "Duplicate", tip: "Copy the selected sticker(s) (Ctrl+D).", disabled: !(selectedIds.length || selectedId) || readOnly, onClick: duplicateSelection }),
+            tool({ action: "pc-tidy", icon: "layout-dashboard", name: "Tidy", tip: "Line every sticker up on a grid.", disabled: !objects.length || readOnly, onClick: tidy2 })
+          ]),
+          group("Add", [
+            jsxs("div", { className: "dy-pc-add", children: [
+              jsx("select", { "data-canvas-kind-picker": true, "aria-label": "Object kind", value: kind, disabled: readOnly, onChange: (event) => setKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx("option", { value, children: CANVAS_KIND_LABELS[value] }, value)) }),
+              jsx("input", { "data-canvas-draft": true, "aria-label": "New object text", value: draft, disabled: readOnly, maxLength: 4e3, placeholder: "Type a note, question or link\u2026", onChange: (event) => setDraft(event.target.value), onKeyDown: (event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  addFromDraft();
+                }
+              } }),
+              tool({ action: "add-canvas-object", icon: "plus", name: "Add object", tip: "Add the text above as a sticker of the chosen kind.", variant: "primary", disabled: !draft.trim() || readOnly, onClick: addFromDraft })
+            ] }),
+            jsxs("div", { className: "dy-pc-tool", ref: addMenuRef, children: [
+              jsx(Button, { small: true, action: "pc-add-menu", ariaLabel: "Add sticker", disabled: readOnly, data: { title: "Add sticker \u2014 pick a kind to drop a blank sticker", "aria-haspopup": "menu", "aria-expanded": addMenuOpen ? "true" : "false" }, onClick: () => setAddMenuOpen((value) => !value), children: [jsx(Icon, { name: "sticky-note" }, "i"), jsx(Icon, { name: "chevron-down" }, "c")] }),
+              jsx("div", { className: "dy-pc-addmenu", role: "menu", "aria-label": "Add sticker", hidden: !addMenuOpen, children: CANVAS_OBJECT_KINDS.map((value) => jsxs("button", {
+                type: "button",
+                role: "menuitem",
+                "data-action": `add-canvas-${value}`,
+                "data-canvas-add-kind": value,
+                onClick: () => {
+                  addObject(value, `New ${CANVAS_KIND_LABELS[value]}`);
+                  setAddMenuOpen(false);
+                },
+                children: [jsx("span", { className: "swatch", style: { background: `var(--dy-pc-fill-${value})`, borderLeft: `3px solid var(--dy-pc-kind-${value})` } }, "s"), jsx(Icon, { name: CANVAS_KIND_ICONS[value] }, "i"), CANVAS_KIND_LABELS[value]]
+              }, `add-${value}`)) })
+            ] })
+          ]),
+          group("View", [
+            tool({ action: "pc-zoom-out", icon: "zoom-out", name: "Zoom out", tip: "Shrink the board view.", onClick: () => zoomBy(-CANVAS_ZOOM.step) }),
+            jsx("span", { className: "dy-pc-readout", "data-canvas-zoom-readout": String(Math.round(zoom * 100)), children: `${Math.round(zoom * 100)}%` }, "zoom"),
+            tool({ action: "pc-zoom-in", icon: "zoom-in", name: "Zoom in", tip: "Enlarge the board view.", onClick: () => zoomBy(CANVAS_ZOOM.step) }),
+            tool({ action: "pc-fit", icon: "scan", name: "Fit", tip: "Fit every sticker in view.", onClick: fit }),
+            tool({ action: "pc-fullscreen", icon: fullscreen ? "minimize-2" : "maximize-2", name: fullscreen ? "Exit full screen" : "Full screen", tip: fullscreen ? "Back to the normal page layout (Esc)." : "Give the board the whole window. Esc returns.", variant: fullscreen ? "primary" : "", onClick: () => setFullscreen((value) => !value), data: { "aria-pressed": fullscreen ? "true" : "false" } }),
+            tool({ action: "pc-theme-light", icon: "sun", name: "Light canvas", tip: "Light canvas for this board only. Click again to follow the app.", variant: theme === "light" ? "primary" : "", onClick: () => setBoardTheme("light"), data: { "aria-pressed": theme === "light" ? "true" : "false" } }),
+            tool({ action: "pc-theme-dark", icon: "moon", name: "Dark canvas", tip: "Dark glowing canvas for this board only. Click again to follow the app.", variant: theme === "dark" ? "primary" : "", onClick: () => setBoardTheme("dark"), data: { "aria-pressed": theme === "dark" ? "true" : "false" } })
+          ]),
+          group("AI", [
+            tool({ action: "pc-curate", icon: "sparkles", name: "Curate", tip: "Ask the steward to turn this board into proposals.", disabled: busy || readOnly, onClick: () => curate() }),
+            tool({ action: "pc-review", icon: "list-checks", name: "Review", tip: "Count what is on this board; nothing is sent to AI.", disabled: busy, onClick: reviewCanvas })
+          ]),
+          jsx("div", { className: "dy-pc-ribbon-fill", "aria-hidden": true }, "fill"),
+          group("Save", [
+            tool({ action: "pc-reload", icon: "refresh-cw", name: "Reload", tip: "Re-read the saved board; discards unsaved edits.", disabled: busy, onClick: reload }),
+            tool({ action: "pc-save", icon: "save", name: "Save canvas", tip: "Save this board as a new revision.", variant: "primary", label: busy ? "Working..." : "Save", disabled: busy || readOnly, onClick: save })
+          ])
         ] }),
-        objects.length >= 2 ? jsxs("div", { className: "dy-pc-linkbar", "data-canvas-connector-editor": true, children: [
+        objects.length >= 2 && !readOnly ? jsxs("div", { className: "dy-pc-linkbar", "data-canvas-connector-editor": true, children: [
           jsxs("label", { children: [jsx("span", { children: "From" }), jsx("select", { value: linkSource, onChange: (event) => setLinkSource(event.target.value), children: [jsx("option", { value: "", children: "Choose source" }, "none"), ...objects.map((item) => jsx("option", { value: item.id, children: canvasText(item) || item.id }, item.id))] })] }),
           jsxs("label", { children: [jsx("span", { children: "Relationship" }), jsx("select", { value: linkMeaning, onChange: (event) => setLinkMeaning(event.target.value), children: CANVAS_CONNECTOR_MEANINGS.map((value) => jsx("option", { value, children: value }, value)) })] }),
           jsxs("label", { children: [jsx("span", { children: "To" }), jsx("select", { value: linkTarget, onChange: (event) => setLinkTarget(event.target.value), children: [jsx("option", { value: "", children: "Choose target" }, "none"), ...objects.map((item) => jsx("option", { value: item.id, children: canvasText(item) || item.id }, item.id))] })] }),
@@ -7683,9 +11238,17 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
           className: "dy-pc-stage",
           "data-pc-stage": true,
           "data-pc-mode": mode,
+          "data-pc-panning": panning ? "true" : "false",
           role: "group",
           "aria-label": "Planning canvas stage",
+          tabIndex: 0,
           onPointerDown: beginPan,
+          onPointerMove: mode === "connect" && pendingConnect ? (event) => {
+            const box = stageRef.current?.getBoundingClientRect();
+            if (!box) return;
+            setConnectPointer({ x: (event.clientX - box.left - panRef.current.x) / zoomRef.current, y: (event.clientY - box.top - panRef.current.y) / zoomRef.current });
+          } : void 0,
+          onKeyDown: onStageKeyDown,
           children: [
             jsxs("div", {
               className: "dy-pc-world",
@@ -7697,31 +11260,138 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
                 jsx("svg", { className: "dy-pc-svg", viewBox: `0 0 ${CANVAS_WORLD.width} ${CANVAS_WORLD.height}`, width: CANVAS_WORLD.width, height: CANVAS_WORLD.height, "aria-hidden": true, children: renderConnectors() }),
                 ...renderFrames(),
                 ...objects.map(renderObject),
+                marquee ? jsx("div", { className: "dy-pc-marquee", "data-pc-marquee": true, style: { left: `${marquee.x}px`, top: `${marquee.y}px`, width: `${marquee.width}px`, height: `${marquee.height}px` } }) : null,
                 objects.length === 0 ? jsx("p", { className: "dy-pc-empty", children: "No canvas objects yet. Capture a note or evidence above, then drag it into place." }) : null
               ]
             }),
-            jsxs("aside", { className: `dy-pc-chat ${chatOpen ? "open" : "closed"}`, "data-canvas-assistant": true, children: [
-              jsxs("button", { type: "button", className: "dy-pc-chat-h", "data-action": "pc-chat-toggle", onClick: () => setChatOpen((current) => !current), children: [
-                jsx("span", { className: "av", "aria-hidden": true, children: "AI" }),
-                jsxs("span", { style: { flex: "1 1 auto" }, children: [
-                  jsx("strong", { children: "Steward" }),
-                  jsx("span", { className: "sub", children: session?.current_question ? "clarification in progress \xB7 nothing applied" : `${number(pendingProposals)} proposal(s) waiting \xB7 nothing applied` })
+            jsx("div", { className: `dy-pc-backdrop${selected ? " open" : ""}`, "data-pc-backdrop": true, onClick: () => setSelectedId(null) }),
+            jsxs("aside", { ref: chatRef, className: `dy-pc-chat ${chatState}${chatDragging ? " dragging" : ""}${selected ? " behind-drawer" : ""}`, "data-canvas-assistant": true, "data-canvas-chat-state": chatState, style: chatStyle, "aria-label": "Steward chat", children: [
+              jsxs("div", { className: "dy-pc-chat-bar", children: [
+                jsx("span", { className: "dy-pc-chat-grip", "data-canvas-chat-grip": true, role: "button", tabIndex: 0, "aria-label": "Move chat window (arrow keys; Home resets)", title: "Drag to move \xB7 arrow keys move \xB7 Home resets", onPointerDown: beginChatDrag, onKeyDown: nudgeChat, children: jsx(Icon, { name: "grip-horizontal" }) }),
+                jsxs("button", { type: "button", className: "dy-pc-chat-h", "data-action": "pc-chat-toggle", "aria-expanded": chatOpen && !chatPill ? "true" : "false", onClick: toggleChat, children: [
+                  jsx("span", { className: "av", "aria-hidden": true, children: jsx(Icon, { name: "bot" }) }),
+                  jsxs("span", { style: { flex: "1 1 auto", minWidth: 0 }, children: [
+                    jsx("strong", { children: "Steward" }),
+                    chatPill ? null : jsx("span", { className: "sub", children: session?.current_question ? "clarification in progress \xB7 nothing applied" : `${number(pendingProposals)} proposal(s) waiting \xB7 nothing applied` })
+                  ] }),
+                  chatPill ? null : jsx("span", { className: "tog", "aria-hidden": true, children: chatOpen ? "\u25BC" : "\u25B2" })
                 ] }),
-                jsx("span", { className: "tog", "aria-hidden": true, children: chatOpen ? "\u25BC" : "\u25B2" })
+                chatPill ? null : jsx(Button, { small: true, action: "pc-chat-minimise", ariaLabel: "Minimise chat to a pill", data: { title: "Minimise to a pill" }, onClick: minimiseChat, children: jsx(Icon, { name: "minimize-2" }) }),
+                chatPill ? null : jsx(Button, { small: true, action: "pc-chat-expand", ariaLabel: "Expand chat into a large view", data: { title: "Expand for reading and editing plans" }, onClick: openExpanded, children: jsx(Icon, { name: "maximize-2" }) })
               ] }),
-              jsxs("div", { className: "dy-pc-chat-b", children: [
-                jsx("div", { className: "dy-pc-msg bot", children: assistantSummary }),
-                questionBlock,
-                review ? jsx("p", { className: "dy-pc-drawer-meta", "data-canvas-review": true, children: `Review: ${number(review.summary?.evidence_count)} evidence, ${number(review.summary?.claim_count)} claim, ${number(review.summary?.question_count)} question, ${number(review.summary?.plan_block_count)} plan block block(s).` }) : null,
-                proposalCards.length ? jsx("div", { "data-canvas-proposals": true, children: proposalCards }) : null,
-                session?.answers?.length ? jsx("div", { className: "dy-pc-msg me", children: `${number(session.answers.length)} clarification answer(s) recorded.` }) : null
-              ] }),
+              boardScoped ? jsxs("label", { className: "dy-pc-chat-model", children: [
+                jsx("span", { children: "Model" }),
+                jsxs("select", { "data-canvas-model": true, "aria-label": "Model for this board", value: modelValue, disabled: boardBusy || readOnly, onChange: (event) => setBoardModel(event.target.value), children: [
+                  jsx("option", { value: "", children: defaultModelLabel }, "default"),
+                  ...modelChoices.map((choice) => jsx("option", { value: choice.value, children: choice.label }, choice.value))
+                ] })
+              ] }) : null,
+              jsxs("div", { className: "dy-pc-chat-b", children: chatBody() }),
               jsxs("div", { className: "dy-pc-chat-f", children: [
-                jsx("span", { className: "dy-pc-readout", children: "Approval contract: scratch + suggested only." }),
-                jsx(Button, { small: true, action: "pc-start-curation", disabled: busy, onClick: curate, children: "Start curation" })
+                jsx("span", { className: "dy-pc-readout", children: readOnly ? `Board is ${CANVAS_BOARD_STATUS_LABELS[boardStatus]} \u2014 reopen it to chat.` : "Approval contract: scratch + suggested only." }),
+                jsx("input", { "data-canvas-chat-input": true, "aria-label": "Message the steward", value: chatDraft, maxLength: 4e3, disabled: readOnly, placeholder: "Ask the steward about this board...", onChange: (event) => setChatDraft(event.target.value), onKeyDown: (event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    sendChat();
+                  }
+                } }),
+                jsx(Button, { small: true, action: "pc-chat-send", ariaLabel: "Send", disabled: chatBusy || !chatDraft.trim() || readOnly, onClick: sendChat, children: [jsx(Icon, { name: "send" }, "i"), "Send"] }),
+                jsx(Button, { small: true, action: "pc-chat-stop", ariaLabel: "Stop", disabled: !chatBusy, onClick: stopChat, children: [jsx(Icon, { name: "square" }, "i"), "Stop"] })
               ] })
             ] }),
-            jsxs("aside", { className: `dy-pc-drawer${selected ? " open" : ""}`, "data-canvas-drawer": selected?.id ?? "none", children: [
+            expanded ? jsx("div", { className: "dy-pc-overlay", "data-canvas-expanded": stepsDraft ? "steps" : "chat", onPointerDown: (event) => {
+              if (event.target === event.currentTarget) setExpanded(false);
+            }, onKeyDown: (event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                setExpanded(false);
+              }
+            }, children: jsxs("div", { className: `dy-pc-overlay-card${stepsDraft ? " steps" : " chat"}`, role: "dialog", "aria-modal": "true", "aria-label": stepsDraft ? "Edit plan steps" : "Steward chat \u2014 large view", children: [
+              jsxs("div", { className: "dy-pc-overlay-h", children: [
+                jsx("span", { className: "dy-pc-overlay-av", "aria-hidden": true, children: jsx(Icon, { name: "bot" }) }),
+                jsxs("div", { className: "dy-pc-overlay-title", children: [
+                  jsx("strong", { children: stepsDraft ? "Edit plan steps" : "Steward" }),
+                  jsx("span", { children: `${canvas?.name ?? "Planning board"} \xB7 ${CANVAS_BOARD_STATUS_LABELS[boardStatus] ?? boardStatus}` })
+                ] }),
+                jsx(Button, { small: true, action: "pc-expanded-close", ariaLabel: "Close large view", data: { title: "Back to the canvas (Esc)" }, onClick: () => setExpanded(false), children: jsx(Icon, { name: "minimize-2" }) })
+              ] }),
+              !stepsDraft && boardScoped ? jsxs("label", { className: "dy-pc-chat-model dy-pc-overlay-model", children: [
+                jsx("span", { children: "Model" }),
+                jsxs("select", { "aria-label": "Model for this board (large view)", value: modelValue, disabled: boardBusy || readOnly, onChange: (event) => setBoardModel(event.target.value), children: [
+                  jsx("option", { value: "", children: defaultModelLabel }, "default"),
+                  ...modelChoices.map((choice) => jsx("option", { value: choice.value, children: choice.label }, choice.value))
+                ] })
+              ] }) : null,
+              jsxs("div", { className: "dy-pc-overlay-b", "data-canvas-expanded-body": true, children: [
+                ...stepsDraft ? [] : chatBody(),
+                stepsDraft ? jsxs("div", { "data-canvas-steps-editor": planPanel?.plan_id ?? true, children: [
+                  jsx("p", { className: "dy-pc-drawer-meta", children: "Edit, reorder, add or remove steps. Steps you keep keep their sources; new steps start with none." }),
+                  jsx("ol", { children: stepsDraft.map((row, index) => jsxs("li", { children: [
+                    jsx("span", { children: `${index + 1}.` }),
+                    jsx("input", { "data-canvas-step-title": index, "aria-label": `Step ${index + 1} title`, maxLength: 400, value: row.title, onChange: (event) => editStep(index, { title: event.target.value }) }),
+                    jsx(Button, { small: true, action: "pc-step-up", ariaLabel: `Move step ${index + 1} up`, disabled: index === 0, onClick: () => moveStep(index, -1), children: "\u2191" }),
+                    jsx(Button, { small: true, action: "pc-step-down", ariaLabel: `Move step ${index + 1} down`, disabled: index === stepsDraft.length - 1, onClick: () => moveStep(index, 1), children: "\u2193" }),
+                    jsx(Button, { small: true, action: "pc-step-remove", ariaLabel: `Remove step ${index + 1}`, disabled: stepsDraft.length === 1, onClick: () => removeStep(index), children: jsx(Icon, { name: "trash-2" }) })
+                  ] }, row.key)) })
+                ] }) : null
+              ] }),
+              stepsDraft ? jsxs("div", { className: "dy-pc-overlay-f", children: [
+                jsx(Button, { small: true, action: "pc-step-add", onClick: addStep, disabled: stepsDraft.length >= 50, children: [jsx(Icon, { name: "plus" }, "i"), "Add step"] }),
+                jsx(Button, { small: true, action: "pc-steps-cancel", onClick: () => setStepsDraft(null), children: "Cancel" }),
+                jsx(Button, { small: true, variant: "primary", action: "pc-steps-save", disabled: planBusy, onClick: saveSteps, children: "Save steps" })
+              ] }) : jsxs("div", { className: "dy-pc-overlay-f dy-pc-overlay-composer", children: [
+                jsx("textarea", { "data-canvas-chat-input-large": true, "aria-label": "Message the steward (large view)", value: chatDraft, maxLength: 4e3, rows: 3, disabled: readOnly, placeholder: readOnly ? `Board is ${CANVAS_BOARD_STATUS_LABELS[boardStatus]} \u2014 reopen it to chat.` : "Ask the steward about this board... (Enter sends, Shift+Enter new line)", onChange: (event) => setChatDraft(event.target.value), onKeyDown: (event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    sendChat();
+                  }
+                } }),
+                jsxs("div", { className: "dy-pc-overlay-actions", children: [
+                  jsx(Button, { small: true, action: "pc-chat-stop-large", ariaLabel: "Stop", disabled: !chatBusy, onClick: stopChat, children: [jsx(Icon, { name: "square" }, "i"), "Stop"] }),
+                  jsx(Button, { small: true, variant: "primary", action: "pc-chat-send-large", ariaLabel: "Send", disabled: chatBusy || !chatDraft.trim() || readOnly, onClick: sendChat, children: [jsx(Icon, { name: "send" }, "i"), "Send"] })
+                ] })
+              ] })
+            ] }) }) : null,
+            pendingStatus ? jsx("div", { className: "dy-pc-overlay dy-pc-leave", "data-canvas-status-confirm": pendingStatus, children: jsxs("div", { className: "dy-pc-overlay-card dy-pc-leave-card", role: "alertdialog", "aria-modal": "true", "aria-labelledby": "dy-pc-status-title", "aria-describedby": "dy-pc-status-body", onKeyDown: (event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                setPendingStatus(null);
+              }
+            }, children: [
+              jsxs("div", { className: "dy-pc-overlay-h", children: [
+                jsx("span", { className: "dy-pc-overlay-av", "aria-hidden": true, children: jsx(Icon, { name: "list-checks" }) }),
+                jsx("strong", { id: "dy-pc-status-title", children: "Change board status?" })
+              ] }),
+              jsx("p", { className: "dy-pc-leave-body", id: "dy-pc-status-body", children: `Move ${canvas?.name ?? "this board"} from ${CANVAS_BOARD_STATUS_LABELS[boardStatus] ?? boardStatus} to ${CANVAS_BOARD_STATUS_LABELS[pendingStatus] ?? pendingStatus}?${CANVAS_READ_ONLY.includes(pendingStatus) ? " The board becomes read-only until you move it back." : ""}` }),
+              jsxs("div", { className: "dy-pc-overlay-f", children: [
+                jsx(Button, { small: true, action: "pc-status-cancel", onClick: () => setPendingStatus(null), children: "Cancel" }),
+                jsx(Button, { small: true, variant: "primary", action: "pc-status-confirm", disabled: boardBusy, onClick: confirmBoardStatus, children: `Move to ${CANVAS_BOARD_STATUS_LABELS[pendingStatus] ?? pendingStatus}` })
+              ] })
+            ] }) }) : null,
+            pendingLeave ? jsx("div", { className: "dy-pc-overlay dy-pc-leave", "data-canvas-unsaved-prompt": true, children: jsxs("div", { className: "dy-pc-overlay-card dy-pc-leave-card", role: "alertdialog", "aria-modal": "true", "aria-labelledby": "dy-pc-leave-title", "aria-describedby": "dy-pc-leave-body", onKeyDown: (event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                setPendingLeave(null);
+              }
+            }, children: [
+              jsxs("div", { className: "dy-pc-overlay-h", children: [
+                jsx("span", { className: "dy-pc-overlay-av warn", "aria-hidden": true, children: jsx(Icon, { name: "save" }) }),
+                jsx("strong", { id: "dy-pc-leave-title", children: "Unsaved changes" })
+              ] }),
+              jsx("p", { className: "dy-pc-leave-body", id: "dy-pc-leave-body", children: `${canvas?.name ?? "This board"} has unsaved edits. Save them before you ${pendingLeave.label}?` }),
+              jsxs("div", { className: "dy-pc-overlay-f", children: [
+                jsx(Button, { small: true, action: "pc-leave-cancel", autoFocus: true, onClick: () => setPendingLeave(null), children: "Cancel" }),
+                jsx(Button, { small: true, variant: "danger", action: "pc-leave-discard", disabled: busy, onClick: leaveDiscarding, children: "Discard changes" }),
+                jsx(Button, { small: true, variant: "primary", action: "pc-leave-save", disabled: busy || readOnly, onClick: leaveSaving, children: busy ? "Saving..." : "Save and continue" })
+              ] })
+            ] }) }) : null,
+            jsxs("aside", { className: `dy-pc-drawer${selected ? " open" : ""}`, "data-canvas-drawer": selected?.id ?? "none", "aria-hidden": selected ? void 0 : "true", onKeyDown: (event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                setSelectedId(null);
+                setSelectedIds([]);
+              }
+            }, children: [
               jsxs("div", { className: "dy-pc-drawer-h", children: [
                 jsxs("div", { children: [
                   jsx("strong", { children: selected ? `${CANVAS_KIND_LABELS[selected.kind] ?? selected.kind} \xB7 selected` : "Selected object" }),
@@ -7730,16 +11400,33 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
                 jsx(Button, { small: true, action: "pc-close-drawer", ariaLabel: "Close selection drawer", onClick: () => setSelectedId(null), children: "\u2715" })
               ] }),
               selected ? jsxs("div", { className: "dy-pc-drawer-b", children: [
-                jsxs("label", { children: [jsx("span", { children: "Title" }), jsx("input", { "data-canvas-object-title": true, value: drawerText, onChange: (event) => setDrawerText(event.target.value) })] }),
-                jsxs("label", { children: [jsx("span", { children: "Kind" }), jsx("select", { "data-canvas-object-kind": true, value: drawerKind, onChange: (event) => setDrawerKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx("option", { value, children: CANVAS_KIND_LABELS[value] }, value)) })] }),
+                readOnly ? jsx("p", { className: "dy-pc-drawer-meta", "data-canvas-drawer-readonly": true, children: `This board is ${CANVAS_BOARD_STATUS_LABELS[boardStatus]} \u2014 details are view-only.` }) : null,
+                jsxs("label", { children: [jsx("span", { children: "Title" }), jsx("input", { "data-canvas-object-title": true, maxLength: 4e3, value: drawerText, readOnly, disabled: readOnly, onChange: (event) => setDrawerText(event.target.value) })] }),
+                jsxs("label", { children: [jsx("span", { children: "Kind" }), jsx("select", { "data-canvas-object-kind": true, value: drawerKind, disabled: readOnly, onChange: (event) => setDrawerKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx("option", { value, children: CANVAS_KIND_LABELS[value] }, value)) })] }),
+                jsxs("div", { className: "dy-pc-colours-field", children: [
+                  jsx("span", { className: "dy-pc-field-label", id: "dy-pc-colour-label", children: `Sticker colour \xB7 ${selectedColour ? CANVAS_STICKER_LABELS[selectedColour] : "Default for kind"}` }),
+                  // Owner 01/10: a coloured dot per choice so the colour is visible before
+                  // picking. Dots read the live theme tokens, so a dark board shows dark fills.
+                  jsx("div", { className: "dy-pc-colours", role: "group", "aria-labelledby": "dy-pc-colour-label", "data-canvas-object-colour": selectedColour ?? "", children: [null, ...CANVAS_STICKER_COLOURS].map((value) => jsx("button", {
+                    type: "button",
+                    className: "dy-pc-colour",
+                    "data-canvas-colour-option": value ?? "default",
+                    disabled: readOnly,
+                    "aria-pressed": (selectedColour ?? null) === value ? "true" : "false",
+                    "aria-label": value ? CANVAS_STICKER_LABELS[value] : "Default for kind",
+                    title: value ? CANVAS_STICKER_LABELS[value] : "Default for kind",
+                    onClick: () => setSelectedColour(value),
+                    children: jsx("span", { className: `dy-pc-colour-dot${value ? "" : " default"}`, style: { background: value ? `var(--dy-pc-sticker-${value})` : `var(--dy-pc-fill-${selected.kind})` } })
+                  }, value ?? "default")) })
+                ] }),
+                ...renderFieldEditors(),
                 jsx("p", { className: "dy-pc-drawer-meta", children: selected.evidence_ref ? `Evidence reference: ${selected.evidence_ref}` : "No evidence reference on this object." }),
-                jsxs("div", { className: "dockyard-form-actions", children: [
+                readOnly ? null : jsxs("div", { className: "dockyard-form-actions", children: [
                   jsx(Button, { small: true, variant: "danger", action: "remove-canvas-object", disabled: busy, onClick: removeSelected, children: "Remove object" }),
-                  jsx(Button, { small: true, variant: "primary", action: "apply-canvas-object", disabled: busy || !drawerText.trim(), onClick: applyDrawer, children: "Apply" })
+                  jsx(Button, { small: true, variant: "primary", action: "apply-canvas-object", disabled: busy || !drawerText.trim() || Boolean(richProblem), onClick: applyDrawer, children: "Apply" })
                 ] })
               ] }) : jsx("p", { className: "dy-pc-drawer-meta", children: "Select an object on the canvas to edit its title, kind or removal." })
-            ] }),
-            jsx("div", { className: `dy-pc-backdrop${selected ? " open" : ""}`, "data-pc-backdrop": true, onClick: () => setSelectedId(null) })
+            ] })
           ]
         }),
         notice ? jsx("p", { className: "dy-pc-notice", role: "status", "data-pc-tone": notice.tone, "data-canvas-notice": true, children: notice.text }) : null
@@ -11129,6 +14816,40 @@ function ProjectReportsPanel({ project, reports, onRefresh }) {
 // hermes_dockyard_plugin/desktop/src/project/dashboard.js
 function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary }) {
   const [projectView, setProjectView] = useState(initialView || "overview");
+  const [canvasDirty, setCanvasDirty] = useState(false);
+  const [pendingView, setPendingView] = useState(null);
+  const changeView = (key) => {
+    if (key === projectView) return;
+    if (projectView === "planning" && canvasDirty) {
+      setPendingView(key);
+      return;
+    }
+    setProjectView(key);
+  };
+  const canvasSaver = useRef(null);
+  const [viewSaving, setViewSaving] = useState(false);
+  const onCanvasDirty = (dirty, saver) => {
+    setCanvasDirty(dirty);
+    canvasSaver.current = dirty ? saver : null;
+    onProjectDirty?.(dirty, dirty ? saver : null);
+  };
+  useDialogFocusManager(pendingView ? "[data-view-switch-confirm] .dockyard-modal" : null);
+  const leaveView = (next) => {
+    setPendingView(null);
+    setCanvasDirty(false);
+    canvasSaver.current = null;
+    onProjectDirty?.(false);
+    setProjectView(next);
+  };
+  const saveThenLeave = async () => {
+    const next = pendingView;
+    if (!next || !canvasSaver.current) return;
+    setViewSaving(true);
+    const ok = await canvasSaver.current();
+    setViewSaving(false);
+    if (ok) leaveView(next);
+    else if (!canvasSaver.current) setPendingView(null);
+  };
   const [selectedWorkItem, setSelectedWorkItem] = useState(null);
   const [workNotice, setWorkNotice] = useState(null);
   const [appliedView, setAppliedView] = useState(null);
@@ -11284,7 +15005,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   } else if (projectView === "objectives") {
     panel = jsx(ObjectivesPanel, { project, settings: view.settings ?? {}, objectives: view.objectives ?? [], goals: view.goals ?? [], missionArchive: view.missionArchive ?? [], onRefresh }, project.id);
   } else if (projectView === "planning") {
-    panel = jsx(PlanningCanvasPanel, { project, canvas: view.canvas, content: view.content ?? [], onRefresh }, project.id);
+    panel = jsx(PlanningCanvasPanel, { project, canvas: view.canvas, content: view.content ?? [], onRefresh, onDirty: onCanvasDirty }, project.id);
   } else if (projectView === "workflows") {
     panel = jsx(ExecutableWorkflowsPanel, { project, workflows: view.workflows ?? [], onRefresh, onOpenLibrary }, project.id);
   } else if (projectView === "content") {
@@ -11382,12 +15103,35 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
           className: projectView === key ? "active" : "",
           "data-project-view": key,
           "aria-pressed": projectView === key,
-          onClick: () => setProjectView(key),
+          onClick: () => changeView(key),
           children: label
         }, key))
       })
     ] }),
     panel,
+    pendingView ? jsxs("section", { className: "dockyard-modal-layer", "data-view-switch-confirm": pendingView, children: [
+      jsxs("div", {
+        className: "dockyard-modal",
+        role: "alertdialog",
+        "aria-modal": true,
+        "aria-label": "Unsaved planning board changes",
+        onKeyDown: (event) => {
+          if (event.key === "Escape" && !viewSaving) {
+            event.stopPropagation();
+            setPendingView(null);
+          }
+        },
+        children: [
+          jsx("h2", { children: "Unsaved changes on this board" }),
+          jsx("p", { children: "The planning board has edits that are not saved. Save them before you leave, discard them, or cancel to keep editing." }),
+          jsxs("div", { className: "dockyard-modal-actions", children: [
+            jsx(Button, { action: "view-switch-cancel", disabled: viewSaving, onClick: () => setPendingView(null), children: "Cancel" }),
+            jsx(Button, { variant: "danger", action: "view-switch-discard", disabled: viewSaving, onClick: () => leaveView(pendingView), children: "Discard" }),
+            jsx(Button, { variant: "primary", action: "view-switch-save", disabled: viewSaving || !canvasSaver.current, onClick: saveThenLeave, children: viewSaving ? "Saving..." : "Save and continue" })
+          ] })
+        ]
+      })
+    ] }) : null,
     jsx(WorkItemDetail, { item: selectedWorkItem, projectId: project.id, profiles: view.profiles ?? [], initiatives: view.initiatives ?? [], onClose: () => setSelectedWorkItem(null), onRefresh })
   ] });
 }
@@ -11960,6 +15704,13 @@ function DashboardPage() {
   const loadSerial = useRef(0);
   const [dirtyProject, setDirtyProject] = useState(null);
   const [pendingProject, setPendingProject] = useState(null);
+  const [pendingTab, setPendingTab] = useState(null);
+  const dirtySaver = useRef(null);
+  const [navSaving, setNavSaving] = useState(false);
+  const markDirty = (projectId) => (dirty, saver) => {
+    setDirtyProject(dirty ? projectId : null);
+    dirtySaver.current = dirty ? saver ?? null : null;
+  };
   useEffect(() => {
     const timers = /* @__PURE__ */ new Map();
     const handleToast = (event) => {
@@ -12026,13 +15777,45 @@ function DashboardPage() {
     setSelectedProject(projectId);
     if (tab === "dashboard" || tab === "notifications" || tab === "inbox" || tab === "onboard") setTab("project");
   };
-  const discardProjectChange = () => {
-    const pending = pendingProject;
-    setPendingProject(null);
-    setDirtyProject(null);
-    setSelectedProject(pending);
-    if (tab === "dashboard" || tab === "notifications" || tab === "inbox" || tab === "onboard") setTab("project");
+  const goTab = (next) => {
+    if (next === "project") setProjectEntryView("overview");
+    if (next === "dashboard") setDashboardHomeVersion((value) => value + 1);
+    setTab(next);
   };
+  const requestTab = (next) => {
+    if (next !== tab && dirtyProject) {
+      setPendingTab(next);
+      return;
+    }
+    goTab(next);
+  };
+  const cancelNav = () => {
+    setPendingProject(null);
+    setPendingTab(null);
+  };
+  const continueNav = () => {
+    const project = pendingProject;
+    const nextTab = pendingTab;
+    setPendingProject(null);
+    setPendingTab(null);
+    setDirtyProject(null);
+    dirtySaver.current = null;
+    if (project) {
+      setSelectedProject(project);
+      if (tab === "dashboard" || tab === "notifications" || tab === "inbox" || tab === "onboard") setTab("project");
+    } else if (nextTab) goTab(nextTab);
+  };
+  const discardProjectChange = continueNav;
+  const saveThenNavigate = async () => {
+    if (!dirtySaver.current) return;
+    setNavSaving(true);
+    const ok = await dirtySaver.current();
+    setNavSaving(false);
+    if (ok) continueNav();
+    else if (!dirtySaver.current) cancelNav();
+  };
+  const navPending = pendingProject || pendingTab;
+  useDialogFocusManager(navPending ? "[data-project-switch-confirm] .dockyard-modal" : null);
   const dismissToast = (id) => setToasts((current) => current.filter((toast) => toast.id !== id));
   const completeOnboarding = (result) => {
     setOnboardingOpen(false);
@@ -12118,7 +15901,7 @@ function DashboardPage() {
       view: payload,
       initialView: projectEntryView,
       onSelectProject: selectProject,
-      onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
+      onProjectDirty: markDirty(payload.project?.id ?? null),
       onRefresh: refresh,
       onOpenLibrary: () => setTab("workflows"),
       pendingWorkRef,
@@ -12130,7 +15913,7 @@ function DashboardPage() {
       view: payload,
       initialView: "settings",
       onSelectProject: selectProject,
-      onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
+      onProjectDirty: markDirty(payload.project?.id ?? null),
       onRefresh: refresh,
       notice: deepLinkNotice
     }, `settings:${payload.project?.id ?? payload.missingProject ?? "none"}`);
@@ -12165,11 +15948,7 @@ function DashboardPage() {
         projects: projectOptions,
         selectedProject,
         onProjectChange: selectProject,
-        onTab: (next) => {
-          if (next === "project") setProjectEntryView("overview");
-          if (next === "dashboard") setDashboardHomeVersion((value) => value + 1);
-          setTab(next);
-        },
+        onTab: requestTab,
         onNewProject: () => setOnboardingOpen(true),
         onOpen: openDeepLink
       }),
@@ -12181,15 +15960,28 @@ function DashboardPage() {
       })
     ] }),
     jsx(ToastRegion, { toasts, onDismiss: dismissToast }),
-    pendingProject ? jsxs("section", { className: "dockyard-modal-layer", "data-project-switch-confirm": true, children: [
-      jsxs("div", { className: "dockyard-modal", role: "dialog", "aria-modal": true, children: [
-        jsx("h2", { children: "Discard unsaved changes?" }),
-        jsx("p", { children: "This project has unsaved changes. Choose Discard to switch projects or Cancel to keep editing." }),
-        jsxs("div", { className: "dockyard-modal-actions", children: [
-          jsx(Button, { onClick: () => setPendingProject(null), children: "Cancel" }),
-          jsx(Button, { variant: "danger", onClick: discardProjectChange, children: "Discard" })
-        ] })
-      ] })
+    navPending ? jsxs("section", { className: "dockyard-modal-layer", "data-project-switch-confirm": true, "data-nav-target": pendingProject ? `project:${pendingProject}` : `tab:${pendingTab}`, children: [
+      jsxs("div", {
+        className: "dockyard-modal",
+        role: "alertdialog",
+        "aria-modal": true,
+        "aria-label": "Unsaved changes",
+        onKeyDown: (event) => {
+          if (event.key === "Escape" && !navSaving) {
+            event.stopPropagation();
+            cancelNav();
+          }
+        },
+        children: [
+          jsx("h2", { children: "Unsaved changes" }),
+          jsx("p", { children: `This project has unsaved changes. ${dirtySaver.current ? "Save them and continue, discard them, or cancel to keep editing." : "Discard them to continue, or cancel to keep editing."}` }),
+          jsxs("div", { className: "dockyard-modal-actions", children: [
+            jsx(Button, { action: "nav-cancel", disabled: navSaving, onClick: cancelNav, children: "Cancel" }),
+            jsx(Button, { variant: "danger", action: "nav-discard", disabled: navSaving, onClick: discardProjectChange, children: "Discard" }),
+            dirtySaver.current ? jsx(Button, { variant: "primary", action: "nav-save", disabled: navSaving, onClick: saveThenNavigate, children: navSaving ? "Saving..." : "Save and continue" }) : null
+          ] })
+        ]
+      })
     ] }) : null,
     onboardingOpen ? jsx(OnboardingWizard, { onClose: () => setOnboardingOpen(false), onComplete: completeOnboarding }) : null
   ] });
