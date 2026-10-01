@@ -14,7 +14,7 @@
     ".venv/bin/python -m pytest",
     "node hermes_dockyard_plugin/desktop/run-browser-suite.mjs"
   ],
-  "start": ".venv/bin/python -m hermes_project_stewardship.api.server",
+  "start": "sh -c 'STEWARD_DB_PATH=\"$(mktemp -d)/dockyard.db\" exec .venv/bin/python -m hermes_project_stewardship.api.server'",
   "port": 9310,
   "readinessPath": "/healthz"
 }
