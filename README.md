@@ -100,7 +100,7 @@ uv sync --locked --extra dev --extra plugin
 hermes verify --json         # bootstrap, full suite and readiness smoke
 stewardctl --help            # standalone CLI
 export STEWARD_RPC_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
-uvicorn hermes_project_stewardship.api.server:app --host 127.0.0.1 --port 9310
+uvicorn --factory hermes_project_stewardship.api.server:create_app --host 127.0.0.1 --port 9310
 ```
 
 ### Vanilla Hermes plugin install

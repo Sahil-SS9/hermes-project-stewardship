@@ -154,6 +154,16 @@ def build_parser() -> argparse.ArgumentParser:
     restore.add_argument("--archive", type=Path, required=True)
     restore.add_argument("--target", type=Path, required=True)
 
+    # P addendum fix 5: rebuild a damaged database into the merged schema.
+    # Operates on copies only; the real database is never opened for writing.
+    db = sub.add_parser("db", help="database maintenance")
+    dsub = db.add_subparsers(dest="action", required=True)
+    rep = dsub.add_parser("repair", help="rebuild a database copy into this binary's schema")
+    rep.add_argument("--db-source", type=Path, required=True, help="database COPY to read (never the live file)")
+    rep.add_argument("--db-target", type=Path, required=True, help="fresh output path (must not exist)")
+    rep.add_argument("--backup-dir", type=Path, required=True, help="where the pre-repair backup is written")
+    rep.add_argument("--report", type=Path, default=None, help="where to write the JSON report")
+
     return p
 
 
@@ -169,6 +179,14 @@ def main(argv: Optional[List[str]] = None) -> int:
             return EXIT_ERROR
         print(json.dumps(result, sort_keys=True))
         return EXIT_OK
+
+    if args.group == "db":
+        from ..persistence.repair import run_cli
+        try:
+            return run_cli(args)
+        except (OSError, RuntimeError, sqlite3.Error) as exc:
+            print(friendly_error(str(exc)), file=sys.stderr)
+            return EXIT_ERROR
 
     try:
         store = open_store(args.db)

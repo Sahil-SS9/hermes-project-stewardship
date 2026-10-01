@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from hermes_project_stewardship.persistence import migrations, store as store_module
-from hermes_project_stewardship.persistence.migrations import SCHEMA_VERSION
 from hermes_project_stewardship.persistence.store import Store
 
 
@@ -48,22 +48,25 @@ def test_v30_v31_v30_v31_roundtrip_preserves_legacy_data_and_name_clash(tmp_path
     whole_before = _whole_v30_snapshot(cx)
     legacy.close()
 
-    upgraded = Store(db)
-    assert upgraded.schema_version == SCHEMA_VERSION
+    # Later lanes' migrations (P v32-v34) are not part of W's round trip.
+    only_w = [m for m in migrations.MIGRATIONS if m.version <= 31]
+    with monkeypatch.context() as context:
+        context.setattr(store_module, "MIGRATIONS", only_w)
+        upgraded = Store(db)
+    assert upgraded.schema_version == 31
     assert upgraded._conn.execute("SELECT count(*) FROM dockyard_global_workflows WHERE name='clash'").fetchone()[0] == 2
     assert [tuple(row) for row in upgraded._conn.execute("SELECT project_id,name,version,scope,owner_project_id FROM dockyard_workflows ORDER BY version")] == [
         ("p1", "clash", 1, "project", "p1"), ("p1", "clash", 2, "project", "p1")]
     assert upgraded._conn.execute("SELECT enabled FROM dockyard_workflow_enablement WHERE project_id='p1' AND scope='project' AND workflow_name='clash'").fetchone()[0] == 1
     assert upgraded._conn.execute("SELECT count(*) FROM dockyard_workflow_enablement WHERE scope='global'").fetchone()[0] == 0
     assert {table: [tuple(row) for row in upgraded._conn.execute(f"SELECT * FROM {table} ORDER BY rowid")] for table in _TABLES[1:]} == {table: before[table] for table in _TABLES[1:]}
-    # Downgrade every lane > 30 (this test pins the v31 roundtrip; later lanes
-    # may have added their own objects on top).
-    for lane in sorted((m.version for m in migrations.MIGRATIONS if 30 < m.version <= SCHEMA_VERSION), reverse=True):
-        upgraded._conn.executescript(next(m for m in migrations.MIGRATIONS if m.version == lane).downgrade_sql)
-        upgraded._conn.execute("DELETE FROM schema_migrations WHERE version=?", (lane,))
+    upgraded._conn.executescript(next(m for m in migrations.MIGRATIONS if m.version == 31).downgrade_sql)
+    upgraded._conn.execute("DELETE FROM schema_migrations WHERE version=31")
     assert _snapshot(upgraded._conn) == before
     assert _whole_v30_snapshot(upgraded._conn) == whole_before
-    upgraded.migrate()
-    assert upgraded.schema_version == SCHEMA_VERSION
+    with monkeypatch.context() as context:
+        context.setattr(store_module, "MIGRATIONS", only_w)
+        upgraded.migrate()
+    assert upgraded.schema_version == 31
     assert upgraded._conn.execute("SELECT count(*) FROM dockyard_global_workflows WHERE name='clash'").fetchone()[0] == 2
     upgraded.close()

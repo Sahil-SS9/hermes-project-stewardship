@@ -47,6 +47,53 @@ def test_schema_version_constant_matches_migrations(tmp_path):
         fresh.close()
 
 
+def test_table_rebuild_migration_keeps_cascade_children(tmp_path):
+    """v30 rebuilds project_initiatives (DROP + RENAME). With foreign keys on,
+    that DROP cascades and silently deletes every decision receipt. The runner
+    must keep child rows through a rebuild and leave no dangling references."""
+    import sqlite3 as _sqlite3
+
+    from hermes_project_stewardship.persistence.migrations import MIGRATIONS
+
+    db = tmp_path / "rebuild.db"
+    conn = _sqlite3.connect(db, isolation_level=None)
+    conn.row_factory = _sqlite3.Row
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute(
+        "CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)")
+    for migration in sorted(MIGRATIONS, key=lambda m: m.version):
+        if migration.version >= 30:
+            break
+        conn.executescript(migration.upgrade_sql)
+        conn.execute("INSERT INTO schema_migrations VALUES(?, '2026')", (migration.version,))
+    required = {
+        row[1]: "x" for row in conn.execute("PRAGMA table_info(project_stewardship)")
+        if row[3] and row[4] is None
+    }
+    required["project_id"] = "p1"
+    conn.execute(
+        f"INSERT INTO project_stewardship({','.join(required)}) VALUES({','.join('?' * len(required))})",
+        list(required.values()))
+    conn.execute(
+        "INSERT INTO project_initiatives(ref, project_id, title, rationale, created_at)"
+        " VALUES('I-1', 'p1', 't', 'r', '2026')")
+    conn.execute(
+        "INSERT INTO stewardship_decision_receipts(initiative_ref, decision, actor, interface,"
+        " fingerprint, revision, decided_at) VALUES('I-1', 'approved', 'sahil', 'ui', 'f', 1, '2026')")
+    conn.close()
+
+    store = Store(db)  # the real runner applies v30 onwards
+    try:
+        assert store.schema_version >= 30
+        receipts = store._conn.execute(
+            "SELECT initiative_ref, decision FROM stewardship_decision_receipts").fetchall()
+        assert [tuple(row) for row in receipts] == [("I-1", "approved")]
+        assert store._conn.execute("PRAGMA foreign_key_check").fetchall() == []
+        assert store._conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+    finally:
+        store.close()
+
+
 def test_initiative_relation_migration_roundtrips(tmp_path):
     """Migration 9 must support downgrade followed by a clean re-upgrade."""
     from hermes_project_stewardship.persistence.migrations import MIGRATIONS
