@@ -808,6 +808,12 @@ class StewardshipService:
                 (goal_id, project_id, clean_title, clean_description, clean_position, now, now),
             )
             self._replace_goal_links_in_tx(cx, project_id, goal_id, objective_ids)
+            # R2: every active goal carries a contract row from birth.
+            cx.execute(
+                "INSERT INTO project_goal_contracts(goal_id, outcome, status, updated_at)"
+                " VALUES(?,?,'active',?)",
+                (goal_id, clean_title, now),
+            )
         self.store.audit(
             actor=actor, interface=interface, action="goal.created", subject=goal_id,
             detail={"project_id": project_id, "objective_ids": list(objective_ids)},
@@ -908,6 +914,15 @@ class StewardshipService:
                 "UPDATE project_goals SET archived_at=NULL, updated_at=?"
                 " WHERE project_id=? AND goal_id=?",
                 (iso(self._clock()), project_id, goal_id),
+            )
+            # R2: a goal archived before the upgrade has no contract yet. Create
+            # one on restore; an existing contract is kept exactly as it is.
+            cx.execute(
+                "INSERT OR IGNORE INTO project_goal_contracts"
+                "(goal_id, outcome, status, updated_at)"
+                " SELECT goal_id, title, 'active', updated_at FROM project_goals"
+                " WHERE project_id=? AND goal_id=?",
+                (project_id, goal_id),
             )
         self.store.audit(
             actor=actor, interface=interface, action="goal.restored", subject=goal_id,

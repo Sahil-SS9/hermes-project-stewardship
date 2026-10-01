@@ -48,6 +48,8 @@ def test_v30_v31_v30_v31_roundtrip_preserves_legacy_data_and_name_clash(tmp_path
     whole_before = _whole_v30_snapshot(cx)
     legacy.close()
 
+    # This test owns the v30<->v31 step only: later migrations must not move it.
+    monkeypatch.setattr(store_module, "MIGRATIONS", [m for m in migrations.MIGRATIONS if m.version <= 31])
     upgraded = Store(db)
     assert upgraded.schema_version == 31
     assert upgraded._conn.execute("SELECT count(*) FROM dockyard_global_workflows WHERE name='clash'").fetchone()[0] == 2

@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 31
+SCHEMA_VERSION = 32
 
 
 @dataclass(frozen=True)
@@ -1311,6 +1311,61 @@ MIGRATIONS: List[Migration] = [
         DROP TABLE IF EXISTS dockyard_global_workflows;
         ALTER TABLE dockyard_workflows DROP COLUMN owner_project_id;
         ALTER TABLE dockyard_workflows DROP COLUMN scope;
+        """,
+    ),
+    Migration(
+        version=32,
+        name="roadmap links and goal contracts",
+        upgrade_sql="""
+        -- Batch R2. Three additive tables, no triggers. The same-project rule
+        -- cannot be written as a foreign key, so RoadmapService enforces it.
+        CREATE TABLE project_goal_contracts (
+            goal_id       TEXT PRIMARY KEY REFERENCES project_goals(goal_id) ON DELETE CASCADE,
+            outcome       TEXT NOT NULL,
+            verification  TEXT NOT NULL DEFAULT '',
+            constraints   TEXT NOT NULL DEFAULT '',
+            boundaries    TEXT NOT NULL DEFAULT '',
+            stop_when     TEXT NOT NULL DEFAULT '',
+            status        TEXT NOT NULL DEFAULT 'active'
+                          CHECK (status IN ('active','paused','done','cleared')),
+            max_turns     INTEGER NOT NULL DEFAULT 20 CHECK (max_turns >= 1),
+            paused_reason TEXT,
+            updated_at    TEXT NOT NULL
+        );
+        CREATE TABLE project_objective_deliveries (
+            objective_id  INTEGER NOT NULL REFERENCES project_objectives(id) ON DELETE CASCADE,
+            initiative_ref TEXT NOT NULL REFERENCES project_initiatives(ref) ON DELETE CASCADE,
+            relationship  TEXT NOT NULL DEFAULT 'supports'
+                          CHECK (relationship IN ('supports','measures','unblocks')),
+            created_by    TEXT NOT NULL,
+            created_at    TEXT NOT NULL,
+            PRIMARY KEY (objective_id, initiative_ref)
+        );
+        CREATE INDEX idx_objective_deliveries_initiative
+            ON project_objective_deliveries(initiative_ref);
+        CREATE TABLE initiative_milestones (
+            initiative_ref TEXT NOT NULL REFERENCES project_initiatives(ref) ON DELETE CASCADE,
+            milestone_id  INTEGER NOT NULL REFERENCES dockyard_milestones(id) ON DELETE CASCADE,
+            relationship  TEXT NOT NULL DEFAULT 'delivers'
+                          CHECK (relationship IN ('delivers','depends_on')),
+            created_by    TEXT NOT NULL,
+            created_at    TEXT NOT NULL,
+            PRIMARY KEY (initiative_ref, milestone_id)
+        );
+        CREATE INDEX idx_initiative_milestones_milestone
+            ON initiative_milestones(milestone_id);
+        -- One contract per active goal. Structural backfill only: it invents no
+        -- verification text and infers no links.
+        INSERT INTO project_goal_contracts(goal_id, outcome, status, updated_at)
+            SELECT goal_id, title, 'active', updated_at
+            FROM project_goals WHERE archived_at IS NULL;
+        """,
+        downgrade_sql="""
+        DROP INDEX IF EXISTS idx_initiative_milestones_milestone;
+        DROP INDEX IF EXISTS idx_objective_deliveries_initiative;
+        DROP TABLE IF EXISTS initiative_milestones;
+        DROP TABLE IF EXISTS project_objective_deliveries;
+        DROP TABLE IF EXISTS project_goal_contracts;
         """,
     ),
 ]

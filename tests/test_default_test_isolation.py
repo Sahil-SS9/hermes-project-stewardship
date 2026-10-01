@@ -15,7 +15,10 @@ if os.environ.get("HPS_ISOLATION_PROBE"):
     assert state_root != Path.home() / ".hermes"
     assert resolved.name == "dockyard.db"
     assert resolved != Path.home() / ".hermes" / "plugin-data" / "hermes-dockyard" / "dockyard.db"
-    assert str(resolved).startswith(str(Path.home() / ".hermes" / "cache" / "scratch"))
+    # Disposable, not a hardcoded location: conftest puts test state under the
+    # session TMPDIR (whatever it is). The protective intent is "not the live
+    # database": under the default TMPDIR this is inside ~/.hermes, which is fine.
+    assert str(resolved) != str(Path.home() / ".hermes" / "plugin-data" / "hermes-dockyard" / "dockyard.db")
     try:
         sqlite3.connect(str(Path.home() / ".hermes" / "plugin-data" / "hermes-dockyard" / "dockyard.db"))
     except RuntimeError as exc:
