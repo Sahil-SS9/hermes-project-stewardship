@@ -21,8 +21,9 @@ from typing import Any, Dict, List, Optional
 from .service import ServiceError, StewardshipService
 from .store import Store, iso
 
-# Error messages deliberately contain "no such" for 404s: the API's existing
-# ServiceError handler maps that phrase to 404 and everything else to 409.
+# Levers deliberately NOT built (YAGNI, Sahil's review point): no project
+# label column (project_id is shown as-is), no confidence summary, no
+# progress percentage. The read model reports what is stored.
 
 
 class RoadmapNotFound(ServiceError):
