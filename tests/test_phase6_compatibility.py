@@ -301,6 +301,10 @@ def test_pm0606_native_host_matrix_cells(tmp_path, monkeypatch):
     import os as _os
 
     with monkeypatch.context() as m:
+        # This cell is the Hermes host resolving its own default; since Quan D1
+        # merely importing hermes_cli no longer counts, so act as the host the
+        # way the gateway does (plugin.register() sets this marker).
+        m.setattr("hermes_project_stewardship.runtime._HOST_REGISTERED", True)
         m.setenv("HERMES_HOME", str(home_a))
         m.delenv("STEWARD_DB_PATH", raising=False)
         m.delenv("DOCKYARD_PLUGIN_DB", raising=False)
