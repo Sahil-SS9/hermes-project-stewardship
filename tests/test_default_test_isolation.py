@@ -11,11 +11,15 @@ if os.environ.get("HPS_ISOLATION_PROBE"):
 
     resolved = resolve_db_path().resolve()
     state_root = Path(os.environ["HPS_TEST_STATE_ROOT"]).resolve()
+    # Mirror tests/conftest.py: the disposable root is the inherited default
+    # $(TMPDIR or ~/.hermes/cache/scratch), never the live home itself.
+    default_tmp_root = Path(os.environ.get("TMPDIR") or (Path.home() / ".hermes" / "cache" / "scratch")).resolve()
     assert resolved == Path(os.environ["STEWARD_DB_PATH"]).resolve()
     assert state_root != Path.home() / ".hermes"
     assert resolved.name == "dockyard.db"
     assert resolved != Path.home() / ".hermes" / "plugin-data" / "hermes-dockyard" / "dockyard.db"
-    assert str(resolved).startswith(str(Path.home() / ".hermes" / "cache" / "scratch"))
+    assert str(resolved).startswith(str(state_root))
+    assert str(state_root).startswith(str(default_tmp_root))
     try:
         sqlite3.connect(str(Path.home() / ".hermes" / "plugin-data" / "hermes-dockyard" / "dockyard.db"))
     except RuntimeError as exc:
