@@ -102,6 +102,78 @@ class WorkflowService:
     def __init__(self, store: Store, port: CanonicalWorkPort) -> None:
         self.store = store
         self.port = port
+        # Timeline cursors are process-local only; the durable source remains
+        # the canonical run projection plus domain_events. A cursor prevents a
+        # poll from recording the same observed status twice.
+        self._timeline_seen: dict[tuple[str, str, int, str], dict[str, str | None]] = {}
+
+    def _timeline_key(self, project_id: str, name: str, version: int, run_key: str) -> tuple[str, str, int, str]:
+        return (project_id, name, version, run_key)
+
+    def _timeline_events(self, project_id: str, name: str, version: int, run_key: str,
+                         result: Mapping[str, Any], snapshot: Mapping[str, Any],
+                         work_index: Mapping[str, Mapping[str, Any]]) -> list[dict[str, Any]]:
+        key = self._timeline_key(project_id, name, version, run_key)
+        seen = self._timeline_seen.setdefault(key, {})
+        now = iso(self.store._clock())
+        events: list[dict[str, Any]] = []
+        refs = result.get("tasks") or {}
+        states = result.get("node_states") or {}
+        # The initial observation is ordered by the stored graph, while later
+        # observations append only changed nodes. The persisted domain-event
+        # rows supply the global sequence in timeline().
+        for node in snapshot.get("nodes", []):
+            node_id = str(node["id"])
+            ref = refs.get(node_id)
+            item = work_index.get(ref) if ref else None
+            status = (item or {}).get("status") if item else states.get(node_id)
+            # The display status is the same canonical vocabulary returned by
+            # runs(); no synthetic 'thinking' or tool-call events are created.
+            status = status or states.get(node_id) or "waiting"
+            previous = seen.get(node_id, None)
+            if node_id not in seen or previous != status:
+                event = {
+                    "seq": len(events), "run_key": run_key, "node_id": node_id,
+                    "task_ref": ref, "kind": (item or {}).get("kind") or ("gate" if node.get("human_gate") else "task"),
+                    "title": node.get("title"), "from_status": previous,
+                    "to_status": status, "ts": now,
+                }
+                events.append(event)
+                seen[node_id] = status
+        return events
+
+    def timeline(self, project_id: str, name: str, run_key: str) -> dict[str, Any]:
+        row = self._run_row(project_id, name, run_key)
+        result = json.loads(row["result_json"]) or {}
+        snapshot = json.loads(row["effective_json"]) if row["effective_json"] else {"nodes": []}
+        work_index = {item["id"]: item for item in self.port.list_work(project_id)}
+        # Timeline events are materialised in domain_events so they survive a
+        # service restart and can be replayed by the canvas. The per-process
+        # cursor only decides what to append on this observation.
+        key = self._timeline_key(project_id, name, row["version"], run_key)
+        existing = self.store._conn.execute(
+            "SELECT id, ts, payload_json FROM domain_events WHERE event_type=? AND project_id=? AND subject=? ORDER BY id",
+            ("workflow.node_state", project_id, f"{name}:v{row['version']}:{run_key}"),
+        ).fetchall()
+        if existing:
+            seen = self._timeline_seen.setdefault(key, {})
+            for item in existing:
+                payload = json.loads(item["payload_json"])
+                seen[payload["node_id"]] = payload["to_status"]
+        new_events = self._timeline_events(project_id, name, row["version"], run_key, result, snapshot, work_index)
+        with self.store.tx() as cx:
+            for event in new_events:
+                event["seq"] = len(existing)
+                cur = cx.execute(
+                    "INSERT INTO domain_events(ts,event_type,project_id,subject,payload_json,emitted_by) VALUES(?,?,?,?,?,?)",
+                    (event["ts"], "workflow.node_state", project_id, f"{name}:v{row['version']}:{run_key}", json.dumps(event, sort_keys=True), "workflow-service"),
+                )
+                event["id"] = int(cur.lastrowid or 0)
+                existing.append({"id": event["id"], "ts": event["ts"], "payload_json": json.dumps(event)})
+        events = [json.loads(item["payload_json"]) | {"id": int(item["id"])} for item in existing]
+        for index, event in enumerate(events):
+            event["seq"] = index
+        return {"project_id": project_id, "name": name, "version": row["version"], "run_key": run_key, "events": events}
 
     # ---- validation ---------------------------------------------------
 
@@ -247,32 +319,16 @@ class WorkflowService:
 
     def define_template(self, name: str, definition: Mapping[str, Any], *,
                         actor: str, interface: str = "rpc") -> dict[str, Any]:
-        clean_name = str(name or "").strip()
-        if not clean_name:
-            raise ValueError("template name is required")
-        clean = self._validated(definition)
-        clean.pop("template", None)  # templates are the origin, not derived
-        with self.store.tx() as cx:
-            row = cx.execute(
-                "SELECT COALESCE(MAX(version), 0) AS version FROM dockyard_workflow_templates "
-                "WHERE name=?", (clean_name,),
-            ).fetchone()
-            version = int(row["version"]) + 1
-            cx.execute(
-                "INSERT INTO dockyard_workflow_templates("
-                "name,version,definition_json,created_at,created_by) VALUES(?,?,?,?,?)",
-                (clean_name, version, json.dumps(clean, sort_keys=True),
-                 iso(self.store._clock()), actor),
-            )
-        self.store.audit(actor=actor, interface=interface,
-                         action="workflow.template_defined",
-                         subject=f"template:{clean_name}:v{version}")
-        return {"name": clean_name, "version": version, "definition": clean}
+        from .workflow_library import WorkflowLibrary
+        result = WorkflowLibrary(self).define(name, "global", definition,
+                                              actor=actor, interface=interface)
+        return {"name": result["name"], "version": result["version"],
+                "definition": result["definition"]}
 
     def list_templates(self) -> list[dict[str, Any]]:
         rows = self.store._conn.execute(
             "SELECT name,version,definition_json,created_at,created_by "
-            "FROM dockyard_workflow_templates ORDER BY name, version",
+            "FROM dockyard_global_workflows ORDER BY name, version",
         ).fetchall()
         latest: dict[str, dict[str, Any]] = {}
         for row in rows:
@@ -287,11 +343,11 @@ class WorkflowService:
         clean_name = str(name or "").strip()
         if version is None:
             row = self.store._conn.execute(
-                "SELECT * FROM dockyard_workflow_templates WHERE name=? "
+                "SELECT * FROM dockyard_global_workflows WHERE name=? "
                 "ORDER BY version DESC LIMIT 1", (clean_name,)).fetchone()
         else:
             row = self.store._conn.execute(
-                "SELECT * FROM dockyard_workflow_templates WHERE name=? AND version=?",
+                "SELECT * FROM dockyard_global_workflows WHERE name=? AND version=?",
                 (clean_name, version)).fetchone()
         if row is None:
             raise ValueError("template was not found")
@@ -318,7 +374,8 @@ class WorkflowService:
 
     # ---- definition versions -----------------------------------------
 
-    def define(self, project_id: str, name: str, definition: Mapping[str, Any]) -> dict[str, Any]:
+    def define(self, project_id: str, name: str, definition: Mapping[str, Any], *,
+               actor: str = "system", interface: str = "service") -> dict[str, Any]:
         clean_name = str(name or "").strip()
         if not clean_name:
             raise ValueError("workflow name is required")
@@ -343,6 +400,8 @@ class WorkflowService:
                 (project_id, clean_name, version, json.dumps(clean, sort_keys=True),
                  iso(self.store._clock())),
             )
+        self.store.audit(actor=actor, interface=interface, action="workflow.defined",
+                         subject=f"{project_id}:{clean_name}:v{version}")
         return {"project_id": project_id, "name": clean_name,
                 "version": version, "definition": clean}
 
@@ -351,7 +410,10 @@ class WorkflowService:
         rows = self.store._conn.execute(
             "SELECT project_id,name,version,definition_json,created_at,"
             " archived_at,archived_by FROM dockyard_workflows "
-            f"WHERE project_id=?{archive_clause} ORDER BY name,version",
+            f"WHERE project_id=?{archive_clause} AND NOT EXISTS ("
+            "SELECT 1 FROM dockyard_global_instances gi WHERE "
+            "gi.project_id=dockyard_workflows.project_id AND "
+            "gi.internal_name=dockyard_workflows.name) ORDER BY name,version",
             (project_id,),
         ).fetchall()
         return [{"project_id": row["project_id"], "name": row["name"],
@@ -613,6 +675,26 @@ class WorkflowService:
             raise ValueError("workflow was not found")
         if row["archived_at"] is not None:
             raise ValueError("workflow is archived; restore it before starting a run")
+        shadow = self.store._conn.execute(
+            "SELECT workflow_name FROM dockyard_global_instances "
+            "WHERE project_id=? AND internal_name=?",
+            (project_id, name),
+        ).fetchone()
+        if shadow is not None:
+            choice = self.store._conn.execute(
+                "SELECT enabled FROM dockyard_workflow_enablement WHERE "
+                "project_id=? AND scope='global' AND workflow_name=?",
+                (project_id, shadow["workflow_name"]),
+            ).fetchone()
+            if choice is not None and not choice["enabled"]:
+                raise ValueError("workflow is disabled for this project")
+        choice = self.store._conn.execute(
+            "SELECT enabled FROM dockyard_workflow_enablement WHERE "
+            "project_id=? AND scope='project' AND workflow_name=?",
+            (project_id, name),
+        ).fetchone()
+        if choice is not None and not choice["enabled"]:
+            raise ValueError("workflow is disabled for this project")
         existing = self.store._conn.execute(
             "SELECT result_json,status FROM dockyard_workflow_runs WHERE project_id=? AND name=? "
             "AND version=? AND run_key=?",
@@ -700,8 +782,11 @@ class WorkflowService:
             "node_states": states,
             "iterations": iterations,
         }
-        return self._finish_run(project_id, name, row["version"], key, result,
-                                status="pending")
+        finished = self._finish_run(project_id, name, row["version"], key, result,
+                                    status="pending")
+        self.store.audit(actor="system", interface="service", action="workflow.started",
+                         subject=f"{project_id}:{name}:{key}")
+        return finished
 
     def _materialise_node(self, project_id: str, name: str, version: int, run_key: str,
                           node: Mapping[str, Any], *, iteration: int | None) -> dict[str, Any]:

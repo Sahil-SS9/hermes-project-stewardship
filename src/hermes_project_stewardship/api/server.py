@@ -27,7 +27,7 @@ from typing import Any, cast, Dict, List, NoReturn, Optional
 
 try:
     from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
-    from pydantic import BaseModel, ConfigDict, Field
+    from pydantic import BaseModel, ConfigDict, Field, StrictBool
 except ImportError as e:  # pragma: no cover
     raise ImportError(
         "The RPC server needs the 'desktop-panel' extra: "
@@ -60,6 +60,7 @@ from ..persistence.service import (
     StewardshipService,
 )
 from ..persistence.workflow_service import WorkflowService
+from ..persistence.workflow_library import WorkflowLibrary
 from ..observation.recovery import ReconcileService
 from ..persistence.store import Store, iso
 from .middleware import (
@@ -649,6 +650,17 @@ class WorkflowInstantiate(BaseModel):
     name: Optional[str] = None
     version: Optional[int] = None
 
+class WorkflowLibraryDefine(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    scope: str
+    name: str
+    owner_project_id: Optional[str] = None
+    nodes: List[Dict[str, Any]]
+
+class WorkflowEnablementBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: StrictBool
+
 
 class WorkflowBindingBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -713,6 +725,7 @@ def create_app(
     membership_service = MembershipService(store, svc)
     team_management = TeamManagementService(store, svc, membership_service, adapter)
     workflows = WorkflowService(store, cast(CanonicalWorkPort, adapter))
+    workflow_library = WorkflowLibrary(workflows)
     dy = DockyardService(store, canonical_work=work)
     integration = DockyardIntegration(
         dy=dy,
@@ -2444,6 +2457,117 @@ def create_app(
             members = []
         return (known or None), (members or None)
 
+    @router.get("/workflow-library")
+    def list_workflow_library(scope: Optional[str] = None,
+                              include_archived: bool = False):
+        try:
+            return {"workflows": workflow_library.list(
+                scope=scope, include_archived=include_archived)}
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @router.post("/workflow-library")
+    def create_workflow_library(body: WorkflowLibraryDefine):
+        try:
+            return workflow_library.define(
+                body.name, body.scope, {"nodes": body.nodes},
+                project_id=body.owner_project_id,
+                actor=current_principal() or "stewardship-api", interface="rpc")
+        except ValueError as exc:
+            raise HTTPException(409 if "archived" in str(exc) else 422, str(exc)) from None
+
+    @router.post("/workflow-library/{scope}/{name}/versions")
+    def version_workflow_library(scope: str, name: str, body: WorkflowVersionDefine,
+                                 owner_project_id: Optional[str] = None):
+        try:
+            if workflow_library._latest(name, scope, owner_project_id) is None:
+                raise ValueError("workflow was not found")
+            return workflow_library.define(
+                name, scope, {"nodes": body.nodes}, project_id=owner_project_id,
+                actor=current_principal() or "stewardship-api", interface="rpc")
+        except ValueError as exc:
+            raise HTTPException(404 if "not found" in str(exc)
+                                else 409 if "archived" in str(exc) else 422, str(exc)) from None
+
+    @router.post("/workflow-library/{scope}/{name}/archive")
+    def archive_workflow_library(scope: str, name: str,
+                                 owner_project_id: Optional[str] = None):
+        principal = _membership_authority("project_archive")
+        try:
+            return workflow_library.archive(
+                name, scope, actor=principal, project_id=owner_project_id,
+                interface="rpc")
+        except ValueError as exc:
+            raise HTTPException(404 if "not found" in str(exc) else 422, str(exc)) from None
+
+    @router.post("/workflow-library/{scope}/{name}/restore")
+    def restore_workflow_library(scope: str, name: str,
+                                 owner_project_id: Optional[str] = None):
+        principal = _membership_authority("project_archive")
+        try:
+            return workflow_library.archive(
+                name, scope, actor=principal, project_id=owner_project_id,
+                restore=True, interface="rpc")
+        except ValueError as exc:
+            raise HTTPException(404 if "not found" in str(exc) else 422, str(exc)) from None
+
+    @router.delete("/workflow-library/{scope}/{name}")
+    def delete_workflow_library(scope: str, name: str,
+                                owner_project_id: Optional[str] = None):
+        principal = _membership_authority("project_archive")
+        try:
+            return workflow_library.delete(
+                name, scope, actor=principal, project_id=owner_project_id,
+                interface="rpc")
+        except ValueError as exc:
+            message = str(exc)
+            raise HTTPException(404 if "not found" in message
+                                else 409 if "run" in message or "enabled" in message
+                                else 422, message) from None
+
+    @router.get("/projects/{project_id}/workflows/available")
+    def available_workflow_library(project_id: str):
+        try:
+            return {"workflows": workflow_library.available(project_id)}
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from None
+
+    @router.put("/projects/{project_id}/workflows/{scope}/{name}/enablement")
+    def toggle_workflow_library(project_id: str, scope: str, name: str,
+                                body: WorkflowEnablementBody):
+        svc.require_feature(project_id, "workflow_canvas")
+        try:
+            return workflow_library.toggle(
+                project_id, name, scope, enabled=body.enabled,
+                actor=current_principal() or "stewardship-api", interface="rpc")
+        except ValueError as exc:
+            raise HTTPException(404 if "not found" in str(exc) else 422, str(exc)) from None
+
+    @router.post("/projects/{project_id}/workflows/{scope}/{name}/start")
+    def start_scoped_workflow(project_id: str, scope: str, name: str,
+                              body: WorkflowStart):
+        svc.require_feature(project_id, "workflow_canvas")
+        known, members = _workflow_audience(project_id)
+        try:
+            return workflow_library.start(
+                project_id, name, scope, body.run_key,
+                actor=current_principal() or "stewardship-api", interface="rpc",
+                known_profiles=known, project_members=members)
+        except KanbanAdapterError as exc:
+            _raise_work_error(exc)
+        except ValueError as exc:
+            raise HTTPException(409 if "disabled" in str(exc) or "archived" in str(exc)
+                                else 404 if "not found" in str(exc) else 422,
+                                str(exc)) from None
+
+    @router.get("/projects/{project_id}/workflows/{scope}/{name}/runs")
+    def scoped_workflow_runs(project_id: str, scope: str, name: str):
+        svc.require_feature(project_id, "workflow_canvas")
+        try:
+            return {"runs": workflow_library.runs(project_id, name, scope)}
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from None
+
     @router.post("/workflow-templates")
     def define_workflow_template(body: WorkflowTemplateDefine):
         try:
@@ -2525,7 +2649,8 @@ def create_app(
         except KanbanAdapterError as exc:
             _raise_work_error(exc)
         except ValueError as exc:
-            raise HTTPException(409 if "archived" in str(exc) else 422, str(exc)) from None
+            raise HTTPException(409 if any(word in str(exc) for word in ("archived", "disabled"))
+                                else 422, str(exc)) from None
 
     @router.get("/projects/{project_id}/workflows/{name}/runs")
     def list_workflow_runs(project_id: str, name: str):
@@ -2533,6 +2658,23 @@ def create_app(
         svc.require_feature(project_id, "workflow_canvas")
         try:
             return {"runs": workflows.runs(project_id, name)}
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from None
+
+    @router.get("/projects/{project_id}/workflows/{scope}/{name}/runs/{run_key}/timeline")
+    def scoped_workflow_run_timeline(project_id: str, scope: str, name: str, run_key: str):
+        svc.require_feature(project_id, "workflow_canvas")
+        try:
+            return workflow_library.timeline(project_id, name, scope, run_key)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from None
+
+    @router.get("/projects/{project_id}/workflows/{name}/runs/{run_key}/timeline")
+    def workflow_run_timeline(project_id: str, name: str, run_key: str):
+        """Ordered canonical node-state history for canvas playback."""
+        svc.require_feature(project_id, "workflow_canvas")
+        try:
+            return workflows.timeline(project_id, name, run_key)
         except ValueError as exc:
             raise HTTPException(404, str(exc)) from None
 

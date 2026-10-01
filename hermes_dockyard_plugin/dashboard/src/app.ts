@@ -1804,6 +1804,8 @@ async function renderWorkflow(
             }),
           };
         },
+        fetchTimeline: (timelineProjectId, timelineName, timelineRunKey) =>
+          s.api.workflowTimeline(timelineProjectId, timelineName, timelineRunKey),
       },
     );
     (canvasHost as unknown as { dyDispose?: () => void }).dyDispose = dispose;

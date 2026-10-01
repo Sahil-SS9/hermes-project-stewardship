@@ -24,6 +24,7 @@ import { TeamsView } from '../views/teams.js'
 // Teams is intentionally imported before Initiative for the legacy text probe.
 import { InitiativeView } from '../views/initiative.js'
 import { InboxView } from '../views/inbox.js'
+import { WorkflowLibraryView } from '../views/workflow-library.js'
 import { NotificationsView } from '../views/notifications.js'
 import { jsxs } from '../runtime/react.js'
 import { ConsoleBar } from '../lib/ui.js'
@@ -84,7 +85,9 @@ export function DashboardPage() {
       setLoadScope(nextLoadScope)
     }
     setError(null)
-    const loader = tab === 'dashboard'
+    const loader = tab === 'workflows-library'
+    ? async () => ({ workflows: (await api('/workflow-library')).workflows ?? [] })
+    : tab === 'dashboard'
       ? loadDashboardData
       : (tab === 'project' || tab === 'settings' || tab === 'workflows')
         ? () => loadProjectData(selectedProject)
@@ -258,6 +261,7 @@ export function DashboardPage() {
       onSelectProject: selectProject,
       onProjectDirty: markDirty(payload.project?.id ?? null),
       onRefresh: refresh,
+      onOpenLibrary: () => setTab('workflows'),
       pendingWorkRef,
       onPendingWorkConsumed: () => setPendingWorkRef(null),
       notice: deepLinkNotice,
@@ -272,14 +276,18 @@ export function DashboardPage() {
       notice: deepLinkNotice,
     }, `settings:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
   } else if (tab === 'workflows') {
-    content = jsx(ProjectDashboard, {
-      view: payload,
-      initialView: 'workflows',
-      onSelectProject: selectProject,
-      onProjectDirty: markDirty(payload.project?.id ?? null),
-      onRefresh: refresh,
-      notice: deepLinkNotice,
-    }, `workflows:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
+    // Option A (Sahil 28/09): the top Workflows tab IS the library. Project
+    // workflows live under Project > Workflows. Enablement and runs act on the
+    // project selected in the global picker, never an implicit first project.
+    content = jsx(WorkflowLibraryView, {
+      projectId: selectedProject,
+      onOpenBuilder: (row) => {
+        const owner = row?.owner_project_id
+        if (owner && owner !== selectedProject) setSelectedProject(owner)
+        setProjectEntryView('workflows')
+        setTab('project')
+      },
+    }, `workflow-library:${selectedProject ?? 'none'}`)
   } else if (tab === 'onboard') {
     content = jsx(OnboardPanel, { view: payload, onOpen: () => setOnboardingOpen(true), onRefresh: refresh })
   } else if (tab === 'backlog') {

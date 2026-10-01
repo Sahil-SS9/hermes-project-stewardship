@@ -25,7 +25,7 @@ execFileSync(esbuildBin, [
 ]);
 const mod = await import('file://' + compiled.replace(/\\/g, '/'));
 const {
-  mountWorkflowCanvas, nodePurpose, nodeShapePath, statusToken,
+  mountWorkflowCanvas, nodePurpose, statusToken, isAwaitingDecision,
   PURPOSE_VISUALS, EDGE_MEANINGS, PLANNING_EDGE_MEANINGS, DEFAULT_EDGE_MEANING,
 } = mod;
 
@@ -98,7 +98,7 @@ const nodeOf = (host, id) => host.querySelector(`[data-node-id="${id}"]`);
 
 // ------------------------------------------------------------- S1: visuals --
 
-test('S1: each purpose renders a distinct silhouette, fill, symbol and label', async () => {
+test('S1: every node is the same card; purpose is stated in words', async () => {
   const dom = makeDom();
   const dispose = mount(dom, FOUR_PURPOSES, {});
   try {
@@ -109,33 +109,23 @@ test('S1: each purpose renders a distinct silhouette, fill, symbol and label', a
       assert.ok(host.querySelector(`.dy-wf-node[data-wf-purpose="${p}"]`),
         `a ${p} node must render with its purpose recorded`);
     }
-    // Shape-led: gate/branch/loop are drawn as paths, a task as a rounded rect.
-    const shape = (id) => nodeOf(host, id).querySelector('.dy-wf-shape');
-    assert.equal(shape('a').tagName.toLowerCase(), 'rect', 'task is a rounded rect');
-    assert.equal(shape('a').getAttribute('rx'), '9');
-    assert.equal(shape('g').tagName.toLowerCase(), 'path', 'human gate is not a rectangle');
-    assert.equal(shape('b').tagName.toLowerCase(), 'path', 'branch is not a rectangle');
-    assert.equal(shape('l').tagName.toLowerCase(), 'path', 'loop is not a rectangle');
-    // The three path silhouettes are genuinely different shapes.
-    const d = (id) => shape(id).getAttribute('d');
-    assert.notEqual(d('g'), d('b'), 'gate and branch must not share a silhouette');
-    assert.notEqual(d('g'), d('l'), 'gate and loop must not share a silhouette');
-    assert.notEqual(d('b'), d('l'), 'branch and loop must not share a silhouette');
-    // Hexagon gate: 6 vertices. Cut-corner branch: 8 vertices.
-    // Every path command here (M/H/V/L) introduces a vertex.
-    const count = (s) => (s.match(/[MLHV]/g) ?? []).length;
-    assert.equal(count(d('g')), 6, 'gate silhouette is a hexagon profile');
-    assert.equal(count(d('b')), 8, 'branch silhouette is a cut-corner octagon profile');
-    assert.ok(/A /.test(d('l')), 'loop silhouette carries rounded returns');
-    // Purpose fill + symbol are per-purpose and never all the same.
-    const fills = purposes.map((p) => host.querySelector(`.dy-wf-node[data-wf-purpose="${p}"] .dy-wf-shape`).getAttribute('fill'));
-    assert.equal(new Set(fills).size, purposes.length, 'every purpose has its own fill token');
-    const glyphs = purposes.map((p) => host.querySelector(`.dy-wf-node[data-wf-purpose="${p}"] .dy-wf-glyph`).textContent);
-    assert.equal(new Set(glyphs).size, purposes.length, 'every purpose has its own symbol');
-    // Per-purpose label treatment: the purpose is named on the node itself.
-    assert.match(nodeOf(host, 'g').querySelector('.dy-wf-sub').textContent, /Human gate/);
-    assert.match(nodeOf(host, 'b').querySelector('.dy-wf-sub').textContent, /Conditional branch/);
-    assert.match(nodeOf(host, 'l').querySelector('.dy-wf-sub').textContent, /Bounded loop/);
+    // Identical cards: one rounded rect of the same size and radius everywhere.
+    const shapes = ['a', 'g', 'b', 'l'].map((id) => nodeOf(host, id).querySelector('.dy-wf-shape'));
+    for (const sh of shapes) {
+      assert.equal(sh.tagName.toLowerCase(), 'rect', 'every node is the card rect');
+      assert.ok(sh.classList.contains('dy-wf-card'), 'the card class is on the shape');
+    }
+    const geom = (sh) => ['width', 'height', 'rx', 'fill'].map((k) => sh.getAttribute(k)).join('|');
+    assert.equal(new Set(shapes.map(geom)).size, 1, 'size, radius and fill are identical for every purpose');
+    // No per-purpose symbol set survives.
+    assert.equal(host.querySelectorAll('.dy-wf-glyph').length, 0, 'no purpose symbols');
+    // Purpose is named on the node itself, and in its accessible name.
+    const sub = (id) => nodeOf(host, id).querySelector('.dy-wf-sub').textContent;
+    assert.equal(sub('a'), PURPOSE_VISUALS.task.label);
+    assert.equal(sub('g'), 'Human gate');
+    assert.equal(sub('b'), 'Conditional branch');
+    assert.equal(sub('l'), 'Bounded loop');
+    assert.match(nodeOf(host, 'g').getAttribute('aria-label'), /^Human gate: Approve gate/);
   } finally {
     dispose();
     restore(dom);
@@ -148,20 +138,15 @@ test('S1: no node carries a coloured side stripe and the shape set is single', a
   try {
     await settle();
     const host = dom.window.document.getElementById('host');
-    // The rejected pattern was a thin coloured rule down one side of a uniform
-    // box. Nothing may draw one: one shape element per node, no stripe nodes.
     for (const g of host.querySelectorAll('.dy-wf-node')) {
       assert.equal(g.querySelectorAll('.dy-wf-shape').length, 1,
-        'a node draws exactly one silhouette');
+        'a node draws exactly one card');
       for (const el of g.querySelectorAll('*')) {
         const cls = el.getAttribute('class') ?? '';
         assert.doesNotMatch(cls, /stripe|side-?line|bar/i,
           `no side-stripe element may exist (found ${cls})`);
       }
-      // A uniform rect for every node is the pattern being replaced.
-      assert.ok(g.querySelector('.dy-wf-shape'), 'silhouette present');
     }
-    // The stylesheet must not style a stripe either.
     assert.doesNotMatch(CSS, /side-?stripe|wf-stripe/i,
       'stylesheet defines no side-stripe treatment');
   } finally {
@@ -170,40 +155,63 @@ test('S1: no node carries a coloured side stripe and the shape set is single', a
   }
 });
 
-test('S1: purpose and status are independent dimensions on the same node', async () => {
+test('S1: status is carried by border, dot and word; the card fill never changes', async () => {
   const dom = makeDom();
   const runs = () => [RUN([
     NODE({ node_id: 'a', title: 'One', status: 'done' }),
     NODE({ node_id: 'b', title: 'Two', status: 'blocked' }),
     NODE({ node_id: 'c', title: 'Three', status: 'pending' }),
+    NODE({ node_id: 'd', title: 'Four', status: 'working' }),
   ])];
   const dispose = mount(dom, runs, {});
   try {
     await settle();
     const host = dom.window.document.getElementById('host');
+    const ids = ['a', 'b', 'c', 'd'];
     const fillOf = (id) => nodeOf(host, id).querySelector('.dy-wf-shape').getAttribute('fill');
-    // Same purpose, three different statuses: the purpose fill is unchanged...
-    assert.equal(new Set(['a', 'b', 'c'].map(fillOf)).size, 1,
-      'status must not re-colour the purpose fill');
-    // ...while the status is still stated, three different ways.
-    const stated = ['a', 'b', 'c'].map((id) => nodeOf(host, id).querySelector('.dy-wf-statustext').textContent);
-    assert.deepEqual(stated.sort(), ['blocked', 'done', 'pending']);
-    const chips = ['a', 'b', 'c'].map((id) => nodeOf(host, id).querySelector('.dy-wf-statuschip').getAttribute('class'));
-    assert.equal(new Set(chips).size, 3, 'each status has its own chip treatment');
-    // The status is on the group too, for the outline rules.
-    assert.ok(nodeOf(host, 'b').getAttribute('class').includes('blocked'));
+    assert.equal(new Set(ids.map(fillOf)).size, 1, 'status must not re-colour the card fill');
+    const stated = ids.map((id) => nodeOf(host, id).querySelector('.dy-wf-statustext').textContent);
+    assert.deepEqual(stated.sort(), ['blocked', 'done', 'pending', 'working']);
+    const dots = ids.map((id) => nodeOf(host, id).querySelector('.dy-wf-statusdot').getAttribute('class'));
+    assert.equal(new Set(dots).size, 4, 'each status has its own dot treatment');
+    assert.ok(nodeOf(host, 'b').getAttribute('class').split(/\s+/).includes('blocked'), 'border rule hook on the group');
     assert.equal(nodeOf(host, 'b').dataset.wfStatus, 'blocked');
     assert.equal(nodeOf(host, 'b').dataset.wfPurpose, 'task');
+    // Each status has its own border rule in the stylesheet, driven by a status token.
+    for (const st of ['done', 'working', 'blocked', 'pending']) {
+      const m = CSS.match(new RegExp(`\\.dy-wf-node\\.${st} \\.dy-wf-shape\\s*\\{([^}]*)\\}`));
+      assert.ok(m, `${st} has a border rule`);
+      assert.match(m[1], new RegExp(`stroke:\\s*var\\(--dy-wf-status-${st}\\)`), `${st} border uses its status token`);
+    }
   } finally {
     dispose();
     restore(dom);
   }
 });
 
-test('S1: purpose and status colours never collide and stay legible on every fill', async () => {
+test('S1: a pending human gate reads as awaiting decision (stated, not inferred)', async () => {
+  const dom = makeDom();
+  const dispose = mount(dom, FOUR_PURPOSES, {});
+  try {
+    await settle();
+    const host = dom.window.document.getElementById('host');
+    const gate = nodeOf(host, 'g');
+    assert.equal(gate.dataset.wfAwaiting, 'true');
+    assert.equal(gate.querySelector('.dy-wf-statustext').textContent, 'awaiting decision');
+    // A pending non-gate node is just pending.
+    assert.equal(isAwaitingDecision(NODE({ status: 'pending' })), false);
+    assert.equal(isAwaitingDecision(NODE({ human_gate: true, status: 'done' })), false);
+    assert.equal(isAwaitingDecision(NODE({ human_gate: true, status: null })), true);
+  } finally {
+    dispose();
+    restore(dom);
+  }
+});
+
+test('S1: card text and status colours stay legible on the card fill', async () => {
   const token = (name) => {
     const m = CSS.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{3,8})`));
-    assert.ok(m, `token --${name} must be declared in style.css`);
+    assert.ok(m, `token --${name} must be declared in the canvas stylesheet`);
     return m[1];
   };
   const srgb = (c) => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
@@ -216,85 +224,21 @@ test('S1: purpose and status colours never collide and stay legible on every fil
     const [x, y] = [lum(a), lum(b)];
     return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
   };
-  const PURPOSE_KEYS = ['task', 'gate', 'branch', 'loop'];
-  // (1) The two dimensions are different colours everywhere: a purpose token
-  // value must never equal a status token value.
-  const purposeVals = PURPOSE_KEYS.flatMap((p) => ['fill', 'line', 'text'].map((k) => token(`dy-wf-purpose-${p}-${k}`)));
-  const statusVals = ['done', 'working', 'blocked', 'pending'].flatMap((s) => [token(`dy-wf-status-${s}`), token(`dy-wf-status-${s}-text`)]);
-  for (const pv of purposeVals) {
-    assert.ok(!statusVals.includes(pv),
-      `purpose colour ${pv} must never be reused as a status colour`);
-  }
-  // (2) Structural separation: purpose-ruled properties are never driven by a
-  // status token, and status-ruled properties are never driven by a purpose
-  // token. This is what makes the two dimensions independent by construction.
-  for (const p of PURPOSE_KEYS) {
-    const purposeRules = [...CSS.matchAll(new RegExp(`\\.dy-wf-node\\.${p}[^{]*\\{([^}]*)\\}`, 'g'))]
-      .map((m) => m[1]).join(' ');
-    assert.ok(purposeRules.length > 0, `the ${p} purpose has its own rules`);
-    assert.doesNotMatch(purposeRules, /--dy-wf-status/,
-      `the ${p} purpose rules must not be coloured by a status token`);
-  }
+  const fill = token('dy-wf-card-fill');
+  const bg = token('dy-wf-canvas-bg');
+  // The card must separate from the stage it sits on.
+  assert.ok(ratio(fill, bg) >= 1.1, `card fill must lift off the canvas (got ${ratio(fill, bg).toFixed(2)})`);
+  assert.ok(ratio(token('dy-wf-card-text'), fill) >= 7, 'card title reaches 7:1');
+  assert.ok(ratio(token('dy-wf-card-dim'), fill) >= 4.5, 'purpose word reaches 4.5:1');
   for (const s of ['done', 'working', 'blocked', 'pending']) {
-    const statusRules = [...CSS.matchAll(new RegExp(`\\.(dy-wf-statuschip|dy-wf-statustext)\\.${s}[^{]*\\{([^}]*)\\}`, 'g'))]
-      .map((m) => m[1]).join(' ');
-    assert.ok(statusRules.length > 0, `the ${s} status has its own rules`);
-    assert.doesNotMatch(statusRules, /--dy-wf-purpose/,
-      `the ${s} status rules must not be coloured by a purpose token`);
+    assert.ok(ratio(token(`dy-wf-status-${s}-text`), fill) >= 4.5, `status word (${s}) reaches 4.5:1 on the card`);
+    assert.ok(ratio(token(`dy-wf-status-${s}`), fill) >= 3, `status border (${s}) reaches 3:1 on the card`);
   }
-  // (3) The standing quality bar, measured on the real palette: status text
-  // legible on every purpose fill, and the status outline visible too.
-  // The canvas background is what a fill must separate from. It is declared as
-  // the fallback of the canvas rule, so read it from there rather than
-  // hard-coding a second copy of the value into the test.
-  const bgMatch = CSS.match(/\.dy-wf\s*\{[^}]*background:\s*var\(--dy-bg-deep,\s*(#[0-9a-fA-F]{6})\)/);
-  assert.ok(bgMatch, 'the canvas background colour must be declared');
-  const bg = bgMatch[1];
-  for (const p of PURPOSE_KEYS) {
-    const fill = token(`dy-wf-purpose-${p}-fill`);
-    // A purpose colour is only a purpose colour if it is perceptible: a fill
-    // indistinguishable from the canvas background reads as black and makes the
-    // dimensions invisible (measured regression: 1.19:1 was not enough).
-    assert.ok(ratio(fill, bg) >= 1.6,
-      `the ${p} fill must read as a tint against the canvas background`);
-    for (const s of ['done', 'working', 'blocked', 'pending']) {
-      assert.ok(ratio(token(`dy-wf-status-${s}-text`), fill) >= 4.5,
-        `status text (${s}) must reach 4.5:1 on the ${p} fill`);
-      assert.ok(ratio(token(`dy-wf-status-${s}`), fill) >= 3,
-        `status outline (${s}) must reach 3:1 on the ${p} fill`);
-    }
-    assert.ok(ratio(token(`dy-wf-purpose-${p}-text`), fill) >= 4.5,
-      `purpose text must be legible on the ${p} fill`);
-    assert.ok(ratio(token(`dy-wf-purpose-${p}-line`), fill) >= 3,
-      `the ${p} silhouette must separate from its own fill`);
-  }
-  // The purposes must be distinguishable from EACH OTHER, not just from the
-  // background: hue separation is what makes "different colours" true.
-  const hue = (hex) => {
-    const h = hex.replace('#', '');
-    const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    if (max === min) return 0;
-    const d = max - min;
-    let deg;
-    if (max === r) deg = ((g - b) / d) % 6;
-    else if (max === g) deg = (b - r) / d + 2;
-    else deg = (r - g) / d + 4;
-    return ((deg * 60) + 360) % 360;
-  };
-  const sep = (a, b) => {
-    const d = Math.abs(hue(a) - hue(b));
-    return Math.min(d, 360 - d);
-  };
-  for (let i = 0; i < PURPOSE_KEYS.length; i += 1) {
-    for (let j = i + 1; j < PURPOSE_KEYS.length; j += 1) {
-      const a = token(`dy-wf-purpose-${PURPOSE_KEYS[i]}-fill`);
-      const b = token(`dy-wf-purpose-${PURPOSE_KEYS[j]}-fill`);
-      assert.ok(sep(a, b) >= 30,
-        `${PURPOSE_KEYS[i]} and ${PURPOSE_KEYS[j]} fills must be ${'>= 30'} degrees apart in hue (got ${Math.round(sep(a, b))})`);
-    }
-  }
+  // The four statuses are distinguishable from each other by hue or lightness.
+  const vals = ['done', 'working', 'blocked', 'pending'].map((s) => token(`dy-wf-status-${s}`));
+  assert.equal(new Set(vals).size, 4, 'each status has its own colour');
+  // No per-purpose palette survives: purpose is words only.
+  assert.doesNotMatch(CSS, /--dy-wf-purpose-/, 'no per-purpose colour tokens');
 });
 
 test('S1: purpose helpers classify the canonical graph shapes', () => {
@@ -303,20 +247,12 @@ test('S1: purpose helpers classify the canonical graph shapes', () => {
   assert.equal(nodePurpose(NODE({ human_gate: true })), 'gate');
   assert.equal(nodePurpose(NODE({ when: { node: 'a', status: 'done' } })), 'branch');
   assert.equal(nodePurpose(NODE({ loop: { max_iterations: 2, until: { status: 'done' } } })), 'loop');
-  // A gate outranks a loop marker: the gate is the decision.
   assert.equal(nodePurpose(NODE({ human_gate: true, loop: { max_iterations: 2, until: { status: 'done' } } })), 'gate');
-  // Only the canonical statuses are coloured; anything else reads as pending
-  // (the raw word is still what the node prints).
   assert.equal(statusToken('done'), 'done');
   assert.equal(statusToken('working'), 'working');
   assert.equal(statusToken('blocked'), 'blocked');
   assert.equal(statusToken(null), 'pending');
   assert.equal(statusToken('weird-host-status'), 'pending');
-  // Silhouettes stay inside the fixed node box so ports and edges keep geometry.
-  assert.equal(nodeShapePath('task'), null, 'task uses the rounded rect');
-  for (const p of ['gate', 'branch', 'loop']) {
-    assert.ok(nodeShapePath(p), `${p} has an explicit silhouette path`);
-  }
 });
 
 // ---------------------------------------------------------- S2: connectors --
@@ -394,25 +330,19 @@ test('S2: the seven planning-canvas meanings exist as tokens without being rende
   }
 });
 
-test('S2: the canvas renders a legend built from the same purpose tokens', async () => {
+test('S2: no legend is drawn over the canvas (identical cards need no key)', async () => {
   const dom = makeDom();
   const dispose = mount(dom, FOUR_PURPOSES, {});
   try {
     await settle();
     const host = dom.window.document.getElementById('host');
-    const legend = host.querySelector('.dy-wf-index');
-    assert.ok(legend, 'the canvas states its visual vocabulary');
-    assert.match(legend.getAttribute('aria-label'), /purpose/i);
-    const text = legend.textContent;
-    for (const p of ['task', 'gate', 'branch', 'loop']) {
-      assert.match(text, new RegExp(PURPOSE_VISUALS[p].label, 'i'),
-        `legend names the ${p} purpose`);
+    assert.equal(host.querySelector('.dy-wf-index'), null, 'no legend panel');
+    assert.doesNotMatch(CSS, /\.dy-wf-index/, 'no legend styles remain');
+    // What the legend used to explain is on every card instead.
+    for (const g of host.querySelectorAll('.dy-wf-node')) {
+      assert.ok(g.querySelector('.dy-wf-sub').textContent.trim(), 'purpose word on the card');
+      assert.ok(g.querySelector('.dy-wf-statustext').textContent.trim(), 'status word on the card');
     }
-    assert.match(text, /depends on/i, 'legend states the edge meaning');
-    // The legend swatches are the purpose silhouettes and fills, not a second
-    // hand-drawn vocabulary.
-    const swatches = [...legend.querySelectorAll('.dy-wf-index-shape')];
-    assert.equal(swatches.length, 4, 'one swatch per purpose present');
   } finally {
     dispose();
     restore(dom);

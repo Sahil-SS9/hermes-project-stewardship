@@ -36,7 +36,7 @@ for pid in ("payments-relaunch", "mobile-client", "atlas-mobile"):
                         assignee="worker", created_by="fixture")
 plugin_api._app = create_app(store, kanban_adapter=adapter,
     auth_token="demo-session-token", auth_principal="demo-owner",
-    auth_principal_is_human=True, capabilities=frozenset({"workflow_revision_approval"}))
+    auth_principal_is_human=True, capabilities=frozenset({"workflow_revision_approval", "project_archive"}))
 plugin_api._client = plugin_api.httpx.AsyncClient(
     transport=plugin_api.httpx.ASGITransport(app=plugin_api._app), base_url="http://dockyard.test")
 app = FastAPI()

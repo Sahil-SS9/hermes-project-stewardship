@@ -98,7 +98,9 @@ test('Phase 5 rendered UI journey: bind team, start run, live status, revision a
     await page.getByRole('combobox', {name: 'Find project'}).fill(project)
     await page.getByRole('listbox', {name: 'Projects'}).getByRole('option', {name: project, exact: true}).click()
     await page.waitForTimeout(1500)
-    await page.locator('[data-tab="workflows"]').click()
+    // Option A: project workflows live under Project > Workflows.
+    await page.locator('[data-tab="project"]').click()
+    await page.locator('[data-project-view="workflows"]').click()
     await page.waitForTimeout(2000)
     // Instance list shows the workflow created through the plugin API; open
     // its definitions/runs (the canvas defaults to the first instance).

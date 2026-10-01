@@ -69,8 +69,7 @@ test('canvas stylesheet: the published copies are the single source, byte for by
   // 4) The palette is declared ONCE. Each purpose/status token must appear
   //    exactly once in the source, so no surface can drift to its own value.
   for (const token of [
-    '--dy-wf-purpose-task-fill', '--dy-wf-purpose-gate-fill',
-    '--dy-wf-purpose-branch-fill', '--dy-wf-purpose-loop-fill',
+    '--dy-wf-card-fill', '--dy-wf-canvas-bg', '--dy-wf-card-text',
     '--dy-wf-status-done', '--dy-wf-status-working',
     '--dy-wf-status-blocked', '--dy-wf-status-pending',
   ]) {

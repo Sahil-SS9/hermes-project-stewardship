@@ -25,6 +25,8 @@ _NORMALISATIONS = (
     ("${encodeURIComponent(project)}", "{id}"),
     ("${encodeURIComponent(ref)}", "{ref}"),
     ("${encodeURIComponent(name)}", "{name}"),
+    ("${encodeURIComponent(scope)}", "{scope}"),
+    ("${encodeURIComponent(runKey)}", "{run_key}"),
     ("${encodeURIComponent(dependencyRef)}", "{dependency_ref}"),
     ("${id}", "{id}"),
 )

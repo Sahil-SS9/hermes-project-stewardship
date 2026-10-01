@@ -18,7 +18,7 @@ async function bundle() {
 const definition = { nodes: [
   { id: 'a', title: 'Plan', depends_on: [], human_gate: false },
   { id: 'b', title: 'Build', depends_on: [], human_gate: false },
-  { id: 'c', title: 'Ship', depends_on: [], human_gate: false },
+  { id: 'c', title: 'Ship', depends_on: ['a'], human_gate: false },
 ] }
 
 async function mounted(page, onEdit) {
@@ -44,6 +44,26 @@ test('browser canvas interactions persist positions, edges, validation feedback,
       globalThis.__dispose = DockyardCanvas.mountDesktopWorkflowCanvas(document.querySelector('#host'), 'p1', 'release', definition, [], { pollMs: 0, onEdit: (nodes) => globalThis.__edits.push(nodes) })
     }, definition)
     await page.locator('[data-node-id="a"]').waitFor()
+    // The production canvas owns connectors and nodes in one world transform.
+    // Assert that each arrow is declared from the source's right port to the
+    // dependent node's left port; detached or reversed lines are a hard fail.
+    const edgeContract = await page.evaluate(() => [...document.querySelectorAll('path.dy-wf-edge')].map((edge) => {
+      const source = document.querySelector(`[data-node-id=\"${edge.getAttribute('data-from')}\"]`);
+      const target = document.querySelector(`[data-node-id=\"${edge.getAttribute('data-to')}\"]`);
+      const nums = (value) => (value || '').match(/-?\d+(?:\.\d+)?/g)?.map(Number) || [];
+      const d = nums(edge.getAttribute('d'));
+      const sp = nums(source?.getAttribute('transform'));
+      const tp = nums(target?.getAttribute('transform'));
+      return {
+        from: edge.getAttribute('data-from'), to: edge.getAttribute('data-to'),
+        sourcePort: edge.getAttribute('data-source-port'), targetPort: edge.getAttribute('data-target-port'),
+        marker: edge.getAttribute('marker-end'),
+        startAttached: Math.abs(d[0] - (sp[0] + 208)) < .01 && Math.abs(d[1] - (sp[1] + 36)) < .01,
+        endAttached: Math.abs(d[d.length - 2] - tp[0]) < .01 && Math.abs(d[d.length - 1] - (tp[1] + 36)) < .01,
+      };
+    }));
+    assert.equal(edgeContract.length, 1);
+    assert.ok(edgeContract.every((edge) => edge.sourcePort === 'right' && edge.targetPort === 'left' && edge.marker?.includes('dyArrowDep') && edge.startAttached && edge.endAttached));
 
     const a = page.locator('[data-node-id="a"]')
     const box = await a.boundingBox(); assert.ok(box)
@@ -84,7 +104,11 @@ test('browser canvas interactions persist positions, edges, validation feedback,
     const keyboardEdge = await page.evaluate(() => globalThis.__edits.at(-1).find((n) => n.node_id === 'b'))
     assert.deepEqual(keyboardEdge.depends_on, ['a'])
 
-    await b.click(); await page.getByLabel('Node title').fill('Build and ship'); await page.getByLabel('Dependencies').fill('a'); await page.getByLabel('Phase team override').fill('release-bots'); await page.getByRole('button', { name: 'Save graph version' }).click()
+    await page.locator('[data-node-id=\"c\"]').click();
+    assert.ok(await page.locator('.dy-wf-route-dim').count() >= 1, 'selection dims unrelated nodes');
+    assert.ok(await page.locator('.dy-wf-route-edge').count() >= 1, 'selection highlights the connected route');
+    await b.click();
+    await page.getByLabel('Node title').fill('Build and ship'); await page.getByLabel('Dependencies').fill('a'); await page.getByLabel('Phase team override').fill('release-bots'); await page.getByRole('button', { name: 'Save graph version' }).click()
     await page.getByRole('button', { name: 'Saved ✓' }).waitFor()
     const saved = await page.evaluate(() => globalThis.__edits.at(-1))
     assert.equal(saved.find((n) => n.node_id === 'a').canvas_position.x, origin.x + 60)

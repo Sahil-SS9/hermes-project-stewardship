@@ -10,8 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-# v31 is reserved for Batch W (merges before this branch); canvas_plans is v32
-# and must be rebased onto W's v31 before merge (Sahil-approved 2026-09-27).
+# Schema numbers: W owns v31, Batch P owns v32-v34. Later lanes take the next
+# free number when they merge. Never edit a released migration (v1-v17 shipped
+# in v0.3.0); fix forward with a new version instead.
 SCHEMA_VERSION = 33
 
 
@@ -1258,6 +1259,62 @@ MIGRATIONS: List[Migration] = [
         CREATE INDEX IF NOT EXISTS idx_canvas_proposals_project ON canvas_proposals(project_id);
         """,
         downgrade_sql="DROP INDEX IF EXISTS idx_canvas_proposals_project; DROP INDEX IF EXISTS idx_canvas_sessions_project; DROP TABLE IF EXISTS canvas_proposals; DROP TABLE IF EXISTS canvas_sessions;",
+    ),
+    Migration(
+        version=31,
+        name="scoped workflow library and per-project enablement",
+        upgrade_sql="""
+        -- Preserve legacy project identities and every attached run, binding,
+        -- revision and template. New scope metadata is additive.
+        ALTER TABLE dockyard_workflows ADD COLUMN scope TEXT NOT NULL DEFAULT 'project'
+            CHECK (scope = 'project');
+        ALTER TABLE dockyard_workflows ADD COLUMN owner_project_id TEXT;
+        UPDATE dockyard_workflows SET owner_project_id = project_id;
+        CREATE TABLE dockyard_global_workflows (
+            name TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            definition_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            created_by TEXT NOT NULL,
+            archived_at TEXT,
+            archived_by TEXT,
+            PRIMARY KEY(name, version)
+        );
+        -- A template is a global library version, not an implicit opt-in.
+        INSERT INTO dockyard_global_workflows
+            (name,version,definition_json,created_at,created_by)
+            SELECT name,version,definition_json,created_at,created_by
+            FROM dockyard_workflow_templates;
+        CREATE TABLE dockyard_workflow_enablement (
+            project_id TEXT NOT NULL,
+            scope TEXT NOT NULL CHECK (scope IN ('global','project')),
+            workflow_name TEXT NOT NULL,
+            enabled INTEGER NOT NULL CHECK (enabled IN (0,1)),
+            updated_at TEXT NOT NULL,
+            updated_by TEXT NOT NULL,
+            PRIMARY KEY(project_id,scope,workflow_name)
+        );
+        -- Keep global run identities outside the legacy (project_id,name)
+        -- namespace so a global and a dedicated workflow can share a name.
+        CREATE TABLE dockyard_global_instances (
+            project_id TEXT NOT NULL,
+            workflow_name TEXT NOT NULL,
+            internal_name TEXT NOT NULL,
+            PRIMARY KEY(project_id,workflow_name),
+            UNIQUE(project_id,internal_name)
+        );
+        INSERT INTO dockyard_workflow_enablement
+            (project_id,scope,workflow_name,enabled,updated_at,updated_by)
+            SELECT project_id,'project',name,1,MIN(created_at),'migration-v31'
+            FROM dockyard_workflows GROUP BY project_id,name;
+        """,
+        downgrade_sql="""
+        DROP TABLE IF EXISTS dockyard_global_instances;
+        DROP TABLE IF EXISTS dockyard_workflow_enablement;
+        DROP TABLE IF EXISTS dockyard_global_workflows;
+        ALTER TABLE dockyard_workflows DROP COLUMN owner_project_id;
+        ALTER TABLE dockyard_workflows DROP COLUMN scope;
+        """,
     ),
     Migration(
         version=32,

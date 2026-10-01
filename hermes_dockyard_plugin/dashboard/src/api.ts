@@ -398,6 +398,14 @@ export function createApi(sdk: HermesPluginSDK) {
           }>;
         }>;
       }>(`/projects/${encodeURIComponent(projectId)}/workflows/${encodeURIComponent(name)}/runs`),
+    workflowTimeline: (projectId: string, name: string, runKey: string) =>
+      get<{ project_id: string; name: string; version: number; run_key: string; events: Array<Record<string, unknown>> }>(
+        `/projects/${encodeURIComponent(projectId)}/workflows/${encodeURIComponent(name)}/runs/${encodeURIComponent(runKey)}/timeline`,
+      ),
+    workflowScopedTimeline: (projectId: string, scope: string, name: string, runKey: string) =>
+      get<{ project_id: string; name: string; version: number; run_key: string; events: Array<Record<string, unknown>> }>(
+        `/projects/${encodeURIComponent(projectId)}/workflows/${encodeURIComponent(scope)}/${encodeURIComponent(name)}/runs/${encodeURIComponent(runKey)}/timeline`,
+      ),
     initiatives: (projectId: string) =>
       get<{ initiatives: Initiative[] }>(
         `/projects/${encodeURIComponent(projectId)}/initiatives`,

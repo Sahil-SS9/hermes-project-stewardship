@@ -2,6 +2,7 @@
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 import { useEffect } from './react.js'
 import { DOCKYARD_CSS } from '../styles/dockyard-css.js'
+import { WORKFLOW_LIBRARY_CSS } from '../styles/workflow-css.js'
 import workflowCanvasCss from '../../workflow-canvas-css.js'
 export let _rest = null
 export let _os = null
@@ -43,9 +44,16 @@ export async function api(path, init) {
     return result
   } catch (error) {
     const raw = String(error?.message ?? error).slice(0, 240)
-    const message = /(?:error\s*)?500|internal service error/i.test(raw)
-      ? 'Dockyard could not confirm the request.'
-      : raw
+    // The Desktop host can stringify a structured 403 response detail as
+    // "403: [object Object]" before passing the error to this plugin. The
+    // original detail is unavailable here: preserve the status and offer
+    // only the verified archive permission as an actionable hint.
+    const message = /^403:\s*\[object Object\]$/.test(raw) &&
+      /^\/projects\/[^/]+\/workflows\/[^/]+\/archive$/.test(path)
+      ? '403 Forbidden: archive permission (project_archive) is required or this action is denied. No change was made.'
+      : /(?:error\s*)?500|internal service error/i.test(raw)
+        ? 'Dockyard could not confirm the request.'
+        : raw
     if (method !== 'GET' && !init?.suppressErrorToast) emitToast('danger', message)
     const failure = new Error(message)
     failure.cause = error
@@ -68,6 +76,9 @@ export function useStylesheet(datasetKey, datasetValue, css) {
 
 export function useDockyardStyles() {
   useStylesheet('dockyard-style', 'dockyardStyle', DOCKYARD_CSS)
+  // W3/W4: workflow library + enablement styles (W-owned; appended here so
+  // dockyard-css.js does not grow, per the Batch W shared-file table).
+  useStylesheet('dy-wf-library-stylesheet', 'dyWfLibraryStylesheet', WORKFLOW_LIBRARY_CSS)
   // The workflow canvas owns a stylesheet of its own (the palette has exactly
   // one home: dashboard/src/workflow-canvas-css.ts). Its rules are scoped to
   // `.dy-wf-scope`, a class the canvas mount host carries itself, so this file

@@ -1415,7 +1415,9 @@ async function testPhase5ManagementJourneys() {
   assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/workflows/release/versions'), 'workflow version definition did not reach proxy');
   await runtime.click('[data-project-view="workflows"]');
   await runtime.setValue('[data-workflow-run-key="release"]', 'browser-run-1');
-  await runtime.click('[data-action="start-workflow"]', 80);
+  // Explicit version start lives in the toolbar Versions menu; the primary
+  // toolbar button starts the latest version only.
+  await runtime.click('[data-workflow-definition-version="1"] [data-action="start-workflow-version"]', 80);
   assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/workflows/release/start' && call.body.version === 1 && call.body.run_key === 'browser-run-1'), 'explicit workflow version start did not reach proxy');
   await runtime.click('[data-project-view="workflows"]');
   await runtime.click('[data-action="inspect-workflow"]', 80);
@@ -2318,5 +2320,7 @@ try {
   console.log(`PASS_SUMMARY=${passed}/${tests.length}`);
 } catch (error) {
   console.error(`FAIL after ${passed}/${tests.length}: ${error.stack || error}`);
-  process.exitCode = 1;
+  // Fail fast: open jsdom timers would otherwise keep the process (and the
+  // serial browser runner) alive indefinitely after a failure.
+  process.exit(1);
 }
