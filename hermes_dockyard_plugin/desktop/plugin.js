@@ -2688,8 +2688,9 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-rt-bar { display: grid; gap: 4px; padding: 5px; border: 1px solid var(--dy-border); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--dy-surface-2, var(--dy-surface)); }
 .dy-pc-scope .dy-rt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; min-width: 0; }
 .dy-pc-scope .dy-rt-row-sel { flex-wrap: nowrap; gap: 4px; }
-.dy-pc-scope .dy-rt-row-sel .dy-rt-select { flex: 1 1 0; min-width: 0; }
-.dy-pc-scope .dy-rt-select { height: 28px; padding: 0 6px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 11.5px; }
+.dy-pc-scope .dy-rt-row-sel .dy-rt-select { flex: 1 1 0; min-width: 120px; }
+/* Owner 01/10: room for the text - no fixed height, so letters are never clipped. */
+.dy-pc-scope .dy-rt-select { box-sizing: border-box; height: auto; min-height: 34px; min-width: 120px; line-height: 1.4; padding: 6px 28px 6px 9px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 11.5px; }
 .dy-pc-scope .dy-rt-btn { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--dy-text); cursor: pointer; }
 .dy-pc-scope .dy-rt-btn:hover:not(:disabled) { background: var(--dy-hover, rgba(127,127,127,.14)); }
 .dy-pc-scope .dy-rt-btn.on { border-color: var(--dy-accent, #5b8def); background: color-mix(in srgb, var(--dy-accent, #5b8def) 18%, transparent); }
@@ -2846,7 +2847,7 @@ var workflow_canvas_css_default = `
   .dy-pc-scope .dy-pc-linkbar select { min-width: 0; width: 100%; }
   .dy-pc-scope .dy-pc-linkbar label { flex: 1 1 100%; }
   .dy-pc-scope .dy-rt-btn { width: 44px; height: 44px; }
-  .dy-pc-scope .dy-rt-select { height: 44px; }
+  .dy-pc-scope .dy-rt-select { min-height: 44px; }
 }
 `;
 

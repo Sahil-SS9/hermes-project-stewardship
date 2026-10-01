@@ -1628,6 +1628,18 @@ test('Owner feedback 01/10: editor rows, checklist width, colour dots, dark ribb
     if (!(await drawer.count())) { await canvas.locator('.dy-pc-obj[data-canvas-kind="plan_block"]').last().click(); await settle(page); }
     const rows = await drawer.locator('.dy-rt-bar').evaluate((el) => new Set([...el.querySelectorAll('button, select')].map((k) => Math.round(k.getBoundingClientRect().top))).size);
     assert.equal(rows, 2, 'formatting bar is two rows (style/size, then buttons)');
+    // Owner 01/10: the style and size boxes show their whole text.
+    for (const v of [['style', 'h1'], ['size', 'huge']]) await drawer.locator(`.dy-rt-select[data-rt="${v[0]}"]`).selectOption(v[1]);
+    const sel = await drawer.locator('.dy-rt-select').evaluateAll((els) => els.map((s) => {
+      const cs = getComputedStyle(s); const k = document.createElement('canvas').getContext('2d'); k.font = `${cs.fontSize} ${cs.fontFamily}`;
+      const m = k.measureText(s.options[s.selectedIndex].text);
+      return { name: s.dataset.rt, inner: s.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom), text: m.fontBoundingBoxAscent + m.fontBoundingBoxDescent,
+        room: s.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), need: Math.max(...[...s.options].map((o) => k.measureText(o.text).width)) };
+    }));
+    for (const x of sel) {
+      assert.ok(x.inner >= x.text - 0.5, `${x.name} box tall enough for its text (${x.inner} >= ${x.text.toFixed(1)})`);
+      assert.ok(x.room >= x.need, `${x.name} box wide enough for its longest option (${x.room} >= ${Math.round(x.need)})`);
+    }
     await drawer.locator('[data-action="pc-checklist-add"]').click();
     const row = await drawer.locator('[data-canvas-field="checklist"] .dy-pc-row').first().evaluate((r) => {
       const [box, text] = r.querySelectorAll('input');
