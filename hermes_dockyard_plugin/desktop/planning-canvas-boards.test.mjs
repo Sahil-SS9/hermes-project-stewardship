@@ -1192,6 +1192,31 @@ test('Rich text: Quan re-check 2 - stale redo, caret after undo, server-sized li
   });
 });
 
+test('Rich text: undo after typing puts the caret back where typing started (Quan Stage 3 N1)', { timeout: 180000 }, async () => {
+  await withPage(1440, 900, async (page) => {
+    const { body } = await openEditor(page);
+    await page.keyboard.type('start');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('next block text');
+    await selectText(page, 'start');
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(1100);
+    await page.keyboard.type('hello');
+    await page.waitForTimeout(1100);
+    await page.keyboard.type(' world');
+    await page.keyboard.press('Control+z');
+    await page.keyboard.type('Q');
+    assert.match(await body.innerText(), /^starthelloQ\n+next block text$/, 'Q lands where " world" was typed');
+    await selectText(page, 'block');
+    await page.keyboard.press('ArrowLeft');
+    await page.waitForTimeout(1100);
+    await page.keyboard.type('XYZ');
+    await page.keyboard.press('Control+z');
+    await page.keyboard.type('W');
+    assert.match(await body.innerText(), /next Wblock text/, 'W lands where XYZ was typed');
+  });
+});
+
 test('Rich text: Bullets and Numbers start a list on a brand-new empty card (Quan re-check 3 H1)', { timeout: 180000 }, async () => {
   await withPage(1440, 900, async (page, host) => {
     for (const [btn, tag] of [['bullets', 'ul'], ['numbers', 'ol']]) {
@@ -1410,6 +1435,51 @@ test('Planning boards: board list create, rename, archive, restore, status and r
     assert.equal(await openRow.locator('[data-canvas-board-open]').count(), 1, 'the open board has an Open tag');
   });
 });
+
+// Quan Stage 3 review: contrast in both canvas themes (the app here is
+// light, so a dark board is the mismatched case that failed at 1.53:1),
+// tooltips and the add menu inside the frame, no strip gaps when wrapped.
+const contrast = (fg, bg) => {
+  const lum = (c) => { const [r, g, b] = c.match(/[\d.]+/g).slice(0, 3).map(Number).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const [a, b] = [lum(fg), lum(bg)].sort((x, y) => y - x);
+  return (a + 0.05) / (b + 0.05);
+};
+for (const [width, height] of [[1440, 900], [1024, 800], [768, 900]]) {
+  test(`Planning toolbar (${width}px): names readable in both canvas themes, tips and add menu inside the frame, strip unbroken`, { timeout: 180000 }, async () => {
+    await withPage(width, height, async (page) => {
+      const canvas = root(page);
+      for (const theme of ['dark', 'light']) {
+        if (await canvas.locator(`[data-action="pc-theme-${theme}"]`).getAttribute('aria-pressed') !== 'true') await canvas.locator(`[data-action="pc-theme-${theme}"]`).click();
+        await settle(page);
+        const colours = await canvas.locator('.dy-pc-group-label').evaluateAll((els) => els.map((el) => {
+          // Resolve color-mix() to rgb by painting it.
+          const probe = document.createElement('canvas').getContext('2d');
+          const rgb = (css) => { probe.fillStyle = '#000'; probe.fillStyle = css; probe.fillRect(0, 0, 1, 1); const d = probe.getImageData(0, 0, 1, 1).data; return `rgb(${d[0]}, ${d[1]}, ${d[2]})`; };
+          const s = getComputedStyle(el); return { fg: rgb(s.color), bg: rgb(s.backgroundColor) };
+        }));
+        for (const c of colours) assert.ok(contrast(c.fg, c.bg) >= 4.5, `${theme} board: group name contrast ${contrast(c.fg, c.bg).toFixed(2)}:1 (${c.fg} on ${c.bg})`);
+      }
+      const frame = await canvas.locator('.dy-pc').boundingBox();
+      for (const action of ['pc-mode-select', 'pc-reload', 'pc-save']) {
+        await canvas.locator(`[data-action="${action}"]`).focus();
+        await page.waitForTimeout(250);
+        const tip = await canvas.locator(`[data-action="${action}"] + .dy-pc-tip`).boundingBox();
+        assert.ok(tip.x >= frame.x - 1 && tip.x + tip.width <= frame.x + frame.width + 1, `${action} tooltip inside the frame (${Math.round(tip.x)}..${Math.round(tip.x + tip.width)} vs ${Math.round(frame.x)}..${Math.round(frame.x + frame.width)})`);
+      }
+      await canvas.locator('[data-action="pc-add-menu"]').click();
+      const menu = await canvas.locator('.dy-pc-addmenu').boundingBox();
+      assert.ok(menu.x >= frame.x - 1 && menu.x + menu.width <= frame.x + frame.width + 1, `add menu inside the frame at ${width}px`);
+      await canvas.locator('[data-action="pc-add-menu"]').click();
+      // Every row of name strips spans the full bar.
+      const rows = await canvas.locator('.dy-pc-toolbar').evaluate((bar) => {
+        const b = bar.getBoundingClientRect(); const byRow = new Map();
+        for (const el of bar.querySelectorAll(':scope > .dy-pc-group, :scope > .dy-pc-ribbon-fill')) { const r = el.getBoundingClientRect(); if (!r.width) continue; const k = Math.round(r.top); byRow.set(k, (byRow.get(k) || 0) + r.width); }
+        return [...byRow.values()].map((w) => b.width - w);
+      });
+      for (const gap of rows) assert.ok(gap <= rows.length + 2, `name strip unbroken (gap ${Math.round(gap)}px)`);
+    });
+  });
+}
 
 for (const [label, width, height] of [['desktop', 1440, 900], ['tablet', 1024, 800], ['phone', 390, 844]]) {
   test(`Planning toolbar (${label}): stacked ribbon - group names in a title strip directly above their tools`, { timeout: 120000 }, async () => {

@@ -220,15 +220,17 @@ export function docToPlain(doc) {
 // writes it (", " and ": " separators), which is what the server counts.
 export function serverJsonBytes(value) {
   const enc = new TextEncoder()
-  const size = (v) => {
+  // The server drops empty ('' / null) fields only at the top level of card
+  // content; nested empties are kept and counted (Quan Stage 3 review note).
+  const size = (v, top = false) => {
     if (Array.isArray(v)) return 2 + v.reduce((n, x) => n + size(x), 0) + Math.max(0, v.length - 1) * 2
     if (v && typeof v === 'object') {
-      const keys = Object.keys(v).filter((k) => v[k] !== undefined && v[k] !== null && v[k] !== '')
+      const keys = Object.keys(v).filter((k) => v[k] !== undefined && (!top || (v[k] !== null && v[k] !== '')))
       return 2 + keys.reduce((n, k) => n + enc.encode(JSON.stringify(k)).length + 2 + size(v[k]), 0) + Math.max(0, keys.length - 1) * 2
     }
     return enc.encode(JSON.stringify(v ?? null)).length
   }
-  return size(value)
+  return size(value, true)
 }
 
 // Size check against the server's limits; returns null or a message.
@@ -665,16 +667,23 @@ export function RichTextEditor({ value, fallbackText, onChange, onProblem, rest,
     setProblem(found)
     problemRef.current?.(found)
   }
+  // Caret just before the edit in progress (set by beforeinput, paste/drop
+  // and toolbar actions). Undo restores this, not the caret after the edit
+  // (Quan Stage 3 review, N1).
+  const pendingBefore = useRef(null)
+  const markBefore = () => { if (!pendingBefore.current) pendingBefore.current = caretNow() }
   const record = (doc, typing) => {
     const h = history.current
     const json = JSON.stringify(doc)
     const top = h.stack[h.index]
+    const before = pendingBefore.current || (top ? top.caret : [0, 0])
+    pendingBefore.current = null
     if (top && top.json === json) { top.caret = caretNow(); return }
-    const entry = { doc, json, caret: caretNow(), typing, at: Date.now() }
+    const entry = { doc, json, caret: caretNow(), before, typing, at: Date.now() }
     // Consecutive typing within a second is one undo step, as in Word.
     // Never merge into a state that has a redo tail after it: that tail is
     // stale once new text is typed (Quan re-check 2, H1).
-    if (typing && top && top.typing === typing && entry.at - top.at < 1000 && h.index > 0 && h.index === h.stack.length - 1) h.stack[h.index] = entry
+    if (typing && top && top.typing === typing && entry.at - top.at < 1000 && h.index > 0 && h.index === h.stack.length - 1) h.stack[h.index] = { ...entry, before: top.before }
     else { h.stack = [...h.stack.slice(0, h.index + 1), entry].slice(-200); h.index = h.stack.length - 1 }
   }
   const emit = (typing = false) => {
@@ -693,7 +702,7 @@ export function RichTextEditor({ value, fallbackText, onChange, onProblem, rest,
     const next = h.index + step
     if (!el || readOnly || next < 0 || next >= h.stack.length) return
     // Undo puts the caret where the undone edit was; redo where it ended.
-    const caret = (step < 0 ? h.stack[h.index] : h.stack[next]).caret
+    const caret = step < 0 ? (h.stack[h.index].before || h.stack[next].caret) : h.stack[next].caret
     h.index = next
     const { doc } = h.stack[next]
     renderDoc(el, doc)
@@ -719,7 +728,9 @@ export function RichTextEditor({ value, fallbackText, onChange, onProblem, rest,
       if (event.inputType === 'historyUndo' || event.inputType === 'historyRedo') {
         event.preventDefault()
         travel(event.inputType === 'historyUndo' ? -1 : 1)
+        return
       }
+      markBefore()
     }
     document.addEventListener('selectionchange', onSelection)
     el.addEventListener('beforeinput', onBeforeInput)
@@ -735,6 +746,7 @@ export function RichTextEditor({ value, fallbackText, onChange, onProblem, rest,
     if (!el || readOnly) return
     el.focus()
     if (saved.current) { const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(saved.current) }
+    markBefore()
     act(el)
     emit()
   }
@@ -762,6 +774,7 @@ export function RichTextEditor({ value, fallbackText, onChange, onProblem, rest,
   // Paste and drop share one path: the data goes through domToDoc (the
   // allow-list) and renderDoc before it reaches the live editor.
   const insertData = (data, range) => {
+    markBefore()
     const html = data.getData('text/html')
     if (!html && !data.getData('text/plain')) return // a file or image: nothing to insert (L5)
     // DOMParser builds an inert document: nothing in it runs or loads.

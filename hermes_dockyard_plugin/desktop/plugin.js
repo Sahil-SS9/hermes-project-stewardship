@@ -2548,15 +2548,17 @@ var workflow_canvas_css_default = `
    group carries a small caption; each button a tooltip (name + one line). */
 /* Stage 3 ribbon (owner 30/09): one title strip spans the whole toolbar with
    the group names; each group's tools sit directly beneath its name, groups
-   split by thin dividers, Save pinned right. The strip is drawn by every
-   label and by the filler, so it stays continuous when groups wrap. */
+   split by thin dividers, Save pinned right. Groups grow to fill their row,
+   so the strip stays continuous when groups wrap onto a second row. */
 .dy-pc-scope .dy-pc-toolbar.dy-pc-ribbon { gap: 0; padding: 0; align-items: stretch; }
-.dy-pc-scope .dy-pc-group { display: flex; flex-direction: column; min-width: 0; border-left: 1px solid var(--dy-border); }
+.dy-pc-scope .dy-pc-group { display: flex; flex: 1 0 auto; flex-direction: column; min-width: 0; border-left: 1px solid var(--dy-border); }
 .dy-pc-scope .dy-pc-ribbon > .dy-pc-group:first-child { border-left: 0; }
 .dy-pc-scope .dy-pc-group-label { display: block; height: 22px; padding: 0 10px; border-bottom: 1px solid var(--dy-border); background: var(--dy-pc-ribbon-band); color: var(--dy-text-2); font-size: 9.5px; font-weight: 700; letter-spacing: .1em; line-height: 22px; text-align: center; text-transform: uppercase; white-space: nowrap; }
 .dy-pc-scope .dy-pc-group-tools { display: flex; flex: 1 1 auto; align-items: center; justify-content: center; gap: 3px; padding: 6px 8px; }
 .dy-pc-scope .dy-pc-ribbon-fill { flex: 1 1 0; min-width: 0; background: linear-gradient(var(--dy-pc-ribbon-band) 0 22px, var(--dy-border) 22px 23px, transparent 23px); }
-.dy-pc-scope { --dy-pc-ribbon-band: color-mix(in srgb, var(--dy-surface-subtle) 55%, var(--dy-border)); }
+/* Declared on .dy-pc, where the canvas theme tokens live, so a dark board in
+   a light app gets a dark band (Quan Stage 3 review, H1). */
+.dy-pc-scope .dy-pc { --dy-pc-ribbon-band: color-mix(in srgb, var(--dy-surface-subtle) 55%, var(--dy-border)); }
 .dy-pc-scope .dy-pc-tool { position: relative; display: inline-flex; }
 .dy-pc-scope .dy-pc-tool .dockyard-button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 30px; min-height: 30px; padding: 5px 7px; }
 .dy-pc-scope .dy-pc-tool .dockyard-button svg { width: 15px; height: 15px; flex: 0 0 auto; }
@@ -2564,7 +2566,12 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-tip strong { font-size: 11.5px; font-weight: 650; }
 .dy-pc-scope .dy-pc-tip span { color: var(--dy-text-2); }
 .dy-pc-scope .dy-pc-tool:hover .dy-pc-tip, .dy-pc-scope .dy-pc-tool:focus-within .dy-pc-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
-.dy-pc-scope .dy-pc-addmenu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 55; display: grid; gap: 2px; min-width: 190px; padding: 5px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); box-shadow: var(--dy-shadow); }
+/* Tips at the frame edges anchor to that edge so the frame does not cut
+   them off (Quan Stage 3 review, M1/L3). */
+.dy-pc-scope .dy-pc-group[data-pc-group="save"] .dy-pc-tip, .dy-pc-scope .dy-pc-group[data-pc-group="save"] .dy-pc-tool:is(:hover, :focus-within) .dy-pc-tip { left: auto; right: 0; transform: none; }
+.dy-pc-scope .dy-pc-group[data-pc-group="edit"] .dy-pc-tool:first-child .dy-pc-tip, .dy-pc-scope .dy-pc-group[data-pc-group="edit"] .dy-pc-tool:first-child:is(:hover, :focus-within) .dy-pc-tip { left: 0; transform: none; }
+/* The add menu opens leftwards from its button above phone width (M2). */
+.dy-pc-scope .dy-pc-addmenu { position: absolute; top: calc(100% + 6px); left: auto; right: 0; z-index: 55; display: grid; gap: 2px; min-width: 190px; padding: 5px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); box-shadow: var(--dy-shadow); }
 .dy-pc-scope .dy-pc-addmenu[hidden] { display: none; }
 .dy-pc-scope .dy-pc-addmenu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 9px; border: 0; border-radius: 7px; background: transparent; color: var(--dy-text); font-size: 12px; text-align: left; cursor: pointer; }
 .dy-pc-scope .dy-pc-addmenu button:hover, .dy-pc-scope .dy-pc-addmenu button:focus-visible { background: var(--dy-accent-soft); color: var(--dy-accent-text); }
@@ -2794,6 +2801,7 @@ var workflow_canvas_css_default = `
   .dy-pc-scope .dy-pc-group-label { text-align: left; }
   .dy-pc-scope .dy-pc-ribbon-fill { display: none; }
   .dy-pc-scope .dy-pc-tip { display: none; }
+  .dy-pc-scope .dy-pc-addmenu { left: 0; right: auto; }
   .dy-pc-scope .dy-pc-chat.open { left: 8px; right: 8px; width: auto; }
   .dy-pc-scope .dy-pc-chat.closed { right: 8px; width: min(268px, calc(100% - 16px)); }
   .dy-pc-scope .dy-pc-board-bar { flex-wrap: wrap; }
@@ -8595,15 +8603,15 @@ function docToPlain(doc) {
 }
 function serverJsonBytes(value) {
   const enc = new TextEncoder();
-  const size = (v) => {
+  const size = (v, top = false) => {
     if (Array.isArray(v)) return 2 + v.reduce((n, x) => n + size(x), 0) + Math.max(0, v.length - 1) * 2;
     if (v && typeof v === "object") {
-      const keys = Object.keys(v).filter((k) => v[k] !== void 0 && v[k] !== null && v[k] !== "");
+      const keys = Object.keys(v).filter((k) => v[k] !== void 0 && (!top || v[k] !== null && v[k] !== ""));
       return 2 + keys.reduce((n, k) => n + enc.encode(JSON.stringify(k)).length + 2 + size(v[k]), 0) + Math.max(0, keys.length - 1) * 2;
     }
     return enc.encode(JSON.stringify(v ?? null)).length;
   };
-  return size(value);
+  return size(value, true);
 }
 function docProblem(doc, rest = {}) {
   let nodes = 0;
@@ -9048,16 +9056,22 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     setProblem(found);
     problemRef.current?.(found);
   };
+  const pendingBefore = useRef(null);
+  const markBefore = () => {
+    if (!pendingBefore.current) pendingBefore.current = caretNow();
+  };
   const record = (doc, typing) => {
     const h = history.current;
     const json = JSON.stringify(doc);
     const top = h.stack[h.index];
+    const before = pendingBefore.current || (top ? top.caret : [0, 0]);
+    pendingBefore.current = null;
     if (top && top.json === json) {
       top.caret = caretNow();
       return;
     }
-    const entry = { doc, json, caret: caretNow(), typing, at: Date.now() };
-    if (typing && top && top.typing === typing && entry.at - top.at < 1e3 && h.index > 0 && h.index === h.stack.length - 1) h.stack[h.index] = entry;
+    const entry = { doc, json, caret: caretNow(), before, typing, at: Date.now() };
+    if (typing && top && top.typing === typing && entry.at - top.at < 1e3 && h.index > 0 && h.index === h.stack.length - 1) h.stack[h.index] = { ...entry, before: top.before };
     else {
       h.stack = [...h.stack.slice(0, h.index + 1), entry].slice(-200);
       h.index = h.stack.length - 1;
@@ -9078,7 +9092,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     const h = history.current;
     const next = h.index + step;
     if (!el || readOnly || next < 0 || next >= h.stack.length) return;
-    const caret = (step < 0 ? h.stack[h.index] : h.stack[next]).caret;
+    const caret = step < 0 ? h.stack[h.index].before || h.stack[next].caret : h.stack[next].caret;
     h.index = next;
     const { doc } = h.stack[next];
     renderDoc(el, doc);
@@ -9111,7 +9125,9 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
       if (event.inputType === "historyUndo" || event.inputType === "historyRedo") {
         event.preventDefault();
         travel(event.inputType === "historyUndo" ? -1 : 1);
+        return;
       }
+      markBefore();
     };
     document.addEventListener("selectionchange", onSelection);
     el.addEventListener("beforeinput", onBeforeInput);
@@ -9132,6 +9148,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
       sel.removeAllRanges();
       sel.addRange(saved.current);
     }
+    markBefore();
     act(el);
     emit();
   };
@@ -9155,6 +9172,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     }
   };
   const insertData = (data, range) => {
+    markBefore();
     const html = data.getData("text/html");
     if (!html && !data.getData("text/plain")) return;
     const doc = html ? domToDoc(new DOMParser().parseFromString(html, "text/html").body) : plainToDoc(data.getData("text/plain"));
