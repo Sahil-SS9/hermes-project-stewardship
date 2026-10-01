@@ -402,6 +402,10 @@ def test_fix4_v34_downgrade_restores_release_and_refuses_feature_rows(tmp_path):
         cx.executescript(v34.downgrade_sql)
         cx.execute("DELETE FROM schema_migrations WHERE version = 34")
         cx.commit()
-        assert _schema(cx) == expected_schema(list(range(1, 34)))
+        # Downgrading 34 must restore exactly the schema of every OTHER known
+        # migration: the v33 release shape plus any later migrations (e.g. R2's
+        # v35) that this downgrade has no business touching.
+        others = [m.version for m in migrations.MIGRATIONS if m.version != 34]
+        assert _schema(cx) == expected_schema(others)
     finally:
         store.close()
