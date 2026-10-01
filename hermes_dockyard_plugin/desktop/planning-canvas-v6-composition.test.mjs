@@ -598,7 +598,7 @@ test('Planning canvas v6: phone width keeps controls inside the viewport and rem
     await canvas.locator('[data-action="pc-chat-toggle"]').click();
     assert.ok(await canvas.locator('[data-canvas-assistant].open').count());
     await canvas.locator('[data-canvas-object="obj-nt"]').click();
-    await canvas.locator('[data-canvas-object-colour]').selectOption('pink');
+    await canvas.locator('[data-canvas-colour-option="pink"]').click();
     assert.equal(await canvas.locator('[data-canvas-object="obj-nt"]').getAttribute('data-canvas-colour'), 'pink');
     assert.deepEqual(errors, [], errors.join('\n'));
   } finally {

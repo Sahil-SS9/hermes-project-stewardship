@@ -838,17 +838,23 @@ export function RichTextEditor({ value, fallbackText, onChange, onProblem, rest,
 
   return jsxs('div', { className: 'dy-rt', 'data-canvas-rich-editor': true, children: [
     jsx('span', { className: 'dy-pc-field-label', children: label }),
+    // Owner 01/10: two tidy rows (style + size, then the buttons) instead of
+    // letting everything wrap into a ragged five-row stack.
     readOnly ? null : jsxs('div', { className: 'dy-rt-bar', role: 'toolbar', 'aria-label': 'Text formatting', children: [
+     jsxs('div', { className: 'dy-rt-row dy-rt-row-sel', children: [
       jsxs('select', { className: 'dy-rt-select', 'data-rt': 'style', 'aria-label': 'Text style', value: state.style,
         onChange: (event) => { const v = event.target.value; run((el) => setBlockStyle(el, v)) },
         children: [['p', 'Normal text'], ['h1', 'Heading 1'], ['h2', 'Heading 2'], ['h3', 'Heading 3']].map(([v, t]) => jsx('option', { value: v, children: t }, v)) }),
       jsxs('select', { className: 'dy-rt-select', 'data-rt': 'size', 'aria-label': 'Text size', value: state.size,
         onChange: (event) => { const v = event.target.value; run((el) => applySize(el, v)) },
         children: [['small', 'Small'], ['normal', 'Normal size'], ['large', 'Large'], ['huge', 'Huge']].map(([v, t]) => jsx('option', { value: v, children: t }, v)) }),
+     ] }, 'sel'),
+     jsxs('div', { className: 'dy-rt-row', children: [
       ...TOOLS.map((tool, i) => (tool ? button(tool) : jsx('span', { className: 'dy-rt-sep', 'aria-hidden': 'true' }, `sep-${i}`))),
       jsx('button', { type: 'button', className: 'dy-rt-btn', 'data-rt': 'clear', title: 'Clear formatting', 'aria-label': 'Clear formatting', disabled: readOnly,
         onMouseDown: (event) => event.preventDefault(),
-        onClick: () => run((el) => clearFormatting(el)), children: jsx(Icon, { name: 'remove-formatting' }) }),
+        onClick: () => run((el) => clearFormatting(el)), children: jsx(Icon, { name: 'remove-formatting' }) }, 'clear'),
+     ] }, 'btns'),
     ] }),
     problem ? jsx('p', { className: 'dy-rt-problem', role: 'alert', 'data-canvas-rich-problem': true, children: problem }) : null,
     jsx('div', { className: `dy-rt-host${readOnly ? ' readonly' : ''}`, children: jsx('div', {

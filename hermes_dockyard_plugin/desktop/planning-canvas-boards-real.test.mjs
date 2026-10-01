@@ -70,7 +70,7 @@ test('Planning boards (real backend): theme, save, chat, plan steps and board li
     await canvas.locator('[data-action="add-canvas-object"]').click()
     await page.keyboard.press('Escape')
     await canvas.locator('[data-canvas-object]').last().click()
-    await canvas.locator('[data-canvas-object-colour]').selectOption('pink')
+    await canvas.locator('[data-canvas-colour-option="pink"]').click()
     await page.keyboard.press('Escape')
     await saveBoard(page, canvas)
     const saved = await board(first)

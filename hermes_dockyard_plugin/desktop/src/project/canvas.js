@@ -18,8 +18,8 @@ import { useDialogFocusManager } from '../lib/ui.js'
 export const CANVAS_OBJECT_KINDS = Object.freeze(['evidence', 'claim', 'question', 'decision', 'plan_block', 'risk', 'assumption', 'note', 'link', 'media'])
 export const CANVAS_CONNECTOR_MEANINGS = Object.freeze(['supports', 'contradicts', 'derived_from', 'clarifies', 'depends_on', 'implements', 'raises_question'])
 export const CANVAS_KIND_LABELS = Object.freeze({ evidence: 'Evidence', claim: 'Claim', question: 'Question', decision: 'Decision', plan_block: 'Plan block', risk: 'Risk', assumption: 'Assumption', note: 'Note', link: 'Link', media: 'Media' })
-export const CANVAS_STICKER_COLOURS = Object.freeze(['yellow', 'green', 'blue', 'pink', 'purple', 'orange'])
-export const CANVAS_STICKER_LABELS = Object.freeze({ yellow: 'Sun', green: 'Mint', blue: 'Sky', pink: 'Rose', purple: 'Violet', orange: 'Amber' })
+export const CANVAS_STICKER_COLOURS = Object.freeze(['yellow', 'orange', 'coral', 'pink', 'purple', 'indigo', 'blue', 'teal', 'green', 'lime', 'clay', 'slate'])
+export const CANVAS_STICKER_LABELS = Object.freeze({ yellow: 'Sun', green: 'Mint', blue: 'Sky', pink: 'Rose', purple: 'Violet', orange: 'Amber', coral: 'Coral', teal: 'Teal', lime: 'Lime', clay: 'Clay', slate: 'Slate', indigo: 'Indigo' })
 // D-P1 a11y: each kind carries its own Lucide icon so it is never identified
 // by colour alone. Names must exist in the generated lucide-icons.js subset.
 export const CANVAS_KIND_ICONS = Object.freeze({
@@ -205,6 +205,11 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   const [expanded, setExpanded] = useState(false)
   const [stepsDraft, setStepsDraft] = useState(null)
   const [addMenuOpen, setAddMenuOpen] = useState(false)
+  // Full screen: the canvas frame takes the whole window (CSS, not the
+  // browser Fullscreen API, so the host window keeps working).
+  const [fullscreen, setFullscreen] = useState(false)
+  // Connect mode: where the pointer is (world coords) for the preview line.
+  const [connectPointer, setConnectPointer] = useState(null)
   // Unsaved-changes prompt: { label, action } while waiting for Save / Discard / Cancel.
   const [pendingLeave, setPendingLeave] = useState(null)
   // Status dropdown picks are confirmed before anything is sent.
@@ -244,6 +249,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   useDialogFocusManager(pendingLeave ? '[data-canvas-unsaved-prompt] .dy-pc-overlay-card' : pendingStatus ? '[data-canvas-status-confirm] .dy-pc-overlay-card' : (expanded ? '[data-canvas-expanded] .dy-pc-overlay-card' : null))
   dirtyRef.current = dirty
   boardsApiRef.current = boardsApi
+  useEffect(() => { if (!pendingConnect) setConnectPointer(null) }, [pendingConnect])
   zoomRef.current = zoom
   panRef.current = pan
   const failureText = (failure) => String(failure?.message ?? failure)
@@ -867,6 +873,14 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     if (event.button !== 0 && event.button !== 1) return
     const target = event.target
     if (target?.closest?.('.dy-pc-obj') || target?.closest?.('.dy-pc-drawer') || target?.closest?.('.dy-pc-chat') || target?.closest?.('.dy-pc-overlay')) return
+    // Connect mode: the left button never drags the board (owner 01/10 - the
+    // pan fought the two-click link). A click on empty space drops a half-made
+    // link; scroll and middle-drag still move around.
+    if (mode === 'connect' && event.button === 0) {
+      event.preventDefault()
+      if (pendingConnect) { setPendingConnect(null); setConnectPointer(null); setNotice({ tone: 'ok', text: 'Connect: link cancelled. Click a sticker to start again.' }) }
+      return
+    }
     const stageBox = stageRef.current?.getBoundingClientRect()
     if (!stageBox) return
     const startX = event.clientX
@@ -1256,6 +1270,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
       const pending = byId.get(pendingConnect)
       if (pending) {
         const rect = canvasRect(pending)
+        if (connectPointer) lines.push(jsx('line', { 'data-pc-pending': 'true', 'data-canvas-connect-preview': pendingConnect, x1: rect.x + rect.width / 2, y1: rect.y + rect.height / 2, x2: connectPointer.x, y2: connectPointer.y }, 'pending-line'))
         lines.push(jsx('circle', { 'data-canvas-pending': pendingConnect, cx: rect.x + rect.width / 2, cy: rect.y + rect.height / 2, r: 7 }, 'pending'))
       }
     }
@@ -1458,7 +1473,9 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
       if (pendingStatus) { setPendingStatus(null); return }
       if (expanded) { setExpanded(false); return }
       if (addMenuOpen) { setAddMenuOpen(false); return }
-      if (selectedId || selectedIds.length) { setSelectedId(null); setSelectedIds([]); setPendingConnect(null) }
+      if (selectedId || selectedIds.length) { setSelectedId(null); setSelectedIds([]); setPendingConnect(null); return }
+      if (pendingConnect) { setPendingConnect(null); return }
+      if (fullscreen) setFullscreen(false)
     },
     children: [
       jsxs('div', { className: `dy-pc-board-bar${boardListOpen ? ' open' : ' collapsed'}`, children: [
@@ -1517,11 +1534,11 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
           content.length ? jsx('p', { className: 'dockyard-meta', children: `${number(content.length)} project content item(s) available to reference.` }) : null,
         ]}),
       ]}),
-      jsxs('div', { className: 'dy-pc', 'data-canvas-theme': theme ?? undefined, children: [
+      jsxs('div', { className: `dy-pc${fullscreen ? ' dy-pc-full' : ''}`, 'data-canvas-theme': theme ?? undefined, 'data-canvas-fullscreen': fullscreen ? 'true' : 'false', children: [
         jsxs('div', { className: 'dy-pc-toolbar dy-pc-ribbon', role: 'toolbar', 'aria-label': 'Planning canvas tools', children: [
           group('Edit', [
             tool({ action: 'pc-mode-select', icon: 'mouse-pointer-2', name: 'Select', tip: 'Click to edit, drag a sticker to move it. Drag empty space or scroll to move around; Shift+drag to multi-select; Ctrl+scroll zooms.', variant: mode === 'select' ? 'primary' : '', onClick: () => { setMode('select'); setPendingConnect(null) } }),
-            tool({ action: 'pc-mode-connect', icon: 'spline', name: 'Connect', tip: 'Click two stickers to link them with the chosen meaning.', variant: mode === 'connect' ? 'primary' : '', disabled: readOnly, onClick: () => { setMode('connect'); setPendingConnect(null) } }),
+            tool({ action: 'pc-mode-connect', icon: 'spline', name: 'Connect', tip: 'Click two stickers to link them with the chosen meaning.', variant: mode === 'connect' ? 'primary' : '', disabled: readOnly, onClick: () => { setMode('connect'); setPendingConnect(null); setNotice({ tone: 'ok', text: 'Connect mode: click a sticker, then the sticker to link it to. Dragging is off while connecting; scroll to move around, Esc cancels.' }) } }),
             tool({ action: 'pc-undo', icon: 'undo-2', name: 'Undo', tip: 'Step back one board edit (Ctrl+Z).', disabled: !history.length || readOnly, onClick: undo }),
             tool({ action: 'pc-redo', icon: 'redo-2', name: 'Redo', tip: 'Re-apply the edit you undid (Ctrl+Shift+Z).', disabled: !future.length || readOnly, onClick: redo }),
             tool({ action: 'pc-duplicate', icon: 'copy-plus', name: 'Duplicate', tip: 'Copy the selected sticker(s) (Ctrl+D).', disabled: !(selectedIds.length || selectedId) || readOnly, onClick: duplicateSelection }),
@@ -1547,6 +1564,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
             jsx('span', { className: 'dy-pc-readout', 'data-canvas-zoom-readout': String(Math.round(zoom * 100)), children: `${Math.round(zoom * 100)}%` }, 'zoom'),
             tool({ action: 'pc-zoom-in', icon: 'zoom-in', name: 'Zoom in', tip: 'Enlarge the board view.', onClick: () => zoomBy(CANVAS_ZOOM.step) }),
             tool({ action: 'pc-fit', icon: 'scan', name: 'Fit', tip: 'Fit every sticker in view.', onClick: fit }),
+            tool({ action: 'pc-fullscreen', icon: fullscreen ? 'minimize-2' : 'maximize-2', name: fullscreen ? 'Exit full screen' : 'Full screen', tip: fullscreen ? 'Back to the normal page layout (Esc).' : 'Give the board the whole window. Esc returns.', variant: fullscreen ? 'primary' : '', onClick: () => setFullscreen((value) => !value), data: { 'aria-pressed': fullscreen ? 'true' : 'false' } }),
             tool({ action: 'pc-theme-light', icon: 'sun', name: 'Light canvas', tip: 'Light canvas for this board only. Click again to follow the app.', variant: theme === 'light' ? 'primary' : '', onClick: () => setBoardTheme('light'), data: { 'aria-pressed': theme === 'light' ? 'true' : 'false' } }),
             tool({ action: 'pc-theme-dark', icon: 'moon', name: 'Dark canvas', tip: 'Dark glowing canvas for this board only. Click again to follow the app.', variant: theme === 'dark' ? 'primary' : '', onClick: () => setBoardTheme('dark'), data: { 'aria-pressed': theme === 'dark' ? 'true' : 'false' } }),
           ]),
@@ -1576,6 +1594,11 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
           'aria-label': 'Planning canvas stage',
           tabIndex: 0,
           onPointerDown: beginPan,
+          onPointerMove: mode === 'connect' && pendingConnect ? (event) => {
+            const box = stageRef.current?.getBoundingClientRect()
+            if (!box) return
+            setConnectPointer({ x: (event.clientX - box.left - panRef.current.x) / zoomRef.current, y: (event.clientY - box.top - panRef.current.y) / zoomRef.current })
+          } : undefined,
           onKeyDown: onStageKeyDown,
           children: [
             jsxs('div', {
@@ -1698,7 +1721,17 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
                 readOnly ? jsx('p', { className: 'dy-pc-drawer-meta', 'data-canvas-drawer-readonly': true, children: `This board is ${CANVAS_BOARD_STATUS_LABELS[boardStatus]} — details are view-only.` }) : null,
                 jsxs('label', { children: [jsx('span', { children: 'Title' }), jsx('input', { 'data-canvas-object-title': true, maxLength: 4000, value: drawerText, readOnly, disabled: readOnly, onChange: (event) => setDrawerText(event.target.value) })] }),
                 jsxs('label', { children: [jsx('span', { children: 'Kind' }), jsx('select', { 'data-canvas-object-kind': true, value: drawerKind, disabled: readOnly, onChange: (event) => setDrawerKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx('option', { value, children: CANVAS_KIND_LABELS[value] }, value)) })] }),
-                jsxs('label', { children: [jsx('span', { children: 'Sticker colour' }), jsx('select', { 'data-canvas-object-colour': true, value: selectedColour ?? '', disabled: readOnly, onChange: (event) => setSelectedColour(event.target.value || null), children: [jsx('option', { value: '', children: 'Default kind colour' }, 'default'), ...CANVAS_STICKER_COLOURS.map((value) => jsx('option', { value, children: CANVAS_STICKER_LABELS[value] }, value))] })] }),
+                jsxs('div', { className: 'dy-pc-colours-field', children: [
+                  jsx('span', { className: 'dy-pc-field-label', id: 'dy-pc-colour-label', children: `Sticker colour · ${selectedColour ? CANVAS_STICKER_LABELS[selectedColour] : 'Default for kind'}` }),
+                  // Owner 01/10: a coloured dot per choice so the colour is visible before
+                  // picking. Dots read the live theme tokens, so a dark board shows dark fills.
+                  jsx('div', { className: 'dy-pc-colours', role: 'group', 'aria-labelledby': 'dy-pc-colour-label', 'data-canvas-object-colour': selectedColour ?? '', children: [null, ...CANVAS_STICKER_COLOURS].map((value) => jsx('button', {
+                    type: 'button', className: 'dy-pc-colour', 'data-canvas-colour-option': value ?? 'default', disabled: readOnly,
+                    'aria-pressed': (selectedColour ?? null) === value ? 'true' : 'false', 'aria-label': value ? CANVAS_STICKER_LABELS[value] : 'Default for kind', title: value ? CANVAS_STICKER_LABELS[value] : 'Default for kind',
+                    onClick: () => setSelectedColour(value),
+                    children: jsx('span', { className: `dy-pc-colour-dot${value ? '' : ' default'}`, style: { background: value ? `var(--dy-pc-sticker-${value})` : `var(--dy-pc-fill-${selected.kind})` } }),
+                  }, value ?? 'default')) }),
+                ] }),
                 ...renderFieldEditors(),
                 jsx('p', { className: 'dy-pc-drawer-meta', children: selected.evidence_ref ? `Evidence reference: ${selected.evidence_ref}` : 'No evidence reference on this object.' }),
                 readOnly ? null : jsxs('div', { className: 'dockyard-form-actions', children: [

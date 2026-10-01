@@ -356,7 +356,7 @@ for (const [label, width, height] of [['desktop', 1440, 900], ['phone', 390, 844
       await settle(page);
       await canvas.locator('[data-canvas-object="a-qu"]').click();
       await settle(page);
-      await canvas.locator('[data-canvas-object-colour]').selectOption('pink');
+      await canvas.locator('[data-canvas-colour-option="pink"]').click();
       const qu = canvas.locator('[data-canvas-object="a-qu"]');
       assert.equal(await qu.getAttribute('data-canvas-colour'), 'pink');
       assert.equal(await qu.evaluate((el) => getComputedStyle(el).backgroundColor), 'rgb(77, 28, 51)', 'dark pink sticker fill');
@@ -1592,3 +1592,103 @@ for (const [label, width, height] of [['desktop', 1440, 900], ['phone', 390, 844
     });
   });
 }
+
+// Owner feedback 01/10: (a) editor toolbar two tidy rows, (b) checklist text
+// box takes the row, (c) colour dots, (d) ribbon readable when the APP is dark
+// and the board follows it, (e) full screen + Edit tips inside the frame,
+// (f) connect mode never drags the board.
+const findEmpty = (page, canvas) => canvas.locator('.dy-pc-stage').evaluate((stage) => {
+  const b = stage.getBoundingClientRect();
+  const ok = (el) => el && el.closest('.dy-pc-stage') && !el.closest('.dy-pc-obj, .dy-pc-chat, .dy-pc-drawer, button');
+  for (let y = b.top + 30; y < b.bottom - 30; y += 20) for (let x = b.left + 180; x < b.right - 30; x += 20) {
+    if (ok(document.elementFromPoint(x, y)) && ok(document.elementFromPoint(x - 150, y - 100))) return { x, y };
+  }
+  return null;
+});
+test('Owner feedback 01/10: editor rows, checklist width, colour dots, dark ribbon, full screen, connect without drag', { timeout: 180000 }, async () => {
+  await withPage(1440, 900, async (page) => {
+    const canvas = root(page);
+    // (d) App dark, board following the app.
+    await page.evaluate(() => document.querySelector('.dockyard-root')?.setAttribute('data-theme', 'dark'));
+    await settle(page);
+    assert.equal(await canvas.getAttribute('data-canvas-theme-source'), 'app');
+    const band = await canvas.locator('.dy-pc-group-label').first().evaluate((el) => {
+      const k = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+      const rgb = (css) => { k.fillStyle = '#000'; k.fillStyle = css; k.fillRect(0, 0, 1, 1); const d = k.getImageData(0, 0, 1, 1).data; return `rgb(${d[0]}, ${d[1]}, ${d[2]})`; };
+      const s = getComputedStyle(el); return { fg: rgb(s.color), bg: rgb(s.backgroundColor) };
+    });
+    assert.ok(contrast(band.fg, band.bg) >= 4.5, `app-dark ribbon names readable (${contrast(band.fg, band.bg).toFixed(2)}:1, ${band.fg} on ${band.bg})`);
+    await page.evaluate(() => document.querySelector('.dockyard-root')?.setAttribute('data-theme', 'light'));
+    await settle(page);
+    // (a)(b)(c) A plan block's details.
+    await canvas.locator('[data-action="pc-add-menu"]').click();
+    await canvas.locator('[data-canvas-add-kind="plan_block"]').click();
+    await settle(page);
+    const drawer = canvas.locator('.dy-pc-drawer.open');
+    if (!(await drawer.count())) { await canvas.locator('.dy-pc-obj[data-canvas-kind="plan_block"]').last().click(); await settle(page); }
+    const rows = await drawer.locator('.dy-rt-bar').evaluate((el) => new Set([...el.querySelectorAll('button, select')].map((k) => Math.round(k.getBoundingClientRect().top))).size);
+    assert.equal(rows, 2, 'formatting bar is two rows (style/size, then buttons)');
+    await drawer.locator('[data-action="pc-checklist-add"]').click();
+    const row = await drawer.locator('[data-canvas-field="checklist"] .dy-pc-row').first().evaluate((r) => {
+      const [box, text] = r.querySelectorAll('input');
+      return { row: r.getBoundingClientRect().width, box: box.getBoundingClientRect().width, text: text.getBoundingClientRect().width };
+    });
+    assert.ok(row.box <= 20, `checkbox stays small (${row.box}px)`);
+    assert.ok(row.text >= row.row * 0.6, `checklist text box takes the row (${Math.round(row.text)} of ${Math.round(row.row)}px)`);
+    const dots = drawer.locator('[data-canvas-colour-option]');
+    assert.equal(await dots.count(), 13, 'default + 12 colours');
+    const fills = await drawer.locator('.dy-pc-colour-dot').evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundColor));
+    assert.equal(new Set(fills.slice(1)).size, 12, 'every colour dot shows its own colour');
+    await drawer.locator('[data-canvas-colour-option="indigo"]').click();
+    assert.equal(await canvas.locator('.dy-pc-obj.selected').getAttribute('data-canvas-colour'), 'indigo');
+    assert.equal(await drawer.locator('[data-canvas-colour-option="indigo"]').getAttribute('aria-pressed'), 'true');
+    await page.keyboard.press('Escape');
+    await settle(page);
+    // (e) Full screen: bigger frame, Edit tips inside it, Esc returns.
+    const before = await canvas.locator('.dy-pc').boundingBox();
+    await canvas.locator('[data-action="pc-fullscreen"]').click();
+    await settle(page);
+    const full = await canvas.locator('.dy-pc').boundingBox();
+    assert.ok(full.width > before.width && full.height > before.height, 'full screen enlarges the board');
+    for (const box of [full]) for (const action of ['pc-mode-select', 'pc-mode-connect', 'pc-undo']) {
+      await canvas.locator(`[data-action="${action}"]`).focus();
+      await page.waitForTimeout(250);
+      const tip = await canvas.locator(`[data-action="${action}"] + .dy-pc-tip`).boundingBox();
+      assert.ok(tip.x >= box.x - 1 && tip.x + tip.width <= box.x + box.width + 1, `${action} tip inside the full-screen frame`);
+    }
+    await page.keyboard.press('Escape');
+    await settle(page);
+    assert.equal(await canvas.locator('.dy-pc').getAttribute('data-canvas-fullscreen'), 'false', 'Esc leaves full screen');
+    const normal = await canvas.locator('.dy-pc').boundingBox();
+    await canvas.locator('[data-action="pc-mode-connect"]').focus();
+    await page.waitForTimeout(250);
+    const ctip = await canvas.locator('[data-action="pc-mode-connect"] + .dy-pc-tip').boundingBox();
+    assert.ok(ctip.x >= normal.x - 1, 'Connect tip not cut off at the left edge');
+    // (f) Connect: dragging empty space does not pan; two clicks link.
+    await canvas.locator('[data-action="pc-mode-connect"]').click();
+    const world = canvas.locator('[data-pc-world]');
+    // Re-measure every time: opening details can scroll the page.
+    const drag = async () => { const spot = await findEmpty(page, canvas); assert.ok(spot, 'an empty patch of board to drag'); await page.mouse.move(spot.x, spot.y); await page.mouse.down(); await page.mouse.move(spot.x - 150, spot.y - 100, { steps: 8 }); await page.mouse.up(); await settle(page); };
+    const pan0 = await world.getAttribute('data-canvas-pan');
+    await drag();
+    assert.equal(await world.getAttribute('data-canvas-pan'), pan0, 'connect mode: dragging does not move the board');
+    const edges = () => canvas.locator('.dy-pc-svg line[data-canvas-meaning]').count();
+    const e0 = await edges();
+    await canvas.locator('[data-canvas-object="a-qu"]').click();
+    const target = await canvas.locator('[data-canvas-object="a-ev"]').boundingBox();
+    await page.mouse.move(target.x + 10, target.y + 10, { steps: 4 });
+    assert.equal(await canvas.locator('[data-canvas-connect-preview]').count(), 1, 'a line follows the pointer');
+    await canvas.locator('[data-canvas-object="a-ev"]').click();
+    assert.equal(await edges(), e0 + 1, 'two clicks make a connector');
+    assert.equal(await canvas.locator('[data-canvas-connect-preview]').count(), 0, 'preview clears');
+    // Half-made link: Esc cancels and keeps connect mode.
+    await canvas.locator('[data-canvas-object="a-qu"]').click();
+    await page.keyboard.press('Escape');
+    assert.equal(await canvas.locator('[data-canvas-pending]').count(), 0, 'Esc drops the half-made link');
+    await canvas.locator('[data-action="pc-mode-select"]').click();
+    await settle(page);
+    const pan1 = await world.getAttribute('data-canvas-pan');
+    await drag();
+    assert.notEqual(await world.getAttribute('data-canvas-pan'), pan1, 'select mode still drags the board');
+  });
+});

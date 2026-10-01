@@ -2427,6 +2427,9 @@ var workflow_canvas_css_default = `
   --dy-pc-sticker-yellow: #fff1a6;    --dy-pc-sticker-green: #d3f4dc;
   --dy-pc-sticker-blue: #d3e6fd;      --dy-pc-sticker-pink: #fcd9e7;
   --dy-pc-sticker-purple: #e7defc;    --dy-pc-sticker-orange: #ffdfc0;
+  --dy-pc-sticker-coral: #ffc4bd;     --dy-pc-sticker-teal: #bfeee6;
+  --dy-pc-sticker-lime: #e3f7b8;      --dy-pc-sticker-clay: #e6d2bf;
+  --dy-pc-sticker-slate: #e2e6eb;     --dy-pc-sticker-indigo: #c9cffa;
   --dy-pc-card-edge: rgba(21, 23, 28, .14);
   /* D18: the canvas frame. */
   --dy-pc-frame: #3654c7;             --dy-pc-frame-halo: rgba(54, 84, 199, .16);
@@ -2462,6 +2465,9 @@ var workflow_canvas_css_default = `
   --dy-pc-sticker-yellow: #463c0e;    --dy-pc-sticker-green: #173d2a;
   --dy-pc-sticker-blue: #16345a;      --dy-pc-sticker-pink: #4d1c33;
   --dy-pc-sticker-purple: #2e2552;    --dy-pc-sticker-orange: #4a2d12;
+  --dy-pc-sticker-coral: #5a1a17;     --dy-pc-sticker-teal: #0c3f3b;
+  --dy-pc-sticker-lime: #2f3d0a;      --dy-pc-sticker-clay: #3a2e27;
+  --dy-pc-sticker-slate: #2b3139;     --dy-pc-sticker-indigo: #22286e;
   --dy-pc-card-edge: rgba(243, 245, 247, .16);
   --dy-pc-frame: #7c8cff;             --dy-pc-frame-halo: rgba(124, 140, 255, .32);
   --dy-pc-glow: rgba(124, 140, 255, .26);
@@ -2569,7 +2575,7 @@ var workflow_canvas_css_default = `
 /* Tips at the frame edges anchor to that edge so the frame does not cut
    them off (Quan Stage 3 review, M1/L3). */
 .dy-pc-scope .dy-pc-group[data-pc-group="save"] .dy-pc-tip, .dy-pc-scope .dy-pc-group[data-pc-group="save"] .dy-pc-tool:is(:hover, :focus-within) .dy-pc-tip { left: auto; right: 0; transform: none; }
-.dy-pc-scope .dy-pc-group[data-pc-group="edit"] .dy-pc-tool:first-child .dy-pc-tip, .dy-pc-scope .dy-pc-group[data-pc-group="edit"] .dy-pc-tool:first-child:is(:hover, :focus-within) .dy-pc-tip { left: 0; transform: none; }
+.dy-pc-scope .dy-pc-group[data-pc-group="edit"] .dy-pc-tip, .dy-pc-scope .dy-pc-group[data-pc-group="edit"] .dy-pc-tool:is(:hover, :focus-within) .dy-pc-tip { left: 0; transform: none; }
 /* The add menu opens leftwards from its button above phone width (M2). */
 .dy-pc-scope .dy-pc-addmenu { position: absolute; top: calc(100% + 6px); left: auto; right: 0; z-index: 55; display: grid; gap: 2px; min-width: 190px; padding: 5px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); box-shadow: var(--dy-shadow); }
 .dy-pc-scope .dy-pc-addmenu[hidden] { display: none; }
@@ -2631,6 +2637,28 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-obj[data-canvas-colour="pink"] { background: var(--dy-pc-sticker-pink); }
 .dy-pc-scope .dy-pc-obj[data-canvas-colour="purple"] { background: var(--dy-pc-sticker-purple); }
 .dy-pc-scope .dy-pc-obj[data-canvas-colour="orange"] { background: var(--dy-pc-sticker-orange); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="coral"] { background: var(--dy-pc-sticker-coral); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="teal"] { background: var(--dy-pc-sticker-teal); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="lime"] { background: var(--dy-pc-sticker-lime); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="clay"] { background: var(--dy-pc-sticker-clay); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="slate"] { background: var(--dy-pc-sticker-slate); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="indigo"] { background: var(--dy-pc-sticker-indigo); }
+/* Colour picker: one dot per choice, ringed when picked. */
+.dy-pc-scope .dy-pc-colours-field { display: grid; gap: 6px; }
+.dy-pc-scope .dy-pc-colours { display: flex; flex-wrap: wrap; gap: 6px; }
+.dy-pc-scope .dy-pc-colour { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 2px solid transparent; border-radius: 50%; background: transparent; cursor: pointer; }
+.dy-pc-scope .dy-pc-colour:hover:not(:disabled) { border-color: var(--dy-control-border); }
+.dy-pc-scope .dy-pc-colour[aria-pressed="true"] { border-color: var(--dy-focus); }
+.dy-pc-scope .dy-pc-colour:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
+.dy-pc-scope .dy-pc-colour:disabled { cursor: not-allowed; opacity: .6; }
+.dy-pc-scope .dy-pc-colour-dot { width: 20px; height: 20px; border: 1px solid var(--dy-control-border); border-radius: 50%; }
+.dy-pc-scope .dy-pc-colour-dot.default { background-image: linear-gradient(135deg, transparent 45%, var(--dy-control-border) 45% 55%, transparent 55%) !important; }
+/* Full screen (owner 01/10): the frame takes the window; the stage grows. */
+.dy-pc-scope .dy-pc.dy-pc-full { position: fixed; inset: 8px; z-index: 900; margin: 0; }
+.dy-pc-scope .dy-pc.dy-pc-full .dy-pc-stage { flex: 1 1 auto; height: auto; min-height: 0; }
+/* Connect mode: stickers are click targets, the board does not drag. */
+.dy-pc-scope .dy-pc-stage[data-pc-mode="connect"] .dy-pc-obj { cursor: pointer; }
+.dy-pc-scope .dy-pc-svg line[data-canvas-connect-preview] { stroke: var(--dy-focus); stroke-width: 2; }
 .dy-pc-scope .dy-pc-obj:hover { box-shadow: 0 0 0 1px var(--dy-accent-border), var(--dy-shadow); }
 .dy-pc-scope .dy-pc-obj.selected { box-shadow: 0 0 0 2px var(--dy-focus), 0 0 18px var(--dy-pc-glow), var(--dy-shadow); }
 .dy-pc-scope .dy-pc-obj:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
@@ -2646,6 +2674,7 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-fieldset legend, .dy-pc-scope .dy-pc-field-label { padding: 0 4px; color: var(--dy-text-2); font-size: 10px; font-weight: 730; }
 .dy-pc-scope .dy-pc-row { display: flex; gap: 6px; align-items: center; min-width: 0; }
 .dy-pc-scope .dy-pc-row input:not([type="checkbox"]) { flex: 1 1 0; min-width: 0; padding: 7px 8px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
+.dy-pc-scope .dy-pc-drawer-b .dy-pc-row input[type="checkbox"] { flex: 0 0 auto; width: 16px; height: 16px; margin: 0 2px; padding: 0; }
 .dy-pc-scope .dy-pc-row input[aria-invalid="true"] { border-color: var(--dy-danger, #c0392b); }
 .dy-pc-scope .dy-pc-open { display: inline-flex; color: var(--dy-accent, inherit); }
 .dy-pc-scope .dy-pc-open svg { width: 14px; height: 14px; }
@@ -2656,7 +2685,10 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-obj[data-canvas-kind="risk"] { border-left-color: var(--dy-pc-kind-risk); background: var(--dy-pc-fill-risk); }
 .dy-pc-scope .dy-pc-obj[data-canvas-kind="assumption"] { border-left-color: var(--dy-pc-kind-assumption); background: var(--dy-pc-fill-assumption); }
 .dy-pc-scope .dy-rt { display: grid; gap: 6px; min-width: 0; }
-.dy-pc-scope .dy-rt-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; padding: 5px; border: 1px solid var(--dy-border); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--dy-surface-2, var(--dy-surface)); }
+.dy-pc-scope .dy-rt-bar { display: grid; gap: 4px; padding: 5px; border: 1px solid var(--dy-border); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--dy-surface-2, var(--dy-surface)); }
+.dy-pc-scope .dy-rt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; min-width: 0; }
+.dy-pc-scope .dy-rt-row-sel { flex-wrap: nowrap; gap: 4px; }
+.dy-pc-scope .dy-rt-row-sel .dy-rt-select { flex: 1 1 0; min-width: 0; }
 .dy-pc-scope .dy-rt-select { height: 28px; padding: 0 6px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 11.5px; }
 .dy-pc-scope .dy-rt-btn { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--dy-text); cursor: pointer; }
 .dy-pc-scope .dy-rt-btn:hover:not(:disabled) { background: var(--dy-hover, rgba(127,127,127,.14)); }
@@ -2673,14 +2705,16 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-rt-host.readonly .dy-rt-body { border-radius: 8px; }
 .dy-pc-scope .dy-rt-body:empty::before { content: ''; }
 .dy-pc-scope .dy-rt-host .dy-rt-body:focus { border-color: var(--dy-accent, #5b8def); }
-.dy-pc-scope .dy-rt-body p { margin: 0 0 6px; }
+.dy-pc-scope .dy-rt-body p { margin: 0 0 4px; }
+.dy-pc-scope .dy-rt-body > :first-child { margin-top: 0; }
+.dy-pc-scope .dy-rt-body > :last-child { margin-bottom: 0; }
 .dy-pc-scope .dy-rt-body h1 { margin: 4px 0 6px; font-size: 19px; line-height: 1.25; }
 .dy-pc-scope .dy-rt-body h2 { margin: 4px 0 6px; font-size: 16px; line-height: 1.3; }
 .dy-pc-scope .dy-rt-body h3 { margin: 4px 0 6px; font-size: 14px; line-height: 1.3; }
 .dy-pc-scope .dy-rt-body ul, .dy-pc-scope .dy-rt-body ol { margin: 0 0 6px; padding-left: 22px; }
 .dy-pc-scope .dy-rt-body ul { list-style: disc; }
 .dy-pc-scope .dy-rt-body ol { list-style: decimal; }
-.dy-pc-scope .dy-rt-body li p { margin: 0 0 2px; }
+.dy-pc-scope .dy-rt-body li p { margin: 0; }
 .dy-pc-scope .dy-rt-problem { margin: 0; padding: 6px 9px; border-radius: 6px; background: var(--dy-danger-bg); color: var(--dy-pc-danger-text); font-size: 12px; }
 .dy-pc-scope .dy-rt-btn:disabled { opacity: .45; cursor: not-allowed; }
 .dy-pc-scope .dy-rt-small { font-size: .82em; }
@@ -2765,7 +2799,7 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-proposal[data-pc-proposal-status="approved"] { border-style: solid; border-color: var(--dy-success); }
 .dy-pc-scope .dy-pc-proposal[data-pc-proposal-status="rejected"] { border-style: solid; border-color: var(--dy-border); background: var(--dy-surface-subtle); }
 /* Drawer: the selection editor (replaces a permanently-docked inspector). */
-.dy-pc-scope .dy-pc-drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 30; display: flex; flex-direction: column; width: min(360px, 100%); max-width: 100%; box-sizing: border-box; border-left: 1px solid var(--dy-border); background: var(--dy-surface); transform: translateX(100%); transition: transform .18s ease; }
+.dy-pc-scope .dy-pc-drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 30; display: flex; flex-direction: column; width: min(420px, 100%); max-width: 100%; box-sizing: border-box; border-left: 1px solid var(--dy-border); background: var(--dy-surface); transform: translateX(100%); transition: transform .18s ease; }
 /* Closed = off-canvas AND inert: it must not catch clicks meant for cards at
    the stage edge, nor let Tab reach its hidden fields. visibility waits for
    the slide-out to finish. */
@@ -9247,41 +9281,47 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
   };
   return jsxs("div", { className: "dy-rt", "data-canvas-rich-editor": true, children: [
     jsx("span", { className: "dy-pc-field-label", children: label }),
+    // Owner 01/10: two tidy rows (style + size, then the buttons) instead of
+    // letting everything wrap into a ragged five-row stack.
     readOnly ? null : jsxs("div", { className: "dy-rt-bar", role: "toolbar", "aria-label": "Text formatting", children: [
-      jsxs("select", {
-        className: "dy-rt-select",
-        "data-rt": "style",
-        "aria-label": "Text style",
-        value: state.style,
-        onChange: (event) => {
-          const v = event.target.value;
-          run((el) => setBlockStyle(el, v));
-        },
-        children: [["p", "Normal text"], ["h1", "Heading 1"], ["h2", "Heading 2"], ["h3", "Heading 3"]].map(([v, t]) => jsx("option", { value: v, children: t }, v))
-      }),
-      jsxs("select", {
-        className: "dy-rt-select",
-        "data-rt": "size",
-        "aria-label": "Text size",
-        value: state.size,
-        onChange: (event) => {
-          const v = event.target.value;
-          run((el) => applySize(el, v));
-        },
-        children: [["small", "Small"], ["normal", "Normal size"], ["large", "Large"], ["huge", "Huge"]].map(([v, t]) => jsx("option", { value: v, children: t }, v))
-      }),
-      ...TOOLS.map((tool, i) => tool ? button(tool) : jsx("span", { className: "dy-rt-sep", "aria-hidden": "true" }, `sep-${i}`)),
-      jsx("button", {
-        type: "button",
-        className: "dy-rt-btn",
-        "data-rt": "clear",
-        title: "Clear formatting",
-        "aria-label": "Clear formatting",
-        disabled: readOnly,
-        onMouseDown: (event) => event.preventDefault(),
-        onClick: () => run((el) => clearFormatting(el)),
-        children: jsx(Icon, { name: "remove-formatting" })
-      })
+      jsxs("div", { className: "dy-rt-row dy-rt-row-sel", children: [
+        jsxs("select", {
+          className: "dy-rt-select",
+          "data-rt": "style",
+          "aria-label": "Text style",
+          value: state.style,
+          onChange: (event) => {
+            const v = event.target.value;
+            run((el) => setBlockStyle(el, v));
+          },
+          children: [["p", "Normal text"], ["h1", "Heading 1"], ["h2", "Heading 2"], ["h3", "Heading 3"]].map(([v, t]) => jsx("option", { value: v, children: t }, v))
+        }),
+        jsxs("select", {
+          className: "dy-rt-select",
+          "data-rt": "size",
+          "aria-label": "Text size",
+          value: state.size,
+          onChange: (event) => {
+            const v = event.target.value;
+            run((el) => applySize(el, v));
+          },
+          children: [["small", "Small"], ["normal", "Normal size"], ["large", "Large"], ["huge", "Huge"]].map(([v, t]) => jsx("option", { value: v, children: t }, v))
+        })
+      ] }, "sel"),
+      jsxs("div", { className: "dy-rt-row", children: [
+        ...TOOLS.map((tool, i) => tool ? button(tool) : jsx("span", { className: "dy-rt-sep", "aria-hidden": "true" }, `sep-${i}`)),
+        jsx("button", {
+          type: "button",
+          className: "dy-rt-btn",
+          "data-rt": "clear",
+          title: "Clear formatting",
+          "aria-label": "Clear formatting",
+          disabled: readOnly,
+          onMouseDown: (event) => event.preventDefault(),
+          onClick: () => run((el) => clearFormatting(el)),
+          children: jsx(Icon, { name: "remove-formatting" })
+        }, "clear")
+      ] }, "btns")
     ] }),
     problem ? jsx("p", { className: "dy-rt-problem", role: "alert", "data-canvas-rich-problem": true, children: problem }) : null,
     jsx("div", { className: `dy-rt-host${readOnly ? " readonly" : ""}`, children: jsx("div", {
@@ -9321,8 +9361,8 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
 var CANVAS_OBJECT_KINDS = Object.freeze(["evidence", "claim", "question", "decision", "plan_block", "risk", "assumption", "note", "link", "media"]);
 var CANVAS_CONNECTOR_MEANINGS = Object.freeze(["supports", "contradicts", "derived_from", "clarifies", "depends_on", "implements", "raises_question"]);
 var CANVAS_KIND_LABELS = Object.freeze({ evidence: "Evidence", claim: "Claim", question: "Question", decision: "Decision", plan_block: "Plan block", risk: "Risk", assumption: "Assumption", note: "Note", link: "Link", media: "Media" });
-var CANVAS_STICKER_COLOURS = Object.freeze(["yellow", "green", "blue", "pink", "purple", "orange"]);
-var CANVAS_STICKER_LABELS = Object.freeze({ yellow: "Sun", green: "Mint", blue: "Sky", pink: "Rose", purple: "Violet", orange: "Amber" });
+var CANVAS_STICKER_COLOURS = Object.freeze(["yellow", "orange", "coral", "pink", "purple", "indigo", "blue", "teal", "green", "lime", "clay", "slate"]);
+var CANVAS_STICKER_LABELS = Object.freeze({ yellow: "Sun", green: "Mint", blue: "Sky", pink: "Rose", purple: "Violet", orange: "Amber", coral: "Coral", teal: "Teal", lime: "Lime", clay: "Clay", slate: "Slate", indigo: "Indigo" });
 var CANVAS_KIND_ICONS = Object.freeze({
   evidence: "file-text",
   claim: "message-square",
@@ -9500,6 +9540,8 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   const [expanded, setExpanded] = useState(false);
   const [stepsDraft, setStepsDraft] = useState(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [connectPointer, setConnectPointer] = useState(null);
   const [pendingLeave, setPendingLeave] = useState(null);
   const [pendingStatus, setPendingStatus] = useState(null);
   const [panning, setPanning] = useState(false);
@@ -9536,6 +9578,9 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   useDialogFocusManager(pendingLeave ? "[data-canvas-unsaved-prompt] .dy-pc-overlay-card" : pendingStatus ? "[data-canvas-status-confirm] .dy-pc-overlay-card" : expanded ? "[data-canvas-expanded] .dy-pc-overlay-card" : null);
   dirtyRef.current = dirty;
   boardsApiRef.current = boardsApi;
+  useEffect(() => {
+    if (!pendingConnect) setConnectPointer(null);
+  }, [pendingConnect]);
   zoomRef.current = zoom;
   panRef.current = pan;
   const failureText = (failure) => String(failure?.message ?? failure);
@@ -10267,6 +10312,15 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     if (event.button !== 0 && event.button !== 1) return;
     const target = event.target;
     if (target?.closest?.(".dy-pc-obj") || target?.closest?.(".dy-pc-drawer") || target?.closest?.(".dy-pc-chat") || target?.closest?.(".dy-pc-overlay")) return;
+    if (mode === "connect" && event.button === 0) {
+      event.preventDefault();
+      if (pendingConnect) {
+        setPendingConnect(null);
+        setConnectPointer(null);
+        setNotice({ tone: "ok", text: "Connect: link cancelled. Click a sticker to start again." });
+      }
+      return;
+    }
     const stageBox = stageRef.current?.getBoundingClientRect();
     if (!stageBox) return;
     const startX = event.clientX;
@@ -10687,6 +10741,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       const pending = byId.get(pendingConnect);
       if (pending) {
         const rect = canvasRect(pending);
+        if (connectPointer) lines.push(jsx("line", { "data-pc-pending": "true", "data-canvas-connect-preview": pendingConnect, x1: rect.x + rect.width / 2, y1: rect.y + rect.height / 2, x2: connectPointer.x, y2: connectPointer.y }, "pending-line"));
         lines.push(jsx("circle", { "data-canvas-pending": pendingConnect, cx: rect.x + rect.width / 2, cy: rect.y + rect.height / 2, r: 7 }, "pending"));
       }
     }
@@ -10895,7 +10950,13 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
         setSelectedId(null);
         setSelectedIds([]);
         setPendingConnect(null);
+        return;
       }
+      if (pendingConnect) {
+        setPendingConnect(null);
+        return;
+      }
+      if (fullscreen) setFullscreen(false);
     },
     children: [
       jsxs("div", { className: `dy-pc-board-bar${boardListOpen ? " open" : " collapsed"}`, children: [
@@ -10958,7 +11019,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
           content.length ? jsx("p", { className: "dockyard-meta", children: `${number(content.length)} project content item(s) available to reference.` }) : null
         ] })
       ] }),
-      jsxs("div", { className: "dy-pc", "data-canvas-theme": theme ?? void 0, children: [
+      jsxs("div", { className: `dy-pc${fullscreen ? " dy-pc-full" : ""}`, "data-canvas-theme": theme ?? void 0, "data-canvas-fullscreen": fullscreen ? "true" : "false", children: [
         jsxs("div", { className: "dy-pc-toolbar dy-pc-ribbon", role: "toolbar", "aria-label": "Planning canvas tools", children: [
           group("Edit", [
             tool({ action: "pc-mode-select", icon: "mouse-pointer-2", name: "Select", tip: "Click to edit, drag a sticker to move it. Drag empty space or scroll to move around; Shift+drag to multi-select; Ctrl+scroll zooms.", variant: mode === "select" ? "primary" : "", onClick: () => {
@@ -10968,6 +11029,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
             tool({ action: "pc-mode-connect", icon: "spline", name: "Connect", tip: "Click two stickers to link them with the chosen meaning.", variant: mode === "connect" ? "primary" : "", disabled: readOnly, onClick: () => {
               setMode("connect");
               setPendingConnect(null);
+              setNotice({ tone: "ok", text: "Connect mode: click a sticker, then the sticker to link it to. Dragging is off while connecting; scroll to move around, Esc cancels." });
             } }),
             tool({ action: "pc-undo", icon: "undo-2", name: "Undo", tip: "Step back one board edit (Ctrl+Z).", disabled: !history.length || readOnly, onClick: undo }),
             tool({ action: "pc-redo", icon: "redo-2", name: "Redo", tip: "Re-apply the edit you undid (Ctrl+Shift+Z).", disabled: !future.length || readOnly, onClick: redo }),
@@ -11005,6 +11067,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
             jsx("span", { className: "dy-pc-readout", "data-canvas-zoom-readout": String(Math.round(zoom * 100)), children: `${Math.round(zoom * 100)}%` }, "zoom"),
             tool({ action: "pc-zoom-in", icon: "zoom-in", name: "Zoom in", tip: "Enlarge the board view.", onClick: () => zoomBy(CANVAS_ZOOM.step) }),
             tool({ action: "pc-fit", icon: "scan", name: "Fit", tip: "Fit every sticker in view.", onClick: fit }),
+            tool({ action: "pc-fullscreen", icon: fullscreen ? "minimize-2" : "maximize-2", name: fullscreen ? "Exit full screen" : "Full screen", tip: fullscreen ? "Back to the normal page layout (Esc)." : "Give the board the whole window. Esc returns.", variant: fullscreen ? "primary" : "", onClick: () => setFullscreen((value) => !value), data: { "aria-pressed": fullscreen ? "true" : "false" } }),
             tool({ action: "pc-theme-light", icon: "sun", name: "Light canvas", tip: "Light canvas for this board only. Click again to follow the app.", variant: theme === "light" ? "primary" : "", onClick: () => setBoardTheme("light"), data: { "aria-pressed": theme === "light" ? "true" : "false" } }),
             tool({ action: "pc-theme-dark", icon: "moon", name: "Dark canvas", tip: "Dark glowing canvas for this board only. Click again to follow the app.", variant: theme === "dark" ? "primary" : "", onClick: () => setBoardTheme("dark"), data: { "aria-pressed": theme === "dark" ? "true" : "false" } })
           ]),
@@ -11034,6 +11097,11 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
           "aria-label": "Planning canvas stage",
           tabIndex: 0,
           onPointerDown: beginPan,
+          onPointerMove: mode === "connect" && pendingConnect ? (event) => {
+            const box = stageRef.current?.getBoundingClientRect();
+            if (!box) return;
+            setConnectPointer({ x: (event.clientX - box.left - panRef.current.x) / zoomRef.current, y: (event.clientY - box.top - panRef.current.y) / zoomRef.current });
+          } : void 0,
           onKeyDown: onStageKeyDown,
           children: [
             jsxs("div", {
@@ -11189,7 +11257,22 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
                 readOnly ? jsx("p", { className: "dy-pc-drawer-meta", "data-canvas-drawer-readonly": true, children: `This board is ${CANVAS_BOARD_STATUS_LABELS[boardStatus]} \u2014 details are view-only.` }) : null,
                 jsxs("label", { children: [jsx("span", { children: "Title" }), jsx("input", { "data-canvas-object-title": true, maxLength: 4e3, value: drawerText, readOnly, disabled: readOnly, onChange: (event) => setDrawerText(event.target.value) })] }),
                 jsxs("label", { children: [jsx("span", { children: "Kind" }), jsx("select", { "data-canvas-object-kind": true, value: drawerKind, disabled: readOnly, onChange: (event) => setDrawerKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx("option", { value, children: CANVAS_KIND_LABELS[value] }, value)) })] }),
-                jsxs("label", { children: [jsx("span", { children: "Sticker colour" }), jsx("select", { "data-canvas-object-colour": true, value: selectedColour ?? "", disabled: readOnly, onChange: (event) => setSelectedColour(event.target.value || null), children: [jsx("option", { value: "", children: "Default kind colour" }, "default"), ...CANVAS_STICKER_COLOURS.map((value) => jsx("option", { value, children: CANVAS_STICKER_LABELS[value] }, value))] })] }),
+                jsxs("div", { className: "dy-pc-colours-field", children: [
+                  jsx("span", { className: "dy-pc-field-label", id: "dy-pc-colour-label", children: `Sticker colour \xB7 ${selectedColour ? CANVAS_STICKER_LABELS[selectedColour] : "Default for kind"}` }),
+                  // Owner 01/10: a coloured dot per choice so the colour is visible before
+                  // picking. Dots read the live theme tokens, so a dark board shows dark fills.
+                  jsx("div", { className: "dy-pc-colours", role: "group", "aria-labelledby": "dy-pc-colour-label", "data-canvas-object-colour": selectedColour ?? "", children: [null, ...CANVAS_STICKER_COLOURS].map((value) => jsx("button", {
+                    type: "button",
+                    className: "dy-pc-colour",
+                    "data-canvas-colour-option": value ?? "default",
+                    disabled: readOnly,
+                    "aria-pressed": (selectedColour ?? null) === value ? "true" : "false",
+                    "aria-label": value ? CANVAS_STICKER_LABELS[value] : "Default for kind",
+                    title: value ? CANVAS_STICKER_LABELS[value] : "Default for kind",
+                    onClick: () => setSelectedColour(value),
+                    children: jsx("span", { className: `dy-pc-colour-dot${value ? "" : " default"}`, style: { background: value ? `var(--dy-pc-sticker-${value})` : `var(--dy-pc-fill-${selected.kind})` } })
+                  }, value ?? "default")) })
+                ] }),
                 ...renderFieldEditors(),
                 jsx("p", { className: "dy-pc-drawer-meta", children: selected.evidence_ref ? `Evidence reference: ${selected.evidence_ref}` : "No evidence reference on this object." }),
                 readOnly ? null : jsxs("div", { className: "dockyard-form-actions", children: [

@@ -27,7 +27,8 @@ BOARD_STATUSES = ("draft", "submitted", "planned", "completed", "archived")
 BOARD_THEMES = frozenset({"light", "dark"})
 # D20: sticker colours are palette KEYS, never raw CSS. The desktop maps each
 # key to a theme token, so a stored value can never inject a style.
-STICKER_COLOURS = frozenset({"yellow", "green", "blue", "pink", "purple", "orange"})
+STICKER_COLOURS = frozenset({"yellow", "green", "blue", "pink", "purple", "orange",
+                             "coral", "teal", "lime", "clay", "slate", "indigo"})
 DEFAULT_BOARD_NAME = "Main board"
 
 # Stage 1 card fields. Every field is validated by type and size. Fields are

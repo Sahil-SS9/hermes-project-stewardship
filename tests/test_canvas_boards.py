@@ -789,7 +789,7 @@ def test_missing_or_blank_sticker_colour_means_default(store, enabled, colour):
     assert saved["objects"][0]["colour"] is None
 
 
-@pytest.mark.parametrize("colour", ["#ff0000", "red; background:url(x)", "PINK ", 7, ["pink"], "teal"])
+@pytest.mark.parametrize("colour", ["#ff0000", "red; background:url(x)", "PINK ", 7, ["pink"], "magenta", "Teal"])
 def test_unknown_or_raw_css_sticker_colour_is_refused(store, enabled, colour):
     svc = CanvasService(store)
     board = svc.create_board(enabled, name="Bad", actor="sahil")
@@ -801,7 +801,8 @@ def test_unknown_or_raw_css_sticker_colour_is_refused(store, enabled, colour):
 
 def test_sticker_palette_is_the_documented_set():
     from hermes_project_stewardship.persistence.canvas_service import STICKER_COLOURS
-    assert STICKER_COLOURS == frozenset({"yellow", "green", "blue", "pink", "purple", "orange"})
+    assert STICKER_COLOURS == frozenset({"yellow", "green", "blue", "pink", "purple", "orange",
+                                         "coral", "teal", "lime", "clay", "slate", "indigo"})
 
 
 def test_sticker_colour_survives_the_http_save_route(tmp_path):

@@ -390,6 +390,9 @@ td.bad, .bad { color: var(--dy-bad); }
   --dy-pc-sticker-yellow: #fff1a6;    --dy-pc-sticker-green: #d3f4dc;
   --dy-pc-sticker-blue: #d3e6fd;      --dy-pc-sticker-pink: #fcd9e7;
   --dy-pc-sticker-purple: #e7defc;    --dy-pc-sticker-orange: #ffdfc0;
+  --dy-pc-sticker-coral: #ffc4bd;     --dy-pc-sticker-teal: #bfeee6;
+  --dy-pc-sticker-lime: #e3f7b8;      --dy-pc-sticker-clay: #e6d2bf;
+  --dy-pc-sticker-slate: #e2e6eb;     --dy-pc-sticker-indigo: #c9cffa;
   --dy-pc-card-edge: rgba(21, 23, 28, .14);
   /* D18: the canvas frame. */
   --dy-pc-frame: #3654c7;             --dy-pc-frame-halo: rgba(54, 84, 199, .16);
@@ -425,6 +428,9 @@ td.bad, .bad { color: var(--dy-bad); }
   --dy-pc-sticker-yellow: #463c0e;    --dy-pc-sticker-green: #173d2a;
   --dy-pc-sticker-blue: #16345a;      --dy-pc-sticker-pink: #4d1c33;
   --dy-pc-sticker-purple: #2e2552;    --dy-pc-sticker-orange: #4a2d12;
+  --dy-pc-sticker-coral: #5a1a17;     --dy-pc-sticker-teal: #0c3f3b;
+  --dy-pc-sticker-lime: #2f3d0a;      --dy-pc-sticker-clay: #3a2e27;
+  --dy-pc-sticker-slate: #2b3139;     --dy-pc-sticker-indigo: #22286e;
   --dy-pc-card-edge: rgba(243, 245, 247, .16);
   --dy-pc-frame: #7c8cff;             --dy-pc-frame-halo: rgba(124, 140, 255, .32);
   --dy-pc-glow: rgba(124, 140, 255, .26);
@@ -532,7 +538,7 @@ td.bad, .bad { color: var(--dy-bad); }
 /* Tips at the frame edges anchor to that edge so the frame does not cut
    them off (Quan Stage 3 review, M1/L3). */
 .dy-pc-scope .dy-pc-group[data-pc-group="save"] .dy-pc-tip, .dy-pc-scope .dy-pc-group[data-pc-group="save"] .dy-pc-tool:is(:hover, :focus-within) .dy-pc-tip { left: auto; right: 0; transform: none; }
-.dy-pc-scope .dy-pc-group[data-pc-group="edit"] .dy-pc-tool:first-child .dy-pc-tip, .dy-pc-scope .dy-pc-group[data-pc-group="edit"] .dy-pc-tool:first-child:is(:hover, :focus-within) .dy-pc-tip { left: 0; transform: none; }
+.dy-pc-scope .dy-pc-group[data-pc-group="edit"] .dy-pc-tip, .dy-pc-scope .dy-pc-group[data-pc-group="edit"] .dy-pc-tool:is(:hover, :focus-within) .dy-pc-tip { left: 0; transform: none; }
 /* The add menu opens leftwards from its button above phone width (M2). */
 .dy-pc-scope .dy-pc-addmenu { position: absolute; top: calc(100% + 6px); left: auto; right: 0; z-index: 55; display: grid; gap: 2px; min-width: 190px; padding: 5px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); box-shadow: var(--dy-shadow); }
 .dy-pc-scope .dy-pc-addmenu[hidden] { display: none; }
@@ -594,6 +600,28 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-pc-scope .dy-pc-obj[data-canvas-colour="pink"] { background: var(--dy-pc-sticker-pink); }
 .dy-pc-scope .dy-pc-obj[data-canvas-colour="purple"] { background: var(--dy-pc-sticker-purple); }
 .dy-pc-scope .dy-pc-obj[data-canvas-colour="orange"] { background: var(--dy-pc-sticker-orange); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="coral"] { background: var(--dy-pc-sticker-coral); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="teal"] { background: var(--dy-pc-sticker-teal); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="lime"] { background: var(--dy-pc-sticker-lime); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="clay"] { background: var(--dy-pc-sticker-clay); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="slate"] { background: var(--dy-pc-sticker-slate); }
+.dy-pc-scope .dy-pc-obj[data-canvas-colour="indigo"] { background: var(--dy-pc-sticker-indigo); }
+/* Colour picker: one dot per choice, ringed when picked. */
+.dy-pc-scope .dy-pc-colours-field { display: grid; gap: 6px; }
+.dy-pc-scope .dy-pc-colours { display: flex; flex-wrap: wrap; gap: 6px; }
+.dy-pc-scope .dy-pc-colour { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 2px solid transparent; border-radius: 50%; background: transparent; cursor: pointer; }
+.dy-pc-scope .dy-pc-colour:hover:not(:disabled) { border-color: var(--dy-control-border); }
+.dy-pc-scope .dy-pc-colour[aria-pressed="true"] { border-color: var(--dy-focus); }
+.dy-pc-scope .dy-pc-colour:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
+.dy-pc-scope .dy-pc-colour:disabled { cursor: not-allowed; opacity: .6; }
+.dy-pc-scope .dy-pc-colour-dot { width: 20px; height: 20px; border: 1px solid var(--dy-control-border); border-radius: 50%; }
+.dy-pc-scope .dy-pc-colour-dot.default { background-image: linear-gradient(135deg, transparent 45%, var(--dy-control-border) 45% 55%, transparent 55%) !important; }
+/* Full screen (owner 01/10): the frame takes the window; the stage grows. */
+.dy-pc-scope .dy-pc.dy-pc-full { position: fixed; inset: 8px; z-index: 900; margin: 0; }
+.dy-pc-scope .dy-pc.dy-pc-full .dy-pc-stage { flex: 1 1 auto; height: auto; min-height: 0; }
+/* Connect mode: stickers are click targets, the board does not drag. */
+.dy-pc-scope .dy-pc-stage[data-pc-mode="connect"] .dy-pc-obj { cursor: pointer; }
+.dy-pc-scope .dy-pc-svg line[data-canvas-connect-preview] { stroke: var(--dy-focus); stroke-width: 2; }
 .dy-pc-scope .dy-pc-obj:hover { box-shadow: 0 0 0 1px var(--dy-accent-border), var(--dy-shadow); }
 .dy-pc-scope .dy-pc-obj.selected { box-shadow: 0 0 0 2px var(--dy-focus), 0 0 18px var(--dy-pc-glow), var(--dy-shadow); }
 .dy-pc-scope .dy-pc-obj:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
@@ -609,6 +637,7 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-pc-scope .dy-pc-fieldset legend, .dy-pc-scope .dy-pc-field-label { padding: 0 4px; color: var(--dy-text-2); font-size: 10px; font-weight: 730; }
 .dy-pc-scope .dy-pc-row { display: flex; gap: 6px; align-items: center; min-width: 0; }
 .dy-pc-scope .dy-pc-row input:not([type="checkbox"]) { flex: 1 1 0; min-width: 0; padding: 7px 8px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
+.dy-pc-scope .dy-pc-drawer-b .dy-pc-row input[type="checkbox"] { flex: 0 0 auto; width: 16px; height: 16px; margin: 0 2px; padding: 0; }
 .dy-pc-scope .dy-pc-row input[aria-invalid="true"] { border-color: var(--dy-danger, #c0392b); }
 .dy-pc-scope .dy-pc-open { display: inline-flex; color: var(--dy-accent, inherit); }
 .dy-pc-scope .dy-pc-open svg { width: 14px; height: 14px; }
@@ -619,7 +648,10 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-pc-scope .dy-pc-obj[data-canvas-kind="risk"] { border-left-color: var(--dy-pc-kind-risk); background: var(--dy-pc-fill-risk); }
 .dy-pc-scope .dy-pc-obj[data-canvas-kind="assumption"] { border-left-color: var(--dy-pc-kind-assumption); background: var(--dy-pc-fill-assumption); }
 .dy-pc-scope .dy-rt { display: grid; gap: 6px; min-width: 0; }
-.dy-pc-scope .dy-rt-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; padding: 5px; border: 1px solid var(--dy-border); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--dy-surface-2, var(--dy-surface)); }
+.dy-pc-scope .dy-rt-bar { display: grid; gap: 4px; padding: 5px; border: 1px solid var(--dy-border); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--dy-surface-2, var(--dy-surface)); }
+.dy-pc-scope .dy-rt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; min-width: 0; }
+.dy-pc-scope .dy-rt-row-sel { flex-wrap: nowrap; gap: 4px; }
+.dy-pc-scope .dy-rt-row-sel .dy-rt-select { flex: 1 1 0; min-width: 0; }
 .dy-pc-scope .dy-rt-select { height: 28px; padding: 0 6px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 11.5px; }
 .dy-pc-scope .dy-rt-btn { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--dy-text); cursor: pointer; }
 .dy-pc-scope .dy-rt-btn:hover:not(:disabled) { background: var(--dy-hover, rgba(127,127,127,.14)); }
@@ -636,14 +668,16 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-pc-scope .dy-rt-host.readonly .dy-rt-body { border-radius: 8px; }
 .dy-pc-scope .dy-rt-body:empty::before { content: ''; }
 .dy-pc-scope .dy-rt-host .dy-rt-body:focus { border-color: var(--dy-accent, #5b8def); }
-.dy-pc-scope .dy-rt-body p { margin: 0 0 6px; }
+.dy-pc-scope .dy-rt-body p { margin: 0 0 4px; }
+.dy-pc-scope .dy-rt-body > :first-child { margin-top: 0; }
+.dy-pc-scope .dy-rt-body > :last-child { margin-bottom: 0; }
 .dy-pc-scope .dy-rt-body h1 { margin: 4px 0 6px; font-size: 19px; line-height: 1.25; }
 .dy-pc-scope .dy-rt-body h2 { margin: 4px 0 6px; font-size: 16px; line-height: 1.3; }
 .dy-pc-scope .dy-rt-body h3 { margin: 4px 0 6px; font-size: 14px; line-height: 1.3; }
 .dy-pc-scope .dy-rt-body ul, .dy-pc-scope .dy-rt-body ol { margin: 0 0 6px; padding-left: 22px; }
 .dy-pc-scope .dy-rt-body ul { list-style: disc; }
 .dy-pc-scope .dy-rt-body ol { list-style: decimal; }
-.dy-pc-scope .dy-rt-body li p { margin: 0 0 2px; }
+.dy-pc-scope .dy-rt-body li p { margin: 0; }
 .dy-pc-scope .dy-rt-problem { margin: 0; padding: 6px 9px; border-radius: 6px; background: var(--dy-danger-bg); color: var(--dy-pc-danger-text); font-size: 12px; }
 .dy-pc-scope .dy-rt-btn:disabled { opacity: .45; cursor: not-allowed; }
 .dy-pc-scope .dy-rt-small { font-size: .82em; }
@@ -728,7 +762,7 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-pc-scope .dy-pc-proposal[data-pc-proposal-status="approved"] { border-style: solid; border-color: var(--dy-success); }
 .dy-pc-scope .dy-pc-proposal[data-pc-proposal-status="rejected"] { border-style: solid; border-color: var(--dy-border); background: var(--dy-surface-subtle); }
 /* Drawer: the selection editor (replaces a permanently-docked inspector). */
-.dy-pc-scope .dy-pc-drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 30; display: flex; flex-direction: column; width: min(360px, 100%); max-width: 100%; box-sizing: border-box; border-left: 1px solid var(--dy-border); background: var(--dy-surface); transform: translateX(100%); transition: transform .18s ease; }
+.dy-pc-scope .dy-pc-drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 30; display: flex; flex-direction: column; width: min(420px, 100%); max-width: 100%; box-sizing: border-box; border-left: 1px solid var(--dy-border); background: var(--dy-surface); transform: translateX(100%); transition: transform .18s ease; }
 /* Closed = off-canvas AND inert: it must not catch clicks meant for cards at
    the stage edge, nor let Tab reach its hidden fields. visibility waits for
    the slide-out to finish. */

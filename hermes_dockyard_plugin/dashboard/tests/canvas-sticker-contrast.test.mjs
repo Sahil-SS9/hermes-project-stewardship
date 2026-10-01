@@ -14,7 +14,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const CSS = readFileSync(join(HERE, '..', 'src', 'workflow-canvas-css.ts'), 'utf8');
 
 const KINDS = ['evidence', 'claim', 'question', 'decision', 'plan_block', 'note', 'link', 'media'];
-const COLOURS = ['yellow', 'green', 'blue', 'pink', 'purple', 'orange'];
+const COLOURS = ['yellow', 'green', 'blue', 'pink', 'purple', 'orange', 'coral', 'teal', 'lime', 'clay', 'slate', 'indigo'];
 
 function block(theme) {
   const darkAt = CSS.search(/\.dockyard-root\[data-theme="dark"\]\s+\.dy-pc-scope,/);
