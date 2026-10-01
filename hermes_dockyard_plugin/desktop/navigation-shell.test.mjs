@@ -23,6 +23,27 @@ test('searchable project context, requested discard target and retained project 
  await page.getByRole('heading',{name:'No initiative available'}).waitFor();
 }));
 
+test('Open workflow library with unsaved changes asks first; Cancel keeps the tab (Quan M1)', async()=>fixtureBrowser(async(page)=>{
+ const select=async(id)=>{await page.getByRole('button',{name:'Project context',exact:true}).click(); await page.getByRole('combobox',{name:'Find project'}).fill(id); await page.getByRole('listbox',{name:'Projects'}).getByRole('option',{name:id,exact:true}).click();};
+ await select('payments-relaunch');
+ await page.locator('[data-tab="project"]').click();
+ await page.locator('[data-project-view="settings"]').click();
+ await page.getByRole('button',{name:/Edit configuration/}).click();
+ await page.locator('[data-setting-field="mission"]').fill('Unsaved library edit');
+ await page.locator('[data-project-view="workflows"]').click();
+ await page.locator('[data-action="open-workflow-library"]').click();
+ const prompt=page.locator('[data-project-switch-confirm]');
+ await prompt.waitFor();
+ assert.equal(await prompt.getAttribute('data-nav-target'),'tab:workflows');
+ await prompt.getByRole('button',{name:'Cancel',exact:true}).click();
+ assert.equal(await prompt.count(),0);
+ await page.locator('[data-project-view="workflows"].active').waitFor();
+ assert.equal(await page.locator('[data-action="open-workflow-library"]').count(),1,'still on the project Workflows view, not the library');
+ await page.locator('[data-action="open-workflow-library"]').click();
+ await prompt.getByRole('button',{name:'Discard',exact:true}).click();
+ await page.locator('[data-action="open-workflow-library"]').waitFor({state:'detached'});
+}));
+
 test('Kanban drag reads back, keyboard alternative and errors never claim success', async()=>fixtureBrowser(async(page,base)=>{
  const errors=[]; page.on('pageerror',e=>errors.push(String(e)));
  await page.getByRole('button',{name:'Project context',exact:true}).waitFor();

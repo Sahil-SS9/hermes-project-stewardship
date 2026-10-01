@@ -15777,21 +15777,25 @@ function DashboardPage() {
     setSelectedProject(projectId);
     if (tab === "dashboard" || tab === "notifications" || tab === "inbox" || tab === "onboard") setTab("project");
   };
-  const goTab = (next) => {
-    if (next === "project") setProjectEntryView("overview");
+  const pendingTabOpts = useRef({});
+  const goTab = (next, opts = {}) => {
+    if (opts.project) setSelectedProject(opts.project);
+    if (next === "project") setProjectEntryView(opts.entryView ?? "overview");
     if (next === "dashboard") setDashboardHomeVersion((value) => value + 1);
     setTab(next);
   };
-  const requestTab = (next) => {
+  const requestTab = (next, opts = {}) => {
     if (next !== tab && dirtyProject) {
+      pendingTabOpts.current = opts;
       setPendingTab(next);
       return;
     }
-    goTab(next);
+    goTab(next, opts);
   };
   const cancelNav = () => {
     setPendingProject(null);
     setPendingTab(null);
+    pendingTabOpts.current = {};
   };
   const continueNav = () => {
     const project = pendingProject;
@@ -15803,7 +15807,11 @@ function DashboardPage() {
     if (project) {
       setSelectedProject(project);
       if (tab === "dashboard" || tab === "notifications" || tab === "inbox" || tab === "onboard") setTab("project");
-    } else if (nextTab) goTab(nextTab);
+    } else if (nextTab) {
+      const opts = pendingTabOpts.current;
+      pendingTabOpts.current = {};
+      goTab(nextTab, opts);
+    }
   };
   const discardProjectChange = continueNav;
   const saveThenNavigate = async () => {
@@ -15903,7 +15911,7 @@ function DashboardPage() {
       onSelectProject: selectProject,
       onProjectDirty: markDirty(payload.project?.id ?? null),
       onRefresh: refresh,
-      onOpenLibrary: () => setTab("workflows"),
+      onOpenLibrary: () => requestTab("workflows"),
       pendingWorkRef,
       onPendingWorkConsumed: () => setPendingWorkRef(null),
       notice: deepLinkNotice
@@ -15922,9 +15930,7 @@ function DashboardPage() {
       projectId: selectedProject,
       onOpenBuilder: (row) => {
         const owner = row?.owner_project_id;
-        if (owner && owner !== selectedProject) setSelectedProject(owner);
-        setProjectEntryView("workflows");
-        setTab("project");
+        requestTab("project", { entryView: "workflows", project: owner && owner !== selectedProject ? owner : void 0 });
       }
     }, `workflow-library:${selectedProject ?? "none"}`);
   } else if (tab === "onboard") {
