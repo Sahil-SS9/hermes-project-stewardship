@@ -21,6 +21,12 @@ from urllib.parse import unquote, urlsplit
 import pytest
 
 
+# Read by the repo-root conftest.py: while this module is loaded it owns every
+# state path, so the root conftest must not re-pin them. A module attribute,
+# not an environment variable, because a shell can export a variable and
+# child processes inherit one.
+HPS_FAIL_CLOSED_STATE_ISOLATION = True
+
 _LIVE_HERMES_HOME = (Path.home() / ".hermes").resolve()
 _LIVE_DOCKYARD_FILES = tuple(
     _LIVE_HERMES_HOME / "plugin-data" / "hermes-dockyard" / name
