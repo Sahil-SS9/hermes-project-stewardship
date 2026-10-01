@@ -422,7 +422,6 @@ def _rows(path, sql):
 
 
 def test_v33_upgrade_keeps_the_legacy_board_and_links_its_history(tmp_path):
-    from hermes_project_stewardship.persistence.store import Store
     db = tmp_path / "legacy.db"
     _v32_db(db)
     store = _open_at_v33(db)
@@ -442,7 +441,6 @@ def test_v33_upgrade_keeps_the_legacy_board_and_links_its_history(tmp_path):
 
 def test_v33_round_trip_is_lossless_and_downgrade_refuses_multi_board_loss(tmp_path):
     from hermes_project_stewardship.persistence.migrations import MIGRATIONS
-    from hermes_project_stewardship.persistence.store import Store
     v33 = next(m for m in MIGRATIONS if m.version == 33)
     db = tmp_path / "rt.db"
     _v32_db(db)
