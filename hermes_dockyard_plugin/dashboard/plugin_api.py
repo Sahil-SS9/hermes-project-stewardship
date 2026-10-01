@@ -1699,3 +1699,70 @@ async def ack(notification_id: int) -> dict:
     return await _proxy(
         "POST", f"/stewardship/v1/notifications/{notification_id}/ack",
         {"actor_id": _ACTOR_ID})
+
+
+# ------------------- Batch E: notifications resolution + settings ----- #
+
+@plugin_api.get("/notifications")
+async def notifications_filtered(
+    state: str | None = None,
+    kind: str | None = None,
+    severity: str | None = None,
+    project_id: str | None = None,
+    before_id: int | None = None,
+    limit: int = 100,
+) -> dict:
+    params = {k: v for k, v in (
+        ("state", state), ("kind", kind), ("severity", severity),
+        ("project_id", project_id), ("before_id", before_id),
+        ("limit", limit)) if v is not None}
+    return await _proxy("GET", "/stewardship/v1/notifications", params=params)
+
+
+@plugin_api.post("/notifications/{notification_id}/resolve")
+async def resolve_notification(notification_id: int, body: dict) -> dict:
+    return await _proxy(
+        "POST", f"/stewardship/v1/notifications/{notification_id}/resolve",
+        {"actor_id": _ACTOR_ID,
+         "note": str(body.get("note") or "")[:2000]})
+
+
+@plugin_api.post("/notifications/ack-all")
+async def ack_all(body: dict | None = None) -> dict:
+    payload = dict(body or {})
+    payload.setdefault("actor_id", _ACTOR_ID)
+    return await _proxy("POST", "/stewardship/v1/notifications/ack-all", payload)
+
+
+@plugin_api.get("/notifications/popups")
+async def notification_popups() -> dict:
+    return await _proxy("GET", "/stewardship/v1/notifications/popups")
+
+
+@plugin_api.post("/notifications/popups/shown")
+async def notification_popups_shown(body: dict) -> dict:
+    ids = body.get("ids")
+    ids = [int(i) for i in ids] if isinstance(ids, list) else []
+    return await _proxy(
+        "POST", "/stewardship/v1/notifications/popups/shown", {"ids": ids})
+
+
+@plugin_api.get("/settings/notifications")
+async def get_notification_settings() -> dict:
+    return await _proxy("GET", "/stewardship/v1/settings/notifications")
+
+
+@plugin_api.put("/settings/notifications")
+async def put_notification_settings(body: dict) -> dict:
+    return await _proxy(
+        "PUT", "/stewardship/v1/settings/notifications",
+        {"policy": body.get("policy"), "actor_id": _ACTOR_ID})
+
+
+@plugin_api.get("/settings/notifications/effective")
+async def effective_notification_settings(
+    project_id: str | None = None,
+) -> dict:
+    params = {"project_id": project_id} if project_id else None
+    return await _proxy(
+        "GET", "/stewardship/v1/settings/notifications/effective", params=params)

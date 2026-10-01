@@ -1241,25 +1241,28 @@ class DockyardService:
     # Notification deep-links (UX-07) — G4 P3                            #
     # ------------------------------------------------------------------ #
 
-    def fleet_notifications(self) -> Dict:
-        """Cross-project notification feed with exact-context deep links."""
-        rows = self.store._conn.execute(
-            "SELECT n.id, n.project_id, n.severity, n.kind, n.title,"
-            " n.body, n.created_at, n.acked_at"
-            " FROM notifications n ORDER BY n.created_at DESC LIMIT 100"
-        ).fetchall()
-        items = []
-        for r in rows:
-            link = self._deep_link(r["kind"], r["project_id"], r["body"])
-            items.append({
-                "id": r["id"], "project": r["project_id"],
-                "severity": r["severity"], "kind": r["kind"],
-                "title": r["title"], "body": r["body"],
-                "created_at": r["created_at"],
-                "acked": r["acked_at"] is not None,
-                "deep_link": link,
-            })
-        return {"notifications": items}
+    def fleet_notifications(
+        self,
+        *,
+        state: Optional[str] = None,
+        kind: Optional[str] = None,
+        severity: Optional[str] = None,
+        project_id: Optional[str] = None,
+        before_id: Optional[int] = None,
+        limit: int = 100,
+    ) -> Dict:
+        """Cross-project notification feed (Batch E shape).
+
+        Delegates to the shared NotificationEngine list/counts so state
+        derivation, filters and deep links come from one code path.
+        """
+        from ..events.notifications import NotificationEngine
+
+        ne = NotificationEngine(self.store, None)  # reads only; no svc use
+        items = ne.list_notifications(
+            project_id=project_id, state=state, kind=kind, severity=severity,
+            before_id=before_id, limit=limit)
+        return {"notifications": items, "counts": ne.counts(project_id=project_id)}
 
     @staticmethod
     def _deep_link(kind: str, project_id: str = "", body: str = "") -> str:

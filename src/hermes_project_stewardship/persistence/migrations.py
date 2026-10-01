@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-SCHEMA_VERSION = 31
+SCHEMA_VERSION = 32
 
 
 @dataclass(frozen=True)
@@ -1311,6 +1311,41 @@ MIGRATIONS: List[Migration] = [
         DROP TABLE IF EXISTS dockyard_global_workflows;
         ALTER TABLE dockyard_workflows DROP COLUMN owner_project_id;
         ALTER TABLE dockyard_workflows DROP COLUMN scope;
+        """,
+    ),
+    # Batch E (notifications): resolved state + per-channel settings.
+    # Appended after W's v31. Renumber at the hps/integration merge only if
+    # another lane has already taken 32; never edit a merged migration.
+    Migration(
+        version=32,
+        name="notification resolution state and app-wide notification policy",
+        upgrade_sql="""
+        ALTER TABLE notifications ADD COLUMN acked_by TEXT;
+        ALTER TABLE notifications ADD COLUMN resolved_at TEXT;
+        ALTER TABLE notifications ADD COLUMN resolved_by TEXT;
+        ALTER TABLE notifications ADD COLUMN resolution TEXT CHECK (resolution IN ('manual','auto'));
+        ALTER TABLE notifications ADD COLUMN resolution_note TEXT NOT NULL DEFAULT '';
+        ALTER TABLE notifications ADD COLUMN popup_shown_at TEXT;
+        ALTER TABLE notifications ADD COLUMN ref TEXT;
+        CREATE INDEX IF NOT EXISTS idx_notifications_open
+            ON notifications(project_id, resolved_at, created_at DESC);
+        CREATE TABLE IF NOT EXISTS dockyard_app_settings (
+            key        TEXT PRIMARY KEY,
+            value_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            updated_by TEXT NOT NULL
+        );
+        """,
+        downgrade_sql="""
+        DROP INDEX IF EXISTS idx_notifications_open;
+        DROP TABLE IF EXISTS dockyard_app_settings;
+        ALTER TABLE notifications DROP COLUMN ref;
+        ALTER TABLE notifications DROP COLUMN popup_shown_at;
+        ALTER TABLE notifications DROP COLUMN resolution_note;
+        ALTER TABLE notifications DROP COLUMN resolution;
+        ALTER TABLE notifications DROP COLUMN resolved_by;
+        ALTER TABLE notifications DROP COLUMN resolved_at;
+        ALTER TABLE notifications DROP COLUMN acked_by;
         """,
     ),
 ]

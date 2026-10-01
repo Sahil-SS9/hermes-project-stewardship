@@ -589,6 +589,17 @@ def create_app(
     svc = StewardshipService(store)
     engine = CycleEngine(svc)
     bus = EventBus(store)
+    # Batch E1: notifications switched on. One engine on the bus; the service
+    # emits initiative lifecycle events through the same bus.
+    from ..events.notifications import NotificationEngine
+
+    notification_engine = NotificationEngine(store, svc)
+    notification_engine.attach(bus)
+    svc.attach_event_bus(bus)
+    # Batch E2: decisions resolve their approval notifications on this path.
+    svc.on_decision(
+        lambda etype, ref, pid: notification_engine.on_decision_event(
+            etype, ref, pid))
     engine.attach_events(bus)
     gateway = GatewayCommandHandler(svc, cycle_engine=engine)
     webhooks = WebhookReceiver(svc, engine)
@@ -628,6 +639,12 @@ def create_app(
     app.state.kanban_adapter = adapter
     app.state.kanban_bridge = bridge
     app.state.canonical_work_service = work
+    # Batch E1: bus + engines surfaced for tests and host integrations.
+    app.state.bus = bus
+    app.state.cycle_engine = engine
+    app.state.notification_engine = notification_engine
+    app.state.svc = svc
+    app.state.gateway = gateway
     token = auth_token or os.environ.get("STEWARD_RPC_TOKEN")
     if token:
         app.add_middleware(
@@ -2030,16 +2047,102 @@ def create_app(
             raise HTTPException(422, str(exc)) from None
 
     @router.get("/notifications")
-    def fleet_notifications():
-        return dy.fleet_notifications()
+    def fleet_notifications(
+        state: Optional[str] = None,
+        kind: Optional[str] = None,
+        severity: Optional[str] = None,
+        project_id: Optional[str] = None,
+        before_id: Optional[int] = None,
+        limit: int = Query(100, ge=1, le=500),
+    ):
+        # Batch E4: filtered, paged feed + counts for the filter chips.
+        # keeps the legacy no-filter shape ("notifications" list) as default.
+        ne = notification_engine
+        items = ne.list_notifications(
+            project_id=project_id, state=state, kind=kind, severity=severity,
+            before_id=before_id, limit=limit)
+        out = {"notifications": items, "counts": ne.counts(
+            project_id=project_id)}
+        if before_id is not None and items:
+            out["next_before_id"] = items[-1]["id"]
+        return out
 
     @router.post("/notifications/{notification_id}/ack")
-    def ack_notification(notification_id: int):
+    def ack_notification(notification_id: int, body: dict | None = None):
+        # Batch E2: one service-side path; records the actor, audited,
+        # idempotent (second ack / ack-after-resolve change nothing).
+        actor = _principal_id((body or {}).get("actor_id") or "unknown")
         try:
-            dy.ack_notification(notification_id)
-        except ValueError as e:
+            acked = notification_engine.ack(notification_id, actor=actor)
+        except LookupError as e:
             raise HTTPException(404, str(e))
-        return {"acked": notification_id}
+        return {"acked": notification_id, "changed": acked}
+
+    # ------------------- Batch E: resolution + pop-ups + settings ------ #
+
+    @router.post("/notifications/{notification_id}/resolve")
+    def resolve_notification(notification_id: int, body: dict | None = None):
+        payload = body or {}
+        note = str(payload.get("note") or "")
+        if len(note) > 2000:
+            raise HTTPException(422, "note must be at most 2000 characters")
+        actor = _principal_id(payload.get("actor_id") or "unknown")
+        try:
+            changed = notification_engine.resolve(
+                notification_id, actor=actor, resolution="manual", note=note)
+        except LookupError as e:
+            raise HTTPException(404, str(e))
+        return {"resolved": notification_id, "changed": changed}
+
+    @router.post("/notifications/ack-all")
+    def ack_all(body: dict | None = None):
+        payload = body or {}
+        project_id = payload.get("project_id") or None
+        kind = payload.get("kind") or None
+        mark_resolved = bool(payload.get("resolve", False))
+        actor = _principal_id(payload.get("actor_id") or "unknown")
+        n = notification_engine.ack_matching(
+            project_id=project_id, kind=kind, resolve=mark_resolved, actor=actor)
+        return {"acked": n}
+
+    @router.get("/notifications/popups")
+    def list_popups():
+        return notification_engine.popups()
+
+    @router.post("/notifications/popups/shown")
+    def popups_shown(body: dict):
+        ids = body.get("ids")
+        if not isinstance(ids, list) or not all(
+                isinstance(i, int) for i in ids):
+            raise HTTPException(422, "ids must be a list of notification ids")
+        return {"marked": notification_engine.mark_popups_shown(ids)}
+
+    @router.get("/settings/notifications")
+    def get_app_notification_settings():
+        return {"policy": notification_engine.app_policy()}
+
+    @router.put("/settings/notifications")
+    def put_app_notification_settings(body: dict):
+        policy = body.get("policy")
+        actor = _principal_id(body.get("actor_id") or "unknown")
+        try:
+            return {"policy": notification_engine.set_app_policy(policy, actor=actor)}
+        except ServiceError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @router.get("/settings/notifications/effective")
+    def get_effective_notification_settings(project_id: Optional[str] = None):
+        try:
+            if project_id:
+                notification_engine.svc.require_feature(project_id, "notifications")
+                return {"effective": notification_engine.effective(project_id)}
+            # No project: the app-wide layer alone.
+            from ..events.notifications import effective_policy
+
+            return {"effective": effective_policy(
+                notification_engine.app_policy(), None)}
+        except ServiceError as exc:
+            raise HTTPException(404, str(exc)) from None
 
     def _workflow_audience(
         project_id: str,

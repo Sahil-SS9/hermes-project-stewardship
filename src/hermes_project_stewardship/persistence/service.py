@@ -65,6 +65,40 @@ class StewardshipService:
         self.store = store
         self._clock = clock or store._clock
         self.default_suppression_days = default_suppression_days
+        # Batch E: optional domain-event bus for initiative lifecycle emits
+        # (APPROVAL_REQUIRED and decision events). Set by attach_event_bus();
+        # every interface (API, CLI, gateway, desktop integration) constructs
+        # this service, so emits here cover every interface.
+        self.events = None
+        # Batch E2: post-decision notification resolution hooks. Registered by
+        # the host wiring (api/server.py, cli/app.py, gateway hosts) so a
+        # decision resolves its approval notification on THAT interface's path
+        # — even when each entrypoint builds its own bus/engine pair.
+        self._decision_hooks = []
+
+    def attach_event_bus(self, bus) -> None:
+        """Wire the domain event bus (Batch E1: notification trigger source)."""
+        self.events = bus
+
+    def on_decision(self, callback) -> None:
+        """Register a post-decision callback (Batch E2 auto-resolve seam).
+
+        Called with (event_type, initiative_ref, project_id) after every
+        recorded decision; used by hosts to resolve approval notifications
+        through their own NotificationEngine instance.
+        """
+        self._decision_hooks.append(callback)
+
+    def _notify_decisions(self, event_type: str, ref: str, project_id: str,
+                          payload: dict) -> None:
+        if self.events is not None:
+            self.events.emit(event_type, project_id=project_id, subject=ref,
+                             payload=payload)
+        for hook in self._decision_hooks:
+            try:
+                hook(event_type, ref, project_id)
+            except Exception:
+                pass
 
     # ------------------------------------------------------------------ #
     # Enable / lifecycle                                                 #
@@ -2488,6 +2522,16 @@ class StewardshipService:
             subject=ref,
             detail={"title": title, "risk": risk, "dedupe_key": dk},
         )
+        # Batch E1: approval-gated proposals raise a notification. Emitted on
+        # the shared service path so desktop, RPC, CLI, gateway and the
+        # dockyard integration all trigger it.
+        if self.events is not None and status == "pending_approval":
+            self.events.emit(
+                "initiative.approval_required",
+                project_id=project_id,
+                subject=ref,
+                payload={"title": title, "risk": risk},
+            )
         return self.initiative_by_ref(ref)
 
     def _next_ref(self, project_id: str) -> str:
@@ -2653,6 +2697,10 @@ class StewardshipService:
                          detail={"decision": "approved", "reason": "",
                                  "note": note, "fingerprint": decision["fingerprint"],
                                  "revision": revision})
+        # Batch E1: decision events resolve the matching approval notification.
+        self._notify_decisions(
+            "initiative.approved", ref, ini["project_id"],
+            {"actor": actor, "interface": interface})
         return self.initiative_by_ref(ref)
 
     def reject_initiative(
@@ -2748,6 +2796,10 @@ class StewardshipService:
                          detail={"decision": "rejected", "reason": reason_text,
                                  "note": note, "fingerprint": decision["fingerprint"],
                                  "revision": revision})
+        # Batch E1: decision events resolve the matching approval notification.
+        self._notify_decisions(
+            "initiative.rejected", ref, ini["project_id"],
+            {"actor": actor, "interface": interface, "reason": reason_text})
         return self.initiative_by_ref(ref)
 
     def request_changes_initiative(
@@ -2803,6 +2855,12 @@ class StewardshipService:
                          detail={"feedback": feedback.strip(), "note": note,
                                  "fingerprint": decision["fingerprint"],
                                  "revision": revision})
+        # Batch E1: changes-requested is a decision too; it resolves the
+        # matching approval notification (E2 auto-resolve).
+        self._notify_decisions(
+            "initiative.changes_requested", ref, ini["project_id"],
+            {"actor": actor, "interface": interface,
+             "feedback": feedback.strip()})
         return self.initiative_by_ref(ref)
 
     def resubmit_initiative(
@@ -2846,6 +2904,17 @@ class StewardshipService:
                              k for k, v in (("rationale", rationale),
                                             ("expected_outcome", expected_outcome),
                                             ("risk", risk)) if v is not None]})
+        # Batch E1: a resubmission re-enters pending_approval — the renewed
+        # request for approval raises a fresh notification (dedupe window
+        # governs repeats; the resolved review-cycle notification stays closed).
+        if self.events is not None:
+            self.events.emit(
+                "initiative.approval_required",
+                project_id=ini["project_id"],
+                subject=ref,
+                payload={"title": ini["title"], "risk": ini.get("risk"),
+                         "resubmitted": True},
+            )
         return self.initiative_by_ref(ref)
 
     def add_initiative_comment(

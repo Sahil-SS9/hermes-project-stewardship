@@ -177,6 +177,19 @@ def main(argv: Optional[List[str]] = None) -> int:
         return EXIT_ERROR
     svc = StewardshipService(store)
     engine = CycleEngine(svc)
+    # Batch E1: the CLI surface reaches the same shared service path, so its
+    # decisions emit the domain events that resolve approval notifications.
+    from ..events.bus import EventBus
+    from ..events.notifications import NotificationEngine
+
+    bus = EventBus(store)
+    engine.attach_events(bus)
+    svc.attach_event_bus(bus)
+    notification_engine = NotificationEngine(store, svc)
+    notification_engine.attach(bus)
+    svc.on_decision(
+        lambda etype, ref, pid: notification_engine.on_decision_event(
+            etype, ref, pid))
 
     try:
         return _dispatch(args, svc, engine, store)
