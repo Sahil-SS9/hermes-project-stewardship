@@ -1270,7 +1270,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     const out = []
     // Stage 2: Word-style formatted description. The server derives the plain
     // `description` copy from `description_doc`, so the two never disagree.
-    out.push(jsx(RichTextEditor, { value: f.description_doc, fallbackText: f.description, readOnly: off, onChange: (doc, plain) => { setField('description_doc', plain ? doc : undefined); setField('description', plain || undefined) }, onProblem: setRichProblem }, `rt-${selected?.id}`))
+    out.push(jsx(RichTextEditor, { value: f.description_doc, fallbackText: f.description, readOnly: off, onChange: (doc, plain) => { setField('description_doc', plain ? doc : undefined); setField('description', plain || undefined) }, onProblem: setRichProblem, rest: { ...f, text: drawerText } }, `rt-${selected?.id}`))
     const links = f.links ?? []
     out.push(jsxs('fieldset', { className: 'dy-pc-fieldset', 'data-canvas-links': true, children: [
       jsx('legend', { children: `Links${links.length ? ` (${links.length})` : ''}` }),

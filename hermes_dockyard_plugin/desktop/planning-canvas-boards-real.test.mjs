@@ -242,6 +242,21 @@ test('Planning boards (real backend): theme, save, chat, plan steps and board li
       body: JSON.stringify({ expected_revision: (await board(first)).revision, objects: fresh.objects, connectors: fresh.connectors }),
     })
     assert.equal(stale.status, 409, 'the real server refuses edits to an archived board')
+    // ...and the app never opens an archived board for editing (Quan L4):
+    // it moves off it, and the archived list offers Restore only.
+    await page.reload({ waitUntil: 'load' })
+    await page.waitForSelector('[data-tab="dashboard"]', { timeout: 20000 })
+    if (!(await canvas.count())) {
+      await page.locator('[data-tab="project"]').click()
+      await page.locator('[data-project-view="planning"]').click()
+    }
+    await canvas.waitFor()
+    assert.notEqual(await canvas.getAttribute('data-canvas-board'), first, 'archived board is not the open board')
+    await canvas.locator('[data-action="pc-board-show-archived"]').click()
+    const archivedRow = canvas.locator(`[data-canvas-board-row="${first}"][data-canvas-board-archived]`)
+    await archivedRow.waitFor()
+    assert.equal(await archivedRow.locator('button').count(), 1, 'archived row has one button')
+    assert.equal(await archivedRow.locator('[data-action="pc-board-restore"]').count(), 1, 'and it is Restore')
 
     assert.deepEqual(errors, [], errors.join('\n'))
   } finally {

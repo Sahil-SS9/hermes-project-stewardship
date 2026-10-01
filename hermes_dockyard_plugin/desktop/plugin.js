@@ -8399,7 +8399,7 @@ var ALIGNS = ["left", "center", "right", "justify"];
 var LIST_TYPES = ["1", "a", "A", "i", "I"];
 var MAX_LIST_LEVELS = 5;
 var MARK_ORDER = ["bold", "italic", "underline", "strike", "fontSize"];
-var RICH_TEXT_LIMITS = Object.freeze({ chars: 2e4, nodes: 3e3, bytes: 60 * 1024 });
+var RICH_TEXT_LIMITS = Object.freeze({ chars: 2e4, nodes: 3e3, bytes: 64 * 1024 });
 var ZWSP = /\u200B/g;
 var plainToDoc = (text) => ({
   type: "doc",
@@ -8443,8 +8443,8 @@ function readBlocks(parent, ctx, makeBlock = () => ({ type: "paragraph" })) {
   const flush = () => {
     const trimmed = inline;
     if (trimmed.length && trimmed[trimmed.length - 1].type === "hardBreak") trimmed.pop();
-    const hasText = trimmed.some((n) => n.type === "text" && n.text.trim());
-    if (hasText || trimmed.some((n) => n.type === "hardBreak")) {
+    const hasText2 = trimmed.some((n) => n.type === "text" && n.text.trim());
+    if (hasText2 || trimmed.some((n) => n.type === "hardBreak")) {
       const block = makeBlock();
       block.content = trimmed;
       blocks.push(block);
@@ -8549,9 +8549,11 @@ var tidy = (node) => {
   if (node.attrs && !Object.keys(node.attrs).length) delete node.attrs;
   return node;
 };
+var hasText = (node) => node.type === "text" ? Boolean(node.text.trim()) : (node.content || []).some(hasText);
+var dropEmptyLists = (nodes) => nodes.filter((n) => !((n.type === "bulletList" || n.type === "orderedList") && !hasText(n))).map((n) => n.content && n.type !== "paragraph" && n.type !== "heading" ? { ...n, content: dropEmptyLists(n.content) } : n);
 function domToDoc(root) {
   const blocks = readBlocks(root, { level: 0, marks: {} });
-  const content = blocks.flatMap((b) => b.type === "__lift" ? [{ type: "bulletList", content: b.content }] : [b]);
+  const content = dropEmptyLists(blocks.flatMap((b) => b.type === "__lift" ? [{ type: "bulletList", content: b.content }] : [b]));
   return tidy({ type: "doc", content: content.length ? content : [{ type: "paragraph" }] });
 }
 function docToPlain(doc) {
@@ -8573,7 +8575,19 @@ function docToPlain(doc) {
   for (const node of doc?.content || []) block(node);
   return lines.join("\n").trim();
 }
-function docProblem(doc) {
+function serverJsonBytes(value) {
+  const enc = new TextEncoder();
+  const size = (v) => {
+    if (Array.isArray(v)) return 2 + v.reduce((n, x) => n + size(x), 0) + Math.max(0, v.length - 1) * 2;
+    if (v && typeof v === "object") {
+      const keys = Object.keys(v).filter((k) => v[k] !== void 0);
+      return 2 + keys.reduce((n, k) => n + enc.encode(JSON.stringify(k)).length + 2 + size(v[k]), 0) + Math.max(0, keys.length - 1) * 2;
+    }
+    return enc.encode(JSON.stringify(v ?? null)).length;
+  };
+  return size(value);
+}
+function docProblem(doc, rest = {}) {
   let nodes = 0;
   const count = (node) => {
     for (const child of node.content || []) {
@@ -8582,11 +8596,13 @@ function docProblem(doc) {
     }
   };
   count(doc);
-  const chars = docToPlain(doc).length;
-  const bytes = new TextEncoder().encode(JSON.stringify(doc)).length;
+  const chars = [...docToPlain(doc)].length;
+  const counted = { ...rest, description_doc: doc };
+  delete counted.description;
+  const bytes = serverJsonBytes(counted);
   if (chars > RICH_TEXT_LIMITS.chars) return `Too long: ${chars.toLocaleString("en-GB")} of ${RICH_TEXT_LIMITS.chars.toLocaleString("en-GB")} characters. Shorten it before applying.`;
   if (nodes > RICH_TEXT_LIMITS.nodes) return `Too much formatting: ${nodes.toLocaleString("en-GB")} of ${RICH_TEXT_LIMITS.nodes.toLocaleString("en-GB")} pieces. Remove some paragraphs or formatting before applying.`;
-  if (bytes > RICH_TEXT_LIMITS.bytes) return "This description is too large to save. Remove some text or formatting before applying.";
+  if (bytes > RICH_TEXT_LIMITS.bytes) return "This card is too large to save. Remove some text or formatting before applying.";
   return null;
 }
 function renderInline(parent, nodes) {
@@ -8705,6 +8721,26 @@ function normaliseDom(host2) {
     el.remove();
     changed = true;
   }
+  if (!host2.textContent.replace(ZWSP, "").trim() && host2.querySelector("ul, ol")) {
+    while (host2.firstChild) host2.removeChild(host2.firstChild);
+    const p = document.createElement("p");
+    p.appendChild(document.createElement("br"));
+    host2.appendChild(p);
+    if (keep) {
+      keep[0] = p;
+      keep[1] = 0;
+      keep[2] = p;
+      keep[3] = 0;
+    }
+    changed = true;
+  }
+  for (const el of [...host2.querySelectorAll("li[style], li > p[style], li > h1[style], li > h2[style], li > h3[style]")]) {
+    if (el.style.textAlign) {
+      el.style.removeProperty("text-align");
+      if (!el.getAttribute("style")) el.removeAttribute("style");
+      changed = true;
+    }
+  }
   for (let guard = 0; guard < 200; guard += 1) {
     const outer = [...host2.querySelectorAll("p, h1, h2, h3")].find((el) => [...el.children].some((c) => INNER_BLOCKS.has(c.tagName)));
     if (!outer) break;
@@ -8760,7 +8796,7 @@ function measure(host2, target, targetOffset) {
       return null;
     }
     if (el.nodeType !== 1) return null;
-    if (el !== host2 && POS_BLOCKS.has(el.tagName)) n += 1;
+    if (el !== host2 && POS_BLOCKS.has(el.tagName) && !(el.tagName === "P" && el.parentElement?.tagName === "LI")) n += 1;
     if (el.tagName === "BR") n += 1;
     const kids = el.childNodes;
     for (let i = 0; i < kids.length; i += 1) {
@@ -8785,7 +8821,7 @@ function locate(host2, pos) {
       return null;
     }
     if (el.nodeType !== 1) return null;
-    if (el !== host2 && POS_BLOCKS.has(el.tagName)) {
+    if (el !== host2 && POS_BLOCKS.has(el.tagName) && !(el.tagName === "P" && el.parentElement?.tagName === "LI")) {
       n += 1;
       if (n >= pos && !el.querySelector("li")) return [el, 0];
     }
@@ -8862,7 +8898,15 @@ var blocksIn = (host2) => {
   if (!sel.rangeCount) return [];
   const range = sel.getRangeAt(0);
   const caretBlock = blockOf(host2, range.startContainer);
-  const all = [...host2.querySelectorAll("p, h1, h2, h3, li")].filter((el) => range.intersectsNode(el));
+  const endBlock = blockOf(host2, range.endContainer);
+  let skip = null;
+  if (endBlock && endBlock !== caretBlock) {
+    const head = document.createRange();
+    head.setStart(endBlock, 0);
+    head.setEnd(range.endContainer, range.endOffset);
+    if (head.toString() === "") skip = endBlock;
+  }
+  const all = [...host2.querySelectorAll("p, h1, h2, h3, li")].filter((el) => el !== skip && range.intersectsNode(el) && !(skip && skip.contains(el)));
   return all.length ? all : caretBlock ? [caretBlock] : [];
 };
 function setBlockStyle(host2, style) {
@@ -8914,6 +8958,7 @@ function stateAt(host2) {
     size: sized && RICH_TEXT_SIZES.includes(sized.getAttribute("data-size")) ? sized.getAttribute("data-size") : "normal",
     align,
     list: list ? list.tagName : null,
+    anyList: Boolean(list) || blocksIn(host2).some((b) => closestIn(host2, b, (el) => el.tagName === "UL" || el.tagName === "OL")),
     bold: has(["STRONG", "B"]) || !heading && q("bold"),
     italic: has(["EM", "I"]) || q("italic"),
     underline: has(["U"]) || q("underline"),
@@ -8954,11 +8999,13 @@ function applySize(host2, size) {
   }
   reselect(texts);
 }
-function RichTextEditor({ value, fallbackText, onChange, onProblem, readOnly, label = "Description" }) {
+function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOnly, label = "Description" }) {
   const host2 = useRef(null);
   const saved = useRef(null);
   const changeRef = useRef(onChange);
   const problemRef = useRef(onProblem);
+  const restRef = useRef(rest);
+  restRef.current = rest;
   const history = useRef({ stack: [], index: -1 });
   const dragging = useRef(false);
   const [state, setState] = useState(stateAt(null));
@@ -8978,7 +9025,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, readOnly, la
     return [measure(el, sel.anchorNode, sel.anchorOffset), measure(el, sel.focusNode, sel.focusOffset)];
   };
   const report = (doc) => {
-    const found = docProblem(doc);
+    const found = docProblem(doc, restRef.current || {});
     setProblem(found);
     problemRef.current?.(found);
   };
@@ -8991,7 +9038,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, readOnly, la
       return;
     }
     const entry = { doc, json, caret: caretNow(), typing, at: Date.now() };
-    if (typing && top && top.typing && entry.at - top.at < 1e3 && h.index > 0) h.stack[h.index] = entry;
+    if (typing && top && top.typing === typing && entry.at - top.at < 1e3 && h.index > 0 && h.index === h.stack.length - 1) h.stack[h.index] = entry;
     else {
       h.stack = [...h.stack.slice(0, h.index + 1), entry].slice(-200);
       h.index = h.stack.length - 1;
@@ -9086,6 +9133,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, readOnly, la
   };
   const insertData = (data, range) => {
     const html = data.getData("text/html");
+    if (!html && !data.getData("text/plain")) return;
     const doc = html ? domToDoc(new DOMParser().parseFromString(html, "text/html").body) : plainToDoc(data.getData("text/plain"));
     const scratch = document.createElement("div");
     renderDoc(scratch, doc);
@@ -9146,11 +9194,11 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, readOnly, la
       type: "button",
       className: `dy-rt-btn${on ? " on" : ""}`,
       "data-rt": id,
-      title: ALIGNS.includes(id) && state.list ? `${title} (not available in lists)` : title,
+      title: ALIGNS.includes(id) && state.anyList ? `${title} (not available in lists)` : title,
       "aria-label": title,
       "aria-pressed": on ? "true" : "false",
       // Alignment is not stored on list items (Quan re-check L1).
-      disabled: readOnly || ALIGNS.includes(id) && Boolean(state.list),
+      disabled: readOnly || ALIGNS.includes(id) && Boolean(state.anyList),
       onMouseDown: (event) => event.preventDefault(),
       onClick: () => run(act),
       children: typeof face === "string" ? jsx("span", { className: `dy-rt-face dy-rt-face-${id}`, children: face }) : jsx(Icon, { name: face.icon })
@@ -9205,7 +9253,10 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, readOnly, la
       contentEditable: readOnly ? "false" : "true",
       suppressContentEditableWarning: true,
       spellCheck: true,
-      onInput: (event) => emit(String(event.nativeEvent?.inputType || "").startsWith("insertText")),
+      onInput: (event) => {
+        const kind = String(event.nativeEvent?.inputType || "");
+        emit(kind.startsWith("insertText") ? "insert" : kind.startsWith("delete") ? "delete" : false);
+      },
       onKeyDown,
       onPaste,
       onDrop,
@@ -10608,7 +10659,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     out.push(jsx(RichTextEditor, { value: f.description_doc, fallbackText: f.description, readOnly: off, onChange: (doc, plain) => {
       setField("description_doc", plain ? doc : void 0);
       setField("description", plain || void 0);
-    }, onProblem: setRichProblem }, `rt-${selected?.id}`));
+    }, onProblem: setRichProblem, rest: { ...f, text: drawerText } }, `rt-${selected?.id}`));
     const links = f.links ?? [];
     out.push(jsxs("fieldset", { className: "dy-pc-fieldset", "data-canvas-links": true, children: [
       jsx("legend", { children: `Links${links.length ? ` (${links.length})` : ""}` }),

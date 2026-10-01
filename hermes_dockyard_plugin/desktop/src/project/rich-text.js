@@ -25,9 +25,10 @@ const LIST_TYPES = ['1', 'a', 'A', 'i', 'I']
 // five list levels is the deepest a document can nest and still save.
 export const MAX_LIST_LEVELS = 5
 const MARK_ORDER = ['bold', 'italic', 'underline', 'strike', 'fontSize']
-// Mirrors canvas_service: description <= 20,000 characters, <= 3,000 rich
-// text nodes, and a card <= 64 KB (other fields need some of that room).
-export const RICH_TEXT_LIMITS = Object.freeze({ chars: 20000, nodes: 3000, bytes: 60 * 1024 })
+// Mirrors canvas_service: description <= 20,000 characters (code points),
+// <= 3,000 rich text nodes, and the whole card <= 64 KB measured the way the
+// server measures it (see serverJsonBytes).
+export const RICH_TEXT_LIMITS = Object.freeze({ chars: 20000, nodes: 3000, bytes: 64 * 1024 })
 const ZWSP = /\u200B/g
 
 // Plain text in, a simple doc out: old cards only have a plain description.
@@ -181,9 +182,15 @@ const tidy = (node) => {
 }
 
 // Read an editor (or pasted) DOM subtree into an allow-listed doc.
+const hasText = (node) => (node.type === 'text' ? Boolean(node.text.trim()) : (node.content || []).some(hasText))
+// Lists whose items are all empty (left behind by select-all + Delete) are
+// not content (Quan re-check 2, L3).
+const dropEmptyLists = (nodes) => nodes.filter((n) => !((n.type === 'bulletList' || n.type === 'orderedList') && !hasText(n)))
+  .map((n) => (n.content && n.type !== 'paragraph' && n.type !== 'heading' ? { ...n, content: dropEmptyLists(n.content) } : n))
+
 export function domToDoc(root) {
   const blocks = readBlocks(root, { level: 0, marks: {} })
-  const content = blocks.flatMap((b) => (b.type === '__lift' ? [{ type: 'bulletList', content: b.content }] : [b]))
+  const content = dropEmptyLists(blocks.flatMap((b) => (b.type === '__lift' ? [{ type: 'bulletList', content: b.content }] : [b])))
   return tidy({ type: 'doc', content: content.length ? content : [{ type: 'paragraph' }] })
 }
 
@@ -209,15 +216,34 @@ export function docToPlain(doc) {
 }
 
 // Size check against the server's limits; returns null or a message.
-export function docProblem(doc) {
+// UTF-8 size of `value` as Python's json.dumps(value, ensure_ascii=False)
+// writes it (", " and ": " separators), which is what the server counts.
+export function serverJsonBytes(value) {
+  const enc = new TextEncoder()
+  const size = (v) => {
+    if (Array.isArray(v)) return 2 + v.reduce((n, x) => n + size(x), 0) + Math.max(0, v.length - 1) * 2
+    if (v && typeof v === 'object') {
+      const keys = Object.keys(v).filter((k) => v[k] !== undefined)
+      return 2 + keys.reduce((n, k) => n + enc.encode(JSON.stringify(k)).length + 2 + size(v[k]), 0) + Math.max(0, keys.length - 1) * 2
+    }
+    return enc.encode(JSON.stringify(v ?? null)).length
+  }
+  return size(value)
+}
+
+// Size check against the server's limits; returns null or a message.
+// `rest` is the card's other content, which shares the 64 KB card limit.
+export function docProblem(doc, rest = {}) {
   let nodes = 0
   const count = (node) => { for (const child of node.content || []) { nodes += 1; count(child) } }
   count(doc)
-  const chars = docToPlain(doc).length
-  const bytes = new TextEncoder().encode(JSON.stringify(doc)).length
+  const chars = [...docToPlain(doc)].length
+  const counted = { ...rest, description_doc: doc }
+  delete counted.description
+  const bytes = serverJsonBytes(counted)
   if (chars > RICH_TEXT_LIMITS.chars) return `Too long: ${chars.toLocaleString('en-GB')} of ${RICH_TEXT_LIMITS.chars.toLocaleString('en-GB')} characters. Shorten it before applying.`
   if (nodes > RICH_TEXT_LIMITS.nodes) return `Too much formatting: ${nodes.toLocaleString('en-GB')} of ${RICH_TEXT_LIMITS.nodes.toLocaleString('en-GB')} pieces. Remove some paragraphs or formatting before applying.`
-  if (bytes > RICH_TEXT_LIMITS.bytes) return 'This description is too large to save. Remove some text or formatting before applying.'
+  if (bytes > RICH_TEXT_LIMITS.bytes) return 'This card is too large to save. Remove some text or formatting before applying.'
   return null
 }
 
@@ -323,6 +349,21 @@ function normaliseDom(host) {
     if (el.style && el.style.length) { el.removeAttribute('style'); changed = true }
   }
   for (const el of [...host.querySelectorAll('ul, ol')]) if (!el.querySelector('li')) { el.remove(); changed = true }
+  // Select-all + Delete can leave empty bullets behind; an editor with no
+  // text whose only leftovers are lists goes back to one empty paragraph
+  // (L3). An empty heading chosen from the style menu is kept.
+  if (!host.textContent.replace(ZWSP, '').trim() && host.querySelector('ul, ol')) {
+    while (host.firstChild) host.removeChild(host.firstChild)
+    const p = document.createElement('p')
+    p.appendChild(document.createElement('br'))
+    host.appendChild(p)
+    if (keep) { keep[0] = p; keep[1] = 0; keep[2] = p; keep[3] = 0 }
+    changed = true
+  }
+  // Alignment is not kept inside lists (Quan re-check 2, L2).
+  for (const el of [...host.querySelectorAll('li[style], li > p[style], li > h1[style], li > h2[style], li > h3[style]')]) {
+    if (el.style.textAlign) { el.style.removeProperty('text-align'); if (!el.getAttribute('style')) el.removeAttribute('style'); changed = true }
+  }
   // Lift blocks out of paragraphs/headings, splitting the parent around them.
   for (let guard = 0; guard < 200; guard += 1) {
     const outer = [...host.querySelectorAll('p, h1, h2, h3')].find((el) => [...el.children].some((c) => INNER_BLOCKS.has(c.tagName)))
@@ -377,7 +418,7 @@ function measure(host, target, targetOffset) {
       return null
     }
     if (el.nodeType !== 1) return null
-    if (el !== host && POS_BLOCKS.has(el.tagName)) n += 1
+    if (el !== host && POS_BLOCKS.has(el.tagName) && !(el.tagName === 'P' && el.parentElement?.tagName === 'LI')) n += 1
     if (el.tagName === 'BR') n += 1
     const kids = el.childNodes
     for (let i = 0; i < kids.length; i += 1) {
@@ -402,7 +443,7 @@ function locate(host, pos) {
       return null
     }
     if (el.nodeType !== 1) return null
-    if (el !== host && POS_BLOCKS.has(el.tagName)) { n += 1; if (n >= pos && !el.querySelector('li')) return [el, 0] }
+    if (el !== host && POS_BLOCKS.has(el.tagName) && !(el.tagName === 'P' && el.parentElement?.tagName === 'LI')) { n += 1; if (n >= pos && !el.querySelector('li')) return [el, 0] }
     if (el.tagName === 'BR') { n += 1; if (n >= pos) return [el.parentNode, [...el.parentNode.childNodes].indexOf(el) + 1] }
     for (const child of el.childNodes) { const found = go(child); if (found) return found }
     return null
@@ -478,7 +519,17 @@ const blocksIn = (host) => {
   if (!sel.rangeCount) return []
   const range = sel.getRangeAt(0)
   const caretBlock = blockOf(host, range.startContainer)
-  const all = [...host.querySelectorAll('p, h1, h2, h3, li')].filter((el) => range.intersectsNode(el))
+  // A triple-click ends the range at offset 0 of the next block; that block
+  // is not selected (Quan re-check 2, L1).
+  const endBlock = blockOf(host, range.endContainer)
+  let skip = null
+  if (endBlock && endBlock !== caretBlock) {
+    const head = document.createRange()
+    head.setStart(endBlock, 0)
+    head.setEnd(range.endContainer, range.endOffset)
+    if (head.toString() === '') skip = endBlock
+  }
+  const all = [...host.querySelectorAll('p, h1, h2, h3, li')].filter((el) => el !== skip && range.intersectsNode(el) && !(skip && skip.contains(el)))
   return all.length ? all : (caretBlock ? [caretBlock] : [])
 }
 
@@ -535,6 +586,7 @@ function stateAt(host) {
     style: heading ? heading.tagName.toLowerCase() : 'p',
     size: sized && RICH_TEXT_SIZES.includes(sized.getAttribute('data-size')) ? sized.getAttribute('data-size') : 'normal',
     align, list: list ? list.tagName : null,
+    anyList: Boolean(list) || blocksIn(host).some((b) => closestIn(host, b, (el) => el.tagName === 'UL' || el.tagName === 'OL')),
     bold: has(['STRONG', 'B']) || (!heading && q('bold')), italic: has(['EM', 'I']) || q('italic'),
     underline: has(['U']) || q('underline'), strike: has(['S', 'STRIKE', 'DEL']) || q('strikeThrough'),
   }
@@ -578,11 +630,13 @@ function applySize(host, size) {
 
 // Word-style editor: a formatting bar over the text. `value` is a TipTap-
 // shaped doc (or null); `onChange(doc, plainText)` fires on every edit.
-export function RichTextEditor({ value, fallbackText, onChange, onProblem, readOnly, label = 'Description' }) {
+export function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOnly, label = 'Description' }) {
   const host = useRef(null)
   const saved = useRef(null)
   const changeRef = useRef(onChange)
   const problemRef = useRef(onProblem)
+  const restRef = useRef(rest)
+  restRef.current = rest
   // Own undo history: [{ doc, caret: [anchor, focus], typing, at }], index.
   const history = useRef({ stack: [], index: -1 })
   const dragging = useRef(false)
@@ -604,7 +658,7 @@ export function RichTextEditor({ value, fallbackText, onChange, onProblem, readO
     return [measure(el, sel.anchorNode, sel.anchorOffset), measure(el, sel.focusNode, sel.focusOffset)]
   }
   const report = (doc) => {
-    const found = docProblem(doc)
+    const found = docProblem(doc, restRef.current || {})
     setProblem(found)
     problemRef.current?.(found)
   }
@@ -615,7 +669,9 @@ export function RichTextEditor({ value, fallbackText, onChange, onProblem, readO
     if (top && top.json === json) { top.caret = caretNow(); return }
     const entry = { doc, json, caret: caretNow(), typing, at: Date.now() }
     // Consecutive typing within a second is one undo step, as in Word.
-    if (typing && top && top.typing && entry.at - top.at < 1000 && h.index > 0) h.stack[h.index] = entry
+    // Never merge into a state that has a redo tail after it: that tail is
+    // stale once new text is typed (Quan re-check 2, H1).
+    if (typing && top && top.typing === typing && entry.at - top.at < 1000 && h.index > 0 && h.index === h.stack.length - 1) h.stack[h.index] = entry
     else { h.stack = [...h.stack.slice(0, h.index + 1), entry].slice(-200); h.index = h.stack.length - 1 }
   }
   const emit = (typing = false) => {
@@ -699,6 +755,7 @@ export function RichTextEditor({ value, fallbackText, onChange, onProblem, readO
   // allow-list) and renderDoc before it reaches the live editor.
   const insertData = (data, range) => {
     const html = data.getData('text/html')
+    if (!html && !data.getData('text/plain')) return // a file or image: nothing to insert (L5)
     // DOMParser builds an inert document: nothing in it runs or loads.
     const doc = html ? domToDoc(new DOMParser().parseFromString(html, 'text/html').body) : plainToDoc(data.getData('text/plain'))
     const scratch = document.createElement('div')
@@ -750,9 +807,9 @@ export function RichTextEditor({ value, fallbackText, onChange, onProblem, readO
     const [id, title, face, act, active] = tool
     const on = Boolean(active(state))
     return jsx('button', {
-      type: 'button', className: `dy-rt-btn${on ? ' on' : ''}`, 'data-rt': id, title: ALIGNS.includes(id) && state.list ? `${title} (not available in lists)` : title, 'aria-label': title, 'aria-pressed': on ? 'true' : 'false',
+      type: 'button', className: `dy-rt-btn${on ? ' on' : ''}`, 'data-rt': id, title: ALIGNS.includes(id) && state.anyList ? `${title} (not available in lists)` : title, 'aria-label': title, 'aria-pressed': on ? 'true' : 'false',
       // Alignment is not stored on list items (Quan re-check L1).
-      disabled: readOnly || (ALIGNS.includes(id) && Boolean(state.list)),
+      disabled: readOnly || (ALIGNS.includes(id) && Boolean(state.anyList)),
       onMouseDown: (event) => event.preventDefault(), onClick: () => run(act),
       children: typeof face === 'string' ? jsx('span', { className: `dy-rt-face dy-rt-face-${id}`, children: face }) : jsx(Icon, { name: face.icon }),
     }, id)
@@ -776,7 +833,10 @@ export function RichTextEditor({ value, fallbackText, onChange, onProblem, readO
     jsx('div', { className: `dy-rt-host${readOnly ? ' readonly' : ''}`, children: jsx('div', {
       ref: host, className: 'dy-rt-body', 'data-canvas-rich-text': 'true', role: 'textbox', 'aria-multiline': 'true', 'aria-label': label,
       contentEditable: readOnly ? 'false' : 'true', suppressContentEditableWarning: true, spellCheck: true,
-      onInput: (event) => emit(String(event.nativeEvent?.inputType || '').startsWith('insertText')),
+      onInput: (event) => {
+        const kind = String(event.nativeEvent?.inputType || '')
+        emit(kind.startsWith('insertText') ? 'insert' : kind.startsWith('delete') ? 'delete' : false)
+      },
       onKeyDown, onPaste, onDrop, onDragOver: (event) => { if (!dragging.current) event.preventDefault() },
       onDragStart: () => { dragging.current = true }, onDragEnd: () => { dragging.current = false },
       onKeyUp: refresh, onMouseUp: refresh, onFocus: refresh,

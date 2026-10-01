@@ -1097,6 +1097,90 @@ test('Rich text: lists - alignment is off inside lists and a heading leaves the 
   });
 });
 
+test('Rich text: Quan re-check 2 - stale redo, caret after undo, server-sized limit, triple-click Clear, mixed alignment, empty bullets, file drop', { timeout: 240000 }, async () => {
+  await withPage(1440, 900, async (page, host) => {
+    const ctx = await openEditor(page);
+    const { body, tool, drawer } = ctx;
+    // H1: undo, then type at once, then redo must not replace the new text.
+    await page.keyboard.type('base hello');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('second line');
+    await page.keyboard.press('Control+z');
+    await page.keyboard.press('Control+z');
+    await page.keyboard.type(' NEWTEXT');
+    assert.match(await body.innerText(), /NEWTEXT/);
+    await page.keyboard.press('Control+Shift+z');
+    await page.keyboard.press('Control+y');
+    assert.match(await body.innerText(), /NEWTEXT/, 'redo after new typing keeps the new text');
+    // M1: caret after undo lands where it was, after a toolbar-built list.
+    await page.keyboard.press('Control+a');
+    await page.keyboard.press('Delete');
+    await tool('bullets').click();
+    for (const w of ['one', 'two', 'three', 'four']) { await page.keyboard.type(w); await page.keyboard.press('Enter'); }
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('tail words here');
+    await selectText(page, 'words');
+    await tool('italic').click();
+    await page.keyboard.press('Control+z');
+    await page.keyboard.press('End');
+    await page.keyboard.type('Q');
+    assert.match(await body.innerText(), /tail words hereQ/, 'caret after undo is in the right place');
+    // L1: triple-click a heading then Clear leaves the next heading alone.
+    await page.keyboard.press('Control+a');
+    await page.keyboard.press('Delete');
+    await pasteHtml(page, '<h1>First head</h1><h2 style="text-align:right">Second head</h2>');
+    await body.locator('h1').click({ clickCount: 3 });
+    await tool('clear').click();
+    assert.equal(await body.locator('h2[style*="right"]').innerText(), 'Second head', 'next heading untouched');
+    // L2: a selection from a paragraph into a list cannot align.
+    await page.keyboard.press('Control+a');
+    await page.keyboard.press('Delete');
+    await page.keyboard.type('para');
+    await page.keyboard.press('Enter');
+    await tool('bullets').click();
+    await page.keyboard.type('item');
+    await page.evaluate(() => {
+      const el = document.querySelector('[data-canvas-rich-text]');
+      const p = el.querySelector('p'); const li = el.querySelector('li');
+      window.getSelection().setBaseAndExtent(p.firstChild, 1, li.firstChild, 2);
+      document.dispatchEvent(new Event('selectionchange'));
+    });
+    await page.waitForTimeout(50);
+    assert.equal(await tool('center').isDisabled(), true, 'alignment off when the selection reaches a list');
+    // L3: select-all + Delete after a nested list leaves no empty bullets.
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('nested');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Control+a');
+    await page.keyboard.press('Delete');
+    // L5: dropping a file (no text) inserts nothing.
+    await page.keyboard.type('alpha');
+    const box = await body.boundingBox();
+    await page.evaluate(({ x, y }) => {
+      const el = document.querySelector('[data-canvas-rich-text]');
+      const dt = new DataTransfer();
+      dt.items.add(new File(['x'], 'a.png', { type: 'image/png' }));
+      el.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: x, clientY: y }));
+    }, { x: box.x + 20, y: box.y + 12 });
+    assert.equal(await body.locator('br').count(), 0, 'no stray line break');
+    const saved = await saveDoc(page, host, ctx);
+    assert.equal(saved.description, 'alpha', 'no empty bullets saved');
+    // M2: a heavily formatted paste the server would refuse is caught,
+    // measured the way the server measures (Python json.dumps).
+    await ctx.canvas.locator(`[data-canvas-object="${ctx.id}"]`).click();
+    await drawer.waitFor();
+    await body.click();
+    await page.keyboard.press('Control+a');
+    await page.keyboard.press('Delete');
+    await pasteHtml(page, Array.from({ length: 330 }, (_, i) => `<span data-size="huge"><b><i><u><s>r${i}</s></u></i></b></span><span>-</span>`).join(''));
+    const problem = drawer.locator('[data-canvas-rich-problem]');
+    await problem.waitFor();
+    assert.match(await problem.innerText(), /too large to save/);
+    assert.equal(await drawer.locator('[data-action="apply-canvas-object"]').isDisabled(), true);
+  });
+});
+
 test('Planning cards on a phone: details panel fits the screen with formatting bar and fields', { timeout: 180000 }, async () => {
   await withPage(390, 844, async (page) => {
     const canvas = root(page);
