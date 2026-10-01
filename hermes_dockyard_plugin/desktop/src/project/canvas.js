@@ -1424,7 +1424,12 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     jsx(Button, { small: true, variant, action, ariaLabel: name, disabled, onClick, data: { title: `${name} — ${tip}`, ...data }, children: label ? [jsx(Icon, { name: icon }, 'i'), jsx('span', { children: label }, 'l')] : jsx(Icon, { name: icon }) }),
     jsxs('span', { className: 'dy-pc-tip', role: 'tooltip', 'aria-hidden': true, children: [jsx('strong', { children: name }), jsx('span', { children: tip })] }),
   ]}, action)
-  const group = (label, children) => jsxs('div', { className: 'dy-pc-group', role: 'group', 'aria-label': label, 'data-pc-group': label.toLowerCase(), children: [jsx('span', { className: 'dy-pc-group-label', 'aria-hidden': true, children: label }), ...children] })
+  // Stage 3 ribbon: each group is a column with its name in the shared title
+  // strip on top and its tools on the row beneath.
+  const group = (label, children) => jsxs('div', { className: 'dy-pc-group', role: 'group', 'aria-label': label, 'data-pc-group': label.toLowerCase(), children: [
+    jsx('span', { className: 'dy-pc-group-label', 'aria-hidden': true, children: label }, 'label'),
+    jsxs('div', { className: 'dy-pc-group-tools', children }, 'tools'),
+  ] })
   const liveBoards = boards.filter((board) => board.status !== 'archived')
   const archivedBoards = boards.filter((board) => board.status === 'archived')
   const listed = boardsApi ? liveBoards : [canvas].filter(Boolean)
@@ -1513,7 +1518,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
         ]}),
       ]}),
       jsxs('div', { className: 'dy-pc', 'data-canvas-theme': theme ?? undefined, children: [
-        jsxs('div', { className: 'dy-pc-toolbar', role: 'toolbar', 'aria-label': 'Planning canvas tools', children: [
+        jsxs('div', { className: 'dy-pc-toolbar dy-pc-ribbon', role: 'toolbar', 'aria-label': 'Planning canvas tools', children: [
           group('Edit', [
             tool({ action: 'pc-mode-select', icon: 'mouse-pointer-2', name: 'Select', tip: 'Click to edit, drag a sticker to move it. Drag empty space or scroll to move around; Shift+drag to multi-select; Ctrl+scroll zooms.', variant: mode === 'select' ? 'primary' : '', onClick: () => { setMode('select'); setPendingConnect(null) } }),
             tool({ action: 'pc-mode-connect', icon: 'spline', name: 'Connect', tip: 'Click two stickers to link them with the chosen meaning.', variant: mode === 'connect' ? 'primary' : '', disabled: readOnly, onClick: () => { setMode('connect'); setPendingConnect(null) } }),
@@ -1525,7 +1530,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
           group('Add', [
             jsxs('div', { className: 'dy-pc-add', children: [
               jsx('select', { 'data-canvas-kind-picker': true, 'aria-label': 'Object kind', value: kind, disabled: readOnly, onChange: (event) => setKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx('option', { value, children: CANVAS_KIND_LABELS[value] }, value)) }),
-              jsx('input', { 'data-canvas-draft': true, 'aria-label': 'New object text', value: draft, disabled: readOnly, maxLength: 4000, placeholder: 'Capture a note, observation, question or link...', onChange: (event) => setDraft(event.target.value), onKeyDown: (event) => { if (event.key === 'Enter') { event.preventDefault(); addFromDraft() } } }),
+              jsx('input', { 'data-canvas-draft': true, 'aria-label': 'New object text', value: draft, disabled: readOnly, maxLength: 4000, placeholder: 'Type a note, question or link…', onChange: (event) => setDraft(event.target.value), onKeyDown: (event) => { if (event.key === 'Enter') { event.preventDefault(); addFromDraft() } } }),
               tool({ action: 'add-canvas-object', icon: 'plus', name: 'Add object', tip: 'Add the text above as a sticker of the chosen kind.', variant: 'primary', disabled: !draft.trim() || readOnly, onClick: addFromDraft }),
             ]}),
             jsxs('div', { className: 'dy-pc-tool', ref: addMenuRef, children: [
@@ -1549,6 +1554,7 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
             tool({ action: 'pc-curate', icon: 'sparkles', name: 'Curate', tip: 'Ask the steward to turn this board into proposals.', disabled: busy || readOnly, onClick: () => curate() }),
             tool({ action: 'pc-review', icon: 'list-checks', name: 'Review', tip: 'Count what is on this board; nothing is sent to AI.', disabled: busy, onClick: reviewCanvas }),
           ]),
+          jsx('div', { className: 'dy-pc-ribbon-fill', 'aria-hidden': true }, 'fill'),
           group('Save', [
             tool({ action: 'pc-reload', icon: 'refresh-cw', name: 'Reload', tip: 'Re-read the saved board; discards unsaved edits.', disabled: busy, onClick: reload }),
             tool({ action: 'pc-save', icon: 'save', name: 'Save canvas', tip: 'Save this board as a new revision.', variant: 'primary', label: busy ? 'Working...' : 'Save', disabled: busy || readOnly, onClick: save }),

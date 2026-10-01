@@ -1411,6 +1411,53 @@ test('Planning boards: board list create, rename, archive, restore, status and r
   });
 });
 
+for (const [label, width, height] of [['desktop', 1440, 900], ['tablet', 1024, 800], ['phone', 390, 844]]) {
+  test(`Planning toolbar (${label}): stacked ribbon - group names in a title strip directly above their tools`, { timeout: 120000 }, async () => {
+    await withPage(width, height, async (page) => {
+      const canvas = root(page);
+      const m = await canvas.locator('.dy-pc-toolbar').evaluate((el) => {
+        const box = el.getBoundingClientRect();
+        const groups = [...el.querySelectorAll(':scope > .dy-pc-group')].map((g) => {
+          const label = g.querySelector(':scope > .dy-pc-group-label');
+          const tools = g.querySelector(':scope > .dy-pc-group-tools');
+          const l = label.getBoundingClientRect(); const t = tools.getBoundingClientRect();
+          const kids = [...tools.children].map((k) => k.getBoundingClientRect());
+          const range = document.createRange(); range.selectNodeContents(label); const txt = range.getBoundingClientRect();
+          return { name: g.dataset.pcGroup, text: label.textContent, gap: t.top - l.bottom, labelH: l.height,
+            textCentre: (txt.left + txt.right) / 2, toolsCentre: (Math.min(...kids.map((k) => k.left)) + Math.max(...kids.map((k) => k.right))) / 2,
+            inside: Math.min(...kids.map((k) => k.left)) >= l.left - 1 && Math.max(...kids.map((k) => k.right)) <= l.right + 1,
+            labelVisible: getComputedStyle(label).display !== 'none' };
+        });
+        const controls = [...el.querySelectorAll('button, select, input')].filter((b) => b.offsetParent).map((b) => b.getBoundingClientRect());
+        return { groups, out: controls.filter((b) => b.left < box.left - 1 || b.right > box.right + 1).length, minControl: Math.min(...controls.map((b) => Math.min(b.width, b.height))) };
+      });
+      assert.deepEqual(m.groups.map((g) => g.name), ['edit', 'add', 'view', 'ai', 'save'], 'five groups in order');
+      for (const g of m.groups) {
+        assert.ok(g.labelVisible && g.labelH >= 18, `${g.name}: name strip visible`);
+        assert.ok(Math.abs(g.gap) <= 1, `${g.name}: tools sit directly beneath the name (gap ${g.gap})`);
+        assert.ok(g.inside, `${g.name}: every tool sits under its own name`);
+        if (width > 700) assert.ok(Math.abs(g.textCentre - g.toolsCentre) <= 2, `${g.name}: name centred over its tools`);
+      }
+      assert.equal(m.out, 0, 'no control outside the toolbar');
+      // The add box is wide enough to show its whole hint.
+      const hint = await canvas.locator('[data-canvas-draft]').evaluate((input) => {
+        const c = document.createElement('canvas').getContext('2d'); const cs = getComputedStyle(input); c.font = `${cs.fontSize} ${cs.fontFamily}`;
+        return { need: c.measureText(input.placeholder).width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight), have: input.getBoundingClientRect().width };
+      });
+      assert.ok(hint.have >= hint.need, `add box shows its whole hint (${Math.round(hint.have)} >= ${Math.round(hint.need)})`);
+      if (width <= 700) assert.ok(m.minControl >= 40, `phone touch targets >= 40px (got ${m.minControl})`);
+      // Desktop: one row - every name strip on the same line, Save at the right edge.
+      if (width >= 1400) {
+        const tops = await canvas.locator('.dy-pc-group-label').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+        assert.equal(new Set(tops).size, 1, 'single ribbon row on desktop');
+        const save = await canvas.locator('[data-pc-group="save"]').boundingBox();
+        const bar = await canvas.locator('.dy-pc-toolbar').boundingBox();
+        assert.ok(Math.abs(save.x + save.width - (bar.x + bar.width)) <= 2, 'Save pinned to the right');
+      }
+    });
+  });
+}
+
 for (const [label, width, height] of [['desktop', 1440, 900], ['phone', 390, 844]]) {
   test(`Planning boards (${label}): every toolbar tool is labelled, explained and works`, { timeout: 180000 }, async () => {
     await withPage(width, height, async (page, host) => {

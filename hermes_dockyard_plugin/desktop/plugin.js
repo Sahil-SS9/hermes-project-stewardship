@@ -2546,8 +2546,17 @@ var workflow_canvas_css_default = `
 .dy-pc-scope .dy-pc-spacer { flex: 1 1 auto; }
 /* D17: grouped toolbar (Edit / Add / View / AI / Save) of icon buttons. Each
    group carries a small caption; each button a tooltip (name + one line). */
-.dy-pc-scope .dy-pc-group { display: flex; align-items: center; gap: 3px; padding: 2px 4px 2px 6px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface); }
-.dy-pc-scope .dy-pc-group-label { margin-right: 3px; color: var(--dy-text-3); font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+/* Stage 3 ribbon (owner 30/09): one title strip spans the whole toolbar with
+   the group names; each group's tools sit directly beneath its name, groups
+   split by thin dividers, Save pinned right. The strip is drawn by every
+   label and by the filler, so it stays continuous when groups wrap. */
+.dy-pc-scope .dy-pc-toolbar.dy-pc-ribbon { gap: 0; padding: 0; align-items: stretch; }
+.dy-pc-scope .dy-pc-group { display: flex; flex-direction: column; min-width: 0; border-left: 1px solid var(--dy-border); }
+.dy-pc-scope .dy-pc-ribbon > .dy-pc-group:first-child { border-left: 0; }
+.dy-pc-scope .dy-pc-group-label { display: block; height: 22px; padding: 0 10px; border-bottom: 1px solid var(--dy-border); background: var(--dy-pc-ribbon-band); color: var(--dy-text-2); font-size: 9.5px; font-weight: 700; letter-spacing: .1em; line-height: 22px; text-align: center; text-transform: uppercase; white-space: nowrap; }
+.dy-pc-scope .dy-pc-group-tools { display: flex; flex: 1 1 auto; align-items: center; justify-content: center; gap: 3px; padding: 6px 8px; }
+.dy-pc-scope .dy-pc-ribbon-fill { flex: 1 1 0; min-width: 0; background: linear-gradient(var(--dy-pc-ribbon-band) 0 22px, var(--dy-border) 22px 23px, transparent 23px); }
+.dy-pc-scope { --dy-pc-ribbon-band: color-mix(in srgb, var(--dy-surface-subtle) 55%, var(--dy-border)); }
 .dy-pc-scope .dy-pc-tool { position: relative; display: inline-flex; }
 .dy-pc-scope .dy-pc-tool .dockyard-button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 30px; min-height: 30px; padding: 5px 7px; }
 .dy-pc-scope .dy-pc-tool .dockyard-button svg { width: 15px; height: 15px; flex: 0 0 auto; }
@@ -2773,8 +2782,17 @@ var workflow_canvas_css_default = `
 @media (max-width: 640px) {
   .dy-pc-scope .dy-pc-add { flex-wrap: wrap; flex: 1 1 100%; }
   .dy-pc-scope .dy-pc-add input { min-width: 0; flex: 1 1 140px; }
-  .dy-pc-scope .dy-pc-group { flex-wrap: wrap; }
-  .dy-pc-scope .dy-pc-group-label { display: none; }
+  /* Phone: groups wrap onto rows, each keeps its name strip on top; tools
+     wrap and get 40px touch targets. */
+  .dy-pc-scope .dy-pc-group { flex: 1 1 auto; border-bottom: 1px solid var(--dy-border); }
+  .dy-pc-scope .dy-pc-group[data-pc-group="add"] { flex-basis: 100%; border-left: 0; }
+  .dy-pc-scope .dy-pc-group-tools { flex-wrap: wrap; justify-content: flex-start; }
+  .dy-pc-scope .dy-pc-tool .dockyard-button { min-width: 40px; min-height: 40px; }
+  .dy-pc-scope .dy-pc-add select, .dy-pc-scope .dy-pc-add input { min-height: 40px; }
+  /* The draft box takes its own full row so the hint text is not cut off. */
+  .dy-pc-scope .dy-pc-add input { flex: 1 1 100%; order: -1; }
+  .dy-pc-scope .dy-pc-group-label { text-align: left; }
+  .dy-pc-scope .dy-pc-ribbon-fill { display: none; }
   .dy-pc-scope .dy-pc-tip { display: none; }
   .dy-pc-scope .dy-pc-chat.open { left: 8px; right: 8px; width: auto; }
   .dy-pc-scope .dy-pc-chat.closed { right: 8px; width: min(268px, calc(100% - 16px)); }
@@ -10813,7 +10831,10 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     jsx(Button, { small: true, variant, action, ariaLabel: name, disabled, onClick, data: { title: `${name} \u2014 ${tip}`, ...data }, children: label ? [jsx(Icon, { name: icon }, "i"), jsx("span", { children: label }, "l")] : jsx(Icon, { name: icon }) }),
     jsxs("span", { className: "dy-pc-tip", role: "tooltip", "aria-hidden": true, children: [jsx("strong", { children: name }), jsx("span", { children: tip })] })
   ] }, action);
-  const group = (label, children) => jsxs("div", { className: "dy-pc-group", role: "group", "aria-label": label, "data-pc-group": label.toLowerCase(), children: [jsx("span", { className: "dy-pc-group-label", "aria-hidden": true, children: label }), ...children] });
+  const group = (label, children) => jsxs("div", { className: "dy-pc-group", role: "group", "aria-label": label, "data-pc-group": label.toLowerCase(), children: [
+    jsx("span", { className: "dy-pc-group-label", "aria-hidden": true, children: label }, "label"),
+    jsxs("div", { className: "dy-pc-group-tools", children }, "tools")
+  ] });
   const liveBoards = boards.filter((board) => board.status !== "archived");
   const archivedBoards = boards.filter((board) => board.status === "archived");
   const listed = boardsApi ? liveBoards : [canvas].filter(Boolean);
@@ -10920,7 +10941,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
         ] })
       ] }),
       jsxs("div", { className: "dy-pc", "data-canvas-theme": theme ?? void 0, children: [
-        jsxs("div", { className: "dy-pc-toolbar", role: "toolbar", "aria-label": "Planning canvas tools", children: [
+        jsxs("div", { className: "dy-pc-toolbar dy-pc-ribbon", role: "toolbar", "aria-label": "Planning canvas tools", children: [
           group("Edit", [
             tool({ action: "pc-mode-select", icon: "mouse-pointer-2", name: "Select", tip: "Click to edit, drag a sticker to move it. Drag empty space or scroll to move around; Shift+drag to multi-select; Ctrl+scroll zooms.", variant: mode === "select" ? "primary" : "", onClick: () => {
               setMode("select");
@@ -10938,7 +10959,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
           group("Add", [
             jsxs("div", { className: "dy-pc-add", children: [
               jsx("select", { "data-canvas-kind-picker": true, "aria-label": "Object kind", value: kind, disabled: readOnly, onChange: (event) => setKind(event.target.value), children: CANVAS_OBJECT_KINDS.map((value) => jsx("option", { value, children: CANVAS_KIND_LABELS[value] }, value)) }),
-              jsx("input", { "data-canvas-draft": true, "aria-label": "New object text", value: draft, disabled: readOnly, maxLength: 4e3, placeholder: "Capture a note, observation, question or link...", onChange: (event) => setDraft(event.target.value), onKeyDown: (event) => {
+              jsx("input", { "data-canvas-draft": true, "aria-label": "New object text", value: draft, disabled: readOnly, maxLength: 4e3, placeholder: "Type a note, question or link\u2026", onChange: (event) => setDraft(event.target.value), onKeyDown: (event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
                   addFromDraft();
@@ -10973,6 +10994,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
             tool({ action: "pc-curate", icon: "sparkles", name: "Curate", tip: "Ask the steward to turn this board into proposals.", disabled: busy || readOnly, onClick: () => curate() }),
             tool({ action: "pc-review", icon: "list-checks", name: "Review", tip: "Count what is on this board; nothing is sent to AI.", disabled: busy, onClick: reviewCanvas })
           ]),
+          jsx("div", { className: "dy-pc-ribbon-fill", "aria-hidden": true }, "fill"),
           group("Save", [
             tool({ action: "pc-reload", icon: "refresh-cw", name: "Reload", tip: "Re-read the saved board; discards unsaved edits.", disabled: busy, onClick: reload }),
             tool({ action: "pc-save", icon: "save", name: "Save canvas", tip: "Save this board as a new revision.", variant: "primary", label: busy ? "Working..." : "Save", disabled: busy || readOnly, onClick: save })
