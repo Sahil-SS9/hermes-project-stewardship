@@ -37,7 +37,6 @@ except ImportError as e:  # pragma: no cover
 from ..cycles.engine import CycleEngine, CycleRefused
 from ..domain.constants import Capability
 from ..dockyard import Actor, ActorKind
-from ..events.bus import EventBus
 from ..gateway.handler import CommandRequest, GatewayCommandHandler
 from ..gateway.webhooks import WebhookRejected, WebhookReceiver
 from ..kanban import (
@@ -588,18 +587,11 @@ def create_app(
         store = open_store(db_path)
     svc = StewardshipService(store)
     engine = CycleEngine(svc)
-    bus = EventBus(store)
-    # Batch E1: notifications switched on. One engine on the bus; the service
-    # emits initiative lifecycle events through the same bus.
-    from ..events.notifications import NotificationEngine
+    # Batch E1: notifications switched on via the ONE shared wiring function
+    # (review bug 2) — bus, engine and decision hook in a single seam.
+    from ..events.notifications import wire_notification_stack
 
-    notification_engine = NotificationEngine(store, svc)
-    notification_engine.attach(bus)
-    svc.attach_event_bus(bus)
-    # Batch E2: decisions resolve their approval notifications on this path.
-    svc.on_decision(
-        lambda etype, ref, pid: notification_engine.on_decision_event(
-            etype, ref, pid))
+    bus, notification_engine = wire_notification_stack(store, svc)
     engine.attach_events(bus)
     gateway = GatewayCommandHandler(svc, cycle_engine=engine)
     webhooks = WebhookReceiver(svc, engine)
@@ -892,6 +884,12 @@ def create_app(
                 project_id, actor=actor, interface=interface, **changes
             )
         except ServiceError as exc:
+            # Review bug 1: notification-policy validation failures are 422
+            # (the review's "saving validates strictly" contract), matching
+            # the app-wide PUT; other settings errors keep the 409 envelope.
+            if "notification policy" in str(exc).lower() or \
+                    "notification_policy" in str(exc).lower():
+                raise HTTPException(status_code=422, detail=str(exc)) from None
             raise HTTPException(status_code=409, detail=str(exc)) from None
 
     @router.post("/projects/{project_id}/pause")
@@ -2099,10 +2097,13 @@ def create_app(
         payload = body or {}
         project_id = payload.get("project_id") or None
         kind = payload.get("kind") or None
-        mark_resolved = bool(payload.get("resolve", False))
+        severity = payload.get("severity") or None
+        if payload.get("resolve"):
+            raise HTTPException(
+                422, "bulk resolve is not supported; resolve items individually")
         actor = _principal_id(payload.get("actor_id") or "unknown")
         n = notification_engine.ack_matching(
-            project_id=project_id, kind=kind, resolve=mark_resolved, actor=actor)
+            project_id=project_id, kind=kind, severity=severity, actor=actor)
         return {"acked": n}
 
     @router.get("/notifications/popups")
@@ -2135,14 +2136,38 @@ def create_app(
         try:
             if project_id:
                 notification_engine.svc.require_feature(project_id, "notifications")
-                return {"effective": notification_engine.effective(project_id)}
-            # No project: the app-wide layer alone.
-            from ..events.notifications import effective_policy
+                effective = notification_engine.effective(project_id)
+            else:
+                # No project: the app-wide layer alone.
+                from ..events.notifications import effective_policy
 
-            return {"effective": effective_policy(
-                notification_engine.app_policy(), None)}
+                effective = effective_policy(
+                    notification_engine.app_policy(), None)
         except ServiceError as exc:
             raise HTTPException(404, str(exc)) from None
+        # The screen needs the zone quiet hours are evaluated in, and the
+        # list of stored keys that were ignored on read (review bug 1).
+        from ..events.notifications import normalize_policy
+
+        ignored = set((effective or {}).get("ignored", []))
+        try:
+            ignored |= set(normalize_policy(
+                notification_engine.app_policy()).get("ignored", []))
+        except ServiceError:
+            pass
+        if project_id:
+            try:
+                override = (
+                    notification_engine.svc.settings(project_id).get("policies")
+                    or {}).get("notification") or {}
+                ignored |= set(normalize_policy(override).get("ignored", []))
+            except ServiceError:
+                pass
+        ignored = sorted(ignored)
+        effective = dict(effective or {})
+        effective["ignored"] = ignored
+        effective["timezone"] = notification_engine.zone_name
+        return {"effective": effective}
 
     def _workflow_audience(
         project_id: str,

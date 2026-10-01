@@ -179,17 +179,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     engine = CycleEngine(svc)
     # Batch E1: the CLI surface reaches the same shared service path, so its
     # decisions emit the domain events that resolve approval notifications.
-    from ..events.bus import EventBus
-    from ..events.notifications import NotificationEngine
+    # One shared wiring seam (review bug 2).
+    from ..events.notifications import wire_notification_stack
 
-    bus = EventBus(store)
+    bus, notification_engine = wire_notification_stack(store, svc)
     engine.attach_events(bus)
-    svc.attach_event_bus(bus)
-    notification_engine = NotificationEngine(store, svc)
-    notification_engine.attach(bus)
-    svc.on_decision(
-        lambda etype, ref, pid: notification_engine.on_decision_event(
-            etype, ref, pid))
 
     try:
         return _dispatch(args, svc, engine, store)

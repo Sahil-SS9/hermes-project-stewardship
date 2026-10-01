@@ -85,6 +85,16 @@ _CHANNEL_SETTINGS: Dict[str, Tuple[str, ...]] = {
 
 _KNOWN_POLICY_KEYS = ("dedupe_window_minutes", "quiet_hours",
                       "bypass_quiet_hours", "channels")
+# Legacy/alias keys accepted on READ and SAVE (review bug 1):
+# - min_severity / severity_threshold: the list's recording threshold;
+# - minimum_severity: the real-DB spelling of min_severity;
+# - digest, max_open_initiatives: carried keys used elsewhere
+#   (propose_initiative reads max_open_initiatives).
+_ALIAS_MIN_SEVERITY = ("min_severity", "severity_threshold", "minimum_severity")
+# Legacy severity vocabulary still present in stored settings: "warning"
+# (the real DB uses it) maps onto the current scale's "low".
+_LEGACY_SEVERITY_ALIASES = {"warning": "low", "error": "high", "fatal": "critical"}
+_CARRIED_POLICY_KEYS = ("digest", "max_open_initiatives")
 _WINDOW_KEY_RE = re.compile(r"^approval_required:(.+)$")
 
 
@@ -92,32 +102,71 @@ _WINDOW_KEY_RE = re.compile(r"^approval_required:(.+)$")
 # Policy normalisation                                                    #
 # --------------------------------------------------------------------- #
 
-def normalize_policy(raw: Any) -> Dict[str, Any]:
+def normalize_policy_strict(raw: Any) -> Dict[str, Any]:
+    """Strict validation for SAVING a policy (app-wide PUT, project PATCH).
+
+    Accepts every legacy/alias shape (min_severity, severity_threshold,
+    minimum_severity, channels-as-list) plus the carried keys digest and
+    max_open_initiatives. Unknown keys or bad values raise ServiceError
+    (the API maps this to 422).
+    """
+    return normalize_policy(raw, strict=True)
+
+
+def normalize_policy(raw: Any, *, strict: bool = False) -> Dict[str, Any]:
     """Normalise a stored/user policy into the canonical effective shape.
 
-    Accepts every legacy shape. Raises ServiceError on unknown keys, bad
-    severities or malformed structures (the API maps this to 422).
+    Accepts every legacy shape. Two modes:
+
+    - **strict=True (saving)**: unknown keys or bad values raise
+      ServiceError (→ 422 at the API). Carried keys ``digest`` and
+      ``max_open_initiatives`` are accepted and preserved.
+    - **strict=False (reading, the default)**: a settings problem must
+      never stop a notification. Unknown keys are ignored and reported
+      under ``ignored``; invalid values fall back to the default; alias
+      keys map onto their new equivalents (a new key wins when both are
+      present).
     """
+    ignored: List[str] = []
     if raw is None:
         raw = {}
     if not isinstance(raw, dict):
-        raise ServiceError("notification policy must be an object")
-    unknown = sorted(set(raw) - set(_KNOWN_POLICY_KEYS + ("min_severity",)))
+        if strict:
+            raise ServiceError("notification policy must be an object")
+        return {**normalize_policy({}, strict=False), "ignored": ["<non-object>"]}
+    unknown = sorted(
+        set(raw) - set(_KNOWN_POLICY_KEYS + _CARRIED_POLICY_KEYS
+                       + _ALIAS_MIN_SEVERITY))
     if unknown:
-        raise ServiceError(f"unknown notification policy keys: {', '.join(unknown)}")
-    if "min_severity" in raw:
-        # Legacy flat shape: the list's recording threshold.
-        sev = raw["min_severity"]
-        if sev not in SEVERITIES:
-            raise ServiceError(f"invalid min_severity: {sev!r}")
-        raw = {k: v for k, v in raw.items() if k != "min_severity"}
+        if strict:
+            raise ServiceError(
+                f"unknown notification policy keys: {', '.join(unknown)}")
+        ignored.extend(unknown)
+        raw = {k: v for k, v in raw.items() if k not in unknown}
+
+    # Alias min-severity keys → the list's recording threshold. The new
+    # shape (channels.in_app.min_severity) wins when both are present.
+    alias_sev = None
+    for key in _ALIAS_MIN_SEVERITY:
+        if key in raw:
+            sev = raw[key]
+            sev = _LEGACY_SEVERITY_ALIASES.get(sev, sev)
+            if sev in SEVERITIES:
+                alias_sev = sev
+            elif strict:
+                raise ServiceError(f"invalid {key}: {sev!r}")
+            else:
+                ignored.append(key)
+    if alias_sev is not None:
+        raw = {k: v for k, v in raw.items() if k not in _ALIAS_MIN_SEVERITY}
         if isinstance(raw.get("channels"), dict):
-            # modern shape coexisting with legacy key: keep both sensibly
-            raw["channels"] = {"in_app": {"min_severity": sev}, **raw["channels"]}
+            raw["channels"] = {**raw["channels"]}
+            raw["channels"].setdefault(
+                "in_app", {"min_severity": alias_sev})
         elif isinstance(raw.get("channels"), list):
-            raw["channels"] = {"in_app": {"min_severity": sev}}
+            raw["channels"] = {"in_app": {"min_severity": alias_sev}}
         else:
-            raw["channels"] = {"in_app": {"min_severity": sev}}
+            raw["channels"] = {"in_app": {"min_severity": alias_sev}}
 
     policy: Dict[str, Any] = {}
 
@@ -125,13 +174,20 @@ def normalize_policy(raw: Any) -> Dict[str, Any]:
     if qh is not None:
         if (not isinstance(qh, dict) or set(qh) != {"start", "end"}
                 or not _is_hhmm(qh.get("start")) or not _is_hhmm(qh.get("end"))):
-            raise ServiceError(
-                'quiet_hours must be {"start": "HH:MM", "end": "HH:MM"}')
+            if strict:
+                raise ServiceError(
+                    'quiet_hours must be {"start": "HH:MM", "end": "HH:MM"}')
+            ignored.append("quiet_hours")
+            qh = None
     policy["quiet_hours"] = qh
 
-    window = raw.get("dedupe_window_minutes", DEFAULT_EFFECTIVE_POLICY["dedupe_window_minutes"])
+    window = raw.get("dedupe_window_minutes",
+                     DEFAULT_EFFECTIVE_POLICY["dedupe_window_minutes"])
     if not isinstance(window, int) or isinstance(window, bool) or window < 1:
-        raise ServiceError("dedupe_window_minutes must be a positive integer")
+        if strict:
+            raise ServiceError("dedupe_window_minutes must be a positive integer")
+        ignored.append("dedupe_window_minutes")
+        window = DEFAULT_EFFECTIVE_POLICY["dedupe_window_minutes"]
     policy["dedupe_window_minutes"] = window
 
     bypass = raw.get("bypass_quiet_hours",
@@ -139,12 +195,48 @@ def normalize_policy(raw: Any) -> Dict[str, Any]:
     if (not isinstance(bypass, list)
             or not all(k in ("approval_required", "alert", "health_change")
                        for k in bypass)):
-        raise ServiceError(
-            "bypass_quiet_hours must be a list of notification kinds")
+        if strict:
+            raise ServiceError(
+                "bypass_quiet_hours must be a list of notification kinds")
+        ignored.append("bypass_quiet_hours")
+        bypass = DEFAULT_EFFECTIVE_POLICY["bypass_quiet_hours"]
     policy["bypass_quiet_hours"] = list(bypass)
 
     channels_raw = raw.get("channels", None)
-    policy["channels"] = _normalize_channels(channels_raw)
+    if isinstance(channels_raw, list):
+        # Legacy: a delivery list. "desktop" present → pop-ups on.
+        names_ok = all(n in ("desktop", "discord", "in_app") for n in channels_raw)
+        if not names_ok:
+            if strict:
+                bad = [n for n in channels_raw
+                       if n not in ("desktop", "discord", "in_app")]
+                raise ServiceError(
+                    f"unknown channel(s): {', '.join(map(str, bad))}")
+            ignored.append("channels")
+            channels_raw = None
+    elif channels_raw is not None and not isinstance(channels_raw, dict):
+        if strict:
+            raise ServiceError("channels must be a list (legacy) or an object")
+        ignored.append("channels")
+        channels_raw = None
+    if channels_raw is not None:
+        try:
+            policy["channels"] = _normalize_channels(channels_raw, strict=strict)
+        except ServiceError:
+            if strict:
+                raise
+            ignored.append("channels")
+            policy["channels"] = _normalize_channels(None)
+    else:
+        policy["channels"] = _normalize_channels(None)
+
+    # Carried keys ride along unchanged (digest, max_open_initiatives).
+    for key in _CARRIED_POLICY_KEYS:
+        if key in raw:
+            policy[key] = raw[key]
+
+    if ignored:
+        policy["ignored"] = sorted(set(ignored))
     return policy
 
 
@@ -154,7 +246,7 @@ def _is_hhmm(value: Any) -> bool:
             and 0 <= int(value[:2]) <= 23 and 0 <= int(value[3:]) <= 59)
 
 
-def _normalize_channels(channels_raw: Any) -> Dict[str, Any]:
+def _normalize_channels(channels_raw: Any, *, strict: bool = False) -> Dict[str, Any]:
     channels: Dict[str, Any] = {
         "in_app": dict(DEFAULT_EFFECTIVE_POLICY["channels"]["in_app"]),
         "desktop": dict(DEFAULT_EFFECTIVE_POLICY["channels"]["desktop"]),
@@ -165,7 +257,9 @@ def _normalize_channels(channels_raw: Any) -> Dict[str, Any]:
         # Legacy: a delivery list. "desktop" present → pop-ups on.
         for name in channels_raw:
             if name not in ("desktop", "discord", "in_app"):
-                raise ServiceError(f"unknown channel '{name}'")
+                if strict:
+                    raise ServiceError(f"unknown channel '{name}'")
+                continue
         channels["desktop"]["enabled"] = "desktop" in channels_raw
         if "discord" in channels_raw:
             # Kept but unused until the Discord batch (Q2 = A).
@@ -176,31 +270,58 @@ def _normalize_channels(channels_raw: Any) -> Dict[str, Any]:
             if name == "discord":
                 # Carried but unused until the Discord batch (Q2 = A).
                 if not isinstance(patch, dict):
-                    raise ServiceError("channels.discord must be an object")
+                    if strict:
+                        raise ServiceError("channels.discord must be an object")
+                    continue
                 channels["discord"] = dict(patch)
                 continue
             if name not in channels:
-                raise ServiceError(f"unknown channel '{name}'")
+                if strict:
+                    raise ServiceError(f"unknown channel '{name}'")
+                continue
             if not isinstance(patch, dict):
-                raise ServiceError(f"channels.{name} must be an object")
+                if strict:
+                    raise ServiceError(f"channels.{name} must be an object")
+                continue
             unknown = sorted(set(patch) - set(_CHANNEL_SETTINGS[name]))
             if unknown:
-                raise ServiceError(
-                    f"unknown channels.{name} keys: {', '.join(unknown)}")
+                if strict:
+                    raise ServiceError(
+                        f"unknown channels.{name} keys: {', '.join(unknown)}")
+                patch = {k: v for k, v in patch.items() if k in _CHANNEL_SETTINGS[name]}
+                if not patch:
+                    continue
             if "min_severity" in patch:
                 if patch["min_severity"] not in SEVERITIES:
-                    raise ServiceError(
-                        f"invalid min_severity: {patch['min_severity']!r}")
+                    if strict:
+                        raise ServiceError(
+                            f"invalid min_severity: {patch['min_severity']!r}")
+                    patch = {k: v for k, v in patch.items()
+                             if k != "min_severity"}
+                    if not patch:
+                        continue
             if name == "desktop" and "enabled" in patch:
                 if not isinstance(patch["enabled"], bool):
-                    raise ServiceError("channels.desktop.enabled must be a boolean")
+                    if strict:
+                        raise ServiceError(
+                            "channels.desktop.enabled must be a boolean")
+                    patch = {k: v for k, v in patch.items() if k != "enabled"}
+                    if not patch:
+                        continue
             if name == "desktop" and "quiet_hours_apply" in patch:
                 if not isinstance(patch["quiet_hours_apply"], bool):
-                    raise ServiceError(
-                        "channels.desktop.quiet_hours_apply must be a boolean")
+                    if strict:
+                        raise ServiceError(
+                            "channels.desktop.quiet_hours_apply must be a boolean")
+                    patch = {k: v for k, v in patch.items()
+                             if k != "quiet_hours_apply"}
+                    if not patch:
+                        continue
             channels[name].update(patch)
         return channels
-    raise ServiceError("channels must be a list (legacy) or an object")
+    if strict:
+        raise ServiceError("channels must be a list (legacy) or an object")
+    return channels
 
 
 def normalize_or_legacy(raw: Any) -> Tuple[Dict[str, Any], bool]:
@@ -224,13 +345,63 @@ def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]
 
 def effective_policy(app_wide: Optional[Dict[str, Any]],
                      project_override: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """deep-merge(built-in default, app-wide, project override)."""
-    policy = dict(DEFAULT_EFFECTIVE_POLICY)
-    for layer in (app_wide, project_override):
+    """deep-merge(built-in default, app-wide, project override) — sparsely.
+
+    Each layer keeps only what the user actually set, so a project that
+    overrides one key does not reset the rest of the stack to defaults
+    (review bug 3). The merge fills the defaults in at the end.
+    """
+    def sparse(layer: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Normalise a layer but keep ONLY what the user actually set.
+
+        normalize_policy fills defaults; here every top-level key (and
+        channel sub-key) the layer did not specify is removed again, so a
+        partial override cannot reset other layers' values (review bug 3).
+        """
         if not layer:
-            continue
-        norm, _already = normalize_or_legacy(layer)
-        policy = deep_merge(policy, norm)
+            return {}
+        norm = normalize_policy(layer)
+        norm.pop("ignored", None)
+        # A legacy alias (min_severity / severity_threshold /
+        # minimum_severity) explicitly sets the in-app threshold even though
+        # the raw layer has no "channels" key — the alias mapping IS the
+        # user's setting, so treat channels as provided via the alias.
+        alias_present = any(k in layer for k in _ALIAS_MIN_SEVERITY)
+        keep: Dict[str, Any] = {}
+        for key, value in norm.items():
+            if key == "channels":
+                raw_channels = layer.get("channels") or {}
+                provided = (raw_channels if isinstance(raw_channels, dict)
+                            else {name: {} for name in raw_channels})
+                if alias_present and not provided:
+                    # The threshold arrived via a legacy alias: keep the
+                    # mapped in_app sub-policy whole (it IS the user's set).
+                    provided = {"in_app": None}
+                kept_channels: Dict[str, Any] = {}
+                for name, sub in value.items():
+                    if name not in provided:
+                        continue
+                    raw_sub = provided.get(name)
+                    if raw_sub is None:
+                        kept_channels[name] = sub  # alias-provided: keep whole
+                    elif isinstance(sub, dict):
+                        allowed = (set(raw_sub) if isinstance(raw_sub, dict)
+                                   else set())
+                        kept_channels[name] = {
+                            k: v for k, v in sub.items() if k in allowed}
+                    else:
+                        kept_channels[name] = sub
+                if kept_channels:
+                    keep["channels"] = kept_channels
+                continue
+            if key in layer:
+                keep[key] = value
+        return keep
+
+    merged: Dict[str, Any] = {}
+    for layer in (sparse(app_wide), sparse(project_override)):
+        merged = deep_merge(merged, layer)
+    policy = deep_merge(DEFAULT_EFFECTIVE_POLICY, merged)
     return policy
 
 
@@ -254,23 +425,88 @@ def _parse_hhmm(value: str) -> time:
     return time(int(hh), int(mm))
 
 
+def _machine_zone() -> str:
+    """The machine's IANA zone name; 'UTC' only when nothing else is known."""
+    try:
+        import os
+        from pathlib import Path
+
+        link = Path("/etc/localtime")
+        if link.is_symlink():
+            target = os.readlink(link)
+            bits = target.split("zoneinfo/")
+            if len(bits) > 1 and bits[-1]:
+                return bits[-1]
+    except Exception:
+        pass
+    import time as _time
+
+    name = getattr(_time, "tzname", (None, None))
+    return name[0] if name and name[0] else "UTC"
+
+
 def in_quiet_hours(policy: Dict[str, Any], now: datetime) -> bool:
+    """Quiet-hours check in LOCAL wall time (review bug 6).
+
+    ``now`` must already be an aware datetime in the zone the caller wants
+    evaluated: the engine converts its store clock (UTC) into the configured
+    zone before calling. Comparing UTC wall time would put UK quiet hours an
+    hour off during summer time.
+    """
     qh = policy.get("quiet_hours") or None
     if not qh:
         return False
     start = _parse_hhmm(qh["start"])
     end = _parse_hhmm(qh["end"])
-    t = now.time()
+    if now.tzinfo is None:
+        from datetime import timezone as _tz
+
+        now = now.replace(tzinfo=_tz.utc)
+    t = now.timetz().replace(tzinfo=None)
     if start <= end:
         return start <= t < end
     # overnight window (e.g. 22:00→07:00)
     return t >= start or t < end
 
 
+def wire_notification_stack(store: Store, svc: StewardshipService,
+                            *, zone: Optional[str] = None):
+    """One shared wiring function (review bug 2).
+
+    Every host that builds a StewardshipService capable of proposing or
+    deciding initiatives MUST construct its bus, notification engine and
+    decision hook through this function, so agent-proposed initiatives
+    raise approval notifications on every interface. Read-only
+    constructions (report/settings readers) are exempt.
+    """
+    from ..events.bus import EventBus
+
+    bus = EventBus(store)
+    engine = NotificationEngine(store, svc, zone=zone)
+    engine.attach(bus)
+    svc.attach_event_bus(bus)
+    svc.on_decision(
+        lambda etype, ref, pid: engine.on_decision_event(etype, ref, pid))
+    return bus, engine
+
+
 class NotificationEngine:
-    def __init__(self, store: Store, service: StewardshipService) -> None:
+    def __init__(self, store: Store, service: StewardshipService,
+                 *, zone: Optional[str] = None) -> None:
         self.store = store
         self.svc = service
+        # Review bug 6: quiet hours are UK local wall time, not UTC. The zone
+        # is injectable (hosts/tests pin it); default = the machine's zone.
+        self.zone_name = zone or _machine_zone()
+
+    def _zone(self):
+        from zoneinfo import ZoneInfo
+
+        return ZoneInfo(self.zone_name)
+
+    def _local_now(self) -> datetime:
+        """Store clock (UTC) converted into the engine's configured zone."""
+        return self.store._clock().astimezone(self._zone())
 
     # ------------------------------------------------------------------ #
     # Bus wiring                                                         #
@@ -312,14 +548,22 @@ class NotificationEngine:
         if not project_id:
             return None
 
+        # E1.4: a project with the notifications feature off records none.
+        # Checked independently of the policy: a settings problem must never
+        # stop a notification from being recorded (review bug 1), but the
+        # feature gate still must.
         try:
-            policy = self.effective(project_id)
-            # E1.4: a project with the notifications feature off records none.
             features = self.svc._features_row(project_id)
             if not features.get("notifications", True):
                 return None
-        except ServiceError:
-            return None
+        except Exception:
+            features = {}
+        try:
+            policy = self.effective(project_id)
+        except Exception:
+            # A settings problem must never stop a notification from being
+            # recorded (review bug 1): fall back to the built-in default.
+            policy = dict(DEFAULT_EFFECTIVE_POLICY)
 
         # Recording threshold (in-app channel decides what is recorded at all).
         in_app = (policy.get("channels") or {}).get("in_app") or {}
@@ -338,7 +582,7 @@ class NotificationEngine:
         else:
             dedupe_key = f"{event['event_type']}:{payload.get('to') or ''}"
 
-        quiet = in_quiet_hours(policy, self.store._clock())
+        quiet = in_quiet_hours(policy, self._local_now())
         bypass = kind in (policy.get("bypass_quiet_hours") or [])
         delivered = iso(self.store._clock()) if (not quiet or bypass) else None
 
@@ -428,14 +672,19 @@ class NotificationEngine:
         project_id = event.get("project_id")
         if etype == HEALTH_CHANGED:
             if (event.get("payload") or {}).get("to") == "healthy":
+                # Plan rule: ALL health_change and alert notifications for the
+                # project resolve — match on kind, not dedupe-key prefix, so
+                # verification-failed alerts (stewardship.verification.failed:*)
+                # close too (review bug 4).
                 self._auto_resolve_state(
-                    project_id, prefixes=("project.health.changed:", "project.critical:"),
+                    project_id, kinds=("health_change", "alert"),
                     note="health back to healthy")
             return
         if ref and project_id and (etype in _AUTO_RESOLVE_EVENTS
                                    or etype == INITIATIVE_CHANGES_REQUESTED):
             self._auto_resolve_state(
-                project_id, prefixes=(f"approval_required:{ref}",), note=None,
+                project_id, kinds=("approval_required",),
+                dedupe_key=f"approval_required:{ref}", note=None,
                 note_template=AUTO_RESOLVE_NOTE.get(etype),
                 note_ref=ref)
 
@@ -443,39 +692,46 @@ class NotificationEngine:
         self,
         project_id: Optional[str],
         *,
-        prefixes: Tuple[str, ...],
+        kinds: Tuple[str, ...] = (),
+        dedupe_key: Optional[str] = None,
         note: Optional[str] = None,
         note_template: Optional[str] = None,
         note_ref: Optional[str] = None,
     ) -> None:
         now = iso(self.store._clock())
         with self.store.tx() as cx:
-            for prefix in prefixes:
-                rows = cx.execute(
-                    "SELECT id FROM notifications"
-                    " WHERE project_id=? AND dedupe_key LIKE ?"
-                    "   AND resolved_at IS NULL",
-                    (project_id, prefix + "%"),
-                ).fetchall()
-                for row in rows:
-                    resolved_note = (note_template or note or "").format(
-                        ref=note_ref or "") if note_template else (note or "")
-                    resolved = cx.execute(
-                        "UPDATE notifications SET resolved_at=?, resolved_by='system',"
-                        " resolution='auto', resolution_note=?,"
-                        " acked_at=COALESCE(acked_at, ?), acked_by=COALESCE(acked_by, 'system')"
-                        " WHERE id=? AND resolved_at IS NULL",
-                        (now, resolved_note, now, row["id"]),
+            clauses = ["project_id=?", "resolved_at IS NULL"]
+            args: List[Any] = [project_id]
+            if kinds:
+                clauses.append(
+                    f"kind IN ({','.join('?' * len(kinds))})")
+                args.extend(kinds)
+            if dedupe_key is not None:
+                clauses.append("dedupe_key=?")
+                args.append(dedupe_key)
+            rows = cx.execute(
+                f"SELECT id FROM notifications WHERE {' AND '.join(clauses)}",
+                tuple(args),
+            ).fetchall()
+            for row in rows:
+                resolved_note = (note_template or note or "").format(
+                    ref=note_ref or "") if note_template else (note or "")
+                resolved = cx.execute(
+                    "UPDATE notifications SET resolved_at=?, resolved_by='system',"
+                    " resolution='auto', resolution_note=?,"
+                    " acked_at=COALESCE(acked_at, ?), acked_by=COALESCE(acked_by, 'system')"
+                    " WHERE id=? AND resolved_at IS NULL",
+                    (now, resolved_note, now, row["id"]),
+                )
+                if resolved.rowcount:
+                    cx.execute(
+                        "INSERT INTO stewardship_audit_log(ts, actor, interface,"
+                        " action, subject, detail_json) VALUES(?,?,?,?,?,?)",
+                        (now, "system", "system", "notification.resolved",
+                         str(row["id"]),
+                         self.svc.store._j({"resolution": "auto",
+                                            "note": (note_template or note or "")})),
                     )
-                    if resolved.rowcount:
-                        cx.execute(
-                            "INSERT INTO stewardship_audit_log(ts, actor, interface,"
-                            " action, subject, detail_json) VALUES(?,?,?,?,?,?)",
-                            (now, "system", "system", "notification.resolved",
-                             str(row["id"]),
-                             self.svc.store._j({"resolution": "auto",
-                                                "note": (note_template or note or "")})),
-                        )
 
     # ------------------------------------------------------------------ #
     # Ack / resolve — one code path (service-side)                        #
@@ -549,8 +805,12 @@ class NotificationEngine:
         return self.svc.store._uj(row["value_json"], {}) if row is not None else {}
 
     def set_app_policy(self, policy: Any, *, actor: str = "system") -> Dict[str, Any]:
-        """Normalise, store and audit the app-wide notification policy."""
-        normalised = normalize_policy(policy)
+        """Normalise, store and audit the app-wide notification policy.
+
+        Saving validates strictly (review bug 1): unknown keys raise
+        ServiceError → 422; legacy/alias and carried keys are accepted.
+        """
+        normalised = normalize_policy_strict(policy)
         now = iso(self.store._clock())
         with self.store.tx() as cx:
             cx.execute(
@@ -573,29 +833,26 @@ class NotificationEngine:
         *,
         project_id: Optional[str] = None,
         kind: Optional[str] = None,
-        resolve: bool = False,
+        severity: Optional[str] = None,
         actor: str = "system",
     ) -> int:
-        """\"Mark all as seen\": ack (or resolve) every notification matching
-        the current filter. Resolved rows are never touched."""
+        """"Mark all as seen": ack every notification still NEW that matches
+        the filter (review bug 5). Only rows actually changed are counted and
+        audited; already-seen rows are untouched, so a second run returns 0
+        and writes no audit rows."""
         now = iso(self.store._clock())
-        clauses, args = ["resolved_at IS NULL"], []
+        clauses = ["resolved_at IS NULL", "acked_at IS NULL"]
+        args: List[Any] = []
         if project_id:
             clauses.append("project_id=?")
             args.append(project_id)
         if kind:
             clauses.append("kind=?")
             args.append(kind)
-        if resolve:
-            sets = ("resolved_at=?, resolved_by=?, resolution='manual',"
-                    " resolution_note='', acked_at=COALESCE(acked_at, ?),"
-                    " acked_by=COALESCE(acked_by, ?)")
-            vals = [now, actor, now, actor]
-            action = "notification.resolved"
-        else:
-            sets = ("acked_at=COALESCE(acked_at, ?), acked_by=COALESCE(acked_by, ?)")
-            vals = [now, actor]
-            action = "notification.acked"
+        if severity:
+            clauses.append("severity=?")
+            args.append(severity)
+        changed = 0
         with self.store.tx() as cx:
             rows = cx.execute(
                 f"SELECT id FROM notifications WHERE {' AND '.join(clauses)}"
@@ -603,19 +860,21 @@ class NotificationEngine:
                 tuple(args),
             ).fetchall()
             for row in rows:
-                cx.execute(
-                    f"UPDATE notifications SET {sets} WHERE id=?"
-                    " AND (resolved_at IS NULL"
-                    + ("" if resolve else " AND acked_at IS NULL") + ")",
-                    (*vals, row["id"]),
+                cur = cx.execute(
+                    "UPDATE notifications SET acked_at=?, acked_by=?"
+                    " WHERE id=? AND resolved_at IS NULL AND acked_at IS NULL",
+                    (now, actor, row["id"]),
                 )
-                cx.execute(
-                    "INSERT INTO stewardship_audit_log(ts, actor, interface,"
-                    " action, subject, detail_json) VALUES(?,?,?,?,?,?)",
-                    (now, actor, "service", action, str(row["id"]),
-                     self.svc.store._j({"bulk": True})),
-                )
-        return len(rows)
+                if cur.rowcount:
+                    changed += 1
+                    cx.execute(
+                        "INSERT INTO stewardship_audit_log(ts, actor, interface,"
+                        " action, subject, detail_json) VALUES(?,?,?,?,?,?)",
+                        (now, actor, "service", "notification.acked",
+                         str(row["id"]),
+                         self.svc.store._j({"bulk": True})),
+                    )
+        return changed
 
     # ------------------------------------------------------------------ #
     # Reads                                                              #
@@ -706,7 +965,9 @@ class NotificationEngine:
             " ORDER BY created_at DESC, id DESC LIMIT 200",
         ).fetchall()
         due: List[Dict[str, Any]] = []
+        extra_due = 0
         held_extra = 0
+        local_now = now.astimezone(self._zone())
         cutoff = now - timedelta(hours=24)
         for row in rows:
             try:
@@ -725,23 +986,23 @@ class NotificationEngine:
                 policy = dict(DEFAULT_EFFECTIVE_POLICY)
             desktop = (policy.get("channels") or {}).get("desktop") or {}
             if not desktop.get("enabled", True):
-                continue
+                continue  # pop-ups off: never pops, never counted (bug 8)
             if SEVERITY_ORDER.get(row["severity"], 0) < SEVERITY_ORDER[
                     desktop.get("min_severity", "high")]:
-                continue
-            quiet = in_quiet_hours(policy, now)
+                continue  # below threshold: never pops, never counted (bug 8)
+            quiet = in_quiet_hours(policy, local_now)
             bypass = row["kind"] in (policy.get("bypass_quiet_hours") or [])
             applies = desktop.get("quiet_hours_apply", True)
             if quiet and applies and not bypass:
-                if row["kind"] == "approval_required":
-                    pass  # approvals bypass quiet hours by default
-                else:
-                    held_extra += 1
-                    continue
-            due.append(self._public_row(row))
+                held_extra += 1
+                continue  # held during quiet hours; due when they end
             if len(due) >= cap:
-                break
-        return {"popups": due, "more": max(0, len(rows) - len(due) - held_extra)}
+                extra_due += 1  # passes every rule but beyond the cap
+                continue
+            due.append(self._public_row(row))
+        # "And N more" counts only rows that pass EVERY pop-up rule: the
+        # due list beyond the cap, plus rows held by quiet hours (bug 8).
+        return {"popups": due, "more": max(0, extra_due + held_extra)}
 
     def mark_popups_shown(self, ids: List[int]) -> int:
         """Set popup_shown_at; idempotent — reprocessing changes nothing."""

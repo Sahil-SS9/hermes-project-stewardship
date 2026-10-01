@@ -24,6 +24,11 @@ class PluginState:
         if cls._svc is None:
             cls._store = open_store(cls.db_path)
             cls._svc = StewardshipService(cls._store)
+            # Review bug 2: the plugin tool path proposes initiatives, so it
+            # must raise approval notifications like every other interface.
+            from .events.notifications import wire_notification_stack
+
+            wire_notification_stack(cls._store, cls._svc)
         return cls._svc
 
     @classmethod

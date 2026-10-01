@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import sqlite3
 import stat
@@ -29,6 +30,8 @@ from ..domain.constants import (
 )
 from ..domain.models import Objective
 from .store import Store, iso
+
+logger = logging.getLogger(__name__)
 
 
 class ServiceError(RuntimeError):
@@ -98,7 +101,11 @@ class StewardshipService:
             try:
                 hook(event_type, ref, project_id)
             except Exception:
-                pass
+                # Review small fix: a broken hook must be visible, never
+                # silently discarded.
+                logger.exception(
+                    "decision notification hook failed (%s, ref=%s, project=%s)",
+                    event_type, ref, project_id)
 
     # ------------------------------------------------------------------ #
     # Enable / lifecycle                                                 #
@@ -591,6 +598,13 @@ class StewardshipService:
         merge_policy("autonomy", autonomy_policy)
         merge_policy("verification", verification_policy)
         merge_policy("release", release_policy)
+        if notification_policy is not None:
+            # Review bug 1 (saving validates strictly): the notification
+            # policy is validated by the shared engine normaliser in strict
+            # mode — aliases and carried keys accepted, anything else 422.
+            from ..events.notifications import normalize_policy_strict
+
+            normalize_policy_strict(notification_policy)
         merge_policy("notification", notification_policy)
 
         if not changed:

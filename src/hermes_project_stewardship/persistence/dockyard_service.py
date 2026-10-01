@@ -1296,14 +1296,11 @@ class DockyardService:
         return "s2:project-board"
 
     def ack_notification(self, notification_id: int) -> None:
-        from .store import iso
+        """One ack code path (review small fix): delegate to the engine so
+        the actor is recorded and an audit row is written."""
+        from ..events.notifications import NotificationEngine
 
-        with self.store.tx() as cx:
-            cur = cx.execute(
-                "UPDATE notifications SET acked_at=? WHERE id=?",
-                (iso(), notification_id))
-        if cur.rowcount == 0:  # C5: fail closed on unknown ids
-            raise ValueError(f"notification {notification_id} not found")
+        NotificationEngine(self.store, None).ack(notification_id, actor="dockyard")
 
     # ------------------------------------------------------------------ #
     # Portfolio rollup (release-cut feature)                              #

@@ -38,6 +38,11 @@ def main() -> int:
 
     store = Store(db_path)
     svc = StewardshipService(store)
+    # The demo decides initiatives, so wire the notification stack like
+    # every other proposing/deciding host (review bug 2).
+    from hermes_project_stewardship.events.notifications import wire_notification_stack
+
+    wire_notification_stack(store, svc)
 
     # 1. Enable stewardship: mission + ownership + autonomy.
     svc.enable(
