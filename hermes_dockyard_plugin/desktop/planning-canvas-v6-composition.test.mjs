@@ -25,20 +25,11 @@
 //      dark, and each kind's stripe resolves to its own token (the "black box"
 //      class of regression the workflow canvas shipped, guarded here too).
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import http from 'node:http';
-import { createRequire } from 'node:module';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { test } from 'node:test';
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const REPO = join(HERE, '..', '..');
-const DASHBOARD = join(REPO, 'hermes_dockyard_plugin', 'dashboard');
-const require = createRequire(join(DASHBOARD, 'package.json'));
-const { chromium } = require('playwright');
+import { DASHBOARD, REPO, buildDesktopBundle, chromium } from './planning-canvas-test-bundle.mjs';
 
 // The vocabulary is read from the REAL persistence module, not retyped: if the
 // schema ever changes, this file follows it instead of drifting.
@@ -75,39 +66,6 @@ const rgbOf = (hex) => {
   const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
   return `rgb(${[0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16)).join(', ')})`;
 };
-
-/** Bundle the REAL plugin.js with the repo's own esbuild (the shape every
- *  rendered desktop test uses). */
-function buildDesktopBundle() {
-  const dir = mkdtempSync(join(tmpdir(), 'dockyard-pc-v6-'));
-  const sdk = join(dir, 'sdk.js');
-  const entry = join(dir, 'entry.jsx');
-  const bundle = join(dir, 'bundle.js');
-  writeFileSync(sdk, 'export const host = { navigate() {} };\n');
-  writeFileSync(entry, [
-    `import plugin from ${JSON.stringify(join(REPO, 'hermes_dockyard_plugin', 'desktop', 'plugin.js'))};`,
-    "import React from 'react';",
-    "import { createRoot } from 'react-dom/client';",
-    'const ctx = {',
-    "  rest: async (p, init = {}) => { const r = await fetch('/api' + p, { method: init.method || 'GET', headers: { 'content-type': 'application/json' }, body: init.method && init.method !== 'GET' ? JSON.stringify(init.body) : undefined }); if (!r.ok) { let detail = ''; try { detail = (await r.json())?.detail ?? ''; } catch {} throw Error(`${r.status}: ${detail}`); } return r.json(); },",
-    '  os: { writeClipboard: async () => true },',
-    '  registerMany(xs) { this.items = xs },',
-    '};',
-    'plugin.register(ctx);',
-    "const page = ctx.items.find((x) => x.area === 'routes');",
-    "createRoot(document.getElementById('root')).render(page.render());",
-  ].join('\n'));
-  const nm = join(DASHBOARD, 'node_modules');
-  execFileSync(join(nm, '.bin', 'esbuild'), [
-    entry, '--bundle', '--format=esm', `--outfile=${bundle}`, '--jsx=automatic',
-    `--alias:@hermes/plugin-sdk=${sdk}`,
-    `--alias:react=${join(nm, 'react')}`,
-    `--alias:react/jsx-runtime=${join(nm, 'react', 'jsx-runtime.js')}`,
-    `--alias:react-dom/client=${join(nm, 'react-dom', 'client.js')}`,
-    '--log-level=error',
-  ], { cwd: DASHBOARD });
-  return { dir, code: readFileSync(bundle, 'utf8') };
-}
 
 const PROJECT = 'p1';
 const SEED_OBJECTS = [
@@ -608,6 +566,40 @@ test('Planning canvas v6: computed styles resolve per kind in light and dark', {
         `${theme}: --dy-pc-kind-evidence must resolve on the scope carrier`);
     }
 
+    assert.deepEqual(errors, [], errors.join('\n'));
+  } finally {
+    await browser?.close();
+    await host.close();
+    rmSync(built.dir, { recursive: true, force: true });
+  }
+});
+
+test('Planning canvas v6: phone width keeps controls inside the viewport and remains operable', { timeout: 180000 }, async () => {
+  const built = buildDesktopBundle();
+  const host = await startHost(built.code);
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true, args: ['--disable-gpu'] });
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await openPlanning(page, host);
+    const canvas = page.locator(`[data-planning-canvas="${PROJECT}"]`);
+    const fit = await canvas.evaluate((root) => {
+      const controls = [...root.querySelectorAll('button:not([data-canvas-object]), input, select')].map((el) => { const box = el.getBoundingClientRect(); return { label: el.getAttribute('aria-label') || el.textContent.trim(), right: box.right, left: box.left }; }).filter((control) => control.right > 0 && control.left < innerWidth);
+      return { overflow: root.scrollWidth > root.clientWidth + 1, controls };
+    });
+    assert.equal(fit.overflow, false, 'canvas must not create horizontal overflow on a 390px viewport');
+    assert.ok(fit.controls.every((control) => control.left >= -1 && control.right <= 391), JSON.stringify(fit.controls.filter((control) => control.right > 391)));
+    await canvas.locator('[data-action="pc-theme-light"]').click();
+    await canvas.locator('[data-action="pc-theme-dark"]').click();
+    await canvas.locator('[data-action="pc-board-toggle"]').click();
+    assert.equal(await canvas.locator('[data-canvas-object]').count(), SEED_OBJECTS.length);
+    await canvas.locator('[data-action="pc-chat-toggle"]').click();
+    assert.ok(await canvas.locator('[data-canvas-assistant].open').count());
+    await canvas.locator('[data-canvas-object="obj-nt"]').click();
+    await canvas.locator('[data-canvas-colour-option="pink"]').click();
+    assert.equal(await canvas.locator('[data-canvas-object="obj-nt"]').getAttribute('data-canvas-colour'), 'pink');
     assert.deepEqual(errors, [], errors.join('\n'));
   } finally {
     await browser?.close();

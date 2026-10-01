@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createRequire} from 'node:module';
+import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const require = createRequire(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dashboard/package.json'));
 const {chromium} = require('playwright');
 const BASE = process.env.STEWARD_DESKTOP_URL;
 const API = process.env.STEWARD_API_URL;
-const OUT = process.env.UXOUT || process.cwd();
+// Evidence goes to UXOUT, else the temp dir; never the repo root (stray files).
+const OUT = process.env.UXOUT || fs.mkdtempSync(path.join(os.tmpdir(), 'real-canvas-review-'));
 const headers = {'content-type': 'application/json', 'x-hermes-session-token': 'demo-session-token'};
 const result = {screenshots: [], console: [], geometry: {}};
 async function call(method, url, body) { const r = await fetch(`${API}${url}`, {method, headers, body: body ? JSON.stringify(body) : undefined}); const text = await r.text(); let j={}; try {j=JSON.parse(text)} catch {} assert.ok(r.ok, `${method} ${url}: ${r.status} ${text}`); return j; }

@@ -23,6 +23,8 @@ from pydantic import BaseModel, ConfigDict
 logger = logging.getLogger(__name__)
 
 from hermes_project_stewardship.persistence.dockyard_store import DockyardStore  # noqa: E402
+from hermes_project_stewardship.persistence.schema_guard import SchemaDriftError  # noqa: E402
+from hermes_project_stewardship.persistence.store import NewerSchemaError  # noqa: E402
 from hermes_project_stewardship.runtime import (  # noqa: E402
     StateSelectionError,
     open_store,
@@ -70,8 +72,7 @@ _store = None
 _app = None
 _dockyard = None
 try:
-    # Deferred import: api.server has a module-level `app = create_app()`
-    # that would otherwise run before the guard below (Phase1 F2).
+    # Deferred import keeps the guard below in charge of every startup error.
     from hermes_project_stewardship.api.server import create_app
 
     _DB = _default_db_path()
@@ -91,10 +92,10 @@ try:
         auth_principal_is_human=os.environ.get("STEWARD_RPC_PRINCIPAL_KIND") == "human",
         capabilities=_rpc_capabilities,
     )
-except StateSelectionError as exc:
-    # Fail closed: no data moved, no alternate database chosen. The host
-    # keeps loading; proxied routes return 503 until an operator selects
-    # state explicitly (STEWARD_DB_PATH / --db).
+except (StateSelectionError, SchemaDriftError, NewerSchemaError) as exc:
+    # Fail closed: no data moved, no alternate database chosen, nothing
+    # migrated. The host keeps loading; proxied routes return 503 with the
+    # reason until an operator selects or repairs state (P addendum fix 3).
     _startup_error = str(exc)
     logger.error("Dockyard plugin startup degraded: %s", exc)
 
@@ -120,8 +121,9 @@ def _degraded_503() -> HTTPException:
     return HTTPException(
         503,
         "Dockyard plugin did not start: " + (_startup_error or "unknown startup error")
-        + " Set STEWARD_DB_PATH (or --db) to select the authoritative database, "
-        "then restart the dashboard host.",
+        + " Set STEWARD_DB_PATH (or --db) to select the authoritative database,"
+        " or repair it with `stewardctl db repair` on a copy, then restart the"
+        " dashboard host.",
     )
 
 
@@ -519,6 +521,12 @@ async def project_team(project_id: str) -> dict:
     return await _proxy("GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/team")
 
 
+@plugin_api.get("/projects/{project_id}/members")
+async def list_project_members(project_id: str) -> dict:
+    # Read-only: the planning canvas owner pickers list current members.
+    return await _proxy("GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/members")
+
+
 @plugin_api.post("/projects/{project_id}/members")
 async def add_project_member(project_id: str, body: MemberBody) -> dict:
     return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/members", body.model_dump())
@@ -804,6 +812,122 @@ async def decide_canvas_proposal(proposal_id: str, body: dict) -> dict:
     return await _proxy("POST", f"/stewardship/v1/canvas/proposals/{quote(proposal_id, safe='')}/decision", {**body, "actor": _ACTOR_ID})
 
 
+@plugin_api.post("/canvas/proposals/{proposal_id}/plan")
+async def synthesise_canvas_plan(proposal_id: str, body: dict) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/canvas/proposals/{quote(proposal_id, safe='')}/plan", body)
+
+
+# ---- D14/D16/D19: several named planning boards per project ---------------
+# Writes always carry the trusted desktop principal; a client "actor" field is
+# overwritten, never forwarded.
+@plugin_api.get("/canvas/models")
+async def canvas_models() -> dict:
+    return await _proxy("GET", "/stewardship/v1/canvas/models")
+
+
+@plugin_api.get("/projects/{project_id}/canvases")
+async def list_canvas_boards(project_id: str, include_archived: bool = False) -> dict:
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases",
+        params={"include_archived": "true" if include_archived else "false"},
+    )
+
+
+@plugin_api.post("/projects/{project_id}/canvases")
+async def create_canvas_board(project_id: str, body: dict) -> dict:
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases",
+        {**body, "actor": _ACTOR_ID},
+    )
+
+
+@plugin_api.get("/projects/{project_id}/canvases/{canvas_id}")
+async def get_canvas_board(project_id: str, canvas_id: str) -> dict:
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases/{quote(canvas_id, safe='')}")
+
+
+@plugin_api.put("/projects/{project_id}/canvases/{canvas_id}")
+async def save_canvas_board(project_id: str, canvas_id: str, body: dict) -> dict:
+    return await _proxy(
+        "PUT", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases/{quote(canvas_id, safe='')}",
+        {**body, "actor": _ACTOR_ID},
+    )
+
+
+@plugin_api.patch("/projects/{project_id}/canvases/{canvas_id}")
+async def update_canvas_board(project_id: str, canvas_id: str, body: dict) -> dict:
+    return await _proxy(
+        "PATCH", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases/{quote(canvas_id, safe='')}",
+        {**body, "actor": _ACTOR_ID},
+    )
+
+
+@plugin_api.post("/projects/{project_id}/canvases/{canvas_id}/sessions")
+async def start_canvas_board_session(project_id: str, canvas_id: str, body: dict) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases/{quote(canvas_id, safe='')}/sessions",
+        {**body, "actor": _ACTOR_ID},
+    )
+
+
+@plugin_api.delete("/projects/{project_id}/canvases/{canvas_id}/objects/{object_id}")
+async def remove_canvas_board_object(project_id: str, canvas_id: str, object_id: str, expected_revision: int) -> dict:
+    return await _proxy(
+        "DELETE",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases/{quote(canvas_id, safe='')}/objects/{quote(object_id, safe='')}",
+        params={"expected_revision": expected_revision, "actor": _ACTOR_ID},
+    )
+
+
+@plugin_api.post("/projects/{project_id}/canvases/{canvas_id}/curate")
+async def curate_canvas_board(project_id: str, canvas_id: str) -> dict:
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases/{quote(canvas_id, safe='')}/curate", {})
+
+
+@plugin_api.patch("/projects/{project_id}/plans/{plan_id}")
+async def update_canvas_plan_steps(project_id: str, plan_id: str, body: dict) -> dict:
+    return await _proxy(
+        "PATCH", f"/stewardship/v1/projects/{quote(project_id, safe='')}/plans/{quote(plan_id, safe='')}",
+        {**body, "actor": _ACTOR_ID},
+    )
+
+
+@plugin_api.get("/projects/{project_id}/canvases/{canvas_id}/plans")
+async def list_canvas_board_plans(project_id: str, canvas_id: str) -> dict:
+    return await _proxy(
+        "GET",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/canvases/{quote(canvas_id, safe='')}/plans")
+
+
+@plugin_api.get("/projects/{project_id}/plans")
+async def list_project_plans(project_id: str) -> dict:
+    return await _proxy("GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/plans")
+
+
+@plugin_api.get("/projects/{project_id}/plans/{plan_id}")
+async def get_project_plan(project_id: str, plan_id: str) -> dict:
+    return await _proxy("GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/plans/{quote(plan_id, safe='')}")
+
+
+@plugin_api.post("/projects/{project_id}/plans/{plan_id}/document")
+async def build_project_plan_document(project_id: str, plan_id: str) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/plans/{quote(plan_id, safe='')}/document", {})
+
+
+@plugin_api.post("/projects/{project_id}/plans/{plan_id}/document/save")
+async def save_project_plan_document(project_id: str, plan_id: str) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/plans/{quote(plan_id, safe='')}/document/save", {})
+
+
+@plugin_api.post("/projects/{project_id}/plans/{plan_id}/backlog")
+async def create_plan_backlog_items(project_id: str, plan_id: str, body: dict) -> dict:
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/plans/{quote(plan_id, safe='')}/backlog", body)
+
+
+
 @plugin_api.get("/projects/{project_id}/content")
 async def project_content(
     project_id: str, include_archived: bool = True,
@@ -838,6 +962,13 @@ async def project_content_preview(project_id: str, content_id: str) -> dict:
     return await _proxy(
         "GET", f"/stewardship/v1/projects/{pid}/content/{cid}/preview"
     )
+
+
+@plugin_api.get("/projects/{project_id}/content/{content_id}/image")
+async def project_content_image(project_id: str, content_id: str) -> dict:
+    pid = quote(project_id, safe="")
+    cid = quote(content_id, safe="")
+    return await _proxy("GET", f"/stewardship/v1/projects/{pid}/content/{cid}/image")
 
 
 @plugin_api.get("/projects/{project_id}/content/{content_id}/dependencies")

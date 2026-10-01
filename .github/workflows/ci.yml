@@ -53,7 +53,7 @@ jobs:
       - name: Install with API extra
         run: uv sync --locked --extra dev --extra plugin --python "3.12"
       - name: Import RPC app
-        run: uv run --locked --extra dev --extra plugin python -c "from hermes_project_stewardship.api.server import app; print('rpc-ok')"
+        run: uv run --locked --extra dev --extra plugin python -c "from hermes_project_stewardship.api.server import create_app; print('rpc-ok')"
 
   frontend:
     runs-on: ubuntu-latest

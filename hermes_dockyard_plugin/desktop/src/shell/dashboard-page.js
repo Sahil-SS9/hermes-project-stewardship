@@ -29,6 +29,7 @@ import { NotificationsView } from '../views/notifications.js'
 import { jsxs } from '../runtime/react.js'
 import { ConsoleBar } from '../lib/ui.js'
 import { ToastRegion } from '../lib/ui.js'
+import { useDialogFocusManager } from '../lib/ui.js'
 import { Button } from '../lib/ui.js'
 import { OnboardingWizard } from '../lib/ui.js'
 export function DashboardPage() {
@@ -51,6 +52,12 @@ export function DashboardPage() {
   const loadSerial = useRef(0)
   const [dirtyProject, setDirtyProject] = useState(null)
   const [pendingProject, setPendingProject] = useState(null)
+  // F-1/F-2: a top tab change is guarded like a project switch, and both
+  // prompts can save (when the dirty panel offers a save handle).
+  const [pendingTab, setPendingTab] = useState(null)
+  const dirtySaver = useRef(null)
+  const [navSaving, setNavSaving] = useState(false)
+  const markDirty = (projectId) => (dirty, saver) => { setDirtyProject(dirty ? projectId : null); dirtySaver.current = dirty ? (saver ?? null) : null }
   useEffect(() => {
     const timers = new Map()
     const handleToast = (event) => {
@@ -131,13 +138,33 @@ export function DashboardPage() {
     setSelectedProject(projectId)
     if (tab === 'dashboard' || tab === 'notifications' || tab === 'inbox' || tab === 'onboard') setTab('project')
   }
-  const discardProjectChange = () => {
-    const pending = pendingProject
-    setPendingProject(null)
-    setDirtyProject(null)
-    setSelectedProject(pending)
-    if (tab === 'dashboard' || tab === 'notifications' || tab === 'inbox' || tab === 'onboard') setTab('project')
+  const goTab = (next) => { if (next === 'project') setProjectEntryView('overview'); if (next === 'dashboard') setDashboardHomeVersion((value) => value + 1); setTab(next) }
+  const requestTab = (next) => {
+    if (next !== tab && dirtyProject) { setPendingTab(next); return }
+    goTab(next)
   }
+  const cancelNav = () => { setPendingProject(null); setPendingTab(null) }
+  const continueNav = () => {
+    const project = pendingProject
+    const nextTab = pendingTab
+    setPendingProject(null); setPendingTab(null)
+    setDirtyProject(null); dirtySaver.current = null
+    if (project) {
+      setSelectedProject(project)
+      if (tab === 'dashboard' || tab === 'notifications' || tab === 'inbox' || tab === 'onboard') setTab('project')
+    } else if (nextTab) goTab(nextTab)
+  }
+  const discardProjectChange = continueNav
+  const saveThenNavigate = async () => {
+    if (!dirtySaver.current) return
+    setNavSaving(true)
+    const ok = await dirtySaver.current()
+    setNavSaving(false)
+    if (ok) continueNav()
+    else if (!dirtySaver.current) cancelNav()
+  }
+  const navPending = pendingProject || pendingTab
+  useDialogFocusManager(navPending ? '[data-project-switch-confirm] .dockyard-modal' : null)
   const dismissToast = (id) => setToasts((current) => current.filter((toast) => toast.id !== id))
   const completeOnboarding = (result) => {
     setOnboardingOpen(false)
@@ -232,7 +259,7 @@ export function DashboardPage() {
       view: payload,
       initialView: projectEntryView,
       onSelectProject: selectProject,
-      onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
+      onProjectDirty: markDirty(payload.project?.id ?? null),
       onRefresh: refresh,
       onOpenLibrary: () => setTab('workflows'),
       pendingWorkRef,
@@ -244,7 +271,7 @@ export function DashboardPage() {
       view: payload,
       initialView: 'settings',
       onSelectProject: selectProject,
-      onProjectDirty: (dirty) => setDirtyProject(dirty ? payload.project?.id : null),
+      onProjectDirty: markDirty(payload.project?.id ?? null),
       onRefresh: refresh,
       notice: deepLinkNotice,
     }, `settings:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
@@ -278,7 +305,7 @@ export function DashboardPage() {
   return jsxs('div', { className: 'dockyard-root', children: [
     jsxs('div', { className: 'dockyard-shell', children: [
       jsx(ConsoleBar, { tab, counts, projects: projectOptions, selectedProject, onProjectChange: selectProject,
-        onTab: (next) => { if (next === 'project') setProjectEntryView('overview'); if (next === 'dashboard') setDashboardHomeVersion((value) => value + 1); setTab(next) },
+        onTab: requestTab,
         onNewProject: () => setOnboardingOpen(true), onOpen: openDeepLink }),
       jsx('main', {
         id: 'dockyard-panel',
@@ -288,13 +315,15 @@ export function DashboardPage() {
       }),
     ]}),
     jsx(ToastRegion, { toasts, onDismiss: dismissToast }),
-    pendingProject ? jsxs('section', { className: 'dockyard-modal-layer', 'data-project-switch-confirm': true, children: [
-      jsxs('div', { className: 'dockyard-modal', role: 'dialog', 'aria-modal': true, children: [
-        jsx('h2', { children: 'Discard unsaved changes?' }),
-        jsx('p', { children: 'This project has unsaved changes. Choose Discard to switch projects or Cancel to keep editing.' }),
+    navPending ? jsxs('section', { className: 'dockyard-modal-layer', 'data-project-switch-confirm': true, 'data-nav-target': pendingProject ? `project:${pendingProject}` : `tab:${pendingTab}`, children: [
+      jsxs('div', { className: 'dockyard-modal', role: 'alertdialog', 'aria-modal': true, 'aria-label': 'Unsaved changes',
+        onKeyDown: (event) => { if (event.key === 'Escape' && !navSaving) { event.stopPropagation(); cancelNav() } }, children: [
+        jsx('h2', { children: 'Unsaved changes' }),
+        jsx('p', { children: `This project has unsaved changes. ${dirtySaver.current ? 'Save them and continue, discard them, or cancel to keep editing.' : 'Discard them to continue, or cancel to keep editing.'}` }),
         jsxs('div', { className: 'dockyard-modal-actions', children: [
-          jsx(Button, { onClick: () => setPendingProject(null), children: 'Cancel' }),
-          jsx(Button, { variant: 'danger', onClick: discardProjectChange, children: 'Discard' }),
+          jsx(Button, { action: 'nav-cancel', disabled: navSaving, onClick: cancelNav, children: 'Cancel' }),
+          jsx(Button, { variant: 'danger', action: 'nav-discard', disabled: navSaving, onClick: discardProjectChange, children: 'Discard' }),
+          dirtySaver.current ? jsx(Button, { variant: 'primary', action: 'nav-save', disabled: navSaving, onClick: saveThenNavigate, children: navSaving ? 'Saving...' : 'Save and continue' }) : null,
         ]}),
       ]}),
     ]}) : null,
