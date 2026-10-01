@@ -298,7 +298,11 @@ class CanvasService:
         # not counted twice: 20,000 accented or CJK characters must still fit
         # (Quan re-check M2).
         counted = {k: v for k, v in out.items() if not (k == "description" and "description_doc" in out)}
-        if len(json.dumps(counted, ensure_ascii=False).encode("utf-8")) > MAX_CONTENT_BYTES:
+        try:
+            size = len(json.dumps(counted, ensure_ascii=False).encode("utf-8"))
+        except UnicodeEncodeError as exc:  # unpaired surrogate: 400, not 500
+            raise ValueError("card content contains invalid characters") from exc
+        if size > MAX_CONTENT_BYTES:
             raise ValueError("a card holds at most 64 KB of content")
         return out
 

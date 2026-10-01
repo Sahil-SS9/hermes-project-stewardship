@@ -1115,16 +1115,27 @@ test('Rich text: Quan re-check 2 - stale redo, caret after undo, server-sized li
     // M1: caret after undo lands where it was, after a toolbar-built list.
     await page.keyboard.press('Control+a');
     await page.keyboard.press('Delete');
+    // Bullets on an EMPTY editor starts a real list (Quan re-check 3, H1).
     await tool('bullets').click();
+    assert.equal(await tool('bullets').getAttribute('aria-pressed'), 'true', 'Bullets pressed on an empty editor');
     for (const w of ['one', 'two', 'three', 'four']) { await page.keyboard.type(w); await page.keyboard.press('Enter'); }
     await page.keyboard.press('Enter');
+    assert.equal(await body.locator('ul > li').count(), 4, 'a real four-item list');
     await page.keyboard.type('tail words here');
+    // Caret after undo/redo, with no End key to hide a wrong position (L1).
+    await selectText(page, 'four');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.type('X');
+    await page.keyboard.press('Control+z');
+    await page.keyboard.press('Control+Shift+z');
+    await page.keyboard.type('Q');
+    assert.match(await body.innerText(), /fourXQ/, 'caret after redo is right after the redone edit');
     await selectText(page, 'words');
     await tool('italic').click();
     await page.keyboard.press('Control+z');
-    await page.keyboard.press('End');
+    await page.keyboard.press('ArrowRight');
     await page.keyboard.type('Q');
-    assert.match(await body.innerText(), /tail words hereQ/, 'caret after undo is in the right place');
+    assert.match(await body.innerText(), /tail wordsQ here/, 'caret after undo is at the undone edit');
     // L1: triple-click a heading then Clear leaves the next heading alone.
     await page.keyboard.press('Control+a');
     await page.keyboard.press('Delete');
@@ -1178,6 +1189,21 @@ test('Rich text: Quan re-check 2 - stale redo, caret after undo, server-sized li
     await problem.waitFor();
     assert.match(await problem.innerText(), /too large to save/);
     assert.equal(await drawer.locator('[data-action="apply-canvas-object"]').isDisabled(), true);
+  });
+});
+
+test('Rich text: Bullets and Numbers start a list on a brand-new empty card (Quan re-check 3 H1)', { timeout: 180000 }, async () => {
+  await withPage(1440, 900, async (page, host) => {
+    for (const [btn, tag] of [['bullets', 'ul'], ['numbers', 'ol']]) {
+      const ctx = await openEditor(page);
+      await ctx.tool(btn).click();
+      await page.keyboard.type('one');
+      await page.keyboard.press('Enter');
+      await page.keyboard.type('two');
+      assert.equal(await ctx.body.locator(`${tag} > li`).count(), 2, `${btn} on an empty card`);
+      const saved = await saveDoc(page, host, ctx);
+      assert.equal(saved.description, btn === 'bullets' ? '- one\n- two' : '1. one\n2. two');
+    }
   });
 });
 

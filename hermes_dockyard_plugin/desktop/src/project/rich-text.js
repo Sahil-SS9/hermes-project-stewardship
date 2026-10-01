@@ -223,7 +223,7 @@ export function serverJsonBytes(value) {
   const size = (v) => {
     if (Array.isArray(v)) return 2 + v.reduce((n, x) => n + size(x), 0) + Math.max(0, v.length - 1) * 2
     if (v && typeof v === 'object') {
-      const keys = Object.keys(v).filter((k) => v[k] !== undefined)
+      const keys = Object.keys(v).filter((k) => v[k] !== undefined && v[k] !== null && v[k] !== '')
       return 2 + keys.reduce((n, k) => n + enc.encode(JSON.stringify(k)).length + 2 + size(v[k]), 0) + Math.max(0, keys.length - 1) * 2
     }
     return enc.encode(JSON.stringify(v ?? null)).length
@@ -313,7 +313,7 @@ const exec = (command, value) => document.execCommand(command, false, value)
 // re-created, so the caret stays where it was.
 const RENAME = { B: 'strong', I: 'em', STRIKE: 's', DEL: 's' }
 const INNER_BLOCKS = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'UL', 'OL'])
-function normaliseDom(host) {
+function normaliseDom(host, { afterDelete = false } = {}) {
   const sel = window.getSelection()
   const keep = sel.rangeCount && host.contains(sel.anchorNode)
     ? [sel.anchorNode, sel.anchorOffset, sel.focusNode, sel.focusOffset] : null
@@ -352,7 +352,9 @@ function normaliseDom(host) {
   // Select-all + Delete can leave empty bullets behind; an editor with no
   // text whose only leftovers are lists goes back to one empty paragraph
   // (L3). An empty heading chosen from the style menu is kept.
-  if (!host.textContent.replace(ZWSP, '').trim() && host.querySelector('ul, ol')) {
+  // Only after a deletion: a list just made from the toolbar on an empty
+  // editor is also empty and must stay (Quan re-check 3, H1).
+  if (afterDelete && !host.textContent.replace(ZWSP, '').trim() && host.querySelector('ul, ol')) {
     while (host.firstChild) host.removeChild(host.firstChild)
     const p = document.createElement('p')
     p.appendChild(document.createElement('br'))
@@ -642,6 +644,7 @@ export function RichTextEditor({ value, fallbackText, onChange, onProblem, rest,
   const dragging = useRef(false)
   const [state, setState] = useState(stateAt(null))
   const [problem, setProblem] = useState(null)
+  const restSize = serverJsonBytes(rest ?? {})
   changeRef.current = onChange
   problemRef.current = onProblem
 
@@ -677,7 +680,7 @@ export function RichTextEditor({ value, fallbackText, onChange, onProblem, rest,
   const emit = (typing = false) => {
     const el = host.current
     if (!el) return
-    normaliseDom(el)
+    normaliseDom(el, { afterDelete: typing === 'delete' })
     const doc = domToDoc(el)
     record(doc, typing)
     changeRef.current?.(doc, docToPlain(doc))
@@ -689,8 +692,10 @@ export function RichTextEditor({ value, fallbackText, onChange, onProblem, rest,
     const h = history.current
     const next = h.index + step
     if (!el || readOnly || next < 0 || next >= h.stack.length) return
+    // Undo puts the caret where the undone edit was; redo where it ended.
+    const caret = (step < 0 ? h.stack[h.index] : h.stack[next]).caret
     h.index = next
-    const { doc, caret } = h.stack[next]
+    const { doc } = h.stack[next]
     renderDoc(el, doc)
     el.focus()
     const [a, ao] = locate(el, caret[0])
@@ -721,6 +726,9 @@ export function RichTextEditor({ value, fallbackText, onChange, onProblem, rest,
     return () => { document.removeEventListener('selectionchange', onSelection); el.removeEventListener('beforeinput', onBeforeInput) }
     // Rendered once per card; the drawer remounts the editor per card.
   }, [])
+
+  // Other card fields share the 64 KB limit: re-check when they change (L3).
+  useEffect(() => { if (host.current && history.current.stack.length) report(domToDoc(host.current)) }, [restSize])
 
   const run = (act) => {
     const el = host.current

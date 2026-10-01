@@ -114,3 +114,9 @@ def test_saved_doc_round_trips_unchanged(store, enabled):
     second = _save(store, enabled, first["description_doc"], name="RT again")
     assert second["description_doc"] == first["description_doc"]
     assert second["description"] == first["description"]
+
+
+def test_unpaired_surrogate_is_a_clean_validation_error(store, enabled):
+    """Quan re-check 3 L4: a hand-made lone surrogate is refused as ValueError."""
+    with pytest.raises(ValueError, match="invalid characters"):
+        _save(store, enabled, _doc(_p("bad \ud800 text")))

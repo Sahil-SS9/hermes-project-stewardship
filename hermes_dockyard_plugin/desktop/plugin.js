@@ -8580,7 +8580,7 @@ function serverJsonBytes(value) {
   const size = (v) => {
     if (Array.isArray(v)) return 2 + v.reduce((n, x) => n + size(x), 0) + Math.max(0, v.length - 1) * 2;
     if (v && typeof v === "object") {
-      const keys = Object.keys(v).filter((k) => v[k] !== void 0);
+      const keys = Object.keys(v).filter((k) => v[k] !== void 0 && v[k] !== null && v[k] !== "");
       return 2 + keys.reduce((n, k) => n + enc.encode(JSON.stringify(k)).length + 2 + size(v[k]), 0) + Math.max(0, keys.length - 1) * 2;
     }
     return enc.encode(JSON.stringify(v ?? null)).length;
@@ -8675,7 +8675,7 @@ var listDepth = (host2, node) => {
 var exec = (command, value) => document.execCommand(command, false, value);
 var RENAME = { B: "strong", I: "em", STRIKE: "s", DEL: "s" };
 var INNER_BLOCKS = /* @__PURE__ */ new Set(["P", "DIV", "H1", "H2", "H3", "UL", "OL"]);
-function normaliseDom(host2) {
+function normaliseDom(host2, { afterDelete = false } = {}) {
   const sel = window.getSelection();
   const keep = sel.rangeCount && host2.contains(sel.anchorNode) ? [sel.anchorNode, sel.anchorOffset, sel.focusNode, sel.focusOffset] : null;
   const swap = (el, tag) => {
@@ -8721,7 +8721,7 @@ function normaliseDom(host2) {
     el.remove();
     changed = true;
   }
-  if (!host2.textContent.replace(ZWSP, "").trim() && host2.querySelector("ul, ol")) {
+  if (afterDelete && !host2.textContent.replace(ZWSP, "").trim() && host2.querySelector("ul, ol")) {
     while (host2.firstChild) host2.removeChild(host2.firstChild);
     const p = document.createElement("p");
     p.appendChild(document.createElement("br"));
@@ -9010,6 +9010,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
   const dragging = useRef(false);
   const [state, setState] = useState(stateAt(null));
   const [problem, setProblem] = useState(null);
+  const restSize = serverJsonBytes(rest ?? {});
   changeRef.current = onChange;
   problemRef.current = onProblem;
   const refresh = () => {
@@ -9047,7 +9048,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
   const emit = (typing = false) => {
     const el = host2.current;
     if (!el) return;
-    normaliseDom(el);
+    normaliseDom(el, { afterDelete: typing === "delete" });
     const doc = domToDoc(el);
     record(doc, typing);
     changeRef.current?.(doc, docToPlain(doc));
@@ -9059,8 +9060,9 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     const h = history.current;
     const next = h.index + step;
     if (!el || readOnly || next < 0 || next >= h.stack.length) return;
+    const caret = (step < 0 ? h.stack[h.index] : h.stack[next]).caret;
     h.index = next;
-    const { doc, caret } = h.stack[next];
+    const { doc } = h.stack[next];
     renderDoc(el, doc);
     el.focus();
     const [a, ao] = locate(el, caret[0]);
@@ -9100,6 +9102,9 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
       el.removeEventListener("beforeinput", onBeforeInput);
     };
   }, []);
+  useEffect(() => {
+    if (host2.current && history.current.stack.length) report(domToDoc(host2.current));
+  }, [restSize]);
   const run = (act) => {
     const el = host2.current;
     if (!el || readOnly) return;
