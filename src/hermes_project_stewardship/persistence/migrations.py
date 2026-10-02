@@ -16,7 +16,6 @@ from typing import List
 # Never edit a released migration (v1-v17 shipped in v0.3.0); fix forward
 # with a new version instead. Batch R2 owns v35. Batch E owns v36.
 SCHEMA_VERSION = 36
-SCHEMA_VERSION = 35
 
 
 @dataclass(frozen=True)
