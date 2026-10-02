@@ -7,6 +7,7 @@
 // the narrow layout. No mocks.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
@@ -188,6 +189,116 @@ test('Roadmap: narrow layout keeps one column and keeps Link… reachable', { ti
     assert.equal(columns, 1, 'narrow window renders a single column')
     const link = page.locator('[data-rm-node="unlinked-milestones:payments-relaunch"]').getByRole('button', { name: 'Link…' })
     assert.equal(await link.isVisible(), true, 'the narrow layout hides chips, never the Link… action')
+  } finally {
+    await browser.close()
+  }
+})
+
+test('Roadmap styles use only colour tokens the shell defines for BOTH themes', () => {
+  const read = (file) => readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8')
+  const shell = read('./src/styles/dockyard-css.js')
+  const block = (selector) => {
+    const start = shell.indexOf(`${selector} {`)
+    assert.ok(start >= 0, `${selector} block exists`)
+    // The block closes on a line of its own; values like ${LIGHT_TOKENS.bg} contain '}'.
+    const end = shell.indexOf('\n}', start)
+    assert.ok(end > start, `${selector} block closes`)
+    return shell.slice(start, end)
+  }
+  const tokens = (text) => new Set([...text.matchAll(/(--dy-[a-z0-9-]+)\s*:/g)].map((match) => match[1]))
+  const light = tokens(block('.dockyard-root'))
+  const dark = tokens(block('.dockyard-root[data-theme="dark"]'))
+  const roadmap = read('./src/styles/roadmap-css.js')
+  const used = [...new Set([...roadmap.matchAll(/var\(\s*(--dy-[a-z0-9-]+)/g)].map((match) => match[1]))]
+  assert.ok(used.length > 5, 'the Roadmap styles read the shell tokens')
+  assert.deepEqual(used.filter((token) => !light.has(token)), [], 'every token exists in the light theme')
+  assert.deepEqual(used.filter((token) => !dark.has(token)), [], 'every token exists in the dark theme')
+  assert.doesNotMatch(roadmap, /var\(--dy-[a-z0-9-]+\s*,/, 'no fallback colours: they hide a missing token in dark mode')
+})
+
+test('Roadmap: filter controls are one consistent size, wide and on a phone', { timeout: 120000 }, async () => {
+  const browser = await chromium.launch({ headless: true })
+  try {
+    for (const width of [1280, 768, 390]) {
+      const page = await browser.newPage({ viewport: { width, height: 900 } })
+      await openRoadmap(page)
+      const toolbar = await page.evaluate(() => ({
+        controls: [...document.querySelectorAll('.dy-rm-toolbar > *')].map((el) => {
+          const box = el.getBoundingClientRect(); const style = getComputedStyle(el)
+          return { name: el.className, top: Math.round(box.top), right: box.right, height: Math.round(box.height), radius: style.borderTopLeftRadius, font: style.fontSize, border: style.borderTopWidth }
+        }),
+        pageWidth: document.documentElement.scrollWidth,
+      }))
+      const [scope, search, attention, reset] = toolbar.controls
+      assert.equal(toolbar.controls.length, 4, `${width}: project, search, attention, Reset`)
+      assert.match(scope.name, /dy-rm-scope/, `${width}: signed order starts with the project picker`)
+      assert.match(search.name, /dy-rm-search/)
+      assert.match(attention.name, /dy-rm-attention/)
+      assert.match(reset.name, /dy-rm-reset/)
+      for (const control of toolbar.controls) {
+        assert.equal(control.height, 38, `${width}: ${control.name} is 38px tall`)
+        assert.equal(control.radius, '6px', `${width}: ${control.name} has the shared radius`)
+        assert.equal(control.font, '13px', `${width}: ${control.name} has the shared text size`)
+        assert.equal(control.border, '1px', `${width}: ${control.name} is a bordered control`)
+        assert.ok(control.right <= width, `${width}: ${control.name} stays on screen`)
+      }
+      assert.equal(attention.top, reset.top, `${width}: attention and Reset share a row`)
+      if (width === 1280) assert.equal(new Set(toolbar.controls.map((control) => control.top)).size, 1, 'wide: one row')
+      assert.ok(toolbar.pageWidth <= width, `${width}: no sideways scroll`)
+      await page.close()
+    }
+  } finally {
+    await browser.close()
+  }
+})
+
+test('Roadmap: dark theme recolours the toolbar, tree, chips and drawer', { timeout: 120000 }, async () => {
+  const browser = await chromium.launch({ headless: true })
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  try {
+    await openRoadmap(page)
+    await projectRow(page, 'payments-relaunch').click()
+    await firstOf(page, 'initiative').click()
+    await page.locator('[data-rm-drawer="initiative"]').waitFor()
+    const plainChip = '.dy-rm-chip:not(.attention):not(.blocked):not(.passed):not(.failed):not(.overdue)'
+    const read = () => page.evaluate((plain) => {
+      const root = document.querySelector('.dockyard-root')
+      const token = (name, property) => {
+        const probe = document.createElement('div')
+        probe.style[property] = `var(${name})`
+        root.append(probe)
+        const value = getComputedStyle(probe)[property]
+        probe.remove()
+        return value
+      }
+      const style = (selector) => getComputedStyle(document.querySelector(selector))
+      return {
+        actual: {
+          control: style('.dy-rm-toolbar .dy-rm-control').backgroundColor,
+          treeHead: style('.dy-rm-tree-head').backgroundColor,
+          chip: style(plain).backgroundColor,
+          attentionChip: style('.dy-rm-chip.attention').backgroundColor,
+          detail: style('.dy-rm-copy small').color,
+          drawerHead: style('.dy-rm-drawer-head').backgroundColor,
+        },
+        expected: {
+          control: token('--dy-surface', 'backgroundColor'),
+          treeHead: token('--dy-surface-subtle', 'backgroundColor'),
+          chip: token('--dy-surface-subtle', 'backgroundColor'),
+          attentionChip: token('--dy-warning-bg', 'backgroundColor'),
+          detail: token('--dy-text-2', 'color'),
+          drawerHead: token('--dy-surface-subtle', 'backgroundColor'),
+        },
+      }
+    }, plainChip)
+    const light = await read()
+    assert.deepEqual(light.actual, light.expected, 'light theme: Roadmap surfaces follow the shell tokens')
+    await page.evaluate(() => document.querySelector('.dockyard-root').setAttribute('data-theme', 'dark'))
+    const dark = await read()
+    assert.deepEqual(dark.actual, dark.expected, 'dark theme: Roadmap surfaces follow the shell tokens')
+    for (const part of Object.keys(light.actual)) {
+      assert.notEqual(dark.actual[part], light.actual[part], `${part} changes colour in dark mode`)
+    }
   } finally {
     await browser.close()
   }
