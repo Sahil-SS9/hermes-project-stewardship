@@ -90,9 +90,11 @@ _KNOWN_POLICY_KEYS = ("dedupe_window_minutes", "quiet_hours",
 # - minimum_severity: the real-DB spelling of min_severity;
 # - digest, max_open_initiatives: carried keys used elsewhere
 #   (propose_initiative reads max_open_initiatives).
-_ALIAS_MIN_SEVERITY = ("min_severity", "severity_threshold", "minimum_severity")
-# Legacy severity vocabulary still present in stored settings: "warning"
-# (the real DB uses it) maps onto the current scale's "low".
+_ALIAS_MIN_SEVERITY = ("min_severity", "severity_threshold")
+# minimum_severity is deliberately NOT an alias: the review's acceptance wants
+# it surfaced under `ignored` (on read) so the old spelling is visible, and
+# rejected with 422 on save. Legacy severity vocabulary still present in stored
+# settings ("warning" in the real DB) maps onto the current scale's "low".
 _LEGACY_SEVERITY_ALIASES = {"warning": "low", "error": "high", "fatal": "critical"}
 _CARRIED_POLICY_KEYS = ("digest", "max_open_initiatives")
 _WINDOW_KEY_RE = re.compile(r"^approval_required:(.+)$")

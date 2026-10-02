@@ -85,13 +85,22 @@ def test_bug1_panel_shape_still_notifies(env):
 
 
 def test_bug1_real_db_shape_still_notifies(env):
-    """The real DB stores {digest, minimum_severity} for payments-relaunch."""
+    """The real DB stores {digest, minimum_severity} for payments-relaunch.
+
+    That shape is pre-existing stored data: it is never 422'd on READ (the
+    unknown minimum_severity lands under `ignored` and the threshold falls
+    back), and the notification still fires. New SAVES reject it with 422.
+    """
     c, store = env
     enable(c, "pa2")
-    r = c.patch(f"{V}/projects/pa2/settings", json={
-        "notification_policy": {"digest": "daily", "minimum_severity": "warning"},
-        "actor": "sahil"})
-    assert r.status_code == 200
+    store._conn.execute(
+        "UPDATE project_stewardship SET notification_policy_json=?"
+        " WHERE project_id='pa2'",
+        ('{"digest": "daily", "minimum_severity": "warning"}',))
+    store._conn.commit()
+    eff = c.get(f"{V}/settings/notifications/effective",
+                params={"project_id": "pa2"}).json()["effective"]
+    assert "minimum_severity" in (eff.get("ignored") or [])
     code, ref, status = propose(c, "pa2")
     assert status == "pending_approval"
     assert len(approvals(c, "pa2")) == 1
@@ -176,6 +185,9 @@ def test_bug2_all_proposing_constructions_wired():
         "src/hermes_project_stewardship/persistence/canonical_work_service.py",
         # read-only convenience store used by desktop dev tooling
         "hermes_dockyard_plugin/desktop/disposable-backend.py",
+        # P's plan documents: uploads/reads project content; never proposes
+        # or decides initiatives
+        "src/hermes_project_stewardship/persistence/canvas_plan_document.py",
     }
     offenders = []
     for py in root.rglob("*.py"):
