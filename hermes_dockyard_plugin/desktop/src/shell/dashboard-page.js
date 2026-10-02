@@ -6,7 +6,6 @@ import { useRef } from '../runtime/react.js'
 import { useEffect } from '../runtime/react.js'
 import { TOAST_EVENT } from '../runtime/context.js'
 import { loadDashboardData } from '../data/loaders.js'
-import { loadRoadmapData } from '../data/loaders.js'
 import { loadProjectData } from '../data/loaders.js'
 import { loadBacklogData } from '../data/loaders.js'
 import { loadTeamsData } from '../data/loaders.js'
@@ -40,6 +39,8 @@ export function DashboardPage() {
   const [selectedProject, setSelectedProject] = useState(null)
   const [projectOptions, setProjectOptions] = useState([])
   const [projectEntryView, setProjectEntryView] = useState('overview')
+  // Roadmap scope: 'all' (the signed default) or one project ("View in Roadmap").
+  const [roadmapScope, setRoadmapScope] = useState('all')
   const [dashboardHomeVersion, setDashboardHomeVersion] = useState(0)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [toasts, setToasts] = useState([])
@@ -92,7 +93,8 @@ export function DashboardPage() {
     : tab === 'dashboard'
       ? loadDashboardData
       : tab === 'roadmap'
-        ? () => loadRoadmapData(selectedProject)
+        // RoadmapView loads its own scope; the shell only gates the tab.
+        ? async () => ({})
       : (tab === 'project' || tab === 'settings' || tab === 'workflows')
         ? () => loadProjectData(selectedProject)
       : tab === 'backlog'
@@ -140,6 +142,8 @@ export function DashboardPage() {
     }
     setDirtyProject(null)
     setSelectedProject(projectId)
+    // The global picker re-scopes an open Roadmap to that project.
+    if (tab === 'roadmap') setRoadmapScope(projectId ?? 'all')
     if (tab === 'dashboard' || tab === 'notifications' || tab === 'inbox' || tab === 'onboard') setTab('project')
   }
   // opts.entryView / opts.project let a guarded switch land on a specific
@@ -148,6 +152,7 @@ export function DashboardPage() {
   const goTab = (next, opts = {}) => {
     if (opts.project) setSelectedProject(opts.project)
     if (next === 'project') setProjectEntryView(opts.entryView ?? 'overview')
+    if (next === 'roadmap') setRoadmapScope(opts.roadmapScope ?? 'all')
     if (next === 'dashboard') setDashboardHomeVersion((value) => value + 1)
     setTab(next)
   }
@@ -163,6 +168,7 @@ export function DashboardPage() {
     setDirtyProject(null); dirtySaver.current = null
     if (project) {
       setSelectedProject(project)
+      if (tab === 'roadmap') setRoadmapScope(project)
       if (tab === 'dashboard' || tab === 'notifications' || tab === 'inbox' || tab === 'onboard') setTab('project')
     } else if (nextTab) { const opts = pendingTabOpts.current; pendingTabOpts.current = {}; goTab(nextTab, opts) }
   }
@@ -274,7 +280,7 @@ export function DashboardPage() {
       onProjectDirty: markDirty(payload.project?.id ?? null),
       onRefresh: refresh,
       onOpenLibrary: () => requestTab('workflows'),
-      onOpenRoadmap: () => requestTab('roadmap'),
+      onOpenRoadmap: () => requestTab('roadmap', { roadmapScope: payload.project?.id }),
       pendingWorkRef,
       onPendingWorkConsumed: () => setPendingWorkRef(null),
       notice: deepLinkNotice,
@@ -303,11 +309,16 @@ export function DashboardPage() {
   } else if (tab === 'onboard') {
     content = jsx(OnboardPanel, { view: payload, onOpen: () => setOnboardingOpen(true), onRefresh: refresh })
   } else if (tab === 'roadmap') {
+    // Keyed by scope: "View in Roadmap" and the global picker re-mount the
+    // view on the chosen project; opening the tab from the bar shows All.
     content = jsx(RoadmapView, {
-      projectId: selectedProject,
-      canWrite: payload.can_write !== false,
+      initialScope: roadmapScope,
       onRefresh: refresh,
-    }, `roadmap:${selectedProject ?? 'all'}`)
+      onOpen: ({ project, entryView, workRef }) => {
+        if (workRef) setPendingWorkRef(workRef)
+        requestTab('project', { project, entryView })
+      },
+    }, `roadmap:${roadmapScope}`)
   } else if (tab === 'backlog') {
     content = jsx(BacklogView, { view: payload, onRefresh: refresh })
   } else if (tab === 'teams') {

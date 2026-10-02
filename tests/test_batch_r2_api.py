@@ -228,6 +228,28 @@ def test_reads_do_not_need_a_capability(store, clock):
     assert client.get(f"{V1}/roadmap/projects/alpha/milestones/{mid}/items").status_code == 200
 
 
+@pytest.mark.parametrize("kind,expected", [
+    ("human_owner", True), ("non_human", False), ("no_capability", False),
+])
+def test_outline_can_write_matches_the_write_check(store, clock, kind, expected):
+    """can_write is the Desktop's cue to show Link…; it must agree with the
+    real write check, so a hidden action is never one the server would allow
+    and a shown action is never one it would refuse."""
+    adapter = ReferenceKanbanAdapter(store)
+    world = World(store, clock, adapter=adapter)
+    world.project("alpha")
+    ini, mid, _oid, _gid = _seed(world)
+    options = {"human_owner": {}, "non_human": dict(human=False),
+               "no_capability": dict(capabilities=[])}[kind]
+    client = TestClient(_app(store, adapter, **options), headers=BEARER)
+    outline = client.get(f"{V1}/roadmap", params={"project_id": "alpha"})
+    assert outline.status_code == 200 and outline.json()["can_write"] is expected
+    write = client.post(f"{V1}/projects/alpha/initiatives/{ini}/milestones",
+                        json={"milestone_id": mid})
+    assert (write.status_code == 200) is expected, write.text
+    assert outline.json()["projects"][0]["id"] == "alpha"  # the read itself is unchanged
+
+
 # ---- goal contract ------------------------------------------------------------------------
 
 def test_goal_contract_get_put_and_refusals(env):
@@ -286,6 +308,7 @@ def test_every_new_route_works_through_the_proxy(proxy):
     ini, mid, oid, gid = _seed(world)
     world.item("alpha", "pilot task", milestone="Pilot")
     assert [p["id"] for p in c.get("/api/roadmap").json()["projects"]] == ["alpha", "beta"]
+    assert c.get("/api/roadmap").json()["can_write"] is True  # human owner, every capability
     assert [p["id"] for p in c.get("/api/roadmap", params={"project_id": "alpha"}).json()["projects"]] == ["alpha"]
     assert c.get("/api/roadmap", params={"project_id": "ghost"}).status_code == 404
 

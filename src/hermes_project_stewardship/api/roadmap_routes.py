@@ -6,7 +6,10 @@ call: the shared file stays easy to merge.
 Authority: link and contract writes use the SAME capability as the goal edit
 routes (``project_archive``). Goal edits and milestone archive/restore both use
 it today, so a link edit is the same class of structural change. Reads need no
-capability, like every other GET.
+capability, like every other GET. The outline read also reports ``can_write``
+(would a write by this caller pass that check?) so the Desktop hides Link…
+instead of offering an action the server will refuse. It is a display hint
+only: every write is still checked on its own.
 """
 
 from __future__ import annotations
@@ -72,7 +75,13 @@ def install(router: APIRouter, roadmap: RoadmapService, *,
 
     @router.get("/roadmap")
     def roadmap_outline(project_id: Optional[str] = None):
-        return _run(lambda: roadmap.roadmap(project_id))
+        outline = _run(lambda: roadmap.roadmap(project_id))
+        try:
+            authority(WRITE_CAPABILITY)
+            can_write = True
+        except HTTPException:
+            can_write = False
+        return {**outline, "can_write": can_write}
 
     @router.get("/roadmap/projects/{project_id}/milestones/{milestone_id}/items")
     def roadmap_milestone_items(project_id: str, milestone_id: int):
