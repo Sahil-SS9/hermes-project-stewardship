@@ -3253,6 +3253,14 @@ def create_app(
             "next": "Review the objective results; onboarding enables no automation.",
         }
 
+    # --- Batch R2: Roadmap routes (one contiguous block; see api/roadmap_routes.py)
+    from ..persistence.roadmap_service import RoadmapService
+    from .roadmap_routes import install as _install_roadmap_routes
+
+    _install_roadmap_routes(
+        router, RoadmapService(store, svc, work), authority=_membership_authority)
+    # --- end Batch R2
+
     app.include_router(router)
 
     @app.exception_handler(HTTPException)

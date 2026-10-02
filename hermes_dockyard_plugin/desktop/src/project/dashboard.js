@@ -32,7 +32,7 @@ import { formatWhen } from '../lib/ui.js'
 import { FirstAssessmentCard } from '../views/dashboard.js'
 import { PageHead } from '../lib/ui.js'
 import { WorkItemDetail } from '../work-item/detail.js'
-export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary }) {
+export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap }) {
   const [projectView, setProjectView] = useState(initialView || 'overview')
   // QA M-7: leaving the Planning view with unsaved board edits asks first.
   const [canvasDirty, setCanvasDirty] = useState(false)
@@ -66,9 +66,9 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
   const [moving, setMoving] = useState(false)
   const moveLock = useRef(false)
   const project = view.project
-  // Tab-driven entry points (Objectives/Delivery/Work/Reports/Settings/
-  // Workflows) focus the matching sub-view; manual sub-view clicks are free
-  // afterwards because this effect only runs when the entry target changes.
+  // Tab-driven entry points (Objectives/Work/Reports/Settings/Workflows)
+  // focus the matching sub-view; manual sub-view clicks are free afterwards
+  // because this effect only runs when the entry target changes.
   useEffect(() => {
     if (initialView) setProjectView(initialView)
   }, [initialView])
@@ -285,6 +285,9 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
       description: `Project dashboard / ${project.id}`,
       status: project.health && project.health !== 'healthy' ? healthLabel : null,
       onRefresh,
+    }),
+    projectView === 'overview' && jsx('div', { className: 'dockyard-view-only-note', 'data-roadmap-link': true, children:
+      jsx('a', { href: '#', onClick: (event) => { event.preventDefault(); onOpenRoadmap?.() }, children: 'View in Roadmap' }),
     }),
     workNotice || notice ? jsxs('div', { className: 'dockyard-view-only-note', role: 'alert', 'data-deep-link-notice': true, children: [
       jsx(Icon, { name: 'alert' }),

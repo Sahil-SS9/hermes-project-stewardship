@@ -1830,3 +1830,100 @@ async def ack(notification_id: int) -> dict:
     return await _proxy(
         "POST", f"/stewardship/v1/notifications/{notification_id}/ack",
         {"actor_id": _ACTOR_ID})
+
+
+# --- Batch R2: Roadmap proxy routes (one contiguous block) ---------------------
+# Bodies are strict (extra="forbid"): the caller can never name its own actor.
+# Attribution comes from the verified session token the proxy forwards.
+
+class RoadmapMilestoneLinkBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    milestone_id: int
+    relationship: str = "delivers"
+
+
+class RoadmapObjectiveLinkBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    initiative_ref: str
+    relationship: str = "supports"
+
+
+class GoalContractBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    outcome: str | None = None
+    verification: str | None = None
+    constraints: str | None = None
+    boundaries: str | None = None
+    stop_when: str | None = None
+    status: str | None = None
+    max_turns: int | str | None = None
+    paused_reason: str | None = None
+
+
+@plugin_api.get("/roadmap")
+async def roadmap_outline(project_id: str | None = None) -> dict:
+    params = {"project_id": project_id} if project_id else None
+    return await _proxy("GET", "/stewardship/v1/roadmap", params=params)
+
+
+@plugin_api.get("/roadmap/projects/{project_id}/milestones/{milestone_id}/items")
+async def roadmap_milestone_items(project_id: str, milestone_id: int) -> dict:
+    return await _proxy(
+        "GET",
+        f"/stewardship/v1/roadmap/projects/{quote(project_id, safe='')}"
+        f"/milestones/{milestone_id}/items",
+    )
+
+
+@plugin_api.post("/projects/{project_id}/initiatives/{ref}/milestones")
+async def roadmap_link_milestone(project_id: str, ref: str, body: RoadmapMilestoneLinkBody) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/initiatives/{quote(ref, safe='')}/milestones",
+        body.model_dump(),
+    )
+
+
+@plugin_api.delete("/projects/{project_id}/initiatives/{ref}/milestones/{milestone_id}")
+async def roadmap_unlink_milestone(project_id: str, ref: str, milestone_id: int) -> dict:
+    return await _proxy(
+        "DELETE",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/initiatives/{quote(ref, safe='')}"
+        f"/milestones/{milestone_id}",
+    )
+
+
+@plugin_api.post("/projects/{project_id}/objectives/{objective_id}/initiatives")
+async def roadmap_link_objective(project_id: str, objective_id: int, body: RoadmapObjectiveLinkBody) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/objectives/{objective_id}/initiatives",
+        body.model_dump(),
+    )
+
+
+@plugin_api.delete("/projects/{project_id}/objectives/{objective_id}/initiatives/{ref}")
+async def roadmap_unlink_objective(project_id: str, objective_id: int, ref: str) -> dict:
+    return await _proxy(
+        "DELETE",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/objectives/{objective_id}"
+        f"/initiatives/{quote(ref, safe='')}",
+    )
+
+
+@plugin_api.get("/projects/{project_id}/goals/{goal_id}/contract")
+async def roadmap_goal_contract(project_id: str, goal_id: str) -> dict:
+    return await _proxy(
+        "GET",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/goals/{quote(goal_id, safe='')}/contract",
+    )
+
+
+@plugin_api.put("/projects/{project_id}/goals/{goal_id}/contract")
+async def roadmap_update_goal_contract(project_id: str, goal_id: str, body: GoalContractBody) -> dict:
+    return await _proxy(
+        "PUT",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/goals/{quote(goal_id, safe='')}/contract",
+        body.model_dump(exclude_unset=True),
+    )
+# --- end Batch R2 ---------------------------------------------------------------

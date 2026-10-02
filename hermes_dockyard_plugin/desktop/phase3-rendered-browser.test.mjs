@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { chromium } from './browser-harness.mjs'
 const BASE = process.env.STEWARD_DESKTOP_URL || 'http://127.0.0.1:19500/desktop'
-const tabs = ['dashboard','project','backlog','workflows','inbox','notifications','onboard','settings']
+const tabs = ['dashboard','project','roadmap','backlog','workflows','inbox','notifications','onboard','settings']
 test('Phase 3 rendered Desktop: scope isolation, dirty switching, keyboard and narrow layout', {timeout:120000}, async()=>{
  const browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1280,height:820}});
  const errors=[];page.on('pageerror',e=>errors.push(String(e)));

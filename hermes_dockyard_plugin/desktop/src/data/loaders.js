@@ -156,6 +156,14 @@ export async function loadBacklogData(projectId) {
   }
 }
 
+export async function loadRoadmapData(projectId) {
+  // R2 (Phase C): the outline read model. One call; the backend makes one
+  // canonical list_work call per project. Milestone items load separately
+  // when a milestone opens (roadmap.milestone_items).
+  const path = projectId ? `/roadmap?project_id=${encodeURIComponent(projectId)}` : '/roadmap'
+  return api(path)
+}
+
 export async function loadTeamsData() {
   const [bots, workload, groups, dashboard, discovery] = await Promise.all([
     api('/bots'), api('/workload'), api('/bot-groups'), api('/dashboard'), api('/onboard/discover'),

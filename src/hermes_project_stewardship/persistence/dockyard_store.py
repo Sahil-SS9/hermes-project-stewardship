@@ -506,7 +506,7 @@ class DockyardStore:
             "SELECT item_ref FROM dockyard_milestone_items WHERE milestone_id=?"
             " ORDER BY item_ref", (row["id"],)
         ).fetchall()]
-        return {"name": name, "total": total, "done": done,
+        return {"id": row["id"], "name": name, "total": total, "done": done,
                 "closed": bool(row["closed_at"]), "due": row["due"],
                 "created_at": row["created_at"], "archived_at": row["archived_at"],
                 "archived_by": row["archived_by"], "item_refs": item_refs}
@@ -515,7 +515,7 @@ class DockyardStore:
         archive_clause = "" if include_archived else " AND m.archived_at IS NULL"
         rows = self.store._conn.execute(
             f"""
-            SELECT m.name, m.due, m.created_at, m.closed_at,
+            SELECT m.id, m.name, m.due, m.created_at, m.closed_at,
                    m.archived_at, m.archived_by,
                    COUNT(mi.item_ref) AS total,
                    COALESCE(SUM(CASE WHEN w.status='done' THEN 1 ELSE 0 END), 0) AS done,
@@ -533,6 +533,7 @@ class DockyardStore:
         ).fetchall()
         return [
             {
+                "id": row["id"],
                 "name": row["name"],
                 "due": row["due"],
                 "created_at": row["created_at"],

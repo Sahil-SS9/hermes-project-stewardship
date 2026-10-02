@@ -134,7 +134,7 @@ export const DOCKYARD_CSS = `
   letter-spacing: -0.01em;
 }
 .dockyard-root .dockyard-brand-copy span { color: var(--dy-text-3); font-size: 11px; }
-.dockyard-root .dockyard-tabs { flex-wrap: wrap;
+.dockyard-root .dockyard-tabs {
   display: flex;
   flex: 1 1 auto;
   flex-wrap: wrap;
