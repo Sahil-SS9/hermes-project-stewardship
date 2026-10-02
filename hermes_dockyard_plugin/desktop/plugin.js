@@ -16053,7 +16053,7 @@ function NotificationDetail({ note, busy, resolveOpen, onResolveToggle, resolveN
       typeof onOpen === "function" && note.deep_link ? jsx(Button, { action: "detail-open", small: true, onClick: () => onOpen(note.deep_link), children: "Open item" }) : null,
       state === "new" ? jsx(Button, { action: "detail-seen", small: true, disabled: busy, onClick: onSeen, children: busy ? "Working\u2026" : "Mark seen" }) : null,
       state !== "resolved" ? jsx(Button, { action: "detail-resolve", small: true, disabled: busy, onClick: onResolveToggle, "aria-expanded": resolveOpen ? "true" : "false", children: "Resolve" }) : null,
-      note.kind === "approval_required" && note.ref ? jsx(Button, { action: "detail-approval", small: true, onClick: () => onOpen?.(`/dockyard/inbox?project=${encodeURIComponent(note.project || "")}`), children: "Review in Approval Inbox" }) : null
+      note.kind === "approval_required" && note.ref ? jsx(Button, { action: "detail-approval", small: true, onClick: () => onOpen?.(note.project ? `s4:project/${note.project}` : "s4:approval-inbox"), children: "Review in Approval Inbox" }) : null
     ] }),
     resolveOpen && state !== "resolved" ? jsxs(Fragment, { children: [
       jsx("textarea", {
@@ -17235,56 +17235,48 @@ function DashboardPage() {
 }
 
 // hermes_dockyard_plugin/desktop/src/index.js
-var POPUP_SEEN_KEY = "dockyard-notification-popups-seen";
 var POPUP_INTERVAL_MS = 6e4;
 var POPUP_CAP = 3;
-function popupSeenIds() {
-  try {
-    const raw = window.sessionStorage.getItem(POPUP_SEEN_KEY);
-    return new Set(raw ? JSON.parse(raw) : []);
-  } catch {
-    return /* @__PURE__ */ new Set();
-  }
-}
-function rememberPopupIds(ids) {
-  try {
-    const seen = popupSeenIds();
-    for (const id of ids) seen.add(id);
-    window.sessionStorage.setItem(POPUP_SEEN_KEY, JSON.stringify([...seen]));
-  } catch {
-  }
+function openDockyard() {
+  host?.navigate?.("/dockyard");
 }
 function surfacePopup(item) {
-  host?.notify?.({
+  const text = String(item?.body ?? "").trim();
+  host.notify({
+    id: `dockyard-notification-${item?.id}`,
+    kind: "info",
     title: item?.title ?? "Fleet notification",
-    body: item?.body ?? "",
-    tag: `dockyard-notification-${item?.id}`,
-    data: item?.deep_link ? { deep_link: item.deep_link } : void 0
+    message: text || "Open Dockyard to review it.",
+    action: { label: "Open Dockyard", onClick: openDockyard }
+  });
+}
+function surfaceMore(count) {
+  host.notify({
+    id: "dockyard-notification-more",
+    kind: "info",
+    title: `and ${count} more notification${count === 1 ? "" : "s"}`,
+    message: "See them all in Dockyard Notifications.",
+    action: { label: "Open Dockyard", onClick: openDockyard }
   });
 }
 function startPopupPoller(ctxRest) {
   if (typeof host?.notify !== "function") return;
   if (typeof window === "undefined" || window.__dockyardPopupPoller) return;
+  const surfaced = /* @__PURE__ */ new Set();
   const tick = async () => {
     if (document.visibilityState !== "visible") return;
     try {
       const result = await ctxRest("/notifications/popups", { method: "GET" });
-      const popups = Array.isArray(result?.popups) ? result.popups : [];
-      if (!popups.length) return;
-      const seen = popupSeenIds();
-      const fresh = popups.filter((item) => !seen.has(item.id)).slice(0, POPUP_CAP);
-      const more = Math.max(0, popups.length - fresh.length);
-      for (const item of fresh) surfacePopup(item);
-      if (more > 0) {
-        host?.notify?.({
-          title: `and ${more} more notification${more === 1 ? "" : "s"}`,
-          body: "",
-          tag: "dockyard-notification-more"
-        });
+      const popups = (Array.isArray(result?.popups) ? result.popups : []).slice(0, POPUP_CAP);
+      const more = Math.max(0, Number(result?.more) || 0);
+      const fresh = popups.filter((item) => !surfaced.has(item.id));
+      for (const item of fresh) {
+        surfaced.add(item.id);
+        surfacePopup(item);
       }
-      const shownIds = fresh.map((item) => item.id);
+      if (fresh.length && more > 0) surfaceMore(more);
+      const shownIds = popups.map((item) => item.id);
       if (shownIds.length) {
-        rememberPopupIds(shownIds);
         await ctxRest("/notifications/popups/shown", { method: "POST", body: { ids: shownIds } });
       }
     } catch {

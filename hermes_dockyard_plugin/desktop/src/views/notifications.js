@@ -312,7 +312,7 @@ export function NotificationDetail({ note, busy, resolveOpen, onResolveToggle, r
         ? jsx(Button, { action: 'detail-resolve', small: true, disabled: busy, onClick: onResolveToggle, 'aria-expanded': resolveOpen ? 'true' : 'false', children: 'Resolve' })
         : null,
       note.kind === 'approval_required' && note.ref
-        ? jsx(Button, { action: 'detail-approval', small: true, onClick: () => onOpen?.(`/dockyard/inbox?project=${encodeURIComponent(note.project || '')}`), children: 'Review in Approval Inbox' })
+        ? jsx(Button, { action: 'detail-approval', small: true, onClick: () => onOpen?.(note.project ? `s4:project/${note.project}` : 's4:approval-inbox'), children: 'Review in Approval Inbox' })
         : null,
     ]}),
     resolveOpen && state !== 'resolved'

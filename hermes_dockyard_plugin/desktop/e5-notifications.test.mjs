@@ -100,6 +100,25 @@ test('E5: filters, day groups, detail actions, badge, settings, poller, keyboard
     await rows.first().locator('button').first().click()
     await page.locator('[data-notification-detail]').waitFor()
     const detail = page.locator('[data-notification-detail]')
+
+    // 3a. "Review in Approval Inbox" (approval rows) must land on the Approval
+    // Inbox. Then come back to the same row for the remaining steps.
+    const reviewButton = detail.getByRole('button', { name: 'Review in Approval Inbox' })
+    assert.equal(await reviewButton.count(), 1, 'approval detail offers Review in Approval Inbox')
+    await reviewButton.click()
+    await page
+      .waitForFunction(() => document.querySelector('[data-tab="inbox"]')?.getAttribute('aria-selected') === 'true')
+      .catch(async () => {
+        const active = await page.locator('[role="tab"][aria-selected="true"]').innerText().catch(() => 'n/a')
+        assert.fail(`Review in Approval Inbox opens the Approval Inbox; active tab is still: ${active}`)
+      })
+    await page.getByRole('heading', { name: 'Approval Inbox' }).first().waitFor()
+    await page.getByRole('tab', { name: 'Notifications' }).click()
+    await page.locator('.dy-notif-filters').waitFor()
+    await page.getByLabel('Filter by type').selectOption('approval_required')
+    await rows.first().locator('button').first().click()
+    await page.locator('[data-notification-detail]').waitFor()
+
     await detail.getByRole('button', { name: 'Mark seen' }).click()
     await page
       .waitForFunction(() => document.querySelector('[data-notification-detail]')?.innerText.includes('Seen by'))

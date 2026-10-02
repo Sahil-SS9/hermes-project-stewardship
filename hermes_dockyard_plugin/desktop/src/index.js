@@ -106,42 +106,43 @@ import { DOCKYARD_TEST } from './styles/tokens.js'
 void DOCKYARD_TEST
 
 // Batch E5: pop-up poller. Every 60 seconds, while the window is visible:
-// fetch /notifications/popups, surface each item through host.notify when the
-// host supports it (fall back to an in-app toast), then mark them shown. A
-// seen-set (sessionStorage-backed, so it survives reloads in the same tab)
-// guarantees the same pop-up never shows twice.
-const POPUP_SEEN_KEY = 'dockyard-notification-popups-seen'
+// fetch /notifications/popups (the backend returns at most 3 due items plus a
+// count of the rest), surface each through host.notify, then mark them shown.
+// The backend's popup_shown_at mark stops a pop-up returning, across reloads
+// too. No browser storage (26/08 locked rule): the only client memory is an
+// in-page set, so an item whose shown-mark failed is not shown again while
+// the mark is retried on the next tick.
 const POPUP_INTERVAL_MS = 60000
 const POPUP_CAP = 3
 
-function popupSeenIds() {
-  try {
-    const raw = window.sessionStorage.getItem(POPUP_SEEN_KEY)
-    return new Set(raw ? JSON.parse(raw) : [])
-  } catch {
-    return new Set()
-  }
-}
-
-function rememberPopupIds(ids) {
-  try {
-    const seen = popupSeenIds()
-    for (const id of ids) seen.add(id)
-    window.sessionStorage.setItem(POPUP_SEEN_KEY, JSON.stringify([...seen]))
-  } catch {
-    // Storage unavailable (private mode): the shown-mark on the backend still
-    // prevents the same pop-up returning within its window.
-  }
+// Hermes Desktop's host.notify reads only: id, kind, icon, accentColor, meta,
+// title, message, detail, action, secondaryAction, onDismiss, durationMs,
+// placement. `message` is required and other fields are dropped, so pop-ups
+// use exactly these names (apps/desktop/src/store/notifications.ts).
+function openDockyard() {
+  host?.navigate?.('/dockyard')
 }
 
 function surfacePopup(item) {
   // The host owns system-surface pop-ups; the poller never falls back to
   // in-app toasts (those are for user-triggered mutations).
-  host?.notify?.({
+  const text = String(item?.body ?? '').trim()
+  host.notify({
+    id: `dockyard-notification-${item?.id}`,
+    kind: 'info',
     title: item?.title ?? 'Fleet notification',
-    body: item?.body ?? '',
-    tag: `dockyard-notification-${item?.id}`,
-    data: item?.deep_link ? { deep_link: item.deep_link } : undefined,
+    message: text || 'Open Dockyard to review it.',
+    action: { label: 'Open Dockyard', onClick: openDockyard },
+  })
+}
+
+function surfaceMore(count) {
+  host.notify({
+    id: 'dockyard-notification-more',
+    kind: 'info',
+    title: `and ${count} more notification${count === 1 ? '' : 's'}`,
+    message: 'See them all in Dockyard Notifications.',
+    action: { label: 'Open Dockyard', onClick: openDockyard },
   })
 }
 
@@ -150,26 +151,21 @@ function startPopupPoller(ctxRest) {
   // surface them on (jsdom/test hosts), so no poller, no stray timers.
   if (typeof host?.notify !== 'function') return
   if (typeof window === 'undefined' || window.__dockyardPopupPoller) return
+  const surfaced = new Set()
   const tick = async () => {
     if (document.visibilityState !== 'visible') return
     try {
       const result = await ctxRest('/notifications/popups', { method: 'GET' })
-      const popups = Array.isArray(result?.popups) ? result.popups : []
-      if (!popups.length) return
-      const seen = popupSeenIds()
-      const fresh = popups.filter((item) => !seen.has(item.id)).slice(0, POPUP_CAP)
-      const more = Math.max(0, popups.length - fresh.length)
-      for (const item of fresh) surfacePopup(item)
-      if (more > 0) {
-        host?.notify?.({
-          title: `and ${more} more notification${more === 1 ? '' : 's'}`,
-          body: '',
-          tag: 'dockyard-notification-more',
-        })
+      const popups = (Array.isArray(result?.popups) ? result.popups : []).slice(0, POPUP_CAP)
+      const more = Math.max(0, Number(result?.more) || 0)
+      const fresh = popups.filter((item) => !surfaced.has(item.id))
+      for (const item of fresh) {
+        surfaced.add(item.id)
+        surfacePopup(item)
       }
-      const shownIds = fresh.map((item) => item.id)
+      if (fresh.length && more > 0) surfaceMore(more)
+      const shownIds = popups.map((item) => item.id)
       if (shownIds.length) {
-        rememberPopupIds(shownIds)
         await ctxRest('/notifications/popups/shown', { method: 'POST', body: { ids: shownIds } })
       }
     } catch {
