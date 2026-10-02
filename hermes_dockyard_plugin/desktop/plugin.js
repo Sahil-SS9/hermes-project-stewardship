@@ -2337,8 +2337,14 @@ var ROADMAP_CSS = `
   .dy-rm-chips { display: none; }
 }
 @media (max-width: 520px) {
-  .dy-rm-toolbar { display: grid; grid-template-columns: 1fr 1fr; }
+  .dy-rm-toolbar { display: grid; grid-template-columns: 1fr 1fr; align-items: center; }
   .dy-rm-toolbar label:has(input[type="search"]) { grid-column: 1 / -1; }
+  /* Tighten the phone toolbar: checkbox aligns with the picker row, Reset
+     keeps a modest width, dropdown can still name long projects. */
+  .dy-rm-toolbar .dy-rm-attention { align-items: center; }
+  .dy-rm-toolbar > label:nth-of-type(3) { grid-column: 1 / 2; }
+  .dy-rm-toolbar > button:last-child { width: auto; justify-self: start; padding-left: 12px; padding-right: 12px; }
+  .dy-rm-toolbar input[type="search"] { min-width: 0; width: 100%; }
 }
 `;
 
@@ -16208,7 +16214,7 @@ function RoadmapView({ projectId, canWrite, onRefresh }) {
         id: initiative.ref,
         depth: 1,
         label: initiative.title,
-        detail: initiative.attention_reasons.length ? initiative.attention_reasons.map((r) => r.replace(/_/g, " ")).join(" \xB7 ") : `${number(initiative.delivery?.total ?? 0)} linked work items`,
+        detail: initiative.attention_reasons.length ? initiative.attention_reasons.map((r) => r.replace(/_/g, " ")).join(" \xB7 ") : initiative.delivery && initiative.delivery.state !== "no_linked_work" ? `${number(initiative.delivery.total)} linked work items` : "No linked work",
         expandable: true,
         open: initiativeOpen,
         selected: selection === initiativeKey,

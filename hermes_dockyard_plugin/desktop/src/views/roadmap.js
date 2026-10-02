@@ -412,7 +412,9 @@ export function RoadmapView({ projectId, canWrite, onRefresh }) {
       rows.push(jsx(Row, {
         type: 'initiative', id: initiative.ref, depth: 1,
         label: initiative.title,
-        detail: initiative.attention_reasons.length ? initiative.attention_reasons.map((r) => r.replace(/_/g, ' ')).join(' · ') : `${number(initiative.delivery?.total ?? 0)} linked work items`,
+        detail: initiative.attention_reasons.length
+          ? initiative.attention_reasons.map((r) => r.replace(/_/g, ' ')).join(' · ')
+          : (initiative.delivery && initiative.delivery.state !== 'no_linked_work' ? `${number(initiative.delivery.total)} linked work items` : 'No linked work'),
         expandable: true, open: initiativeOpen, selected: selection === initiativeKey,
         chips: jsxs(Fragment, { children: [
           deliveryChips(initiative.delivery),
