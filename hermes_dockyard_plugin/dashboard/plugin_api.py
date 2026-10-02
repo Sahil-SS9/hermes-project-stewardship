@@ -1189,6 +1189,28 @@ class DecisionActionBody(BaseModel):
     note: str = ""
 
 
+# The caller never names the actor: these bodies forbid it, and the proxy
+# attaches _ACTOR_ID itself, exactly as approve/reject do.
+class RequestChangesBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_fingerprint: str | None = None
+    feedback: str = ""
+    note: str = ""
+
+
+class ResubmitBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    rationale: str | None = None
+    expected_outcome: str | None = None
+    risk: str | None = None
+    note: str = ""
+
+
+class InitiativeCommentBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    body: str = ""
+
+
 class BacklogAddBody(BaseModel):
     ref: str
     rank: int
@@ -1537,6 +1559,12 @@ async def onboard(body: OnboardBody) -> dict:
     return await _proxy("POST", "/stewardship/v1/onboard", payload)
 
 
+@plugin_api.post("/projects/{project_id}/first-assessment")
+async def first_assessment(project_id: str) -> dict:
+    # Onboarding's last step (P7.6): one read-only assessment; it proposes nothing.
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/first-assessment")
+
+
 @plugin_api.get("/initiatives/{ref}/decision")
 async def decision(ref: str) -> dict:
     r = quote(ref, safe="")
@@ -1574,6 +1602,34 @@ async def reject(ref: str, body: DecisionActionBody | None = None) -> dict:
         if body.note:
             payload["note"] = body.note
     return await _proxy("POST", f"/stewardship/v1/initiatives/{r}/reject", payload)
+
+
+@plugin_api.post("/initiatives/{ref}/request-changes")
+async def request_changes(ref: str, body: RequestChangesBody) -> dict:
+    r = quote(ref, safe="")
+    payload = {**body.model_dump(exclude_none=True), "actor": _ACTOR_ID, "interface": "dockyard:human"}
+    return await _proxy("POST", f"/stewardship/v1/initiatives/{r}/request-changes", payload)
+
+
+@plugin_api.post("/initiatives/{ref}/resubmit")
+async def resubmit(ref: str, body: ResubmitBody) -> dict:
+    r = quote(ref, safe="")
+    payload = {**body.model_dump(exclude_none=True), "actor": _ACTOR_ID, "interface": "dockyard:human"}
+    return await _proxy("POST", f"/stewardship/v1/initiatives/{r}/resubmit", payload)
+
+
+@plugin_api.get("/initiatives/{ref}/comments")
+async def initiative_comments(ref: str) -> dict:
+    r = quote(ref, safe="")
+    return await _proxy("GET", f"/stewardship/v1/initiatives/{r}/comments")
+
+
+@plugin_api.post("/initiatives/{ref}/comments")
+async def add_initiative_comment(ref: str, body: InitiativeCommentBody) -> dict:
+    # A comment never changes the decision; the backend records it beside it.
+    r = quote(ref, safe="")
+    payload = {"body": body.body, "actor": _ACTOR_ID, "interface": "dockyard:human"}
+    return await _proxy("POST", f"/stewardship/v1/initiatives/{r}/comments", payload)
 
 
 @plugin_api.post("/initiatives/{ref}/complete")

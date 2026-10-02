@@ -23,6 +23,7 @@ import { jsxs } from '../runtime/react.js'
 import { Button } from '../lib/ui.js'
 import { EmptyState } from '../lib/ui.js'
 import { ErrorState } from '../lib/ui.js'
+import { Icon } from '../lib/ui.js'
 import { LoadingState } from '../lib/ui.js'
 import { PageHead } from '../lib/ui.js'
 import { number } from '../lib/ui.js'
@@ -717,20 +718,26 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
       onRefresh: () => { void load(); onRefresh?.() },
       status: error ? 'Load failed' : null,
     }),
-    jsxs('div', { className: 'dy-rm-toolbar', children: [
-      jsx('label', { children: jsx('input', { type: 'search', placeholder: 'Search the roadmap', value: search, onChange: (event) => setSearch(event.target.value), 'aria-label': 'Search the roadmap' }) }),
-      jsx('label', { className: 'dy-rm-attention', children: jsxs(Fragment, { children: [
-        jsx('input', { type: 'checkbox', checked: attentionOnly, onChange: (event) => setAttentionOnly(event.target.checked) }),
-        'Needs attention only',
-      ] }) }),
-      jsx('label', { children: jsxs(Fragment, { children: [
-        'Project',
+    // Filters in the signed v4 order: project, search, attention, Reset.
+    // Every control shares one height, radius and font (roadmap-css.js).
+    jsxs('div', { className: 'dy-rm-toolbar', role: 'group', 'aria-label': 'Roadmap filters', children: [
+      jsxs('label', { className: 'dy-rm-control dy-rm-scope', children: [
+        jsx('span', { className: 'dy-rm-scope-label', children: 'Project' }),
         jsx('select', { value: scope, onChange: (event) => changeScope(event.target.value), 'aria-label': 'Roadmap project picker', children: [
           jsx('option', { value: 'all', children: 'All projects' }, 'all'),
           ...options.map((project) => jsx('option', { value: project.id, children: project.label ?? project.id }, project.id)),
         ] }),
-      ] }) }),
-      jsx(Button, { onClick: () => { setSearch(''); setAttentionOnly(false); setOpenNodes(new Set()); changeScope('all') }, children: 'Reset' }),
+        jsx(Icon, { name: 'chevron-down' }),
+      ] }),
+      jsxs('label', { className: 'dy-rm-control dy-rm-search', children: [
+        jsx(Icon, { name: 'search' }),
+        jsx('input', { type: 'search', placeholder: 'Search the roadmap', value: search, onChange: (event) => setSearch(event.target.value), 'aria-label': 'Search the roadmap' }),
+      ] }),
+      jsxs('label', { className: 'dy-rm-control dy-rm-attention', children: [
+        jsx('input', { type: 'checkbox', checked: attentionOnly, onChange: (event) => setAttentionOnly(event.target.checked) }),
+        jsx('span', { children: 'Needs attention only' }),
+      ] }),
+      jsx('button', { type: 'button', className: 'dy-rm-control dy-rm-reset', onClick: () => { setSearch(''); setAttentionOnly(false); setOpenNodes(new Set()); changeScope('all') }, children: 'Reset' }),
     ]}),
     content,
     linkDialog ? jsx(LinkDialog, {
