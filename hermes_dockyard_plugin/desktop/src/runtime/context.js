@@ -39,9 +39,12 @@ export function emitToast(tone, message) {
 
 export async function api(path, init) {
   const method = init?.method ?? 'GET'
+  // `quiet` is for background saves the person did not ask to confirm (the
+  // remembered project): no success or error toast.
+  const quiet = init?.quiet === true
   try {
     const result = await _rest(path, { method, body: init?.body })
-    if (method !== 'GET') emitToast('success', mutationMessage(path, result))
+    if (method !== 'GET' && !quiet) emitToast('success', mutationMessage(path, result))
     return result
   } catch (error) {
     const raw = String(error?.message ?? error).slice(0, 240)
@@ -55,7 +58,7 @@ export async function api(path, init) {
       : /(?:error\s*)?500|internal service error/i.test(raw)
         ? 'Dockyard could not confirm the request.'
         : raw
-    if (method !== 'GET' && !init?.suppressErrorToast) emitToast('danger', message)
+    if (method !== 'GET' && !init?.suppressErrorToast && !quiet) emitToast('danger', message)
     const failure = new Error(message)
     failure.cause = error
     throw failure

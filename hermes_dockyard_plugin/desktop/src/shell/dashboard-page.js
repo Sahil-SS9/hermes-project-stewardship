@@ -64,6 +64,34 @@ export function DashboardPage() {
   const dirtySaver = useRef(null)
   const [navSaving, setNavSaving] = useState(false)
   const markDirty = (projectId) => (dirty, saver) => { setDirtyProject(dirty ? projectId : null); dirtySaver.current = dirty ? (saver ?? null) : null }
+  // Sahil 02/10: Dockyard reopens on the last project the person chose. The
+  // choice is kept in the backend (GET/PUT /settings/last-project), never in
+  // browser storage (26/08 locked rule). Only a person's choice is saved:
+  // the automatic first pick (the remembered project, or the project needing
+  // most attention) is not. It is requested once per app load, right after
+  // the first load starts: the dashboard stays the first request (repro-live
+  // fails the first GET) and the first pick waits for no extra round trip.
+  const lastProject = useRef({ request: null, saved: null, auto: null })
+  const rememberedProject = () => {
+    const memory = lastProject.current
+    memory.request ??= api('/settings/last-project').then(
+      (result) => {
+        const saved = typeof result?.project_id === 'string' && result.project_id ? result.project_id : null
+        memory.saved ??= saved
+        return saved
+      },
+      () => null, // unavailable: open on the default project as before
+    )
+    return memory.request
+  }
+  useEffect(() => {
+    const memory = lastProject.current
+    const auto = memory.auto
+    memory.auto = null
+    if (!selectedProject || selectedProject === auto || selectedProject === memory.saved) return
+    memory.saved = selectedProject
+    api('/settings/last-project', { method: 'PUT', body: { project_id: selectedProject }, quiet: true }).catch(() => {})
+  }, [selectedProject])
   useEffect(() => {
     const timers = new Map()
     const handleToast = (event) => {
@@ -114,14 +142,27 @@ export function DashboardPage() {
           ...(await api('/notifications?limit=200')),
           settings: (await api('/settings/notifications/effective')).effective,
         })
-    loader().then(
+    const loading = loader()
+    // No project picked yet: ask for the remembered one alongside this load.
+    if (!selectedProject) rememberedProject()
+    loading.then(
       (result) => {
         if (!current || serial !== loadSerial.current) return
         setData({ tab, projectId: selectedProject, payload: result })
         if (result.projects) {
           const options = sortProjects(result.projects)
           setProjectOptions(options)
-          if (!selectedProject && options.length) setSelectedProject(result.project?.id || options[0].id)
+          if (!selectedProject && options.length) {
+            // First pick: the remembered project when it is still listed,
+            // otherwise the project needing most attention (as before).
+            const fallback = result.project?.id || options[0].id
+            rememberedProject().then((saved) => {
+              if (!current || serial !== loadSerial.current) return
+              const pick = saved && options.some((option) => option.id === saved) ? saved : fallback
+              lastProject.current.auto = pick
+              setSelectedProject(pick)
+            })
+          }
         }
         if (tab === 'dashboard') {
           setCounts({

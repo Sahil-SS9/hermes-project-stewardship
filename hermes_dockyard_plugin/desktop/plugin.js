@@ -3134,14 +3134,15 @@ function emitToast(tone, message) {
 }
 async function api(path, init) {
   const method = init?.method ?? "GET";
+  const quiet = init?.quiet === true;
   try {
     const result = await _rest(path, { method, body: init?.body });
-    if (method !== "GET") emitToast("success", mutationMessage(path, result));
+    if (method !== "GET" && !quiet) emitToast("success", mutationMessage(path, result));
     return result;
   } catch (error) {
     const raw = String(error?.message ?? error).slice(0, 240);
     const message = /^403:\s*\[object Object\]$/.test(raw) && /^\/projects\/[^/]+\/workflows\/[^/]+\/archive$/.test(path) ? "403 Forbidden: archive permission (project_archive) is required or this action is denied. No change was made." : /(?:error\s*)?500|internal service error/i.test(raw) ? "Dockyard could not confirm the request." : raw;
-    if (method !== "GET" && !init?.suppressErrorToast) emitToast("danger", message);
+    if (method !== "GET" && !init?.suppressErrorToast && !quiet) emitToast("danger", message);
     const failure = new Error(message);
     failure.cause = error;
     throw failure;
@@ -16933,6 +16934,29 @@ function DashboardPage() {
     setDirtyProject(dirty ? projectId : null);
     dirtySaver.current = dirty ? saver ?? null : null;
   };
+  const lastProject = useRef({ request: null, saved: null, auto: null });
+  const rememberedProject = () => {
+    const memory = lastProject.current;
+    memory.request ??= api("/settings/last-project").then(
+      (result) => {
+        const saved = typeof result?.project_id === "string" && result.project_id ? result.project_id : null;
+        memory.saved ??= saved;
+        return saved;
+      },
+      () => null
+      // unavailable: open on the default project as before
+    );
+    return memory.request;
+  };
+  useEffect(() => {
+    const memory = lastProject.current;
+    const auto = memory.auto;
+    memory.auto = null;
+    if (!selectedProject || selectedProject === auto || selectedProject === memory.saved) return;
+    memory.saved = selectedProject;
+    api("/settings/last-project", { method: "PUT", body: { project_id: selectedProject }, quiet: true }).catch(() => {
+    });
+  }, [selectedProject]);
   useEffect(() => {
     const timers = /* @__PURE__ */ new Map();
     const handleToast = (event) => {
@@ -16963,14 +16987,24 @@ function DashboardPage() {
       ...await api("/notifications?limit=200"),
       settings: (await api("/settings/notifications/effective")).effective
     });
-    loader().then(
+    const loading = loader();
+    if (!selectedProject) rememberedProject();
+    loading.then(
       (result) => {
         if (!current || serial !== loadSerial.current) return;
         setData({ tab, projectId: selectedProject, payload: result });
         if (result.projects) {
           const options = sortProjects(result.projects);
           setProjectOptions(options);
-          if (!selectedProject && options.length) setSelectedProject(result.project?.id || options[0].id);
+          if (!selectedProject && options.length) {
+            const fallback = result.project?.id || options[0].id;
+            rememberedProject().then((saved) => {
+              if (!current || serial !== loadSerial.current) return;
+              const pick = saved && options.some((option) => option.id === saved) ? saved : fallback;
+              lastProject.current.auto = pick;
+              setSelectedProject(pick);
+            });
+          }
         }
         if (tab === "dashboard") {
           setCounts({
