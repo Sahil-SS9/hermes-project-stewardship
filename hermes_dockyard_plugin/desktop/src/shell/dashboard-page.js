@@ -6,7 +6,6 @@ import { useRef } from '../runtime/react.js'
 import { useEffect } from '../runtime/react.js'
 import { TOAST_EVENT } from '../runtime/context.js'
 import { loadDashboardData } from '../data/loaders.js'
-import { loadRoadmapData } from '../data/loaders.js'
 import { loadProjectData } from '../data/loaders.js'
 import { loadBacklogData } from '../data/loaders.js'
 import { loadTeamsData } from '../data/loaders.js'
@@ -27,7 +26,6 @@ import { InitiativeView } from '../views/initiative.js'
 import { InboxView } from '../views/inbox.js'
 import { WorkflowLibraryView } from '../views/workflow-library.js'
 import { NotificationsView } from '../views/notifications.js'
-import { RoadmapView } from '../views/roadmap.js'
 import { jsxs } from '../runtime/react.js'
 import { ConsoleBar } from '../lib/ui.js'
 import { ToastRegion } from '../lib/ui.js'
@@ -91,8 +89,6 @@ export function DashboardPage() {
     ? async () => ({ workflows: (await api('/workflow-library')).workflows ?? [] })
     : tab === 'dashboard'
       ? loadDashboardData
-      : tab === 'roadmap'
-        ? () => loadRoadmapData(selectedProject)
       : (tab === 'project' || tab === 'settings' || tab === 'workflows')
         ? () => loadProjectData(selectedProject)
       : tab === 'backlog'
@@ -266,7 +262,6 @@ export function DashboardPage() {
       onProjectDirty: markDirty(payload.project?.id ?? null),
       onRefresh: refresh,
       onOpenLibrary: () => setTab('workflows'),
-      onOpenRoadmap: () => setTab('roadmap'),
       pendingWorkRef,
       onPendingWorkConsumed: () => setPendingWorkRef(null),
       notice: deepLinkNotice,
@@ -295,12 +290,6 @@ export function DashboardPage() {
     }, `workflow-library:${selectedProject ?? 'none'}`)
   } else if (tab === 'onboard') {
     content = jsx(OnboardPanel, { view: payload, onOpen: () => setOnboardingOpen(true), onRefresh: refresh })
-  } else if (tab === 'roadmap') {
-    content = jsx(RoadmapView, {
-      projectId: selectedProject,
-      canWrite: payload.can_write !== false,
-      onRefresh: refresh,
-    }, `roadmap:${selectedProject ?? 'all'}`)
   } else if (tab === 'backlog') {
     content = jsx(BacklogView, { view: payload, onRefresh: refresh })
   } else if (tab === 'teams') {

@@ -8,14 +8,11 @@ per owner.
 
 
 def seed_roadmap_fixtures(service, adapter, roadmap) -> None:
-    store = service.store
+    from hermes_project_stewardship.dockyard import Actor, ActorKind
+    from hermes_project_stewardship.persistence.dockyard_service import DockyardService
 
-    def actor():
-        return __import__("hermes_project_stewardship.dockyard", fromlist=["Actor"]).Actor(
-            id="fixture", display_name="fixture",
-            kind=__import__("hermes_project_stewardship.dockyard", fromlist=["ActorKind"]).ActorKind.HUMAN)
-
-    HUMAN = actor()
+    HUMAN = Actor(id="fixture", display_name="fixture", kind=ActorKind.HUMAN)
+    store = service.store  # noqa: F841 — kept for parity with disposable-backend locals
     # payments-relaunch: the fully linked story.
     pid = "payments-relaunch"
     service.update_features(pid, {"initiatives": True, "milestones": True}, actor="fixture", interface="fixture")
@@ -26,22 +23,17 @@ def seed_roadmap_fixtures(service, adapter, roadmap) -> None:
         service.approve_initiative(ref, actor="fixture", interface="fixture")
     except Exception:
         pass  # already approved or governance differs; the link rules still hold
-    mid = None
-    try:
-        mid = adapter.milestone_create(pid, "Pilot release", due="2099-01-01", actor=HUMAN)
-    except Exception:
-        from hermes_project_stewardship.persistence.dockyard_service import DockyardService
-        dy = DockyardService(store, canonical_work=adapter)
-        mid = dy.milestone_create(pid, "Pilot release", due="2099-01-01", actor=HUMAN)
-    work = adapter.create_work(pid, kind="task", title="Build setup flow", body="fixture", assignee="worker", created_by="fixture")
-    adapter.transition_work(pid, "task", work["ref"], "in_progress")
-    attached = adapter.milestone_attach(pid, "Pilot release", work["ref"], actor=HUMAN) if hasattr(
-        adapter, "milestone_attach") else None
-    if attached is None:
-        store._conn.execute(
-            "INSERT INTO dockyard_milestone_items(milestone_id, item_ref) VALUES(?,?)",
-            (mid, work["ref"]))
-        store._conn.commit()
+    from hermes_project_stewardship.persistence.canonical_work_service import CanonicalWorkService
+    dy = DockyardService(store, canonical_work=CanonicalWorkService(store, adapter))
+    mid = dy.milestone_create(pid, "Pilot release", due="2099-01-01", actor=HUMAN)
+    # The linked work item lives in a project the LEGACY drag suites never
+    # open (they drive payments-relaunch's board with exact coordinates).
+    # payments-relaunch keeps its milestone with zero items ('No linked work'
+    # — an honest state). atlas-mobile hosts the demonstration work item.
+    work = adapter.create_work("atlas-mobile", kind="task", title="Build setup flow", body="fixture", assignee="worker", created_by="fixture")
+    adapter.transition_work("atlas-mobile", "task", work["ref"], "in_progress")
+    dy.milestone_create("atlas-mobile", "Demo milestone", due="2099-02-01", actor=HUMAN)
+    dy.milestone_attach("atlas-mobile", "Demo milestone", work["ref"], actor=HUMAN)
     roadmap.link_initiative_milestone(pid, ref, mid, "delivers", actor="fixture", interface="fixture")
     objective_id = int(service.add_objective(
         pid, name="Review cycle under two days", evaluator_type="manual", target=">=1",
@@ -61,9 +53,4 @@ def seed_roadmap_fixtures(service, adapter, roadmap) -> None:
     service.add_objective(
         pid, name="Unlinked objective for linking", evaluator_type="manual", target=">=1",
         actor="fixture", interface="fixture")
-    try:
-        from hermes_project_stewardship.persistence.dockyard_service import DockyardService
-        dy2 = DockyardService(store, canonical_work=adapter)
-        dy2.milestone_create(pid, "Unlinked milestone for linking", actor=HUMAN)
-    except Exception:
-        pass
+    dy.milestone_create(pid, "Unlinked milestone for linking", actor=HUMAN)

@@ -286,7 +286,7 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
       status: project.health && project.health !== 'healthy' ? healthLabel : null,
       onRefresh,
     }),
-    jsx('div', { className: 'dockyard-view-only-note', 'data-roadmap-link': true, children:
+    projectView === 'overview' && jsx('div', { className: 'dockyard-view-only-note', 'data-roadmap-link': true, children:
       jsx('a', { href: '#', onClick: (event) => { event.preventDefault(); onOpenRoadmap?.() }, children: 'View in Roadmap' }),
     }),
     workNotice || notice ? jsxs('div', { className: 'dockyard-view-only-note', role: 'alert', 'data-deep-link-notice': true, children: [

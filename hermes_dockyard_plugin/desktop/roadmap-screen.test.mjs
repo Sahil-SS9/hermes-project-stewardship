@@ -57,7 +57,9 @@ test('Roadmap: tab, drill-down, drawer, search, attention filter, reset', { time
     await drawer.waitFor()
     const drawerText = await drawer.innerText()
     assert.ok(!/(\d+\s*%|percent)/i.test(drawerText), 'no percentage in the drawer')
-    assert.match(drawerText, /Total linked/)
+    // Honest delivery facts: a milestone with no linked work says so; one with
+    // work shows counted buckets + 'Total linked'.
+    assert.match(drawerText, /No linked work|Total linked/)
 
     // 4. Objective -> Goal context opens under the initiative.
     await page.locator('[data-rm-node^="objective:"]').first().waitFor()
