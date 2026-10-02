@@ -243,8 +243,22 @@ test('Roadmap: filter controls are one consistent size, wide and on a phone', { 
         assert.ok(control.right <= width, `${width}: ${control.name} stays on screen`)
       }
       assert.equal(attention.top, reset.top, `${width}: attention and Reset share a row`)
-      if (width === 1280) assert.equal(new Set(toolbar.controls.map((control) => control.top)).size, 1, 'wide: one row')
+      if (width < 800) assert.equal(Math.round(reset.right), Math.round(search.right), `${width}: both rows end on the same edge`)
       assert.ok(toolbar.pageWidth <= width, `${width}: no sideways scroll`)
+      if (width === 1280) {
+        assert.equal(new Set(toolbar.controls.map((control) => control.top)).size, 1, 'wide: one row')
+        // Inner fields drop their own outline, so each box must show the focus ring.
+        const ring = (selector) => page.evaluate((target) => {
+          const { outlineStyle, outlineWidth } = getComputedStyle(document.querySelector(`.dy-rm-toolbar ${target}`))
+          return `${outlineStyle} ${outlineWidth}`
+        }, selector)
+        await page.getByRole('searchbox', { name: 'Search the roadmap' }).focus()
+        assert.equal(await ring('.dy-rm-search'), 'solid 3px', 'focus ring on the search box')
+        await page.keyboard.press('Tab')
+        assert.equal(await ring('.dy-rm-attention'), 'solid 3px', 'focus ring on Needs attention only')
+        await page.keyboard.press('Tab')
+        assert.equal(await ring('.dy-rm-reset'), 'solid 3px', 'focus ring on Reset')
+      }
       await page.close()
     }
   } finally {

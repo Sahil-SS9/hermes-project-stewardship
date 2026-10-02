@@ -2357,9 +2357,11 @@ var ROADMAP_CSS = `
   .dy-rm-row.depth-2 { padding-left: 43px; }
   .dy-rm-row.depth-3 { padding-left: 59px; }
   .dy-rm-chips { display: none; }
-  /* Two rows: project + search, then attention (under the project box) + Reset. */
-  .dy-rm-toolbar { display: grid; grid-template-columns: auto auto minmax(0, 1fr); }
+  /* Two rows on the same edges: project + search, then attention + Reset
+     (Reset in the last column, so it ends under the search box). */
+  .dy-rm-toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
   .dy-rm-toolbar .dy-rm-search { grid-column: 2 / -1; min-width: 0; }
+  .dy-rm-toolbar .dy-rm-reset { grid-column: -2; }
 }
 @media (max-width: 520px) {
   /* Phone: project and search full width, then attention beside Reset.
