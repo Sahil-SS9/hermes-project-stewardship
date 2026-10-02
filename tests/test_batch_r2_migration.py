@@ -76,8 +76,13 @@ def _seed_legacy(cx):
 
 
 def test_migration_is_last_and_registered_exactly_once():
-    assert migrations.MIGRATIONS[-1].name == R2_NAME
+    # R2's v35 was the newest lane when Batch R2 merged; later lanes (Batch E)
+    # may genuinely follow it. Registered exactly once, ledger maximum intact,
+    # and nothing after R2 re-registers R2's name.
+    r2_versions = [m.version for m in migrations.MIGRATIONS if m.name == R2_NAME]
+    assert r2_versions == [35]
     assert migrations.SCHEMA_VERSION == max(m.version for m in migrations.MIGRATIONS)
+    assert all(m.name != R2_NAME for m in migrations.MIGRATIONS if m.version > 35)
 
 
 def test_fresh_build_equals_upgraded_build(tmp_path, monkeypatch):
@@ -99,6 +104,14 @@ def test_upgrade_creates_exactly_the_three_tables_and_two_indexes(tmp_path, monk
     pre = _store_without_r2(tmp_path / "pre.db", monkeypatch)
     before_tables = set(_all_tables(pre._conn))
     pre.close()
+    # Apply only through R2's v35: Batch E's v36 is a later lane and its tables
+    # are asserted in its own suite. R2's delta must still be exactly R2's.
+    # Patch both bindings: store.py from-imports MIGRATIONS/SCHEMA_VERSION.
+    through_r2 = [m for m in migrations.MIGRATIONS if m.version <= 35]
+    monkeypatch.setattr(migrations, "MIGRATIONS", through_r2)
+    monkeypatch.setattr(migrations, "SCHEMA_VERSION", 35)
+    monkeypatch.setattr(store_module, "MIGRATIONS", through_r2)
+    monkeypatch.setattr(store_module, "SCHEMA_VERSION", 35)
     store = Store(tmp_path / "pre.db")
     try:
         after_tables = set(_all_tables(store._conn))
@@ -158,8 +171,15 @@ def test_downgrade_removes_only_the_new_tables_then_reupgrades(tmp_path, monkeyp
     try:
         cx = store._conn
         r2 = _r2()
-        cx.executescript(r2.downgrade_sql)
-        cx.execute("DELETE FROM schema_migrations WHERE version=?", (r2.version,))
+        # A coherent partial downgrade on a multi-lane ledger: R2's v35 and
+        # every later lane (Batch E's v36) go together, leaving the pre-R2
+        # world (1..34). Downgrading only v35 would leave a ledger gap that
+        # the schema guard rightly refuses.
+        for lane in sorted((m.version for m in migrations.MIGRATIONS
+                            if m.version >= r2.version), reverse=True):
+            lane_m = next(m for m in migrations.MIGRATIONS if m.version == lane)
+            cx.executescript(lane_m.downgrade_sql)
+            cx.execute("DELETE FROM schema_migrations WHERE version=?", (lane,))
         names = set(_all_tables(cx))
         assert not names & set(NEW_TABLES)
         indexes = {r[0] for r in cx.execute("SELECT name FROM sqlite_master WHERE type='index'")}
@@ -170,7 +190,7 @@ def test_downgrade_removes_only_the_new_tables_then_reupgrades(tmp_path, monkeyp
         assert cx.execute("SELECT COUNT(*) FROM project_initiatives").fetchone()[0] == 1
         assert cx.execute("SELECT COUNT(*) FROM dockyard_milestone_items").fetchone()[0] == 1
         store.migrate()
-        assert store.schema_version == r2.version
+        assert store.schema_version == migrations.SCHEMA_VERSION
         assert cx.execute("SELECT COUNT(*) FROM project_goal_contracts").fetchone()[0] == 2
     finally:
         store.close()

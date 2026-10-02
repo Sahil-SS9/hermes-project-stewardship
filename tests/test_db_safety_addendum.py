@@ -449,22 +449,11 @@ def test_fix4_v34_downgrade_restores_release_and_refuses_feature_rows(tmp_path):
         cx.execute("DELETE FROM dockyard_work_items")
         cx.commit()
         cx.executescript(v34.downgrade_sql)
-        # Later lanes' objects (e.g. Batch E v35) are not v34's business; drop
-        # every lane above 33 so the snapshot compares the v33 world, which is
-        # what this fix-4 assertion pins.
-        for lane in sorted((m.version for m in migrations.MIGRATIONS
-                            if 33 < m.version <= migrations.SCHEMA_VERSION),
-                           reverse=True):
-            if lane == 34:
-                continue
-            later = next(m for m in migrations.MIGRATIONS if m.version == lane)
-            cx.executescript(later.downgrade_sql)
-            cx.execute("DELETE FROM schema_migrations WHERE version = ?", (lane,))
         cx.execute("DELETE FROM schema_migrations WHERE version = 34")
         cx.commit()
-        # Downgrading 34 must restore exactly the schema of every OTHER known
-        # migration: the v33 release shape plus any later migrations (e.g. R2's
-        # v35) that this downgrade has no business touching.
+        # Downgrading 34 must restore exactly the schema of every OTHER current
+        # migration (the v33 release shape plus later lanes' migrations, which
+        # this downgrade has no business touching).
         others = [m.version for m in migrations.MIGRATIONS if m.version != 34]
         assert _schema(cx) == expected_schema(others)
     finally:
