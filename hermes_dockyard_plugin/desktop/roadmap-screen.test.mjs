@@ -105,20 +105,41 @@ test('Roadmap: all projects by default, drill-down, drawer, contract, Open, keyb
 test('Roadmap: View in Roadmap opens that project; the global picker re-scopes', { timeout: 120000 }, async () => {
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  const picker = page.getByRole('button', { name: 'Project context', exact: true })
+  const pick = async (id) => {
+    await picker.click()
+    await page.getByRole('combobox', { name: 'Find project' }).fill(id)
+    await page.getByRole('listbox', { name: 'Projects' }).getByRole('option', { name: id, exact: true }).click()
+  }
+  const showsAll = () => page
+    .waitForFunction(() => document.querySelectorAll('[data-rm-node^="project:"]').length >= 2)
+    .catch(() => assert.fail('the Roadmap did not show all projects'))
+  const scopedTo = async (id) => {
+    await page
+      .waitForFunction((want) => {
+        const rows = [...document.querySelectorAll('[data-rm-node^="project:"]')]
+        return rows.length === 1 && rows[0].getAttribute('data-rm-node') === `project:${want}`
+      }, id)
+      .catch(() => assert.fail(`the Roadmap did not narrow to ${id}`))
+    assert.equal(await page.locator('[data-roadmap-screen] select[aria-label="Roadmap project picker"]').inputValue(), id)
+  }
   try {
+    // View in Roadmap: opens on the project it was clicked from.
     await page.goto(BASE)
     await page.getByRole('tab', { name: /^Project/ }).click()
+    const current = (await picker.innerText()).trim()
     await page.locator('[data-roadmap-link] a').click()
     await page.locator('[data-roadmap-screen]').waitFor()
-    const picker = page.locator('[data-roadmap-screen] select[aria-label="Roadmap project picker"]')
-    await page.waitForFunction(() => document.querySelector('[data-roadmap-screen] select[aria-label="Roadmap project picker"]')?.value !== 'all')
-    const scoped = await picker.inputValue()
-    assert.equal(await page.locator('[data-rm-node^="project:"]').count(), 1, 'one project in scope')
-    assert.equal(await page.locator('[data-rm-node^="project:"]').getAttribute('data-rm-node'), `project:${scoped}`)
-    // Reset returns to All projects.
-    await page.getByRole('button', { name: 'Reset' }).click()
-    await page.waitForFunction(() => document.querySelectorAll('[data-rm-node^="project:"]').length >= 2)
-    assert.equal(await picker.inputValue(), 'all')
+    await scopedTo(current)
+    // The global picker re-scopes an open Roadmap: another project, then the
+    // one it already holds (the Roadmap reopens on All, so that narrows too).
+    const other = current === 'atlas-mobile' ? 'mobile-client' : 'atlas-mobile'
+    for (const id of [other, other]) {
+      await page.getByRole('button', { name: 'Reset' }).click()
+      await showsAll()
+      await pick(id)
+      await scopedTo(id)
+    }
   } finally {
     await browser.close()
   }

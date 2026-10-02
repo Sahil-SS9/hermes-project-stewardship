@@ -37,7 +37,7 @@ export const ROADMAP_CSS = `
 .dy-rm-chip.failed { color: var(--dy-danger, #a72a2a); border-color: var(--dy-danger, #a72a2a); }
 .dy-rm-chip.overdue { color: var(--dy-danger, #a72a2a); background: var(--dy-danger-soft, #ffeded); border-color: var(--dy-danger, #a72a2a); }
 .dy-rm-row-actions { display: flex; align-items: center; gap: 4px; flex: none; }
-.dy-rm-row:focus-visible { outline: 2px solid var(--dy-accent, #3654c7); outline-offset: -2px; }
+.dy-rm-row:focus-visible { outline: 2px solid var(--dy-focus, #3654c7); outline-offset: -2px; }
 .dy-rm-copied { display: block; margin-top: 2px; color: var(--dy-text-secondary, #515968); font-size: 10px; font-weight: 400; }
 .dy-rm-confirm { margin: 0; font-size: 12px; }
 .dy-rm-confirm + .dy-rm-confirm { color: var(--dy-text-secondary, #515968); font-size: 11px; }

@@ -2298,7 +2298,7 @@ var ROADMAP_CSS = `
 .dy-rm-chip.failed { color: var(--dy-danger, #a72a2a); border-color: var(--dy-danger, #a72a2a); }
 .dy-rm-chip.overdue { color: var(--dy-danger, #a72a2a); background: var(--dy-danger-soft, #ffeded); border-color: var(--dy-danger, #a72a2a); }
 .dy-rm-row-actions { display: flex; align-items: center; gap: 4px; flex: none; }
-.dy-rm-row:focus-visible { outline: 2px solid var(--dy-accent, #3654c7); outline-offset: -2px; }
+.dy-rm-row:focus-visible { outline: 2px solid var(--dy-focus, #3654c7); outline-offset: -2px; }
 .dy-rm-copied { display: block; margin-top: 2px; color: var(--dy-text-secondary, #515968); font-size: 10px; font-weight: 400; }
 .dy-rm-confirm { margin: 0; font-size: 12px; }
 .dy-rm-confirm + .dy-rm-confirm { color: var(--dy-text-secondary, #515968); font-size: 11px; }
@@ -16588,7 +16588,8 @@ function DashboardPage() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [projectOptions, setProjectOptions] = useState([]);
   const [projectEntryView, setProjectEntryView] = useState("overview");
-  const [roadmapScope, setRoadmapScope] = useState("all");
+  const [roadmap, setRoadmap] = useState({ scope: "all", version: 0 });
+  const showRoadmap = (scope) => setRoadmap(({ version }) => ({ scope, version: version + 1 }));
   const [dashboardHomeVersion, setDashboardHomeVersion] = useState(0);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
@@ -16665,21 +16666,24 @@ function DashboardPage() {
   }, [tab, selectedProject, requestVersion]);
   const refresh = () => setRequestVersion((version) => version + 1);
   const selectProject = (projectId) => {
-    if (projectId === selectedProject) return;
+    if (projectId === selectedProject) {
+      if (tab === "roadmap") showRoadmap(projectId);
+      return;
+    }
     if (dirtyProject && dirtyProject !== projectId) {
       setPendingProject(projectId);
       return;
     }
     setDirtyProject(null);
     setSelectedProject(projectId);
-    if (tab === "roadmap") setRoadmapScope(projectId ?? "all");
+    if (tab === "roadmap") showRoadmap(projectId ?? "all");
     if (tab === "dashboard" || tab === "notifications" || tab === "inbox" || tab === "onboard") setTab("project");
   };
   const pendingTabOpts = useRef({});
   const goTab = (next, opts = {}) => {
     if (opts.project) setSelectedProject(opts.project);
     if (next === "project") setProjectEntryView(opts.entryView ?? "overview");
-    if (next === "roadmap") setRoadmapScope(opts.roadmapScope ?? "all");
+    if (next === "roadmap") showRoadmap(opts.roadmapScope ?? "all");
     if (next === "dashboard") setDashboardHomeVersion((value) => value + 1);
     setTab(next);
   };
@@ -16705,7 +16709,7 @@ function DashboardPage() {
     dirtySaver.current = null;
     if (project) {
       setSelectedProject(project);
-      if (tab === "roadmap") setRoadmapScope(project);
+      if (tab === "roadmap") showRoadmap(project);
       if (tab === "dashboard" || tab === "notifications" || tab === "inbox" || tab === "onboard") setTab("project");
     } else if (nextTab) {
       const opts = pendingTabOpts.current;
@@ -16838,13 +16842,13 @@ function DashboardPage() {
     content = jsx(OnboardPanel, { view: payload, onOpen: () => setOnboardingOpen(true), onRefresh: refresh });
   } else if (tab === "roadmap") {
     content = jsx(RoadmapView, {
-      initialScope: roadmapScope,
+      initialScope: roadmap.scope,
       onRefresh: refresh,
       onOpen: ({ project, entryView, workRef }) => {
         if (workRef) setPendingWorkRef(workRef);
         requestTab("project", { project, entryView });
       }
-    }, `roadmap:${roadmapScope}`);
+    }, `roadmap:${roadmap.version}`);
   } else if (tab === "backlog") {
     content = jsx(BacklogView, { view: payload, onRefresh: refresh });
   } else if (tab === "teams") {
