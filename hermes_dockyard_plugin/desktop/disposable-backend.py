@@ -34,6 +34,18 @@ for pid in ("payments-relaunch", "mobile-client", "atlas-mobile"):
                    member_profiles=["worker", "reviewer"], autonomy_level=2)
     adapter.create_work(pid, kind="task", title=f"Verify {pid}", body="Fixture canonical work",
                         assignee="worker", created_by="fixture")
+
+# R2 Phase C: real Roadmap fixtures. Built through the same services the
+# production routes use, so the browser suite exercises the real read model.
+import importlib.util as _il  # noqa: E402 (after env setup, like plugin_api above)
+from hermes_project_stewardship.persistence.roadmap_service import RoadmapService  # noqa: E402 (needs plugin_api._store above)
+_roadmap_fixtures_spec = _il.spec_from_file_location(
+    "_roadmap_fixtures", Path(__file__).resolve().parent / "_roadmap_fixtures.py")
+_roadmap_fixtures = _il.module_from_spec(_roadmap_fixtures_spec)
+_roadmap_fixtures_spec.loader.exec_module(_roadmap_fixtures)  # noqa: E402 (file-path load after env setup)
+
+roadmap = RoadmapService(store, service, adapter)
+_roadmap_fixtures.seed_roadmap_fixtures(service, adapter, roadmap)
 plugin_api._app = create_app(store, kanban_adapter=adapter,
     auth_token="demo-session-token", auth_principal="demo-owner",
     auth_principal_is_human=True, capabilities=frozenset({"workflow_revision_approval", "project_archive"}))
