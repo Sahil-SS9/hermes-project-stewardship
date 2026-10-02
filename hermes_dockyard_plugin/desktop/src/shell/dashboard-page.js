@@ -110,7 +110,10 @@ export function DashboardPage() {
         ? loadOnboardData
       : tab === 'inbox'
         ? loadInboxData
-        : () => api('/notifications')
+        : async () => ({
+          ...(await api('/notifications?limit=200')),
+          settings: (await api('/settings/notifications/effective')).effective,
+        })
     loader().then(
       (result) => {
         if (!current || serial !== loadSerial.current) return
@@ -123,12 +126,12 @@ export function DashboardPage() {
         if (tab === 'dashboard') {
           setCounts({
             approvals: Number(result.inbox?.count ?? result.owed_decisions ?? 0),
-            notifications: Number((result.notifications?.notifications ?? []).filter((note) => !note.acked).length),
+            notifications: Number((result.notifications?.notifications ?? []).filter((note) => (note.state ?? (note.acked ? 'seen' : 'new')) === 'new').length),
           })
         } else if (tab === 'inbox') {
           setCounts((previous) => ({ ...previous, approvals: Number(result.count ?? result.items?.length ?? 0) }))
         } else if (tab === 'notifications') {
-          setCounts((previous) => ({ ...previous, notifications: Number((result.notifications ?? []).filter((note) => !note.acked).length) }))
+          setCounts((previous) => ({ ...previous, notifications: Number((result.notifications ?? []).filter((note) => (note.state ?? (note.acked ? 'seen' : 'new')) === 'new').length) }))
         }
       },
       (failure) => { if (current && serial === loadSerial.current) setError({ tab, error: failure }) },
@@ -199,7 +202,7 @@ export function DashboardPage() {
         ...previous,
         payload: {
           ...previous.payload,
-          notifications: previous.payload.notifications.map((note) => note.id === id ? { ...note, acked: true } : note),
+          notifications: previous.payload.notifications.map((note) => note.id === id ? { ...note, acked: true, state: 'seen' } : note),
         },
       }
     })

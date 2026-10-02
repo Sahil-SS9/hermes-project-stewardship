@@ -38,7 +38,6 @@ import { Icon } from './lib/ui.js'
 import { InboxView } from './views/inbox.js'
 import { InitiativeRevisionRow } from './views/dashboard.js'
 import { LoadingState } from './lib/ui.js'
-import { NotificationGroup } from './views/notifications.js'
 import { NotificationRow } from './views/notifications.js'
 import { NotificationsView } from './views/notifications.js'
 import { ObjectiveEvidence } from './work-item/detail.js'
@@ -76,7 +75,6 @@ import { canvasText } from './project/canvas.js'
 import { dockyardChildTypes } from './views/backlog.js'
 import { dockyardParentAccepts } from './views/backlog.js'
 import { dockyardTypeLabel } from './views/backlog.js'
-import { emitToast } from './runtime/context.js'
 import { fileAsBase64 } from './lib/ui.js'
 import { formatBytes } from './lib/ui.js'
 import { formatWhen } from './lib/ui.js'
@@ -107,11 +105,91 @@ import { validationSummary } from './data/loaders.js'
 import { DOCKYARD_TEST } from './styles/tokens.js'
 void DOCKYARD_TEST
 
+// Batch E5: pop-up poller. Every 60 seconds, while the window is visible:
+// fetch /notifications/popups, surface each item through host.notify when the
+// host supports it (fall back to an in-app toast), then mark them shown. A
+// seen-set (sessionStorage-backed, so it survives reloads in the same tab)
+// guarantees the same pop-up never shows twice.
+const POPUP_SEEN_KEY = 'dockyard-notification-popups-seen'
+const POPUP_INTERVAL_MS = 60000
+const POPUP_CAP = 3
+
+function popupSeenIds() {
+  try {
+    const raw = window.sessionStorage.getItem(POPUP_SEEN_KEY)
+    return new Set(raw ? JSON.parse(raw) : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function rememberPopupIds(ids) {
+  try {
+    const seen = popupSeenIds()
+    for (const id of ids) seen.add(id)
+    window.sessionStorage.setItem(POPUP_SEEN_KEY, JSON.stringify([...seen]))
+  } catch {
+    // Storage unavailable (private mode): the shown-mark on the backend still
+    // prevents the same pop-up returning within its window.
+  }
+}
+
+function surfacePopup(item) {
+  // The host owns system-surface pop-ups; the poller never falls back to
+  // in-app toasts (those are for user-triggered mutations).
+  host?.notify?.({
+    title: item?.title ?? 'Fleet notification',
+    body: item?.body ?? '',
+    tag: `dockyard-notification-${item?.id}`,
+    data: item?.deep_link ? { deep_link: item.deep_link } : undefined,
+  })
+}
+
+function startPopupPoller(ctxRest) {
+  // Pop-ups are a host capability: without host.notify there is nothing to
+  // surface them on (jsdom/test hosts), so no poller, no stray timers.
+  if (typeof host?.notify !== 'function') return
+  if (typeof window === 'undefined' || window.__dockyardPopupPoller) return
+  const tick = async () => {
+    if (document.visibilityState !== 'visible') return
+    try {
+      const result = await ctxRest('/notifications/popups', { method: 'GET' })
+      const popups = Array.isArray(result?.popups) ? result.popups : []
+      if (!popups.length) return
+      const seen = popupSeenIds()
+      const fresh = popups.filter((item) => !seen.has(item.id)).slice(0, POPUP_CAP)
+      const more = Math.max(0, popups.length - fresh.length)
+      for (const item of fresh) surfacePopup(item)
+      if (more > 0) {
+        host?.notify?.({
+          title: `and ${more} more notification${more === 1 ? '' : 's'}`,
+          body: '',
+          tag: 'dockyard-notification-more',
+        })
+      }
+      const shownIds = fresh.map((item) => item.id)
+      if (shownIds.length) {
+        rememberPopupIds(shownIds)
+        await ctxRest('/notifications/popups/shown', { method: 'POST', body: { ids: shownIds } })
+      }
+    } catch {
+      // Offline or restarting backend: try again on the next tick.
+    }
+  }
+  const interval = Number(window.__dockyardPopupIntervalMs) > 0
+    ? Number(window.__dockyardPopupIntervalMs)
+    : POPUP_INTERVAL_MS
+  window.__dockyardPopupPoller = setInterval(tick, interval)
+  // Prime shortly after load so a fresh pop-up does not wait a full minute.
+  window.setTimeout(tick, 1500)
+}
+
 const __plugin = {
   id: 'hermes-dockyard',
   name: 'Hermes Dockyard',
   register(ctx) {
     bindContext(ctx)
+    startPopupPoller(ctx.rest)
     ctx.registerMany([
       {
         id: 'page',

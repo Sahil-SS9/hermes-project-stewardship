@@ -1036,6 +1036,13 @@ async def project_report(project_id: str, report_id: str) -> dict:
     )
 
 
+@plugin_api.post("/projects/{project_id}/initiatives")
+async def propose_project_initiative(project_id: str, body: dict) -> dict:
+    pid = quote(project_id, safe='')
+    return await _proxy(
+        "POST", f"/stewardship/v1/projects/{pid}/initiatives", body)
+
+
 @plugin_api.get("/projects/{project_id}/initiatives")
 async def project_initiatives(project_id: str,
                               status: str | None = None) -> dict:

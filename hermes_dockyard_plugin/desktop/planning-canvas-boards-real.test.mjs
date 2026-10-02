@@ -202,10 +202,14 @@ test('Planning boards (real backend): theme, save, chat, plan steps and board li
     // Reload the page: the editor shows the saved formatting.
     await page.reload({ waitUntil: 'load' })
     await page.waitForSelector('[data-tab="dashboard"]', { timeout: 20000 })
-    if (!(await canvas.count())) {
-      await page.locator('[data-tab="project"]').click()
-      await page.locator('[data-project-view="planning"]').click()
-    }
+    // A fresh page does not inherit the pre-reload global context; re-pick
+    // this project explicitly (another suite file may have seeded attention
+    // rows elsewhere, changing the default landing project).
+    await page.getByRole('button', { name: 'Project context', exact: true }).click()
+    await page.getByRole('combobox', { name: 'Find project' }).fill(PROJECT)
+    await page.getByRole('listbox', { name: 'Projects' }).getByRole('option', { name: PROJECT, exact: true }).click()
+    await page.locator('[data-tab="project"]').click()
+    await page.locator('[data-project-view="planning"]').click()
     await canvas.waitFor()
     await canvas.locator(`[data-canvas-object="${alphaId}"]`).click()
     await drawer.waitFor()
@@ -246,10 +250,14 @@ test('Planning boards (real backend): theme, save, chat, plan steps and board li
     // it moves off it, and the archived list offers Restore only.
     await page.reload({ waitUntil: 'load' })
     await page.waitForSelector('[data-tab="dashboard"]', { timeout: 20000 })
-    if (!(await canvas.count())) {
-      await page.locator('[data-tab="project"]').click()
-      await page.locator('[data-project-view="planning"]').click()
-    }
+    // A fresh page does not inherit the pre-reload global context (another
+    // suite file may have seeded attention rows on other projects, changing
+    // the default); re-pick this project explicitly before waiting.
+    await page.getByRole('button', { name: 'Project context', exact: true }).click()
+    await page.getByRole('combobox', { name: 'Find project' }).fill(PROJECT)
+    await page.getByRole('listbox', { name: 'Projects' }).getByRole('option', { name: PROJECT, exact: true }).click()
+    await page.locator('[data-tab="project"]').click()
+    await page.locator('[data-project-view="planning"]').click()
     await canvas.waitFor()
     assert.notEqual(await canvas.getAttribute('data-canvas-board'), first, 'archived board is not the open board')
     await canvas.locator('[data-action="pc-board-show-archived"]').click()

@@ -119,8 +119,8 @@ const POPULATED = {
   },
   notifications: {
     notifications: [
-      { id: 3, project: 'payments-relaunch', severity: 'medium', kind: 'bot_status', title: 'Load test flagged latency spike', body: 'p95 checkout latency exceeded 800ms under 3x load. Investigation assigned.', created_at: '2026-08-24T18:36:13.609423+00:00', acked: false, deep_link: 's2:project/payments-relaunch' },
-      { id: 2, project: 'demo-project', severity: 'info', kind: 'bot_status', title: 'Nightly sweep finished', body: 'Bot fleet check complete: no issues found.', created_at: '2026-08-24T18:10:07.321115+00:00', acked: true, deep_link: 's2:project/demo-project' },
+      { id: 3, project: 'payments-relaunch', severity: 'medium', kind: 'bot_status', title: 'Load test flagged latency spike', body: 'p95 checkout latency exceeded 800ms under 3x load. Investigation assigned.', created_at: '2026-08-24T18:36:13.609423+00:00', acked: false, state: 'new', deep_link: 's2:project/payments-relaunch' },
+      { id: 2, project: 'demo-project', severity: 'info', kind: 'bot_status', title: 'Nightly sweep finished', body: 'Bot fleet check complete: no issues found.', created_at: '2026-08-24T18:10:07.321115+00:00', acked: true, state: 'seen', deep_link: 's2:project/demo-project' },
     ],
   },
   settings: {
@@ -678,7 +678,10 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       return clone(data.FIRST_ASSESSMENT);
     }
     if (path === '/inbox') return clone(data.inbox);
-    if (path === '/notifications') return clone(data.notifications);
+    if (/^\/notifications(\?|$)/.test(path)) return clone(data.notifications);
+    if (path === '/settings/notifications/effective') {
+      return { effective: { dedupe_window_minutes: 60, quiet_hours: null, bypass_quiet_hours: ['approval_required'], channels: { in_app: { min_severity: 'low' }, desktop: { enabled: true, min_severity: 'high', quiet_hours_apply: true } }, ignored: [], timezone: 'Europe/London' } };
+    }
     if (path === '/bots') return clone(data.bots);
     const transcriptRead = path.match(/^\/bots\/([^/]+)\/sessions\/([^/]+)$/);
     if (method === 'GET' && transcriptRead) {
@@ -1785,8 +1788,8 @@ async function testNotificationFlow() {
   await runtime.mount();
   await runtime.click('[data-tab="notifications"]');
   const doc = runtime.dom.window.document;
-  assert.equal(doc.querySelectorAll('[data-notification-state="unread"]').length, 1, 'expected one unread notification');
-  assert.equal(doc.querySelectorAll('[data-notification-state="cleared"]').length, 1, 'expected one cleared notification');
+  assert.equal(doc.querySelectorAll('[data-notification-state="new"]').length, 1, 'expected one unread notification');
+  assert.equal(doc.querySelectorAll('[data-notification-state="seen"]').length, 1, 'expected one cleared notification');
   // Phase 6: notifications expose an exact-context deep link; Open navigates
   // only (P6.5): no ack POST fires and the row state does not change. The
   // link must land on the notification's own project (exact object, not a
@@ -1795,7 +1798,7 @@ async function testNotificationFlow() {
   assert.equal(openButtons.length, 1, 'unread notification lacks an Open deep-link control');
   await runtime.click('[data-notification-id="3"] [data-action="open"]', 50);
   assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === '/notifications/3/ack'), 'Open must not acknowledge');
-  assert.equal(runtime.dom.window.document.querySelectorAll('[data-notification-state="unread"]').length, 0, 'Open did not navigate away');
+  assert.equal(runtime.dom.window.document.querySelectorAll('[data-notification-state="new"]').length, 0, 'Open did not navigate away');
   const landed = runtime.dom.window.document.querySelector('[data-project-dashboard]');
   assert.equal(landed?.getAttribute('data-project-dashboard'), 'payments-relaunch', 'Open did not open the notification project');
   await runtime.dispose();
@@ -1804,11 +1807,11 @@ async function testNotificationFlow() {
   await second.mount();
   await second.click('[data-tab="notifications"]');
   const secondDoc = second.dom.window.document;
-  await second.click('[data-notification-id="3"] [data-action="acknowledge"]', 50);
+  await second.click('[data-notification-id="3"] [data-action="mark-seen"]', 50);
   assert(second.calls.some((call) => call.method === 'POST' && call.path === '/notifications/3/ack'), 'acknowledge POST was not sent');
-  assert.equal(secondDoc.querySelectorAll('[data-notification-state="unread"]').length, 0, 'acknowledged notification remains unread');
-  assert.equal(secondDoc.querySelectorAll('[data-notification-state="cleared"]').length, 2, 'acknowledged notification did not move to Cleared');
-  assert.match(secondDoc.querySelector('[data-notification-id="3"]')?.textContent || '', /Cleared/);
+  assert.equal(secondDoc.querySelectorAll('[data-notification-state="new"]').length, 0, 'acknowledged notification remains unread');
+  assert.equal(secondDoc.querySelectorAll('[data-notification-state="seen"]').length, 2, 'acknowledged notification did not move to Seen');
+  assert.match(secondDoc.querySelector('[data-notification-id="3"]')?.textContent || '', /Seen/);
   await second.dispose();
 }
 

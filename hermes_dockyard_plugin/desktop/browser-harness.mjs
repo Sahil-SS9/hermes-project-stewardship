@@ -21,7 +21,7 @@ export function buildBundle(realBackend = false) {
   const sdk = path.join(outDir, 'sdk.js');
   const entry = path.join(outDir, 'entry.jsx');
   const bundle = path.join(outDir, 'bundle.js');
-  fs.writeFileSync(sdk, 'export const host = { navigate() {} };\n');
+  fs.writeFileSync(sdk, "export const host = { navigate() {}, notify(item) { (window.__hostNotifyCalls ??= []).push(item); if (typeof window.__hostNotifyWaitResolve === 'function') { window.__hostNotifyWaitResolve(item); window.__hostNotifyWaitResolve = undefined; } } };\n");
   fs.writeFileSync(entry, [
     `import plugin from ${JSON.stringify(path.join(REPO, 'hermes_dockyard_plugin', 'desktop', 'plugin.js'))};`,
     "import React from 'react';",

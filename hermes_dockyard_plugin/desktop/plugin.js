@@ -15722,70 +15722,367 @@ function WorkflowLibraryView({ projectId, onOpenBuilder }) {
   ] });
 }
 
+// hermes_dockyard_plugin/desktop/src/styles/notifications-css.js
+var NOTIFICATIONS_CSS = `
+.dockyard-root .dy-notif-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0 4px; }
+.dockyard-root .dy-notif-toolbar .dy-notif-spacer { flex: 1; }
+.dockyard-root .dy-notif-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
+.dockyard-root .dy-notif-filter { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--dy-border); border-radius: 999px; background: var(--dy-surface); padding: 3px 10px; font-size: 12px; }
+.dockyard-root .dy-notif-filter select { background: transparent; color: inherit; border: 0; font: inherit; }
+.dockyard-root .dy-notif-chip { border: 1px solid var(--dy-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-muted); padding: 3px 10px; font-size: 12px; cursor: pointer; }
+.dockyard-root .dy-notif-chip[aria-pressed="true"] { background: var(--dy-accent-bg, var(--dy-surface-strong, #eef)); color: var(--dy-text); border-color: var(--dy-accent, var(--dy-border)); }
+.dockyard-root .dy-notif-day { margin: 16px 0 6px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--dy-muted); }
+.dockyard-root .dy-notif-more { display: block; margin: 10px auto; }
+.dockyard-root .dy-notif-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr); gap: 14px; align-items: start; }
+.dockyard-root .dy-notif-layout[data-panel="none"] { grid-template-columns: 1fr; }
+@media (max-width: 900px) { .dockyard-root .dy-notif-layout { grid-template-columns: 1fr; } }
+.dockyard-root .dy-notif-detail { border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); padding: 14px; position: sticky; top: 12px; }
+.dockyard-root .dy-notif-detail h3 { margin: 0 0 6px; }
+.dockyard-root .dy-notif-detail .dockyard-meta { display: block; margin: 2px 0; }
+.dockyard-root .dy-notif-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.dockyard-root .dy-notif-resolve-note { width: 100%; min-height: 64px; margin-top: 10px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); color: inherit; padding: 8px; font: inherit; }
+.dockyard-root .dy-notif-settings { border: 1px solid var(--dy-border); border-radius: 14px; background: var(--dy-surface); padding: 14px; margin-top: 14px; }
+.dockyard-root .dy-notif-settings h3 { margin: 0 0 8px; }
+.dockyard-root .dy-notif-settings .dy-notif-setting { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.dockyard-root .dy-notif-settings label { font-size: 12px; color: var(--dy-muted); }
+.dockyard-root .dy-notif-settings select, .dockyard-root .dy-notif-settings input[type="time"] { border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); color: inherit; padding: 4px 8px; font: inherit; }
+.dockyard-root .dy-notif-settings .dy-notif-override-link { font-size: 12px; }
+.dockyard-root .dy-notif-row-btn { display: block; width: 100%; box-sizing: border-box; cursor: pointer; text-align: left; background: transparent; border: 0; color: inherit; font: inherit; padding: 0; margin: 0; }
+.dockyard-root .dy-notif-row-btn:focus-visible { outline: 2px solid var(--dy-accent, #6ea8fe); outline-offset: 2px; }
+.dockyard-root .dy-notif-row-inner { display: flex; gap: 10px; align-items: baseline; }
+.dockyard-root .dy-notif-row-titleline { display: flex; gap: 8px; align-items: center; }
+.dockyard-root .dy-notif-popups { position: fixed; right: 16px; bottom: 16px; display: grid; gap: 8px; z-index: 60; max-width: 360px; }
+.dockyard-root .dy-notif-popup { border: 1px solid var(--dy-border); border-radius: 12px; background: var(--dy-surface-strong, var(--dy-surface)); box-shadow: 0 8px 24px rgba(0,0,0,.25); padding: 10px 12px; }
+.dockyard-root .dy-notif-popup strong { display: block; }
+.dockyard-root .dy-notif-popup span { color: var(--dy-muted); font-size: 12px; }
+`;
+
 // hermes_dockyard_plugin/desktop/src/views/notifications.js
-function NotificationRow({ note, onAcknowledged, onOpen }) {
-  const [state, setState] = useState(note.acked ? "cleared" : "unread");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const tone = severityTone(note.severity);
-  const acknowledge = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await api(`/notifications/${note.id}/ack`, { method: "POST", body: {} });
-      setState("cleared");
-      onAcknowledged(note.id);
-    } catch (failure) {
-      setError(String(failure?.message ?? failure));
-    }
-    setBusy(false);
-  };
-  const when = formatWhen(note.created_at);
-  return jsxs("article", { className: "dockyard-notification-row", "data-notification-id": String(note.id), "data-notification-state": state, children: [
-    jsx("span", { className: `dockyard-notification-marker ${tone}`, children: jsx(Icon, { name: tone === "danger" || tone === "warning" ? "alert" : "bell" }) }),
-    jsxs("div", { className: "dockyard-notification-main", children: [
-      jsx("h3", { children: note.title ?? "Fleet notification" }),
-      jsx("p", { children: note.body ?? "" }),
-      jsx("span", { className: "dockyard-meta", children: `${note.project || "Fleet"}${when ? ` / ${when}` : ""}` })
-    ] }),
-    jsxs("div", { className: "dockyard-notification-action", children: [
-      typeof onOpen === "function" && note.deep_link ? jsx(Button, { action: "open", small: true, onClick: () => onOpen(note.deep_link), children: "Open" }) : null,
-      state === "cleared" ? jsx(StatusTag, { tone: "neutral", label: "Cleared" }) : jsx(Button, { action: "acknowledge", small: true, disabled: busy, onClick: acknowledge, children: busy ? "Clearing..." : "Acknowledge" })
-    ] }),
-    error ? jsx("p", { className: "dockyard-inline-error", children: `Could not clear: ${error}` }) : null
-  ] });
+var SEVERITIES = ["info", "low", "medium", "high", "critical"];
+var KIND_LABELS = {
+  approval_required: "Approvals",
+  health_change: "Health",
+  alert: "Alerts"
+};
+var STATE_LABELS = { new: "New", seen: "Seen", resolved: "Resolved" };
+var PAGE_SIZE = 50;
+var kindLabel = (kind) => KIND_LABELS[kind] ?? "Other";
+function dayBucket(createdAt) {
+  const value = String(createdAt || "");
+  const stamp = Date.parse(value);
+  if (!Number.isFinite(stamp)) return "Earlier";
+  const day = new Date(stamp);
+  day.setHours(0, 0, 0, 0);
+  const today = /* @__PURE__ */ new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.round((today.getTime() - day.getTime()) / 864e5);
+  if (diff <= 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  return "Earlier";
 }
-function NotificationGroup({ title, description, items, onAcknowledged, onOpen }) {
-  return jsxs("section", { className: "dockyard-feed-group", children: [
-    jsxs("div", { className: "dockyard-feed-head", children: [
-      jsxs("div", { children: [jsx("h2", { children: title }), jsx("p", { children: description })] }),
-      jsx("span", { className: "dockyard-section-count", children: number(items.length) })
-    ] }),
-    items.map((note) => jsx(NotificationRow, { note, onAcknowledged, onOpen }, String(note.id)))
-  ] });
-}
-function NotificationsView({ view, onRefresh, onAcknowledged, onOpen }) {
-  const notes = view.notifications ?? [];
-  if (notes.length === 0) {
-    return jsxs(Fragment, { children: [
-      jsx(PageHead, { title: "Notifications", description: "Attributed fleet events and their cleared history.", onRefresh }),
-      jsx(EmptyState, { title: "No notifications yet", description: "Fleet events will appear here when work changes state or needs attention.", icon: "bell" })
-    ] });
-  }
-  const unread = notes.filter((note) => !note.acked).sort((left, right) => {
-    const severity = (SEVERITY_PRIORITY[String(left.severity || "info").toLowerCase()] ?? 3) - (SEVERITY_PRIORITY[String(right.severity || "info").toLowerCase()] ?? 3);
-    return severity !== 0 ? severity : String(right.created_at || "").localeCompare(String(left.created_at || ""));
+function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, onOpen }) {
+  const [stateFilter, setStateFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [severityFilter, setSeverityFilter] = useState("all");
+  const [projectFilter, setProjectFilter] = useState("all");
+  const [selectedId, setSelectedId] = useState(null);
+  const [resolveOpen, setResolveOpen] = useState(false);
+  const [resolveNote, setResolveNote] = useState("");
+  const [busyId, setBusyId] = useState(null);
+  const [settings, setSettings] = useState(view.settings ?? null);
+  const [settingsBusy, setSettingsBusy] = useState(false);
+  const [settingsError, setSettingsError] = useState(null);
+  const [actionError, setActionError] = useState(null);
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  const [localStates, setLocalStates] = useState({});
+  const all = (view.notifications ?? []).slice().map((note) => {
+    const override = localStates[note.id];
+    if (!override) return note;
+    if (override === "seen") return { ...note, state: "seen", acked: true };
+    return { ...note, state: "resolved", resolved_at: note.resolved_at ?? (/* @__PURE__ */ new Date()).toISOString(), resolved_by: note.resolved_by ?? "desktop", resolution: "manual" };
   });
-  const cleared = notes.filter((note) => note.acked).sort((left, right) => String(right.created_at || "").localeCompare(String(left.created_at || "")));
+  const projects = [];
+  for (const note of all) {
+    const key = note.project || "Fleet";
+    if (!projects.some((p) => p.key === key)) {
+      projects.push({ key, count: all.filter((n) => (n.project || "Fleet") === key).length });
+    }
+  }
+  const filtered = all.filter((note) => {
+    if (stateFilter !== "all" && (note.state ?? (note.acked ? "seen" : "new")) !== stateFilter) return false;
+    if (typeFilter !== "all") {
+      if (typeFilter === "other" && KIND_LABELS[note.kind]) return false;
+      if (typeFilter !== "other" && note.kind !== typeFilter) return false;
+    }
+    if (severityFilter !== "all" && String(note.severity || "info").toLowerCase() !== severityFilter) return false;
+    if (projectFilter !== "all" && (note.project || "Fleet") !== projectFilter) return false;
+    return true;
+  });
+  filtered.sort((left, right) => String(right.created_at || "").localeCompare(String(left.created_at || "")));
+  const shown = filtered.slice(0, visible);
+  const selected = filtered.find((note) => note.id === selectedId) ?? null;
+  const newCount = all.filter((note) => (note.state ?? (note.acked ? "seen" : "new")) === "new").length;
+  const markSeen = async (note) => {
+    setBusyId(note.id);
+    setActionError(null);
+    try {
+      await api(`/notifications/${note.id}/ack`, { method: "POST", body: { actor_id: "desktop" } });
+      setLocalStates((current) => ({ ...current, [note.id]: "seen" }));
+      onChanged?.(note.id);
+      onRefresh?.();
+    } catch (failure) {
+      setActionError(String(failure?.message ?? failure));
+    }
+    setBusyId(null);
+  };
+  const resolve = async (note) => {
+    setBusyId(note.id);
+    setActionError(null);
+    try {
+      await api(`/notifications/${note.id}/resolve`, {
+        method: "POST",
+        body: { actor_id: "desktop", note: resolveNote }
+      });
+      setResolveOpen(false);
+      setResolveNote("");
+      setLocalStates((current) => ({ ...current, [note.id]: "resolved" }));
+      onChanged?.(note.id);
+      onRefresh?.();
+    } catch (failure) {
+      setActionError(String(failure?.message ?? failure));
+    }
+    setBusyId(null);
+  };
+  const markAllSeen = async () => {
+    setBusyId("all");
+    setActionError(null);
+    try {
+      await api("/notifications/ack-all", {
+        method: "POST",
+        body: {
+          actor_id: "desktop",
+          ...projectFilter !== "all" ? { project_id: projectFilter } : {},
+          ...typeFilter !== "all" && KIND_LABELS[typeFilter] ? { kind: typeFilter } : {},
+          ...severityFilter !== "all" ? { severity: severityFilter } : {}
+        }
+      });
+      onRefresh?.();
+    } catch (failure) {
+      setActionError(String(failure?.message ?? failure));
+    }
+    setBusyId(null);
+  };
+  const saveSettings = async (patch) => {
+    setSettingsBusy(true);
+    setSettingsError(null);
+    const { ignored: _ignored, timezone: _timezone, ...base } = settings ?? {};
+    const next = { ...base, ...patch };
+    setSettings(next);
+    try {
+      const result = await api("/settings/notifications", {
+        method: "PUT",
+        body: { actor_id: "desktop", policy: next }
+      });
+      setSettings(result.policy ?? next);
+    } catch (failure) {
+      setSettingsError(String(failure?.message ?? failure));
+    }
+    setSettingsBusy(false);
+  };
+  const groups = [];
+  for (const note of shown) {
+    const bucket = dayBucket(note.created_at);
+    let group = groups.find((g) => g.title === bucket);
+    if (!group) {
+      group = { title: bucket, items: [] };
+      groups.push(group);
+    }
+    group.items.push(note);
+  }
+  const filterEmpty = all.length > 0 && filtered.length === 0;
   return jsxs(Fragment, { children: [
+    jsx("style", { "data-dy-notifications": "true", children: NOTIFICATIONS_CSS }),
     jsx(PageHead, {
       title: "Notifications",
-      description: "Attributed fleet events and their cleared history.",
-      status: unread.length > 0 ? `${number(unread.length)} unread` : null,
+      description: "Fleet events: approvals, health and alerts, with their history.",
+      status: newCount > 0 ? `${number(newCount)} new` : null,
       onRefresh
     }),
-    unread.length > 0 ? jsx(NotificationGroup, { title: "Needs attention", description: "Unread fleet events.", items: unread, onAcknowledged, onOpen }) : null,
-    cleared.length > 0 ? jsx(NotificationGroup, { title: "Cleared", description: "Acknowledged events remain available for context.", items: cleared, onAcknowledged, onOpen }) : null
+    jsxs("div", { className: "dy-notif-toolbar", children: [
+      jsxs("div", { className: "dy-notif-filters", role: "group", "aria-label": "Notification filters", children: [
+        jsx("label", { className: "dy-notif-filter", children: jsx("select", { "aria-label": "Filter by state", value: stateFilter, onChange: (e) => {
+          setStateFilter(e.target.value);
+          setVisible(PAGE_SIZE);
+        }, children: ["all", "new", "seen", "resolved"].map((value) => jsx("option", { value, children: value === "all" ? "All states" : STATE_LABELS[value] }, value)) }) }),
+        jsx("label", { className: "dy-notif-filter", children: jsx("select", { "aria-label": "Filter by type", value: typeFilter, onChange: (e) => {
+          setTypeFilter(e.target.value);
+          setVisible(PAGE_SIZE);
+        }, children: [["all", "All types"], ["approval_required", "Approvals"], ["health_change", "Health"], ["alert", "Alerts"], ["other", "Other"]].map(([value, label]) => jsx("option", { value, children: label }, value)) }) }),
+        jsx("label", { className: "dy-notif-filter", children: jsx("select", { "aria-label": "Filter by severity", value: severityFilter, onChange: (e) => {
+          setSeverityFilter(e.target.value);
+          setVisible(PAGE_SIZE);
+        }, children: [["all", "All severities"], ...SEVERITIES.map((s) => [s, s])].map(([value, label]) => jsx("option", { value, children: label }, value)) }) }),
+        jsx("label", { className: "dy-notif-filter", children: jsx("select", { "aria-label": "Filter by project", value: projectFilter, onChange: (e) => {
+          setProjectFilter(e.target.value);
+          setVisible(PAGE_SIZE);
+        }, children: [["all", "All projects"], ...projects.map((p) => [p.key, `${p.key} (${p.count})`])].map(([value, label]) => jsx("option", { value, children: label }, value)) }) })
+      ] }),
+      jsx("span", { className: "dy-notif-spacer" }),
+      jsx(Button, {
+        action: "ack-all",
+        small: true,
+        disabled: busyId === "all" || filtered.length === 0,
+        onClick: markAllSeen,
+        children: busyId === "all" ? "Marking\u2026" : "Mark all as seen"
+      })
+    ] }),
+    filterEmpty ? jsx(EmptyState, { title: "Nothing matches these filters", description: "Loosen or reset the filters to see more of the history.", icon: "bell" }) : all.length === 0 ? jsx(EmptyState, { title: "No notifications yet", description: "Fleet events will appear here when work changes state or needs attention.", icon: "bell" }) : jsxs("div", { className: "dy-notif-layout", "data-panel": selected ? "open" : "none", children: [
+      jsxs("div", { children: [
+        groups.map((group) => jsxs("section", { className: "dockyard-feed-group", children: [
+          jsxs("div", { className: "dockyard-feed-head", children: [
+            jsx("h2", { className: "dy-notif-day", children: group.title }),
+            jsx("span", { className: "dockyard-section-count", children: number(group.items.length) })
+          ] }),
+          group.items.map((note) => jsx(NotificationRow, {
+            note,
+            busy: busyId === note.id,
+            selected: note.id === selectedId,
+            onSelect: () => {
+              setSelectedId(note.id === selectedId ? null : note.id);
+              setResolveOpen(false);
+            },
+            onSeen: () => markSeen(note),
+            onOpen
+          }, String(note.id)))
+        ] }, group.title)),
+        filtered.length > visible ? jsx(Button, { action: "load-more", className: "dy-notif-more", onClick: () => setVisible((v) => v + PAGE_SIZE), children: "Load more" }) : null
+      ] }),
+      selected ? jsx(NotificationDetail, {
+        note: selected,
+        busy: busyId === selected.id,
+        resolveOpen,
+        onResolveToggle: () => setResolveOpen((open) => !open),
+        resolveNote,
+        onResolveNote: setResolveNote,
+        onResolve: () => resolve(selected),
+        onSeen: () => markSeen(selected),
+        onOpen
+      }) : null
+    ] }),
+    all.length > 0 ? jsx(NotificationSettings, {
+      settings,
+      busy: settingsBusy,
+      error: settingsError,
+      onSave: saveSettings
+    }) : null,
+    actionError ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: `Action failed: ${actionError}` }) : null
+  ] });
+}
+function NotificationRow({ note, busy, selected, onSelect, onSeen, onOpen }) {
+  const tone = severityTone(note.severity);
+  const state = note.state ?? (note.acked ? "seen" : "new");
+  const when = formatWhen(note.created_at);
+  return jsxs("article", {
+    className: "dockyard-notification-row",
+    "data-notification-id": String(note.id),
+    "data-notification-state": state,
+    "data-selected": selected ? "true" : "false",
+    children: [
+      jsx("button", {
+        type: "button",
+        className: "dockyard-notification-main dy-notif-row-btn",
+        "aria-expanded": selected ? "true" : "false",
+        onClick: onSelect,
+        children: jsxs("span", { className: "dy-notif-row-inner", children: [
+          jsx("span", { className: `dockyard-notification-marker ${tone}`, "aria-hidden": "true", children: jsx(Icon, { name: tone === "danger" || tone === "warning" ? "alert" : "bell" }) }),
+          jsxs("span", { children: [
+            jsxs("span", { className: "dy-notif-row-titleline", children: [
+              jsx("strong", { children: note.title ?? "Fleet notification" }),
+              jsx(StatusTag, { tone: state === "new" ? "info" : "neutral", label: STATE_LABELS[state] ?? state })
+            ] }),
+            jsx("p", { children: note.body ?? "" }),
+            jsx("span", { className: "dockyard-meta", children: `${note.project || "Fleet"} \xB7 ${kindLabel(note.kind)} \xB7 ${note.severity}${when ? ` \xB7 ${when}` : ""}` })
+          ] })
+        ] })
+      }),
+      jsxs("div", { className: "dockyard-notification-action", children: [
+        typeof onOpen === "function" && note.deep_link ? jsx(Button, { action: "open", small: true, onClick: () => onOpen(note.deep_link), children: "Open" }) : null,
+        state === "new" ? jsx(Button, { action: "mark-seen", small: true, disabled: busy, onClick: onSeen, children: busy ? "Working\u2026" : "Mark seen" }) : null
+      ] })
+    ]
+  });
+}
+function NotificationDetail({ note, busy, resolveOpen, onResolveToggle, resolveNote, onResolveNote, onResolve, onSeen, onOpen }) {
+  const state = note.state ?? (note.acked ? "seen" : "new");
+  const resolvedBy = note.resolved_by;
+  const seenBy = note.acked_by;
+  return jsxs("aside", { className: "dy-notif-detail", "data-notification-detail": String(note.id), "aria-label": "Notification detail", children: [
+    jsxs("h3", { children: [note.title ?? "Fleet notification", " ", jsx(StatusTag, { tone: state === "new" ? "info" : "neutral", label: STATE_LABELS[state] ?? state })] }),
+    jsx("p", { children: note.body ?? "" }),
+    jsx("span", { className: "dockyard-meta", children: `Project: ${note.project || "Fleet"}` }),
+    jsx("span", { className: "dockyard-meta", children: `Type: ${kindLabel(note.kind)} \xB7 Severity: ${note.severity}` }),
+    jsx("span", { className: "dockyard-meta", children: `Created: ${formatWhen(note.created_at)}` }),
+    seenBy ? jsx("span", { className: "dockyard-meta", children: `Seen by ${seenBy}${note.acked_at ? ` at ${formatWhen(note.acked_at)}` : ""}` }) : null,
+    resolvedBy ? jsxs("span", { className: "dockyard-meta", children: [
+      `Resolved by ${resolvedBy}${note.resolved_at ? ` at ${formatWhen(note.resolved_at)}` : ""}`,
+      note.resolution ? ` (${note.resolution})` : "",
+      note.resolution_note ? ` \u2014 \u201C${note.resolution_note}\u201D` : ""
+    ] }) : null,
+    jsxs("div", { className: "dy-notif-detail-actions", children: [
+      typeof onOpen === "function" && note.deep_link ? jsx(Button, { action: "detail-open", small: true, onClick: () => onOpen(note.deep_link), children: "Open item" }) : null,
+      state === "new" ? jsx(Button, { action: "detail-seen", small: true, disabled: busy, onClick: onSeen, children: busy ? "Working\u2026" : "Mark seen" }) : null,
+      state !== "resolved" ? jsx(Button, { action: "detail-resolve", small: true, disabled: busy, onClick: onResolveToggle, "aria-expanded": resolveOpen ? "true" : "false", children: "Resolve" }) : null,
+      note.kind === "approval_required" && note.ref ? jsx(Button, { action: "detail-approval", small: true, onClick: () => onOpen?.(`/dockyard/inbox?project=${encodeURIComponent(note.project || "")}`), children: "Review in Approval Inbox" }) : null
+    ] }),
+    resolveOpen && state !== "resolved" ? jsxs(Fragment, { children: [
+      jsx("textarea", {
+        className: "dy-notif-resolve-note",
+        "aria-label": "Resolution note",
+        placeholder: "Resolution note (optional)",
+        value: resolveNote,
+        maxLength: 2e3,
+        onChange: (e) => onResolveNote(e.target.value)
+      }),
+      jsx(Button, { action: "detail-resolve-confirm", variant: "primary", small: true, disabled: busy, onClick: onResolve, children: busy ? "Resolving\u2026" : "Confirm resolve" })
+    ] }) : null
+  ] });
+}
+function NotificationSettings({ settings, busy, error, onSave }) {
+  const value = settings ?? {};
+  const channels = value.channels ?? {};
+  const desktop = channels.desktop ?? {};
+  const quiet = value.quiet_hours ?? {};
+  const bypass = value.bypass_quiet_hours ?? ["approval_required"];
+  const approvalsBypass = bypass.includes("approval_required");
+  return jsxs("aside", { className: "dy-notif-settings", "data-notification-settings": "true", "aria-label": "Notification settings", children: [
+    jsx("h3", { children: "Notification settings" }),
+    jsxs("div", { className: "dy-notif-setting", children: [
+      jsx("label", { htmlFor: "dy-notif-min-severity", children: "Minimum severity" }),
+      jsx("select", { id: "dy-notif-min-severity", value: channels.in_app?.min_severity ?? "low", disabled: busy, onChange: (e) => onSave({ channels: { ...channels, in_app: { ...channels.in_app ?? {}, min_severity: e.target.value } } }), children: SEVERITIES.map((s) => jsx("option", { value: s, children: s }, s)) })
+    ] }),
+    jsxs("div", { className: "dy-notif-setting", children: [
+      jsx("label", { htmlFor: "dy-notif-popups-enabled", children: "Pop-ups" }),
+      jsx("select", { id: "dy-notif-popups-enabled", value: desktop.enabled === false ? "off" : "on", disabled: busy, onChange: (e) => onSave({ channels: { ...channels, desktop: { ...desktop, enabled: e.target.value === "on" } } }), children: [["on", "On"], ["off", "Off"]].map(([v, label]) => jsx("option", { value: v, children: label }, v)) })
+    ] }),
+    jsxs("div", { className: "dy-notif-setting", children: [
+      jsx("label", { htmlFor: "dy-notif-popups-severity", children: "Pop-up minimum severity" }),
+      jsx("select", { id: "dy-notif-popups-severity", value: desktop.min_severity ?? "high", disabled: busy, onChange: (e) => onSave({ channels: { ...channels, desktop: { ...desktop, min_severity: e.target.value } } }), children: SEVERITIES.map((s) => jsx("option", { value: s, children: s }, s)) })
+    ] }),
+    jsxs("div", { className: "dy-notif-setting", children: [
+      jsx("label", { htmlFor: "dy-notif-quiet-start", children: "Quiet hours" }),
+      jsx("input", { id: "dy-notif-quiet-start", type: "time", value: quiet.start ?? "", disabled: busy, onChange: (e) => onSave({ quiet_hours: { ...quiet || {}, start: e.target.value, end: quiet.end ?? "" } }) }),
+      jsx("span", { children: "\u2192" }),
+      jsx("input", { "aria-label": "Quiet hours end", type: "time", value: quiet.end ?? "", disabled: busy, onChange: (e) => onSave({ quiet_hours: { ...quiet || {}, start: quiet.start ?? "", end: e.target.value } }) })
+    ] }),
+    jsxs("div", { className: "dy-notif-setting", children: [
+      jsx("input", { id: "dy-notif-bypass", type: "checkbox", checked: approvalsBypass, disabled: busy, onChange: (e) => {
+        const next = e.target.checked ? Array.from(/* @__PURE__ */ new Set([...bypass, "approval_required"])) : bypass.filter((k) => k !== "approval_required");
+        onSave({ bypass_quiet_hours: next });
+      } }),
+      jsx("label", { htmlFor: "dy-notif-bypass", children: "Approvals ignore quiet hours" })
+    ] }),
+    jsx("p", { className: "dy-notif-override-link", children: "Per-project overrides: pick a project, then Projects \u2192 Settings." }),
+    error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: `Could not save: ${error}` }) : null
   ] });
 }
 
@@ -16635,7 +16932,10 @@ function DashboardPage() {
       setLoadScope(nextLoadScope);
     }
     setError(null);
-    const loader = tab === "workflows-library" ? async () => ({ workflows: (await api("/workflow-library")).workflows ?? [] }) : tab === "dashboard" ? loadDashboardData : tab === "roadmap" ? async () => ({}) : tab === "project" || tab === "settings" || tab === "workflows" ? () => loadProjectData(selectedProject) : tab === "backlog" ? () => loadBacklogData(selectedProject) : tab === "teams" ? loadTeamsData : tab === "initiative" ? () => loadProjectData(selectedProject) : tab === "onboard" ? loadOnboardData : tab === "inbox" ? loadInboxData : () => api("/notifications");
+    const loader = tab === "workflows-library" ? async () => ({ workflows: (await api("/workflow-library")).workflows ?? [] }) : tab === "dashboard" ? loadDashboardData : tab === "roadmap" ? async () => ({}) : tab === "project" || tab === "settings" || tab === "workflows" ? () => loadProjectData(selectedProject) : tab === "backlog" ? () => loadBacklogData(selectedProject) : tab === "teams" ? loadTeamsData : tab === "initiative" ? () => loadProjectData(selectedProject) : tab === "onboard" ? loadOnboardData : tab === "inbox" ? loadInboxData : async () => ({
+      ...await api("/notifications?limit=200"),
+      settings: (await api("/settings/notifications/effective")).effective
+    });
     loader().then(
       (result) => {
         if (!current || serial !== loadSerial.current) return;
@@ -16648,12 +16948,12 @@ function DashboardPage() {
         if (tab === "dashboard") {
           setCounts({
             approvals: Number(result.inbox?.count ?? result.owed_decisions ?? 0),
-            notifications: Number((result.notifications?.notifications ?? []).filter((note) => !note.acked).length)
+            notifications: Number((result.notifications?.notifications ?? []).filter((note) => (note.state ?? (note.acked ? "seen" : "new")) === "new").length)
           });
         } else if (tab === "inbox") {
           setCounts((previous) => ({ ...previous, approvals: Number(result.count ?? result.items?.length ?? 0) }));
         } else if (tab === "notifications") {
-          setCounts((previous) => ({ ...previous, notifications: Number((result.notifications ?? []).filter((note) => !note.acked).length) }));
+          setCounts((previous) => ({ ...previous, notifications: Number((result.notifications ?? []).filter((note) => (note.state ?? (note.acked ? "seen" : "new")) === "new").length) }));
         }
       },
       (failure) => {
@@ -16741,7 +17041,7 @@ function DashboardPage() {
         ...previous,
         payload: {
           ...previous.payload,
-          notifications: previous.payload.notifications.map((note) => note.id === id ? { ...note, acked: true } : note)
+          notifications: previous.payload.notifications.map((note) => note.id === id ? { ...note, acked: true, state: "seen" } : note)
         }
       };
     });
@@ -16908,11 +17208,71 @@ function DashboardPage() {
 }
 
 // hermes_dockyard_plugin/desktop/src/index.js
+var POPUP_SEEN_KEY = "dockyard-notification-popups-seen";
+var POPUP_INTERVAL_MS = 6e4;
+var POPUP_CAP = 3;
+function popupSeenIds() {
+  try {
+    const raw = window.sessionStorage.getItem(POPUP_SEEN_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return /* @__PURE__ */ new Set();
+  }
+}
+function rememberPopupIds(ids) {
+  try {
+    const seen = popupSeenIds();
+    for (const id of ids) seen.add(id);
+    window.sessionStorage.setItem(POPUP_SEEN_KEY, JSON.stringify([...seen]));
+  } catch {
+  }
+}
+function surfacePopup(item) {
+  host?.notify?.({
+    title: item?.title ?? "Fleet notification",
+    body: item?.body ?? "",
+    tag: `dockyard-notification-${item?.id}`,
+    data: item?.deep_link ? { deep_link: item.deep_link } : void 0
+  });
+}
+function startPopupPoller(ctxRest) {
+  if (typeof host?.notify !== "function") return;
+  if (typeof window === "undefined" || window.__dockyardPopupPoller) return;
+  const tick = async () => {
+    if (document.visibilityState !== "visible") return;
+    try {
+      const result = await ctxRest("/notifications/popups", { method: "GET" });
+      const popups = Array.isArray(result?.popups) ? result.popups : [];
+      if (!popups.length) return;
+      const seen = popupSeenIds();
+      const fresh = popups.filter((item) => !seen.has(item.id)).slice(0, POPUP_CAP);
+      const more = Math.max(0, popups.length - fresh.length);
+      for (const item of fresh) surfacePopup(item);
+      if (more > 0) {
+        host?.notify?.({
+          title: `and ${more} more notification${more === 1 ? "" : "s"}`,
+          body: "",
+          tag: "dockyard-notification-more"
+        });
+      }
+      const shownIds = fresh.map((item) => item.id);
+      if (shownIds.length) {
+        rememberPopupIds(shownIds);
+        await ctxRest("/notifications/popups/shown", { method: "POST", body: { ids: shownIds } });
+      }
+    } catch {
+    }
+  };
+  const interval = Number(window.__dockyardPopupIntervalMs) > 0 ? Number(window.__dockyardPopupIntervalMs) : POPUP_INTERVAL_MS;
+  window.__dockyardPopupPoller = setInterval(tick, interval);
+  window.setTimeout(tick, 1500);
+}
 var __plugin = {
   id: "hermes-dockyard",
   name: "Hermes Dockyard",
   register(ctx) {
     bindContext(ctx);
+    startPopupPoller(ctx.rest);
     ctx.registerMany([
       {
         id: "page",
