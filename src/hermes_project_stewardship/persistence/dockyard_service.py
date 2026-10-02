@@ -467,6 +467,7 @@ class DockyardService:
             who = item.get("assignee") or item.get("assignee_id") or "unassigned"
             assignee_wip[who] = assignee_wip.get(who, 0) + 1
         progress = {
+            "id": row["id"],
             "name": name,
             "total": len(attached),
             "done": done,
@@ -567,6 +568,7 @@ class DockyardService:
             ).fetchall()
             attached = [str(item["item_ref"]) for item in refs]
             out.append({
+                "id": row["id"],
                 "name": row["name"],
                 "due": row["due"],
                 "created_at": row["created_at"],

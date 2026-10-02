@@ -26,6 +26,7 @@ import { InitiativeView } from '../views/initiative.js'
 import { InboxView } from '../views/inbox.js'
 import { WorkflowLibraryView } from '../views/workflow-library.js'
 import { NotificationsView } from '../views/notifications.js'
+import { RoadmapView } from '../views/roadmap.js'
 import { jsxs } from '../runtime/react.js'
 import { ConsoleBar } from '../lib/ui.js'
 import { ToastRegion } from '../lib/ui.js'
@@ -38,6 +39,11 @@ export function DashboardPage() {
   const [selectedProject, setSelectedProject] = useState(null)
   const [projectOptions, setProjectOptions] = useState([])
   const [projectEntryView, setProjectEntryView] = useState('overview')
+  // Roadmap scope: 'all' (the signed default) or one project. Every request
+  // bumps the version, so the view re-mounts on it even when the scope is
+  // unchanged (re-picking the picker's current project still narrows).
+  const [roadmap, setRoadmap] = useState({ scope: 'all', version: 0 })
+  const showRoadmap = (scope) => setRoadmap(({ version }) => ({ scope, version: version + 1 }))
   const [dashboardHomeVersion, setDashboardHomeVersion] = useState(0)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [toasts, setToasts] = useState([])
@@ -89,6 +95,9 @@ export function DashboardPage() {
     ? async () => ({ workflows: (await api('/workflow-library')).workflows ?? [] })
     : tab === 'dashboard'
       ? loadDashboardData
+      : tab === 'roadmap'
+        // RoadmapView loads its own scope; the shell only gates the tab.
+        ? async () => ({})
       : (tab === 'project' || tab === 'settings' || tab === 'workflows')
         ? () => loadProjectData(selectedProject)
       : tab === 'backlog'
@@ -129,21 +138,32 @@ export function DashboardPage() {
 
   const refresh = () => setRequestVersion((version) => version + 1)
   const selectProject = (projectId) => {
-    if (projectId === selectedProject) return
+    // An open Roadmap follows the global picker, the current project included.
+    if (projectId === selectedProject) { if (tab === 'roadmap') showRoadmap(projectId); return }
     if (dirtyProject && dirtyProject !== projectId) {
       setPendingProject(projectId)
       return
     }
     setDirtyProject(null)
     setSelectedProject(projectId)
+    if (tab === 'roadmap') showRoadmap(projectId ?? 'all')
     if (tab === 'dashboard' || tab === 'notifications' || tab === 'inbox' || tab === 'onboard') setTab('project')
   }
-  const goTab = (next) => { if (next === 'project') setProjectEntryView('overview'); if (next === 'dashboard') setDashboardHomeVersion((value) => value + 1); setTab(next) }
-  const requestTab = (next) => {
-    if (next !== tab && dirtyProject) { setPendingTab(next); return }
-    goTab(next)
+  // opts.entryView / opts.project let a guarded switch land on a specific
+  // project view (or owner project) once the unsaved-changes prompt clears.
+  const pendingTabOpts = useRef({})
+  const goTab = (next, opts = {}) => {
+    if (opts.project) setSelectedProject(opts.project)
+    if (next === 'project') setProjectEntryView(opts.entryView ?? 'overview')
+    if (next === 'roadmap') showRoadmap(opts.roadmapScope ?? 'all')
+    if (next === 'dashboard') setDashboardHomeVersion((value) => value + 1)
+    setTab(next)
   }
-  const cancelNav = () => { setPendingProject(null); setPendingTab(null) }
+  const requestTab = (next, opts = {}) => {
+    if (next !== tab && dirtyProject) { pendingTabOpts.current = opts; setPendingTab(next); return }
+    goTab(next, opts)
+  }
+  const cancelNav = () => { setPendingProject(null); setPendingTab(null); pendingTabOpts.current = {} }
   const continueNav = () => {
     const project = pendingProject
     const nextTab = pendingTab
@@ -151,8 +171,9 @@ export function DashboardPage() {
     setDirtyProject(null); dirtySaver.current = null
     if (project) {
       setSelectedProject(project)
+      if (tab === 'roadmap') showRoadmap(project)
       if (tab === 'dashboard' || tab === 'notifications' || tab === 'inbox' || tab === 'onboard') setTab('project')
-    } else if (nextTab) goTab(nextTab)
+    } else if (nextTab) { const opts = pendingTabOpts.current; pendingTabOpts.current = {}; goTab(nextTab, opts) }
   }
   const discardProjectChange = continueNav
   const saveThenNavigate = async () => {
@@ -261,7 +282,8 @@ export function DashboardPage() {
       onSelectProject: selectProject,
       onProjectDirty: markDirty(payload.project?.id ?? null),
       onRefresh: refresh,
-      onOpenLibrary: () => setTab('workflows'),
+      onOpenLibrary: () => requestTab('workflows'),
+      onOpenRoadmap: () => requestTab('roadmap', { roadmapScope: payload.project?.id }),
       pendingWorkRef,
       onPendingWorkConsumed: () => setPendingWorkRef(null),
       notice: deepLinkNotice,
@@ -282,14 +304,24 @@ export function DashboardPage() {
     content = jsx(WorkflowLibraryView, {
       projectId: selectedProject,
       onOpenBuilder: (row) => {
+        // Quan M1: guarded like every other tab switch (no silent loss of edits).
         const owner = row?.owner_project_id
-        if (owner && owner !== selectedProject) setSelectedProject(owner)
-        setProjectEntryView('workflows')
-        setTab('project')
+        requestTab('project', { entryView: 'workflows', project: owner && owner !== selectedProject ? owner : undefined })
       },
     }, `workflow-library:${selectedProject ?? 'none'}`)
   } else if (tab === 'onboard') {
     content = jsx(OnboardPanel, { view: payload, onOpen: () => setOnboardingOpen(true), onRefresh: refresh })
+  } else if (tab === 'roadmap') {
+    // The view owns its scope after mounting; the shell re-mounts it (new
+    // version key) for "View in Roadmap", the tab bar (All) and the picker.
+    content = jsx(RoadmapView, {
+      initialScope: roadmap.scope,
+      onRefresh: refresh,
+      onOpen: ({ project, entryView, workRef }) => {
+        if (workRef) setPendingWorkRef(workRef)
+        requestTab('project', { project, entryView })
+      },
+    }, `roadmap:${roadmap.version}`)
   } else if (tab === 'backlog') {
     content = jsx(BacklogView, { view: payload, onRefresh: refresh })
   } else if (tab === 'teams') {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from datetime import timedelta
 from pathlib import Path
 
@@ -47,19 +48,50 @@ def test_stress_parallel_proposals_never_duplicate(svc, enabled):
     assert len(errors) == 7
 
 
-def test_stress_parallel_approvals_idempotent(svc, enabled):
+@pytest.mark.parametrize("stagger", [0.0, 0.02], ids=["together", "staggered"])
+def test_stress_parallel_approvals_idempotent(svc, enabled, stagger):
+    """Six racing approvals of one initiative make exactly one transition.
+
+    How many calls *return* depends on timing, by design: approving an
+    already-approved initiative returns it unchanged (sequential idempotence,
+    pinned in test_service.py and test_phase4_decisions.py). A thread that
+    starts after the winner commits takes that return; one that loses the
+    race inside the transaction is refused. So the invariant is checked on
+    the database, not on return counts, and the staggered case reproduces
+    deliberately what a busy machine does by accident.
+    """
     ini = svc.propose_initiative(enabled, title="T", rationale="R")
-    outcomes = []
+    ref = ini["ref"]
+    cx = svc.store._conn
+    revision_before = cx.execute(
+        "SELECT decision_revision FROM project_initiatives WHERE ref=?", (ref,)).fetchone()[0]
+    returned, refused = [], []
     def approver():
         try:
-            svc.approve_initiative(ini["ref"], actor="h", interface="cli")
-            outcomes.append("ok")
-        except ServiceError:
-            outcomes.append("refused")
+            returned.append(svc.approve_initiative(ref, actor="h", interface="cli")["status"])
+        except ServiceError as exc:
+            refused.append(str(exc))
     threads = [threading.Thread(target=approver) for _ in range(6)]
-    for t in threads: t.start()
-    for t in threads: t.join()
-    assert outcomes.count("ok") == 1  # single transition; rest refused cleanly
+    for t in threads:
+        t.start()
+        if stagger:
+            time.sleep(stagger)
+    for t in threads:
+        t.join()
+    # every call finished: each returned the approved initiative or was refused cleanly
+    assert len(returned) + len(refused) == 6
+    assert returned and set(returned) == {"approved"}
+    assert all("changed state concurrently" in msg for msg in refused), refused
+    # exactly one real transition, whatever the thread timing
+    assert tuple(cx.execute(
+        "SELECT status, decision_revision FROM project_initiatives WHERE ref=?",
+        (ref,)).fetchone()) == ("approved", revision_before + 1)
+    assert cx.execute(
+        "SELECT COUNT(*) FROM stewardship_decision_receipts WHERE initiative_ref=?",
+        (ref,)).fetchone()[0] == 1
+    assert cx.execute(
+        "SELECT COUNT(*) FROM stewardship_audit_log"
+        " WHERE action='initiative.approved' AND subject=?", (ref,)).fetchone()[0] == 1
 
 
 # --------------------------------------------------------------------- #

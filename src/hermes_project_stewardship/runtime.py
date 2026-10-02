@@ -47,21 +47,35 @@ def _inside_git_checkout(path: Path) -> bool:
     return any((parent / ".git").exists() for parent in path.parents)
 
 
+_HOST_REGISTERED = False
+
+
+def mark_hermes_host() -> None:
+    """Called only from ``plugin.register()``, which only the Hermes host invokes."""
+    global _HOST_REGISTERED
+    _HOST_REGISTERED = True
+
+
 def default_location_allowed() -> bool:
     """P addendum fix 2: who may fall back to the profile default database.
 
     Only two callers may: the Hermes host loading the plugin, and an installed
-    ``stewardctl``. The host signal is the host's own modules being loaded in
-    this process: the dashboard imports ``plugin_api.py`` under the module name
-    ``hermes_dashboard_plugin_<name>`` (registered in ``sys.modules`` before
-    the file executes) and the gateway/CLI host runs from ``hermes_cli``. An
-    installed ``stewardctl`` is the console script running from an installed
+    ``stewardctl``. The host signals are explicit, set only by host entry points:
+
+    * the gateway/CLI host calls ``plugin.register()``, which calls
+      ``mark_hermes_host()`` (Quan D1: merely having ``hermes_cli`` imported is
+      no longer enough - any script with a Hermes checkout on ``sys.path`` had it);
+    * the dashboard imports ``plugin_api.py`` under the module name
+      ``hermes_dashboard_plugin_<name>``, registered in ``sys.modules`` by the
+      host loader before the file executes.
+
+    An installed ``stewardctl`` is the console script running from an installed
     package, not from a git checkout or worktree. Everything else - ad-hoc
     imports, scripts, ``stewardctl`` from a checkout - must name a path.
     """
-    if any(name.startswith("hermes_dashboard_plugin_") for name in sys.modules):
+    if _HOST_REGISTERED:
         return True
-    if "hermes_cli" in sys.modules:
+    if any(name.startswith("hermes_dashboard_plugin_") for name in sys.modules):
         return True
     entry = Path(sys.argv[0]).name if sys.argv and sys.argv[0] else ""
     if entry == "stewardctl":

@@ -30,8 +30,8 @@ def run_surface(tmp_path, code, **overrides):
 @pytest.fixture
 def as_host(monkeypatch):
     """Fix 2: the profile default is reserved for the Hermes host; act as it."""
-    import types
-    monkeypatch.setitem(sys.modules, "hermes_cli", types.ModuleType("hermes_cli"))
+    from hermes_project_stewardship import runtime
+    monkeypatch.setattr(runtime, "_HOST_REGISTERED", True)
 
 
 def test_default_surfaces_observe_the_same_project(tmp_path):
@@ -39,7 +39,8 @@ def test_default_surfaces_observe_the_same_project(tmp_path):
 import sys, importlib, json, io, contextlib, types
 sys.modules["httpx"] = importlib.import_module("httpx2")
 # Fix 2: only the Hermes host may use the profile default; act as the host.
-sys.modules["hermes_cli"] = types.ModuleType("hermes_cli")
+from hermes_project_stewardship.runtime import mark_hermes_host
+mark_hermes_host()
 from hermes_project_stewardship.plugin import PluginState, tool_steward_status
 from hermes_project_stewardship.cli.app import main
 from hermes_project_stewardship.api.server import create_app

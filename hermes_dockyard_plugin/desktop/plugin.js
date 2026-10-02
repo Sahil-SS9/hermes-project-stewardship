@@ -269,7 +269,7 @@ var DOCKYARD_CSS = `
   letter-spacing: -0.01em;
 }
 .dockyard-root .dockyard-brand-copy span { color: var(--dy-text-3); font-size: 11px; }
-.dockyard-root .dockyard-tabs { flex-wrap: wrap;
+.dockyard-root .dockyard-tabs {
   display: flex;
   flex: 1 1 auto;
   flex-wrap: wrap;
@@ -2263,6 +2263,96 @@ var WORKFLOW_LIBRARY_CSS = `
 .dockyard-wf-enablement .dockyard-switch input:focus-visible ~ .dockyard-switch-track { outline: 2px solid var(--dy-focus, #3654c7); outline-offset: 2px; }
 `;
 
+// hermes_dockyard_plugin/desktop/src/styles/roadmap-css.js
+var ROADMAP_CSS = `
+.dy-rm-page { display: grid; gap: 14px; }
+.dy-rm-toolbar { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; }
+.dy-rm-toolbar label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--dy-text-secondary, #515968); }
+.dy-rm-toolbar input[type="search"] { min-width: 220px; padding: 7px 10px; border: 1px solid var(--dy-border, #87909d); border-radius: 6px; background: var(--dy-surface, #fff); color: inherit; }
+.dy-rm-attention { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--dy-border, #87909d); border-radius: 6px; background: var(--dy-surface, #fff); color: var(--dy-text-secondary, #515968); font-size: 11px; }
+.dy-rm-attention input { accent-color: var(--dy-accent, #3654c7); }
+.dy-rm-tree { border: 1px solid var(--dy-border, #87909d); border-radius: 8px; background: var(--dy-surface, #fff); overflow: hidden; }
+.dy-rm-tree-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 42px; padding: 9px 12px; border-bottom: 1px solid var(--dy-border, #87909d); background: var(--dy-surface-2, #f0f2f5); font-size: 12px; }
+.dy-rm-tree-head span { color: var(--dy-text-tertiary, #697382); font-size: 10px; }
+.dy-rm-row { display: flex; align-items: center; gap: 8px; min-height: 46px; padding: 6px 11px; border-bottom: 1px solid var(--dy-border, #87909d); background: transparent; border-left: 0; border-right: 0; border-top: 0; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.dy-rm-row:last-child { border-bottom: 0; }
+.dy-rm-row:hover { background: var(--dy-accent-soft, #eef1ff); }
+.dy-rm-row[data-selected="true"] { background: var(--dy-accent-soft, #eef1ff); box-shadow: inset 3px 0 0 var(--dy-accent, #3654c7); }
+.dy-rm-row.depth-1 { padding-left: 34px; }
+.dy-rm-row.depth-2 { padding-left: 57px; }
+.dy-rm-row.depth-3 { padding-left: 80px; }
+.dy-rm-disclosure { flex: 0 0 20px; width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid var(--dy-border, #87909d); border-radius: 4px; background: var(--dy-surface, #fff); color: var(--dy-text-secondary, #515968); padding: 0; font-size: 12px; line-height: 1; }
+.dy-rm-disclosure.blank { visibility: hidden; }
+.dy-rm-icon { flex: 0 0 22px; display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid var(--dy-border, #87909d); border-radius: 5px; background: var(--dy-surface, #fff); color: var(--dy-text-secondary, #515968); font-size: 9px; font-weight: 800; }
+.dy-rm-icon.project { border-radius: 50%; border-color: var(--dy-accent, #3654c7); background: var(--dy-accent, #3654c7); color: #fff; }
+.dy-rm-icon.initiative { border-radius: 50%; }
+.dy-rm-icon.work { border-style: dashed; }
+.dy-rm-copy { min-width: 0; flex: 1; }
+.dy-rm-copy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.dy-rm-copy small { display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dy-text-secondary, #515968); font-size: 10px; }
+.dy-rm-chips { display: flex; align-items: center; gap: 4px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+.dy-rm-chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--dy-border, #87909d); border-radius: 999px; padding: 2px 7px; font-size: 10px; font-weight: 700; color: var(--dy-text-secondary, #515968); background: var(--dy-surface-2, #f0f2f5); white-space: nowrap; }
+.dy-rm-chip.blocked { color: var(--dy-danger, #a72a2a); border-color: var(--dy-danger, #a72a2a); }
+.dy-rm-chip.attention { color: var(--dy-warning, #805200); background: var(--dy-warning-soft, #fff3d4); border-color: var(--dy-warning, #805200); }
+.dy-rm-chip.passed { color: var(--dy-success, #136c4a); border-color: var(--dy-success, #136c4a); }
+.dy-rm-chip.failed { color: var(--dy-danger, #a72a2a); border-color: var(--dy-danger, #a72a2a); }
+.dy-rm-chip.overdue { color: var(--dy-danger, #a72a2a); background: var(--dy-danger-soft, #ffeded); border-color: var(--dy-danger, #a72a2a); }
+.dy-rm-row-actions { display: flex; align-items: center; gap: 4px; flex: none; }
+.dy-rm-row:focus-visible { outline: 2px solid var(--dy-focus, #3654c7); outline-offset: -2px; }
+.dy-rm-copied { display: block; margin-top: 2px; color: var(--dy-text-secondary, #515968); font-size: 10px; font-weight: 400; }
+.dy-rm-confirm { margin: 0; font-size: 12px; }
+.dy-rm-confirm + .dy-rm-confirm { color: var(--dy-text-secondary, #515968); font-size: 11px; }
+.dy-rm-blank { padding: 26px 15px; color: var(--dy-text-secondary, #515968); text-align: center; font-size: 12px; }
+/* Drawer */
+.dy-rm-shell { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; align-items: start; }
+.dy-rm-shell.full { grid-template-columns: minmax(0, 1fr); }
+.dy-rm-drawer { border: 1px solid var(--dy-border, #87909d); border-radius: 8px; background: var(--dy-surface, #fff); overflow: hidden; }
+.dy-rm-drawer-head { padding: 12px; border-bottom: 1px solid var(--dy-border, #87909d); background: var(--dy-surface-2, #f0f2f5); }
+.dy-rm-drawer-head h3 { margin: 4px 0 0; font-size: 14px; }
+.dy-rm-drawer-head p { margin: 3px 0 0; color: var(--dy-text-secondary, #515968); font-size: 10px; }
+.dy-rm-drawer-body { padding: 12px; display: grid; gap: 10px; }
+.dy-rm-drawer-body > p { margin: 0; color: var(--dy-text-secondary, #515968); font-size: 11px; }
+.dy-rm-facts { margin: 0; padding: 0; list-style: none; }
+.dy-rm-facts li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--dy-border, #87909d); font-size: 11px; }
+.dy-rm-facts li span:first-child { color: var(--dy-text-secondary, #515968); }
+.dy-rm-facts li span:last-child { font-weight: 700; text-align: right; overflow-wrap: anywhere; }
+.dy-rm-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+/* Link picker dialog */
+.dy-rm-modal-backdrop { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 16px; background: rgba(10, 15, 25, .38); }
+.dy-rm-modal { width: min(460px, 100%); max-height: min(560px, 90vh); overflow: auto; border: 1px solid var(--dy-border, #87909d); border-radius: 8px; background: var(--dy-surface, #fff); box-shadow: 0 18px 50px rgba(0, 0, 0, .26); }
+.dy-rm-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px; border-bottom: 1px solid var(--dy-border, #87909d); }
+.dy-rm-modal-head h3 { margin: 3px 0 0; font-size: 15px; }
+.dy-rm-modal-head p { margin: 2px 0 0; color: var(--dy-text-secondary, #515968); font-size: 11px; }
+.dy-rm-modal-body { padding: 12px 14px; display: grid; gap: 10px; }
+.dy-rm-modal-body label { display: grid; gap: 4px; font-size: 11px; color: var(--dy-text-secondary, #515968); }
+.dy-rm-modal-body select { min-height: 34px; padding: 6px 8px; border: 1px solid var(--dy-border, #87909d); border-radius: 5px; background: var(--dy-surface, #fff); color: inherit; }
+.dy-rm-modal-error { margin: 0; color: var(--dy-danger, #a72a2a); font-size: 11px; min-height: 14px; }
+.dy-rm-modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 0 14px 14px; }
+/* Milestone items (loaded on open) */
+.dy-rm-items { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 5px; }
+.dy-rm-items li { display: flex; align-items: center; gap: 7px; padding: 6px 8px; border: 1px solid var(--dy-border, #87909d); border-radius: 5px; font-size: 11px; }
+.dy-rm-items li strong { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.dy-rm-items li small { color: var(--dy-text-secondary, #515968); }
+@media (max-width: 800px) {
+  .dy-rm-shell { grid-template-columns: minmax(0, 1fr); }
+  .dy-rm-drawer { position: static; }
+  .dy-rm-row.depth-1 { padding-left: 27px; }
+  .dy-rm-row.depth-2 { padding-left: 43px; }
+  .dy-rm-row.depth-3 { padding-left: 59px; }
+  .dy-rm-chips { display: none; }
+}
+@media (max-width: 520px) {
+  .dy-rm-toolbar { display: grid; grid-template-columns: 1fr 1fr; align-items: center; }
+  .dy-rm-toolbar label:has(input[type="search"]) { grid-column: 1 / -1; }
+  /* Tighten the phone toolbar: checkbox aligns with the picker row, Reset
+     keeps a modest width, dropdown can still name long projects. */
+  .dy-rm-toolbar .dy-rm-attention { align-items: center; }
+  .dy-rm-toolbar > label:nth-of-type(3) { grid-column: 1 / 2; }
+  .dy-rm-toolbar > button:last-child { width: auto; justify-self: start; padding-left: 12px; padding-right: 12px; }
+  .dy-rm-toolbar input[type="search"] { min-width: 0; width: 100%; }
+}
+`;
+
 // hermes_dockyard_plugin/desktop/workflow-canvas-css.js
 var workflow_canvas_css_default = `
 /* ---- Workflow canvas: card + status token set ----------------------------
@@ -3051,6 +3141,7 @@ function useStylesheet(datasetKey, datasetValue, css) {
 function useDockyardStyles() {
   useStylesheet("dockyard-style", "dockyardStyle", DOCKYARD_CSS);
   useStylesheet("dy-wf-library-stylesheet", "dyWfLibraryStylesheet", WORKFLOW_LIBRARY_CSS);
+  useStylesheet("dy-roadmap-stylesheet", "dyRoadmapStylesheet", ROADMAP_CSS);
   useStylesheet("dy-wf-stylesheet", "dyWfStylesheet", workflow_canvas_css_default);
 }
 
@@ -4987,8 +5078,8 @@ function sortApprovals(items) {
   });
 }
 function initials(value) {
-  const words = String(value || "?").replace(/-bot$/i, "").split(/[-_\s]+/).filter(Boolean);
-  return words.slice(0, 2).map((word) => word.charAt(0).toUpperCase()).join("") || "?";
+  const words2 = String(value || "?").replace(/-bot$/i, "").split(/[-_\s]+/).filter(Boolean);
+  return words2.slice(0, 2).map((word) => word.charAt(0).toUpperCase()).join("") || "?";
 }
 function readableLabel(value, fallback = "All") {
   const text = String(value || fallback).replace(/[_-]+/g, " ").trim();
@@ -5105,6 +5196,10 @@ async function loadBacklogData(projectId) {
     bots: bots.bots ?? [],
     profiles: discovery.profiles ?? []
   };
+}
+async function loadRoadmapData(projectId) {
+  const path = projectId ? `/roadmap?project_id=${encodeURIComponent(projectId)}` : "/roadmap";
+  return api(path);
 }
 async function loadTeamsData() {
   const [bots, workload, groups, dashboard, discovery] = await Promise.all([
@@ -5785,6 +5880,7 @@ function ConsoleBar({ tab, counts, onTab, onNewProject, projects = [], selectedP
   const tabs = [
     ["dashboard", "Dashboard", null],
     ["project", "Projects", null],
+    ["roadmap", "Roadmap", null],
     ["backlog", "Backlog", null],
     ["workflows", "Workflows", null],
     ["inbox", "Approval Inbox", counts.approvals],
@@ -14814,7 +14910,7 @@ function ProjectReportsPanel({ project, reports, onRefresh }) {
 }
 
 // hermes_dockyard_plugin/desktop/src/project/dashboard.js
-function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary }) {
+function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap }) {
   const [projectView, setProjectView] = useState(initialView || "overview");
   const [canvasDirty, setCanvasDirty] = useState(false);
   const [pendingView, setPendingView] = useState(null);
@@ -15082,6 +15178,14 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
       description: `Project dashboard / ${project.id}`,
       status: project.health && project.health !== "healthy" ? healthLabel : null,
       onRefresh
+    }),
+    projectView === "overview" && jsx("div", {
+      className: "dockyard-view-only-note",
+      "data-roadmap-link": true,
+      children: jsx("a", { href: "#", onClick: (event) => {
+        event.preventDefault();
+        onOpenRoadmap?.();
+      }, children: "View in Roadmap" })
     }),
     workNotice || notice ? jsxs("div", { className: "dockyard-view-only-note", role: "alert", "data-deep-link-notice": true, children: [
       jsx(Icon, { name: "alert" }),
@@ -15685,6 +15789,798 @@ function NotificationsView({ view, onRefresh, onAcknowledged, onOpen }) {
   ] });
 }
 
+// hermes_dockyard_plugin/desktop/src/views/roadmap.js
+var BUCKETS = [
+  ["planned", "Planned"],
+  ["building", "Building"],
+  ["ready_for_review", "Ready for review"],
+  ["complete", "Complete"]
+];
+var GOAL_LABEL = { met: "Met", at_risk: "At risk", unknown: "Unknown evidence", unproven: "Unproven" };
+var OUTCOME_LABEL = { passed: "Passed", failed: "Failed", stale: "Stale", unknown: "Unknown", not_applicable: "Not applicable" };
+var REL_LABEL = { delivers: "delivers", depends_on: "depends on", supports: "supports", measures: "measures", unblocks: "unblocks" };
+var CONTRACT_STATUS = { active: "Active", paused: "Paused", done: "Done", cleared: "Cleared" };
+var ICON = { project: "P", initiative: "I", milestone: "M", work: "W", objective: "O", goal: "G" };
+var OPEN_VIEW = { project: "overview", initiative: "initiative", milestone: "board", objective: "objectives", goal: "objectives" };
+var LINK_KIND = {
+  milestone: {
+    title: "Link a milestone to an initiative",
+    itemLabel: "Milestone",
+    relationships: ["delivers", "depends_on"],
+    items: (project) => (project.unlinked?.milestones ?? []).map((row) => ({ id: String(row.id), label: row.name })),
+    submit: (projectId, itemId, ref, relationship) => api(
+      `/projects/${encodeURIComponent(projectId)}/initiatives/${encodeURIComponent(ref)}/milestones`,
+      { method: "POST", body: { milestone_id: Number(itemId), relationship } }
+    )
+  },
+  objective: {
+    title: "Link an objective to an initiative",
+    itemLabel: "Objective",
+    relationships: ["supports", "measures", "unblocks"],
+    items: (project) => (project.unlinked?.objectives ?? []).map((row) => ({ id: String(row.id), label: row.name })),
+    submit: (projectId, itemId, ref, relationship) => api(
+      `/projects/${encodeURIComponent(projectId)}/objectives/${encodeURIComponent(itemId)}/initiatives`,
+      { method: "POST", body: { initiative_ref: ref, relationship } }
+    )
+  }
+};
+var words = (value) => String(value ?? "").replace(/_/g, " ");
+var chip = (text, tone = "") => jsx("span", { className: `dy-rm-chip${tone ? ` ${tone}` : ""}`, children: text });
+function treeKeydown(event) {
+  const rows = [...event.currentTarget.querySelectorAll("[data-rm-row]")];
+  const row = document.activeElement?.closest?.("[data-rm-row]");
+  const index = rows.indexOf(row);
+  if (index < 0) return;
+  const move = (target) => {
+    event.preventDefault();
+    target?.focus();
+  };
+  const level = Number(row.getAttribute("aria-level"));
+  if (event.key === "ArrowDown") move(rows[index + 1]);
+  else if (event.key === "ArrowUp") move(rows[index - 1]);
+  else if (event.key === "Home") move(rows[0]);
+  else if (event.key === "End") move(rows[rows.length - 1]);
+  else if (event.key === "ArrowRight" && row.dataset.rmExpandable === "true") {
+    event.preventDefault();
+    if (row.dataset.rmOpen === "true") rows[index + 1]?.focus();
+    else row.querySelector("[data-rm-disclosure]")?.click();
+  } else if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    if (row.dataset.rmOpen === "true") row.querySelector("[data-rm-disclosure]")?.click();
+    else rows.slice(0, index).reverse().find((other) => Number(other.getAttribute("aria-level")) === level - 1)?.focus();
+  } else if ((event.key === "Enter" || event.key === " ") && event.target === row) {
+    event.preventDefault();
+    row.click();
+  }
+}
+function deliveryChips(delivery) {
+  if (!delivery) return null;
+  if (delivery.state === "no_linked_work") return chip("No linked work");
+  if (delivery.state === "unavailable") return chip("Unavailable");
+  const chips = BUCKETS.map(([key, label]) => Number(delivery[key] ?? 0) > 0 ? jsx("span", { className: "dy-rm-chip", children: `${label} ${number(delivery[key])}` }, key) : null).filter(Boolean);
+  if (Number(delivery.blocked ?? 0) > 0) {
+    chips.push(jsx("span", { className: "dy-rm-chip blocked", children: `Blocked ${number(delivery.blocked)}` }, "blocked"));
+  }
+  chips.push(jsx("span", { className: "dy-rm-chip", children: `${number(delivery.total)} total` }, "total"));
+  return chips;
+}
+function goalChip(goal) {
+  if (!goal) return null;
+  if (goal.unavailable === "archived") return chip(`Goal ${goal.title} \u2014 unavailable (archived)`);
+  return chip(`Goal: ${GOAL_LABEL[goal.state] ?? goal.state}`);
+}
+function deliveryDetail(delivery) {
+  if (!delivery) return [];
+  if (delivery.state === "no_linked_work") return [["Linked work", "No linked work"]];
+  if (delivery.state === "unavailable") return [["Linked work", "Unavailable (the work host did not respond)"]];
+  return [
+    ...BUCKETS.map(([key, label]) => [label, number(delivery[key] ?? 0)]),
+    ["Blocked", number(delivery.blocked ?? 0)],
+    ["Total linked", number(delivery.total)]
+  ];
+}
+function focusProps(node, tabStop, onFocusRow) {
+  return {
+    "data-rm-node": node,
+    tabIndex: tabStop ? 0 : -1,
+    onFocus: (event) => {
+      if (event.target === event.currentTarget) onFocusRow(node);
+    }
+  };
+}
+function Row({ node, type, depth, label, detail, open, expandable, selected, tabStop, chips, actions, onFocusRow, onToggle, onOpen }) {
+  return jsxs("div", {
+    className: `dy-rm-row depth-${depth}`,
+    "data-rm-row": true,
+    "data-rm-expandable": String(Boolean(expandable)),
+    "data-rm-open": String(Boolean(open)),
+    "data-selected": String(Boolean(selected)),
+    role: "treeitem",
+    "aria-level": depth + 1,
+    "aria-expanded": expandable ? Boolean(open) : void 0,
+    "aria-selected": Boolean(selected),
+    ...focusProps(node, tabStop, onFocusRow),
+    onClick: () => onOpen(),
+    children: [
+      jsx("button", {
+        type: "button",
+        className: `dy-rm-disclosure${expandable ? "" : " blank"}`,
+        "data-rm-disclosure": true,
+        tabIndex: -1,
+        "aria-hidden": !expandable,
+        "aria-label": `${open ? "Collapse" : "Expand"} ${label}`,
+        onClick: (event) => {
+          event.stopPropagation();
+          if (expandable) onToggle();
+        },
+        children: open ? "\u2212" : "+"
+      }),
+      jsx("span", { className: `dy-rm-icon ${type}`, "aria-hidden": true, children: ICON[type] ?? "\xB7" }),
+      jsxs("span", { className: "dy-rm-copy", children: [
+        jsx("strong", { children: label }),
+        jsx("small", { children: detail })
+      ] }),
+      jsx("span", { className: "dy-rm-chips", children: chips ?? null }),
+      // Actions sit outside the chip strip: the narrow layout hides chips, never actions.
+      actions ? jsx("span", { className: "dy-rm-row-actions", children: actions }) : null
+    ]
+  });
+}
+function PlainRow({ node, depth, label, detail, tabStop, onFocusRow }) {
+  return jsx("div", {
+    className: `dy-rm-row depth-${depth}`,
+    "data-rm-row": true,
+    role: "treeitem",
+    "aria-level": depth + 1,
+    ...focusProps(node, tabStop, onFocusRow),
+    children: jsxs("span", { className: "dy-rm-copy", children: [jsx("strong", { children: label }), jsx("small", { children: detail })] })
+  });
+}
+function MilestoneItems({ projectId, milestoneId, onOpen }) {
+  const [items, setItems] = useState(null);
+  const [error, setError] = useState(null);
+  useEffect(() => {
+    let current = true;
+    api(`/roadmap/projects/${encodeURIComponent(projectId)}/milestones/${milestoneId}/items`).then((result) => {
+      if (current) {
+        setItems(result.items ?? []);
+        setError(result.state === "unavailable" ? "Work items are unavailable (the work host did not respond)." : null);
+      }
+    }).catch((failure) => {
+      if (current) setError(String(failure?.message ?? failure));
+    });
+    return () => {
+      current = false;
+    };
+  }, [projectId, milestoneId]);
+  if (error) return jsx("p", { role: "status", children: error });
+  if (!items) return jsx("p", { role: "status", children: "Loading work items\u2026" });
+  if (!items.length) return jsx("p", { role: "status", children: "No work items are attached to this milestone." });
+  return jsx("ul", { className: "dy-rm-items", children: items.map((item) => jsxs("li", { children: [
+    jsx("strong", { children: item.title }),
+    jsx("small", { children: words(item.bucket) }),
+    Array.isArray(item.blockers) && item.blockers.length ? jsx("small", { children: `waiting on ${item.blockers.join(", ")}` }) : null,
+    jsx(Button, {
+      small: true,
+      action: "roadmap-open-work",
+      ariaLabel: `Open ${item.title} on the project board`,
+      onClick: (event) => {
+        event.stopPropagation();
+        onOpen({ project: projectId, entryView: "board", workRef: item.ref });
+      },
+      children: "Open"
+    })
+  ] }, item.ref)) });
+}
+function MilestoneItemsRow({ node, projectId, milestoneId, tabStop, onFocusRow, onOpen }) {
+  return jsx("div", {
+    className: "dy-rm-row depth-3",
+    "data-rm-row": true,
+    "data-rm-items-row": milestoneId,
+    role: "treeitem",
+    "aria-level": 4,
+    ...focusProps(node, tabStop, onFocusRow),
+    children: jsx("div", { style: { minWidth: 0, flex: 1 }, children: jsx(MilestoneItems, { projectId, milestoneId, onOpen }) })
+  });
+}
+function contractFacts(entry, goalTitle) {
+  if (!entry || entry.loading) return [["Goal contract", "Loading\u2026"]];
+  if (entry.error) return [["Goal contract", `Unavailable: ${entry.error}`]];
+  const contract = entry.contract;
+  const text = (value) => value === null || value === void 0 || String(value).trim() === "" ? "\u2014" : String(value);
+  const outcome = String(contract.outcome ?? "").trim();
+  const copied = outcome !== "" && outcome === String(goalTitle ?? "").trim();
+  return [
+    ["Outcome", copied ? jsxs(Fragment, { children: [contract.outcome, jsx("small", { className: "dy-rm-copied", children: "Copied from the goal title" })] }) : text(contract.outcome)],
+    ["Contract status", CONTRACT_STATUS[contract.status] ?? words(contract.status)],
+    ...contract.status === "paused" ? [["Paused because", text(contract.paused_reason)]] : [],
+    ["Verification", text(contract.verification)],
+    ["Constraints", text(contract.constraints)],
+    ["Boundaries", text(contract.boundaries)],
+    ["Stop when", text(contract.stop_when)],
+    ...contract.max_turns !== null && contract.max_turns !== void 0 ? [["Turn limit", number(contract.max_turns)]] : []
+  ];
+}
+function drawerBody(sel, project, contract, onOpen) {
+  const open = { project: project.id, entryView: OPEN_VIEW[sel.type] };
+  const initiativeOf = (ref) => (project.initiatives ?? []).find((row) => row.ref === ref);
+  if (sel.type === "project") {
+    return {
+      title: project.label ?? project.id,
+      subtitle: project.mission || "No mission recorded",
+      open,
+      facts: [
+        ["Initiatives", number(project.initiatives?.length ?? 0)],
+        ["Goals", number(project.goals?.length ?? 0)],
+        ["Milestones not linked", number(project.unlinked?.milestones?.length ?? 0)],
+        ["Objectives not linked", number(project.unlinked?.objectives?.length ?? 0)],
+        ["Work host", project.work_host === "unavailable" ? "Unavailable" : "Connected"]
+      ]
+    };
+  }
+  if (sel.type === "initiative") {
+    const initiative = initiativeOf(sel.id);
+    if (!initiative) return null;
+    return {
+      title: initiative.title,
+      subtitle: `Governance: ${words(initiative.governance)}`,
+      open,
+      facts: [
+        ...deliveryDetail(initiative.delivery),
+        ["Work not in a milestone", initiative.unmilestoned_work?.state === "ok" ? number(initiative.unmilestoned_work.count) : "Unavailable"],
+        ["Objectives linked", number(initiative.objectives?.length ?? 0)],
+        ["Attention", initiative.attention_reasons?.length ? initiative.attention_reasons.map(words).join(", ") : "none"]
+      ]
+    };
+  }
+  if (sel.type === "milestone") {
+    const milestone = (initiativeOf(sel.via)?.milestones ?? []).find((row) => row.id === sel.id);
+    if (!milestone) return null;
+    return {
+      title: milestone.name,
+      open,
+      subtitle: milestone.relationship ? `Relationship: ${REL_LABEL[milestone.relationship] ?? milestone.relationship}` : "Not linked yet",
+      facts: [
+        ...deliveryDetail(milestone.delivery),
+        ["Due", milestone.due ?? "No due date"],
+        ["Closed", milestone.closed ? "Yes" : "No"],
+        ...milestone.overdue ? [["Overdue", "Yes \u2014 past due and not closed"]] : [],
+        ...milestone.archived ? [["Status", "Unavailable (archived)"]] : [],
+        ...milestone.also_under?.length ? [["Also under", milestone.also_under.map((row) => row.title).join(", ")]] : []
+      ],
+      extra: milestone.archived ? null : jsx(MilestoneItems, { projectId: project.id, milestoneId: milestone.id, onOpen })
+    };
+  }
+  if (sel.type === "objective") {
+    const objective = (initiativeOf(sel.via)?.objectives ?? []).find((row) => row.id === sel.id);
+    if (!objective) return null;
+    return {
+      title: objective.name,
+      open,
+      subtitle: objective.relationship ? `Relationship: ${REL_LABEL[objective.relationship] ?? objective.relationship}` : "Not linked yet",
+      facts: [
+        ["Outcome", OUTCOME_LABEL[objective.outcome?.state] ?? "Unknown"],
+        ["Evidence window", objective.outcome?.window ?? "\u2014"],
+        ["Last evaluated", objective.outcome?.evaluated_at ?? "Never"],
+        ...objective.unavailable === "archived" ? [["Status", "Unavailable (archived)"]] : [],
+        ...objective.goal ? [["Goal", objective.goal.unavailable === "archived" ? `${objective.goal.title} (unavailable, archived)` : `${objective.goal.title} \u2014 ${GOAL_LABEL[objective.goal.state] ?? objective.goal.state}`]] : []
+      ]
+    };
+  }
+  if (sel.type === "goal") {
+    const goal = (project.goals ?? []).find((row) => row.id === sel.id);
+    if (!goal) {
+      return { title: sel.goal?.title ?? sel.id, subtitle: "Goal", open, facts: [["Status", "Unavailable (archived)"]] };
+    }
+    const entry = contract?.key === `${project.id}/${goal.id}` ? contract : null;
+    return {
+      title: goal.title,
+      subtitle: "Goal \xB7 its contract is read-only here",
+      open,
+      facts: [
+        ["State", GOAL_LABEL[goal.state] ?? goal.state],
+        ["Objectives linked", number(goal.objectives_linked ?? 0)],
+        ["Objectives passed", goal.objectives_passed === null || goal.objectives_passed === void 0 ? "Unknown (evidence missing)" : number(goal.objectives_passed)],
+        ...contractFacts(entry, goal.title)
+      ]
+    };
+  }
+  return null;
+}
+function Drawer({ type, body, onClose, onOpen }) {
+  return jsxs("aside", { className: "dy-rm-drawer", "aria-live": "polite", "data-rm-drawer": type, children: [
+    jsxs("header", { className: "dy-rm-drawer-head", children: [
+      jsx("p", { className: "dockyard-meta", children: type }),
+      jsx("h3", { children: body.title }),
+      jsx("p", { children: body.subtitle })
+    ] }),
+    jsxs("div", { className: "dy-rm-drawer-body", children: [
+      jsx("ul", { className: "dy-rm-facts", children: body.facts.map(([label, value]) => jsxs("li", { children: [
+        jsx("span", { children: label }),
+        jsx("span", { children: value })
+      ] }, label)) }),
+      body.extra ?? null,
+      jsxs("div", { className: "dy-rm-actions", children: [
+        jsx(Button, { variant: "primary", action: "roadmap-open", ariaLabel: `Open ${body.title} on its project screen`, onClick: () => onOpen(body.open), children: "Open" }),
+        jsx(Button, { onClick: onClose, children: "Close" })
+      ] })
+    ] })
+  ] });
+}
+function LinkDialog({ kind, projectId, projectLabel, onClose, onDone }) {
+  const spec = LINK_KIND[kind];
+  const [choices, setChoices] = useState(null);
+  const [item, setItem] = useState("");
+  const [initiative, setInitiative] = useState("");
+  const [relationship, setRelationship] = useState(spec.relationships[0]);
+  const [step, setStep] = useState("choose");
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useDialogFocusManager(`[data-rm-link-dialog][data-rm-step="${step}"] .dy-rm-modal`);
+  useEffect(() => {
+    let current = true;
+    loadRoadmapData(projectId).then((result) => {
+      if (!current) return;
+      const project = result.projects?.[0];
+      setChoices({
+        items: project ? spec.items(project) : [],
+        initiatives: (project?.initiatives ?? []).map((row) => ({ ref: row.ref, title: row.title, governance: words(row.governance) }))
+      });
+    }).catch((failure) => {
+      if (current) setError(String(failure?.message ?? failure));
+    });
+    return () => {
+      current = false;
+    };
+  }, []);
+  const itemLabel = choices?.items.find((row) => row.id === item)?.label ?? "";
+  const initiativeTitle = choices?.initiatives.find((row) => row.ref === initiative)?.title ?? "";
+  const ready = Boolean(choices && item && initiative);
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await spec.submit(projectId, item, initiative, relationship);
+      emitToast("success", `Linked \u201C${itemLabel}\u201D to \u201C${initiativeTitle}\u201D.`);
+      onDone();
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+      setBusy(false);
+    }
+  };
+  const field = (id, label, value, onChange, options) => jsxs("label", { htmlFor: id, children: [
+    label,
+    jsx("select", { id, value, onChange: (event) => onChange(event.target.value), children: options })
+  ] });
+  const choose = jsxs("div", { className: "dy-rm-modal-body", children: [
+    choices === null && !error ? jsx("p", { role: "status", children: "Loading choices\u2026" }) : null,
+    choices && choices.items.length === 0 ? jsx("p", { children: `Nothing to link: every ${spec.itemLabel.toLowerCase()} in this project is already linked.` }) : null,
+    choices && choices.items.length > 0 ? field("dy-rm-link-choice", spec.itemLabel, item, setItem, [
+      jsx("option", { value: "", children: "Choose\u2026" }, ""),
+      ...choices.items.map((row) => jsx("option", { value: row.id, children: row.label }, row.id))
+    ]) : null,
+    choices && choices.initiatives.length === 0 ? jsx("p", { children: "This project has no initiatives yet. Create one on the project screen first." }) : null,
+    choices && choices.initiatives.length > 0 ? field("dy-rm-link-initiative", "Initiative", initiative, setInitiative, [
+      jsx("option", { value: "", children: "Choose\u2026" }, ""),
+      ...choices.initiatives.map((row) => jsx("option", { value: row.ref, children: `${row.title} (${row.governance})` }, row.ref))
+    ]) : null,
+    choices ? field(
+      "dy-rm-link-rel",
+      "Relationship",
+      relationship,
+      setRelationship,
+      spec.relationships.map((value) => jsx("option", { value, children: REL_LABEL[value] ?? value }, value))
+    ) : null,
+    jsx("p", { className: "dy-rm-modal-error", role: "alert", children: error })
+  ] });
+  const confirm = jsxs("div", { className: "dy-rm-modal-body", "data-rm-link-confirm": true, children: [
+    jsx("p", { className: "dy-rm-confirm", children: `Link the ${spec.itemLabel.toLowerCase()} \u201C${itemLabel}\u201D to the initiative \u201C${initiativeTitle}\u201D (${REL_LABEL[relationship] ?? relationship})?` }),
+    jsx("p", { className: "dy-rm-confirm", children: "This records one link and an audit entry under your name." }),
+    jsx("p", { className: "dy-rm-modal-error", role: "alert", children: error })
+  ] });
+  return jsx("div", {
+    className: "dy-rm-modal-backdrop",
+    "data-rm-link-dialog": true,
+    "data-rm-step": step,
+    onKeyDown: (event) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onClose();
+      }
+    },
+    children: jsxs("section", { className: "dy-rm-modal", role: "dialog", "aria-modal": true, "aria-label": spec.title, children: [
+      jsxs("header", { className: "dy-rm-modal-head", children: [
+        jsxs("div", { children: [jsx("p", { className: "dockyard-meta", children: "Link" }), jsx("h3", { children: spec.title }), jsx("p", { children: `Project ${projectLabel}` })] }),
+        jsx(Button, { onClick: onClose, ariaLabel: "Close link dialog", children: "\xD7" })
+      ] }),
+      step === "choose" ? choose : confirm,
+      step === "choose" ? jsxs("div", { className: "dy-rm-modal-actions", children: [
+        jsx(Button, { onClick: onClose, children: "Cancel" }),
+        jsx(Button, { variant: "primary", disabled: !ready, onClick: () => {
+          setError(null);
+          setStep("confirm");
+        }, children: "Continue" })
+      ] }) : jsxs("div", { className: "dy-rm-modal-actions", children: [
+        jsx(Button, { disabled: busy, onClick: () => {
+          setError(null);
+          setStep("choose");
+        }, children: "Back" }),
+        jsx(Button, { variant: "primary", disabled: busy, onClick: submit, children: busy ? "Linking\u2026" : "Create link" })
+      ] })
+    ] })
+  });
+}
+function RoadmapView({ initialScope = "all", onOpen, onRefresh }) {
+  const [scope, setScope] = useState(initialScope);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [attentionOnly, setAttentionOnly] = useState(false);
+  const [openNodes, setOpenNodes] = useState(() => /* @__PURE__ */ new Set());
+  const [selection, setSelection] = useState(null);
+  const [focusNode, setFocusNode] = useState(null);
+  const [linkDialog, setLinkDialog] = useState(null);
+  const [contract, setContract] = useState(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [pickerProjects, setPickerProjects] = useState([]);
+  const loadSerial = useRef(0);
+  const load = async () => {
+    const serial = ++loadSerial.current;
+    setLoading(true);
+    setError(null);
+    setRefreshTick((tick) => tick + 1);
+    try {
+      const result = await loadRoadmapData(scope === "all" ? null : scope);
+      if (serial !== loadSerial.current) return;
+      setData(result);
+      if (scope === "all") setPickerProjects((result.projects ?? []).map(({ id, label }) => ({ id, label })));
+    } catch (failure) {
+      if (serial === loadSerial.current) setError(String(failure?.message ?? failure));
+    } finally {
+      if (serial === loadSerial.current) setLoading(false);
+    }
+  };
+  useEffect(() => {
+    void load();
+  }, [scope]);
+  useEffect(() => {
+    if (scope === "all" || pickerProjects.length) return void 0;
+    let current = true;
+    loadRoadmapData(null).then((result) => {
+      if (current) setPickerProjects((result.projects ?? []).map(({ id, label }) => ({ id, label })));
+    }).catch(() => {
+    });
+    return () => {
+      current = false;
+    };
+  }, [scope]);
+  useEffect(() => {
+    if (selection?.type !== "goal" || selection.goal?.unavailable === "archived") return void 0;
+    const key = `${selection.projectId}/${selection.id}`;
+    let current = true;
+    setContract({ key, loading: true });
+    api(`/projects/${encodeURIComponent(selection.projectId)}/goals/${encodeURIComponent(selection.id)}/contract`).then((result) => {
+      if (current) setContract({ key, contract: result });
+    }).catch((failure) => {
+      if (current) setContract({ key, error: String(failure?.message ?? failure) });
+    });
+    return () => {
+      current = false;
+    };
+  }, [selection?.node, refreshTick]);
+  const changeScope = (next) => {
+    setSelection(null);
+    if (next === scope) return;
+    setData(null);
+    setScope(next);
+  };
+  const projects = data?.projects ?? [];
+  const canWrite = data?.can_write === true;
+  const matches = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return (project) => {
+      if (attentionOnly && !project.attention) return false;
+      if (!query) return true;
+      const haystack = [
+        project.id,
+        project.label,
+        project.mission,
+        ...(project.initiatives ?? []).flatMap((row) => [
+          row.ref,
+          row.title,
+          ...(row.milestones ?? []).map((m) => m.name),
+          ...(row.objectives ?? []).flatMap((o) => [o.name, o.goal?.title])
+        ]),
+        ...(project.goals ?? []).map((g) => g.title),
+        ...(project.unlinked?.milestones ?? []).map((m) => m.name),
+        ...(project.unlinked?.objectives ?? []).map((o) => o.name)
+      ].join(" ").toLowerCase();
+      return haystack.includes(query);
+    };
+  }, [search, attentionOnly]);
+  const toggle = (node) => setOpenNodes((current) => {
+    const next = new Set(current);
+    if (next.has(node)) next.delete(node);
+    else next.add(node);
+    return next;
+  });
+  const openNode = (node) => setOpenNodes((current) => current.has(node) ? current : /* @__PURE__ */ new Set([...current, node]));
+  useEffect(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return;
+    setOpenNodes((current) => {
+      const next = new Set(current);
+      const hit = (value) => String(value ?? "").toLowerCase().includes(query);
+      for (const project of projects) {
+        for (const row of project.initiatives ?? []) {
+          const goalHits = (row.objectives ?? []).filter((o) => o.goal && hit(o.goal.title));
+          const childHit = (row.milestones ?? []).some((m) => hit(m.name)) || (row.objectives ?? []).some((o) => hit(o.name)) || goalHits.length > 0;
+          if (childHit || hit(row.title) || hit(row.ref)) next.add(`project:${project.id}`);
+          if (childHit) next.add(`initiative:${row.ref}`);
+          for (const o of goalHits) next.add(`objective:${o.id}@${row.ref}`);
+        }
+        if ([...project.unlinked?.milestones ?? [], ...project.unlinked?.objectives ?? []].some((x) => hit(x.name))) next.add(`project:${project.id}`);
+      }
+      return next;
+    });
+  }, [search, data]);
+  const linkButton = (kind, project) => jsx(Button, {
+    small: true,
+    action: `roadmap-link-${kind}`,
+    onClick: (event) => {
+      event.stopPropagation();
+      setLinkDialog({ kind, projectId: project.id, projectLabel: project.label ?? project.id });
+    },
+    children: "Link\u2026"
+  });
+  const rows = [];
+  const add = (node, render) => rows.push({ node, render });
+  const base = (node) => ({ node, selected: selection?.node === node, onFocusRow: setFocusNode });
+  const visibleProjects = projects.filter(matches);
+  for (const project of visibleProjects) {
+    const pid = project.id;
+    const projectNode = `project:${pid}`;
+    const projectOpen = openNodes.has(projectNode);
+    const initiativeCount = project.initiatives?.length ?? 0;
+    add(projectNode, (tabStop2) => jsx(Row, {
+      ...base(projectNode),
+      tabStop: tabStop2,
+      type: "project",
+      depth: 0,
+      label: project.label ?? pid,
+      detail: `${number(initiativeCount)} ${plural(initiativeCount, "initiative")}${project.mission ? ` \xB7 ${project.mission}` : ""}`,
+      expandable: true,
+      open: projectOpen,
+      chips: project.attention ? chip("Needs attention", "attention") : null,
+      onToggle: () => toggle(projectNode),
+      onOpen: () => {
+        openNode(projectNode);
+        setSelection({ type: "project", id: pid, projectId: pid, node: projectNode });
+      }
+    }, projectNode));
+    if (!projectOpen) continue;
+    if (project.features?.initiatives === false) {
+      add(`${projectNode}:off`, (tabStop2) => jsx(PlainRow, {
+        node: `${projectNode}:off`,
+        depth: 1,
+        tabStop: tabStop2,
+        onFocusRow: setFocusNode,
+        label: "Initiatives are turned off for this project.",
+        detail: "Turn them on in the project settings to use the Roadmap here."
+      }, `${projectNode}:off`));
+      continue;
+    }
+    for (const initiative of project.initiatives ?? []) {
+      const ref = initiative.ref;
+      const initiativeNode = `initiative:${ref}`;
+      const initiativeOpen = openNodes.has(initiativeNode);
+      add(initiativeNode, (tabStop2) => jsx(Row, {
+        ...base(initiativeNode),
+        tabStop: tabStop2,
+        type: "initiative",
+        depth: 1,
+        label: initiative.title,
+        detail: initiative.attention_reasons?.length ? initiative.attention_reasons.map(words).join(" \xB7 ") : initiative.delivery?.state === "ok" ? `${number(initiative.delivery.total)} linked work items` : "No linked work",
+        expandable: true,
+        open: initiativeOpen,
+        chips: jsxs(Fragment, { children: [
+          deliveryChips(initiative.delivery),
+          initiative.attention ? chip("Attention", "attention") : null
+        ] }),
+        onToggle: () => toggle(initiativeNode),
+        onOpen: () => {
+          openNode(initiativeNode);
+          setSelection({ type: "initiative", id: ref, projectId: pid, node: initiativeNode });
+        }
+      }, initiativeNode));
+      if (!initiativeOpen) continue;
+      for (const milestone of initiative.milestones ?? []) {
+        const milestoneNode = `milestone:${milestone.id}@${ref}`;
+        const milestoneOpen = openNodes.has(milestoneNode) && !milestone.archived;
+        add(milestoneNode, (tabStop2) => jsx(Row, {
+          ...base(milestoneNode),
+          tabStop: tabStop2,
+          type: "milestone",
+          depth: 2,
+          label: milestone.name,
+          detail: milestone.archived ? "Unavailable (archived)" : `${milestone.relationship ? REL_LABEL[milestone.relationship] : "not linked"}${milestone.also_under?.length ? ` \xB7 also under ${milestone.also_under.map((row) => row.title).join(", ")}` : ""}`,
+          expandable: !milestone.archived,
+          open: milestoneOpen,
+          chips: jsxs(Fragment, { children: [
+            deliveryChips(milestone.delivery),
+            milestone.overdue ? chip("Overdue", "overdue") : null
+          ] }),
+          onToggle: () => toggle(milestoneNode),
+          onOpen: () => {
+            if (!milestone.archived) openNode(milestoneNode);
+            setSelection({ type: "milestone", id: milestone.id, via: ref, projectId: pid, node: milestoneNode });
+          }
+        }, milestoneNode));
+        if (milestoneOpen) {
+          const itemsNode = `items:${milestone.id}@${ref}`;
+          add(itemsNode, (tabStop2) => jsx(MilestoneItemsRow, {
+            node: itemsNode,
+            projectId: pid,
+            milestoneId: milestone.id,
+            tabStop: tabStop2,
+            onFocusRow: setFocusNode,
+            onOpen
+          }, itemsNode));
+        }
+      }
+      if (initiative.unmilestoned_work?.count > 0) {
+        const looseNode = `loose:${ref}`;
+        add(looseNode, (tabStop2) => jsx(PlainRow, {
+          node: looseNode,
+          depth: 2,
+          tabStop: tabStop2,
+          onFocusRow: setFocusNode,
+          label: "Not in a milestone",
+          detail: initiative.unmilestoned_work.items.map((item) => `${item.title} (${words(item.bucket)})`).join(", ")
+        }, looseNode));
+      }
+      for (const objective of initiative.objectives ?? []) {
+        const objectiveNode = `objective:${objective.id}@${ref}`;
+        const objectiveOpen = openNodes.has(objectiveNode) && Boolean(objective.goal);
+        add(objectiveNode, (tabStop2) => jsx(Row, {
+          ...base(objectiveNode),
+          tabStop: tabStop2,
+          type: "objective",
+          depth: 2,
+          label: objective.name,
+          detail: objective.unavailable === "archived" ? "Unavailable (archived)" : `Outcome: ${OUTCOME_LABEL[objective.outcome?.state] ?? "Unknown"}${objective.outcome?.evaluated_at ? "" : " \xB7 never evaluated"}`,
+          expandable: Boolean(objective.goal),
+          open: objectiveOpen,
+          chips: jsxs(Fragment, { children: [
+            chip(OUTCOME_LABEL[objective.outcome?.state] ?? "Unknown", objective.outcome?.state === "passed" ? "passed" : objective.outcome?.state === "failed" ? "failed" : ""),
+            goalChip(objective.goal)
+          ] }),
+          onToggle: () => {
+            if (objective.goal) toggle(objectiveNode);
+          },
+          onOpen: () => {
+            if (objective.goal) openNode(objectiveNode);
+            setSelection({ type: "objective", id: objective.id, via: ref, projectId: pid, node: objectiveNode });
+          }
+        }, objectiveNode));
+        if (objectiveOpen) {
+          const goal = objective.goal;
+          const goalNode = `goal:${goal.id}@${objective.id}@${ref}`;
+          add(goalNode, (tabStop2) => jsx(Row, {
+            ...base(goalNode),
+            tabStop: tabStop2,
+            type: "goal",
+            depth: 3,
+            label: goal.unavailable === "archived" ? `${goal.title} \u2014 unavailable (archived)` : goal.title,
+            detail: "Goal context \xB7 contract in the drawer (read-only)",
+            expandable: false,
+            open: false,
+            chips: goal.unavailable !== "archived" ? chip(GOAL_LABEL[goal.state] ?? goal.state) : null,
+            onToggle: () => {
+            },
+            onOpen: () => setSelection({ type: "goal", id: goal.id, goal, projectId: pid, node: goalNode })
+          }, goalNode));
+        }
+      }
+    }
+    const unlinkedMilestones = project.unlinked?.milestones ?? [];
+    if (unlinkedMilestones.length) {
+      const node = `unlinked-milestones:${pid}`;
+      add(node, (tabStop2) => jsx(Row, {
+        ...base(node),
+        tabStop: tabStop2,
+        type: "milestone",
+        depth: 1,
+        label: "Milestones not linked to an initiative",
+        detail: unlinkedMilestones.map((m) => m.name).join(", "),
+        expandable: false,
+        open: false,
+        actions: canWrite ? linkButton("milestone", project) : null,
+        onToggle: () => {
+        },
+        onOpen: () => {
+        }
+      }, node));
+    }
+    const unlinkedObjectives = project.unlinked?.objectives ?? [];
+    if (unlinkedObjectives.length) {
+      const node = `unlinked-objectives:${pid}`;
+      add(node, (tabStop2) => jsx(Row, {
+        ...base(node),
+        tabStop: tabStop2,
+        type: "objective",
+        depth: 1,
+        label: "Objectives not linked to an initiative",
+        detail: unlinkedObjectives.map((o) => o.name).join(", "),
+        expandable: false,
+        open: false,
+        actions: canWrite ? linkButton("objective", project) : null,
+        onToggle: () => {
+        },
+        onOpen: () => {
+        }
+      }, node));
+    }
+  }
+  const nodes = rows.map((row) => row.node);
+  const tabStop = nodes.includes(focusNode) ? focusNode : nodes[0];
+  const selectedProject = selection ? projects.find((project) => project.id === selection.projectId) ?? null : null;
+  const body = selection && selectedProject ? drawerBody(selection, selectedProject, contract, onOpen) : null;
+  const content = loading && !data ? jsx(LoadingState, {}) : error ? jsx(ErrorState, { error, onRetry: load }) : !visibleProjects.length ? jsx(EmptyState, { title: "No projects match this view", description: "Adjust the search, the attention filter, or the project picker." }) : jsxs("div", { className: `dy-rm-shell${body ? "" : " full"}`, children: [
+    jsxs("section", { className: "dy-rm-tree", role: "tree", "aria-label": "Project roadmap tree", onKeyDown: treeKeydown, "data-rm-tree": true, children: [
+      jsxs("header", { className: "dy-rm-tree-head", children: [
+        jsx("strong", { children: scope === "all" ? "All projects" : projects[0]?.label ?? scope }),
+        jsx("span", { children: `${number(visibleProjects.length)} shown` })
+      ] }),
+      ...rows.map((row) => row.render(row.node === tabStop))
+    ] }),
+    body ? jsx(Drawer, { type: selection.type, body, onClose: () => setSelection(null), onOpen }) : null
+  ] });
+  const known = pickerProjects.length ? pickerProjects : projects.map(({ id, label }) => ({ id, label }));
+  const options = scope !== "all" && !known.some((project) => project.id === scope) ? [...known, { id: scope, label: scope }] : known;
+  return jsxs("div", { className: "dy-rm-page", "data-roadmap-screen": true, children: [
+    jsx(PageHead, {
+      title: "Roadmap",
+      description: "Projects first: initiatives, milestones, objectives and goals \u2014 linked by hand, never inferred.",
+      onRefresh: () => {
+        void load();
+        onRefresh?.();
+      },
+      status: error ? "Load failed" : null
+    }),
+    jsxs("div", { className: "dy-rm-toolbar", children: [
+      jsx("label", { children: jsx("input", { type: "search", placeholder: "Search the roadmap", value: search, onChange: (event) => setSearch(event.target.value), "aria-label": "Search the roadmap" }) }),
+      jsx("label", { className: "dy-rm-attention", children: jsxs(Fragment, { children: [
+        jsx("input", { type: "checkbox", checked: attentionOnly, onChange: (event) => setAttentionOnly(event.target.checked) }),
+        "Needs attention only"
+      ] }) }),
+      jsx("label", { children: jsxs(Fragment, { children: [
+        "Project",
+        jsx("select", { value: scope, onChange: (event) => changeScope(event.target.value), "aria-label": "Roadmap project picker", children: [
+          jsx("option", { value: "all", children: "All projects" }, "all"),
+          ...options.map((project) => jsx("option", { value: project.id, children: project.label ?? project.id }, project.id))
+        ] })
+      ] }) }),
+      jsx(Button, { onClick: () => {
+        setSearch("");
+        setAttentionOnly(false);
+        setOpenNodes(/* @__PURE__ */ new Set());
+        changeScope("all");
+      }, children: "Reset" })
+    ] }),
+    content,
+    linkDialog ? jsx(LinkDialog, {
+      ...linkDialog,
+      onClose: () => setLinkDialog(null),
+      onDone: () => {
+        setLinkDialog(null);
+        void load();
+      }
+    }) : null
+  ] });
+}
+
 // hermes_dockyard_plugin/desktop/src/shell/dashboard-page.js
 function DashboardPage() {
   useDockyardStyles();
@@ -15692,6 +16588,8 @@ function DashboardPage() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [projectOptions, setProjectOptions] = useState([]);
   const [projectEntryView, setProjectEntryView] = useState("overview");
+  const [roadmap, setRoadmap] = useState({ scope: "all", version: 0 });
+  const showRoadmap = (scope) => setRoadmap(({ version }) => ({ scope, version: version + 1 }));
   const [dashboardHomeVersion, setDashboardHomeVersion] = useState(0);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
@@ -15737,7 +16635,7 @@ function DashboardPage() {
       setLoadScope(nextLoadScope);
     }
     setError(null);
-    const loader = tab === "workflows-library" ? async () => ({ workflows: (await api("/workflow-library")).workflows ?? [] }) : tab === "dashboard" ? loadDashboardData : tab === "project" || tab === "settings" || tab === "workflows" ? () => loadProjectData(selectedProject) : tab === "backlog" ? () => loadBacklogData(selectedProject) : tab === "teams" ? loadTeamsData : tab === "initiative" ? () => loadProjectData(selectedProject) : tab === "onboard" ? loadOnboardData : tab === "inbox" ? loadInboxData : () => api("/notifications");
+    const loader = tab === "workflows-library" ? async () => ({ workflows: (await api("/workflow-library")).workflows ?? [] }) : tab === "dashboard" ? loadDashboardData : tab === "roadmap" ? async () => ({}) : tab === "project" || tab === "settings" || tab === "workflows" ? () => loadProjectData(selectedProject) : tab === "backlog" ? () => loadBacklogData(selectedProject) : tab === "teams" ? loadTeamsData : tab === "initiative" ? () => loadProjectData(selectedProject) : tab === "onboard" ? loadOnboardData : tab === "inbox" ? loadInboxData : () => api("/notifications");
     loader().then(
       (result) => {
         if (!current || serial !== loadSerial.current) return;
@@ -15768,30 +16666,39 @@ function DashboardPage() {
   }, [tab, selectedProject, requestVersion]);
   const refresh = () => setRequestVersion((version) => version + 1);
   const selectProject = (projectId) => {
-    if (projectId === selectedProject) return;
+    if (projectId === selectedProject) {
+      if (tab === "roadmap") showRoadmap(projectId);
+      return;
+    }
     if (dirtyProject && dirtyProject !== projectId) {
       setPendingProject(projectId);
       return;
     }
     setDirtyProject(null);
     setSelectedProject(projectId);
+    if (tab === "roadmap") showRoadmap(projectId ?? "all");
     if (tab === "dashboard" || tab === "notifications" || tab === "inbox" || tab === "onboard") setTab("project");
   };
-  const goTab = (next) => {
-    if (next === "project") setProjectEntryView("overview");
+  const pendingTabOpts = useRef({});
+  const goTab = (next, opts = {}) => {
+    if (opts.project) setSelectedProject(opts.project);
+    if (next === "project") setProjectEntryView(opts.entryView ?? "overview");
+    if (next === "roadmap") showRoadmap(opts.roadmapScope ?? "all");
     if (next === "dashboard") setDashboardHomeVersion((value) => value + 1);
     setTab(next);
   };
-  const requestTab = (next) => {
+  const requestTab = (next, opts = {}) => {
     if (next !== tab && dirtyProject) {
+      pendingTabOpts.current = opts;
       setPendingTab(next);
       return;
     }
-    goTab(next);
+    goTab(next, opts);
   };
   const cancelNav = () => {
     setPendingProject(null);
     setPendingTab(null);
+    pendingTabOpts.current = {};
   };
   const continueNav = () => {
     const project = pendingProject;
@@ -15802,8 +16709,13 @@ function DashboardPage() {
     dirtySaver.current = null;
     if (project) {
       setSelectedProject(project);
+      if (tab === "roadmap") showRoadmap(project);
       if (tab === "dashboard" || tab === "notifications" || tab === "inbox" || tab === "onboard") setTab("project");
-    } else if (nextTab) goTab(nextTab);
+    } else if (nextTab) {
+      const opts = pendingTabOpts.current;
+      pendingTabOpts.current = {};
+      goTab(nextTab, opts);
+    }
   };
   const discardProjectChange = continueNav;
   const saveThenNavigate = async () => {
@@ -15903,7 +16815,8 @@ function DashboardPage() {
       onSelectProject: selectProject,
       onProjectDirty: markDirty(payload.project?.id ?? null),
       onRefresh: refresh,
-      onOpenLibrary: () => setTab("workflows"),
+      onOpenLibrary: () => requestTab("workflows"),
+      onOpenRoadmap: () => requestTab("roadmap", { roadmapScope: payload.project?.id }),
       pendingWorkRef,
       onPendingWorkConsumed: () => setPendingWorkRef(null),
       notice: deepLinkNotice
@@ -15922,13 +16835,20 @@ function DashboardPage() {
       projectId: selectedProject,
       onOpenBuilder: (row) => {
         const owner = row?.owner_project_id;
-        if (owner && owner !== selectedProject) setSelectedProject(owner);
-        setProjectEntryView("workflows");
-        setTab("project");
+        requestTab("project", { entryView: "workflows", project: owner && owner !== selectedProject ? owner : void 0 });
       }
     }, `workflow-library:${selectedProject ?? "none"}`);
   } else if (tab === "onboard") {
     content = jsx(OnboardPanel, { view: payload, onOpen: () => setOnboardingOpen(true), onRefresh: refresh });
+  } else if (tab === "roadmap") {
+    content = jsx(RoadmapView, {
+      initialScope: roadmap.scope,
+      onRefresh: refresh,
+      onOpen: ({ project, entryView, workRef }) => {
+        if (workRef) setPendingWorkRef(workRef);
+        requestTab("project", { project, entryView });
+      }
+    }, `roadmap:${roadmap.version}`);
   } else if (tab === "backlog") {
     content = jsx(BacklogView, { view: payload, onRefresh: refresh });
   } else if (tab === "teams") {

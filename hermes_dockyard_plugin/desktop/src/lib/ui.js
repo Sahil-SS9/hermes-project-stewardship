@@ -622,6 +622,7 @@ export function ConsoleBar({ tab, counts, onTab, onNewProject, projects = [], se
   const tabs = [
     ['dashboard', 'Dashboard', null],
     ['project', 'Projects', null],
+    ['roadmap', 'Roadmap', null],
     ['backlog', 'Backlog', null],
     ['workflows', 'Workflows', null],
     ['inbox', 'Approval Inbox', counts.approvals],

@@ -185,12 +185,61 @@ def test_fix2_adhoc_plugin_import_refuses_default_and_creates_nothing(tmp_path):
     assert _files(home) == []
 
 
+def _run_py(tmp_path, code, home):
+    return subprocess.run([sys.executable, "-c", code], cwd=tmp_path, env=_clean_env(home),
+                          capture_output=True, text=True, timeout=60)
+
+
+def test_d1_importing_hermes_cli_does_not_unlock_the_default(tmp_path):
+    """Quan D1: a process that merely has hermes_cli loaded must name a path."""
+    home = tmp_path / "home"
+    home.mkdir()
+    r = _run_py(tmp_path, """
+import sys, types
+sys.modules["hermes_cli"] = types.ModuleType("hermes_cli")
+from hermes_project_stewardship.runtime import resolve_db_path, StateSelectionError
+try:
+    print("RESOLVED", resolve_db_path())
+except StateSelectionError:
+    print("REFUSED")
+""", home)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == "REFUSED", r.stdout
+    assert _files(home) == []
+
+
+def test_d1_real_host_entry_point_keeps_the_default(tmp_path):
+    """The Hermes host calls register(); after that the profile default is allowed."""
+    home = tmp_path / "home"
+    home.mkdir()
+    r = _run_py(tmp_path, """
+from hermes_project_stewardship.runtime import resolve_db_path, StateSelectionError
+try:
+    resolve_db_path(); print("BEFORE allowed")
+except StateSelectionError:
+    print("BEFORE refused")
+class Ctx:
+    def register_tool(self, **kw): pass
+    def register_command(self, **kw): pass
+    def register_skill(self, *a): pass
+    def register_cli_command(self, **kw): pass
+from hermes_project_stewardship.plugin import register
+register(Ctx())
+print("AFTER", resolve_db_path())
+""", home)
+    assert r.returncode == 0, r.stderr
+    lines = r.stdout.strip().splitlines()
+    assert lines[0] == "BEFORE refused"
+    assert lines[1] == f"AFTER {(home / 'plugin-data' / 'hermes-dockyard' / 'dockyard.db').resolve()}"
+    assert _files(home) == []  # resolving creates nothing
+
+
 def test_fix2_installed_stewardctl_may_use_default(monkeypatch):
     from hermes_project_stewardship import runtime
     # Earlier tests may load real host modules; this test is about the CLI alone.
-    for name in [n for n in sys.modules
-                 if n == "hermes_cli" or n.startswith("hermes_dashboard_plugin_")]:
+    for name in [n for n in sys.modules if n.startswith("hermes_dashboard_plugin_")]:
         monkeypatch.delitem(sys.modules, name)
+    monkeypatch.setattr(runtime, "_HOST_REGISTERED", False)
     monkeypatch.setattr(sys, "argv", ["/usr/local/bin/stewardctl", "audit"])
     monkeypatch.setattr(runtime, "_inside_git_checkout", lambda _path: False)
     assert runtime.default_location_allowed() is True
@@ -413,6 +462,10 @@ def test_fix4_v34_downgrade_restores_release_and_refuses_feature_rows(tmp_path):
             cx.execute("DELETE FROM schema_migrations WHERE version = ?", (lane,))
         cx.execute("DELETE FROM schema_migrations WHERE version = 34")
         cx.commit()
-        assert _schema(cx) == expected_schema(list(range(1, 34)))
+        # Downgrading 34 must restore exactly the schema of every OTHER known
+        # migration: the v33 release shape plus any later migrations (e.g. R2's
+        # v35) that this downgrade has no business touching.
+        others = [m.version for m in migrations.MIGRATIONS if m.version != 34]
+        assert _schema(cx) == expected_schema(others)
     finally:
         store.close()

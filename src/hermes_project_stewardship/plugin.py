@@ -9,7 +9,7 @@ from typing import Any, Optional
 
 from .persistence.service import StewardshipService
 from .persistence.store import Store
-from .runtime import open_store
+from .runtime import mark_hermes_host, open_store
 
 
 class PluginState:
@@ -208,6 +208,9 @@ def _run_cli(namespace: argparse.Namespace) -> int:
 
 def register(runtime: Any) -> dict:
     """Register only APIs shipped by vanilla Hermes PluginContext."""
+    # Only the Hermes host calls register(): this is the host's explicit signal
+    # that the profile default database may be used (P addendum fix 2, Quan D1).
+    mark_hermes_host()
     registered = {"tools": [], "commands": [], "hooks": []}
     for name, fn in TOOLS.items():
         try:

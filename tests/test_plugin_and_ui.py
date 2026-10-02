@@ -31,7 +31,9 @@ class FakeRuntime:
         assert name == "stewardship"
 
 
-def test_register_with_full_runtime(store):
+def test_register_with_full_runtime(store, monkeypatch):
+    # register() marks this process as the Hermes host; keep that from leaking.
+    monkeypatch.setattr("hermes_project_stewardship.runtime._HOST_REGISTERED", False)
     plugin.PluginState.reset()
     plugin.PluginState.db_path = store.db_path
     rt = FakeRuntime()
@@ -40,7 +42,9 @@ def test_register_with_full_runtime(store):
     assert "project-status" in summary["commands"]
 
 
-def test_register_defensive_against_bare_runtime():
+def test_register_defensive_against_bare_runtime(monkeypatch):
+    monkeypatch.setattr("hermes_project_stewardship.runtime._HOST_REGISTERED", False)
+
     class Bare:  # no register_tool at all
         pass
 
