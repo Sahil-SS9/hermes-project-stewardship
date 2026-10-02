@@ -2374,6 +2374,33 @@ var ROADMAP_CSS = `
 }
 `;
 
+// hermes_dockyard_plugin/desktop/src/styles/settings-css.js
+var SETTINGS_CSS = `
+/* C8 Settings option A (signed 16/09): three uppercase category labels over the
+   existing Project configuration grid. The labels are decorative group headings
+   for the existing fields; the fields themselves are unchanged. */
+.dockyard-root .dockyard-settings-category { display: grid; gap: 14px; grid-column: 1 / -1; }
+.dockyard-root .dockyard-settings-category-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 0;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--dy-border);
+  color: var(--dy-text-3);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.dockyard-root .dockyard-settings-category-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--dy-border);
+}
+`;
+
 // hermes_dockyard_plugin/desktop/workflow-canvas-css.js
 var workflow_canvas_css_default = `
 /* ---- Workflow canvas: card + status token set ----------------------------
@@ -3163,6 +3190,7 @@ function useDockyardStyles() {
   useStylesheet("dockyard-style", "dockyardStyle", DOCKYARD_CSS);
   useStylesheet("dy-wf-library-stylesheet", "dyWfLibraryStylesheet", WORKFLOW_LIBRARY_CSS);
   useStylesheet("dy-roadmap-stylesheet", "dyRoadmapStylesheet", ROADMAP_CSS);
+  useStylesheet("dy-settings-stylesheet", "dySettingsStylesheet", SETTINGS_CSS);
   useStylesheet("dy-wf-stylesheet", "dyWfStylesheet", workflow_canvas_css_default);
 }
 
@@ -14751,71 +14779,80 @@ function ProjectSettingsPanel({ project, settings, onRefresh, onDirty }) {
       ] })
     ] }),
     jsxs("fieldset", { className: "dockyard-settings-grid dockyard-settings-fieldset", disabled: !enabled || !editing, children: [
-      jsxs("label", { className: "dockyard-field dockyard-field-wide", children: [
-        jsx("span", { children: "Mission" }),
-        jsx("textarea", { "data-setting-field": "mission", rows: 3, value: form.mission, onInput: (event) => update("mission", event.target.value), onChange: (event) => update("mission", event.target.value) })
+      jsxs("div", { className: "dockyard-settings-category", children: [
+        jsx("div", { className: "dockyard-settings-category-label", children: "General" }),
+        jsxs("label", { className: "dockyard-field dockyard-field-wide", children: [
+          jsx("span", { children: "Mission" }),
+          jsx("textarea", { "data-setting-field": "mission", rows: 3, value: form.mission, onInput: (event) => update("mission", event.target.value), onChange: (event) => update("mission", event.target.value) })
+        ] }),
+        jsxs("label", { className: "dockyard-field", children: [
+          jsx("span", { children: "Lead profile" }),
+          jsx("input", { "data-setting-field": "lead-profile", value: form.leadProfile, onChange: (event) => update("leadProfile", event.target.value) })
+        ] }),
+        jsxs("label", { className: "dockyard-field", children: [
+          jsx("span", { children: "Member profiles" }),
+          jsx("input", { "data-setting-field": "members", value: form.members, placeholder: "bot-a, bot-b", onChange: (event) => update("members", event.target.value) })
+        ] })
       ] }),
-      jsxs("label", { className: "dockyard-field", children: [
-        jsx("span", { children: "Lead profile" }),
-        jsx("input", { "data-setting-field": "lead-profile", value: form.leadProfile, onChange: (event) => update("leadProfile", event.target.value) })
+      jsxs("div", { className: "dockyard-settings-category", children: [
+        jsx("div", { className: "dockyard-settings-category-label", children: "Autonomy & verification" }),
+        jsxs("label", { className: "dockyard-field", children: [
+          jsx("span", { children: "Autonomy level" }),
+          jsx("select", {
+            "data-setting-field": "autonomy",
+            value: form.autonomyLevel,
+            onChange: (event) => update("autonomyLevel", event.target.value),
+            children: [0, 1, 2, 3, 4, 5].map((level) => jsx("option", { value: String(level), children: `${level} / ${level === 0 ? "manual" : level === 5 ? "bounded maximum" : "bounded"}` }, String(level)))
+          })
+        ] }),
+        jsxs("label", { className: "dockyard-field", children: [
+          jsx("span", { children: "Human gate from risk" }),
+          jsx("select", {
+            value: form.humanGateRisk,
+            onChange: (event) => update("humanGateRisk", event.target.value),
+            children: ["low", "medium", "high", "critical"].map((risk) => jsx("option", { value: risk, children: risk }, risk))
+          })
+        ] }),
+        jsxs("label", { className: "dockyard-check-field", children: [
+          jsx("input", { type: "checkbox", checked: form.autoStartLowRisk, onChange: (event) => update("autoStartLowRisk", event.target.checked) }),
+          jsxs("span", { children: [jsx("strong", { children: "Auto-start low-risk work" }), jsx("small", { children: "Only inside the declared autonomy boundary." })] })
+        ] }),
+        jsxs("label", { className: "dockyard-check-field", children: [
+          jsx("input", { type: "checkbox", "data-setting-field": "require-tests", checked: form.requireTests, onChange: (event) => update("requireTests", event.target.checked) }),
+          jsxs("span", { children: [jsx("strong", { children: "Require test evidence" }), jsx("small", { children: "Block verification without a test result." })] })
+        ] }),
+        jsxs("label", { className: "dockyard-field", children: [
+          jsx("span", { children: "Maximum open initiatives" }),
+          jsx("input", { type: "number", min: 1, max: 25, value: form.maxOpenInitiatives, onChange: (event) => update("maxOpenInitiatives", event.target.value) })
+        ] })
       ] }),
-      jsxs("label", { className: "dockyard-field", children: [
-        jsx("span", { children: "Member profiles" }),
-        jsx("input", { "data-setting-field": "members", value: form.members, placeholder: "bot-a, bot-b", onChange: (event) => update("members", event.target.value) })
-      ] }),
-      jsxs("label", { className: "dockyard-field", children: [
-        jsx("span", { children: "Autonomy level" }),
-        jsx("select", {
-          "data-setting-field": "autonomy",
-          value: form.autonomyLevel,
-          onChange: (event) => update("autonomyLevel", event.target.value),
-          children: [0, 1, 2, 3, 4, 5].map((level) => jsx("option", { value: String(level), children: `${level} / ${level === 0 ? "manual" : level === 5 ? "bounded maximum" : "bounded"}` }, String(level)))
-        })
-      ] }),
-      jsxs("label", { className: "dockyard-field", children: [
-        jsx("span", { children: "Human gate from risk" }),
-        jsx("select", {
-          value: form.humanGateRisk,
-          onChange: (event) => update("humanGateRisk", event.target.value),
-          children: ["low", "medium", "high", "critical"].map((risk) => jsx("option", { value: risk, children: risk }, risk))
-        })
-      ] }),
-      jsxs("label", { className: "dockyard-check-field", children: [
-        jsx("input", { type: "checkbox", checked: form.autoStartLowRisk, onChange: (event) => update("autoStartLowRisk", event.target.checked) }),
-        jsxs("span", { children: [jsx("strong", { children: "Auto-start low-risk work" }), jsx("small", { children: "Only inside the declared autonomy boundary." })] })
-      ] }),
-      jsxs("label", { className: "dockyard-check-field", children: [
-        jsx("input", { type: "checkbox", "data-setting-field": "require-tests", checked: form.requireTests, onChange: (event) => update("requireTests", event.target.checked) }),
-        jsxs("span", { children: [jsx("strong", { children: "Require test evidence" }), jsx("small", { children: "Block verification without a test result." })] })
-      ] }),
-      jsxs("label", { className: "dockyard-field", children: [
-        jsx("span", { children: "Maximum open initiatives" }),
-        jsx("input", { type: "number", min: 1, max: 25, value: form.maxOpenInitiatives, onChange: (event) => update("maxOpenInitiatives", event.target.value) })
-      ] }),
-      jsxs("label", { className: "dockyard-check-field", children: [
-        jsx("input", { type: "checkbox", checked: form.requireRollback, onChange: (event) => update("requireRollback", event.target.checked) }),
-        jsxs("span", { children: [jsx("strong", { children: "Require rollback plan" }), jsx("small", { children: "Every release must declare its recovery path." })] })
-      ] }),
-      jsxs("label", { className: "dockyard-field", children: [
-        jsx("span", { children: "Soak period in hours" }),
-        jsx("input", { type: "number", min: 0, max: 720, "data-setting-field": "soak-hours", value: form.soakHours, onChange: (event) => update("soakHours", event.target.value) })
-      ] }),
-      jsxs("label", { className: "dockyard-field", children: [
-        jsx("span", { children: "Alert threshold" }),
-        jsx("select", {
-          value: form.severityThreshold,
-          onChange: (event) => update("severityThreshold", event.target.value),
-          children: ["info", "low", "medium", "high", "critical"].map((severity) => jsx("option", { value: severity, children: severity }, severity))
-        })
-      ] }),
-      jsxs("label", { className: "dockyard-field", children: [
-        jsx("span", { children: "Notification cadence" }),
-        jsx("select", {
-          "data-setting-field": "digest",
-          value: form.digest,
-          onChange: (event) => update("digest", event.target.value),
-          children: ["immediate", "daily", "weekly", "off"].map((cadence) => jsx("option", { value: cadence, children: cadence }, cadence))
-        })
+      jsxs("div", { className: "dockyard-settings-category", children: [
+        jsx("div", { className: "dockyard-settings-category-label", children: "Release & notifications" }),
+        jsxs("label", { className: "dockyard-check-field", children: [
+          jsx("input", { type: "checkbox", checked: form.requireRollback, onChange: (event) => update("requireRollback", event.target.checked) }),
+          jsxs("span", { children: [jsx("strong", { children: "Require rollback plan" }), jsx("small", { children: "Every release must declare its recovery path." })] })
+        ] }),
+        jsxs("label", { className: "dockyard-field", children: [
+          jsx("span", { children: "Soak period in hours" }),
+          jsx("input", { type: "number", min: 0, max: 720, "data-setting-field": "soak-hours", value: form.soakHours, onChange: (event) => update("soakHours", event.target.value) })
+        ] }),
+        jsxs("label", { className: "dockyard-field", children: [
+          jsx("span", { children: "Alert threshold" }),
+          jsx("select", {
+            value: form.severityThreshold,
+            onChange: (event) => update("severityThreshold", event.target.value),
+            children: ["info", "low", "medium", "high", "critical"].map((severity) => jsx("option", { value: severity, children: severity }, severity))
+          })
+        ] }),
+        jsxs("label", { className: "dockyard-field", children: [
+          jsx("span", { children: "Notification cadence" }),
+          jsx("select", {
+            "data-setting-field": "digest",
+            value: form.digest,
+            onChange: (event) => update("digest", event.target.value),
+            children: ["immediate", "daily", "weekly", "off"].map((cadence) => jsx("option", { value: cadence, children: cadence }, cadence))
+          })
+        ] })
       ] })
     ] }),
     message ? jsx("p", { className: message.tone === "danger" ? "dockyard-inline-error" : "dockyard-inline-success", role: "status", children: message.text }) : null,
