@@ -207,14 +207,19 @@ class FakeProjectKanbanHost:
         task_id: str,
         *,
         board: str | None = None,
+        limit: int = 500,
     ) -> dict[str, list[dict[str, str]]]:
+        # Same row shape as the real host (vanilla_host.list_links): one page
+        # whose ``items`` are {parent_task_id, child_task_id} rows, the ones
+        # that point AT the task first, then the ones that point away from it.
+        # Recorded from a real Hermes in evidence/kensei-link-probe/.
         return {
-            "dependencies": [
+            "items": [
                 {"parent_task_id": parent, "child_task_id": child}
                 for parent, child in sorted(self.links)
                 if child == task_id
-            ],
-            "dependents": [
+            ]
+            + [
                 {"parent_task_id": parent, "child_task_id": child}
                 for parent, child in sorted(self.links)
                 if parent == task_id
@@ -597,3 +602,149 @@ def test_factory_rejects_hostless_environment_cleanly(
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip().startswith("KanbanAdapterError host_contract_unavailable")
+
+
+# ---- link rows: the real host's shape, converted relative to the item ------------
+
+
+def _link_adapter(host=None):
+    host = host or FakeProjectKanbanHost()
+    return host, _adapter_type()(host)
+
+
+def test_list_work_links_converts_real_host_rows_relative_to_the_item_asked_about():
+    host, adapter = _link_adapter()
+    # epic -> task -> after: for "task" the epic is a blocker (direction parent)
+    # and "after" waits on it (direction child).
+    host.links.update({("t_epic", "t_task"), ("t_task", "t_after")})
+
+    assert adapter.list_work_links("project-1", "t_task") == [
+        {"direction": "parent", "task_id": "t_epic"},
+        {"direction": "child", "task_id": "t_after"},
+    ]
+    assert adapter.list_work_links("project-1", "t_epic") == [
+        {"direction": "child", "task_id": "t_task"},
+    ]
+    assert adapter.list_work_links("project-1", "t_after") == [
+        {"direction": "parent", "task_id": "t_task"},
+    ]
+
+
+def test_list_work_links_passes_through_rows_already_in_direction_form():
+    class DirectionHost(FakeProjectKanbanHost):
+        def list_links(self, task_id, *, board=None, limit=500):
+            return {
+                "items": [
+                    {"direction": "parent", "task_id": "t_a"},
+                    {"direction": "child", "task_id": "t_b"},
+                ]
+            }
+
+    _, adapter = _link_adapter(DirectionHost())
+    assert adapter.list_work_links("project-1", "t_x") == [
+        {"direction": "parent", "task_id": "t_a"},
+        {"direction": "child", "task_id": "t_b"},
+    ]
+
+
+def test_list_work_links_accepts_both_row_forms_in_one_page_and_an_empty_page():
+    class MixedHost(FakeProjectKanbanHost):
+        def list_links(self, task_id, *, board=None, limit=500):
+            return {
+                "items": [
+                    {"direction": "parent", "task_id": "t_a"},
+                    {"parent_task_id": task_id, "child_task_id": "t_b"},
+                ]
+            }
+
+    _, adapter = _link_adapter(MixedHost())
+    assert adapter.list_work_links("project-1", "t_x") == [
+        {"direction": "parent", "task_id": "t_a"},
+        {"direction": "child", "task_id": "t_b"},
+    ]
+    # A task with no links is a genuinely empty list, not an error.
+    _, adapter = _link_adapter()
+    assert adapter.list_work_links("project-1", "t_none") == []
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        {"foo": "bar"},
+        {},
+        {"parent_task_id": "t_a"},
+        {"child_task_id": "t_a"},
+        # a link row that is not about the item asked about
+        {"parent_task_id": "t_a", "child_task_id": "t_b"},
+        # a link from the item to itself is not a valid dependency
+        {"parent_task_id": "t_x", "child_task_id": "t_x"},
+        {"parent_task_id": "", "child_task_id": "t_x"},
+        {"parent_task_id": None, "child_task_id": "t_x"},
+        {"direction": "sideways", "task_id": "t_a"},
+        {"direction": "parent"},
+        {"direction": "parent", "task_id": ""},
+        {"direction": "parent", "task_id": "t_a", "parent_task_id": "t_a", "child_task_id": "t_x"},
+        "t_a",
+        ["t_a", "t_x"],
+        None,
+    ],
+)
+def test_list_work_links_raises_on_any_row_shape_it_does_not_know(row):
+    class OddHost(FakeProjectKanbanHost):
+        def list_links(self, task_id, *, board=None, limit=500):
+            return {"items": [row]}
+
+    _, adapter = _link_adapter(OddHost())
+    with pytest.raises(_adapter_error_type()) as exc:
+        adapter.list_work_links("project-1", "t_x")
+    assert exc.value.code == "host_link_shape_invalid"
+    # redacted: the message never echoes row values
+    assert "t_a" not in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        {"dependencies": [], "dependents": []},  # a shape no real host returns
+        {},
+        {"items": None},
+        {"items": "t_a"},
+        {"items": {"t_a": 1}},
+        [],
+        None,
+    ],
+)
+def test_list_work_links_raises_when_the_page_is_not_a_page_of_rows(page):
+    class OddHost(FakeProjectKanbanHost):
+        def list_links(self, task_id, *, board=None, limit=500):
+            return page
+
+    _, adapter = _link_adapter(OddHost())
+    with pytest.raises(_adapter_error_type()) as exc:
+        adapter.list_work_links("project-1", "t_x")
+    assert exc.value.code == "host_link_shape_invalid"
+
+
+def test_list_work_links_refuses_a_page_that_says_more_links_exist():
+    class MoreHost(FakeProjectKanbanHost):
+        def list_links(self, task_id, *, board=None, limit=500):
+            return {
+                "items": [{"parent_task_id": "t_a", "child_task_id": task_id}],
+                "has_more": True,
+            }
+
+    _, adapter = _link_adapter(MoreHost())
+    with pytest.raises(_adapter_error_type()) as exc:
+        adapter.list_work_links("project-1", "t_x")
+    assert exc.value.code == "host_link_shape_invalid"
+
+
+def test_list_work_links_still_maps_host_failures_to_the_stable_codes():
+    class MissingHost(FakeProjectKanbanHost):
+        def list_links(self, task_id, *, board=None, limit=500):
+            raise FakeHostFailure("task_not_found")
+
+    _, adapter = _link_adapter(MissingHost())
+    with pytest.raises(_adapter_error_type()) as exc:
+        adapter.list_work_links("project-1", "t_x")
+    assert exc.value.code == "task_not_found"

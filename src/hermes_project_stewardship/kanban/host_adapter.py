@@ -552,12 +552,25 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
         project_id: str,
         item_id: str,
     ) -> list[dict[str, Any]]:
+        """Links of one item as ``{direction, task_id}`` rows.
+
+        ``direction == "parent"``: ``task_id`` blocks this item (it is a
+        dependency of it). ``direction == "child"``: this item blocks
+        ``task_id``. The real Hermes host returns ``{parent_task_id,
+        child_task_id}`` rows; they are converted here, relative to the item
+        asked about, so every service reads one shape.
+
+        A page or row in any other shape raises ``host_link_shape_invalid``.
+        This method never turns an unrecognised answer into an empty list: an
+        empty list means "this item has no links".
+        """
         board = self.project_board(project_id)
         try:
             page = self.host.list_links(item_id, board=board, limit=500)
-            return [dict(item) for item in page.get("items") or ()]
         except Exception as exc:
             raise self._mapped_error(exc) from None
+        # Converted outside the try: _mapped_error would hide our own code.
+        return _link_rows_for(item_id, page)
 
     def update_work(
         self,
@@ -727,6 +740,64 @@ _HOST_CONTRACT_METHODS = (
     "validate_project", "provision_project", "list_tasks", "list_epics",
     "get_task", "get_project", "get_board",
 )
+
+
+def _link_shape_error() -> KanbanAdapterError:
+    return KanbanAdapterError(
+        "host_link_shape_invalid",
+        "canonical Kanban host returned a link in an unrecognised shape",
+    )
+
+
+def _link_ref(value: Any) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
+def _link_rows_for(item_id: str, page: Any) -> list[dict[str, str]]:
+    """Convert one host page of link rows to ``{direction, task_id}`` rows.
+
+    Accepted row forms (anything else raises ``host_link_shape_invalid``):
+    - the real host's ``{parent_task_id, child_task_id}``, where exactly one
+      end is ``item_id``; and
+    - ``{direction: "parent" | "child", task_id}``, passed through unchanged.
+    """
+    if not isinstance(page, Mapping):
+        raise _link_shape_error()
+    rows = page.get("items")
+    if not isinstance(rows, (list, tuple)):
+        raise _link_shape_error()
+    if page.get("has_more"):
+        # More links exist than this page holds. A partial list would read as
+        # a complete one, so refuse it.
+        raise KanbanAdapterError(
+            "host_link_shape_invalid",
+            "canonical Kanban host returned an incomplete page of links",
+        )
+    converted: list[dict[str, str]] = []
+    for row in rows:
+        if not isinstance(row, Mapping):
+            raise _link_shape_error()
+        has_pair = "parent_task_id" in row or "child_task_id" in row
+        has_direction = "direction" in row or "task_id" in row
+        if has_pair == has_direction:  # neither form, or both forms at once
+            raise _link_shape_error()
+        if has_direction:
+            direction, other = row.get("direction"), _link_ref(row.get("task_id"))
+            if direction not in ("parent", "child") or other is None:
+                raise _link_shape_error()
+            converted.append({"direction": str(direction), "task_id": other})
+            continue
+        parent = _link_ref(row.get("parent_task_id"))
+        child = _link_ref(row.get("child_task_id"))
+        if parent is None or child is None or parent == child:
+            raise _link_shape_error()
+        if child == item_id:
+            converted.append({"direction": "parent", "task_id": parent})
+        elif parent == item_id:
+            converted.append({"direction": "child", "task_id": child})
+        else:
+            raise _link_shape_error()  # a link that is not about this item
+    return converted
 
 
 def _host_contract_complete(host_type: Any) -> bool:

@@ -78,8 +78,11 @@ def test_phase5_complete_multistep_execution_on_pinned_vanilla(tmp_path, monkeyp
             ship_before = [x for x in work if x == "Ship"]
             assert not ship_before
             links = adapter.list_work_links(project_id, build["id"])
+            # The adapter hands the services rows relative to the item asked
+            # about: build -> review means review is a dependent (direction
+            # "child") of build. No alternative key names are accepted.
             assert any(
-                str(x.get("child_id") or x.get("to_id") or x.get("child_task_id")) == review["id"]
+                x.get("direction") == "child" and x.get("task_id") == review["id"]
                 for x in links
             ), links
 
