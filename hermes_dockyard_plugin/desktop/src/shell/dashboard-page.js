@@ -1,6 +1,7 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 import { useDockyardStyles } from '../runtime/context.js'
+import { useStylesheet } from '../runtime/context.js'
 import { useState } from '../runtime/react.js'
 import { useRef } from '../runtime/react.js'
 import { useEffect } from '../runtime/react.js'
@@ -33,8 +34,9 @@ import { ToastRegion } from '../lib/ui.js'
 import { useDialogFocusManager } from '../lib/ui.js'
 import { Button } from '../lib/ui.js'
 import { OnboardingWizard } from '../lib/ui.js'
-export function DashboardPage() {
+export function DashboardPage({ inboxCss = '' } = {}) {
   useDockyardStyles()
+  useStylesheet('dy-inbox-stylesheet', 'dyInboxStylesheet', inboxCss)
   const [tab, setTab] = useState('dashboard')
   const [selectedProject, setSelectedProject] = useState(null)
   const [projectOptions, setProjectOptions] = useState([])
@@ -212,6 +214,7 @@ export function DashboardPage() {
   // surfaces an explicit error state (never a silent different project);
   // s6:initiative/<ref> / s4 open the approval inbox focused on the ref.
   const [deepLinkNotice, setDeepLinkNotice] = useState(null)
+  const [inboxFocusRef, setInboxFocusRef] = useState(null)
   const openDeepLink = (link) => {
     if (typeof link !== 'string' || !link.includes(':')) return
     const [screen, rest] = link.split(':', 2)
@@ -220,6 +223,7 @@ export function DashboardPage() {
     const objectId = slash >= 0 ? rest.slice(slash + 1) : rest
     if (screen === 's4' || (screen === 's6' && objectKind === 'initiative')) {
       setDeepLinkNotice(objectId ? `Approval inbox: focus ${objectId}` : null)
+      setInboxFocusRef(objectId || null)
       setTab('inbox')
       return
     }
@@ -329,7 +333,7 @@ export function DashboardPage() {
   } else if (tab === 'initiative') {
     content = jsx(InitiativeView, { view: payload, onRefresh: refresh })
   } else if (tab === 'inbox') {
-    content = jsx(InboxView, { view: payload, onRefresh: refresh })
+    content = jsx(InboxView, { view: payload, onRefresh: refresh, focusRef: inboxFocusRef, onOpenProject: openDeepLink })
   } else {
     content = jsx(NotificationsView, { view: payload, onRefresh: refresh, onAcknowledged: acknowledge, onOpen: openDeepLink })
   }

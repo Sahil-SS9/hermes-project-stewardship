@@ -1058,36 +1058,36 @@ async function testReferenceBenchmarkApprovalCardsAndReject() {
   await runtime.click('[data-tab="inbox"]', 60);
   const doc = runtime.dom.window.document;
 
-  const cards = [...doc.querySelectorAll('[data-approval-card]')];
-  assert.equal(cards.length, 2, 'each approval must be a separated decision card');
-  assert.equal(cards[0]?.getAttribute('data-approval-ref'), 'INI-DEMO-2', 'approval cards must be risk ordered');
-  for (const card of cards) {
-    assert.equal(card.querySelectorAll('[data-evidence-cell]').length, 3, 'approval card must expose three evidence/context cells');
-    assert(card.querySelector('[data-action="reject"]'), 'approval card is missing the supported Reject action');
-    assert(card.querySelector('[data-action="toggle-evidence"]'), 'approval card is missing evidence disclosure');
+  const rows = [...doc.querySelectorAll('[data-inbox-row]')];
+  assert.equal(rows.length, 2, 'each approval must have a separated inbox row');
+  assert.equal(rows[0]?.getAttribute('data-inbox-ref'), 'INI-DEMO-2', 'approval rows must be risk ordered');
+  assert(doc.querySelector('[data-inbox-tab="all"]'), 'approval inbox is missing the All filter');
+  assert(doc.querySelector('[data-inbox-tab="urgent"]'), 'approval inbox is missing the Urgent filter');
+
+  // Batch D contract: opening a list row reveals the complete decision scope.
+  await runtime.click('[data-inbox-ref="INI-DEMO-2"]', 60);
+  const panel = doc.querySelector('[data-inbox-panel="true"]');
+  assert(panel, 'opening an approval row did not reveal the detail panel');
+  for (const section of ['Requested change', 'Policy gate', 'Potential impact', 'Capability boundary', 'Who asked', 'Evidence', 'Affected work items', 'Activity', "Comments don't change the decision"]) {
+    assert.match(panel.textContent, new RegExp(section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `detail panel is missing ${section}`);
   }
-  // Phase 4 contract: the card shows the fetched decision scope (fetched at
-  // render, round-3 R1), so the rationale text comes from /decision.
-  assert.match(cards[0].textContent, /Rationale shown on the desktop card/);
+  assert.equal(panel.querySelectorAll('[data-evidence-cell]').length, 3, 'detail panel must expose the fetched validation evidence');
+  assert(panel.querySelector('[data-action="approve"]'), 'detail panel is missing the supported Approve action');
+  assert(panel.querySelector('[data-action="reject"]'), 'detail panel is missing the supported Reject action');
+  assert(panel.querySelector('[data-action="request-changes"]'), 'detail panel is missing the supported Request changes action');
+  assert.match(panel.textContent, /Rationale shown on the desktop card/);
   assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/initiatives'), 'approval view did not load initiative detail supported by the backend');
 
-  await runtime.click('[data-approval-ref="INI-DEMO-2"] [data-action="toggle-evidence"]');
-  assert.equal(doc.querySelector('[data-approval-ref="INI-DEMO-2"] [data-evidence-details]')?.hidden, false, 'evidence disclosure did not open');
-
-  await runtime.click('[data-approval-ref="INI-DEMO-2"] [data-action="reject"]', 40);
+  // Batch D replaces the former confirm-then-second-form flow with ONE dialog
+  // that captures the required reason before any POST is permitted.
+  await runtime.click('[data-inbox-panel="true"] [data-action="reject"]', 40);
   const rejectionConfirm = doc.querySelector('[data-destructive-confirm="reject-INI-DEMO-2"]');
-  assert(rejectionConfirm && !rejectionConfirm.hidden, 'Reject did not ask for confirmation');
+  assert(rejectionConfirm && !rejectionConfirm.hidden, 'Reject did not open the reason confirmation dialog');
   assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === '/initiatives/INI-DEMO-2/reject'), 'Reject mutated state before confirmation');
-  await runtime.click('[data-action="confirm-destructive-action"]', 40);
-  // Owner supplies the rejection reason (round-3 R1 contract): the submit
-  // stays disabled until a reason is captured, and the POST carries it.
-  const reasonSelector = '[data-approval-ref="INI-DEMO-2"] [data-decision-note-form] input';
-  assert(doc.querySelector(reasonSelector), 'rejection reason form did not open');
-  const beforeTyping = doc.querySelector('[data-approval-ref="INI-DEMO-2"] [data-action="confirm-reject-with-reason"]');
-  assert(beforeTyping?.disabled, 'reject submit must stay disabled without a reason');
-  await runtime.setValue(reasonSelector, 'Rollback risk not acceptable', 60);
-  await runtime.click('[data-approval-ref="INI-DEMO-2"] [data-action="confirm-reject-with-reason"]', 60);
-  assert.equal(doc.querySelector('[data-approval-ref="INI-DEMO-2"]')?.getAttribute('data-state'), 'rejected', 'rejection state was not shown');
+  const confirm = rejectionConfirm.querySelector('[data-action="confirm-destructive-action"]');
+  assert(confirm?.disabled, 'reject confirmation must stay disabled without a reason');
+  await runtime.setValue('[data-destructive-confirm="reject-INI-DEMO-2"] input', 'Rollback risk not acceptable', 60);
+  await runtime.click('[data-destructive-confirm="reject-INI-DEMO-2"] [data-action="confirm-destructive-action"]', 80);
   const rejectionPost = runtime.calls.find((call) => call.method === 'POST' && call.path === '/initiatives/INI-DEMO-2/reject');
   assert(rejectionPost, 'rejection POST was not sent');
   assert.equal(rejectionPost.body?.reason, 'Rollback risk not acceptable', 'rejection POST did not carry the owner reason');
@@ -1732,21 +1732,18 @@ async function testOnboardingWizardAndToastSurface() {
   const failed = await createRuntime({ failMutationPath: '/initiatives/INI-DEMO-1/reject' });
   await failed.mount();
   await failed.click('[data-tab="inbox"]');
-  await failed.click('[data-approval-ref="INI-DEMO-1"] [data-action="reject"]', 40);
-  await failed.click('[data-action="confirm-destructive-action"]', 80);
-  // round-3 R1: the owner must type a rejection reason before the submit
-  // unlocks; type it, then submit (the reason form opens after confirmation).
-  const failedReasonSelector = '[data-approval-ref="INI-DEMO-1"] [data-decision-note-form] input';
-  assert(failed.dom.window.document.querySelector(failedReasonSelector), 'rejection reason form did not open for the failed-mutation journey');
-  await failed.setValue(failedReasonSelector, 'Not acceptable', 40);
-  await failed.click('[data-approval-ref="INI-DEMO-1"] [data-action="confirm-reject-with-reason"]', 80);
+  await failed.click('[data-inbox-ref="INI-DEMO-1"]', 40);
+  await failed.click('[data-inbox-panel="true"] [data-action="reject"]', 40);
+  const failedDialog = '[data-destructive-confirm="reject-INI-DEMO-1"]';
+  await failed.setValue(`${failedDialog} input`, 'Not acceptable', 40);
+  await failed.click(`${failedDialog} [data-action="confirm-destructive-action"]`, 80);
   const failedDoc = failed.dom.window.document;
-  const failedRow = failedDoc.querySelector('[data-approval-ref="INI-DEMO-1"]');
+  const failedPanel = failedDoc.querySelector('[data-inbox-panel="true"]');
   const alert = failedDoc.querySelector('[data-toast-region] [role="alert"]');
   assert(alert, 'failed mutation did not create an alert toast');
-  assert.equal(failedRow?.getAttribute('data-state'), 'failed', 'failed rejection did not show an unconfirmed state');
-  assert.match(failedRow?.textContent || '', /Decision unconfirmed/);
-  assert.match(alert.textContent, /Reject was not recorded.*still pending/);
+  assert.equal(failedPanel?.getAttribute('data-state'), 'failed', 'failed rejection did not show an unconfirmed state');
+  assert.match(failedPanel?.textContent || '', /could not be confirmed/i);
+  assert.match(alert.textContent, /Reject could not be confirmed/);
   assert(!alert.textContent.includes('Error invoking remote method'), 'raw host error leaked into the user status');
   await failed.dispose();
 }
@@ -1756,27 +1753,27 @@ async function testApprovalFlow() {
   await runtime.mount();
   await runtime.click('[data-tab="inbox"]');
   const doc = runtime.dom.window.document;
-  assert.equal(doc.querySelectorAll('[data-approval-ref]').length, 2, 'inbox should show two approvals');
-  await runtime.click('[data-approval-ref="INI-DEMO-1"] [data-action="approve"]', 40);
-  assert.equal(doc.querySelector('[data-approval-ref="INI-DEMO-1"]')?.getAttribute('data-state'), 'approved', 'approval row did not show its approved state');
+  assert.equal(doc.querySelectorAll('[data-inbox-row]').length, 2, 'inbox should show two approvals');
+
+  await runtime.click('[data-inbox-ref="INI-DEMO-1"]', 40);
+  await runtime.click('[data-inbox-panel="true"] [data-action="approve"]', 80);
   assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/initiatives/INI-DEMO-1/approve'), 'approval POST was not sent');
+  assert(runtime.calls.some((call) => call.method === 'GET' && call.path === '/initiatives/INI-DEMO-1/decision/receipts'), 'approval outcome was not checked against the receipt ledger');
   await runtime.flush(1000);
-  assert.equal(doc.querySelectorAll('[data-approval-ref]').length, 1, 'approved item did not leave the queue after refresh');
+  assert.equal(doc.querySelectorAll('[data-inbox-row]').length, 1, 'approved item did not leave the queue after receipt confirmation');
   assert(!doc.body.textContent.includes('Add weekly digest email'), 'approved item remains visible after refresh');
 
-  await runtime.click('[data-approval-ref="INI-DEMO-2"] [data-action="reject"]', 20);
+  await runtime.click('[data-inbox-ref="INI-DEMO-2"]', 40);
+  await runtime.click('[data-inbox-panel="true"] [data-action="reject"]', 20);
   assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === '/initiatives/INI-DEMO-2/reject'), 'rejection bypassed confirmation');
-  await runtime.click('[data-action="confirm-destructive-action"]', 40);
-  // round-3 R1: owner-typed reason is required before the submit unlocks.
-  const approveReasonSelector = '[data-approval-ref="INI-DEMO-2"] [data-decision-note-form] input';
-  assert(doc.querySelector(approveReasonSelector), 'rejection reason form did not open in the approval journey');
-  await runtime.setValue(approveReasonSelector, 'Rollback risk not acceptable', 40);
-  await runtime.click('[data-approval-ref="INI-DEMO-2"] [data-action="confirm-reject-with-reason"]', 60);
-  assert.equal(doc.querySelector('[data-approval-ref="INI-DEMO-2"]')?.getAttribute('data-state'), 'rejected', 'rejection row did not show its rejected state');
+  const dialog = '[data-destructive-confirm="reject-INI-DEMO-2"]';
+  assert(doc.querySelector(`${dialog} [data-action="confirm-destructive-action"]`)?.disabled, 'rejection reason must be required in the confirmation dialog');
+  await runtime.setValue(`${dialog} input`, 'Rollback risk not acceptable', 40);
+  await runtime.click(`${dialog} [data-action="confirm-destructive-action"]`, 80);
   assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/initiatives/INI-DEMO-2/reject'), 'rejection POST was not sent');
-  assert.match(doc.querySelector('[data-approval-ref="INI-DEMO-2"]')?.textContent || '', /Rejected/);
+  assert(runtime.calls.some((call) => call.method === 'GET' && call.path === '/initiatives/INI-DEMO-2/decision/receipts'), 'rejection outcome was not checked against the receipt ledger');
   await runtime.flush(1000);
-  assert.equal(doc.querySelectorAll('[data-approval-ref]').length, 0, 'rejected item did not leave the queue after refresh');
+  assert.equal(doc.querySelectorAll('[data-inbox-row]').length, 0, 'rejected item did not leave the queue after receipt confirmation');
   await runtime.dispose();
 }
 
@@ -2123,8 +2120,8 @@ async function testChromiumLayouts() {
   await writeSnapshot('project', snapshots.initiative, { prepare: (runtime) => runtime.click('[data-project-view="initiative"]') });
   await writeSnapshot('project', snapshots.initiativeFreeze, { prepare: async (runtime) => { await runtime.click('[data-project-view="initiative"]'); await runtime.click('[data-action="freeze-project"]'); } });
   await writeSnapshot('workflows', snapshots.workflows);
-  await writeSnapshot('inbox', snapshots.inbox);
-  await writeSnapshot('inbox', snapshots.inboxReject, { prepare: (runtime) => runtime.click('[data-approval-ref="INI-DEMO-2"] [data-action="reject"]') });
+  await writeSnapshot('inbox', snapshots.inbox, { prepare: (runtime) => runtime.click('[data-inbox-ref="INI-DEMO-2"]') });
+  await writeSnapshot('inbox', snapshots.inboxReject, { prepare: async (runtime) => { await runtime.click('[data-inbox-ref="INI-DEMO-2"]'); await runtime.click('[data-inbox-panel="true"] [data-action="reject"]'); } });
   await writeSnapshot('notifications', snapshots.notifications);
   await writeSnapshot('dashboard', snapshots.onboarding, { onboarding: true });
 

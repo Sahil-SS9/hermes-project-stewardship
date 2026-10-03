@@ -1,107 +1,153 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
-import { useState } from '../runtime/react.js'
-import { useEffect } from '../runtime/react.js'
-import { api } from '../runtime/context.js'
-import { riskDetails } from '../lib/ui.js'
-import { emitToast } from '../runtime/context.js'
-import { formatWhen } from '../lib/ui.js'
-import { jsxs } from '../runtime/react.js'
-import { jsx } from '../runtime/react.js'
-import { Icon } from '../lib/ui.js'
-import { StatusTag } from '../lib/ui.js'
-import { validationSummary } from '../data/loaders.js'
-import { Button } from '../lib/ui.js'
-import { number } from '../lib/ui.js'
-import { ConfirmDialog } from '../lib/ui.js'
-export function ApprovalRow({ item, onResolved }) {
+import { useEffect, useState } from '../runtime/react.js'
+import { api, emitToast } from '../runtime/context.js'
+import { jsx, jsxs } from '../runtime/react.js'
+import { Button, StatusTag, formatWhen, riskDetails, useDialogFocusManager } from '../lib/ui.js'
+import { mergeActivity } from '../inbox/model.js'
+
+const decisionText = (value) => {
+  if (value == null || value === '') return 'Not supplied'
+  if (Array.isArray(value)) return value.join(', ')
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
+const Section = ({ title, children, className = '' }) => jsxs('section', {
+  className: `dockyard-inbox-section ${className}`.trim(),
+  children: [jsx('h3', { children: title }), children],
+})
+
+function RejectDialog({ item, busy, reason, onReason, onCancel, onConfirm }) {
+  useDialogFocusManager('[data-destructive-confirm]')
+  useEffect(() => {
+    const close = (event) => { if (event.key === 'Escape' && !busy) onCancel() }
+    window.addEventListener('keydown', close)
+    return () => window.removeEventListener('keydown', close)
+  }, [busy, onCancel])
+  return jsx('section', {
+    className: 'dockyard-modal-layer',
+    'data-destructive-confirm': `reject-${item.ref}`,
+    onClick: (event) => { if (event.target === event.currentTarget && !busy) onCancel() },
+    children: jsxs('div', { className: 'dockyard-modal', role: 'dialog', 'aria-modal': true, 'aria-label': `Reject ${item.title}`, children: [
+      jsx('h2', { children: 'Reject this initiative?' }),
+      jsx('p', { children: `${item.title} will leave the approval queue. Record the reason in this one confirmation step.` }),
+      jsxs('label', { children: ['Rejection reason ', jsx('input', {
+        value: reason,
+        onChange: (event) => onReason(event.target.value),
+        placeholder: 'Why this initiative should not proceed',
+        autoFocus: true,
+      })] }),
+      jsxs('div', { className: 'dockyard-modal-actions', children: [
+        jsx(Button, { disabled: busy, onClick: onCancel, children: 'Cancel' }),
+        jsx(Button, {
+          action: 'confirm-destructive-action',
+          variant: 'danger',
+          disabled: busy || !reason.trim(),
+          onClick: onConfirm,
+          children: busy ? 'Rejecting...' : 'Reject initiative',
+        }),
+      ]}),
+    ]}),
+  })
+}
+
+export function ApprovalDetail({ item, onResolved, onBack }) {
+  const [decision, setDecision] = useState(null)
+  const [decisionError, setDecisionError] = useState(null)
+  const [comments, setComments] = useState([])
+  const [receipts, setReceipts] = useState([])
+  const [commentBody, setCommentBody] = useState('')
   const [state, setState] = useState('idle')
   const [error, setError] = useState(null)
-  const [expanded, setExpanded] = useState(false)
-  const [rejectConfirm, setRejectConfirm] = useState(false)
-  // Decision is fetched and displayed when the row renders, not on click;
-  // the submitted fingerprint must bind to the reviewed scope (round-2
-  // review issue 3).
-  const [reviewedDecision, setReviewedDecision] = useState(null)
-  const [decisionError, setDecisionError] = useState(null)
-  useEffect(() => {
-    let disposed = false
-    api(`/initiatives/${encodeURIComponent(item.ref)}/decision`)
-      .then((decision) => {
-        if (!disposed) setReviewedDecision(decision)
-      })
-      .catch(() => {
-        if (!disposed) setDecisionError('Decision evidence unavailable; refresh before deciding.')
-      })
-    return () => { disposed = true }
-  }, [item.ref])
-  // The card must present the DECISION scope it will bind the fingerprint to
-  // (round-3 R1; field mapping corrected round-4 Residual A). The canonical
-  // decision payload carries the rationale under `reason` and the validation
-  // contract nested at `validation.contract`.
-  const tone2source = reviewedDecision
-    ? {
-        title: reviewedDecision.title ?? item.title,
-        risk: reviewedDecision.risk ?? item.risk,
-        rationale: reviewedDecision.reason
-          ?? reviewedDecision.rationale
-          ?? (item.detail?.rationale ?? ''),
-        expected_outcome: reviewedDecision.expected_outcome ?? (item.detail?.expected_outcome ?? ''),
-        validation: reviewedDecision.validation?.contract
-          ?? reviewedDecision.validation
-          ?? item.detail?.validation_contract
-          ?? null,
-      }
-    : { title: item.title, risk: item.risk, rationale: item.detail?.rationale, expected_outcome: item.detail?.expected_outcome, validation: item.detail?.validation_contract ?? null }
-  const [tone, label] = riskDetails(tone2source.risk)
-  const detail = {
-    ...item.detail,
-    rationale: tone2source.rationale,
-    expected_outcome: tone2source.expected_outcome,
-    validation_contract: tone2source.validation,
-  }
-  const [decisionNote, setDecisionNote] = useState('')
-  const [decisionReason, setDecisionReason] = useState('')
-  const [noteOpen, setNoteOpen] = useState(false)
+  const [rejectOpen, setRejectOpen] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
   const [changesOpen, setChangesOpen] = useState(false)
-  const [changesFeedback, setChangesFeedback] = useState('')
-  const [changesBusy, setChangesBusy] = useState(false)
-  const [commentBody, setCommentBody] = useState('')
-  const [comments, setComments] = useState([])
+  const [feedback, setFeedback] = useState('')
+
   useEffect(() => {
-    let disposed = false
-    api(`/initiatives/${encodeURIComponent(item.ref)}/comments`)
-      .then((thread) => { if (!disposed) setComments(thread.comments ?? []) })
-      .catch(() => {})
-    return () => { disposed = true }
-  }, [item.ref])
-  const requestChanges = async () => {
-    setChangesBusy(true)
+    let current = true
+    setDecision(null)
+    setDecisionError(null)
+    setComments([])
+    setReceipts([])
+    setState('idle')
     setError(null)
+    setRejectOpen(false)
+    setChangesOpen(false)
+    Promise.all([
+      api(`/initiatives/${encodeURIComponent(item.ref)}/decision`),
+      api(`/initiatives/${encodeURIComponent(item.ref)}/comments`).catch(() => ({ comments: [] })),
+      api(`/initiatives/${encodeURIComponent(item.ref)}/decision/receipts`).catch(() => ({ receipts: [] })),
+    ]).then(([scope, thread, ledger]) => {
+      if (!current) return
+      setDecision(scope)
+      setComments(thread.comments ?? [])
+      setReceipts(ledger.receipts ?? [])
+    }).catch(() => {
+      if (current) setDecisionError('Decision evidence unavailable; refresh before deciding.')
+    })
+    return () => { current = false }
+  }, [item.ref])
+
+  const confirmReceipt = async (expected) => {
+    const ledger = await api(`/initiatives/${encodeURIComponent(item.ref)}/decision/receipts`)
+    const rows = ledger?.receipts ?? []
+    const latest = rows[rows.length - 1]
+    if (latest?.decision !== expected) {
+      throw new Error(`Decision receipt did not confirm ${expected}. Refresh before trying again.`)
+    }
+    setReceipts(rows)
+  }
+
+  const finish = (message) => {
+    emitToast('success', message)
+    onResolved(item.ref)
+  }
+
+  const decide = async (action) => {
+    if (!decision) return
+    setState(action === 'approve' ? 'approving' : 'rejecting')
+    setError(null)
+    const expected = action === 'approve' ? 'approved' : 'rejected'
     try {
-      if (!reviewedDecision) {
-        throw new Error('Decision evidence not reviewed yet; refresh before deciding.')
-      }
-      await api(`/initiatives/${encodeURIComponent(item.ref)}/request-changes`, {
-        method: 'POST',
-        body: {
-          expected_fingerprint: reviewedDecision.fingerprint,
-          feedback: changesFeedback.trim(),
-          note: decisionNote || undefined,
-        },
-        suppressErrorToast: true,
+      const body = action === 'reject'
+        ? { expected_fingerprint: decision.fingerprint, reason: rejectReason.trim() }
+        : { expected_fingerprint: decision.fingerprint }
+      await api(`/initiatives/${encodeURIComponent(item.ref)}/${action}`, {
+        method: 'POST', body, suppressErrorToast: true,
       })
-      setState('returned')
-      emitToast('success', 'Returned to the proposer with your feedback')
-      setTimeout(onResolved, 850)
+      await confirmReceipt(expected)
+      finish(action === 'approve' ? 'Approved; confirmed by decision receipt' : 'Rejected; confirmed by decision receipt')
     } catch (failure) {
-      setChangesOpen(false)
       setState('failed')
-      const message = `Request changes was not recorded. ${String(failure?.message ?? failure)}`
+      setRejectOpen(false)
+      const message = `${action === 'approve' ? 'Approve' : 'Reject'} could not be confirmed. ${String(failure?.message ?? failure)}`
       setError(message)
       emitToast('danger', message)
-    } finally { setChangesBusy(false) }
+    }
   }
+
+  const requestChanges = async () => {
+    if (!decision || !feedback.trim()) return
+    setState('returning')
+    setError(null)
+    try {
+      await api(`/initiatives/${encodeURIComponent(item.ref)}/request-changes`, {
+        method: 'POST',
+        body: { expected_fingerprint: decision.fingerprint, feedback: feedback.trim() },
+        suppressErrorToast: true,
+      })
+      await confirmReceipt('changes_requested')
+      finish('Returned to the proposer with your feedback')
+    } catch (failure) {
+      setState('failed')
+      const message = `Request changes could not be confirmed. ${String(failure?.message ?? failure)}`
+      setError(message)
+      emitToast('danger', message)
+    }
+  }
+
   const addComment = async () => {
     const body = commentBody.trim()
     if (!body) return
@@ -109,233 +155,95 @@ export function ApprovalRow({ item, onResolved }) {
       const created = await api(`/initiatives/${encodeURIComponent(item.ref)}/comments`, {
         method: 'POST', body: { body }, suppressErrorToast: true,
       })
-      setComments((thread) => [...thread, created])
+      setComments((rows) => [...rows, created])
       setCommentBody('')
     } catch (failure) {
       emitToast('danger', `Comment was not recorded. ${String(failure?.message ?? failure)}`)
     }
   }
-  const decide = async (action) => {
-    const resolvedState = action === 'approve' ? 'approved' : 'rejected'
-    const actionLabel = action === 'approve' ? 'Approve' : 'Reject'
-    if (action === 'reject' && !noteOpen) {
-      // Owner must supply the rejection reason (round-3 R1): no hard-coded reason.
-      setNoteOpen(true)
-      return
-    }
-    setState(action === 'approve' ? 'approving' : 'rejecting')
-    setError(null)
-    try {
-      if (!reviewedDecision) {
-        throw new Error('Decision evidence not reviewed yet; refresh before deciding.')
-      }
-      const body = action === 'reject'
-        ? {
-            expected_fingerprint: reviewedDecision.fingerprint,
-            reason: decisionReason.trim() || 'Rejected from Desktop review',
-            note: decisionNote || undefined,
-          }
-        : { expected_fingerprint: reviewedDecision.fingerprint, note: decisionNote || undefined }
-      await api(`/initiatives/${encodeURIComponent(item.ref)}/${action}`, {
-        method: 'POST', body, suppressErrorToast: true,
-      })
-      setState(resolvedState)
-      setTimeout(onResolved, 850)
-    } catch (failure) {
-      setNoteOpen(false)
-      // Ambiguous outcome (round-3 R2): queue disappearance is NOT proof of
-      // which decision happened. Read the authoritative receipts instead.
-      let confirmed = null
-      try {
-        const receipts = await api(`/initiatives/${encodeURIComponent(item.ref)}/decision/receipts`)
-        const rows = receipts?.receipts ?? []
-        if (rows.length > 0) {
-          const latest = rows[rows.length - 1]
-          confirmed = latest.decision === 'approved' ? 'approved' : latest.decision === 'rejected' ? 'rejected' : null
-        }
-      } catch {
-        confirmed = null
-      }
-      if (confirmed === resolvedState) {
-        setState(resolvedState)
-        emitToast('success', `Initiative ${resolvedState}; confirmed by decision receipt`)
-        setTimeout(onResolved, 850)
-        return
-      }
-      if (confirmed != null) {
-        // The other decision won; report the truth, never our attempted action.
-        setState(confirmed)
-        emitToast('warning', `Initiative was ${confirmed} by another decision; your ${actionLabel.toLowerCase()} was not applied`)
-        setTimeout(onResolved, 850)
-        return
-      }
-      let stillPending = null
-      try {
-        const inbox = await api('/inbox')
-        stillPending = (inbox?.items ?? []).some((pending) => pending.ref === item.ref)
-      } catch {
-        stillPending = null
-      }
-      if (stillPending === true) {
-        setState('failed')
-        const detailMessage = String(failure?.message ?? failure)
-        const message = `${actionLabel} was not recorded. The approval is still pending. ${detailMessage}`
-        setError(message)
-        emitToast('danger', message)
-        return
-      }
-      setState('failed')
-      const detailMessage = String(failure?.message ?? failure)
-      const message = `${actionLabel} could not be confirmed. Refresh before trying again. ${detailMessage}`
-      setError(message)
-      emitToast('danger', message)
-    }
+
+  const scope = decision ?? {
+    title: item.title,
+    risk: item.risk,
+    reason: item.detail?.rationale,
+    expected_outcome: item.detail?.expected_outcome,
+    validation: { contract: item.detail?.validation_contract },
+    authority: null,
+    proposer: null,
   }
-  const resolved = state === 'approved' || state === 'rejected'
-  const stateTone = state === 'approved' ? 'success' : state === 'rejected' || state === 'failed' ? 'danger' : tone
-  const stateLabel = state === 'approved'
-    ? 'Approved'
-    : state === 'rejected'
-      ? 'Rejected'
-      : state === 'failed'
-        ? 'Decision unconfirmed'
-        : label
-  const created = formatWhen(detail.created_at)
+  const [riskTone, riskLabel] = riskDetails(scope.risk)
+  const contract = scope.validation?.contract ?? {}
+  const steps = Array.isArray(contract.steps) ? contract.steps : []
+  const affected = item.detail?.affected_work_items ?? item.detail?.work_items ?? []
+  const activity = mergeActivity({ comments, receipts, events: item.detail?.events ?? [] })
+  const busy = ['approving', 'rejecting', 'returning'].includes(state)
+
   return jsxs('article', {
-    className: 'dockyard-approval-row',
+    className: 'dockyard-inbox-panel dockyard-approval-row',
+    'data-inbox-panel': 'true',
     'data-approval-card': true,
     'data-approval-ref': item.ref,
     'data-state': state,
     children: [
-      jsxs('div', { className: 'dockyard-approval-top', children: [
-        jsx('span', { className: `dockyard-approval-icon ${tone}`, children: jsx(Icon, { name: tone === 'danger' ? 'alert' : 'check' }) }),
-        jsxs('div', { className: 'dockyard-approval-main', children: [
-          jsx('h2', { children: tone2source.title }),
-          jsx('span', { className: 'dockyard-meta', children: `${item.project || 'Unknown project'} / ${item.ref}${created ? ` / proposed ${created}` : ''}` }),
+      jsxs('header', { className: 'dockyard-inbox-panel-head', children: [
+        jsxs('div', { children: [
+          onBack ? jsx(Button, { variant: 'quiet', small: true, onClick: onBack, children: 'Back' }) : null,
+          jsx('h2', { children: scope.title }),
+          jsx('small', { children: `${item.project || scope.project_id || 'Unknown project'} · ${item.ref}` }),
         ]}),
-        jsx(StatusTag, { tone: stateTone, label: stateLabel }),
+        jsx(StatusTag, { tone: riskTone, label: riskLabel }),
       ]}),
-      jsxs('div', { className: 'dockyard-evidence-grid', 'data-evidence-grid': true, children: [
-        jsxs('div', { className: 'dockyard-evidence-cell', 'data-evidence-cell': 'rationale', children: [
-          jsx('span', { children: 'WHY PROPOSED' }),
-          jsx('strong', { children: detail.rationale || 'No rationale supplied' }),
-        ]}),
-        jsxs('div', { className: 'dockyard-evidence-cell', 'data-evidence-cell': 'outcome', children: [
-          jsx('span', { children: 'EXPECTED OUTCOME' }),
-          jsx('strong', { children: detail.expected_outcome || 'No expected outcome supplied' }),
-        ]}),
-        jsxs('div', { className: 'dockyard-evidence-cell', 'data-evidence-cell': 'validation', children: [
-          jsx('span', { children: 'VALIDATION' }),
-          jsx('strong', { children: validationSummary(detail.validation_contract) }),
-        ]}),
-      ]}),
-      decisionError
-        ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: decisionError })
-        : null,
-      noteOpen && !resolved
-        ? jsxs('div', { className: 'dockyard-decision-note-form', 'data-decision-note-form': true, children: [
-            jsxs('label', { children: ['Rejection reason ', jsx('input', {
-              value: decisionReason,
-              onChange: (event) => setDecisionReason(event.target.value),
-              placeholder: 'Why this initiative is rejected',
-            })]}),
-            jsxs('label', { children: ['Note (optional) ', jsx('input', {
-              value: decisionNote,
-              onChange: (event) => setDecisionNote(event.target.value),
-              placeholder: 'Optional context recorded with the decision',
-            })]}),
-            jsxs('div', { className: 'dockyard-form-actions', children: [
-              jsx(Button, {
-                action: 'confirm-reject-with-reason', variant: 'danger',
-                disabled: state === 'rejecting' || !decisionReason.trim(),
-                onClick: () => decide('reject'),
-                children: 'Reject with reason',
-              }),
-              jsx(Button, { variant: 'quiet', onClick: () => setNoteOpen(false), children: 'Cancel' }),
-            ]}),
-          ]})
-        : null,
-      changesOpen && !resolved
-        ? jsxs('div', { className: 'dockyard-decision-note-form', 'data-request-changes-form': true, children: [
-            jsxs('label', { children: ['Feedback for the proposer ', jsx('input', {
-              value: changesFeedback,
-              onChange: (event) => setChangesFeedback(event.target.value),
-              placeholder: 'What must change before you can approve',
-            })]}),
-            jsxs('div', { className: 'dockyard-form-actions', children: [
-              jsx(Button, {
-                action: 'confirm-request-changes', variant: 'primary',
-                disabled: changesBusy || !changesFeedback.trim(),
-                onClick: requestChanges,
-                children: changesBusy ? 'Returning…' : 'Return to proposer',
-              }),
-              jsx(Button, { variant: 'quiet', onClick: () => setChangesOpen(false), children: 'Cancel' }),
-            ]}),
-          ]})
-        : null,
-      jsxs('div', { className: 'dockyard-approval-actions', children: [
-        resolved ? jsx(StatusTag, { tone: stateTone, label: stateLabel }) : jsx(Button, {
-          action: 'approve',
-          variant: 'primary',
-          disabled: state === 'approving' || state === 'rejecting',
-          onClick: () => decide('approve'),
-          children: state === 'approving' ? 'Approving...' : 'Approve',
-        }),
-        resolved ? null : jsx(Button, {
-          action: 'reject',
-          variant: 'danger',
-          disabled: state === 'approving' || state === 'rejecting',
-          onClick: () => setRejectConfirm(true),
-          children: state === 'rejecting' ? 'Rejecting...' : 'Reject',
-        }),
-        resolved ? null : jsx(Button, {
-          action: 'request-changes',
-          variant: 'quiet',
-          disabled: state === 'approving' || state === 'rejecting',
-          onClick: () => setChangesOpen((open) => !open),
-          children: 'Request changes',
-        }),
-        jsx(Button, {
-          action: 'toggle-evidence',
-          variant: 'quiet',
-          onClick: () => setExpanded((open) => !open),
-          children: expanded ? 'Hide evidence details' : 'Show evidence details',
-        }),
-        !resolved ? jsx(StatusTag, { tone: 'neutral', label: 'Awaiting you' }) : null,
-      ]}),
-      jsx('div', {
-        className: 'dockyard-evidence-details',
-        'data-evidence-details': true,
-        hidden: !expanded,
-        children: `Status: ${detail.status || 'pending approval'}. Priority: ${number(detail.priority ?? 0)}. Approval state: ${detail.approval_state || 'pending'}. Context reference: ${item.deep_link || item.ref}.`,
-      }),
-      error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
-      rejectConfirm ? jsx(ConfirmDialog, {
-        confirmKey: `reject-${item.ref}`,
-        title: 'Reject this initiative?',
-        description: `${item.title} will leave the approval queue and be recorded as rejected.`,
-        confirmLabel: 'Reject initiative',
-        busy: state === 'rejecting',
-        onCancel: () => setRejectConfirm(false),
-        onConfirm: async () => { setRejectConfirm(false); await decide('reject') },
-      }) : null,
-      jsxs('div', { className: 'dockyard-approval-comments', 'data-approval-comments': true, children: [
-        comments.length ? jsxs('div', { className: 'dockyard-comment-thread', children:
-          comments.map((comment) => jsxs('p', { children: [
-            jsx('strong', { children: comment.actor }),
-            jsx('span', { children: ` · ${formatWhen(comment.created_at)} · ${comment.body}` }),
-          ]}, comment.id)),
-        }) : jsx('p', { className: 'dockyard-meta', children: 'No comments yet.' }),
+      decisionError ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: decisionError }) : null,
+      jsx(Section, { title: 'Requested change', children: jsx('p', { children: decisionText(scope.reason) }) }),
+      jsx(Section, { title: 'Policy gate', children: jsx('p', { className: 'dim', children: decision ? `Decision revision ${decision.revision}; the displayed fingerprint is required before mutation.` : 'Loading the decision gate…' }) }),
+      jsx(Section, { title: 'Potential impact', children: jsx('p', { children: decisionText(scope.expected_outcome) }) }),
+      jsx(Section, { title: 'Capability boundary', children: jsx('p', { children: scope.authority?.granted ? jsxs('span', { children: [jsx('code', { children: scope.authority.granted }), ` for ${decisionText(scope.authority.scope)}`] }) : 'No capability grant supplied.' }) }),
+      jsx(Section, { title: 'Who asked', children: jsx('p', { children: decisionText(scope.proposer) }) }),
+      jsx(Section, { title: 'Evidence', children: jsxs('ul', { className: 'dockyard-inbox-evidence-list', children: [
+        ...steps.map((step, index) => jsx('li', { 'data-evidence-cell': true, children: `Step ${index + 1}: ${decisionText(step)}` }, `${item.ref}-step-${index}`)),
+        contract.tests ? jsx('li', { 'data-evidence-cell': true, children: `Tests: ${decisionText(contract.tests)}` }) : null,
+        steps.length === 0 && !contract.tests ? jsx('li', { 'data-evidence-cell': true, children: 'No validation evidence supplied.' }) : null,
+      ] }) }),
+      jsx(Section, { title: 'Affected work items', children: jsx('ul', { className: 'dockyard-inbox-workitems', children: affected.length
+        ? affected.map((work) => jsx('li', { children: decisionText(work) }, decisionText(work)))
+        : jsx('li', { children: 'No linked work items supplied.' }) }) }),
+      jsx(Section, { title: 'Activity', children: jsx('div', { className: 'dockyard-comment-thread', children: activity.length
+        ? activity.map((entry, index) => jsx('p', { children: `${entry.actor || entry.kind} · ${formatWhen(entry.at)} · ${entry.body || entry.summary || entry.decision || entry.kind}` }, `${entry.kind}-${entry.at}-${index}`))
+        : jsx('p', { children: 'No activity recorded yet.' }) }) }),
+      jsx(Section, { title: "Comments don't change the decision", children: jsxs('div', { className: 'dockyard-approval-comments', 'data-approval-comments': true, children: [
+        jsx('p', { className: 'dim', children: 'Comments add audit context only. They do not approve, reject, or alter the decision fingerprint.' }),
         jsxs('div', { className: 'dockyard-comment-form', children: [
-          jsx('input', {
-            value: commentBody,
-            onChange: (event) => setCommentBody(event.target.value),
-            placeholder: 'Add context without deciding (recorded in the audit trail)',
-            'aria-label': 'Comment',
-          }),
+          jsx('input', { value: commentBody, onChange: (event) => setCommentBody(event.target.value), placeholder: 'Add context without deciding', 'aria-label': 'Comment' }),
           jsx(Button, { small: true, variant: 'quiet', onClick: addComment, disabled: !commentBody.trim(), children: 'Comment' }),
         ]}),
+      ] }) }),
+      changesOpen ? jsxs('section', { className: 'dockyard-request-changes', 'data-request-changes-form': 'true', children: [
+        jsxs('label', { children: ['Feedback for the proposer ', jsx('input', { value: feedback, onChange: (event) => setFeedback(event.target.value), placeholder: 'What must change before approval' })] }),
+        jsxs('div', { className: 'dockyard-request-changes-actions', children: [
+          jsx(Button, { variant: 'primary', action: 'confirm-request-changes', disabled: busy || !feedback.trim(), onClick: requestChanges, children: busy ? 'Returning…' : 'Return to proposer' }),
+          jsx(Button, { variant: 'quiet', disabled: busy, onClick: () => setChangesOpen(false), children: 'Cancel' }),
+        ]}),
+      ]}) : null,
+      error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
+      jsxs('footer', { className: 'dockyard-inbox-actions', children: [
+        jsx(Button, { action: 'approve', variant: 'primary', disabled: busy || !decision, onClick: () => decide('approve'), children: state === 'approving' ? 'Approving...' : 'Approve' }),
+        jsx(Button, { action: 'reject', variant: 'danger', disabled: busy || !decision, onClick: () => setRejectOpen(true), children: 'Reject' }),
+        jsx(Button, { action: 'request-changes', variant: 'quiet', disabled: busy || !decision, onClick: () => setChangesOpen((open) => !open), children: 'Request changes' }),
+        jsx('span', { className: 'spacer' }),
+        jsx('span', { className: 'dockyard-inbox-status', children: decision ? 'Receipt required' : 'Loading evidence…' }),
       ]}),
+      rejectOpen ? jsx(RejectDialog, {
+        item,
+        busy: state === 'rejecting',
+        reason: rejectReason,
+        onReason: setRejectReason,
+        onCancel: () => setRejectOpen(false),
+        onConfirm: () => decide('reject'),
+      }) : null,
     ],
   })
 }
+
+// Kept as a compatibility export for external imports. The Inbox now owns row
+// selection and renders ApprovalDetail only for the selected decision.
+export const ApprovalRow = ApprovalDetail
