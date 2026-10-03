@@ -29,9 +29,17 @@ store = plugin_api._store
 adapter = ReferenceKanbanAdapter(
     store, profiles=["worker", "reviewer", "fixture-lead", "octacon", "quan"])
 service = StewardshipService(store)
+# Fixture budget: the whole browser suite shares this one backend, and its
+# fixtures and tests open more than the default 5 initiatives in
+# payments-relaunch (roadmap fixture 1 + inbox fixtures 2 + E5 test 3).
+# Raise that project's cap through its documented policy knob, as
+# tests/r2_helpers.py does for the Roadmap tests. No browser test exercises
+# the cap; tests/test_service.py::test_concurrency_cap proves it is enforced.
+_FIXTURE_VERIFICATION_POLICY = {"payments-relaunch": {"max_open_initiatives": 50}}
 for pid in ("payments-relaunch", "mobile-client", "atlas-mobile", "legacy-integration"):
     service.enable(pid, mission=f"Deliver {pid}", lead_profile="fixture-lead",
-                   member_profiles=["worker", "reviewer"], autonomy_level=2)
+                   member_profiles=["worker", "reviewer"], autonomy_level=2,
+                   verification_policy=_FIXTURE_VERIFICATION_POLICY.get(pid))
     adapter.create_work(pid, kind="task", title=f"Verify {pid}", body="Fixture canonical work",
                         assignee="worker", created_by="fixture")
 
