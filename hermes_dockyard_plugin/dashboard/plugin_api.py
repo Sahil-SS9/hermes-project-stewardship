@@ -2043,6 +2043,25 @@ async def get_notification_settings() -> dict:
     return await _proxy("GET", "/stewardship/v1/settings/notifications")
 
 
+# The last project chosen in the app (Sahil 02/10): kept in the backend, never
+# in browser storage. null forgets it. The caller never names the actor.
+class LastProjectBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project_id: str | None
+
+
+@plugin_api.get("/settings/last-project")
+async def get_last_project() -> dict:
+    return await _proxy("GET", "/stewardship/v1/settings/last-project")
+
+
+@plugin_api.put("/settings/last-project")
+async def put_last_project(body: LastProjectBody) -> dict:
+    return await _proxy(
+        "PUT", "/stewardship/v1/settings/last-project",
+        {"project_id": body.project_id, "actor_id": _ACTOR_ID})
+
+
 @plugin_api.put("/settings/notifications")
 async def put_notification_settings(body: dict) -> dict:
     return await _proxy(

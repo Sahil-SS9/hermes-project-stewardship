@@ -746,6 +746,71 @@ class StewardshipService:
         return [dict(r) for r in rows]
 
     # ------------------------------------------------------------------ #
+    # Last project chosen in the app (dockyard_app_settings, schema v36)  #
+    # ------------------------------------------------------------------ #
+    # Sahil decided 02/10: the app reopens on the last project chosen, and
+    # the choice lives here, never in browser storage (26/08 locked rule).
+
+    _LAST_PROJECT_KEY = "last_project"
+
+    def last_project(self) -> Optional[str]:
+        """The last project chosen in the app, or None.
+
+        A saved project that is no longer configured reads as None, so the app
+        never opens on a project that no longer exists.
+        """
+        row = self.store._conn.execute(
+            "SELECT value_json FROM dockyard_app_settings WHERE key=?",
+            (self._LAST_PROJECT_KEY,),
+        ).fetchone()
+        if row is None:
+            return None
+        project_id = self.store._uj(row["value_json"], {}).get("project_id")
+        if not isinstance(project_id, str):
+            return None
+        known = self.store._conn.execute(
+            "SELECT 1 FROM project_stewardship WHERE project_id=?", (project_id,)
+        ).fetchone()
+        return project_id if known else None
+
+    def set_last_project(self, project_id: Any, *, actor: str) -> Optional[str]:
+        """Remember the project chosen in the app; None forgets it.
+
+        Audited; re-saving the current value is a no-op.
+        """
+        if project_id is not None:
+            if not isinstance(project_id, str) or not project_id:
+                raise ServiceError("project_id must be a project id or null")
+            self._require_known(project_id)
+        stored = self.store._conn.execute(
+            "SELECT value_json FROM dockyard_app_settings WHERE key=?",
+            (self._LAST_PROJECT_KEY,),
+        ).fetchone()
+        if project_id is None and stored is None:
+            return None
+        if project_id is not None and self.last_project() == project_id:
+            return project_id
+        now = iso(self._clock())
+        with self.store.tx() as cx:
+            if project_id is None:
+                cx.execute("DELETE FROM dockyard_app_settings WHERE key=?", (self._LAST_PROJECT_KEY,))
+            else:
+                cx.execute(
+                    "INSERT INTO dockyard_app_settings(key, value_json, updated_at, updated_by)"
+                    " VALUES(?, ?, ?, ?)"
+                    " ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,"
+                    " updated_at=excluded.updated_at, updated_by=excluded.updated_by",
+                    (self._LAST_PROJECT_KEY, self.store._j({"project_id": project_id}), now, actor),
+                )
+            cx.execute(
+                "INSERT INTO stewardship_audit_log(ts, actor, interface,"
+                " action, subject, detail_json) VALUES(?,?,?,?,?,?)",
+                (now, actor, "service", "last_project.updated", "app",
+                 self.store._j({"project_id": project_id})),
+            )
+        return project_id
+
+    # ------------------------------------------------------------------ #
     # Goals                                                              #
     # ------------------------------------------------------------------ #
 

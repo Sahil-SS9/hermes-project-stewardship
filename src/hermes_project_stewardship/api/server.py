@@ -2510,6 +2510,22 @@ def create_app(
     def get_app_notification_settings():
         return {"policy": notification_engine.app_policy()}
 
+    # The last project chosen in the app (Sahil 02/10): kept in the backend,
+    # never in browser storage. null forgets it; unknown projects are 422.
+    @router.get("/settings/last-project")
+    def get_last_project():
+        return {"project_id": svc.last_project()}
+
+    @router.put("/settings/last-project")
+    def put_last_project(body: dict):
+        if "project_id" not in body:
+            raise HTTPException(422, "project_id is required (a project id or null)")
+        actor = _principal_id(body.get("actor_id") or "unknown")
+        try:
+            return {"project_id": svc.set_last_project(body["project_id"], actor=actor)}
+        except ServiceError as exc:
+            raise HTTPException(422, str(exc)) from None
+
     @router.put("/settings/notifications")
     def put_app_notification_settings(body: dict):
         policy = body.get("policy")
