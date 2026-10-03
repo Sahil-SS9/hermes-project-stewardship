@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { chromium } from './browser-harness.mjs'
 const BASE = process.env.STEWARD_DESKTOP_URL || 'http://127.0.0.1:19500/desktop'
+const API = process.env.STEWARD_API_URL || 'http://127.0.0.1:19500/api/plugins/hermes-dockyard'
 const tabs = ['dashboard','project','roadmap','backlog','workflows','inbox','notifications','onboard','settings']
 test('Phase 3 rendered Desktop: scope isolation, dirty switching, keyboard and narrow layout', {timeout:120000}, async()=>{
  const browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1280,height:820}});
@@ -15,8 +16,13 @@ test('Phase 3 rendered Desktop: scope isolation, dirty switching, keyboard and n
   assert.equal(await picker.count(),1);
   // Dashboard metric strip is rendered from real backend data (restored check).
   assert.deepEqual(await page.locator('[data-metric]').evaluateAll(els=>els.map(e=>e.dataset.metric)),['projects','needs-your-review','on-track','evidence-files']);
-  // Three fixture projects exist in the disposable backend; the metric must reflect real data.
-  assert.equal(await page.locator('[data-metric="projects"] strong').innerText(),'3');
+  // The metric must reflect the real number of seeded fixture projects (not a
+  // hard-coded count), so the check stays true when a batch adds a fixture project.
+  const seeded = await page.evaluate(async (api) => {
+    const res = await fetch(`${api}/projects`, { headers: { 'x-hermes-session-token': 'demo-session-token' } })
+    return (await res.json()).projects.length
+  }, API)
+  assert.equal(await page.locator('[data-metric="projects"] strong').innerText(), String(seeded));
   assert.match(await page.locator('body').innerText(),/payments-relaunch/);
   assert.equal(await page.locator('[data-tab="dashboard"]').getAttribute('aria-selected'),'true');
   await page.locator('[data-tab="dashboard"]').focus();await page.keyboard.press('ArrowRight');
