@@ -257,8 +257,13 @@ def test_r5_probe_no_principal_requires_attribution_and_records_it(client):
     """Without any trusted principal the behaviour is recorded as it is:
     a decision without attribution is refused (never silently decided via a
     guessed identity); with attribution the receipt records exactly the
-    supplied actor. The deployed config never reaches this branch — the proxy
-    always binds a principal server-side."""
+    supplied actor. The Desktop proxy always sets the actor itself, but this
+    branch IS reached whenever the backend has no token (STEWARD_RPC_TOKEN and
+    HERMES_DASHBOARD_SESSION_TOKEN unset, e.g. a dashboard started from the
+    CLI: Hermes keeps its generated session token in memory and does not
+    export it). There, the Hermes dashboard's session-token check is the only
+    gate. Refusing self-named actors here is an open pre-release decision
+    (Rule 5 note in the HPS plan)."""
     c, _ = client
     ref = _propose(client)
     fp = _decision(client, ref)["fingerprint"]

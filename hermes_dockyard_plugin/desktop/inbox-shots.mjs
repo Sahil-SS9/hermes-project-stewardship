@@ -1,15 +1,21 @@
 // Batch D — Inbox screenshots for Sahil's visual sign-off: light + dark at
 // 1440, 1024 and 390. Runs against the disposable real backend (fixed fixture rows).
+// Not a test of behaviour (inbox-decisions.test.mjs covers that). Run only via
+// run-browser-suite.mjs so it uses the disposable backend, never real data:
+//   node run-browser-suite.mjs $PWD/inbox-shots.mjs
+// Kept out of the default suite by its name (not *.test.mjs).
+// Output folder: D_SHOTS, else <os tmpdir>/hps-screens/inbox.
 import { test } from 'node:test'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
+import os from 'node:os'
 import path from 'node:path'
 import fs from 'node:fs'
 
 const require = createRequire(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dashboard', 'package.json'))
 const { chromium } = require('playwright')
 const BASE = process.env.STEWARD_DESKTOP_URL || 'http://127.0.0.1:19500/desktop'
-const OUT = process.env.D_SHOTS || '/home/kensei/HPS-Audit-2026-09-24/evidence/d'
+const OUT = process.env.D_SHOTS || path.join(os.tmpdir(), 'hps-screens', 'inbox')
 
 test('Batch D Inbox screenshots: light + dark at 1440/1024/390', { timeout: 180000 }, async () => {
   fs.mkdirSync(OUT, { recursive: true })

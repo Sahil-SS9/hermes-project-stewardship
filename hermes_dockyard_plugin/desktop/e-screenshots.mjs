@@ -9,11 +9,14 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdirSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {chromium} from './browser-harness.mjs';
 
 const BASE = process.env.STEWARD_DESKTOP_URL;
 const API = process.env.STEWARD_API_URL;
-const OUT = process.env.E_SCREENS_OUT || '/home/kensei/HPS-Audit-2026-09-24/evidence/kensei-e-final/screens';
+// Output folder: E_SCREENS_OUT, else <os tmpdir>/hps-screens/notifications.
+const OUT = process.env.E_SCREENS_OUT || join(tmpdir(), 'hps-screens', 'notifications');
 
 async function api(path, method = 'GET', body) {
   const res = await fetch(`${API}${path}`, {
