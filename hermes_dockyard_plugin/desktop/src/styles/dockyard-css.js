@@ -1432,44 +1432,6 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-activity-item p { margin: 0; color: var(--dy-text); font-size: 13px; }
 .dockyard-root .dockyard-activity-item time { display: block; margin-top: 4px; color: var(--dy-text-3); font-size: 11px; }
 .dockyard-root .dockyard-activity-item .dockyard-notification-marker { grid-area: auto; }
-.dockyard-root .dockyard-approval-list {
-  display: grid;
-  gap: 14px;
-  overflow: visible;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-.dockyard-root .dockyard-approval-row {
-  display: block;
-  min-height: 0;
-  padding: 22px;
-  border: 1px solid var(--dy-border);
-  border-radius: 14px;
-  background: var(--dy-surface);
-}
-.dockyard-root .dockyard-approval-row[data-state="approved"] { background: var(--dy-success-bg); }
-.dockyard-root .dockyard-approval-row[data-state="rejected"] { background: var(--dy-danger-bg); }
-.dockyard-root .dockyard-approval-top {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
-  gap: 14px;
-  align-items: start;
-}
-.dockyard-root .dockyard-approval-icon {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  color: var(--dy-warning);
-  background: var(--dy-warning-bg);
-}
-.dockyard-root .dockyard-approval-icon.danger { color: var(--dy-danger); background: var(--dy-danger-bg); }
-.dockyard-root .dockyard-approval-icon.success { color: var(--dy-success); background: var(--dy-success-bg); }
-.dockyard-root .dockyard-approval-icon svg { width: 17px; height: 17px; }
-.dockyard-root .dockyard-approval-top .dockyard-approval-main { grid-area: auto; }
-.dockyard-root .dockyard-approval-main h2 { font-size: 17px; }
 .dockyard-root .dockyard-evidence-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1485,8 +1447,6 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-evidence-cell:last-child { padding-right: 0; }
 .dockyard-root .dockyard-evidence-cell span { display: block; color: var(--dy-text-3); font-size: 10px; font-weight: 750; }
 .dockyard-root .dockyard-evidence-cell strong { display: block; margin-top: 7px; color: var(--dy-text); font-size: 13px; line-height: 1.4; }
-.dockyard-root .dockyard-approval-actions { display: flex; align-items: center; justify-content: flex-start; gap: 9px; flex-wrap: wrap; }
-.dockyard-root .dockyard-approval-comments { display: grid; gap: 9px; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--dy-border); }
 .dockyard-root .dockyard-comment-thread { display: grid; gap: 5px; }
 .dockyard-root .dockyard-comment-thread p { margin: 0; color: var(--dy-text-2); font-size: 11px; line-height: 1.5; }
 .dockyard-root .dockyard-comment-thread strong { color: var(--dy-text); }
@@ -1561,8 +1521,6 @@ export const DOCKYARD_CSS = `
   .dockyard-root .dockyard-evidence-grid { grid-template-columns: 1fr; gap: 13px; }
   .dockyard-root .dockyard-evidence-cell { padding: 13px 0 0; border-top: 1px solid var(--dy-border); border-left: 0; }
   .dockyard-root .dockyard-evidence-cell:first-child { padding-top: 0; border-top: 0; }
-  .dockyard-root .dockyard-approval-top { grid-template-columns: 38px minmax(0, 1fr); }
-  .dockyard-root .dockyard-approval-top > .dockyard-status-tag { grid-column: 2; }
 }
 @container dockyard (max-width: 640px) {
   .dockyard-root .dockyard-metric-strip,
@@ -1858,8 +1816,6 @@ export const DOCKYARD_CSS = `
 .dockyard-root [data-bulk-import-layer] [data-import-preview] li { display: grid; grid-template-columns: 72px minmax(0,1fr) 98px; align-items: start; gap: 10px; background: var(--dy-surface); }
 .dockyard-root .dockyard-detail-modal .dockyard-detail-footer { margin: 0; padding: 13px 24px 18px; justify-content: space-between; }
 .dockyard-root .dockyard-detail-footer-right { display: inline-flex; align-items: center; gap: 10px; }
-+/* Approved dark reference: breadcrumb, iconed fields, status dots, X clears,
-+   full-width activity timeline. */
 .dockyard-root .dockyard-detail-breadcrumb { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--dy-text-2); }
 .dockyard-root .dockyard-detail-breadcrumb svg { width: 12px; height: 12px; opacity: 0.7; }
 .dockyard-root .dockyard-detail-breadcrumb span:last-child { color: var(--dy-text); font-weight: 600; }
@@ -1900,8 +1856,6 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-detail-modal .dockyard-history-change > .dockyard-history-to { color: var(--dy-success, var(--dy-accent-text)); font-weight: 600; }
 @media (max-width: 520px) { .dockyard-root .dockyard-detail-modal .dockyard-history-change { grid-template-columns: 78px minmax(0, 1fr) 16px minmax(0, 1fr); gap: 4px; padding-inline: 4px; } }
 .dockyard-root [data-bulk-import-layer] .import-row-error { color: var(--dy-danger); grid-column: 2 / -1; font-size: 11px; }
-+/* Approved import design: summary cards, warnings toggle, per-row badges,
-+   split-pane preview with parsed values + will-import-as. */
 .dockyard-root [data-bulk-import-layer] .import-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 10px; align-items: center; margin: 10px 0 6px; }
 .dockyard-root [data-bulk-import-layer] .import-stat { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface-subtle); font-size: 12px; }
 .dockyard-root [data-bulk-import-layer] .import-stat strong { font-size: 14px; }

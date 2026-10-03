@@ -1,0 +1,37 @@
+# Batch D RED run — 03/10/2026
+
+Command:
+  cd hermes_dockyard_plugin/desktop
+  ulimit -n 4096; export TMPDIR=/tmp/ktest-d; mkdir -p $TMPDIR
+  export HPS_BROWSER_PORT=19850
+  node run-browser-suite.mjs \
+    $PWD/inbox-decisions.test.mjs $PWD/inbox-model.test.mjs $PWD/inbox-css.test.mjs
+
+Exit code 1 — 0 pass / 12 fail over 203s (this is the required RED observation).
+
+Backend: DISPOSABLE_BACKEND {backend: 'real', adapter: 'reference'} booted clean
+with the seeded inbox fixtures (Ship saved views from _roadmap_fixtures +
+Retire legacy webhook listener from _inbox_fixtures) and the frozen
+mobile-client / atlas-mobile attention projects.
+
+RED reasons, per file (all three are the intended " behaviour is missing"
+failures, not setup errors):
+
+1. inbox-decisions.test.mjs (10 scenarios) — every scenario times out waiting
+   for [data-inbox-screen="true"]: the committed plugin.js (commit 2580d7c)
+   has no Approval Inbox screen, no [data-inbox-row]/[data-inbox-panel]
+   hooks, no tab set, no decision UI. The upstream 404s visible in the log
+   (/stewardship/v1/initiatives/active/decision etc.) are the OLD approvals
+   panel probing refs that do not resolve for these fixture refs.
+
+2. inbox-model.test.mjs — ERR_MODULE_NOT_FOUND src/inbox/model.js: the pure
+   model module does not exist yet.
+
+3. inbox-css.test.mjs — ERR_MODULE_NOT_FOUND src/styles/inbox-css.js: the
+   stylesheet module does not exist yet (and it must fail until the approval
+   block MOVES out of dockyard-css.js).
+
+No assertions were weakened. Next step (GREEN): build src/inbox/model.js +
+src/styles/inbox-css.js + rewrite src/views/inbox.js, src/work-item/
+approvals.js, wire shell focusRef + index.js CSS import, then rebuild
+desktop/plugin.js via node desktop/build.mjs and re-run to GREEN.

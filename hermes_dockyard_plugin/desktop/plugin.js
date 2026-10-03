@@ -1567,44 +1567,6 @@ var DOCKYARD_CSS = `
 .dockyard-root .dockyard-activity-item p { margin: 0; color: var(--dy-text); font-size: 13px; }
 .dockyard-root .dockyard-activity-item time { display: block; margin-top: 4px; color: var(--dy-text-3); font-size: 11px; }
 .dockyard-root .dockyard-activity-item .dockyard-notification-marker { grid-area: auto; }
-.dockyard-root .dockyard-approval-list {
-  display: grid;
-  gap: 14px;
-  overflow: visible;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-.dockyard-root .dockyard-approval-row {
-  display: block;
-  min-height: 0;
-  padding: 22px;
-  border: 1px solid var(--dy-border);
-  border-radius: 14px;
-  background: var(--dy-surface);
-}
-.dockyard-root .dockyard-approval-row[data-state="approved"] { background: var(--dy-success-bg); }
-.dockyard-root .dockyard-approval-row[data-state="rejected"] { background: var(--dy-danger-bg); }
-.dockyard-root .dockyard-approval-top {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
-  gap: 14px;
-  align-items: start;
-}
-.dockyard-root .dockyard-approval-icon {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  color: var(--dy-warning);
-  background: var(--dy-warning-bg);
-}
-.dockyard-root .dockyard-approval-icon.danger { color: var(--dy-danger); background: var(--dy-danger-bg); }
-.dockyard-root .dockyard-approval-icon.success { color: var(--dy-success); background: var(--dy-success-bg); }
-.dockyard-root .dockyard-approval-icon svg { width: 17px; height: 17px; }
-.dockyard-root .dockyard-approval-top .dockyard-approval-main { grid-area: auto; }
-.dockyard-root .dockyard-approval-main h2 { font-size: 17px; }
 .dockyard-root .dockyard-evidence-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1620,8 +1582,6 @@ var DOCKYARD_CSS = `
 .dockyard-root .dockyard-evidence-cell:last-child { padding-right: 0; }
 .dockyard-root .dockyard-evidence-cell span { display: block; color: var(--dy-text-3); font-size: 10px; font-weight: 750; }
 .dockyard-root .dockyard-evidence-cell strong { display: block; margin-top: 7px; color: var(--dy-text); font-size: 13px; line-height: 1.4; }
-.dockyard-root .dockyard-approval-actions { display: flex; align-items: center; justify-content: flex-start; gap: 9px; flex-wrap: wrap; }
-.dockyard-root .dockyard-approval-comments { display: grid; gap: 9px; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--dy-border); }
 .dockyard-root .dockyard-comment-thread { display: grid; gap: 5px; }
 .dockyard-root .dockyard-comment-thread p { margin: 0; color: var(--dy-text-2); font-size: 11px; line-height: 1.5; }
 .dockyard-root .dockyard-comment-thread strong { color: var(--dy-text); }
@@ -1696,8 +1656,6 @@ var DOCKYARD_CSS = `
   .dockyard-root .dockyard-evidence-grid { grid-template-columns: 1fr; gap: 13px; }
   .dockyard-root .dockyard-evidence-cell { padding: 13px 0 0; border-top: 1px solid var(--dy-border); border-left: 0; }
   .dockyard-root .dockyard-evidence-cell:first-child { padding-top: 0; border-top: 0; }
-  .dockyard-root .dockyard-approval-top { grid-template-columns: 38px minmax(0, 1fr); }
-  .dockyard-root .dockyard-approval-top > .dockyard-status-tag { grid-column: 2; }
 }
 @container dockyard (max-width: 640px) {
   .dockyard-root .dockyard-metric-strip,
@@ -1993,8 +1951,6 @@ var DOCKYARD_CSS = `
 .dockyard-root [data-bulk-import-layer] [data-import-preview] li { display: grid; grid-template-columns: 72px minmax(0,1fr) 98px; align-items: start; gap: 10px; background: var(--dy-surface); }
 .dockyard-root .dockyard-detail-modal .dockyard-detail-footer { margin: 0; padding: 13px 24px 18px; justify-content: space-between; }
 .dockyard-root .dockyard-detail-footer-right { display: inline-flex; align-items: center; gap: 10px; }
-+/* Approved dark reference: breadcrumb, iconed fields, status dots, X clears,
-+   full-width activity timeline. */
 .dockyard-root .dockyard-detail-breadcrumb { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--dy-text-2); }
 .dockyard-root .dockyard-detail-breadcrumb svg { width: 12px; height: 12px; opacity: 0.7; }
 .dockyard-root .dockyard-detail-breadcrumb span:last-child { color: var(--dy-text); font-weight: 600; }
@@ -2035,8 +1991,6 @@ var DOCKYARD_CSS = `
 .dockyard-root .dockyard-detail-modal .dockyard-history-change > .dockyard-history-to { color: var(--dy-success, var(--dy-accent-text)); font-weight: 600; }
 @media (max-width: 520px) { .dockyard-root .dockyard-detail-modal .dockyard-history-change { grid-template-columns: 78px minmax(0, 1fr) 16px minmax(0, 1fr); gap: 4px; padding-inline: 4px; } }
 .dockyard-root [data-bulk-import-layer] .import-row-error { color: var(--dy-danger); grid-column: 2 / -1; font-size: 11px; }
-+/* Approved import design: summary cards, warnings toggle, per-row badges,
-+   split-pane preview with parsed values + will-import-as. */
 .dockyard-root [data-bulk-import-layer] .import-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 10px; align-items: center; margin: 10px 0 6px; }
 .dockyard-root [data-bulk-import-layer] .import-stat { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface-subtle); font-size: 12px; }
 .dockyard-root [data-bulk-import-layer] .import-stat strong { font-size: 14px; }
@@ -6012,312 +5966,322 @@ function LoadingState() {
   ] });
 }
 
+// hermes_dockyard_plugin/desktop/src/inbox/model.js
+var TAB_KEYS = ["all", "urgent", "today", "earlier"];
+var TAB_LABELS = { all: "All", urgent: "Urgent", today: "Today", earlier: "Earlier" };
+var highRisk = (item) => ["high", "critical"].includes(String(item?.risk ?? "").toLowerCase());
+var isAttention = (item) => item?.kind === "project_attention";
+var sameDay = (iso, now) => {
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return false;
+  return then.getUTCFullYear() === now.getUTCFullYear() && then.getUTCMonth() === now.getUTCMonth() && then.getUTCDate() === now.getUTCDate();
+};
+var earlierThanToday = (iso, now) => {
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return false;
+  return then.getTime() < Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+};
+function countTabs(items, now = /* @__PURE__ */ new Date()) {
+  const counts = { all: 0, urgent: 0, today: 0, earlier: 0 };
+  for (const item of items ?? []) {
+    counts.all += 1;
+    const risky = isAttention(item) ? true : highRisk(item);
+    if (risky) counts.urgent += 1;
+    if (sameDay(item?.created_at, now)) counts.today += 1;
+    if (earlierThanToday(item?.created_at, now)) counts.earlier += 1;
+  }
+  return counts;
+}
+function filterByTab(items, tab, now = /* @__PURE__ */ new Date()) {
+  const all = items ?? [];
+  if (tab === "all") return all;
+  if (tab === "urgent") return all.filter((item) => isAttention(item) || highRisk(item));
+  if (tab === "today") return all.filter((item) => sameDay(item.created_at, now));
+  if (tab === "earlier") return all.filter((item) => earlierThanToday(item.created_at, now));
+  return [];
+}
+function ageLabel(item, now = /* @__PURE__ */ new Date()) {
+  if (item?.age_days != null && Number.isFinite(Number(item.age_days))) {
+    const days2 = Number(item.age_days);
+    return days2 <= 0 ? "today" : `${days2} days old`;
+  }
+  if (!item?.created_at) return "";
+  const then = new Date(item.created_at);
+  if (Number.isNaN(then.getTime())) return "";
+  const days = Math.floor((Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - Date.UTC(then.getUTCFullYear(), then.getUTCMonth(), then.getUTCDate())) / 864e5);
+  return days <= 0 ? "today" : `${days} days old`;
+}
+function evidenceCount(item) {
+  const contract = item?.detail?.validation_contract;
+  if (!contract) return 0;
+  let count = 0;
+  if (Array.isArray(contract.steps)) count += contract.steps.length;
+  if (contract.tests) count += 1;
+  if (Array.isArray(contract.evidence)) count += contract.evidence.length;
+  return count;
+}
+function rowSummary(item, now = /* @__PURE__ */ new Date()) {
+  const risk = String(item?.risk ?? "").toLowerCase();
+  const attention = isAttention(item);
+  const age = ageLabel(item, now);
+  const meta = [attention ? "project" : "initiative", risk ? `${risk} risk` : "", age].filter(Boolean).join(" \xB7 ");
+  return { project: item?.project ?? "", meta, risk };
+}
+var stamp = (entry, kind) => ({
+  kind,
+  at: entry?.created_at ?? entry?.at ?? null,
+  actor: entry?.actor ?? entry?.display_name ?? "",
+  body: entry?.body ?? "",
+  decision: entry?.decision ?? void 0,
+  summary: entry?.summary ?? void 0
+});
+function mergeActivity(payload = {}) {
+  const merged = [
+    ...(payload.comments ?? []).map((e) => stamp(e, "comment")),
+    ...(payload.receipts ?? []).map((e) => stamp(e, "receipt")),
+    ...(payload.events ?? []).map((e) => stamp(e, "event"))
+  ].filter((entry) => entry.at);
+  merged.sort((a, b) => new Date(a.at) - new Date(b.at));
+  return merged;
+}
+function attentionPanel(item) {
+  return {
+    title: "This project needs attention",
+    description: `${item?.project ?? "This project"} is frozen or disabled, so its pending work cannot be decided here. Open the project to see what is blocking it.`,
+    project: item?.project ?? "",
+    deeplink: item?.deep_link ?? null,
+    decidable: false
+  };
+}
+
 // hermes_dockyard_plugin/desktop/src/work-item/approvals.js
-function ApprovalRow({ item, onResolved }) {
+var decisionText = (value) => {
+  if (value == null || value === "") return "Not supplied";
+  if (Array.isArray(value)) return value.join(", ");
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+};
+var Section = ({ title, children, className = "" }) => jsxs("section", {
+  className: `dockyard-inbox-section ${className}`.trim(),
+  children: [jsx("h3", { children: title }), children]
+});
+function RejectDialog({ item, busy, reason, onReason, onCancel, onConfirm }) {
+  useDialogFocusManager("[data-destructive-confirm]");
+  useEffect(() => {
+    const close = (event) => {
+      if (event.key === "Escape" && !busy) onCancel();
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [busy, onCancel]);
+  return jsx("section", {
+    className: "dockyard-modal-layer",
+    "data-destructive-confirm": `reject-${item.ref}`,
+    onClick: (event) => {
+      if (event.target === event.currentTarget && !busy) onCancel();
+    },
+    children: jsxs("div", { className: "dockyard-modal", role: "dialog", "aria-modal": true, "aria-label": `Reject ${item.title}`, children: [
+      jsx("h2", { children: "Reject this initiative?" }),
+      jsx("p", { children: `${item.title} will leave the approval queue. Record the reason in this one confirmation step.` }),
+      jsxs("label", { children: ["Rejection reason ", jsx("input", {
+        value: reason,
+        onChange: (event) => onReason(event.target.value),
+        placeholder: "Why this initiative should not proceed",
+        autoFocus: true
+      })] }),
+      jsxs("div", { className: "dockyard-modal-actions", children: [
+        jsx(Button, { disabled: busy, onClick: onCancel, children: "Cancel" }),
+        jsx(Button, {
+          action: "confirm-destructive-action",
+          variant: "danger",
+          disabled: busy || !reason.trim(),
+          onClick: onConfirm,
+          children: busy ? "Rejecting..." : "Reject initiative"
+        })
+      ] })
+    ] })
+  });
+}
+function ApprovalDetail({ item, onResolved, onBack }) {
+  const [decision, setDecision] = useState(null);
+  const [decisionError, setDecisionError] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [receipts, setReceipts] = useState([]);
+  const [commentBody, setCommentBody] = useState("");
   const [state, setState] = useState("idle");
   const [error, setError] = useState(null);
-  const [expanded, setExpanded] = useState(false);
-  const [rejectConfirm, setRejectConfirm] = useState(false);
-  const [reviewedDecision, setReviewedDecision] = useState(null);
-  const [decisionError, setDecisionError] = useState(null);
-  useEffect(() => {
-    let disposed = false;
-    api(`/initiatives/${encodeURIComponent(item.ref)}/decision`).then((decision) => {
-      if (!disposed) setReviewedDecision(decision);
-    }).catch(() => {
-      if (!disposed) setDecisionError("Decision evidence unavailable; refresh before deciding.");
-    });
-    return () => {
-      disposed = true;
-    };
-  }, [item.ref]);
-  const tone2source = reviewedDecision ? {
-    title: reviewedDecision.title ?? item.title,
-    risk: reviewedDecision.risk ?? item.risk,
-    rationale: reviewedDecision.reason ?? reviewedDecision.rationale ?? (item.detail?.rationale ?? ""),
-    expected_outcome: reviewedDecision.expected_outcome ?? (item.detail?.expected_outcome ?? ""),
-    validation: reviewedDecision.validation?.contract ?? reviewedDecision.validation ?? item.detail?.validation_contract ?? null
-  } : { title: item.title, risk: item.risk, rationale: item.detail?.rationale, expected_outcome: item.detail?.expected_outcome, validation: item.detail?.validation_contract ?? null };
-  const [tone, label] = riskDetails(tone2source.risk);
-  const detail = {
-    ...item.detail,
-    rationale: tone2source.rationale,
-    expected_outcome: tone2source.expected_outcome,
-    validation_contract: tone2source.validation
-  };
-  const [decisionNote, setDecisionNote] = useState("");
-  const [decisionReason, setDecisionReason] = useState("");
-  const [noteOpen, setNoteOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
   const [changesOpen, setChangesOpen] = useState(false);
-  const [changesFeedback, setChangesFeedback] = useState("");
-  const [changesBusy, setChangesBusy] = useState(false);
-  const [commentBody, setCommentBody] = useState("");
-  const [comments, setComments] = useState([]);
+  const [feedback, setFeedback] = useState("");
   useEffect(() => {
-    let disposed = false;
-    api(`/initiatives/${encodeURIComponent(item.ref)}/comments`).then((thread) => {
-      if (!disposed) setComments(thread.comments ?? []);
+    let current = true;
+    setDecision(null);
+    setDecisionError(null);
+    setComments([]);
+    setReceipts([]);
+    setState("idle");
+    setError(null);
+    setRejectOpen(false);
+    setChangesOpen(false);
+    Promise.all([
+      api(`/initiatives/${encodeURIComponent(item.ref)}/decision`),
+      api(`/initiatives/${encodeURIComponent(item.ref)}/comments`).catch(() => ({ comments: [] })),
+      api(`/initiatives/${encodeURIComponent(item.ref)}/decision/receipts`).catch(() => ({ receipts: [] }))
+    ]).then(([scope2, thread, ledger]) => {
+      if (!current) return;
+      setDecision(scope2);
+      setComments(thread.comments ?? []);
+      setReceipts(ledger.receipts ?? []);
     }).catch(() => {
+      if (current) setDecisionError("Decision evidence unavailable; refresh before deciding.");
     });
     return () => {
-      disposed = true;
+      current = false;
     };
   }, [item.ref]);
-  const requestChanges = async () => {
-    setChangesBusy(true);
+  const confirmReceipt = async (expected) => {
+    const ledger = await api(`/initiatives/${encodeURIComponent(item.ref)}/decision/receipts`);
+    const rows = ledger?.receipts ?? [];
+    const latest = rows[rows.length - 1];
+    if (latest?.decision !== expected) {
+      throw new Error(`Decision receipt did not confirm ${expected}. Refresh before trying again.`);
+    }
+    setReceipts(rows);
+  };
+  const finish = (message) => {
+    emitToast("success", message);
+    onResolved(item.ref);
+  };
+  const decide = async (action) => {
+    if (!decision) return;
+    setState(action === "approve" ? "approving" : "rejecting");
     setError(null);
+    const expected = action === "approve" ? "approved" : "rejected";
     try {
-      if (!reviewedDecision) {
-        throw new Error("Decision evidence not reviewed yet; refresh before deciding.");
-      }
-      await api(`/initiatives/${encodeURIComponent(item.ref)}/request-changes`, {
+      const body = action === "reject" ? { expected_fingerprint: decision.fingerprint, reason: rejectReason.trim() } : { expected_fingerprint: decision.fingerprint };
+      await api(`/initiatives/${encodeURIComponent(item.ref)}/${action}`, {
         method: "POST",
-        body: {
-          expected_fingerprint: reviewedDecision.fingerprint,
-          feedback: changesFeedback.trim(),
-          note: decisionNote || void 0
-        },
+        body,
         suppressErrorToast: true
       });
-      setState("returned");
-      emitToast("success", "Returned to the proposer with your feedback");
-      setTimeout(onResolved, 850);
+      await confirmReceipt(expected);
+      finish(action === "approve" ? "Approved; confirmed by decision receipt" : "Rejected; confirmed by decision receipt");
     } catch (failure) {
-      setChangesOpen(false);
       setState("failed");
-      const message = `Request changes was not recorded. ${String(failure?.message ?? failure)}`;
+      setRejectOpen(false);
+      const message = `${action === "approve" ? "Approve" : "Reject"} could not be confirmed. ${String(failure?.message ?? failure)}`;
       setError(message);
       emitToast("danger", message);
-    } finally {
-      setChangesBusy(false);
+    }
+  };
+  const requestChanges = async () => {
+    if (!decision || !feedback.trim()) return;
+    setState("returning");
+    setError(null);
+    try {
+      await api(`/initiatives/${encodeURIComponent(item.ref)}/request-changes`, {
+        method: "POST",
+        body: { expected_fingerprint: decision.fingerprint, feedback: feedback.trim() },
+        suppressErrorToast: true
+      });
+      await confirmReceipt("changes_requested");
+      finish("Returned to the proposer with your feedback");
+    } catch (failure) {
+      setState("failed");
+      const message = `Request changes could not be confirmed. ${String(failure?.message ?? failure)}`;
+      setError(message);
+      emitToast("danger", message);
     }
   };
   const addComment = async () => {
     const body = commentBody.trim();
     if (!body) return;
     try {
-      const created2 = await api(`/initiatives/${encodeURIComponent(item.ref)}/comments`, {
+      const created = await api(`/initiatives/${encodeURIComponent(item.ref)}/comments`, {
         method: "POST",
         body: { body },
         suppressErrorToast: true
       });
-      setComments((thread) => [...thread, created2]);
+      setComments((rows) => [...rows, created]);
       setCommentBody("");
     } catch (failure) {
       emitToast("danger", `Comment was not recorded. ${String(failure?.message ?? failure)}`);
     }
   };
-  const decide = async (action) => {
-    const resolvedState = action === "approve" ? "approved" : "rejected";
-    const actionLabel = action === "approve" ? "Approve" : "Reject";
-    if (action === "reject" && !noteOpen) {
-      setNoteOpen(true);
-      return;
-    }
-    setState(action === "approve" ? "approving" : "rejecting");
-    setError(null);
-    try {
-      if (!reviewedDecision) {
-        throw new Error("Decision evidence not reviewed yet; refresh before deciding.");
-      }
-      const body = action === "reject" ? {
-        expected_fingerprint: reviewedDecision.fingerprint,
-        reason: decisionReason.trim() || "Rejected from Desktop review",
-        note: decisionNote || void 0
-      } : { expected_fingerprint: reviewedDecision.fingerprint, note: decisionNote || void 0 };
-      await api(`/initiatives/${encodeURIComponent(item.ref)}/${action}`, {
-        method: "POST",
-        body,
-        suppressErrorToast: true
-      });
-      setState(resolvedState);
-      setTimeout(onResolved, 850);
-    } catch (failure) {
-      setNoteOpen(false);
-      let confirmed = null;
-      try {
-        const receipts = await api(`/initiatives/${encodeURIComponent(item.ref)}/decision/receipts`);
-        const rows = receipts?.receipts ?? [];
-        if (rows.length > 0) {
-          const latest = rows[rows.length - 1];
-          confirmed = latest.decision === "approved" ? "approved" : latest.decision === "rejected" ? "rejected" : null;
-        }
-      } catch {
-        confirmed = null;
-      }
-      if (confirmed === resolvedState) {
-        setState(resolvedState);
-        emitToast("success", `Initiative ${resolvedState}; confirmed by decision receipt`);
-        setTimeout(onResolved, 850);
-        return;
-      }
-      if (confirmed != null) {
-        setState(confirmed);
-        emitToast("warning", `Initiative was ${confirmed} by another decision; your ${actionLabel.toLowerCase()} was not applied`);
-        setTimeout(onResolved, 850);
-        return;
-      }
-      let stillPending = null;
-      try {
-        const inbox = await api("/inbox");
-        stillPending = (inbox?.items ?? []).some((pending) => pending.ref === item.ref);
-      } catch {
-        stillPending = null;
-      }
-      if (stillPending === true) {
-        setState("failed");
-        const detailMessage2 = String(failure?.message ?? failure);
-        const message2 = `${actionLabel} was not recorded. The approval is still pending. ${detailMessage2}`;
-        setError(message2);
-        emitToast("danger", message2);
-        return;
-      }
-      setState("failed");
-      const detailMessage = String(failure?.message ?? failure);
-      const message = `${actionLabel} could not be confirmed. Refresh before trying again. ${detailMessage}`;
-      setError(message);
-      emitToast("danger", message);
-    }
+  const scope = decision ?? {
+    title: item.title,
+    risk: item.risk,
+    reason: item.detail?.rationale,
+    expected_outcome: item.detail?.expected_outcome,
+    validation: { contract: item.detail?.validation_contract },
+    authority: null,
+    proposer: null
   };
-  const resolved = state === "approved" || state === "rejected";
-  const stateTone = state === "approved" ? "success" : state === "rejected" || state === "failed" ? "danger" : tone;
-  const stateLabel = state === "approved" ? "Approved" : state === "rejected" ? "Rejected" : state === "failed" ? "Decision unconfirmed" : label;
-  const created = formatWhen(detail.created_at);
+  const [riskTone, riskLabel] = riskDetails(scope.risk);
+  const contract = scope.validation?.contract ?? {};
+  const steps = Array.isArray(contract.steps) ? contract.steps : [];
+  const affected = item.detail?.affected_work_items ?? item.detail?.work_items ?? [];
+  const activity = mergeActivity({ comments, receipts, events: item.detail?.events ?? [] });
+  const busy = ["approving", "rejecting", "returning"].includes(state);
   return jsxs("article", {
-    className: "dockyard-approval-row",
+    className: "dockyard-inbox-panel dockyard-approval-row",
+    "data-inbox-panel": "true",
     "data-approval-card": true,
     "data-approval-ref": item.ref,
     "data-state": state,
     children: [
-      jsxs("div", { className: "dockyard-approval-top", children: [
-        jsx("span", { className: `dockyard-approval-icon ${tone}`, children: jsx(Icon, { name: tone === "danger" ? "alert" : "check" }) }),
-        jsxs("div", { className: "dockyard-approval-main", children: [
-          jsx("h2", { children: tone2source.title }),
-          jsx("span", { className: "dockyard-meta", children: `${item.project || "Unknown project"} / ${item.ref}${created ? ` / proposed ${created}` : ""}` })
+      jsxs("header", { className: "dockyard-inbox-panel-head", children: [
+        jsxs("div", { children: [
+          onBack ? jsx(Button, { variant: "quiet", small: true, onClick: onBack, children: "Back" }) : null,
+          jsx("h2", { children: scope.title }),
+          jsx("small", { children: `${item.project || scope.project_id || "Unknown project"} \xB7 ${item.ref}` })
         ] }),
-        jsx(StatusTag, { tone: stateTone, label: stateLabel })
-      ] }),
-      jsxs("div", { className: "dockyard-evidence-grid", "data-evidence-grid": true, children: [
-        jsxs("div", { className: "dockyard-evidence-cell", "data-evidence-cell": "rationale", children: [
-          jsx("span", { children: "WHY PROPOSED" }),
-          jsx("strong", { children: detail.rationale || "No rationale supplied" })
-        ] }),
-        jsxs("div", { className: "dockyard-evidence-cell", "data-evidence-cell": "outcome", children: [
-          jsx("span", { children: "EXPECTED OUTCOME" }),
-          jsx("strong", { children: detail.expected_outcome || "No expected outcome supplied" })
-        ] }),
-        jsxs("div", { className: "dockyard-evidence-cell", "data-evidence-cell": "validation", children: [
-          jsx("span", { children: "VALIDATION" }),
-          jsx("strong", { children: validationSummary(detail.validation_contract) })
-        ] })
+        jsx(StatusTag, { tone: riskTone, label: riskLabel })
       ] }),
       decisionError ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: decisionError }) : null,
-      noteOpen && !resolved ? jsxs("div", { className: "dockyard-decision-note-form", "data-decision-note-form": true, children: [
-        jsxs("label", { children: ["Rejection reason ", jsx("input", {
-          value: decisionReason,
-          onChange: (event) => setDecisionReason(event.target.value),
-          placeholder: "Why this initiative is rejected"
-        })] }),
-        jsxs("label", { children: ["Note (optional) ", jsx("input", {
-          value: decisionNote,
-          onChange: (event) => setDecisionNote(event.target.value),
-          placeholder: "Optional context recorded with the decision"
-        })] }),
-        jsxs("div", { className: "dockyard-form-actions", children: [
-          jsx(Button, {
-            action: "confirm-reject-with-reason",
-            variant: "danger",
-            disabled: state === "rejecting" || !decisionReason.trim(),
-            onClick: () => decide("reject"),
-            children: "Reject with reason"
-          }),
-          jsx(Button, { variant: "quiet", onClick: () => setNoteOpen(false), children: "Cancel" })
-        ] })
-      ] }) : null,
-      changesOpen && !resolved ? jsxs("div", { className: "dockyard-decision-note-form", "data-request-changes-form": true, children: [
-        jsxs("label", { children: ["Feedback for the proposer ", jsx("input", {
-          value: changesFeedback,
-          onChange: (event) => setChangesFeedback(event.target.value),
-          placeholder: "What must change before you can approve"
-        })] }),
-        jsxs("div", { className: "dockyard-form-actions", children: [
-          jsx(Button, {
-            action: "confirm-request-changes",
-            variant: "primary",
-            disabled: changesBusy || !changesFeedback.trim(),
-            onClick: requestChanges,
-            children: changesBusy ? "Returning\u2026" : "Return to proposer"
-          }),
-          jsx(Button, { variant: "quiet", onClick: () => setChangesOpen(false), children: "Cancel" })
-        ] })
-      ] }) : null,
-      jsxs("div", { className: "dockyard-approval-actions", children: [
-        resolved ? jsx(StatusTag, { tone: stateTone, label: stateLabel }) : jsx(Button, {
-          action: "approve",
-          variant: "primary",
-          disabled: state === "approving" || state === "rejecting",
-          onClick: () => decide("approve"),
-          children: state === "approving" ? "Approving..." : "Approve"
-        }),
-        resolved ? null : jsx(Button, {
-          action: "reject",
-          variant: "danger",
-          disabled: state === "approving" || state === "rejecting",
-          onClick: () => setRejectConfirm(true),
-          children: state === "rejecting" ? "Rejecting..." : "Reject"
-        }),
-        resolved ? null : jsx(Button, {
-          action: "request-changes",
-          variant: "quiet",
-          disabled: state === "approving" || state === "rejecting",
-          onClick: () => setChangesOpen((open) => !open),
-          children: "Request changes"
-        }),
-        jsx(Button, {
-          action: "toggle-evidence",
-          variant: "quiet",
-          onClick: () => setExpanded((open) => !open),
-          children: expanded ? "Hide evidence details" : "Show evidence details"
-        }),
-        !resolved ? jsx(StatusTag, { tone: "neutral", label: "Awaiting you" }) : null
-      ] }),
-      jsx("div", {
-        className: "dockyard-evidence-details",
-        "data-evidence-details": true,
-        hidden: !expanded,
-        children: `Status: ${detail.status || "pending approval"}. Priority: ${number(detail.priority ?? 0)}. Approval state: ${detail.approval_state || "pending"}. Context reference: ${item.deep_link || item.ref}.`
-      }),
-      error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: error }) : null,
-      rejectConfirm ? jsx(ConfirmDialog, {
-        confirmKey: `reject-${item.ref}`,
-        title: "Reject this initiative?",
-        description: `${item.title} will leave the approval queue and be recorded as rejected.`,
-        confirmLabel: "Reject initiative",
-        busy: state === "rejecting",
-        onCancel: () => setRejectConfirm(false),
-        onConfirm: async () => {
-          setRejectConfirm(false);
-          await decide("reject");
-        }
-      }) : null,
-      jsxs("div", { className: "dockyard-approval-comments", "data-approval-comments": true, children: [
-        comments.length ? jsxs("div", {
-          className: "dockyard-comment-thread",
-          children: comments.map((comment) => jsxs("p", { children: [
-            jsx("strong", { children: comment.actor }),
-            jsx("span", { children: ` \xB7 ${formatWhen(comment.created_at)} \xB7 ${comment.body}` })
-          ] }, comment.id))
-        }) : jsx("p", { className: "dockyard-meta", children: "No comments yet." }),
+      jsx(Section, { title: "Requested change", children: jsx("p", { children: decisionText(scope.reason) }) }),
+      jsx(Section, { title: "Policy gate", children: jsx("p", { className: "dim", children: decision ? `Decision revision ${decision.revision}; the displayed fingerprint is required before mutation.` : "Loading the decision gate\u2026" }) }),
+      jsx(Section, { title: "Potential impact", children: jsx("p", { children: decisionText(scope.expected_outcome) }) }),
+      jsx(Section, { title: "Capability boundary", children: jsx("p", { children: scope.authority?.granted ? jsxs("span", { children: [jsx("code", { children: scope.authority.granted }), ` for ${decisionText(scope.authority.scope)}`] }) : "No capability grant supplied." }) }),
+      jsx(Section, { title: "Who asked", children: jsx("p", { children: decisionText(scope.proposer) }) }),
+      jsx(Section, { title: "Evidence", children: jsxs("ul", { className: "dockyard-inbox-evidence-list", children: [
+        ...steps.map((step, index) => jsx("li", { "data-evidence-cell": true, children: `Step ${index + 1}: ${decisionText(step)}` }, `${item.ref}-step-${index}`)),
+        contract.tests ? jsx("li", { "data-evidence-cell": true, children: `Tests: ${decisionText(contract.tests)}` }) : null,
+        steps.length === 0 && !contract.tests ? jsx("li", { "data-evidence-cell": true, children: "No validation evidence supplied." }) : null
+      ] }) }),
+      jsx(Section, { title: "Affected work items", children: jsx("ul", { className: "dockyard-inbox-workitems", children: affected.length ? affected.map((work) => jsx("li", { children: decisionText(work) }, decisionText(work))) : jsx("li", { children: "No linked work items supplied." }) }) }),
+      jsx(Section, { title: "Activity", children: jsx("div", { className: "dockyard-comment-thread", children: activity.length ? activity.map((entry, index) => jsx("p", { children: `${entry.actor || entry.kind} \xB7 ${formatWhen(entry.at)} \xB7 ${entry.body || entry.summary || entry.decision || entry.kind}` }, `${entry.kind}-${entry.at}-${index}`)) : jsx("p", { children: "No activity recorded yet." }) }) }),
+      jsx(Section, { title: "Comments don't change the decision", children: jsxs("div", { className: "dockyard-approval-comments", "data-approval-comments": true, children: [
+        jsx("p", { className: "dim", children: "Comments add audit context only. They do not approve, reject, or alter the decision fingerprint." }),
         jsxs("div", { className: "dockyard-comment-form", children: [
-          jsx("input", {
-            value: commentBody,
-            onChange: (event) => setCommentBody(event.target.value),
-            placeholder: "Add context without deciding (recorded in the audit trail)",
-            "aria-label": "Comment"
-          }),
+          jsx("input", { value: commentBody, onChange: (event) => setCommentBody(event.target.value), placeholder: "Add context without deciding", "aria-label": "Comment" }),
           jsx(Button, { small: true, variant: "quiet", onClick: addComment, disabled: !commentBody.trim(), children: "Comment" })
         ] })
-      ] })
+      ] }) }),
+      changesOpen ? jsxs("section", { className: "dockyard-request-changes", "data-request-changes-form": "true", children: [
+        jsxs("label", { children: ["Feedback for the proposer ", jsx("input", { value: feedback, onChange: (event) => setFeedback(event.target.value), placeholder: "What must change before approval" })] }),
+        jsxs("div", { className: "dockyard-request-changes-actions", children: [
+          jsx(Button, { variant: "primary", action: "confirm-request-changes", disabled: busy || !feedback.trim(), onClick: requestChanges, children: busy ? "Returning\u2026" : "Return to proposer" }),
+          jsx(Button, { variant: "quiet", disabled: busy, onClick: () => setChangesOpen(false), children: "Cancel" })
+        ] })
+      ] }) : null,
+      error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: error }) : null,
+      jsxs("footer", { className: "dockyard-inbox-actions", children: [
+        jsx(Button, { action: "approve", variant: "primary", disabled: busy || !decision, onClick: () => decide("approve"), children: state === "approving" ? "Approving..." : "Approve" }),
+        jsx(Button, { action: "reject", variant: "danger", disabled: busy || !decision, onClick: () => setRejectOpen(true), children: "Reject" }),
+        jsx(Button, { action: "request-changes", variant: "quiet", disabled: busy || !decision, onClick: () => setChangesOpen((open) => !open), children: "Request changes" }),
+        jsx("span", { className: "spacer" }),
+        jsx("span", { className: "dockyard-inbox-status", children: decision ? "Receipt required" : "Loading evidence\u2026" })
+      ] }),
+      rejectOpen ? jsx(RejectDialog, {
+        item,
+        busy: state === "rejecting",
+        reason: rejectReason,
+        onReason: setRejectReason,
+        onCancel: () => setRejectOpen(false),
+        onConfirm: () => decide("reject")
+      }) : null
     ]
   });
 }
@@ -10252,7 +10216,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     const ids = selectedIds.length ? selectedIds : selectedId ? [selectedId] : [];
     if (!ids.length) return;
     const before = snapshot(objects, connectors);
-    const stamp = Date.now();
+    const stamp2 = Date.now();
     setObjects((current) => {
       const next = [...current];
       ids.forEach((id) => {
@@ -10262,7 +10226,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
         const rect = canvasRect(origin);
         next.push({
           ...origin,
-          id: `canvas-obj-${stamp}-${canvasObjectSeq}`,
+          id: `canvas-obj-${stamp2}-${canvasObjectSeq}`,
           content: { ...origin.content ?? {} },
           tags: [...origin.tags ?? []],
           x: canvasClamp(rect.x + 24, CANVAS_MIN_POS.x, CANVAS_WORLD.width - CANVAS_CARD.width - CANVAS_MIN_POS.x),
@@ -11552,6 +11516,146 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     ]
   });
 }
+
+// hermes_dockyard_plugin/desktop/src/styles/inbox-css.js
+var INBOX_CSS = `
+/* ==== Approval Inbox (Batch D): list left, detail right ==== */
+.dockyard-root .dockyard-inbox { display: grid; gap: 14px; min-width: 0; }
+.dockyard-root .dockyard-inbox-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dockyard-root .dockyard-inbox-tab {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 13px;
+  border: 1px solid var(--dy-border);
+  border-radius: 999px;
+  background: var(--dy-surface);
+  color: var(--dy-text-2);
+  font: inherit; font-size: 12px; font-weight: 600;
+  cursor: pointer;
+}
+.dockyard-root .dockyard-inbox-tab:hover { border-color: var(--dy-accent-border); color: var(--dy-accent-text); }
+.dockyard-root .dockyard-inbox-tab[aria-selected="true"] {
+  border-color: var(--dy-accent-border);
+  background: var(--dy-accent-soft);
+  color: var(--dy-accent-text);
+}
+.dockyard-root .dockyard-inbox-tab small { color: var(--dy-text-3); font-weight: 600; }
+.dockyard-root .dockyard-inbox-tab[aria-selected="true"] small { color: var(--dy-accent-text); }
+.dockyard-root .dockyard-inbox-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  min-width: 0;
+}
+.dockyard-root .dockyard-inbox-list { display: grid; gap: 9px; min-width: 0; }
+.dockyard-root .dockyard-inbox-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  width: 100%;
+  padding: 12px 13px;
+  border: 1px solid var(--dy-border);
+  border-radius: 12px;
+  background: var(--dy-surface);
+  color: var(--dy-text);
+  font: inherit; text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+.dockyard-root .dockyard-inbox-row:hover { border-color: var(--dy-accent-border); }
+.dockyard-root .dockyard-inbox-row[aria-selected="true"] {
+  border-color: var(--dy-accent-border);
+  background: var(--dy-accent-soft);
+}
+.dockyard-root .dockyard-inbox-row:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
+.dockyard-root .dockyard-inbox-row-title { overflow: hidden; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.dockyard-root .dockyard-inbox-row-meta { grid-column: 1; color: var(--dy-text-3); font-size: 11px; }
+.dockyard-root .dockyard-inbox-row-badge { grid-row: 1 / span 2; grid-column: 2; align-self: center; padding: 3px 8px; border-radius: 999px; background: var(--dy-warning-bg); color: var(--dy-warning); font-size: 10px; font-weight: 700; }
+.dockyard-root .dockyard-inbox-row-badge.danger { background: var(--dy-danger-bg); color: var(--dy-danger); }
+.dockyard-root .dockyard-inbox-row-badge.urgent { background: var(--dy-accent-soft); color: var(--dy-accent-text); }
+.dockyard-root .dockyard-inbox-empty { padding: 18px 14px; border: 1px dashed var(--dy-border); border-radius: 12px; color: var(--dy-text-3); font-size: 12.5px; }
+/* Attention rows: honest, listed, never decidable here. */
+.dockyard-root .dockyard-attention-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  width: 100%;
+  padding: 12px 13px;
+  border: 1px solid var(--dy-warning);
+  border-radius: 12px;
+  background: var(--dy-warning-bg);
+  color: var(--dy-text);
+  font: inherit; text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+.dockyard-root .dockyard-attention-row-title { font-size: 13px; font-weight: 650; }
+.dockyard-root .dockyard-attention-row small { grid-column: 1; color: var(--dy-text-2); font-size: 11px; }
+.dockyard-root .dockyard-attention-row a, .dockyard-root .dockyard-attention-row button { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 11px; }
+.dockyard-root .dockyard-attention-panel {
+  display: grid;
+  gap: 9px;
+  padding: 15px;
+  border: 1px solid var(--dy-warning);
+  border-radius: 12px;
+  background: var(--dy-warning-bg);
+}
+.dockyard-root .dockyard-attention-panel h2 { margin: 0; font-size: 14.5px; }
+.dockyard-root .dockyard-attention-panel p { margin: 0; color: var(--dy-text-2); font-size: 12.5px; line-height: 1.5; }
+/* Detail panel: the decision context, ordered; actions pinned at the bottom. */
+.dockyard-root .dockyard-inbox-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  min-width: 0;
+  padding: 17px;
+  border: 1px solid var(--dy-border);
+  border-radius: 14px;
+  background: var(--dy-surface);
+  max-height: calc(100vh - 150px);
+  overflow: auto;
+}
+.dockyard-root .dockyard-inbox-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.dockyard-root .dockyard-inbox-panel-head h2 { margin: 0; font-size: 17px; line-height: 1.3; }
+.dockyard-root .dockyard-inbox-panel-head small { display: block; margin-top: 3px; color: var(--dy-text-3); font-size: 11.5px; }
+.dockyard-root .dockyard-inbox-section { display: grid; gap: 6px; }
+.dockyard-root .dockyard-inbox-section > h3 { margin: 0; color: var(--dy-text-3); font-size: 10.5px; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; }
+.dockyard-root .dockyard-inbox-section > p { margin: 0; color: var(--dy-text); font-size: 13px; line-height: 1.55; }
+.dockyard-root .dockyard-inbox-section > p.dim { color: var(--dy-text-2); }
+.dockyard-root .dockyard-inbox-section code { padding: 1px 6px; border-radius: 6px; background: var(--dy-surface-subtle); color: var(--dy-text); font-size: 11.5px; }
+.dockyard-root .dockyard-inbox-status { display: inline-flex; align-items: center; gap: 7px; width: fit-content; padding: 5px 10px; border-radius: 999px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11.5px; font-weight: 600; }
+.dockyard-root .dockyard-inbox-status.pass { background: var(--dy-success-bg); color: var(--dy-success); }
+.dockyard-root .dockyard-inbox-status.block { background: var(--dy-danger-bg); color: var(--dy-danger); }
+.dockyard-root .dockyard-inbox-evidence-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.dockyard-root .dockyard-inbox-evidence-list li { display: flex; gap: 8px; align-items: baseline; color: var(--dy-text-2); font-size: 12.5px; }
+.dockyard-root .dockyard-inbox-workitems { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.dockyard-root .dockyard-inbox-workitems li { color: var(--dy-text-2); font-size: 12.5px; }
+/* Pinned action bar: the three outcomes, always the last thing on screen. */
+.dockyard-root .dockyard-inbox-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  padding: 12px 0 2px;
+  border-top: 1px solid var(--dy-border);
+  background: var(--dy-surface);
+}
+.dockyard-root .dockyard-inbox-actions .spacer { flex: 1 1 auto; }
+/* Request-changes feedback form (R2): one required field, then submit. */
+.dockyard-root .dockyard-request-changes { display: grid; gap: 9px; padding: 13px; border: 1px solid var(--dy-accent-border); border-radius: 12px; background: var(--dy-accent-soft); }
+.dockyard-root .dockyard-request-changes label { color: var(--dy-text); font-size: 12px; font-weight: 650; }
+.dockyard-root .dockyard-request-changes input { min-height: 34px; padding: 6px 10px; border: 1px solid var(--dy-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12.5px; }
+.dockyard-root .dockyard-request-changes input:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
+.dockyard-root .dockyard-request-changes-actions { display: flex; gap: 8px; }
+/* Narrow container: the list is alone; the detail opens full width. */
+@container dockyard (max-width: 820px) {
+  .dockyard-root .dockyard-inbox-layout { grid-template-columns: 1fr; }
+  .dockyard-root .dockyard-inbox-panel { max-height: none; }
+}
+`;
 
 // hermes_dockyard_plugin/desktop/src/views/dashboard.js
 function DiscoveredProfilePicker({ profiles = [], value = "", onChange, name, label = "Hermes profile", disabled = false }) {
@@ -15571,26 +15675,160 @@ function TeamsView({ view, onRefresh }) {
 }
 
 // hermes_dockyard_plugin/desktop/src/views/inbox.js
-function InboxView({ view, onRefresh }) {
-  const items = sortApprovals(view.items ?? []);
+var narrowViewport = () => typeof window !== "undefined" && window.innerWidth <= 820;
+function InboxRow({ item, selected, onSelect, onOpenProject }) {
+  const summary = rowSummary(item);
+  if (isAttention(item)) {
+    return jsxs("div", {
+      className: "dockyard-attention-row",
+      role: "button",
+      tabIndex: 0,
+      "aria-selected": selected,
+      "data-inbox-row": true,
+      "data-attention-row": true,
+      "data-inbox-ref": item.ref,
+      onClick: () => onSelect(item.ref),
+      onKeyDown: (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect(item.ref);
+        }
+      },
+      children: [
+        jsx("span", { className: "dockyard-attention-row-title", children: `${item.project || item.title} needs attention` }),
+        jsx("small", { children: summary.meta || "frozen or disabled project" }),
+        jsx("a", {
+          href: "#",
+          onClick: (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onOpenProject?.(item.deep_link);
+          },
+          children: "Open project"
+        })
+      ]
+    });
+  }
+  const count = evidenceCount(item);
+  const danger = ["high", "critical"].includes(summary.risk);
+  return jsxs("button", {
+    type: "button",
+    className: "dockyard-inbox-row",
+    "aria-selected": selected,
+    "data-inbox-row": true,
+    "data-inbox-ref": item.ref,
+    "data-approval-ref": item.ref,
+    onClick: () => onSelect(item.ref),
+    children: [
+      jsx("span", { className: "dockyard-inbox-row-title", children: item.title }),
+      jsx("span", { className: "dockyard-inbox-row-meta", children: `${summary.project}${summary.project && summary.meta ? " \xB7 " : ""}${summary.meta}` }),
+      jsx("span", { className: `dockyard-inbox-row-badge${danger ? " danger" : ""}`, children: count ? `${count} evidence` : summary.risk || "pending" })
+    ]
+  });
+}
+function AttentionDetail({ item, onBack, onOpenProject }) {
+  const copy = attentionPanel(item);
+  return jsxs("article", { className: "dockyard-inbox-panel dockyard-attention-panel", "data-inbox-panel": "true", children: [
+    onBack ? jsx(Button, { variant: "quiet", small: true, onClick: onBack, children: "Back" }) : null,
+    jsx("h2", { children: copy.title }),
+    jsx("p", { children: copy.description }),
+    jsx(Button, { variant: "primary", onClick: () => onOpenProject?.(copy.deeplink), children: `Open ${copy.project || "project"}` })
+  ] });
+}
+function InboxView({ view, onRefresh, focusRef = null, onOpenProject }) {
+  const [items, setItems] = useState(() => sortApprovals(view.items ?? []));
+  const [tab, setTab] = useState("all");
+  const [selectedRef, setSelectedRef] = useState(null);
+  const [narrow, setNarrow] = useState(narrowViewport);
+  const lastRow = useRef(null);
+  useEffect(() => {
+    setItems(sortApprovals(view.items ?? []));
+  }, [view.items]);
+  useEffect(() => {
+    const resize = () => setNarrow(narrowViewport());
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, []);
+  useEffect(() => {
+    if (!focusRef) return;
+    if (items.some((item) => item.ref === focusRef)) setSelectedRef(focusRef);
+  }, [focusRef, items]);
+  useEffect(() => {
+    const handle = (event) => {
+      const link = event.detail;
+      if (typeof link !== "string" || !link.startsWith("s6:initiative/")) return;
+      const ref = link.slice("s6:initiative/".length);
+      if (items.some((item) => item.ref === ref)) setSelectedRef(ref);
+    };
+    window.addEventListener("dockyard:test:deeplink", handle);
+    return () => window.removeEventListener("dockyard:test:deeplink", handle);
+  }, [items]);
+  useEffect(() => {
+    const close = (event) => {
+      if (event.key !== "Escape" || !selectedRef) return;
+      const ref = selectedRef;
+      setSelectedRef(null);
+      window.setTimeout(() => document.querySelector(`[data-inbox-ref="${CSS.escape(ref)}"]`)?.focus(), 0);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [selectedRef]);
+  const counts = countTabs(items);
+  const visible = filterByTab(items, tab);
+  const selected = items.find((item) => item.ref === selectedRef) ?? null;
+  const selectRow = (ref) => {
+    lastRow.current = ref;
+    setSelectedRef(ref);
+  };
+  const closePanel = () => {
+    const ref = selectedRef || lastRow.current;
+    setSelectedRef(null);
+    window.setTimeout(() => document.querySelector(`[data-inbox-ref="${CSS.escape(ref || "")}"]`)?.focus(), 0);
+  };
+  const resolved = (ref) => {
+    const index = visible.findIndex((item) => item.ref === ref);
+    const remaining = items.filter((item) => item.ref !== ref);
+    const nextVisible = filterByTab(remaining, tab);
+    const next = nextVisible[Math.min(index, Math.max(0, nextVisible.length - 1))] ?? null;
+    setItems(remaining);
+    setSelectedRef(narrow ? null : next?.ref ?? null);
+    window.setTimeout(() => document.querySelector(`[data-inbox-ref="${CSS.escape(next?.ref || "")}"]`)?.focus(), 0);
+    onRefresh?.();
+  };
   if (items.length === 0) {
-    return jsxs(Fragment, { children: [
+    return jsxs("div", { "data-inbox-screen": "true", children: [
       jsx(PageHead, { title: "Approval Inbox", description: "Every pending human decision across every project, with enough context to decide here.", onRefresh }),
       jsx(EmptyState, { title: "No approvals waiting", description: "New owner decisions will appear here with their project, evidence context and risk.", icon: "check" })
     ] });
   }
-  return jsxs(Fragment, { children: [
+  return jsxs("div", { className: "dockyard-inbox", "data-inbox-screen": "true", children: [
     jsx(PageHead, {
       title: "Approval Inbox",
-      description: "Every pending human decision across every project, with enough context to decide here.",
-      status: `${number(items.length)} ${plural(items.length, "decision")} owed`,
+      description: "Review one decision at a time. Attention rows are project warnings, not decisions.",
+      status: `${number(items.length)} ${plural(items.length, "item")} waiting`,
       onRefresh
     }),
-    jsx("section", {
-      className: "dockyard-approval-list",
-      "aria-label": "Pending approvals",
-      children: items.map((item) => jsx(ApprovalRow, { item, onResolved: onRefresh }, item.ref))
-    })
+    jsx("div", {
+      className: "dockyard-inbox-tabs",
+      role: "tablist",
+      "aria-label": "Approval age filters",
+      children: TAB_KEYS.map((key) => jsxs("button", {
+        type: "button",
+        role: "tab",
+        className: "dockyard-inbox-tab",
+        "data-inbox-tab": key,
+        "aria-selected": tab === key,
+        onClick: () => {
+          setTab(key);
+          setSelectedRef(null);
+        },
+        children: [TAB_LABELS[key], jsx("small", { children: number(counts[key]) })]
+      }, key))
+    }),
+    jsxs("section", { className: "dockyard-inbox-layout", children: [
+      narrow && selected ? null : jsx("div", { className: "dockyard-inbox-list", "aria-label": "Pending approvals and project attention", children: visible.length ? visible.map((item) => jsx(InboxRow, { item, selected: item.ref === selectedRef, onSelect: selectRow, onOpenProject }, item.ref)) : jsx("p", { className: "dockyard-inbox-empty", children: `No ${TAB_LABELS[tab].toLowerCase()} items.` }) }),
+      selected ? isAttention(selected) ? jsx(AttentionDetail, { item: selected, onBack: narrow ? closePanel : null, onOpenProject }) : jsx(ApprovalDetail, { item: selected, onResolved: resolved, onBack: narrow ? closePanel : null }) : narrow ? null : jsx("p", { className: "dockyard-inbox-empty", children: "Select a row to review its full decision context." })
+    ] })
   ] });
 }
 
@@ -15791,9 +16029,9 @@ var PAGE_SIZE = 50;
 var kindLabel = (kind) => KIND_LABELS[kind] ?? "Other";
 function dayBucket(createdAt) {
   const value = String(createdAt || "");
-  const stamp = Date.parse(value);
-  if (!Number.isFinite(stamp)) return "Earlier";
-  const day = new Date(stamp);
+  const stamp2 = Date.parse(value);
+  if (!Number.isFinite(stamp2)) return "Earlier";
+  const day = new Date(stamp2);
   day.setHours(0, 0, 0, 0);
   const today = /* @__PURE__ */ new Date();
   today.setHours(0, 0, 0, 0);
@@ -16907,8 +17145,9 @@ function RoadmapView({ initialScope = "all", onOpen, onRefresh }) {
 }
 
 // hermes_dockyard_plugin/desktop/src/shell/dashboard-page.js
-function DashboardPage() {
+function DashboardPage({ inboxCss = "" } = {}) {
   useDockyardStyles();
+  useStylesheet("dy-inbox-stylesheet", "dyInboxStylesheet", inboxCss);
   const [tab, setTab] = useState("dashboard");
   const [selectedProject, setSelectedProject] = useState(null);
   const [projectOptions, setProjectOptions] = useState([]);
@@ -17109,6 +17348,7 @@ function DashboardPage() {
     setCounts((previous) => ({ ...previous, notifications: Math.max(0, Number(previous.notifications ?? 1) - 1) }));
   };
   const [deepLinkNotice, setDeepLinkNotice] = useState(null);
+  const [inboxFocusRef, setInboxFocusRef] = useState(null);
   const openDeepLink = (link) => {
     if (typeof link !== "string" || !link.includes(":")) return;
     const [screen, rest] = link.split(":", 2);
@@ -17117,6 +17357,7 @@ function DashboardPage() {
     const objectId = slash >= 0 ? rest.slice(slash + 1) : rest;
     if (screen === "s4" || screen === "s6" && objectKind === "initiative") {
       setDeepLinkNotice(objectId ? `Approval inbox: focus ${objectId}` : null);
+      setInboxFocusRef(objectId || null);
       setTab("inbox");
       return;
     }
@@ -17217,7 +17458,7 @@ function DashboardPage() {
   } else if (tab === "initiative") {
     content = jsx(InitiativeView, { view: payload, onRefresh: refresh });
   } else if (tab === "inbox") {
-    content = jsx(InboxView, { view: payload, onRefresh: refresh });
+    content = jsx(InboxView, { view: payload, onRefresh: refresh, focusRef: inboxFocusRef, onOpenProject: openDeepLink });
   } else {
     content = jsx(NotificationsView, { view: payload, onRefresh: refresh, onAcknowledged: acknowledge, onOpen: openDeepLink });
   }
@@ -17331,7 +17572,7 @@ var __plugin = {
         id: "page",
         area: "routes",
         data: { path: "/dockyard" },
-        render: () => jsx(DashboardPage, {})
+        render: () => jsx(DashboardPage, { inboxCss: INBOX_CSS })
       },
       {
         id: "nav",

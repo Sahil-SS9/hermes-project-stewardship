@@ -29,7 +29,7 @@ store = plugin_api._store
 adapter = ReferenceKanbanAdapter(
     store, profiles=["worker", "reviewer", "fixture-lead", "octacon", "quan"])
 service = StewardshipService(store)
-for pid in ("payments-relaunch", "mobile-client", "atlas-mobile"):
+for pid in ("payments-relaunch", "mobile-client", "atlas-mobile", "legacy-integration"):
     service.enable(pid, mission=f"Deliver {pid}", lead_profile="fixture-lead",
                    member_profiles=["worker", "reviewer"], autonomy_level=2)
     adapter.create_work(pid, kind="task", title=f"Verify {pid}", body="Fixture canonical work",
@@ -46,6 +46,16 @@ _roadmap_fixtures_spec.loader.exec_module(_roadmap_fixtures)  # noqa: E402 (file
 
 roadmap = RoadmapService(store, service, adapter)
 _roadmap_fixtures.seed_roadmap_fixtures(service, adapter, roadmap)
+
+# Batch D inbox fixtures: pending decisions across both tab states + one
+# frozen project for the attention row. Same seam as the roadmap fixtures.
+_inbox_fixtures_spec = _il.spec_from_file_location(
+    "_inbox_fixtures", Path(__file__).resolve().parent / "_inbox_fixtures.py")
+_inbox_fixtures = _il.module_from_spec(_inbox_fixtures_spec)
+_inbox_fixtures_spec.loader.exec_module(_inbox_fixtures)  # noqa: E402 (file-path load after env setup)
+_inbox_fixtures.seed_inbox_fixtures(service)
+for _pid in ("legacy-integration",):
+    service.disable(_pid, actor="fixture", interface="fixture")
 plugin_api._app = create_app(store, kanban_adapter=adapter,
     auth_token="demo-session-token", auth_principal="demo-owner",
     auth_principal_is_human=True, capabilities=frozenset({"workflow_revision_approval", "project_archive"}))

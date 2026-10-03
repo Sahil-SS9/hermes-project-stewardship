@@ -19,6 +19,7 @@ import { ConsoleBar } from './lib/ui.js'
 import { DOCKYARD_ALLOWED_CHILDREN } from './views/backlog.js'
 import { DOCKYARD_CREATE_CHILD_TYPES } from './views/backlog.js'
 import { DOCKYARD_CSS } from './styles/dockyard-css.js'
+import { INBOX_CSS } from './styles/inbox-css.js'
 import { DOCKYARD_EDITABLE_TYPES } from './views/backlog.js'
 import { DOCKYARD_ROOT_TYPES } from './views/backlog.js'
 import { DOCKYARD_TYPE_NAMES } from './views/backlog.js'
@@ -191,7 +192,7 @@ const __plugin = {
         id: 'page',
         area: 'routes',
         data: { path: '/dockyard' },
-        render: () => jsx(DashboardPage, {}),
+        render: () => jsx(DashboardPage, { inboxCss: INBOX_CSS }),
       },
       {
         id: 'nav',
