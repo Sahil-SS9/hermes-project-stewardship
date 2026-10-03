@@ -4,6 +4,7 @@ import { useEffect } from './react.js'
 import { DOCKYARD_CSS } from '../styles/dockyard-css.js'
 import { WORKFLOW_LIBRARY_CSS } from '../styles/workflow-css.js'
 import { ROADMAP_CSS } from '../styles/roadmap-css.js'
+import { SETTINGS_CSS } from '../styles/settings-css.js'
 import workflowCanvasCss from '../../workflow-canvas-css.js'
 export let _rest = null
 export let _os = null
@@ -86,6 +87,10 @@ export function useDockyardStyles() {
   // R2 Phase C: Roadmap styles (R2-owned; appended here so dockyard-css.js
   // does not grow, same rule as the workflow library block above).
   useStylesheet('dy-roadmap-stylesheet', 'dyRoadmapStylesheet', ROADMAP_CSS)
+  // C8 Settings option A: three uppercase category labels over the existing
+  // Project configuration grid (C8-owned; appended here so dockyard-css.js does
+  // not grow, same rule as the workflow library and roadmap blocks above).
+  useStylesheet('dy-settings-stylesheet', 'dySettingsStylesheet', SETTINGS_CSS)
   // The workflow canvas owns a stylesheet of its own (the palette has exactly
   // one home: dashboard/src/workflow-canvas-css.ts). Its rules are scoped to
   // `.dy-wf-scope`, a class the canvas mount host carries itself, so this file
