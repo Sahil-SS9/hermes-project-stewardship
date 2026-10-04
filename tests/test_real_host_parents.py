@@ -95,6 +95,8 @@ def test_a_real_dependency_still_blocks(real):
     blocker = world.item(pid, "Blocker task")
     blocked = world.item(pid, "Blocked task")
     world.work.add_dependency(pid, blocked, blocker, actor=HUMAN)
-    rows = world.adapter.list_work_links(pid, blocked)
+    # Checked at the host: these rows are what make it a Hermes link. The
+    # adapter's view of them is the Kanban lane's to shape (C2 reshapes it).
+    rows = world.adapter.host.list_links(blocked)["items"]
     assert rows == [{"parent_task_id": blocker, "child_task_id": blocked}]
     assert world.work.detail(pid, blocked)["parent"] is None  # a blocker is not a parent
