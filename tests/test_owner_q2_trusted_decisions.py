@@ -211,6 +211,17 @@ def _proposal_row(store: Store, proposal_id: str) -> tuple:
     return tuple(row)
 
 
+@pytest.fixture()
+def local_canvas_contract(monkeypatch):
+    """Canvas sessions here use the provider-neutral local contract.
+
+    The suite never calls a real model (server._canvas_provider): the default
+    provider is the real Hermes one, which loads the host's model config.
+    """
+    monkeypatch.setenv("HPS_CANVAS_PROVIDER", "none")
+
+
+@pytest.mark.usefixtures("local_canvas_contract")
 @pytest.mark.parametrize("approve", [True, False], ids=["approve", "dismiss"])
 @pytest.mark.parametrize("actor,headers", UNTRUSTED_CANVAS_CALLERS, ids=UNTRUSTED_CANVAS_IDS)
 def test_direct_canvas_decision_without_a_trusted_principal_is_refused(open_backend, approve, actor, headers):
@@ -225,6 +236,7 @@ def test_direct_canvas_decision_without_a_trusted_principal_is_refused(open_back
     assert _proposal_row(svc.store, proposal_id) == ("pending", None), "a refused decision must record nothing"
 
 
+@pytest.mark.usefixtures("local_canvas_contract")
 def test_canvas_decider_is_the_trusted_principal_never_the_body(tmp_path):
     store = Store(tmp_path / "q2-canvas.db")
     StewardshipService(store).enable("demo", mission="m", lead_profile="lead", member_profiles=["worker"],
@@ -242,6 +254,7 @@ def test_canvas_decider_is_the_trusted_principal_never_the_body(tmp_path):
         store.close()
 
 
+@pytest.mark.usefixtures("local_canvas_contract")
 @pytest.mark.parametrize("approve,status", [(True, "approved"), (False, "rejected")], ids=["approve", "dismiss"])
 @pytest.mark.parametrize("env_token", [False, True], ids=["cli_started_dashboard", "desktop_env_token"])
 def test_desktop_canvas_buttons_work_in_the_production_composition(tmp_path, monkeypatch, env_token, approve, status):
