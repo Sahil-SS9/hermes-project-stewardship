@@ -33,6 +33,8 @@ export const KANBAN_CSS = `
 /* Unsaved view changes: one slim strip under the filters. */
 .dockyard-root .dy-kb-edited { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 10px; border: 1px solid var(--dy-warning); border-radius: 8px; background: var(--dy-warning-bg); color: var(--dy-text); font-size: 12px; }
 .dockyard-root .dy-kb-edited-text { flex: 1 1 auto; font-weight: 650; }
+/* One quiet line: how to move a card. */
+.dockyard-root .dy-kb-help { margin: 0; color: var(--dy-text-3); font-size: 12px; }
 
 /* Filter row. Every control is the same box as on Roadmap: 38px tall, control border, 6px radius, 13px text. */
 .dockyard-root .dy-kb-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

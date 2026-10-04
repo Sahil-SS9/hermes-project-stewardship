@@ -2357,6 +2357,8 @@ var KANBAN_CSS = `
 /* Unsaved view changes: one slim strip under the filters. */
 .dockyard-root .dy-kb-edited { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 10px; border: 1px solid var(--dy-warning); border-radius: 8px; background: var(--dy-warning-bg); color: var(--dy-text); font-size: 12px; }
 .dockyard-root .dy-kb-edited-text { flex: 1 1 auto; font-weight: 650; }
+/* One quiet line: how to move a card. */
+.dockyard-root .dy-kb-help { margin: 0; color: var(--dy-text-3); font-size: 12px; }
 
 /* Filter row. Every control is the same box as on Roadmap: 38px tall, control border, 6px radius, 13px text. */
 .dockyard-root .dy-kb-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -15868,6 +15870,7 @@ function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onN
     }) : null,
     jsx("span", { className: "dy-kb-count", "data-kanban-count": true, role: "status", children: `${number(liveCount)} ${plural(liveCount, "item")}` })
   ] });
+  const help = working.layout === "board" ? jsx("p", { className: "dy-kb-help", "data-kanban-help": true, children: "Drag a card to another column, or open the card and use Move to. Only moves Hermes accepts are offered." }) : null;
   const editedStrip = edited ? jsxs("div", { className: "dy-kb-edited", "data-view-edited": currentName ?? ALL_WORK, role: "status", children: [
     jsx("span", { className: "dy-kb-dot", "aria-hidden": true }),
     jsx("span", { className: "dy-kb-edited-text", children: currentSaved ? `Unsaved changes to "${currentSaved.name}".` : "You changed All work. Save it as a view to keep this." }),
@@ -15993,7 +15996,7 @@ function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onN
     groups: STAGES.map((stage) => ({ key: stage.key, label: stage.label, items: grouped[stage.key] })).filter((group) => group.items.length > 0),
     emptyText: "No work items to list."
   }) }, "list");
-  const body = page === "milestones" ? [jsx(PlanningPanel, { project, milestones: view.milestones ?? [], workItems: allItems, onRefresh }, "milestones")] : [jsxs("div", { className: "dy-kb-controls", children: [toolbar, editedStrip] }, "controls"), ...notes, empty, working.layout === "list" ? list : board];
+  const body = page === "milestones" ? [jsx(PlanningPanel, { project, milestones: view.milestones ?? [], workItems: allItems, onRefresh }, "milestones")] : [jsxs("div", { className: "dy-kb-controls", children: [toolbar, editedStrip, help] }, "controls"), ...notes, empty, working.layout === "list" ? list : board];
   return jsxs("div", { className: "dockyard-board-wrap", "data-kanban-screen": true, "data-view": currentName ?? ALL_WORK, "data-panel-open": panel ? "true" : void 0, children: [
     viewsBar,
     ...body,

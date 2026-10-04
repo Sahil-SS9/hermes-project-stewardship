@@ -474,6 +474,11 @@ export function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenIt
     jsx('span', { className: 'dy-kb-count', 'data-kanban-count': true, role: 'status', children: `${number(liveCount)} ${plural(liveCount, 'item')}` }),
   ]})
 
+  // How to move a card; drag is never the only way (kept from C's board).
+  const help = working.layout === 'board'
+    ? jsx('p', { className: 'dy-kb-help', 'data-kanban-help': true, children: 'Drag a card to another column, or open the card and use Move to. Only moves Hermes accepts are offered.' })
+    : null
+
   const editedStrip = edited ? jsxs('div', { className: 'dy-kb-edited', 'data-view-edited': currentName ?? ALL_WORK, role: 'status', children: [
     jsx('span', { className: 'dy-kb-dot', 'aria-hidden': true }),
     jsx('span', { className: 'dy-kb-edited-text', children: currentSaved ? `Unsaved changes to "${currentSaved.name}".` : 'You changed All work. Save it as a view to keep this.' }),
@@ -578,7 +583,7 @@ export function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenIt
 
   const body = page === 'milestones'
     ? [jsx(PlanningPanel, { project, milestones: view.milestones ?? [], workItems: allItems, onRefresh }, 'milestones')]
-    : [jsxs('div', { className: 'dy-kb-controls', children: [toolbar, editedStrip] }, 'controls'), ...notes, empty, working.layout === 'list' ? list : board]
+    : [jsxs('div', { className: 'dy-kb-controls', children: [toolbar, editedStrip, help] }, 'controls'), ...notes, empty, working.layout === 'list' ? list : board]
 
   return jsxs('div', { className: 'dockyard-board-wrap', 'data-kanban-screen': true, 'data-view': currentName ?? ALL_WORK, 'data-panel-open': panel ? 'true' : undefined, children: [
     viewsBar,
