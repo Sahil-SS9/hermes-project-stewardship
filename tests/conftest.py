@@ -20,6 +20,9 @@ from urllib.parse import unquote, urlsplit
 
 import pytest
 
+from tests.offline_guard import ATTEMPTS as _OFFLINE_ATTEMPTS
+from tests.offline_guard import install as _install_offline_guard
+
 
 # Read by the repo-root conftest.py: while this module is loaded it owns every
 # state path, so the root conftest must not re-pin them. A module attribute,
@@ -97,6 +100,13 @@ def _guarded_sqlite_connect(database, *args, **kwargs):
 sqlite3.connect = _guarded_sqlite_connect
 
 
+# Tests stay offline: no connection off this machine and no GitHub CLI run
+# (see tests/offline_guard.py for why). Attempts are refused and recorded;
+# _test_stays_offline fails the test that made one, and attempts outside any
+# test fail the session.
+_install_offline_guard()
+
+
 def _fingerprint(paths: tuple[Path, ...]) -> tuple[tuple[str, int, str], ...]:
     """Content fingerprint only.
 
@@ -147,12 +157,56 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     if after != _LIVE_BEFORE:
         print("\nERROR: live Dockyard database changed during pytest; refusing a green result")
         session.exitstatus = 1
+    if _OFFLINE_ATTEMPTS:
+        print(f"\nERROR: code outside any test tried to go online (refused): {_OFFLINE_ATTEMPTS[:5]}")
+        session.exitstatus = 1
 
 
 @pytest.fixture(scope="session", autouse=True)
 def _prove_test_paths_are_disposable():
     """Keep the isolation contract active for the complete pytest session."""
     yield
+
+
+_SANDBOX_ENV = ("HPS_TEST_STATE_ROOT", "HERMES_HOME", "HERMES_KANBAN_HOME", "STEWARD_DB_PATH", "DOCKYARD_PLUGIN_DB")
+
+
+@pytest.fixture(autouse=True)
+def _sandbox_env_survives_each_test():
+    """Fail any test that leaves a sandbox path changed or unset, after repairing it.
+
+    A test that popped HERMES_HOME instead of restoring it pointed every later
+    test at the live ~/.hermes. This fixture tears down after the test's own
+    fixtures (monkeypatch undo has run); repairing first stops one leak from
+    carrying later tests onto live state.
+    """
+    before = {name: os.environ.get(name) for name in _SANDBOX_ENV}
+    yield
+    after = {name: os.environ.get(name) for name in _SANDBOX_ENV}
+    if after == before:
+        return
+    for name, value in before.items():
+        if value is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = value
+    changed = {name: (before[name], after[name]) for name in _SANDBOX_ENV if after[name] != before[name]}
+    pytest.fail(f"test left the pytest sandbox environment changed (before, after): {changed}", pytrace=False)
+
+
+@pytest.fixture(autouse=True)
+def _test_stays_offline():
+    """Fail any test that tried to leave the machine or run the GitHub CLI.
+
+    The refusal itself happens in _offline_audit_hook; this turns a refusal the
+    code under test swallowed into a failure of the test that caused it.
+    """
+    start = len(_OFFLINE_ATTEMPTS)
+    yield
+    attempts = _OFFLINE_ATTEMPTS[start:]
+    if attempts:
+        del _OFFLINE_ATTEMPTS[start:]
+        pytest.fail(f"test tried to go online (refused): {attempts[:5]}", pytrace=False)
 
 
 class FrozenClock:

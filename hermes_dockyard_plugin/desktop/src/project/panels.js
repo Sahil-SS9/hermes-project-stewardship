@@ -14,6 +14,7 @@ import { reportDownloadFilename } from '../../download.js'
 import { downloadTextFile } from '../../download.js'
 import { formatWhen } from '../lib/ui.js'
 import { Icon } from '../lib/ui.js'
+import { effectiveMaxOpenInitiatives } from './settings-model.js'
 export function ProjectSettingsPanel({ project, settings, onRefresh, onDirty }) {
   const buildForm = () => ({
     mission: settings?.mission ?? '',
@@ -23,7 +24,7 @@ export function ProjectSettingsPanel({ project, settings, onRefresh, onDirty }) 
     humanGateRisk: settings?.policies?.autonomy?.human_gate_risk ?? 'medium',
     autoStartLowRisk: Boolean(settings?.policies?.autonomy?.auto_start_low_risk),
     requireTests: settings?.policies?.verification?.require_tests !== false,
-    maxOpenInitiatives: String(settings?.policies?.verification?.max_open_initiatives ?? 3),
+    maxOpenInitiatives: String(effectiveMaxOpenInitiatives(settings?.policies)),
     requireRollback: settings?.policies?.release?.require_rollback !== false,
     soakHours: String(settings?.policies?.release?.soak_hours ?? 24),
     severityThreshold: settings?.policies?.notification?.severity_threshold ?? 'medium',

@@ -11,6 +11,8 @@ import re
 import time
 from typing import Any, Iterator
 
+from .work_parents import WorkParents
+
 CONTRACT_VERSION = 2
 MAX_PAGE_SIZE = 500
 _PROFILE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
@@ -55,6 +57,8 @@ class ProjectKanbanHost:
         self.hermes_home = Path(hermes_home)
         self.kanban_home = Path(os.environ.get("HERMES_KANBAN_HOME", self.hermes_home))
         self.board = (board or "default").strip()
+        # Grouping parents live beside the boards, never as Hermes links (owner decision 4 = B).
+        self._work_parents = WorkParents(self.kanban_home / "dockyard" / "work-parents.db")
 
     @staticmethod
     def _modules():
@@ -338,6 +342,30 @@ class ProjectKanbanHost:
         ) & ((1 << 63) - 1)
         return record
 
+    def _with_parents(self, conn, board: str, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Add each record's grouping parent (owner decision 4 = B).
+
+        The parent comes from the plugin's own store, never from a Hermes link,
+        and shows only while the parent task still exists on the board. It
+        replaces any native parent field the host has: for Dockyard items the
+        plugin's store is the only writer.
+        """
+        stored = self._work_parents.for_board(board)
+        wanted = {str(r["id"]): stored[str(r["id"])] for r in records if str(r["id"]) in stored}
+        parent_ids = sorted(set(wanted.values()))
+        existing: set[str] = set()
+        for start in range(0, len(parent_ids), 500):
+            chunk = parent_ids[start:start + 500]
+            rows = conn.execute(f"SELECT id FROM tasks WHERE id IN ({','.join('?' * len(chunk))})", chunk)
+            existing.update(str(row[0]) for row in rows)
+        for record in records:
+            parent = wanted.get(str(record["id"]))
+            record["parent_task_id"] = parent if parent in existing else None
+        return records
+
+    def _full_record(self, conn, board: str, task: Any) -> dict[str, Any]:
+        return self._with_parents(conn, board, [self._task_record(task)])[0]
+
     @staticmethod
     def _native_status(status: str) -> str:
         # Dockyard's backlog/todo vocabulary maps to vanilla's triage/ready
@@ -345,23 +373,24 @@ class ProjectKanbanHost:
         return {"backlog": "triage", "todo": "ready"}.get(status, status)
 
     def get_task(self, task_id: str, *, board: str | None = None) -> dict[str, Any]:
-        with self._kanban(board) as (kb, conn, _):
+        with self._kanban(board) as (kb, conn, selected):
             task = kb.get_task(conn, task_id)
             if task is None or self._task_record(task)["task_kind"] == "epic":
                 raise HostError("task_not_found", "canonical task was not found")
-            return {"task": self._task_record(task)}
+            return {"task": self._full_record(conn, selected, task)}
 
     def get_epic(self, epic_id: str, *, board: str | None = None) -> dict[str, Any]:
-        with self._kanban(board) as (kb, conn, _):
+        with self._kanban(board) as (kb, conn, selected):
             task = kb.get_task(conn, epic_id)
             if task is None or self._task_record(task)["task_kind"] != "epic":
                 raise HostError("epic_not_found", "canonical epic was not found")
-            return self._task_record(task)
+            return self._full_record(conn, selected, task)
 
     def _list(self, *, epic: bool, board: str | None, limit: int, offset: int = 0) -> dict[str, Any]:
-        with self._kanban(board) as (kb, conn, _):
+        with self._kanban(board) as (kb, conn, selected):
             items = [self._task_record(task) for task in kb.list_tasks(conn, include_archived=False)]
-        items = [item for item in items if (item["task_kind"] == "epic") is epic]
+            items = [item for item in items if (item["task_kind"] == "epic") is epic]
+            self._with_parents(conn, selected, items)
         return _page(items, limit, offset)
 
     def list_tasks(self, *, board: str | None = None, limit: int = 100, offset: int = 0) -> dict[str, Any]:
@@ -391,20 +420,22 @@ class ProjectKanbanHost:
                     (idempotency_key,),
                 ).fetchone()
             if existing:
-                return self._task_record(kb.get_task(conn, str(existing["id"])))
+                return self._full_record(conn, selected, kb.get_task(conn, str(existing["id"])))
             task_id = kb.create_task(
                 conn, title=title, body=body, assignee=assignee, created_by=created_by,
                 tenant=f"dockyard:{task_kind}",
                 initial_status="blocked" if initial_status == "blocked" else "running",
                 triage=self._native_status(initial_status) == "triage",
-                parents=(parent_task_id,) if parent_task_id else (),
                 idempotency_key=idempotency_key, board=selected, project_id=project_id,
             )
+            if parent_task_id:
+                # Grouping only: never a Hermes link, so it never gates the child.
+                self._work_parents.set(selected, task_id, str(parent_task_id))
             if initial_status in {"review", "done"}:
                 operation = kb.request_review if initial_status == "review" else kb.complete_task
                 if not operation(conn, task_id):
                     raise HostError("transition_conflict", "canonical task transition was rejected")
-            return self._task_record(kb.get_task(conn, task_id))
+            return self._full_record(conn, selected, kb.get_task(conn, task_id))
 
     def create_epic(
         self, *, title: str, description: str | None = None,
@@ -414,6 +445,8 @@ class ProjectKanbanHost:
         if status not in {"active", "done"}:
             raise HostError("validation_error", "epic status must be active or done")
         with self._kanban(board) as (kb, conn, selected):
+            if parent_epic_id and kb.get_task(conn, parent_epic_id) is None:
+                raise HostError("epic_not_found", "canonical parent epic was not found")
             # Epics are grouping records, never claimable agent work: they are
             # created in triage and only ever closed through native completion.
             epic_id = kb.create_task(
@@ -421,11 +454,11 @@ class ProjectKanbanHost:
                 tenant="dockyard:epic", triage=True, board=selected,
             )
             if parent_epic_id:
-                kb.link_tasks(conn, parent_epic_id, epic_id)
+                self._work_parents.set(selected, epic_id, str(parent_epic_id))
             if status == "done":
                 if not kb.specify_triage_task(conn, epic_id) or not kb.complete_task(conn, epic_id, summary="epic created as closed"):
                     raise HostError("transition_conflict", "canonical task transition was rejected")
-            return self._task_record(kb.get_task(conn, epic_id))
+            return self._full_record(conn, selected, kb.get_task(conn, epic_id))
 
     @staticmethod
     def _set_status(conn, task_id: str, status: str) -> None:
@@ -443,7 +476,7 @@ class ProjectKanbanHost:
         self, task_id: str, status: str, *, board: str | None = None,
         force_review: bool = False, **_kwargs: Any,
     ) -> dict[str, Any]:
-        with self._kanban(board) as (kb, conn, _):
+        with self._kanban(board) as (kb, conn, selected):
             task = kb.get_task(conn, task_id)
             if task is None:
                 raise HostError("task_not_found", "canonical task was not found")
@@ -481,7 +514,7 @@ class ProjectKanbanHost:
                     raise HostError("transition_conflict", "canonical task transition was rejected")
             elif native_status != task.status:
                 raise HostError("transition_conflict", "canonical task transition is not supported")
-            return self._task_record(kb.get_task(conn, task_id))
+            return self._full_record(conn, selected, kb.get_task(conn, task_id))
 
     def block_task(self, task_id: str, *, board: str | None = None, **_kwargs: Any) -> dict[str, Any]:
         return self.transition_task(task_id, "blocked", board=board, **_kwargs)
@@ -490,9 +523,24 @@ class ProjectKanbanHost:
         columns = {"title": "title", "body": "body"}
         if "task_kind" in changes and str(changes["task_kind"]) not in _TASK_KINDS:
             raise HostError("validation_error", "canonical work type is not supported")
-        with self._kanban(board) as (kb, conn, _):
+        with self._kanban(board) as (kb, conn, selected):
             if kb.get_task(conn, task_id) is None:
                 raise HostError("task_not_found", "canonical task was not found")
+            # A parent only groups (owner decision 4 = B). It is checked before
+            # any write, replaced or cleared (None) beside the board, and never
+            # written as a Hermes link.
+            parent_id = str(changes["parent_task_id"]) if changes.get("parent_task_id") else None
+            if parent_id is not None:
+                if kb.get_task(conn, parent_id) is None:
+                    raise HostError("task_not_found", "canonical parent task was not found")
+                stored = self._work_parents.for_board(selected)
+                cursor: str | None = parent_id
+                seen: set[str] = set()
+                while cursor and cursor not in seen:
+                    if cursor == task_id:
+                        raise HostError("validation_error", "a work item cannot sit under itself")
+                    seen.add(cursor)
+                    cursor = stored.get(cursor)
             for key, column in columns.items():
                 if key in changes:
                     conn.execute(f"UPDATE tasks SET {column}=? WHERE id=?", (changes[key], task_id))
@@ -501,13 +549,16 @@ class ProjectKanbanHost:
                 if kind not in _TASK_KINDS:
                     raise HostError("validation_error", "canonical work type is not supported")
                 conn.execute("UPDATE tasks SET tenant=? WHERE id=?", (f"dockyard:{kind}", task_id))
-            if changes.get("parent_task_id"):
-                kb.link_tasks(conn, str(changes["parent_task_id"]), task_id)
-            return self._task_record(kb.get_task(conn, task_id))
+            if "parent_task_id" in changes:
+                self._work_parents.set(selected, task_id, parent_id)
+            return self._full_record(conn, selected, kb.get_task(conn, task_id))
 
     def update_epic(self, epic_id: str, *, board: str | None = None, **changes: Any) -> dict[str, Any]:
         mapped = {"title": changes.get("title"), "body": changes.get("description")}
-        result = self.update_task(epic_id, board=board, **{k: v for k, v in mapped.items() if v is not None})
+        fields = {k: v for k, v in mapped.items() if v is not None}
+        if "parent_epic_id" in changes:
+            fields["parent_task_id"] = changes["parent_epic_id"]  # None clears
+        result = self.update_task(epic_id, board=board, **fields)
         if "status" in changes:
             if changes["status"] == "done":
                 with self._kanban(board) as (kb, conn, _):
@@ -522,17 +573,17 @@ class ProjectKanbanHost:
         return result
 
     def assign_task(self, task_id: str, assignee: str | None, *, board: str | None = None) -> dict[str, Any]:
-        with self._kanban(board) as (kb, conn, _):
+        with self._kanban(board) as (kb, conn, selected):
             if not kb.assign_task(conn, task_id, assignee):
                 raise HostError("task_not_found", "canonical task was not found")
-            return self._task_record(kb.get_task(conn, task_id))
+            return self._full_record(conn, selected, kb.get_task(conn, task_id))
 
     def assign_task_if_unchanged(
         self, task_id: str, from_profile: str, to_profile: str,
         guard: dict[str, Any], *, board: str | None = None,
     ) -> dict[str, Any]:
         """Atomically verify transfer guards and assign in one host transaction."""
-        with self._kanban(board) as (kb, conn, _):
+        with self._kanban(board) as (kb, conn, selected):
             with kb.write_txn(conn):
                 task = kb.get_task(conn, task_id)
                 if task is None:
@@ -559,7 +610,7 @@ class ProjectKanbanHost:
                 if changed.rowcount != 1:
                     raise HostError("write_conflict", "canonical task changed before assignment")
             kb.notify_task_updated(conn, task_id, ("assignee",))
-            return self._task_record(kb.get_task(conn, task_id))
+            return self._full_record(conn, selected, kb.get_task(conn, task_id))
 
     def link_tasks(self, parent_id: str, child_id: str, *, board: str | None = None) -> dict[str, Any]:
         with self._kanban(board) as (kb, conn, _):

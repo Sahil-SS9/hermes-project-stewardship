@@ -21,9 +21,9 @@ from hermes_project_stewardship.persistence.store import Store  # noqa: E402
 @pytest.fixture()
 def client(tmp_path):
     store = Store(tmp_path / "lifecycle.db")
-    app = create_app(store, kanban_adapter=ReferenceKanbanAdapter(store))
+    app = create_app(store, auth_token="test-token", auth_principal="test-user", auth_principal_is_human=True, kanban_adapter=ReferenceKanbanAdapter(store))
     try:
-        with TestClient(app) as c:
+        with TestClient(app, headers={"Authorization": "Bearer test-token"}) as c:
             c.post("/stewardship/v1/projects/demo/enable", json={
                 "project_id": "demo", "mission": "m", "lead_profile": "lead",
                 "autonomy_level": 2})
@@ -60,7 +60,7 @@ def test_request_changes_returns_to_proposer_with_audit_trail(client):
     receipts = c.get(f"/stewardship/v1/initiatives/{ref}/decision/receipts").json()["receipts"]
     assert [x["decision"] for x in receipts] == ["changes_requested"]
     assert receipts[0]["reason"] == "tighten the risk note"
-    assert receipts[0]["actor"] == "reviewer"
+    assert receipts[0]["actor"] == "test-user"
 
 
 def test_request_changes_is_not_a_rejection_and_not_an_approval(client):
@@ -125,7 +125,7 @@ def test_comments_recorded_independently_of_decision_state(client):
     thread = c.get(f"/stewardship/v1/initiatives/{ref}/comments").json()["comments"]
     assert len(thread) == 1
     assert thread[0]["body"] == "Which metrics back this?"
-    assert thread[0]["actor"] == "reviewer"
+    assert thread[0]["actor"] == "test-user"
     # comment did not mutate the decision payload
     before = _decision(client, ref)["fingerprint"]
     c.post(f"/stewardship/v1/initiatives/{ref}/comments", json={

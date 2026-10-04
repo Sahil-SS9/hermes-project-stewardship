@@ -226,13 +226,19 @@ def test_stale_revision_on_one_board_does_not_block_another(store, enabled):
 
 
 # --------------------------------------------------------------------- API --
-def _client(tmp_path):
+def _client(tmp_path, *, trusted=False):
     from fastapi.testclient import TestClient
     from hermes_project_stewardship.api.server import create_app
     from hermes_project_stewardship.kanban import ReferenceKanbanAdapter
     from hermes_project_stewardship.persistence.store import Store
     store = Store(tmp_path / "boards.db")
-    client = TestClient(create_app(store, kanban_adapter=ReferenceKanbanAdapter(store)))
+    if trusted:
+        # Proposal decisions need a trusted caller (Q2 rule, Sahil 04/10/2026).
+        app = create_app(store, auth_token="test-token", auth_principal="test-user",
+                         auth_principal_is_human=True, kanban_adapter=ReferenceKanbanAdapter(store))
+        client = TestClient(app, headers={"Authorization": "Bearer test-token"})
+    else:
+        client = TestClient(create_app(store, kanban_adapter=ReferenceKanbanAdapter(store)))
     client.post(f"{B}/projects/p9/enable", json={
         "project_id": "p9", "mission": "boards", "lead_profile": "l", "autonomy_level": 2})
     return client
@@ -692,7 +698,7 @@ def test_documented_plan_and_locked_board_refuse_step_edits(store, enabled):
 
 
 def test_plan_step_route(tmp_path):
-    client = _client(tmp_path)
+    client = _client(tmp_path, trusted=True)
     cid = client.post(f"{B}/projects/p9/canvases", json={"name": "R"}).json()["canvas_id"]
     board = client.get(f"{B}/projects/p9/canvases/{cid}").json()
     client.put(f"{B}/projects/p9/canvases/{cid}", json={"expected_revision": board["revision"], "objects": FULL, "connectors": []})
@@ -838,7 +844,7 @@ def test_sticker_colour_survives_the_http_save_route(tmp_path):
 
 def test_proposal_decision_is_refused_for_another_project(tmp_path):
     """QA M-4: a decision naming the wrong project reads as 'not found'."""
-    client = _client(tmp_path)
+    client = _client(tmp_path, trusted=True)
     cid = client.post(f"{B}/projects/p9/canvases", json={"name": "Scoped"}).json()["canvas_id"]
     rev = client.get(f"{B}/projects/p9/canvases/{cid}").json()["revision"]
     client.put(f"{B}/projects/p9/canvases/{cid}", json={"expected_revision": rev, "objects": FULL, "connectors": []})

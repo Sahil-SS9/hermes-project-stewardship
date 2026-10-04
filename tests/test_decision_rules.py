@@ -16,14 +16,17 @@ Rules under test
       is never the authority. This file IS the Rule 5 probe (Decision C):
       - with a trusted principal the body actor is IGNORED and the receipt
         names the principal;
-      - without any principal the behaviour is recorded as it is today:
-        attribution is required (refused without it, accepted with it);
-      - through the proxy a caller-named actor is refused with 422 — proven
-        in tests/test_desktop_proxy_routes.py and in the browser test.
-      Deployed-config conclusion (recorded 03/10/2026): the Desktop proxy
-      always binds a bearer-authenticated principal server-side and refuses
-      caller-named actors, so the deployed path satisfies Rule 5 without a
-      backend change. No code change was needed; nothing was stopped for.
+      - without any trusted principal every decision is REFUSED (403), with
+        or without a body actor. Decided by Sahil 03/10/2026 (Q2). Before
+        it, the backend recorded the body actor, and a dashboard started
+        from the CLI (no token in the environment) reached that branch;
+      - through the proxy a caller-named actor is refused with 422, and the
+        Desktop decision buttons keep working with and without the env
+        token: the in-process proxy vouches for the dashboard user Hermes
+        already authenticated. Proven in tests/test_owner_q2_trusted_decisions.py,
+        tests/test_desktop_proxy_routes.py and in the browser test.
+      The decision tests below (R1, R2, R3, idempotency) therefore decide
+      through a trusted principal; their assertions are unchanged.
   R6  the decision payload carries the evidence, the policy gate, the impact
       and the capability boundary (the authority grant).
 """
@@ -66,7 +69,7 @@ def trusted_client(tmp_path):
         auth_token="trusted-token", auth_principal="owner",
         auth_principal_is_human=True)
     try:
-        with TestClient(app) as c:
+        with TestClient(app, headers=TRUSTED_HEADERS) as c:
             r = c.post("/stewardship/v1/projects/demo/enable", headers=TRUSTED_HEADERS, json={
                 "project_id": "demo", "mission": "m", "lead_profile": "lead",
                 "autonomy_level": 2})
@@ -101,7 +104,8 @@ def _receipts(client, ref, headers=None):
 # --------------------------------------------------------------------------- #
 # R1 — the three outcomes are three distinct states and receipts
 # --------------------------------------------------------------------------- #
-def test_r1_approve_reject_request_changes_are_three_outcomes(client):
+def test_r1_approve_reject_request_changes_are_three_outcomes(trusted_client):
+    client = trusted_client  # Q2 (03/10/2026): only a trusted caller decides
     c, _ = client
     # One initiative per outcome: the resulting status and the receipt decision
     # label must each be distinct.
@@ -143,7 +147,8 @@ def test_r1_approve_reject_request_changes_are_three_outcomes(client):
 # --------------------------------------------------------------------------- #
 # R2 — request changes sends the item back to the proposer with feedback
 # --------------------------------------------------------------------------- #
-def test_r2_request_changes_returns_to_proposer_with_feedback(client):
+def test_r2_request_changes_returns_to_proposer_with_feedback(trusted_client):
+    client = trusted_client  # Q2 (03/10/2026): only a trusted caller decides
     c, _ = client
     ref = _propose(client)
     fp = _decision(client, ref)["fingerprint"]
@@ -168,7 +173,8 @@ def test_r2_request_changes_returns_to_proposer_with_feedback(client):
 # R3 — resubmit changes the fingerprint; the old fingerprint is refused for
 #      approve, reject AND request-changes
 # --------------------------------------------------------------------------- #
-def test_r3_resubmit_changes_fingerprint_and_old_one_is_refused(client):
+def test_r3_resubmit_changes_fingerprint_and_old_one_is_refused(trusted_client):
+    client = trusted_client  # Q2 (03/10/2026): only a trusted caller decides
     c, _ = client
     ref = _propose(client)
     old = _decision(client, ref)["fingerprint"]
@@ -253,31 +259,23 @@ def test_r5_probe_trusted_principal_ignores_body_actor(trusted_client):
     assert not any(i.get("ref") == ref for i in inbox)
 
 
-def test_r5_probe_no_principal_requires_attribution_and_records_it(client):
-    """Without any trusted principal the behaviour is recorded as it is:
-    a decision without attribution is refused (never silently decided via a
-    guessed identity); with attribution the receipt records exactly the
-    supplied actor. The Desktop proxy always sets the actor itself, but this
-    branch IS reached whenever the backend has no token (STEWARD_RPC_TOKEN and
+def test_r5_probe_no_principal_refuses_every_decision(client):
+    """Without any trusted principal no decision is recorded, whoever the body
+    names (Sahil's decision 03/10/2026, Q2). This branch is reached whenever
+    the backend has no token (STEWARD_RPC_TOKEN and
     HERMES_DASHBOARD_SESSION_TOKEN unset, e.g. a dashboard started from the
     CLI: Hermes keeps its generated session token in memory and does not
-    export it). There, the Hermes dashboard's session-token check is the only
-    gate. Refusing self-named actors here is an open pre-release decision
-    (Rule 5 note in the HPS plan)."""
+    export it). The Desktop proxy no longer relies on the body there: it
+    vouches for the user Hermes authenticated (tests/test_owner_q2_trusted_decisions.py)."""
     c, _ = client
     ref = _propose(client)
     fp = _decision(client, ref)["fingerprint"]
-    no_actor = c.post(f"/stewardship/v1/initiatives/{ref}/approve",
-                      json={"expected_fingerprint": fp})
-    assert no_actor.status_code in (409, 422), no_actor.text
-    assert _receipts(client, ref) == [], "a refused decision must not leave a receipt"
-
-    attributed = c.post(f"/stewardship/v1/initiatives/{ref}/approve",
-                        json={"expected_fingerprint": fp, "actor": "sahil"})
-    assert attributed.status_code == 200, attributed.text
-    receipt = _receipts(client, ref)[-1]
-    assert receipt["actor"] == "sahil"
-    assert receipt["decision"] == "approved"
+    for body in ({"expected_fingerprint": fp},
+                 {"expected_fingerprint": fp, "actor": "sahil"}):
+        refused = c.post(f"/stewardship/v1/initiatives/{ref}/approve", json=body)
+        assert refused.status_code == 403, refused.text
+        assert refused.json()["error"]["code"] == "trusted_principal_required"
+        assert _receipts(client, ref) == [], "a refused decision must not leave a receipt"
 
 
 # --------------------------------------------------------------------------- #
@@ -304,7 +302,8 @@ def test_r6_decision_payload_carries_evidence_impact_and_boundary(client):
 # --------------------------------------------------------------------------- #
 # Cross-rule invariant: a decision is idempotent per fingerprint
 # --------------------------------------------------------------------------- #
-def test_same_fingerprint_is_idempotent_not_double_decided(client):
+def test_same_fingerprint_is_idempotent_not_double_decided(trusted_client):
+    client = trusted_client  # Q2 (03/10/2026): only a trusted caller decides
     c, _ = client
     ref = _propose(client)
     fp = _decision(client, ref)["fingerprint"]

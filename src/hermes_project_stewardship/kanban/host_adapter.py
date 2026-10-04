@@ -587,6 +587,8 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
                     payload["title"] = changes["title"]
                 if "body" in changes:
                     payload["description"] = changes["body"]
+                if "parent_id" in changes:
+                    payload["parent_epic_id"] = changes["parent_id"]  # None clears
                 raw = self.host.update_epic(item_id, board=board, **payload)
                 return self._work_record(raw, project_id=project_id, kind="epic")
             payload = {}

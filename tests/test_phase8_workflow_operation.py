@@ -28,7 +28,7 @@ def _definition():
 @pytest.fixture()
 def api(store, enabled):
     adapter = ReferenceKanbanAdapter(store)
-    client = TestClient(create_app(store, kanban_adapter=adapter))
+    client = TestClient(create_app(store, auth_token="test-token", auth_principal="test-user", auth_principal_is_human=True, kanban_adapter=adapter), headers={"Authorization": "Bearer test-token"})
     client.post(
         f"/stewardship/v1/projects/{enabled}/workflows", json={
             "name": "release", "nodes": _definition()["nodes"]})
@@ -145,7 +145,7 @@ def test_duplicate_start_of_same_run_key_stays_idempotent(store, enabled):
     """P8.5 duplicate-action safety at the API boundary: re-clicking the
     start action never duplicates tasks (UI duplicate guard mirrors this)."""
     adapter = ReferenceKanbanAdapter(store)
-    client = TestClient(create_app(store, kanban_adapter=adapter))
+    client = TestClient(create_app(store, auth_token="test-token", auth_principal="test-user", auth_principal_is_human=True, kanban_adapter=adapter), headers={"Authorization": "Bearer test-token"})
     client.post(
         f"/stewardship/v1/projects/{enabled}/workflows",
         json={"name": "release", "nodes": _definition()["nodes"]})

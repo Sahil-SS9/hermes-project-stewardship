@@ -6130,16 +6130,16 @@ function filterByTab(items, tab, now = /* @__PURE__ */ new Date()) {
   if (tab === "earlier") return all.filter((item) => earlierThanToday(item.created_at, now));
   return [];
 }
+var daysOld = (days) => days <= 0 ? "today" : days === 1 ? "1 day old" : `${days} days old`;
 function ageLabel(item, now = /* @__PURE__ */ new Date()) {
   if (item?.age_days != null && Number.isFinite(Number(item.age_days))) {
-    const days2 = Number(item.age_days);
-    return days2 <= 0 ? "today" : `${days2} days old`;
+    return daysOld(Number(item.age_days));
   }
   if (!item?.created_at) return "";
   const then = new Date(item.created_at);
   if (Number.isNaN(then.getTime())) return "";
   const days = Math.floor((Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - Date.UTC(then.getUTCFullYear(), then.getUTCMonth(), then.getUTCDate())) / 864e5);
-  return days <= 0 ? "today" : `${days} days old`;
+  return daysOld(days);
 }
 function evidenceCount(item) {
   const contract = item?.detail?.validation_contract;
@@ -14701,6 +14701,12 @@ function downloadTextFile(content, filename, mediaType = "text/markdown;charset=
   return true;
 }
 
+// hermes_dockyard_plugin/desktop/src/project/settings-model.js
+var DEFAULT_MAX_OPEN_INITIATIVES = 5;
+function effectiveMaxOpenInitiatives(policies) {
+  return policies?.verification?.max_open_initiatives ?? policies?.notification?.max_open_initiatives ?? DEFAULT_MAX_OPEN_INITIATIVES;
+}
+
 // hermes_dockyard_plugin/desktop/src/project/panels.js
 function ProjectSettingsPanel({ project, settings, onRefresh, onDirty }) {
   const buildForm = () => ({
@@ -14711,7 +14717,7 @@ function ProjectSettingsPanel({ project, settings, onRefresh, onDirty }) {
     humanGateRisk: settings?.policies?.autonomy?.human_gate_risk ?? "medium",
     autoStartLowRisk: Boolean(settings?.policies?.autonomy?.auto_start_low_risk),
     requireTests: settings?.policies?.verification?.require_tests !== false,
-    maxOpenInitiatives: String(settings?.policies?.verification?.max_open_initiatives ?? 3),
+    maxOpenInitiatives: String(effectiveMaxOpenInitiatives(settings?.policies)),
     requireRollback: settings?.policies?.release?.require_rollback !== false,
     soakHours: String(settings?.policies?.release?.soak_hours ?? 24),
     severityThreshold: settings?.policies?.notification?.severity_threshold ?? "medium",

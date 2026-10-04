@@ -45,7 +45,7 @@ V = "/stewardship/v1"
 @pytest.fixture()
 def env(tmp_path):
     store = Store(tmp_path / "e.db")
-    app = create_app(store, kanban_adapter=ReferenceKanbanAdapter(store))
+    app = create_app(store, auth_token="test-token", auth_principal="test-user", auth_principal_is_human=True, kanban_adapter=ReferenceKanbanAdapter(store))
     c = TestClient(app)
     c.headers.update({"Authorization": "Bearer test-token"})
     yield c, store
@@ -296,7 +296,7 @@ def test_resolve_is_idempotent(env):
     row = [n for n in
            c.get(f"{V}/notifications").json()["notifications"]
            if n["id"] == nid][0]
-    assert row["resolved_by"] == "sahil"
+    assert row["resolved_by"] == "test-user"
 
 
 def test_unknown_id_404(env):
@@ -316,9 +316,9 @@ def test_ack_records_actor_and_audits(env):
     row = [n for n in
            c.get(f"{V}/notifications").json()["notifications"]
            if n["id"] == nid][0]
-    assert row["acked_by"] == "sahil"
+    assert row["acked_by"] == "test-user"
     tail = store.audit_tail(30)
-    assert any(a["action"] == "notification.acked" and a["actor"] == "sahil"
+    assert any(a["action"] == "notification.acked" and a["actor"] == "test-user"
                and a.get("subject") == str(nid) for a in tail), tail
 
 

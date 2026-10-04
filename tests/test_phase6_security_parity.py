@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import sys
 from pathlib import Path
@@ -233,11 +232,9 @@ def test_pm0605_every_dashboard_call_resolves_to_backend_route(phase6):
     saved_modules = {name: sys.modules.pop(name, None) for name in (monkey_target,)}
     try:
         import hermes_dockyard_plugin  # noqa: F401  (namespace package init)
-        os.environ["STEWARD_DB_PATH"] = str(tmp_db)
-        try:
+        with pytest.MonkeyPatch.context() as mp:  # restores the suite's sandbox on exit
+            mp.setenv("STEWARD_DB_PATH", str(tmp_db))
             plugin = importlib.import_module(monkey_target)
-        finally:
-            os.environ.pop("STEWARD_DB_PATH", None)
 
         application = create_app(
             plugin._store,

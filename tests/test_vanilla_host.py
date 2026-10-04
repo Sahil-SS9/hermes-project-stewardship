@@ -113,18 +113,116 @@ def test_idempotent_create_never_rewinds_completed_work(native_host):
 
 
 def test_dependencies_gate_ready_and_completion(native_host):
-    parent = native_host.create_task(title="Parent", initial_status="ready")
-    child = native_host.create_task(title="Child", initial_status="ready",
-                                     parent_task_id=parent["id"])
+    """A real Hermes link still gates the blocked task: workflow steps rely on it.
+
+    Until 04/10 this test made the link by giving the child a parent. Owner
+    decision 4 = B moved parents off Hermes links (they group, never block), so
+    the link is now made explicitly; the gating it proves is unchanged.
+    """
+    blocker = native_host.create_task(title="Blocker", initial_status="ready")
+    blocked = native_host.create_task(title="Blocked", initial_status="ready")
+    native_host.link_tasks(blocker["id"], blocked["id"])
     with native_host._kanban() as (kb, conn, _):
-        assert kb.get_task(conn, child["id"]).status == "todo"
+        assert kb.get_task(conn, blocked["id"]).status == "todo"
     with pytest.raises(HostError):
-        native_host.transition_task(child["id"], "done")
-    native_host.transition_task(parent["id"], "done", summary="parent finished")
+        native_host.transition_task(blocked["id"], "done")
+    native_host.transition_task(blocker["id"], "done", summary="blocker finished")
     with native_host._kanban() as (kb, conn, _):
         kb.recompute_ready(conn)
+        assert kb.get_task(conn, blocked["id"]).status == "ready"
+    native_host.transition_task(blocked["id"], "done", summary="blocked finished")
+
+
+# --- Owner decision 4 = B (04/10): a parent only groups, it never blocks ---
+
+def test_parent_groups_without_blocking(native_host):
+    parent = native_host.create_task(title="Parent", initial_status="ready")
+    child = native_host.create_task(title="Child", initial_status="ready",
+                                    parent_task_id=parent["id"])
+    assert child["parent_task_id"] == parent["id"]
+    assert native_host.get_task(child["id"])["task"]["parent_task_id"] == parent["id"]
+    listed = {item["id"]: item for item in native_host.list_tasks()["items"]}
+    assert listed[child["id"]]["parent_task_id"] == parent["id"]
+    assert listed[parent["id"]]["parent_task_id"] is None
+    # Not a Hermes link, so it never shows as "blocked by" and never gates.
+    assert native_host.list_links(child["id"])["items"] == []
+    with native_host._kanban() as (kb, conn, _):
         assert kb.get_task(conn, child["id"]).status == "ready"
-    native_host.transition_task(child["id"], "done", summary="child finished")
+    done = native_host.transition_task(child["id"], "done", summary="child finished first")
+    assert done["status"] == "done"
+    assert done["parent_task_id"] == parent["id"]
+
+
+def test_parent_can_be_changed_and_cleared(native_host):
+    first = native_host.create_task(title="First", initial_status="ready")
+    second = native_host.create_task(title="Second", initial_status="ready")
+    child = native_host.create_task(title="Child", initial_status="ready",
+                                    parent_task_id=first["id"])
+    moved = native_host.update_task(child["id"], parent_task_id=second["id"])
+    assert moved["parent_task_id"] == second["id"]  # replaced, not added
+    assert native_host.list_links(child["id"])["items"] == []
+    cleared = native_host.update_task(child["id"], parent_task_id=None)
+    assert cleared["parent_task_id"] is None
+    assert native_host.get_task(child["id"])["task"]["parent_task_id"] is None
+    renamed = native_host.update_task(child["id"], title="Renamed")
+    assert renamed["parent_task_id"] is None  # an unrelated edit leaves the parent alone
+
+
+def test_bad_parent_update_is_rejected_before_any_write(native_host):
+    parent = native_host.create_task(title="Parent", initial_status="ready")
+    child = native_host.create_task(title="Child", initial_status="ready",
+                                    parent_task_id=parent["id"])
+    grandchild = native_host.create_task(title="Grandchild", initial_status="ready",
+                                         parent_task_id=child["id"])
+    for bad in ("t_000000000000", child["id"], grandchild["id"]):  # missing, itself, its own child
+        with pytest.raises(HostError):
+            native_host.update_task(child["id"], title="Renamed", parent_task_id=bad)
+    task = native_host.get_task(child["id"])["task"]
+    assert task["title"] == "Child"
+    assert task["parent_task_id"] == parent["id"]
+
+
+def test_epic_parent_groups_without_a_link(native_host):
+    outer = native_host.create_epic(title="Outer")
+    inner = native_host.create_epic(title="Inner", parent_epic_id=outer["id"])
+    assert inner["parent_task_id"] == outer["id"]
+    assert native_host.get_epic(inner["id"])["parent_task_id"] == outer["id"]
+    listed = {item["id"]: item for item in native_host.list_epics()["items"]}
+    assert listed[inner["id"]]["parent_task_id"] == outer["id"]
+    assert native_host.list_links(inner["id"])["items"] == []
+    renamed = native_host.update_epic(inner["id"], title="Inner renamed")
+    assert renamed["parent_task_id"] == outer["id"]  # an unrelated edit leaves the parent alone
+    cleared = native_host.update_epic(inner["id"], parent_epic_id=None)
+    assert cleared["parent_task_id"] is None
+    assert native_host.get_epic(inner["id"])["parent_task_id"] is None
+    with native_host._kanban() as (kb, conn, _):
+        before = len(kb.list_tasks(conn))
+    with pytest.raises(HostError):
+        native_host.create_epic(title="Orphan", parent_epic_id="t_000000000000")
+    with native_host._kanban() as (kb, conn, _):
+        assert len(kb.list_tasks(conn)) == before
+
+
+def test_a_deleted_parent_reads_as_no_parent(native_host):
+    parent = native_host.create_task(title="Parent", initial_status="ready")
+    child = native_host.create_task(title="Child", initial_status="ready",
+                                    parent_task_id=parent["id"])
+    with native_host._kanban() as (kb, conn, _):
+        assert kb.delete_task(conn, parent["id"])
+    assert native_host.get_task(child["id"])["task"]["parent_task_id"] is None
+    listed = {item["id"]: item for item in native_host.list_tasks()["items"]}
+    assert listed[child["id"]]["parent_task_id"] is None
+
+
+def test_parents_are_kept_beside_the_boards_and_never_in_the_host_database(native_host):
+    parent = native_host.create_task(title="Parent", initial_status="ready")
+    native_host.create_task(title="Child", initial_status="ready", parent_task_id=parent["id"])
+    store = native_host.kanban_home / "dockyard" / "work-parents.db"
+    assert store.is_file()
+    with native_host._kanban() as (kb, conn, _):
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        assert conn.execute("SELECT COUNT(*) FROM task_links").fetchone()[0] == 0
+    assert not any("parent" in name for name in tables - {"task_links"})  # no host schema change
 
 
 def test_block_closes_run_and_retains_reason(native_host):

@@ -44,3 +44,31 @@ test('C8 Settings: three uppercase category labels over the unchanged configurat
     await browser.close()
   }
 })
+
+// Owner decision 03/10/2026 (Q3): Settings shows the open-initiative limit the
+// backend enforces. Nothing saved -> 5 (persistence/service.py), never the old
+// 3 that quietly lowered the real limit on the next save. A saved number is
+// kept. Fixtures: mobile-client saved nothing; payments-relaunch saved 50.
+test('Q3 Settings: "Maximum open initiatives" shows 5 when nothing is saved and keeps a saved number', { timeout: 180000 }, async () => {
+  const browser = await chromium.launch({ headless: true })
+  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
+  const errors = []
+  page.on('pageerror', (error) => errors.push(String(error)))
+  const openSettings = async (project) => {
+    await page.goto(BASE, { waitUntil: 'networkidle' })
+    await page.getByRole('button', { name: 'Project context', exact: true }).click()
+    await page.getByRole('combobox', { name: 'Find project' }).fill(project)
+    await page.getByRole('listbox', { name: 'Projects' }).getByRole('option', { name: project, exact: true }).click()
+    await page.waitForTimeout(1200)
+    await page.locator('[data-tab="settings"]').click()
+    await page.locator('[data-project-settings-form]').waitFor({ timeout: 8000 })
+    return page.locator('[data-project-settings-form]').getByLabel('Maximum open initiatives').inputValue()
+  }
+  try {
+    assert.equal(await openSettings('mobile-client'), '5', 'nothing saved: the backend default, 5')
+    assert.equal(await openSettings('payments-relaunch'), '50', 'a saved number is kept')
+    assert.deepEqual(errors, [], 'no page errors')
+  } finally {
+    await browser.close()
+  }
+})

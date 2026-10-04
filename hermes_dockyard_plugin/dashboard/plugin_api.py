@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict
 
 logger = logging.getLogger(__name__)
 
+from hermes_project_stewardship.api.middleware import desktop_proxy_headers  # noqa: E402
 from hermes_project_stewardship.persistence.dockyard_store import DockyardStore  # noqa: E402
 from hermes_project_stewardship.persistence.schema_guard import SchemaDriftError  # noqa: E402
 from hermes_project_stewardship.persistence.store import NewerSchemaError  # noqa: E402
@@ -135,7 +136,10 @@ async def _proxy(method: str, path: str, json_body: dict | None = None,
         logger.error("Proxy %s %s rejected: plugin startup degraded", method, path)
         raise _degraded_503()
     logger.debug("Proxying %s %s", method, path)
-    headers = {}
+    # Hermes only routes an authenticated dashboard user here, so the proxy
+    # vouches for that user (owner decision 03/10/2026, Q2). The backend
+    # trusts this only for decisions, and a bearer principal still wins.
+    headers = desktop_proxy_headers(_ACTOR_ID)
     authorization = _REQUEST_AUTHORIZATION.get()
     if authorization:
         headers["authorization"] = authorization
@@ -815,7 +819,10 @@ async def answer_canvas_session(session_id: str, body: dict) -> dict:
 
 @plugin_api.post("/canvas/proposals/{proposal_id}/decision")
 async def decide_canvas_proposal(proposal_id: str, body: dict) -> dict:
-    return await _proxy("POST", f"/stewardship/v1/canvas/proposals/{quote(proposal_id, safe='')}/decision", {**body, "actor": _ACTOR_ID})
+    # The decider comes from this proxy's vouching headers, never the body
+    # (Q2 rule, extended to canvas proposals 04/10/2026).
+    payload = {key: value for key, value in body.items() if key != "actor"}
+    return await _proxy("POST", f"/stewardship/v1/canvas/proposals/{quote(proposal_id, safe='')}/decision", payload)
 
 
 @plugin_api.post("/canvas/proposals/{proposal_id}/plan")
@@ -1195,8 +1202,9 @@ class DecisionActionBody(BaseModel):
     note: str = ""
 
 
-# The caller never names the actor: these bodies forbid it, and the proxy
-# attaches _ACTOR_ID itself, exactly as approve/reject do.
+# The caller never names the actor: these bodies forbid it. For decisions the
+# backend takes the decider from the bearer principal or this proxy's vouching
+# headers; for resubmit and comments the proxy attaches _ACTOR_ID itself.
 class RequestChangesBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_fingerprint: str | None = None
@@ -1585,9 +1593,10 @@ async def decision_receipts(ref: str) -> dict:
 
 @plugin_api.post("/initiatives/{ref}/approve")
 async def approve(ref: str, body: DecisionActionBody | None = None) -> dict:
-    # Actor attribution is fixed server-side: this dashboard always acts as sahil.
+    # The decider is never named in the body: the backend takes it from the
+    # bearer principal or from this proxy's vouching headers (Q2, 03/10/2026).
     r = quote(ref, safe="")
-    payload = {"actor": _ACTOR_ID, "interface": "dockyard:human"}
+    payload = {"interface": "dockyard:human"}
     if body is not None:
         if body.expected_fingerprint is not None:
             payload["expected_fingerprint"] = body.expected_fingerprint
@@ -1599,7 +1608,7 @@ async def approve(ref: str, body: DecisionActionBody | None = None) -> dict:
 @plugin_api.post("/initiatives/{ref}/reject")
 async def reject(ref: str, body: DecisionActionBody | None = None) -> dict:
     r = quote(ref, safe="")
-    payload = {"actor": _ACTOR_ID, "interface": "dockyard:human"}
+    payload = {"interface": "dockyard:human"}
     if body is not None:
         if body.expected_fingerprint is not None:
             payload["expected_fingerprint"] = body.expected_fingerprint
@@ -1613,7 +1622,7 @@ async def reject(ref: str, body: DecisionActionBody | None = None) -> dict:
 @plugin_api.post("/initiatives/{ref}/request-changes")
 async def request_changes(ref: str, body: RequestChangesBody) -> dict:
     r = quote(ref, safe="")
-    payload = {**body.model_dump(exclude_none=True), "actor": _ACTOR_ID, "interface": "dockyard:human"}
+    payload = {**body.model_dump(exclude_none=True), "interface": "dockyard:human"}
     return await _proxy("POST", f"/stewardship/v1/initiatives/{r}/request-changes", payload)
 
 

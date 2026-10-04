@@ -67,6 +67,7 @@ from .middleware import (
     MissingAuthMiddleware,
     RateLimitMiddleware,
     current_principal,
+    desktop_proxy_actor,
     error_envelope_handler,
 )
 
@@ -247,7 +248,9 @@ class CanvasSessionAnswerRequest(BaseModel):
 
 class CanvasProposalDecisionRequest(BaseModel):
     approve: bool
-    actor: str = "system"
+    # Ignored, like ApprovalAction.actor: the decider is the trusted caller
+    # (Q2 rule, extended to canvas proposals by Sahil 04/10/2026).
+    actor: str = ""
     # QA M-4: when given, the proposal must belong to this project (404 if
     # not). Optional so older callers keep working.
     project_id: str | None = Field(default=None, min_length=1, max_length=200)
@@ -356,6 +359,9 @@ class InitiativeProposal(BaseModel):
 
 
 class ApprovalAction(BaseModel):
+    # Ignored by approve/reject (owner decision 03/10/2026, Q2): the decider is
+    # the trusted caller, never a name in the body. Kept so older callers that
+    # still send it are not rejected for the field itself.
     actor: str = ""
     interface: str = "rpc"
     expected_fingerprint: Optional[str] = None
@@ -365,7 +371,7 @@ class ApprovalAction(BaseModel):
 
 class RequestChangesAction(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    actor: str = ""
+    actor: str = ""  # ignored: see ApprovalAction (Q2, 03/10/2026)
     interface: str = "desktop"
     expected_fingerprint: Optional[str] = None
     feedback: str = ""
@@ -1465,11 +1471,14 @@ def create_app(
             raise HTTPException(422, str(exc)) from exc
 
     @router.post("/canvas/proposals/{proposal_id}/decision")
-    def decide_canvas_proposal(proposal_id: str, body: CanvasProposalDecisionRequest):
+    def decide_canvas_proposal(proposal_id: str, body: CanvasProposalDecisionRequest, request: Request):
         from ..persistence.canvas_service import CanvasConflictError
         from ..persistence.canvas_planning import CanvasPlanningService
+        # Approving or dismissing a proposal is a decision: trusted callers
+        # only, checked before anything is looked up (Sahil 04/10/2026).
+        actor = _decision_actor(request)
         try:
-            return CanvasPlanningService(store).decide(proposal_id, approve=body.approve, actor=_principal_id(body.actor),
+            return CanvasPlanningService(store).decide(proposal_id, approve=body.approve, actor=actor,
                                                        project_id=body.project_id)
         except CanvasConflictError as exc:
             raise _board_error(exc) from exc
@@ -1681,12 +1690,31 @@ def create_app(
     def decision_receipts(ref: str):
         return {"receipts": svc.decision_receipts(ref)}
 
+    def _decision_actor(request: Request) -> str:
+        """Owner decision 03/10/2026 (Q2, Rule 5): only a trusted caller decides.
+
+        Trusted means the bearer principal (STEWARD_RPC_TOKEN or the dashboard
+        session token), or the in-process Desktop proxy vouching for the user
+        Hermes already authenticated. An actor named in the request body is
+        attribution from an unverified caller: it is never accepted, so with
+        neither of the above the decision is refused and nothing is recorded.
+        """
+        actor = current_principal() or desktop_proxy_actor(request)
+        if not actor:
+            raise HTTPException(403, {
+                "code": "trusted_principal_required",
+                "message": (
+                    "decisions need a trusted caller: the Desktop app, or a"
+                    " backend started with STEWARD_RPC_TOKEN. An actor named"
+                    " in the request is attribution only, never authority."
+                ),
+            })
+        return actor
+
     @router.post("/initiatives/{ref}/approve")
-    def approve(ref: str, body: ApprovalAction):
+    def approve(ref: str, body: ApprovalAction, request: Request):
+        actor_id = _decision_actor(request)
         try:
-            actor_id = current_principal() or body.actor
-            if not actor_id:
-                raise ServiceError("trusted actor attribution is required")
             return integration.approve(
                 ref,
                 actor=Actor(
@@ -1701,10 +1729,8 @@ def create_app(
             raise HTTPException(409, str(exc)) from None
 
     @router.post("/initiatives/{ref}/reject")
-    def reject(ref: str, body: ApprovalAction):
-        actor_id = current_principal() or body.actor
-        if not actor_id:
-            raise HTTPException(409, "trusted actor attribution is required")
+    def reject(ref: str, body: ApprovalAction, request: Request):
+        actor_id = _decision_actor(request)
         try:
             return svc.reject_initiative(
                 ref, actor=actor_id, interface=body.interface,
@@ -1716,10 +1742,8 @@ def create_app(
             raise HTTPException(409, str(exc)) from None
 
     @router.post("/initiatives/{ref}/request-changes")
-    def request_changes(ref: str, body: RequestChangesAction):
-        actor_id = current_principal() or body.actor
-        if not actor_id:
-            raise HTTPException(409, "trusted actor attribution is required")
+    def request_changes(ref: str, body: RequestChangesAction, request: Request):
+        actor_id = _decision_actor(request)
         try:
             return svc.request_changes_initiative(
                 ref, actor=actor_id, interface=body.interface,
