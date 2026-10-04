@@ -9,19 +9,19 @@ from __future__ import annotations
 
 import atexit
 import hashlib
-import ipaddress
 import os
 import shutil
-import socket
 import sqlite3
 import subprocess
-import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 import pytest
+
+from tests.offline_guard import ATTEMPTS as _OFFLINE_ATTEMPTS
+from tests.offline_guard import install as _install_offline_guard
 
 
 # Read by the repo-root conftest.py: while this module is loaded it owns every
@@ -100,50 +100,11 @@ def _guarded_sqlite_connect(database, *args, **kwargs):
 sqlite3.connect = _guarded_sqlite_connect
 
 
-# Tests stay offline. A test once reached real model providers with the
-# operator's own logins: the board model picker ran `gh auth token` and fetched
-# model lists over the network. Every connection off this machine and every
-# GitHub CLI run is refused here, recorded, and fails the test that tried it,
-# even when the code under test swallows the refusal. This guards the pytest
-# process only; subprocesses are out of its reach (the opt-in real-provider
-# lane runs its driver in one on purpose).
-_OFFLINE_ATTEMPTS: list[str] = []
-
-
-def _is_local_host(host: object) -> bool:
-    if isinstance(host, bytes):
-        host = host.decode("ascii", "replace")
-    if not isinstance(host, str):
-        return False
-    if host == "localhost":
-        return True
-    try:
-        address = ipaddress.ip_address(host.split("%", 1)[0])
-    except ValueError:
-        return False  # any other hostname resolves off this machine
-    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
-        address = address.ipv4_mapped
-    return address.is_loopback or address.is_unspecified
-
-
-def _offline_audit_hook(event: str, args: tuple) -> None:
-    if event == "socket.connect":
-        sock, address = args
-        if getattr(sock, "family", None) not in (socket.AF_INET, socket.AF_INET6):
-            return  # unix sockets and socket pairs never leave the machine
-        host = address[0] if isinstance(address, tuple) and address else address
-        if not _is_local_host(host):
-            _OFFLINE_ATTEMPTS.append(f"connection to {address!r}")
-            raise ConnectionRefusedError(f"pytest offline guard refused a connection to {address!r}")
-    elif event == "subprocess.Popen":
-        executable, argv = args[0], args[1]
-        if isinstance(executable, (str, bytes, os.PathLike)) and os.path.basename(os.fsdecode(executable)) == "gh":
-            shown = list(argv[1:3]) if isinstance(argv, (list, tuple)) else []
-            _OFFLINE_ATTEMPTS.append(f"GitHub CLI run {shown!r}")
-            raise PermissionError("pytest offline guard refused to run the GitHub CLI")
-
-
-sys.addaudithook(_offline_audit_hook)
+# Tests stay offline: no connection off this machine and no GitHub CLI run
+# (see tests/offline_guard.py for why). Attempts are refused and recorded;
+# _test_stays_offline fails the test that made one, and attempts outside any
+# test fail the session.
+_install_offline_guard()
 
 
 def _fingerprint(paths: tuple[Path, ...]) -> tuple[tuple[str, int, str], ...]:

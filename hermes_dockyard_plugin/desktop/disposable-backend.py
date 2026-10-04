@@ -15,6 +15,16 @@ os.environ["DOCKYARD_PLUGIN_DB"] = str(root / "dockyard.db")
 os.environ["STEWARD_DB_PATH"] = str(root / "dockyard.db")
 os.environ["HERMES_DASHBOARD_SESSION_TOKEN"] = "demo-session-token"
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "dashboard"))
+# The practice server stays offline, like the pytest suite: every connection
+# off this machine and every GitHub CLI run is refused and recorded
+# (tests/offline_guard.py). /health reports the refusals and
+# run-browser-suite.mjs fails the run if there are any.
+import importlib.util as _il  # noqa: E402 (after env setup, like plugin_api below)
+_offline_guard_spec = _il.spec_from_file_location(
+    "_offline_guard", Path(__file__).resolve().parents[2] / "tests" / "offline_guard.py")
+_offline_guard = _il.module_from_spec(_offline_guard_spec)
+_offline_guard_spec.loader.exec_module(_offline_guard)  # noqa: E402 (file-path load after env setup)
+_offline_guard.install()
 import plugin_api
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse
@@ -23,6 +33,12 @@ from hermes_project_stewardship.kanban import ReferenceKanbanAdapter
 from hermes_project_stewardship.persistence.service import StewardshipService
 
 store = plugin_api._store
+# The practice server has no Hermes behind it (reference adapter), so the
+# board model picker gets the same answer as a machine without Hermes. Left
+# alone, every canvas open listed this machine's real models: it ran
+# `gh auth token` and called provider APIs with the operator's logins.
+from hermes_project_stewardship.persistence import hermes_curation_provider  # noqa: E402 (after env setup)
+hermes_curation_provider.list_hermes_models = lambda: {"available": False, "default": None, "providers": []}
 # Phase-5 workflow binding validates overrides against discovered profiles
 # (P5.2). Declare the fixture team's profiles through the adapter's own
 # constructor seam. This is reference-adapter coverage, not vanilla-host proof.
@@ -45,7 +61,6 @@ for pid in ("payments-relaunch", "mobile-client", "atlas-mobile", "legacy-integr
 
 # R2 Phase C: real Roadmap fixtures. Built through the same services the
 # production routes use, so the browser suite exercises the real read model.
-import importlib.util as _il  # noqa: E402 (after env setup, like plugin_api above)
 from hermes_project_stewardship.persistence.roadmap_service import RoadmapService  # noqa: E402 (needs plugin_api._store above)
 _roadmap_fixtures_spec = _il.spec_from_file_location(
     "_roadmap_fixtures", Path(__file__).resolve().parent / "_roadmap_fixtures.py")
@@ -82,7 +97,8 @@ def bundle():
 
 @app.get("/health")
 def health():
-    return {"state": str(root), "adapter": "reference", "backend": "real"}
+    return {"state": str(root), "adapter": "reference", "backend": "real",
+            "offline_refusals": list(_offline_guard.ATTEMPTS)}
 
 if __name__ == "__main__":
     import uvicorn
