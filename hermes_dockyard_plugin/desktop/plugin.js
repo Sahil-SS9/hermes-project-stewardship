@@ -1745,6 +1745,9 @@ var DOCKYARD_CSS = `
 .dockyard-root .dockyard-section-fold:hover { background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-section-count { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .dockyard-root .dockyard-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* Content previews (Sahil 04/10): images and PDFs show in the Content tab. */
+.dockyard-root .dockyard-content-image { display: block; max-width: 100%; max-height: 520px; margin: 0 auto; object-fit: contain; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-content-pdf { display: block; width: 100%; height: 560px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); }
 /* App settings (Sahil 04/10): the whole app only; project settings stay in the project. */
 .dockyard-root .dockyard-app-settings { display: grid; gap: 14px; max-width: 880px; }
 .dockyard-root .dockyard-app-settings-project { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 0; padding: 11px 13px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 13px; }
@@ -14776,6 +14779,17 @@ function ProjectContentPanel({ project, content, onRefresh }) {
   const [contentAction, setContentAction] = useState(null);
   const [actionBusy, setActionBusy] = useState(false);
   const encoded = encodeURIComponent(project.id);
+  const [pdfUrl, setPdfUrl] = useState(null);
+  useEffect(() => {
+    if (previewState !== "ready" || selected?.preview_kind !== "pdf" || !selected?.data_base64) {
+      setPdfUrl(null);
+      return void 0;
+    }
+    const bytes = Uint8Array.from(atob(selected.data_base64), (char) => char.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+    setPdfUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [selected, previewState]);
   const openPreview = async (item) => {
     setSelected(item);
     setPreviewState("loading");
@@ -14862,7 +14876,7 @@ function ProjectContentPanel({ project, content, onRefresh }) {
       jsx("span", { className: "dockyard-card-label", children: "PREVIEW" }),
       selected ? jsx("h2", { children: selected.filename }) : jsx("h2", { children: "Select a document" }),
       previewState === "loading" ? jsx("p", { children: "Loading preview..." }) : null,
-      previewState === "ready" && selected?.preview_kind === "text" ? jsx("pre", { "data-content-preview": true, className: "dockyard-content-preview", children: selected.text || "This text file is empty." }) : previewState === "ready" ? jsx("div", { "data-content-preview": true, className: "dockyard-report-placeholder", children: `Preview is not available for ${mediaTypeLabel(selected?.media_type)}. File metadata remains visible.` }) : previewState === "idle" ? jsx("p", { className: "dockyard-meta", children: "Text and Markdown files can be read here. Other formats show verified metadata." }) : null,
+      previewState === "ready" && selected?.preview_kind === "text" ? jsx("pre", { "data-content-preview": true, className: "dockyard-content-preview", children: selected.text || "This text file is empty." }) : previewState === "ready" && selected?.preview_kind === "image" && selected.data_base64 ? jsx("img", { "data-content-preview": true, "data-preview-kind": "image", className: "dockyard-content-image", alt: selected.filename, src: `data:${selected.media_type};base64,${selected.data_base64}` }) : previewState === "ready" && selected?.preview_kind === "pdf" && pdfUrl ? jsx("iframe", { "data-content-preview": true, "data-preview-kind": "pdf", className: "dockyard-content-pdf", title: `PDF preview: ${selected.filename}`, src: pdfUrl }) : previewState === "ready" ? jsx("div", { "data-content-preview": true, className: "dockyard-report-placeholder", children: `Preview is not available for ${mediaTypeLabel(selected?.media_type)}. File metadata remains visible.` }) : previewState === "idle" ? jsx("p", { className: "dockyard-meta", children: "Text, Markdown, images and PDFs show here. Other formats show verified metadata." }) : null,
       selected ? jsxs("div", { className: "dockyard-form-actions", children: [
         selected.archived_at ? jsx(Button, { action: "restore-project-content", disabled: actionBusy, onClick: () => setContentAction("restore"), children: "Restore" }) : jsx(Button, { action: "archive-project-content", disabled: actionBusy, onClick: () => setContentAction("archive"), children: "Archive" }),
         jsx(Button, { action: "remove-project-content", variant: "danger", disabled: actionBusy, onClick: () => setContentAction("remove"), children: "Remove file" })

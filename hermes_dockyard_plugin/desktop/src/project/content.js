@@ -1,6 +1,7 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 import { useState } from '../runtime/react.js'
+import { useEffect } from '../runtime/react.js'
 import { api } from '../runtime/context.js'
 import { fileAsBase64 } from '../lib/ui.js'
 import { emitToast } from '../runtime/context.js'
@@ -26,6 +27,16 @@ export function ProjectContentPanel({ project, content, onRefresh }) {
   const [contentAction, setContentAction] = useState(null)
   const [actionBusy, setActionBusy] = useState(false)
   const encoded = encodeURIComponent(project.id)
+  // Sahil 04/10 (demo feedback g): a PDF shows through an object URL (Chromium
+  // will not frame a data: PDF). It is released when the selection changes.
+  const [pdfUrl, setPdfUrl] = useState(null)
+  useEffect(() => {
+    if (previewState !== 'ready' || selected?.preview_kind !== 'pdf' || !selected?.data_base64) { setPdfUrl(null); return undefined }
+    const bytes = Uint8Array.from(atob(selected.data_base64), (char) => char.charCodeAt(0))
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
+    setPdfUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [selected, previewState])
   const openPreview = async (item) => {
     setSelected(item)
     setPreviewState('loading')
@@ -111,10 +122,14 @@ export function ProjectContentPanel({ project, content, onRefresh }) {
       previewState === 'loading' ? jsx('p', { children: 'Loading preview...' }) : null,
       previewState === 'ready' && selected?.preview_kind === 'text'
         ? jsx('pre', { 'data-content-preview': true, className: 'dockyard-content-preview', children: selected.text || 'This text file is empty.' })
+        : previewState === 'ready' && selected?.preview_kind === 'image' && selected.data_base64
+          ? jsx('img', { 'data-content-preview': true, 'data-preview-kind': 'image', className: 'dockyard-content-image', alt: selected.filename, src: `data:${selected.media_type};base64,${selected.data_base64}` })
+        : previewState === 'ready' && selected?.preview_kind === 'pdf' && pdfUrl
+          ? jsx('iframe', { 'data-content-preview': true, 'data-preview-kind': 'pdf', className: 'dockyard-content-pdf', title: `PDF preview: ${selected.filename}`, src: pdfUrl })
         : previewState === 'ready'
           ? jsx('div', { 'data-content-preview': true, className: 'dockyard-report-placeholder', children: `Preview is not available for ${mediaTypeLabel(selected?.media_type)}. File metadata remains visible.` })
           : previewState === 'idle'
-            ? jsx('p', { className: 'dockyard-meta', children: 'Text and Markdown files can be read here. Other formats show verified metadata.' })
+            ? jsx('p', { className: 'dockyard-meta', children: 'Text, Markdown, images and PDFs show here. Other formats show verified metadata.' })
             : null,
       selected ? jsxs('div', { className: 'dockyard-form-actions', children: [
         selected.archived_at

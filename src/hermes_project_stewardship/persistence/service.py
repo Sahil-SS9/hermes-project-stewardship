@@ -55,6 +55,12 @@ _CONTENT_TYPES = {
     "image/webp": ".webp",
 }
 _MAX_CONTENT_BYTES = 5 * 1024 * 1024
+# What the Content tab can show, by media type (text is read as text).
+# Videos need a schema change first: project_content's CHECK allows only these.
+_MEDIA_PREVIEW_KINDS = {
+    "image/png": "image", "image/jpeg": "image", "image/webp": "image",
+    "application/pdf": "pdf",
+}
 _TEXT_PREVIEW_BYTES = 100_000
 
 
@@ -2453,6 +2459,14 @@ class StewardshipService:
         ):
             raise ServiceError("project content failed its integrity check")
         metadata = self._content_metadata(row)
+        kind = _MEDIA_PREVIEW_KINDS.get(row["media_type"])
+        if kind is not None:
+            # Sahil 04/10 (demo feedback g): images and PDFs show in the
+            # Content tab. Same checks as text: the bytes are the stored file,
+            # untouched, and they must still match their declared type.
+            self._validate_content_bytes(row["media_type"], raw)
+            return {**metadata, "preview_kind": kind, "text": None, "truncated": False,
+                    "data_base64": base64.b64encode(raw).decode("ascii")}
         if row["media_type"] in ("text/plain", "text/markdown"):
             preview = raw[:_TEXT_PREVIEW_BYTES].decode("utf-8", errors="ignore")
             return {
