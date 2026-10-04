@@ -155,6 +155,32 @@ def _prove_test_paths_are_disposable():
     yield
 
 
+_SANDBOX_ENV = ("HPS_TEST_STATE_ROOT", "HERMES_HOME", "HERMES_KANBAN_HOME", "STEWARD_DB_PATH", "DOCKYARD_PLUGIN_DB")
+
+
+@pytest.fixture(autouse=True)
+def _sandbox_env_survives_each_test():
+    """Fail any test that leaves a sandbox path changed or unset, after repairing it.
+
+    A test that popped HERMES_HOME instead of restoring it pointed every later
+    test at the live ~/.hermes. This fixture tears down after the test's own
+    fixtures (monkeypatch undo has run); repairing first stops one leak from
+    carrying later tests onto live state.
+    """
+    before = {name: os.environ.get(name) for name in _SANDBOX_ENV}
+    yield
+    after = {name: os.environ.get(name) for name in _SANDBOX_ENV}
+    if after == before:
+        return
+    for name, value in before.items():
+        if value is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = value
+    changed = {name: (before[name], after[name]) for name in _SANDBOX_ENV if after[name] != before[name]}
+    pytest.fail(f"test left the pytest sandbox environment changed (before, after): {changed}", pytrace=False)
+
+
 class FrozenClock:
     """Deterministic clock; advance() moves time forward."""
 
