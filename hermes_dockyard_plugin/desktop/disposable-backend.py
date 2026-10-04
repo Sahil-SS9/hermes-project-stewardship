@@ -84,11 +84,12 @@ _kanban_fixtures_spec = _il.spec_from_file_location(
     "_kanban_fixtures", Path(__file__).resolve().parent / "_kanban_fixtures.py")
 _kanban_fixtures = _il.module_from_spec(_kanban_fixtures_spec)
 _kanban_fixtures_spec.loader.exec_module(_kanban_fixtures)  # noqa: E402 (file-path load after env setup)
-_kanban_fixtures.seed_kanban_fixtures(service, adapter, roadmap)
+_PRINCIPAL = "demo-owner"  # who the Desktop is signed in as; the backend binds every action to it
+_kanban_fixtures.seed_kanban_fixtures(service, adapter, roadmap, owner=_PRINCIPAL)
 for _pid in ("legacy-integration",):
     service.disable(_pid, actor="fixture", interface="fixture")
 plugin_api._app = create_app(store, kanban_adapter=adapter,
-    auth_token="demo-session-token", auth_principal="demo-owner",
+    auth_token="demo-session-token", auth_principal=_PRINCIPAL,
     auth_principal_is_human=True, capabilities=frozenset({"workflow_revision_approval", "project_archive"}))
 plugin_api._client = plugin_api.httpx.AsyncClient(
     transport=plugin_api.httpx.ASGITransport(app=plugin_api._app), base_url="http://dockyard.test")

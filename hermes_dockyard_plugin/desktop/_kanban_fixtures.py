@@ -14,7 +14,7 @@ Rules for these fixtures:
 """
 
 
-def seed_kanban_fixtures(service, adapter, roadmap) -> None:
+def seed_kanban_fixtures(service, adapter, roadmap, *, owner: str) -> None:
     from hermes_project_stewardship.dockyard import Actor, ActorKind
     from hermes_project_stewardship.persistence.canonical_work_service import CanonicalWorkService
     from hermes_project_stewardship.persistence.dockyard_service import DockyardService
@@ -68,3 +68,15 @@ def seed_kanban_fixtures(service, adapter, roadmap) -> None:
     dy.milestone_create(pid, "Beta launch", due="2099-03-01", actor=human)
     dy.milestone_attach(pid, "Beta launch", screens, actor=human)
     dy.milestone_attach(pid, "Beta launch", analytics, actor=human)
+
+    # PROTOTYPE r6 (Kanban views): three saved views, so the views bar has
+    # something to show. Two belong to `owner`, the user the practice server
+    # signs the Desktop in as (one shared); the third is shared by grace-hopper,
+    # so the panel shows a view you can open and duplicate but not change.
+    me = Actor(id=owner, display_name=owner, kind=ActorKind.HUMAN)
+    every_field = ["assignee", "links", "due", "labels", "planning"]
+    dy.view_save(pid, "Ada's work", "board", actor=me, filters={
+        "assignee": "ada-lovelace", "display": {"density": "compact", "fields": ["assignee", "links", "due", "labels"]}})
+    dy.view_save(pid, "Mobile, expanded", "board", actor=me, shared=True, filters={
+        "labels": ["mobile"], "display": {"density": "detailed", "fields": every_field}})
+    dy.view_save(pid, "Grace's bugs", "table", actor=grace, shared=True, filters={"types": ["bug"]})

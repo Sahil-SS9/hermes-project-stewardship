@@ -3,29 +3,37 @@
 // unit-tested without a browser (kanban-model.test.mjs).
 //
 // Rules this file keeps:
-// - A chip exists only if the data says so. Nothing is invented.
+// - A signal or link exists only if the data says so. Nothing is invented.
 // - Blocked by / Blocks come only from the dependencies route (real links).
 // - An objective appears only through the item's initiative, never directly.
 // - `parent_task_id` is never read.
+//
+// PROTOTYPE r6 (04/10/2026, Sahil's C2 review): five columns and no catch-all,
+// a compact card with an expanded form, moves limited to what Hermes accepts,
+// and views that save what you see (filters, layout and card settings).
 
 export const DONE_STATUSES = Object.freeze(['done', 'complete', 'completed'])
 export const isDone = (status) => DONE_STATUSES.includes(status)
 
-// The six stages: same keys, labels and status mapping as the board always had.
+// Five columns. Every Hermes status reaches one of them through the backend
+// (persistence/canonical_work_service.py _CANONICAL_STATUS): Backlog = triage
+// or todo, In progress = ready, scheduled or running, Review = review,
+// Blocked = blocked, Done = done. There is no catch-all column: an item whose
+// status no column lists is named in a notice above the board instead.
 export const STAGES = Object.freeze([
-  { key: 'backlog', label: 'Backlog', statuses: ['backlog'] },
-  { key: 'active', label: 'In progress', statuses: ['in_progress', 'executing', 'active'] },
-  { key: 'review', label: 'Review', statuses: ['in_review', 'review'] },
-  { key: 'blocked', label: 'Blocked', statuses: ['blocked'] },
-  { key: 'done', label: 'Done', statuses: DONE_STATUSES },
-  { key: 'other', label: 'Other states', statuses: null },
+  { key: 'backlog', label: 'Backlog', statuses: ['backlog'], hint: 'Not started' },
+  { key: 'active', label: 'In progress', statuses: ['in_progress', 'executing', 'active'], hint: 'Being worked on' },
+  { key: 'review', label: 'Review', statuses: ['in_review', 'review'], hint: 'Waiting for a check' },
+  { key: 'blocked', label: 'Blocked', statuses: ['blocked'], hint: 'Stopped until something changes' },
+  { key: 'done', label: 'Done', statuses: DONE_STATUSES, hint: 'Finished' },
 ])
+const STAGE_BY_KEY = Object.fromEntries(STAGES.map((stage) => [stage.key, stage]))
+export const stageLabel = (key) => STAGE_BY_KEY[key]?.label ?? key
 
-// Which stage an item belongs to. Archived items belong to none.
+// Which column an item belongs to: null when archived or when no column lists its status.
 export function stageKeyOf(item) {
   if (!item || item.status === 'archived') return null
-  const stage = STAGES.find((candidate) => candidate.statuses?.includes(item.status))
-  return stage ? stage.key : 'other'
+  return STAGES.find((candidate) => candidate.statuses.includes(item.status))?.key ?? null
 }
 
 // { backlog: [...], active: [...], ... } in the original item order.
@@ -38,8 +46,39 @@ export function groupByStage(items) {
   return groups
 }
 
-// The status a card takes when it is dropped on, or moved into, a stage.
-export const dropStatusOf = (stageKey) => STAGES.find((stage) => stage.key === stageKey)?.statuses?.[0] ?? null
+// Items no column can show (never archived ones). Named in a notice, never hidden.
+export const unplacedItems = (items) => (items ?? []).filter((item) => item && item.status !== 'archived' && !stageKeyOf(item))
+
+// The status a card takes when it is dropped on, or moved into, a column.
+export const dropStatusOf = (stageKey) => STAGE_BY_KEY[stageKey]?.statuses[0] ?? null
+
+// ---- moves ---------------------------------------------------------------------
+// The moves real Hermes accepts, measured on 04/10/2026 against upstream
+// 8c098e9e81 and KenseiAgent 67751cd9f23 with the plugin's own services
+// (evidence/c/C2/other-states-probe/move-matrix-*.out). Hermes refuses every
+// other move, or (for epics) accepts it without the card landing in that column.
+// r6: the backend should send each item's allowed moves, because they depend
+// on the host; this table is the prototype's stand-in.
+const TASK_MOVES = Object.freeze({ backlog: ['active', 'done'], active: ['review', 'blocked', 'done'], review: ['done'], blocked: ['active', 'done'], done: [] })
+const EPIC_MOVES = Object.freeze({ backlog: ['active'], active: [], review: [], blocked: [], done: [] })
+
+// { targets: [{ key, label, status }], reason } for one card. `openBlockers` is
+// the number of Blocked by items that are not done: Hermes parks a task with
+// open blockers in Backlog until they finish, and refuses to close it.
+export function movesFor(item, openBlockers = 0) {
+  const from = stageKeyOf(item)
+  if (!from) return { targets: [], reason: 'This item is not in a board column.' }
+  const epic = (item.type || 'task') === 'epic'
+  let keys = (epic ? EPIC_MOVES : TASK_MOVES)[from] ?? []
+  let reason = null
+  if (!epic && from === 'backlog' && openBlockers > 0) {
+    keys = []
+    reason = `Can't start yet: waiting on ${openBlockers} open ${openBlockers === 1 ? 'blocker' : 'blockers'}.`
+  } else if (keys.length === 0) {
+    reason = from === 'done' ? 'Finished work stays in Done.' : epic ? 'Hermes does not move an epic from this column.' : null
+  }
+  return { targets: keys.map((key) => ({ key, label: STAGE_BY_KEY[key].label, status: dropStatusOf(key) })), reason }
+}
 
 export const typeLabel = (type) => {
   const value = String(type || 'task')
@@ -55,6 +94,10 @@ export function initialsOf(name) {
   return (first + last).toUpperCase()
 }
 
+// "ada-lovelace" -> "Ada Lovelace". Profile ids read as names on the card.
+export const displayName = (name) => String(name ?? '').trim().split(/[\s._-]+/).filter(Boolean)
+  .map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+
 // Overdue only when the due date has passed and the item is not done.
 // `today` is an ISO date (YYYY-MM-DD) so tests never depend on the clock.
 export function isOverdue(item, today) {
@@ -63,29 +106,16 @@ export function isOverdue(item, today) {
   return due < today
 }
 
-// ---- chips -------------------------------------------------------------------
-
-export const CHIP_GROUPS = Object.freeze({ blocked_by: 'links', blocks: 'links', initiative: 'planning', milestone: 'planning', objective: 'planning' })
-export const TAG_KEYS = Object.freeze(['links', 'planning', 'due', 'labels'])
-export const TAG_LABELS = Object.freeze({ links: 'Links', planning: 'Planning', due: 'Due', labels: 'Labels' })
-export const defaultTags = () => ({ links: true, planning: true, due: true, labels: true })
-
-function linkChip(kind, card) {
-  const word = kind === 'blocked_by' ? 'Blocked by' : 'Blocks'
-  const done = isDone(card.status)
-  const status = String(card.status || 'unknown').replaceAll('_', ' ')
-  return {
-    key: `${kind}:${card.ref}`,
-    kind,
-    group: 'links',
-    ref: card.ref,
-    // The type word is the linked item's own type. Done is written, not just coloured.
-    text: `${word} · ${typeLabel(card.type)} · ${card.ref} ${card.title || ''}`.trim() + (done ? ' · Done' : ''),
-    title: `${card.ref} — ${card.title || 'Untitled'} · ${typeLabel(card.type)} · ${status}`,
-    done,
-    target: { kind: 'item', ref: card.ref },
-  }
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+// "2099-06-30" -> "30 Jun 2099"; the year is dropped when it is this year.
+export function shortDate(iso, today) {
+  const [year, month, day] = String(iso ?? '').slice(0, 10).split('-').map(Number)
+  if (!year || !month || !day) return String(iso ?? '')
+  const text = `${day} ${MONTHS[month - 1]}`
+  return today && String(today).slice(0, 4) === String(year) ? text : `${text} ${year}`
 }
+
+// ---- links and planning ------------------------------------------------------
 
 // The objectives an initiative supports, from the roadmap read model.
 export function objectivesOfInitiative(roadmapProject, initiativeRef) {
@@ -93,64 +123,61 @@ export function objectivesOfInitiative(roadmapProject, initiativeRef) {
   return initiative ? { initiative, objectives: initiative.objectives ?? [] } : { initiative: null, objectives: [] }
 }
 
-// Chips for one item, in display order: links, then planning.
+// Everything one card can show, from real data only.
 // `data` = { deps, initiatives, milestones, roadmapProject }; each may be missing.
-export function chipsFor(item, data = {}) {
-  if (!item) return []
-  const chips = []
-  const entry = data.deps?.[item.ref]
-  for (const card of entry?.blocked_by ?? []) chips.push(linkChip('blocked_by', card))
-  for (const card of entry?.blocks ?? []) chips.push(linkChip('blocks', card))
-
-  if (item.initiative_ref) {
-    const initiative = (data.initiatives ?? []).find((candidate) => candidate.ref === item.initiative_ref)
-    chips.push({
-      key: `initiative:${item.initiative_ref}`, kind: 'initiative', group: 'planning', ref: item.initiative_ref,
-      text: `Initiative · ${item.initiative_ref}${initiative?.title ? ` ${initiative.title}` : ''}`,
-      title: `${item.initiative_ref}${initiative?.title ? ` — ${initiative.title}` : ''}`,
-      target: { kind: 'view', view: 'initiative' },
-    })
+export function cardFacts(item, data = {}, today = null) {
+  const entry = data.deps?.[item.ref] ?? {}
+  const link = (card) => ({ ref: card.ref, title: card.title || '', type: card.type || 'task', status: card.status || 'unknown', done: isDone(card.status) })
+  const blockedBy = (entry.blocked_by ?? []).map(link)
+  const blocks = (entry.blocks ?? []).map(link)
+  const initiative = item.initiative_ref
+    ? { ref: item.initiative_ref, title: (data.initiatives ?? []).find((candidate) => candidate.ref === item.initiative_ref)?.title ?? '' }
+    : null
+  const milestones = (data.milestones ?? [])
+    .filter((milestone) => !milestone.archived_at && (milestone.item_refs ?? []).includes(item.ref))
+    .map((milestone) => ({ name: milestone.name, due: milestone.due ?? null }))
+  // Objective: only through the item's initiative. No initiative, no objective.
+  const objectives = item.initiative_ref
+    ? objectivesOfInitiative(data.roadmapProject, item.initiative_ref).objectives.map((objective) => ({ id: objective.id, name: objective.name, relationship: objective.relationship ?? null }))
+    : []
+  const due = item.due ? String(item.due).slice(0, 10) : null
+  return {
+    blockedBy, blocks,
+    openBlockers: blockedBy.filter((card) => !card.done).length,
+    openBlocks: blocks.filter((card) => !card.done).length,
+    initiative, milestones, objectives,
+    due, overdue: isOverdue(item, today),
+    labels: item.labels ?? [],
   }
-  for (const milestone of data.milestones ?? []) {
-    if (milestone.archived_at) continue // archived milestones are skipped
-    if (!(milestone.item_refs ?? []).includes(item.ref)) continue
-    chips.push({
-      key: `milestone:${milestone.id ?? milestone.name}`, kind: 'milestone', group: 'planning', ref: null,
-      text: `Milestone · ${milestone.name}`, title: `${milestone.name}${milestone.due ? ` · due ${milestone.due}` : ''}`,
-      target: { kind: 'view', view: 'milestones' },
-    })
-  }
-  // Objective: only through the item's initiative. No initiative, no objective chip.
-  if (item.initiative_ref) {
-    const { initiative, objectives } = objectivesOfInitiative(data.roadmapProject, item.initiative_ref)
-    for (const objective of objectives) {
-      const via = initiative?.title || item.initiative_ref
-      const relationship = objective.relationship ? ` · ${objective.relationship}` : ''
-      chips.push({
-        key: `objective:${objective.id}:${item.initiative_ref}`, kind: 'objective', group: 'planning', ref: null,
-        text: `Objective · ${objective.name} · via ${via}${relationship}`,
-        title: `${objective.name} — through initiative ${via}`,
-        target: { kind: 'view', view: 'objectives' },
-      })
-    }
-  }
-  return chips
 }
 
-// Chips shown for the current Tags choices. Due and Labels are not chips.
-export const visibleChips = (chips, tags) => chips.filter((chip) => tags?.[CHIP_GROUPS[chip.kind]] !== false)
+// ---- card settings (part of a view) --------------------------------------------
 
-// A card shows the first three chips; the rest sit behind "+n".
-export const CHIP_LIMIT = 3
-export function splitChips(chips, expanded) {
-  if (expanded || chips.length <= CHIP_LIMIT) return { shown: chips, hidden: 0 }
-  return { shown: chips.slice(0, CHIP_LIMIT), hidden: chips.length - CHIP_LIMIT }
+export const CARD_FIELDS = Object.freeze(['assignee', 'links', 'due', 'labels', 'planning'])
+export const CARD_FIELD_LABELS = Object.freeze({
+  assignee: 'Assignee', links: 'Blocked by and Blocks', due: 'Due date', labels: 'Labels', planning: 'Initiative and milestone',
+})
+export const defaultFields = () => ({ assignee: true, links: true, due: true, labels: true, planning: false })
+export const DENSITIES = Object.freeze(['compact', 'detailed'])
+export const LABEL_LIMIT = 2
+
+// The one-line signals on a compact card, in reading order. Only what applies.
+export function cardSignals(facts, fields, today) {
+  const out = []
+  if (fields.links && facts.openBlockers > 0) out.push({ kind: 'blocked_by', icon: 'hand', text: `Blocked by ${facts.openBlockers}` })
+  if (fields.links && facts.openBlocks > 0) out.push({ kind: 'blocks', icon: 'link', text: `Blocks ${facts.openBlocks}` })
+  if (fields.due && facts.due) {
+    out.push(facts.overdue
+      ? { kind: 'overdue', icon: 'clock-3', text: `Overdue · ${shortDate(facts.due, today)}` }
+      : { kind: 'due', icon: 'calendar', text: `Due ${shortDate(facts.due, today)}` })
+  }
+  return out
 }
 
-// ---- filters -----------------------------------------------------------------
+// ---- filters ---------------------------------------------------------------------
 
-export const emptyFilters = () => ({ query: '', assignee: '', type: '', label: '' })
-export const filtersActive = (filters) => Boolean(filters.query.trim() || filters.assignee || filters.type || filters.label)
+export const emptyFilters = () => ({ query: '', assignee: '', type: '', label: '', statuses: [] })
+export const filtersActive = (filters) => Boolean(filters.query.trim() || filters.assignee || filters.type || filters.label || filters.statuses.length)
 
 // Values that exist in this project, sorted, for the dropdowns.
 export function filterOptions(items) {
@@ -163,16 +190,97 @@ export function filterOptions(items) {
   }
 }
 
-// Search finds an item by its own ref or title, and also every item whose
-// chips reference the searched ref (so searching HDY-1 finds what it blocks).
-export function applyFilters(items, filters, chipsByRef = {}) {
+// Search finds an item by its own ref or title, and also every item that links
+// to the searched ref (so searching a ref finds what it blocks).
+export function applyFilters(items, filters, factsByRef = {}) {
   const query = filters.query.trim().toLowerCase()
   return (items ?? []).filter((item) => {
     if (filters.assignee && (item.assignee || '') !== filters.assignee) return false
     if (filters.type && (item.type || 'task') !== filters.type) return false
     if (filters.label && !(item.labels ?? []).includes(filters.label)) return false
+    if (filters.statuses.length && !filters.statuses.includes(item.status)) return false
     if (!query) return true
     if (String(item.ref).toLowerCase().includes(query) || String(item.title ?? '').toLowerCase().includes(query)) return true
-    return (chipsByRef[item.ref] ?? []).some((chip) => chip.ref && String(chip.ref).toLowerCase().includes(query))
+    const facts = factsByRef[item.ref]
+    return [...(facts?.blockedBy ?? []), ...(facts?.blocks ?? [])].some((card) => String(card.ref).toLowerCase().includes(query))
   })
+}
+
+// ---- views -----------------------------------------------------------------------
+// A view is what you are looking at: layout, filters and card settings.
+// "All work" is built in: everything, on the board, compact cards.
+
+export const ALL_WORK = 'All work'
+export const defaultDefinition = () => ({ layout: 'board', filters: emptyFilters(), density: 'compact', fields: defaultFields() })
+
+const sortedFields = (fields) => CARD_FIELDS.filter((key) => fields[key])
+export const sameDefinition = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b))
+function canonical(definition) {
+  const filters = definition.filters
+  return {
+    layout: definition.layout, density: definition.density, fields: sortedFields(definition.fields),
+    filters: { query: filters.query.trim(), assignee: filters.assignee, type: filters.type, label: filters.label, statuses: [...filters.statuses].sort() },
+  }
+}
+
+// Backend saved view -> definition. Missing parts fall back to the defaults, so
+// views saved before r6 (layout + one status) still open.
+export function definitionOf(view) {
+  if (!view) return defaultDefinition()
+  const stored = view.filters ?? {}
+  const display = stored.display ?? {}
+  const fields = Array.isArray(display.fields)
+    ? Object.fromEntries(CARD_FIELDS.map((key) => [key, display.fields.includes(key)]))
+    : defaultFields()
+  return {
+    layout: view.layout === 'table' ? 'list' : 'board',
+    density: DENSITIES.includes(display.density) ? display.density : 'compact',
+    fields,
+    filters: {
+      query: typeof stored.query === 'string' ? stored.query : '',
+      assignee: stored.assignee ?? '',
+      type: (stored.types ?? [])[0] ?? '',
+      label: (stored.labels ?? [])[0] ?? '',
+      statuses: Array.isArray(stored.status) ? stored.status : typeof stored.status === 'string' ? [stored.status] : [],
+    },
+  }
+}
+
+// Definition -> the body of PUT /projects/{id}/views.
+export function viewBody(name, definition, shared = false) {
+  const { filters } = definition
+  const stored = { display: { density: definition.density, fields: sortedFields(definition.fields) } }
+  if (filters.query.trim()) stored.query = filters.query.trim()
+  if (filters.assignee) stored.assignee = filters.assignee
+  if (filters.type) stored.types = [filters.type]
+  if (filters.label) stored.labels = [filters.label]
+  if (filters.statuses.length) stored.status = [...filters.statuses]
+  return { name, layout: definition.layout === 'list' ? 'table' : 'board', filters: stored, shared: Boolean(shared) }
+}
+
+// "Search "x" · Assignee ada-lovelace · Label mobile", or "" when nothing filters.
+export function describeFilters(filters) {
+  const parts = []
+  if (filters.query.trim()) parts.push(`Search "${filters.query.trim()}"`)
+  if (filters.assignee) parts.push(`Assignee ${displayName(filters.assignee)}`)
+  if (filters.type) parts.push(`Type ${typeLabel(filters.type)}`)
+  if (filters.label) parts.push(`Label ${filters.label}`)
+  if (filters.statuses.length) parts.push(`Status ${filters.statuses.map((status) => status.replaceAll('_', ' ')).join(', ')}`)
+  return parts.join(' · ')
+}
+
+// "Board · Assignee Ada Lovelace · Label mobile · Summary cards" for the views panel.
+export function describeDefinition(definition) {
+  const parts = [definition.layout === 'list' ? 'List' : 'Board']
+  const filters = describeFilters(definition.filters)
+  if (filters) parts.push(filters)
+  if (definition.layout !== 'list') parts.push(definition.density === 'detailed' ? 'Expanded cards' : 'Summary cards')
+  return parts.join(' · ')
+}
+
+// A free name for "Save as new view" and "Duplicate": "Mine", "Mine (2)", ...
+export function freeName(base, taken) {
+  const names = new Set(taken)
+  if (!names.has(base)) return base
+  for (let n = 2; ; n++) if (!names.has(`${base} (${n})`)) return `${base} (${n})`
 }

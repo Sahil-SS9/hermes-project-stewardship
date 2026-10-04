@@ -26,7 +26,13 @@ ALLOWED_STATUSES = {
     "archived", "pending",
 }
 
-FILTER_KEYS = ("status", "assignee", "labels", "milestone", "shared_with")
+FILTER_KEYS = ("status", "assignee", "labels", "milestone", "shared_with",
+               # PROTOTYPE r6 (Kanban views save what you see): type, search
+               # text and the card settings. Optional; older views are unchanged.
+               "types", "query", "display")
+
+DISPLAY_DENSITIES = {"compact", "detailed"}
+DISPLAY_FIELDS = ("assignee", "links", "due", "labels", "planning")
 
 
 LEGACY_KEY_MAP = {
@@ -105,6 +111,40 @@ def validate_query(filters: Any) -> Dict[str, Any]:
             raise QuerySchemaError("shared_with supports at most 32 names")
         out["shared_with"] = [x.strip() for x in shared]
 
+    types = filters.get("types")
+    if types is not None:
+        if not isinstance(types, list) or not types or not all(
+                isinstance(x, str) and x.strip() for x in types):
+            raise QuerySchemaError("types must be a non-empty list of strings")
+        out["types"] = [x.strip() for x in types]
+
+    text = filters.get("query")
+    if text is not None:
+        if not isinstance(text, str) or len(text) > 200:
+            raise QuerySchemaError("query must be a string of at most 200 characters")
+        if text.strip():
+            out["query"] = text.strip()
+
+    display = filters.get("display")
+    if display is not None:
+        if not isinstance(display, dict):
+            raise QuerySchemaError("display must be an object")
+        unknown_display = sorted(set(display) - {"density", "fields"})
+        if unknown_display:
+            raise QuerySchemaError(f"unknown display keys: {', '.join(unknown_display)}")
+        shown: Dict[str, Any] = {}
+        if "density" in display:
+            if display["density"] not in DISPLAY_DENSITIES:
+                raise QuerySchemaError("display density must be compact or detailed")
+            shown["density"] = display["density"]
+        if "fields" in display:
+            fields = display["fields"]
+            if not isinstance(fields, list) or not all(x in DISPLAY_FIELDS for x in fields):
+                raise QuerySchemaError(
+                    f"display fields must be a list of: {', '.join(DISPLAY_FIELDS)}")
+            shown["fields"] = [x for x in DISPLAY_FIELDS if x in fields]
+        out["display"] = shown
+
     return out
 
 
@@ -128,4 +168,12 @@ def apply_query(items: List[Dict[str, Any]], query: Dict[str, Any],
     if query.get("milestone") and milestone_items is not None:
         ms = query["milestone"]
         out = [i for i in out if milestone_items.get(i.get("ref")) == ms]
+    if query.get("types"):
+        wanted = set(query["types"])
+        out = [i for i in out if (i.get("type") or "task") in wanted]
+    if query.get("query"):
+        text = query["query"].lower()
+        out = [i for i in out
+               if text in str(i.get("ref") or "").lower()
+               or text in str(i.get("title") or "").lower()]
     return out
