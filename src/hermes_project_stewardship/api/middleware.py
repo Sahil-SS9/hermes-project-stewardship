@@ -12,6 +12,7 @@ token (when authed) or client host. 429 with Retry-After on exhaustion.
 from __future__ import annotations
 
 import hmac
+import secrets
 import threading
 import time as _time
 from contextvars import ContextVar
@@ -29,6 +30,37 @@ _CURRENT_PRINCIPAL: ContextVar[Optional[str]] = ContextVar(
 
 def current_principal() -> Optional[str]:
     return _CURRENT_PRINCIPAL.get()
+
+
+# Owner decision 03/10/2026 (Q2, Rule 5): only a trusted caller decides.
+# Hermes lets only an authenticated dashboard user reach the plugin's routes,
+# and the Desktop proxy (dashboard/plugin_api.py) reaches this backend through
+# an in-process ASGI transport. The proxy vouches for that user with this key.
+# It is minted per process and never leaves it: it is not logged, stored or
+# sent over a network, so no caller outside the process can present it.
+DESKTOP_PROXY_KEY_HEADER = "x-dockyard-desktop-proxy"
+DESKTOP_PROXY_ACTOR_HEADER = "x-dockyard-desktop-actor"
+_DESKTOP_PROXY_KEY = secrets.token_urlsafe(32)
+
+
+def desktop_proxy_headers(actor_id: str) -> dict[str, str]:
+    """Headers the in-process Desktop proxy attaches to vouch for its user."""
+    return {DESKTOP_PROXY_KEY_HEADER: _DESKTOP_PROXY_KEY,
+            DESKTOP_PROXY_ACTOR_HEADER: actor_id}
+
+
+def desktop_proxy_actor(request: Request) -> Optional[str]:
+    """The user the in-process Desktop proxy vouches for, or None.
+
+    Anything else a caller sends (a guessed key, an actor header alone, an
+    actor in the body) is never trusted.
+    """
+    presented = request.headers.get(DESKTOP_PROXY_KEY_HEADER, "")
+    if not presented or not hmac.compare_digest(
+        presented.encode(), _DESKTOP_PROXY_KEY.encode()
+    ):
+        return None
+    return request.headers.get(DESKTOP_PROXY_ACTOR_HEADER, "").strip() or None
 
 
 class BearerAuthMiddleware(BaseHTTPMiddleware):

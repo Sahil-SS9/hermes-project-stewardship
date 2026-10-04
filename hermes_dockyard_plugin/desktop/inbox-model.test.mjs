@@ -50,6 +50,8 @@ test('isAttention marks project_attention rows undecidable', () => {
 test('ageLabel renders an honest age from created_at or the backend age_days', () => {
   assert.equal(model.ageLabel({ created_at: '2026-10-03T08:00:00Z' }, NOW), 'today')
   assert.equal(model.ageLabel({ created_at: '2026-10-01T08:00:00Z' }, NOW), '2 days old')
+  assert.equal(model.ageLabel({ created_at: '2026-10-02T08:00:00Z' }, NOW), '1 day old')
+  assert.equal(model.ageLabel({ age_days: 1 }, NOW), '1 day old')
   assert.equal(model.ageLabel({ age_days: 5 }, NOW), '5 days old')
   assert.equal(model.ageLabel({}, NOW), '')
 })
@@ -62,7 +64,7 @@ test('evidenceCount derives a count for the row badge', () => {
 })
 
 test('rowSummary gives the list line: project, meta and risk', () => {
-  const summary = model.rowSummary(ITEMS[0])
+  const summary = model.rowSummary(ITEMS[0], NOW)
   assert.equal(summary.project, 'payments-relaunch')
   assert.equal(summary.risk, 'high')
   assert.ok(summary.meta.includes('high risk'), `meta carries risk: ${summary.meta}`)

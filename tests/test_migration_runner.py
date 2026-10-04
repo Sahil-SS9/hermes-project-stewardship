@@ -42,22 +42,25 @@ def _fixture(tmp_path: Path, *, status: str = "backlog"):
     (home / IsolatedMigrationRunner.TARGET_MARKER).write_text(
         "dockyard-isolated-v1\n", encoding="utf-8")
     token = hermes_constants.set_hermes_home_override(home)
-    # Scope BOTH roots: kanban_db resolves the board umbrella from
-    # HERMES_KANBAN_HOME before the default root; leaving it shared makes the
-    # migration write outside `home` and the restore assertions meaningless.
-    os.environ["HERMES_HOME"] = str(home)
-    os.environ["HERMES_KANBAN_HOME"] = str(home)
     try:
-        with pdb.connect_closing() as conn:
-            project_id = pdb.create_project(
-                conn, name="Demo", slug="demo", board_slug="demo")
-        with kb.scoped_current_board("demo"):
-            kb.create_board("demo", name="Demo", project_id=project_id)
+        with pytest.MonkeyPatch.context() as mp:  # restores the suite's sandbox on exit
+            _use_hermes_home(mp, home)
+            with pdb.connect_closing() as conn:
+                project_id = pdb.create_project(
+                    conn, name="Demo", slug="demo", board_slug="demo")
+            with kb.scoped_current_board("demo"):
+                kb.create_board("demo", name="Demo", project_id=project_id)
     finally:
         hermes_constants.reset_hermes_home_override(token)
-        os.environ.pop("HERMES_HOME", None)
-        os.environ.pop("HERMES_KANBAN_HOME", None)
     return source_root / "legacy.db", home, tmp_path / "snapshot"
+
+
+def _use_hermes_home(monkeypatch, home: Path) -> None:
+    # Scope BOTH roots: kanban_db resolves the board umbrella from
+    # HERMES_KANBAN_HOME before HERMES_HOME; leaving it shared makes the
+    # migration write outside `home` and the restore assertions meaningless.
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
 
 
 def test_runner_refuses_unmarked_roots(tmp_path):
@@ -75,7 +78,7 @@ def test_apply_failure_restores_snapshot_and_preserves_failed_target(
     tmp_path, monkeypatch,
 ):
     source_db, home, snapshot = _fixture(tmp_path, status="done")
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    _use_hermes_home(monkeypatch, home)
     original = ProjectKanbanHostAdapter.transition_work
 
     def fail_after_create(self, *args, **kwargs):
@@ -92,14 +95,14 @@ def test_apply_failure_restores_snapshot_and_preserves_failed_target(
     restored = ProjectKanbanHostAdapter(ProjectKanbanHost(hermes_home=home))
     assert restored.list_work("demo") == []
     failed = snapshot.with_name(snapshot.name + "-failed")
-    monkeypatch.setenv("HERMES_HOME", str(failed))
+    _use_hermes_home(monkeypatch, failed)
     failed_host = ProjectKanbanHostAdapter(ProjectKanbanHost(hermes_home=failed))
     assert len(failed_host.list_work("demo")) == 1
 
 
 def test_successful_apply_can_be_explicitly_rolled_back(tmp_path, monkeypatch):
     source_db, home, snapshot = _fixture(tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    _use_hermes_home(monkeypatch, home)
     runner = IsolatedMigrationRunner(
         source_db=source_db, target_home=home, snapshot=snapshot, board="demo")
     result = runner.apply("demo")
