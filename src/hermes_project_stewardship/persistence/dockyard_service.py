@@ -644,7 +644,7 @@ class DockyardService:
             if (v.get("shared")
                     or v.get("owner") == actor.id
                     or actor.id in shared_with):
-                # PROTOTYPE r6: tell the screen which views the caller owns, so
+                # Tell the screen which views the caller owns, so
                 # Rename, Share and Delete show only where they will work.
                 visible.append({**v, "mine": v.get("owner") == actor.id})
         return visible

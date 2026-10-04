@@ -32,7 +32,7 @@ def seed_kanban_fixtures(service, adapter, roadmap, *, owner: str) -> None:
     def item(actor, kind, title, **kwargs):
         return work.create_item(pid, kind, title, actor=actor, **kwargs)["ref"]
 
-    epic = item(ada, "epic", "Mobile app revamp", labels=["mobile"])  # no links: shows the Epic type only
+    item(ada, "epic", "Mobile app revamp", labels=["mobile"])  # no links: shows the Epic type only
     feature = item(ada, "task", "Guided setup", labels=["mobile"], due="2099-06-30")
     screens = item(ada, "task", "Build setup screens", labels=["mobile", "ux"], due="2000-01-15")
     crash = item(grace, "bug", "Crash on first launch", labels=["mobile", "stability"], due="2099-12-31")
@@ -69,7 +69,7 @@ def seed_kanban_fixtures(service, adapter, roadmap, *, owner: str) -> None:
     dy.milestone_attach(pid, "Beta launch", screens, actor=human)
     dy.milestone_attach(pid, "Beta launch", analytics, actor=human)
 
-    # PROTOTYPE r6 (Kanban views): three saved views, so the views bar has
+    # Kanban views: three saved views, so the views bar has
     # something to show. Two belong to `owner`, the user the practice server
     # signs the Desktop in as (one shared); the third is shared by grace-hopper,
     # so the panel shows a view you can open and duplicate but not change.

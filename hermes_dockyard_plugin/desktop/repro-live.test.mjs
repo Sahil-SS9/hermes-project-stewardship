@@ -1123,10 +1123,13 @@ async function testProjectDashboardScreen() {
   assert(doc.querySelector('[data-overview-activity]'), 'project overview is missing attributed activity context');
   assert.match(doc.querySelector('[data-overview-work]').textContent, /Fix double-charge on retry path/);
   await runtime.click('[data-project-view="board"]');
-  assert.equal(doc.querySelectorAll('[data-board-column]').length, 6, 'project board must expose backlog, active, review, blocked, done and other-states columns');
+  // r6 (Sahil's C2 review): five columns with stated statuses, no catch-all column.
+  assert.equal(doc.querySelectorAll('[data-board-column]').length, 5, 'project board must expose backlog, active, review, blocked and done columns');
   assert(doc.querySelectorAll('[data-work-card]').length >= 3, 'project board did not render backend work items');
   assert(doc.querySelector('[data-kanban-help]'), 'project board must explain drag and keyboard moves');
-  await runtime.click('[data-work-card="HDY-12"] button');
+  // r6: a card expands in place; Open full details opens the editable drawer.
+  await runtime.click('[data-card-toggle="HDY-12"]');
+  await runtime.click('[data-card-open="HDY-12"]');
   const workDetail = doc.querySelector('[data-work-item-detail="HDY-12"]');
   assert(workDetail, 'board item did not open its editable detail');
   assert.match(workDetail.textContent, /Edit backlog item|Task ID/, 'editable drawer rendered with its editing contract');
@@ -1371,8 +1374,8 @@ async function testPhase5ManagementJourneys() {
   // approved shell removed the global Delivery tab.
   await runtime.click('[data-tab="project"]', 80);
   await runtime.click('[data-project-view="board"]', 60);
-  // C2: milestone planning moved off the board into the Milestones sub-tab.
-  await runtime.click('[data-kanban-tab="milestones"]', 60);
+  // C2: milestone planning moved off the board; r6 opens it from the Milestones button in the views bar.
+  await runtime.click('[data-kanban-page="milestones"]', 60);
   const doc = runtime.dom.window.document;
 
   assert(doc.querySelector('[data-action="create-milestone"]'), 'milestone create control is missing');
@@ -1669,26 +1672,33 @@ async function testInitiativeLoopScreen() {
 async function testSavedViewsScreenAndCreator() {
   const runtime = await createRuntime();
   await runtime.mount();
-  // Saved views are display preferences inside the project (Kanban view);
-  // the approved shell removed the global Work tab.
+  // r6 (Sahil's C2 review): saved views are a views bar above the Kanban board,
+  // with a Manage views side panel. They are display preferences only.
   await runtime.click('[data-tab="project"]', 120);
   await runtime.click('[data-project-view="board"]', 60);
   const doc = runtime.dom.window.document;
-  assert(doc.querySelector('[data-saved-views-screen]'), 'saved views section is missing from Work');
-  assert.match(doc.body.textContent, /display preferences/i);
-  assert.match(doc.body.textContent, /do not run automations/i);
-  assert.match(doc.body.textContent, /displayed/i);
+  assert(doc.querySelector('[data-kanban-screen]'), 'the Kanban screen is missing');
+  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/views'), 'the views bar did not load backend views');
+  const tabs = [...doc.querySelectorAll('[data-view-tab]')].map((tab) => tab.getAttribute('data-view-tab'));
+  assert.deepEqual(tabs, ['All work', 'Release focus'], 'saved view did not render in the views bar');
+  const savedTab = doc.querySelector('[data-view-tab="Release focus"]');
+  assert.match(savedTab.getAttribute('title') || '', /^Board · Status in progress/, 'saved view exposes raw filter data instead of readable labels');
+  assert(!(savedTab.getAttribute('title') || '').includes('{'), 'saved view exposes raw JSON');
   assert(!doc.querySelector('[data-workflow-visual]'), 'a fabricated executable workflow is still rendered');
-  assert.equal(doc.querySelectorAll('[data-saved-view]').length, 1, 'saved view did not render');
-  const savedViewRow = doc.querySelector('[data-saved-view="Release focus"]');
-  assert.match(savedViewRow?.textContent || '', /Board\s*\/\s*In progress/, 'saved view exposes raw filter data instead of readable labels');
-  assert(!savedViewRow?.textContent.includes('{'), 'saved view exposes raw JSON');
-  await runtime.click('[data-saved-view="Release focus"]');
-  assert.equal(doc.querySelector('#dockyard-view-name')?.value, 'Release focus', 'saved view did not populate the editor');
-  assert(doc.querySelector('[data-saved-view-editor]'), 'saved view editor is missing');
   assert(!/Saved workflows|Create workflow|LIVE DELIVERY PATH/.test(doc.body.textContent), 'misleading workflow copy remains visible');
-  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/views'), 'saved views section did not load backend views');
-  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/views/Release%20focus/items'), 'recall did not run the stored view query');
+
+  // Recall applies the stored filter to the board.
+  await runtime.click('[data-view-tab="Release focus"]', 60);
+  assert.equal(doc.querySelector('[data-kanban-screen]')?.getAttribute('data-view'), 'Release focus', 'the board does not name the recalled view');
+  assert.match(doc.querySelector('[data-kanban-status-filter]')?.textContent || '', /In progress/, 'the stored status filter is not shown');
+  const cards = [...doc.querySelectorAll('[data-work-card]')].map((card) => card.getAttribute('data-work-card'));
+  assert.deepEqual(cards, ['HDY-12'], 'recall did not apply the stored view filter');
+
+  // The Manage views panel says what a view is, and what it never does.
+  await runtime.click('[data-views-manage]', 60);
+  const note = doc.querySelector('[data-views-panel] [data-views-note]')?.textContent || '';
+  assert.match(note, /only changes what this board shows/i);
+  assert.match(note, /never runs automations, assigns work or changes permissions/i);
   await runtime.dispose();
 }
 
@@ -2107,8 +2117,9 @@ async function testChromiumLayouts() {
   } });
   await writeSnapshot('project', snapshots.projectBoardDetail, { prepare: async (runtime) => {
     await runtime.click('[data-project-view="board"]');
-    // The card is now a draggable article; the details button opens the drawer.
-    await runtime.click('[data-work-card="HDY-12"] button');
+    // r6: the card expands in place; Open full details opens the drawer.
+    await runtime.click('[data-card-toggle="HDY-12"]');
+    await runtime.click('[data-card-open="HDY-12"]');
   } });
   await writeSnapshot('project', snapshots.projectReports, { prepare: async (runtime) => {
     await runtime.click('[data-project-view="reports"]');

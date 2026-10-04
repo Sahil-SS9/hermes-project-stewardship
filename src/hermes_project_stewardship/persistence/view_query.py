@@ -27,8 +27,8 @@ ALLOWED_STATUSES = {
 }
 
 FILTER_KEYS = ("status", "assignee", "labels", "milestone", "shared_with",
-               # PROTOTYPE r6 (Kanban views save what you see): type, search
-               # text and the card settings. Optional; older views are unchanged.
+               # Kanban views save what you see: type, search text and the
+               # card settings. Optional; older views are unchanged.
                "types", "query", "display")
 
 DISPLAY_DENSITIES = {"compact", "detailed"}

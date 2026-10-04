@@ -49,9 +49,11 @@ test('the board rules moved out of dockyard-css.js (move, not copy)', () => {
   for (const selector of ['.dockyard-board-wrap', '.dockyard-board {', '.dockyard-board-column', '.dockyard-board-cards', '.dockyard-work-card', '.dockyard-work-type']) {
     assert.ok(!shell.includes(`.dockyard-root ${selector}`), `${selector} must live in kanban-css.js now`)
   }
-  for (const selector of ['.dockyard-board-wrap', '.dockyard-board {', '.dockyard-board-column', '.dockyard-work-card', '.dockyard-work-type']) {
+  // r6: the card's type label is .dy-kb-type; the old .dockyard-work-type class is gone from the screen too.
+  for (const selector of ['.dockyard-board-wrap', '.dockyard-board {', '.dockyard-board-column', '.dockyard-work-card', '.dy-kb-type']) {
     assert.ok(kanban.includes(`.dockyard-root ${selector}`), `${selector} is in kanban-css.js`)
   }
+  assert.ok(!read('./src/kanban/board.js').includes('dockyard-work-type'), 'no class is left without its rule')
 })
 
 test('rules other screens use stay where they are', () => {

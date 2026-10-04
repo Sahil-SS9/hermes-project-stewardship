@@ -1,6 +1,6 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
-// C2 Kanban screen. PROTOTYPE r6 (04/10/2026), built for Sahil's review:
+// C2 Kanban screen, r6 design (Sahil's C2 review, 04/10/2026):
 // - Cards show a summary by default. Click one to expand it in place (several
 //   can be open). Actions (Move, Open full details) live in the expanded card.
 // - A view is what you see: filters, layout and card settings. Change any of
@@ -231,6 +231,7 @@ function ViewsPanel({ views, currentName, working, edited, startNew, busy, error
       jsx('h2', { id: 'dy-kb-panel-title', tabIndex: -1, children: 'Manage views' }),
       jsx('button', { type: 'button', className: 'dy-kb-collapse', 'aria-label': 'Close Manage views', 'data-views-close': true, onClick: close, children: jsx(Icon, { name: 'x' }) }),
     ]}),
+    jsx('p', { className: 'dy-kb-panel-meta', 'data-views-note': true, children: 'A view only changes what this board shows. It never runs automations, assigns work or changes permissions.' }),
     error ? jsx('p', { className: 'dy-kb-note', role: 'alert', 'data-views-error': true, children: error }) : null,
     newForm,
     jsxs('section', { className: 'dy-kb-panel-section', children: [
@@ -241,7 +242,7 @@ function ViewsPanel({ views, currentName, working, edited, startNew, busy, error
   ]})
 }
 
-const HELD = 'kanban-r6'
+const HELD = 'kanban-view'
 
 export function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onNavigate, appliedView, setAppliedView }) {
   const [page, setPage] = useState('work')

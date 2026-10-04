@@ -2334,7 +2334,7 @@ var SETTINGS_CSS = `
 var KANBAN_CSS = `
 .dockyard-root .dockyard-board-wrap { display: grid; gap: 12px; min-width: 0; }
 
-/* PROTOTYPE r6. Views bar: All work, saved views, New view; Milestones and Manage views on the right. */
+/* Views bar: All work, saved views, New view; Milestones and Manage views on the right. */
 .dockyard-root .dy-kb-viewsbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--dy-border); }
 .dockyard-root .dy-kb-viewtabs { display: flex; align-items: flex-end; gap: 2px; flex-wrap: wrap; min-width: 0; }
 .dockyard-root .dy-kb-viewtab { display: inline-flex; align-items: center; gap: 6px; height: 38px; margin: 0 0 -1px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--dy-text-2); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
@@ -2400,7 +2400,7 @@ var KANBAN_CSS = `
 .dockyard-root .dy-kb-strip-count { color: var(--dy-text-3); font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .dockyard-root .dy-kb-strip-label { font-size: 13px; font-weight: 650; writing-mode: vertical-rl; white-space: nowrap; }
 
-/* Card, PROTOTYPE r6. Summary: type and ref, assignee, title, one row of signals. */
+/* Card. Summary: type and ref, assignee, title, one row of signals. */
 .dockyard-root .dockyard-work-card {
   container: dy-card / inline-size;
   display: block;
@@ -15607,6 +15607,7 @@ function ViewsPanel({
       jsx("h2", { id: "dy-kb-panel-title", tabIndex: -1, children: "Manage views" }),
       jsx("button", { type: "button", className: "dy-kb-collapse", "aria-label": "Close Manage views", "data-views-close": true, onClick: close, children: jsx(Icon, { name: "x" }) })
     ] }),
+    jsx("p", { className: "dy-kb-panel-meta", "data-views-note": true, children: "A view only changes what this board shows. It never runs automations, assigns work or changes permissions." }),
     error ? jsx("p", { className: "dy-kb-note", role: "alert", "data-views-error": true, children: error }) : null,
     newForm,
     jsxs("section", { className: "dy-kb-panel-section", children: [
@@ -15616,7 +15617,7 @@ function ViewsPanel({
     adjust
   ] });
 }
-var HELD = "kanban-r6";
+var HELD = "kanban-view";
 function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onNavigate, appliedView, setAppliedView }) {
   const [page, setPage] = useState("work");
   const [overrides, setOverrides] = useState({});

@@ -8,7 +8,7 @@
 // - An objective appears only through the item's initiative, never directly.
 // - `parent_task_id` is never read.
 //
-// PROTOTYPE r6 (04/10/2026, Sahil's C2 review): five columns and no catch-all,
+// r6 design (Sahil's C2 review, 04/10/2026): five columns and no catch-all,
 // a compact card with an expanded form, moves limited to what Hermes accepts,
 // and views that save what you see (filters, layout and card settings).
 
@@ -57,8 +57,9 @@ export const dropStatusOf = (stageKey) => STAGE_BY_KEY[stageKey]?.statuses[0] ??
 // 8c098e9e81 and KenseiAgent 67751cd9f23 with the plugin's own services
 // (evidence/c/C2/other-states-probe/move-matrix-*.out). Hermes refuses every
 // other move, or (for epics) accepts it without the card landing in that column.
-// r6: the backend should send each item's allowed moves, because they depend
-// on the host; this table is the prototype's stand-in.
+// Known limit: the allowed moves depend on the host, so the backend should send
+// them with each item. Until it does, this measured table is the source; a move
+// the host refuses anyway is reported as an error, never as a success.
 const TASK_MOVES = Object.freeze({ backlog: ['active', 'done'], active: ['review', 'blocked', 'done'], review: ['done'], blocked: ['active', 'done'], done: [] })
 const EPIC_MOVES = Object.freeze({ backlog: ['active'], active: [], review: [], blocked: [], done: [] })
 
