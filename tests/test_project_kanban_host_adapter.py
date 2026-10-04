@@ -614,15 +614,15 @@ def _link_adapter(host=None):
 
 def test_list_work_links_converts_real_host_rows_relative_to_the_item_asked_about():
     host, adapter = _link_adapter()
-    # epic -> task -> after: for "task" the epic is a blocker (direction parent)
-    # and "after" waits on it (direction child).
-    host.links.update({("t_epic", "t_task"), ("t_task", "t_after")})
+    # first -> task -> after, three plain blocking links: "first" blocks "task"
+    # (direction parent, from task's side) and "task" blocks "after".
+    host.links.update({("t_first", "t_task"), ("t_task", "t_after")})
 
     assert adapter.list_work_links("project-1", "t_task") == [
-        {"direction": "parent", "task_id": "t_epic"},
+        {"direction": "parent", "task_id": "t_first"},
         {"direction": "child", "task_id": "t_after"},
     ]
-    assert adapter.list_work_links("project-1", "t_epic") == [
+    assert adapter.list_work_links("project-1", "t_first") == [
         {"direction": "child", "task_id": "t_task"},
     ]
     assert adapter.list_work_links("project-1", "t_after") == [

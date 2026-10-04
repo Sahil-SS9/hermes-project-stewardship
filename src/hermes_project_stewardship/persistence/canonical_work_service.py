@@ -318,6 +318,32 @@ class CanonicalWorkService:
                 return item
         return None
 
+    def dependency_map(self, project_id: str) -> dict[str, dict[str, list[dict[str, Any]]]]:
+        """Per item with links: what blocks it and what it blocks, as cards.
+
+        A host ``parent`` link means a blocker (as on the real host and in
+        ``detail``); it is never read as a work item's parent.
+        One list call plus one link call per item; a failing link read raises,
+        so a partial map is never mistaken for a complete one.
+        """
+        items = self.list(project_id)
+        by_ref = {row["ref"]: row for row in items}
+
+        def card(row: dict[str, Any]) -> dict[str, Any]:
+            return {"ref": row["ref"], "title": row.get("title") or row["ref"],
+                    "type": row.get("type") or row.get("kind"), "status": row.get("status")}
+
+        out: dict[str, dict[str, list[dict[str, Any]]]] = {}
+        for ref in by_ref:
+            links = self.port.list_work_links(project_id, ref)
+            blocked_by = [card(by_ref[r["task_id"]]) for r in links
+                          if r.get("direction") == "parent" and r.get("task_id") in by_ref]
+            blocks = [card(by_ref[r["task_id"]]) for r in links
+                      if r.get("direction") == "child" and r.get("task_id") in by_ref]
+            if blocked_by or blocks:
+                out[ref] = {"blocked_by": blocked_by, "blocks": blocks}
+        return out
+
     def detail(self, project_id: str, ref: str) -> dict[str, Any] | None:
         items = self.list(project_id)
         item = next((row for row in items if row["ref"] == ref), None)

@@ -498,6 +498,12 @@ async def work_items(project_id: str, status: str | None = None) -> dict:
         "GET", f"/stewardship/v1/projects/{pid}/work-items", params=params)
 
 
+@plugin_api.get("/projects/{project_id}/work-dependencies")
+async def work_dependencies(project_id: str) -> dict:
+    return await _proxy(
+        "GET", f"/stewardship/v1/projects/{quote(project_id, safe='')}/work-dependencies")
+
+
 class MemberBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     profile_slug: str

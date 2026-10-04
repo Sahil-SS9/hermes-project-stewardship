@@ -116,13 +116,20 @@ def test_roadmap_milestone_items_list_the_real_blocker(real):
     assert items[blocked]["blockers"] == [blocker]
 
 
-def test_a_task_under_an_epic_shows_the_epic_as_a_blocker(real):
-    """On real Hermes an epic -> task link is a blocker. It is shown, not hidden."""
+def test_the_dependency_map_shows_real_links_with_the_linked_items_type(real):
+    """The Kanban board's chips come from explicit blocking links only."""
     world, pid = real
-    epic = world.work.create_item(pid, "epic", "Payments rewrite", actor=HUMAN)["ref"]
-    task = world.item(pid, "Task under the epic")
-    world.adapter.link_work(pid, epic, task)
+    bug = world.work.create_item(pid, "bug", "Login crash", actor=HUMAN)["ref"]
+    blocker = world.item(pid, "Blocker task")
+    task = world.item(pid, "Ship the release")
+    world.work.add_dependency(pid, task, bug, actor=HUMAN)
+    world.work.add_dependency(pid, task, blocker, actor=HUMAN)
 
-    detail = world.work.detail(pid, task)
-    assert _refs(detail["dependencies"]) == [epic]
-    assert _refs(world.work.detail(pid, epic)["dependents"]) == [task]
+    deps = world.work.dependency_map(pid)
+
+    assert sorted((c["ref"], c["type"]) for c in deps[task]["blocked_by"]) == sorted(
+        [(bug, "bug"), (blocker, "task")]
+    )
+    assert [c["ref"] for c in deps[bug]["blocks"]] == [task]
+    assert [c["ref"] for c in deps[blocker]["blocks"]] == [task]
+    assert deps[task]["blocks"] == []
