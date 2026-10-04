@@ -108,6 +108,10 @@ def test_board_routes_proxy_with_trusted_actor(tmp_path, monkeypatch):
     proxy, and writes are attributed to the trusted principal, never a
     client-supplied actor."""
     module, _adapter, client = _load_proxy(tmp_path, monkeypatch, auth=False)
+    # The board model picker is not under test here. Unstubbed, it read this
+    # machine's logins and called provider APIs; the conftest guard refuses both.
+    import hermes_project_stewardship.persistence.hermes_curation_provider as hcp
+    monkeypatch.setattr(hcp, "list_hermes_models", lambda: {"available": False, "default": None, "providers": []})
     created = client.post("/api/projects/p1/canvases", headers=HEADERS,
                           json={"name": "Import", "actor": "forged"})
     assert created.status_code == 200, created.text
