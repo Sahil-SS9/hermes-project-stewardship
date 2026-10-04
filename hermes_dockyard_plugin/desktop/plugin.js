@@ -14753,6 +14753,12 @@ function downloadTextFile(content, filename, mediaType = "text/markdown;charset=
   return true;
 }
 
+// hermes_dockyard_plugin/desktop/src/project/settings-model.js
+var DEFAULT_MAX_OPEN_INITIATIVES = 5;
+function effectiveMaxOpenInitiatives(policies) {
+  return policies?.verification?.max_open_initiatives ?? policies?.notification?.max_open_initiatives ?? DEFAULT_MAX_OPEN_INITIATIVES;
+}
+
 // hermes_dockyard_plugin/desktop/src/project/panels.js
 function ProjectSettingsPanel({ project, settings, onRefresh, onDirty }) {
   const buildForm = () => ({
@@ -14763,7 +14769,7 @@ function ProjectSettingsPanel({ project, settings, onRefresh, onDirty }) {
     humanGateRisk: settings?.policies?.autonomy?.human_gate_risk ?? "medium",
     autoStartLowRisk: Boolean(settings?.policies?.autonomy?.auto_start_low_risk),
     requireTests: settings?.policies?.verification?.require_tests !== false,
-    maxOpenInitiatives: String(settings?.policies?.verification?.max_open_initiatives ?? 3),
+    maxOpenInitiatives: String(effectiveMaxOpenInitiatives(settings?.policies)),
     requireRollback: settings?.policies?.release?.require_rollback !== false,
     soakHours: String(settings?.policies?.release?.soak_hours ?? 24),
     severityThreshold: settings?.policies?.notification?.severity_threshold ?? "medium",
