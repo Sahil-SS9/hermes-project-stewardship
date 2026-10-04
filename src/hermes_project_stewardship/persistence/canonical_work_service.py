@@ -88,6 +88,9 @@ class CanonicalWorkPort(Protocol):
 
 _CANONICAL_STATUS = {
     "backlog": "backlog",
+    # Upstream Hermes has no "backlog": the host saves a Backlog item as
+    # "triage" (kanban/vanilla_host.py _native_status), so read it back as one.
+    "triage": "backlog",
     "todo": "backlog",
     "ready": "in_progress",
     "scheduled": "in_progress",

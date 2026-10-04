@@ -256,6 +256,56 @@ def enabled(svc) -> str:
     return pid
 
 
+@pytest.fixture()
+def real_host(tmp_path: Path, monkeypatch):
+    """The real services on a disposable real Hermes kanban: (world, project id).
+
+    Drives the plugin as the Desktop app does, against whichever Hermes is
+    importable. Every piece of state lives under tmp_path. Skips when no Hermes
+    runtime is installed, unless the native host lane demands one.
+    """
+    try:
+        import hermes_cli.kanban_db  # noqa: F401
+    except ImportError:
+        if os.environ.get("STEWARD_REQUIRE_NATIVE_HOST") == "1":
+            pytest.fail("Native host lane requires a real pinned Hermes runtime")
+        pytest.skip("optional native Hermes runtime not installed")
+    from hermes_project_stewardship.kanban.host_adapter import create_project_kanban_adapter
+    from hermes_project_stewardship.persistence.store import Store
+    from tests.r2_helpers import World
+
+    # This fixture owns only tmp_path state: clear the orchestration child marker
+    # so Hermes' write guard does not mistake it for a live delegated write.
+    monkeypatch.delenv("HERMES_DELEGATED_CHILD_CONTEXT", raising=False)
+    try:
+        import agent.delegation_context as delegation_context
+
+        monkeypatch.setattr(delegation_context, "is_delegated_child_process_context", lambda: False)
+    except ImportError:
+        pass
+    for key in ("HERMES_KANBAN_DB", "HERMES_KANBAN_BOARD", "HERMES_KANBAN_TASK",
+                "HERMES_KANBAN_WORKSPACES_ROOT", "HERMES_TENANT"):
+        monkeypatch.delenv(key, raising=False)
+    home = tmp_path / "hermes-home"
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "kanban-root"))
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    adapter = create_project_kanban_adapter(hermes_home=home)
+    assert adapter.host_provenance["host_module"].endswith("vanilla_host")  # the real host
+    native = adapter.host.provision_project(
+        idempotency_key="real-host", name="Real host", slug="real-host",
+        board_slug="default", description="disposable real-host lane",
+        lead_profile="default", repo_path=str(tmp_path),
+    )
+    project_id = str(native["project"]["id"])
+    store = Store(tmp_path / "dockyard.db")
+    world = World(store, None, adapter=adapter)
+    world.project(project_id)
+    try:
+        yield world, project_id
+    finally:
+        store.close()
+
+
 def enable_project(svc, pid: str) -> str:
     svc.enable(pid, mission="keep CI green and deps fresh", lead_profile="lead",
                member_profiles=["coder", "qa"], autonomy_level=2)
