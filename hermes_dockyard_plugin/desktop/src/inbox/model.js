@@ -55,18 +55,19 @@ export function filterByTab(items, tab, now = new Date()) {
   return []
 }
 
-// 'today' | 'N days old' | '' — honest about missing data.
+// 'today' | '1 day old' | 'N days old' | '' — honest about missing data.
+const daysOld = (days) => (days <= 0 ? 'today' : days === 1 ? '1 day old' : `${days} days old`)
+
 export function ageLabel(item, now = new Date()) {
   if (item?.age_days != null && Number.isFinite(Number(item.age_days))) {
-    const days = Number(item.age_days)
-    return days <= 0 ? 'today' : `${days} days old`
+    return daysOld(Number(item.age_days))
   }
   if (!item?.created_at) return ''
   const then = new Date(item.created_at)
   if (Number.isNaN(then.getTime())) return ''
   const days = Math.floor((Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
     - Date.UTC(then.getUTCFullYear(), then.getUTCMonth(), then.getUTCDate())) / 86400000)
-  return days <= 0 ? 'today' : `${days} days old`
+  return daysOld(days)
 }
 
 // Evidence count for the row badge: steps + tests contract items.

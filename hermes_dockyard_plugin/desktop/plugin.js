@@ -6028,16 +6028,16 @@ function filterByTab(items, tab, now = /* @__PURE__ */ new Date()) {
   if (tab === "earlier") return all.filter((item) => earlierThanToday(item.created_at, now));
   return [];
 }
+var daysOld = (days) => days <= 0 ? "today" : days === 1 ? "1 day old" : `${days} days old`;
 function ageLabel(item, now = /* @__PURE__ */ new Date()) {
   if (item?.age_days != null && Number.isFinite(Number(item.age_days))) {
-    const days2 = Number(item.age_days);
-    return days2 <= 0 ? "today" : `${days2} days old`;
+    return daysOld(Number(item.age_days));
   }
   if (!item?.created_at) return "";
   const then = new Date(item.created_at);
   if (Number.isNaN(then.getTime())) return "";
   const days = Math.floor((Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - Date.UTC(then.getUTCFullYear(), then.getUTCMonth(), then.getUTCDate())) / 864e5);
-  return days <= 0 ? "today" : `${days} days old`;
+  return daysOld(days);
 }
 function evidenceCount(item) {
   const contract = item?.detail?.validation_contract;
