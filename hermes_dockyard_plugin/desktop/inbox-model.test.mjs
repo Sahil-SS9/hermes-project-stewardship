@@ -62,7 +62,7 @@ test('evidenceCount derives a count for the row badge', () => {
 })
 
 test('rowSummary gives the list line: project, meta and risk', () => {
-  const summary = model.rowSummary(ITEMS[0])
+  const summary = model.rowSummary(ITEMS[0], NOW)
   assert.equal(summary.project, 'payments-relaunch')
   assert.equal(summary.risk, 'high')
   assert.ok(summary.meta.includes('high risk'), `meta carries risk: ${summary.meta}`)
