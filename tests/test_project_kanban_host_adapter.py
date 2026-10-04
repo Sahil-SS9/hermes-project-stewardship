@@ -346,6 +346,26 @@ def test_adapter_exposes_project_scoped_canonical_work_service_operations():
     assert moved["status"] == "done"
 
 
+def test_adapter_passes_parent_changes_through_for_epics_too():
+    """Owner decision 4 = B: an epic's grouping parent changes and clears like a task's."""
+    host = FakeProjectKanbanHost()
+    adapter = _adapter_type()(host)
+    outer = adapter.create_work("project-1", kind="epic", title="Outer", body=None,
+                                assignee=None, created_by="sahil")
+    inner = adapter.create_work("project-1", kind="epic", title="Inner", body=None,
+                                assignee=None, created_by="sahil", parent_id=outer["id"])
+    assert host.epics[inner["id"]]["parent_epic_id"] == outer["id"]
+    adapter.update_work("project-1", "epic", inner["id"], title="Inner renamed")
+    assert host.epics[inner["id"]]["parent_epic_id"] == outer["id"]  # untouched
+    adapter.update_work("project-1", "epic", inner["id"], parent_id=None)
+    assert host.epics[inner["id"]]["parent_epic_id"] is None
+    task = adapter.create_work("project-1", kind="task", title="Child", body=None,
+                               assignee=None, created_by="sahil", parent_id=outer["id"],
+                               idempotency_key="dockyard:task:child")
+    adapter.update_work("project-1", "task", task["id"], parent_id=None)
+    assert host.tasks[task["id"]]["parent_task_id"] is None
+
+
 def test_transition_work_uses_canonical_post_write_readback(monkeypatch):
     host = FakeProjectKanbanHost()
     adapter = _adapter_type()(host)
