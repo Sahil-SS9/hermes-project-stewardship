@@ -18,6 +18,8 @@ test('searchable project context, requested discard target and retained project 
  await page.locator('[data-project-dashboard="mobile-client"]').waitFor();
  await page.locator('[data-project-view="board"]').click();
  await page.locator('[data-saved-views-screen]').waitFor();
+ // C2: milestone planning moved off the board into the Milestones sub-tab.
+ await page.locator('[data-kanban-tab="milestones"]').click();
  await page.locator('[data-planning-panel]').waitFor();
  await page.locator('[data-project-view="initiative"]').click();
  await page.getByRole('heading',{name:'No initiative available'}).waitFor();

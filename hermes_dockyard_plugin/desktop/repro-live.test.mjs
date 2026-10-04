@@ -1371,6 +1371,8 @@ async function testPhase5ManagementJourneys() {
   // approved shell removed the global Delivery tab.
   await runtime.click('[data-tab="project"]', 80);
   await runtime.click('[data-project-view="board"]', 60);
+  // C2: milestone planning moved off the board into the Milestones sub-tab.
+  await runtime.click('[data-kanban-tab="milestones"]', 60);
   const doc = runtime.dom.window.document;
 
   assert(doc.querySelector('[data-action="create-milestone"]'), 'milestone create control is missing');

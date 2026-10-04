@@ -5,6 +5,7 @@ import { DOCKYARD_CSS } from '../styles/dockyard-css.js'
 import { WORKFLOW_LIBRARY_CSS } from '../styles/workflow-css.js'
 import { ROADMAP_CSS } from '../styles/roadmap-css.js'
 import { SETTINGS_CSS } from '../styles/settings-css.js'
+import { KANBAN_CSS } from '../styles/kanban-css.js'
 import workflowCanvasCss from '../../workflow-canvas-css.js'
 export let _rest = null
 export let _os = null
@@ -91,6 +92,9 @@ export function useDockyardStyles() {
   // Project configuration grid (C8-owned; appended here so dockyard-css.js does
   // not grow, same rule as the workflow library and roadmap blocks above).
   useStylesheet('dy-settings-stylesheet', 'dySettingsStylesheet', SETTINGS_CSS)
+  // C2 Kanban: the board's own rules (C2-owned; moved here out of
+  // dockyard-css.js, same rule as the blocks above).
+  useStylesheet('dy-kanban-stylesheet', 'dyKanbanStylesheet', KANBAN_CSS)
   // The workflow canvas owns a stylesheet of its own (the palette has exactly
   // one home: dashboard/src/workflow-canvas-css.ts). Its rules are scoped to
   // `.dy-wf-scope`, a class the canvas mount host carries itself, so this file

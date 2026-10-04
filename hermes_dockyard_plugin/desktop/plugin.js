@@ -860,31 +860,6 @@ var DOCKYARD_CSS = `
 .dockyard-root .dockyard-overview-list .dockyard-status-tag { max-width: 118px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dockyard-root .dockyard-overview-list.activity article { grid-template-columns: 1fr; }
 .dockyard-root .dockyard-card-label { color: var(--dy-text-3); font-size: 10px; font-weight: 760; }
-.dockyard-root .dockyard-board-wrap { overflow-x: auto; padding-bottom: 6px; }
-.dockyard-root .dockyard-board { display: grid; grid-template-columns: repeat(4, minmax(240px, 1fr)); gap: 12px; min-width: 1040px; }
-.dockyard-root .dockyard-board-column { min-height: 360px; border: 1px solid var(--dy-border); border-radius: 13px; background: var(--dy-surface-subtle); }
-.dockyard-root .dockyard-board-column > header { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 11px; }
-.dockyard-root .dockyard-board-column h3 { margin: 0; font-size: 13px; }
-.dockyard-root .dockyard-board-column header span { color: var(--dy-text-3); font-size: 11px; }
-.dockyard-root .dockyard-board-cards { padding: 0 9px 10px; }
-.dockyard-root .dockyard-work-card {
-  display: block;
-  width: 100%;
-  margin-bottom: 9px;
-  padding: 12px;
-  border: 1px solid var(--dy-border);
-  border-radius: 10px;
-  background: var(--dy-surface);
-  color: var(--dy-text);
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
-  transition: border-color .16s ease, background .16s ease, transform .16s ease;
-}
-.dockyard-root .dockyard-work-card:hover { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); transform: translateY(-1px); }
-.dockyard-root .dockyard-work-card h4 { margin: 8px 0 12px; font-size: 13px; line-height: 1.35; }
-.dockyard-root .dockyard-work-card footer { display: flex; justify-content: space-between; gap: 8px; color: var(--dy-text-3); font-size: 10px; }
-.dockyard-root .dockyard-work-type { color: var(--dy-accent-text); font-size: 9px; font-weight: 780; text-transform: uppercase; }
 .dockyard-root .dockyard-policy-summary { margin: 15px 0 0; padding: 13px; overflow: auto; border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font: 11px/1.5 ui-monospace, monospace; }
 .dockyard-root .dockyard-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .dockyard-root .dockyard-section-head h2,
@@ -2355,6 +2330,132 @@ var SETTINGS_CSS = `
 }
 `;
 
+// hermes_dockyard_plugin/desktop/src/styles/kanban-css.js
+var KANBAN_CSS = `
+.dockyard-root .dockyard-board-wrap { display: grid; gap: 12px; min-width: 0; }
+
+/* Sub-tabs: Board, List, Milestones. */
+.dockyard-root .dy-kb-subtabs { display: flex; gap: 4px; margin: 0; border-bottom: 1px solid var(--dy-border); }
+.dockyard-root .dy-kb-subtab { height: 38px; margin: 0 0 -1px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--dy-text-2); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+.dockyard-root .dy-kb-subtab:hover { color: var(--dy-text); }
+.dockyard-root .dy-kb-subtab[aria-pressed="true"] { border-bottom-color: var(--dy-action); color: var(--dy-text); }
+.dockyard-root .dy-kb-subtab:focus-visible { outline: 3px solid var(--dy-focus); outline-offset: -3px; }
+
+/* Filter row. Every control is the same box as on Roadmap: 38px tall, control border, 6px radius, 13px text. */
+.dockyard-root .dy-kb-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dockyard-root .dy-kb-control { position: relative; display: flex; align-items: center; gap: 8px; height: 38px; margin: 0; padding: 0 12px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font-size: 13px; }
+.dockyard-root .dy-kb-control svg { flex: none; width: 15px; height: 15px; color: var(--dy-text-3); pointer-events: none; }
+.dockyard-root .dy-kb-control:has(:focus-visible) { outline: 3px solid var(--dy-focus); outline-offset: 2px; }
+.dockyard-root .dy-kb-control select,
+.dockyard-root .dy-kb-control input[type="search"] { min-width: 0; height: 100%; margin: 0; padding: 0; border: 0; outline: none; background: transparent; color: var(--dy-text); font: inherit; font-size: 13px; }
+.dockyard-root .dy-kb-control select { max-width: 150px; cursor: pointer; }
+.dockyard-root .dy-kb-search { flex: 1 1 220px; min-width: 180px; cursor: text; }
+.dockyard-root .dy-kb-search input[type="search"] { flex: 1 1 auto; }
+.dockyard-root .dy-kb-search input::placeholder { color: var(--dy-text-3); opacity: 1; }
+.dockyard-root .dy-kb-button { justify-content: center; font-weight: 650; cursor: pointer; }
+.dockyard-root .dy-kb-button:hover { background: var(--dy-surface-subtle); }
+.dockyard-root .dy-kb-button:disabled { border-color: var(--dy-border); background: var(--dy-disabled-bg); color: var(--dy-disabled-text); cursor: not-allowed; }
+.dockyard-root .dy-kb-button[aria-expanded="true"] { border-color: var(--dy-action); background: var(--dy-accent-soft); }
+.dockyard-root .dy-kb-count { margin-left: auto; color: var(--dy-text-3); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dockyard-root .dy-kb-tags { position: relative; }
+.dockyard-root .dy-kb-tags-panel { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; display: grid; gap: 2px; min-width: 190px; padding: 6px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); box-shadow: 0 8px 24px var(--dy-shadow); }
+.dockyard-root .dy-kb-tags-panel label { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 8px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.dockyard-root .dy-kb-tags-panel label:hover { background: var(--dy-surface-subtle); }
+.dockyard-root .dy-kb-tags-panel input { width: 15px; height: 15px; margin: 0; accent-color: var(--dy-action); }
+.dockyard-root .dy-kb-note { margin: 0; padding: 8px 12px; border: 1px solid var(--dy-warning); border-radius: 8px; background: var(--dy-warning-bg); color: var(--dy-text); font-size: 12px; }
+.dockyard-root .dy-kb-empty { margin: 0; padding: 22px 14px; border: 1px dashed var(--dy-border); border-radius: 10px; color: var(--dy-text-2); text-align: center; font-size: 13px; }
+
+/* Board: one row. Only this area scrolls sideways; the page never does. */
+.dockyard-root .dockyard-board { display: flex; align-items: stretch; gap: 12px; max-width: 100%; min-width: 0; overflow-x: auto; padding-bottom: 6px; }
+.dockyard-root .dockyard-board:focus-visible { outline: 3px solid var(--dy-focus); outline-offset: 2px; }
+.dockyard-root .dockyard-board-column { display: flex; flex-direction: column; flex: 1 0 210px; min-width: 210px; min-height: 200px; border: 1px solid var(--dy-border); border-radius: 13px; background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-board-column > header { display: flex; align-items: center; gap: 6px; padding: 10px 10px 8px 8px; }
+.dockyard-root .dockyard-board-column h3 { flex: 1; min-width: 0; margin: 0; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.dockyard-root .dockyard-board-column header span { color: var(--dy-text-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+.dockyard-root .dockyard-board-cards { padding: 0 9px 10px; }
+.dockyard-root .dockyard-board-column[data-drop-ready="true"] { border-color: var(--dy-action); background: var(--dy-accent-soft); }
+.dockyard-root .dy-kb-collapse { flex: none; display: grid; place-items: center; width: 28px; height: 28px; margin: 0; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--dy-text-2); cursor: pointer; }
+.dockyard-root .dy-kb-collapse:hover { border-color: var(--dy-control-border); background: var(--dy-surface); color: var(--dy-text); }
+.dockyard-root .dy-kb-collapse:focus-visible,
+.dockyard-root .dy-kb-strip:focus-visible { outline: 3px solid var(--dy-focus); outline-offset: 2px; }
+.dockyard-root .dy-kb-collapse svg { width: 15px; height: 15px; }
+/* A collapsed column is a thin strip that still accepts a dropped card. */
+.dockyard-root .dockyard-board-column[data-collapsed="true"] { flex: 0 0 48px; min-width: 48px; }
+.dockyard-root .dy-kb-strip { display: flex; flex: 1; flex-direction: column; align-items: center; gap: 12px; width: 100%; margin: 0; padding: 12px 0; border: 0; border-radius: 13px; background: transparent; color: var(--dy-text); font: inherit; cursor: pointer; }
+.dockyard-root .dy-kb-strip:hover { background: var(--dy-accent-soft); }
+.dockyard-root .dy-kb-strip-count { color: var(--dy-text-3); font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.dockyard-root .dy-kb-strip-label { font-size: 13px; font-weight: 650; writing-mode: vertical-rl; white-space: nowrap; }
+
+/* Card. */
+.dockyard-root .dockyard-work-card {
+  display: block;
+  width: 100%;
+  margin-bottom: 9px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--dy-border);
+  border-radius: 10px;
+  background: var(--dy-surface);
+  color: var(--dy-text);
+  text-align: left;
+  font: inherit;
+  transition: border-color .16s ease, background .16s ease;
+}
+.dockyard-root .dockyard-work-card[draggable="true"] { cursor: grab; }
+.dockyard-root .dockyard-work-card:hover { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
+.dockyard-root .dockyard-work-card h4 { display: -webkit-box; margin: 8px 0 8px; overflow: hidden; font-size: 13px; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.dockyard-root .dockyard-work-type { color: var(--dy-accent-text); font-size: 9px; font-weight: 780; text-transform: uppercase; }
+.dockyard-root .dy-kb-actions { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
+.dockyard-root .dy-kb-actions .dockyard-button { flex: none; min-height: 34px; }
+.dockyard-root .dy-kb-actions select { flex: 1 1 auto; min-width: 0; height: 34px; padding: 0 6px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
+.dockyard-root .dy-kb-actions select:focus-visible { outline: 3px solid var(--dy-focus); outline-offset: 1px; }
+.dockyard-root .dy-kb-keyrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dockyard-root .dy-kb-key { color: var(--dy-accent-text); font: 650 11px ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dockyard-root .dy-kb-who { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--dy-text-2); font-size: 11px; }
+.dockyard-root .dy-kb-who span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dockyard-root .dy-kb-avatar { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid var(--dy-accent-border); border-radius: 50%; background: var(--dy-accent-soft); color: var(--dy-accent-text); font-size: 9px; font-weight: 760; }
+.dockyard-root .dy-kb-avatar.empty { border-style: dashed; border-color: var(--dy-control-border); background: transparent; }
+
+/* Chips. */
+.dockyard-root .dy-kb-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 8px 0 0; }
+/* The text wraps (two lines at most) so a chip never hides the id and name it exists to show. */
+.dockyard-root .dy-kb-chip { display: inline-flex; align-items: flex-start; gap: 4px; box-sizing: border-box; max-width: 100%; min-height: 24px; margin: 0; padding: 3px 9px; border: 1px solid var(--dy-border); border-radius: 12px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font: inherit; font-size: 11px; font-weight: 650; line-height: 1.35; text-align: left; }
+.dockyard-root .dy-kb-chip > span { display: -webkit-box; min-width: 0; overflow: hidden; overflow-wrap: anywhere; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.dockyard-root button.dy-kb-chip { cursor: pointer; }
+.dockyard-root button.dy-kb-chip:hover { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
+.dockyard-root button.dy-kb-chip:focus-visible { outline: 3px solid var(--dy-focus); outline-offset: 1px; }
+.dockyard-root .dy-kb-chip[data-kind="blocked_by"] { border-color: var(--dy-warning); background: var(--dy-warning-bg); color: var(--dy-warning); }
+.dockyard-root .dy-kb-chip[data-kind="blocks"] { border-color: var(--dy-info); background: var(--dy-info-bg); color: var(--dy-info); }
+.dockyard-root .dy-kb-chip[data-kind="initiative"] { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); color: var(--dy-accent-text); }
+.dockyard-root .dy-kb-chip[data-kind="milestone"] { border-color: var(--dy-neutral); background: var(--dy-neutral-bg); color: var(--dy-neutral); }
+.dockyard-root .dy-kb-chip[data-kind="objective"] { border-color: var(--dy-success); background: var(--dy-success-bg); color: var(--dy-success); }
+.dockyard-root .dy-kb-chip[data-done="true"] { border-color: var(--dy-success); background: var(--dy-success-bg); color: var(--dy-success); }
+.dockyard-root .dy-kb-chip[data-overdue="true"] { border-color: var(--dy-danger); background: var(--dy-danger-bg); color: var(--dy-danger); }
+.dockyard-root .dy-kb-more { cursor: pointer; font-weight: 760; }
+
+/* List tab: the shared table scrolls inside itself. */
+.dockyard-root .dy-kb-list { max-width: 100%; overflow-x: auto; }
+.dockyard-root .dy-kb-table { width: 100%; min-width: 960px; border-collapse: collapse; font-size: 12px; }
+.dockyard-root .dy-kb-table th,
+.dockyard-root .dy-kb-table td { padding: 8px 10px; border-bottom: 1px solid var(--dy-border); text-align: left; vertical-align: top; }
+.dockyard-root .dy-kb-table thead th { color: var(--dy-text-3); font-size: 10px; font-weight: 760; }
+.dockyard-root .dy-kb-table td:first-child { color: var(--dy-accent-text); font: 650 11px ui-monospace, monospace; white-space: nowrap; }
+.dockyard-root .dy-kb-stage-row th { background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; font-weight: 760; }
+.dockyard-root .dy-kb-cell-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* Narrow containers: bigger touch targets in the card's action row. */
+@container dockyard (max-width: 640px) {
+  .dockyard-root .dy-kb-actions .dockyard-button,
+  .dockyard-root .dy-kb-actions select { min-height: 40px; height: 40px; }
+  .dockyard-root .dy-kb-collapse { width: 40px; height: 40px; }
+  .dockyard-root .dy-kb-subtab { height: 44px; }
+  .dockyard-root .dy-kb-control { height: 44px; }
+  .dockyard-root .dy-kb-search { flex-basis: 100%; }
+  .dockyard-root .dy-kb-count { margin-left: 0; }
+  .dockyard-root .dockyard-board-column { flex-basis: 230px; min-width: 230px; }
+  .dockyard-root .dockyard-board-column[data-collapsed="true"] { flex-basis: 48px; min-width: 48px; }
+}
+`;
+
 // hermes_dockyard_plugin/desktop/workflow-canvas-css.js
 var workflow_canvas_css_default = `
 /* ---- Workflow canvas: card + status token set ----------------------------
@@ -3146,6 +3247,7 @@ function useDockyardStyles() {
   useStylesheet("dy-wf-library-stylesheet", "dyWfLibraryStylesheet", WORKFLOW_LIBRARY_CSS);
   useStylesheet("dy-roadmap-stylesheet", "dyRoadmapStylesheet", ROADMAP_CSS);
   useStylesheet("dy-settings-stylesheet", "dySettingsStylesheet", SETTINGS_CSS);
+  useStylesheet("dy-kanban-stylesheet", "dyKanbanStylesheet", KANBAN_CSS);
   useStylesheet("dy-wf-stylesheet", "dyWfStylesheet", workflow_canvas_css_default);
 }
 
@@ -7249,7 +7351,7 @@ function BacklogBoard(ctx) {
     treeRows,
     typeChoicesFor,
     typeFilterValues,
-    typeLabel,
+    typeLabel: typeLabel2,
     updateCreate,
     view,
     workByRef
@@ -7394,7 +7496,7 @@ function BacklogBoard(ctx) {
           jsx("span", { children: "Type" }),
           jsx("select", { "data-filter-field": "type", "aria-label": "Filter by type", value: columnFilters.type, onChange: (event) => setColumnFilters((current) => ({ ...current, type: event.target.value })), children: [
             jsx("option", { value: "", children: "All types" }),
-            ...typeFilterValues.map((type) => jsx("option", { value: type, children: typeLabel(type) }, type))
+            ...typeFilterValues.map((type) => jsx("option", { value: type, children: typeLabel2(type) }, type))
           ] })
         ] }),
         jsxs("label", { className: "cm-filter", children: [
@@ -7540,9 +7642,9 @@ function BacklogBoard(ctx) {
                   setEditing({ ref, field: "rank" });
                 }, children: number(entry.rank) }) : jsx("span", { children: "\xB7" })
               ] }) : null,
-              jsxs("span", { className: "tree-type-cell", title: `Type: ${typeLabel(item.type)}`, children: [
+              jsxs("span", { className: "tree-type-cell", title: `Type: ${typeLabel2(item.type)}`, children: [
                 jsx("span", { className: `tree-type ${TYPE_NAMES.includes(item.type) ? item.type : "task"}`, "aria-hidden": true, children: jsx(Icon, { name: `type-${TYPE_NAMES.includes(item.type) ? item.type : "task"}` }) }),
-                jsx("span", { children: typeLabel(item.type) })
+                jsx("span", { children: typeLabel2(item.type) })
               ] }),
               jsxs("span", { className: "tree-title", children: [
                 cell === "title" ? jsxs("span", { className: "cell-edit is-input", style: { display: "inline-flex", alignItems: "center", minWidth: 0, flex: 1 }, children: [
@@ -7639,9 +7741,9 @@ function BacklogBoard(ctx) {
                       setMenuRef(null);
                       changeType(ref, event.target.value);
                     },
-                    children: validTypeChoices.map((type) => jsx("option", { value: type, children: typeLabel(type) }, type))
+                    children: validTypeChoices.map((type) => jsx("option", { value: type, children: typeLabel2(type) }, type))
                   })
-                ] }) : jsx("div", { className: "tree-menu-static", children: [jsx("span", { children: "Type" }), jsx("strong", { children: typeLabel(item.type) })] }),
+                ] }) : jsx("div", { className: "tree-menu-static", children: [jsx("span", { children: "Type" }), jsx("strong", { children: typeLabel2(item.type) })] }),
                 mayAddChild || mayReparent || depth === 0 && entry ? jsx("div", { className: "menu-label", children: "Structure" }) : null,
                 mayAddChild ? jsxs("button", { type: "button", role: "menuitem", "data-menu-action": "add-child", onClick: () => {
                   setMenuRef(null);
@@ -7734,7 +7836,7 @@ function BacklogBoard(ctx) {
       runImport,
       api
     }) : null,
-    jsx(BacklogReasonModal, { pendingMove, reason, setReason, error, saving, pendingParentItem, pendingParentRef, pendingParentChoices, pendingParentChanged, saveParent, saveMove, setPendingMove, typeLabel }),
+    jsx(BacklogReasonModal, { pendingMove, reason, setReason, error, saving, pendingParentItem, pendingParentRef, pendingParentChoices, pendingParentChanged, saveParent, saveMove, setPendingMove, typeLabel: typeLabel2 }),
     jsxs("section", {
       className: "dockyard-modal-layer",
       "data-create-backlog-layer": true,
@@ -7758,14 +7860,14 @@ function BacklogBoard(ctx) {
               jsxs("label", { className: "dockyard-field dockyard-field-wide", children: [jsx("span", { children: "Description (optional)" }), jsx("textarea", { rows: 3, "data-create-field": "body", value: createForm.body, onChange: (event) => updateCreate("body", event.target.value), placeholder: "Describe the outcome and acceptance criteria\u2026" })] }),
               jsxs("label", { className: "dockyard-field", children: [jsx("span", { children: "Parent (optional)" }), jsx("select", { "data-create-field": "parent", value: createForm.parent, onChange: (event) => updateCreate("parent", event.target.value), children: [
                 ROOT_TYPES.includes(createForm.type) ? jsx("option", { value: "", children: "Top level" }, "none") : null,
-                ...availableCreateParents.map((parent) => jsx("option", { value: parent.ref, children: `${parent.title || parent.ref} \xB7 ${typeLabel(parent.type)}` }, parent.ref))
+                ...availableCreateParents.map((parent) => jsx("option", { value: parent.ref, children: `${parent.title || parent.ref} \xB7 ${typeLabel2(parent.type)}` }, parent.ref))
               ] })] }),
               jsxs("label", { className: "dockyard-field", children: [jsx("span", { children: "Due date (optional)" }), jsx("input", { type: "date", "data-create-field": "due", value: createForm.due, onInput: (event) => updateCreate("due", event.target.value), onChange: (event) => updateCreate("due", event.target.value) })] }),
               jsxs("label", { className: "dockyard-field field-required", children: [jsx("span", { children: "Type" }), jsx("select", {
                 "data-create-field": "type",
                 value: createForm.type,
                 onChange: (event) => updateCreate("type", event.target.value),
-                children: availableCreateTypes.map((type) => jsx("option", { value: type, children: typeLabel(type) }, type))
+                children: availableCreateTypes.map((type) => jsx("option", { value: type, children: typeLabel2(type) }, type))
               })] }),
               jsxs("label", { className: "dockyard-field", children: [jsx("span", { children: "Estimated days (optional)" }), jsx("input", { type: "number", min: 0, step: 0.5, "data-create-field": "estimate_days", value: createForm.estimate_days, onInput: (event) => updateCreate("estimate_days", event.target.value), onChange: (event) => updateCreate("estimate_days", event.target.value), placeholder: "e.g. 2.5" })] }),
               jsxs("label", { className: "dockyard-field field-required", children: [jsx("span", { children: "Assignee" }), jsx("select", { "data-create-field": "assignee", value: createForm.assignee, onChange: (event) => updateCreate("assignee", event.target.value), children: [
@@ -7917,7 +8019,7 @@ function BacklogView({ view, onRefresh }) {
   const TYPE_NAMES = DOCKYARD_TYPE_NAMES;
   const ROOT_TYPES = DOCKYARD_ROOT_TYPES;
   const CHILD_TYPES = DOCKYARD_CREATE_CHILD_TYPES;
-  const typeLabel = dockyardTypeLabel;
+  const typeLabel2 = dockyardTypeLabel;
   const childTypesFor = dockyardChildTypes;
   const parentAccepts = dockyardParentAccepts;
   const todayISO = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
@@ -7946,7 +8048,7 @@ function BacklogView({ view, onRefresh }) {
   };
   const collapsedSet = new Set(collapsed);
   const q = search.trim().toLowerCase();
-  const typeFilterValues = [...new Set(entries.map((entry) => workByRef[entry.item_ref]?.type || "task"))].sort((a, b) => typeLabel(a).localeCompare(typeLabel(b)));
+  const typeFilterValues = [...new Set(entries.map((entry) => workByRef[entry.item_ref]?.type || "task"))].sort((a, b) => typeLabel2(a).localeCompare(typeLabel2(b)));
   const statusFilterValues = [...new Set(entries.map((entry) => STATUS_UI[workByRef[entry.item_ref]?.status] || workByRef[entry.item_ref]?.status || "backlog"))].sort((a, b) => STATUS_OPTIONS.indexOf(a) - STATUS_OPTIONS.indexOf(b));
   const initiativeFilterValues = [...new Set(entries.map((entry) => workByRef[entry.item_ref]?.initiative_ref).filter(Boolean))].sort((a, b) => initiativeLabel(a).localeCompare(initiativeLabel(b)));
   const assigneeFilterValues = [...new Set(entries.map((entry) => workByRef[entry.item_ref]?.assignee).filter(Boolean))].sort((a, b) => ownerLabel(a).localeCompare(ownerLabel(b)));
@@ -7964,7 +8066,7 @@ function BacklogView({ view, onRefresh }) {
       it.title,
       it.body,
       ref,
-      typeLabel(it.type),
+      typeLabel2(it.type),
       ownerLabel(it.assignee),
       STATUS_LABELS[it.status],
       initiativeLabel(it.initiative_ref),
@@ -7978,7 +8080,7 @@ function BacklogView({ view, onRefresh }) {
     const ia = workByRef[a] ?? {}, ib = workByRef[b] ?? {};
     const keyVal = (item, ref) => ({
       rank: rankOf(ref),
-      type: typeLabel(item.type),
+      type: typeLabel2(item.type),
       title: String(item.title || ref),
       status: STATUS_LABELS[item.status] || readableLabel(item.status || "backlog"),
       initiative: item.initiative_ref ? initiativeLabel(item.initiative_ref) : "\\uffff",
@@ -8005,7 +8107,7 @@ function BacklogView({ view, onRefresh }) {
     const map = /* @__PURE__ */ new Map();
     for (const row of treeRows) {
       const it = workByRef[row.ref] ?? {};
-      const key = groupBy === "status" ? STATUS_LABELS[it.status] || it.status || "Unset" : groupBy === "assignee" ? ownerLabel(it.assignee) : groupBy === "initiative" ? initiativeLabel(it.initiative_ref) : groupBy === "type" ? typeLabel(it.type) : String(it.due || "No due date").slice(0, 7) || "No due date";
+      const key = groupBy === "status" ? STATUS_LABELS[it.status] || it.status || "Unset" : groupBy === "assignee" ? ownerLabel(it.assignee) : groupBy === "initiative" ? initiativeLabel(it.initiative_ref) : groupBy === "type" ? typeLabel2(it.type) : String(it.due || "No due date").slice(0, 7) || "No due date";
       (map.get(key) || map.set(key, []).get(key)).push(row);
     }
     return [...map.entries()].sort((a, b) => String(a[0]).localeCompare(String(b[0])));
@@ -8116,7 +8218,7 @@ function BacklogView({ view, onRefresh }) {
       flashCell(ref, "type", `Changing ${item.type} to ${nextType} is not valid for this item's parent and children.`);
       return;
     }
-    patchItem(ref, { type: nextType }, `${item.title} is now ${typeLabel(nextType)}.`);
+    patchItem(ref, { type: nextType }, `${item.title} is now ${typeLabel2(nextType)}.`);
   };
   const requestReparent = (ref) => {
     setMenuRef(null);
@@ -8589,7 +8691,7 @@ function BacklogView({ view, onRefresh }) {
     treeRows,
     typeChoicesFor,
     typeFilterValues,
-    typeLabel,
+    typeLabel: typeLabel2,
     updateCreate,
     view,
     workByRef
@@ -12102,6 +12204,433 @@ function FirstAssessmentCard({ projectId }) {
   ] });
 }
 
+// hermes_dockyard_plugin/desktop/src/views/initiative.js
+function InitiativeView({ view, onRefresh }) {
+  const initiative = [...view.initiatives ?? []].sort((left, right) => (RISK_PRIORITY[left.risk] ?? 1) - (RISK_PRIORITY[right.risk] ?? 1))[0];
+  const project = view.project;
+  const stages = [
+    ["verify", "Verify state", "Confirm the project state and evidence source."],
+    ["detect", "Detect gap", initiative?.rationale || "Research the highest-value project gap."],
+    ["propose", "Create initiative", initiative?.expected_outcome || "Declare the expected outcome."],
+    ["prioritise", "Prioritise", `Priority ${number(initiative?.priority ?? 0)} with a recorded rationale.`],
+    ["approval", "Human approval", "Owner reviews the risk, evidence and validation contract."],
+    ["execute", "Build and verify", validationSummary(initiative?.validation_contract)],
+    ["release", "Release", "Release remains bounded by project policy."],
+    ["observe", "Observe outcome", "Measure whether the project improved."]
+  ];
+  const currentIndex = initiative?.status === "pending_approval" ? 4 : ["approved", "executing"].includes(initiative?.status) ? 5 : ["completed", "measured"].includes(initiative?.status) ? 7 : 2;
+  const [selectedStage, setSelectedStage] = useState(currentIndex);
+  const [freezeState, setFreezeState] = useState(null);
+  const [freezeConfirm, setFreezeConfirm] = useState(false);
+  const freeze = async () => {
+    if (!project) return;
+    setFreezeState("freezing");
+    try {
+      await api(`/projects/${encodeURIComponent(project.id)}/freeze`, { method: "POST", body: {} });
+      setFreezeState("frozen");
+      onRefresh();
+    } catch (failure) {
+      setFreezeState(String(failure?.message ?? failure));
+    }
+  };
+  if (!project || !initiative) return jsx(EmptyState, { title: "No initiative available", description: "A project initiative will appear here after it is proposed.", icon: "project" });
+  return jsxs("div", { "data-initiative-loop": initiative.ref, children: [
+    jsx(PageHead, {
+      title: initiative.title,
+      description: `${project.id} / ${initiative.ref} / one canonical improvement loop`,
+      status: initiative.status || "unknown",
+      onRefresh
+    }),
+    jsxs("div", { className: "dockyard-loop-layout", children: [
+      jsxs("section", { className: "dockyard-feature-card dockyard-loop-card", children: [
+        jsxs("div", { className: "dockyard-loop-head", children: [
+          jsxs("div", { children: [jsx("h2", { children: "Initiative loop" }), jsx("p", { children: "Select a stage to inspect its current evidence and state." })] }),
+          jsx(Button, { action: "freeze-project", variant: "danger", disabled: freezeState === "freezing" || freezeState === "frozen", onClick: () => setFreezeConfirm(true), children: freezeState === "freezing" ? "Freezing..." : freezeState === "frozen" ? "Project frozen" : "Freeze project" })
+        ] }),
+        jsx("div", {
+          className: "dockyard-loop-visual-wrap",
+          children: jsx("svg", {
+            viewBox: "0 0 1010 140",
+            role: "img",
+            "aria-label": "Initiative stages from verification to observed outcome",
+            "data-loop-visual": true,
+            children: stages.map(([key, label], index) => {
+              const x = 20 + index * 123;
+              const state = index < currentIndex ? "done" : index === currentIndex ? "current" : "queued";
+              return jsxs(Fragment, { children: [
+                index < stages.length - 1 ? jsx("path", { className: `dockyard-loop-edge ${state}`, d: `M${x + 105} 55H${x + 123}` }) : null,
+                jsx("rect", { className: `dockyard-loop-node ${state}`, x, y: 30, width: 105, height: 52, rx: 10 }),
+                jsx("text", { x: x + 52.5, y: 60, textAnchor: "middle", children: label })
+              ] }, key);
+            })
+          })
+        }),
+        jsx("div", {
+          className: "dockyard-stage-list",
+          children: stages.map(([key, label], index) => jsx("button", {
+            type: "button",
+            className: selectedStage === index ? "active" : "",
+            "data-initiative-stage": key,
+            onClick: () => setSelectedStage(index),
+            children: jsxs(Fragment, { children: [
+              jsx("span", { children: number(index + 1) }),
+              jsxs("span", { children: [jsx("strong", { children: label }), jsx("small", { children: index < currentIndex ? "Done" : index === currentIndex ? "Current gate" : "Queued" })] })
+            ] })
+          }, key))
+        })
+      ] }),
+      jsxs("aside", { className: "dockyard-feature-card dockyard-stage-detail", children: [
+        jsx("span", { className: "dockyard-card-label", children: "SELECTED STAGE" }),
+        jsx("h2", { children: stages[selectedStage][1] }),
+        jsx("p", { children: stages[selectedStage][2] }),
+        jsxs("div", { className: "dockyard-evidence-details", children: [
+          jsx("strong", { children: "Initiative evidence" }),
+          jsx("p", { children: initiative.rationale || "No rationale supplied." }),
+          jsx("p", { children: `Validation: ${validationSummary(initiative.validation_contract)}` })
+        ] }),
+        freezeState && !["freezing", "frozen"].includes(freezeState) ? jsx("p", { className: "dockyard-inline-error", children: freezeState }) : null
+      ] })
+    ] }),
+    freezeConfirm ? jsx(ConfirmDialog, {
+      confirmKey: "freeze-project",
+      title: "Freeze this project?",
+      description: "Freezing stops new execution until the project is explicitly resumed.",
+      confirmLabel: "Freeze project",
+      busy: freezeState === "freezing",
+      onCancel: () => setFreezeConfirm(false),
+      onConfirm: async () => {
+        setFreezeConfirm(false);
+        await freeze();
+      }
+    }) : null
+  ] });
+}
+
+// hermes_dockyard_plugin/desktop/src/project/objectives.js
+function GoalsManager({ project, goals, objectives, onRefresh }) {
+  const [rows, setRows] = useState(goals ?? []);
+  const [editor, setEditor] = useState(null);
+  const [form, setForm] = useState({ title: "", description: "", objective_ids: [] });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const encoded = encodeURIComponent(project.id);
+  const start = (goal = null) => {
+    setEditor(goal?.goal_id ?? "new");
+    setForm({
+      title: goal?.title ?? "",
+      description: goal?.description ?? "",
+      objective_ids: [...goal?.objective_ids ?? []]
+    });
+    setError(null);
+  };
+  const toggleObjective = (objectiveId) => setForm((current) => ({
+    ...current,
+    objective_ids: current.objective_ids.includes(objectiveId) ? current.objective_ids.filter((value) => value !== objectiveId) : [...current.objective_ids, objectiveId]
+  }));
+  const save = async () => {
+    if (!form.title.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const body = { ...form, title: form.title.trim(), description: form.description.trim() };
+      const saved = editor === "new" ? await api(`/projects/${encoded}/goals`, { method: "POST", body }) : await api(`/projects/${encoded}/goals/${encodeURIComponent(editor)}`, { method: "PATCH", body });
+      setRows((current) => editor === "new" ? [...current, saved] : current.map((goal) => goal.goal_id === saved.goal_id ? saved : goal));
+      setEditor(null);
+      onRefresh?.();
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    }
+    setBusy(false);
+  };
+  const move = async (goalId, direction) => {
+    const active2 = rows.filter((goal) => !goal.archived_at).sort((a, b) => a.position - b.position);
+    const index = active2.findIndex((goal) => goal.goal_id === goalId);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= active2.length) return;
+    const reordered = [...active2];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api(`/projects/${encoded}/goals/order`, { method: "PUT", body: { goal_ids: reordered.map((goal) => goal.goal_id) } });
+      const archived2 = rows.filter((goal) => goal.archived_at);
+      setRows([...result.goals ?? [], ...archived2]);
+      onRefresh?.();
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    }
+    setBusy(false);
+  };
+  const lifecycle = async (goal, action) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const saved = await api(`/projects/${encoded}/goals/${encodeURIComponent(goal.goal_id)}/${action}`, { method: "POST", body: {} });
+      setRows((current) => current.map((item) => item.goal_id === saved.goal_id ? saved : item));
+      onRefresh?.();
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    }
+    setBusy(false);
+  };
+  const objectiveName = (id) => objectives.find((item) => Number(item.id) === Number(id))?.name ?? `Objective ${id}`;
+  const active = rows.filter((goal) => !goal.archived_at).sort((a, b) => a.position - b.position);
+  const archived = rows.filter((goal) => goal.archived_at);
+  return jsxs("section", { className: "dockyard-feature-card", "data-goals-manager": true, children: [
+    jsxs("div", { className: "dockyard-section-head", children: [
+      jsxs("div", { children: [jsx("span", { className: "dockyard-card-label", children: "GOALS" }), jsx("h2", { children: `${active.length} active` }), jsx("p", { children: "Goals order outcomes. Objectives may stay unlinked." })] }),
+      jsx(Button, { action: "add-goal", variant: "primary", small: true, onClick: () => start(), children: "Add goal" })
+    ] }),
+    editor !== null ? jsxs("div", { className: "dockyard-inline-editor", "data-goal-editor": String(editor), children: [
+      jsxs("label", { children: [jsx("span", { children: "Title" }), jsx("input", { "data-goal-field": "title", value: form.title, onChange: (event) => setForm((current) => ({ ...current, title: event.target.value })) })] }),
+      jsxs("label", { children: [jsx("span", { children: "Description" }), jsx("textarea", { "data-goal-field": "description", rows: 3, value: form.description, onChange: (event) => setForm((current) => ({ ...current, description: event.target.value })) })] }),
+      jsxs("fieldset", { "data-goal-objectives": true, children: [
+        jsx("legend", { children: "Linked objectives (optional)" }),
+        ...(objectives ?? []).map((objective) => jsxs("label", { children: [jsx("input", { type: "checkbox", value: String(objective.id), checked: form.objective_ids.includes(Number(objective.id)), onChange: () => toggleObjective(Number(objective.id)) }), objective.name] }, String(objective.id)))
+      ] }),
+      jsxs("div", { className: "dockyard-form-actions", children: [
+        jsx(Button, { disabled: busy, onClick: () => setEditor(null), children: "Cancel" }),
+        jsx(Button, { action: "save-goal", variant: "primary", disabled: busy || !form.title.trim(), onClick: save, children: busy ? "Saving..." : editor === "new" ? "Create goal" : "Save goal" })
+      ] })
+    ] }) : null,
+    jsx("div", { className: "dockyard-objective-list", children: [...active, ...archived].map((goal, index) => jsxs("article", { "data-goal-row": goal.goal_id, className: goal.archived_at ? "archived" : "", children: [
+      jsxs("div", { className: "dockyard-objective-copy", children: [jsxs("span", { children: [jsx("strong", { children: goal.title }), jsx("small", { children: goal.description || "No description supplied." })] }), jsx(StatusTag, { tone: goal.archived_at ? "neutral" : "success", label: goal.archived_at ? "Archived" : `Order ${goal.position + 1}` })] }),
+      jsx("p", { children: goal.objective_ids?.length ? `Objectives: ${goal.objective_ids.map(objectiveName).join(", ")}` : "No linked objectives." }),
+      jsxs("div", { className: "dockyard-form-actions", children: goal.archived_at ? [
+        jsx(Button, { action: "restore-goal", small: true, disabled: busy, onClick: () => lifecycle(goal, "restore"), children: "Restore" }, "restore")
+      ] : [
+        jsx(Button, { action: "move-goal-up", small: true, disabled: busy || index === 0, onClick: () => move(goal.goal_id, -1), children: "Move up" }, "up"),
+        jsx(Button, { action: "move-goal-down", small: true, disabled: busy || index === active.length - 1, onClick: () => move(goal.goal_id, 1), children: "Move down" }, "down"),
+        jsx(Button, { action: "edit-goal", small: true, disabled: busy, onClick: () => start(goal), children: "Edit" }, "edit"),
+        jsx(Button, { action: "archive-goal", small: true, disabled: busy, onClick: () => lifecycle(goal, "archive"), children: "Archive" }, "archive")
+      ] })
+    ] }, goal.goal_id)) }),
+    error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: error }) : null
+  ] });
+}
+function ObjectivesPanel({ project, settings, objectives, goals, missionArchive, onRefresh }) {
+  const [mission, setMission] = useState(settings?.mission ?? "");
+  const [missionDraft, setMissionDraft] = useState(settings?.mission ?? "");
+  const [missionEditing, setMissionEditing] = useState(false);
+  const [history, setHistory] = useState(missionArchive ?? []);
+  const [items, setItems] = useState(objectives ?? []);
+  const [objectiveEditor, setObjectiveEditor] = useState(null);
+  const [objectiveForm, setObjectiveForm] = useState({ name: "", description: "", target: ">=1", severity: "medium" });
+  const [pending, setPending] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [evaluating, setEvaluating] = useState(null);
+  const [evaluations, setEvaluations] = useState({});
+  const encoded = encodeURIComponent(project.id);
+  const startObjective = (objective = null) => {
+    setObjectiveEditor(objective?.id ?? "new");
+    setObjectiveForm({
+      name: objective?.name ?? "",
+      description: objective?.description ?? "",
+      target: objective?.target ?? ">=1",
+      severity: objective?.severity ?? "medium"
+    });
+    setError(null);
+  };
+  const saveMission = async () => {
+    const clean = missionDraft.trim();
+    if (!clean) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api(`/projects/${encoded}/settings`, { method: "PATCH", body: { mission: clean } });
+      setMission(result?.mission ?? clean);
+      setMissionDraft(result?.mission ?? clean);
+      setMissionEditing(false);
+      onRefresh?.();
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    }
+    setBusy(false);
+  };
+  const saveObjective = async () => {
+    if (!objectiveForm.name.trim() || !objectiveForm.target.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const body = {
+        name: objectiveForm.name.trim(),
+        description: objectiveForm.description.trim(),
+        target: objectiveForm.target.trim(),
+        severity: objectiveForm.severity
+      };
+      if (objectiveEditor === "new") {
+        const created = await api(`/projects/${encoded}/objectives`, { method: "POST", body: { ...body, evaluator_type: "manual", window: "30d" } });
+        setItems((current) => [...current, created]);
+      } else {
+        const updated = await api(`/projects/${encoded}/objectives/${objectiveEditor}`, { method: "PATCH", body });
+        setItems((current) => current.map((item) => Number(item.id) === Number(objectiveEditor) ? updated : item));
+      }
+      setObjectiveEditor(null);
+      onRefresh?.();
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    }
+    setBusy(false);
+  };
+  const evaluateNow = async (objective) => {
+    setEvaluating(objective.id);
+    setError(null);
+    try {
+      const result = await api(`/projects/${encoded}/objectives/${objective.id}/evaluate`, { method: "POST" });
+      setEvaluations((current) => ({ ...current, [objective.id]: result }));
+      const refreshed = await api(`/projects/${encoded}/objectives`);
+      setItems(refreshed.objectives || []);
+      const state = result?.result?.state ?? "unknown";
+      emitToast(
+        state === "passed" ? "success" : "danger",
+        `Evaluate now (${objective.name}): ${readableLabel(state, "unknown")}.` + (state === "unknown" ? " No evidence was fabricated \u2014 the objective stays unproven." : "")
+      );
+      onRefresh?.();
+    } catch (failure) {
+      setEvaluations((current) => ({ ...current, [objective.id]: { error: String(failure?.message ?? failure) } }));
+    }
+    setEvaluating(null);
+  };
+  const applyDestructive = async () => {
+    if (!pending) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (pending.type === "archive-mission") {
+        const archived = await api(`/projects/${encoded}/mission/archive`, { method: "POST", body: {} });
+        setHistory((current) => [archived, ...current]);
+        setMission("");
+        setMissionDraft("");
+        setMissionEditing(false);
+      } else if (pending.type === "remove-mission") {
+        await api(`/projects/${encoded}/mission`, { method: "DELETE", body: {} });
+        setMission("");
+        setMissionDraft("");
+        setMissionEditing(false);
+      } else if (pending.type === "archive-objective") {
+        const archived = await api(`/projects/${encoded}/objectives/${pending.id}/archive`, { method: "POST", body: {} });
+        setItems((current) => current.map((item) => Number(item.id) === Number(pending.id) ? archived : item));
+      } else if (pending.type === "remove-objective") {
+        await api(`/projects/${encoded}/objectives/${pending.id}`, { method: "DELETE", body: {} });
+        setItems((current) => current.filter((item) => Number(item.id) !== Number(pending.id)));
+      }
+      setPending(null);
+      onRefresh?.();
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    }
+    setBusy(false);
+  };
+  const confirmation = pending ? {
+    "archive-mission": {
+      key: "archive-mission",
+      title: "Archive this mission?",
+      description: "The mission moves to history and is removed from the active project.",
+      label: "Archive mission"
+    },
+    "remove-mission": {
+      key: "remove-mission",
+      title: "Remove this mission?",
+      description: "The active mission is cleared without adding it to mission history.",
+      label: "Remove mission"
+    },
+    "archive-objective": {
+      key: `archive-objective-${pending.id}`,
+      title: "Archive this objective?",
+      description: "The objective remains visible in history but stops participating in active evaluation.",
+      label: "Archive objective"
+    },
+    "remove-objective": {
+      key: `remove-objective-${pending.id}`,
+      title: "Remove this objective?",
+      description: "This permanently removes the objective from the project.",
+      label: "Remove objective"
+    }
+  }[pending.type] : null;
+  return jsxs("div", { className: "dockyard-objectives-layout", children: [
+    jsx(GoalsManager, { project, goals, objectives: items, onRefresh }),
+    jsxs("section", { className: "dockyard-feature-card", "data-mission-manager": true, children: [
+      jsxs("div", { className: "dockyard-section-head", children: [
+        jsxs("div", { children: [jsx("span", { className: "dockyard-card-label", children: "MISSION" }), jsx("h2", { children: mission || "No active mission" })] }),
+        mission ? jsx(StatusTag, { tone: "success", label: "Active" }) : jsx(StatusTag, { tone: "neutral", label: "Not set" })
+      ] }),
+      missionEditing ? jsxs("div", { className: "dockyard-inline-editor", children: [
+        jsx("label", { htmlFor: "dockyard-mission-editor", children: "Mission statement" }),
+        jsx("textarea", { id: "dockyard-mission-editor", "data-mission-field": true, rows: 4, value: missionDraft, onInput: (event) => setMissionDraft(event.target.value), onChange: (event) => setMissionDraft(event.target.value) }),
+        jsxs("div", { className: "dockyard-form-actions", children: [
+          jsx(Button, { disabled: busy, onClick: () => {
+            setMissionDraft(mission);
+            setMissionEditing(false);
+          }, children: "Cancel" }),
+          jsx(Button, { action: "save-mission", variant: "primary", disabled: busy || !missionDraft.trim(), onClick: saveMission, children: busy ? "Saving..." : "Save mission" })
+        ] })
+      ] }) : jsxs("div", { className: "dockyard-form-actions", children: [
+        jsx(Button, { action: "edit-mission", onClick: () => {
+          setMissionDraft(mission);
+          setMissionEditing(true);
+        }, children: mission ? "Edit mission" : "Set mission" }),
+        mission ? jsx(Button, { action: "archive-mission", variant: "danger", onClick: () => setPending({ type: "archive-mission" }), children: "Archive" }) : null,
+        mission ? jsx(Button, { action: "remove-mission", variant: "danger", onClick: () => setPending({ type: "remove-mission" }), children: "Remove" }) : null
+      ] }),
+      history.length > 0 ? jsxs("div", { className: "dockyard-mission-history", children: [
+        jsx("h3", { children: "Mission history" }),
+        history.map((entry) => jsxs("article", { children: [
+          jsx("strong", { children: entry.mission }),
+          jsx("span", { children: `Archived ${formatWhen(entry.archived_at) || "previously"} by ${entry.archived_by || "unknown"}` })
+        ] }, entry.archive_id))
+      ] }) : null
+    ] }),
+    jsxs("section", { className: "dockyard-feature-card", children: [
+      jsxs("div", { className: "dockyard-section-head", children: [
+        jsxs("div", { children: [jsx("span", { className: "dockyard-card-label", children: "OBJECTIVES" }), jsx("h2", { children: `${number(items.filter((item) => item.enabled !== false).length)} active` })] }),
+        jsx(Button, { action: "add-objective", variant: "primary", small: true, onClick: () => startObjective(), children: "Add objective" })
+      ] }),
+      objectiveEditor !== null ? jsxs("div", { className: "dockyard-inline-editor", "data-objective-editor": String(objectiveEditor), children: [
+        jsxs("label", { children: [jsx("span", { children: "Name" }), jsx("input", { "data-objective-field": "name", value: objectiveForm.name, onChange: (event) => setObjectiveForm((current) => ({ ...current, name: event.target.value })) })] }),
+        jsxs("label", { children: [jsx("span", { children: "Description" }), jsx("textarea", { "data-objective-field": "description", rows: 3, value: objectiveForm.description, onInput: (event) => setObjectiveForm((current) => ({ ...current, description: event.target.value })), onChange: (event) => setObjectiveForm((current) => ({ ...current, description: event.target.value })) })] }),
+        jsxs("div", { className: "dockyard-settings-grid", children: [
+          jsxs("label", { className: "dockyard-field", children: [jsx("span", { children: "Target" }), jsx("input", { "data-objective-field": "target", value: objectiveForm.target, onChange: (event) => setObjectiveForm((current) => ({ ...current, target: event.target.value })) })] }),
+          jsxs("label", { className: "dockyard-field", children: [jsx("span", { children: "Severity" }), jsx("select", { "data-objective-field": "severity", value: objectiveForm.severity, onChange: (event) => setObjectiveForm((current) => ({ ...current, severity: event.target.value })), children: ["info", "low", "medium", "high"].map((value) => jsx("option", { value, children: readableLabel(value) }, value)) })] })
+        ] }),
+        jsxs("div", { className: "dockyard-form-actions", children: [
+          jsx(Button, { disabled: busy, onClick: () => setObjectiveEditor(null), children: "Cancel" }),
+          jsx(Button, { action: "save-objective", variant: "primary", disabled: busy || !objectiveForm.name.trim() || !objectiveForm.target.trim(), onClick: saveObjective, children: busy ? "Saving..." : objectiveEditor === "new" ? "Create objective" : "Save objective" })
+        ] })
+      ] }) : null,
+      items.length > 0 ? jsx("div", { className: "dockyard-objective-list", children: items.map((objective) => jsxs("article", { "data-objective-row": objective.id, className: objective.enabled === false ? "archived" : "", children: [
+        jsxs("div", { className: "dockyard-objective-copy", children: [
+          jsxs("span", { children: [jsx("strong", { children: objective.name }), jsx("small", { children: objective.description || "No description supplied." })] }),
+          jsx(StatusTag, { tone: objective.enabled === false ? "neutral" : severityTone(objective.severity), label: objective.enabled === false ? "Archived" : readableLabel(objective.severity) })
+        ] }),
+        jsx("p", { children: `Target ${objective.target} / ${readableLabel(objective.evaluator_type, "Manual")} / ${objective.window || "30d"}` }),
+        jsx(ObjectiveEvidence, { objective, projectId: project.id, onSaved: async () => {
+          const refreshed = await api(`/projects/${encoded}/objectives`);
+          setItems(refreshed.objectives || []);
+          onRefresh?.();
+        } }),
+        jsxs("div", { className: "dockyard-objective-evaluate", children: [
+          jsx("button", { type: "button", className: "dockyard-button small", "data-action": "evaluate-objective", "data-objective-id": objective.id, disabled: objective.enabled === false || evaluating === objective.id, onClick: () => evaluateNow(objective), children: evaluating === objective.id ? "Evaluating..." : "Evaluate now" }),
+          jsx("span", { className: "dockyard-meta", children: "Evaluates this objective only. The full stewardship cycle is a separate action." })
+        ] }),
+        evaluations[objective.id] ? evaluations[objective.id].error ? jsx("p", { className: "dockyard-inline-error", role: "alert", "data-objective-evaluation": objective.id, children: evaluations[objective.id].error }) : jsx("p", { className: "dockyard-meta", "data-objective-evaluation": objective.id, children: [
+          `Last evaluation: ${readableLabel(evaluations[objective.id].result?.state, "unknown")}`,
+          evaluations[objective.id].result?.measured != null ? ` / measured ${evaluations[objective.id].result.measured}` : "",
+          evaluations[objective.id].result?.detail ? ` / ${evaluations[objective.id].result.detail}` : "",
+          evaluations[objective.id].recorded === false ? " (no new evidence recorded)" : ""
+        ].join("") }) : null,
+        jsxs("div", { className: "dockyard-form-actions", children: [
+          objective.enabled !== false ? jsx("button", { type: "button", className: "dockyard-button small", "data-action": "edit-objective", "data-objective-id": objective.id, onClick: () => startObjective(objective), children: "Edit" }) : null,
+          objective.enabled !== false ? jsx("button", { type: "button", className: "dockyard-button danger small", "data-action": "archive-objective", "data-objective-id": objective.id, onClick: () => setPending({ type: "archive-objective", id: objective.id }), children: "Archive" }) : null,
+          jsx("button", { type: "button", className: "dockyard-button danger small", "data-action": "remove-objective", "data-objective-id": objective.id, onClick: () => setPending({ type: "remove-objective", id: objective.id }), children: "Remove" })
+        ] })
+      ] }, String(objective.id))) }) : jsx("p", { className: "dockyard-meta", children: "No objectives are configured." })
+    ] }),
+    error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: error }) : null,
+    confirmation ? jsx(ConfirmDialog, { confirmKey: confirmation.key, title: confirmation.title, description: confirmation.description, confirmLabel: confirmation.label, busy, onConfirm: applyDestructive, onCancel: () => setPending(null) }) : null
+  ] });
+}
+
 // hermes_dockyard_plugin/dashboard/src/components/live-detail.ts
 function buildActivityThread(items, opts = {}) {
   const max = opts.max ?? 8;
@@ -14025,587 +14554,6 @@ function PlanningPanel({ project, milestones, workItems, onRefresh }) {
   ] });
 }
 
-// hermes_dockyard_plugin/desktop/src/project/saved-views.js
-function SavedViewsSection({ project, views, onApply, onClear, appliedName, onRefresh }) {
-  const [name, setName] = useState("");
-  const [layout, setLayout] = useState("board");
-  const [statusFilter, setStatusFilter] = useState("in_progress");
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [error, setError] = useState(null);
-  const [selectedView, setSelectedView] = useState(null);
-  const [overwriteConfirm, setOverwriteConfirm] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
-  const [recallNotice, setRecallNotice] = useState(null);
-  const encoded = encodeURIComponent(project.id);
-  const savedList = views ?? [];
-  const loadSavedView = (saved) => {
-    setSelectedView(saved.name);
-    setName(saved.name ?? "");
-    setLayout(saved.layout ?? "board");
-    setStatusFilter(saved.filters?.status ?? "in_progress");
-    setError(null);
-    setRecallNotice(null);
-  };
-  const recall = async (saved) => {
-    loadSavedView(saved);
-    try {
-      const result = await api(`/projects/${encoded}/views/${encodeURIComponent(saved.name)}/items`);
-      onApply({ name: saved.name, layout: saved.layout ?? "board", items: result.items ?? [] });
-    } catch (failure) {
-      setRecallNotice(`Could not run saved view ${saved.name}: ${String(failure?.message ?? failure)}`);
-    }
-  };
-  const persist = async (viewName) => {
-    setSaving(true);
-    setError(null);
-    try {
-      await api(`/projects/${encoded}/views`, {
-        method: "PUT",
-        body: { name: viewName, layout, filters: { status: statusFilter }, shared: false }
-      });
-      setSelectedView(viewName);
-      if (appliedName && appliedName !== viewName) onClear();
-      emitToast("success", `Saved view ${viewName}.`);
-      onRefresh();
-    } catch (failure) {
-      setError(String(failure?.message ?? failure));
-    }
-    setSaving(false);
-  };
-  const save = () => {
-    const viewName = name.trim();
-    if (!viewName) return;
-    if (savedList.some((saved) => saved.name === viewName)) {
-      setOverwriteConfirm(true);
-      return;
-    }
-    persist(viewName);
-  };
-  const remove = async () => {
-    const viewName = selectedView;
-    if (!viewName) return;
-    setDeleting(true);
-    setError(null);
-    try {
-      await api(`/projects/${encoded}/views/${encodeURIComponent(viewName)}`, { method: "DELETE" });
-      if (appliedName === viewName) onClear();
-      setSelectedView(null);
-      setName("");
-      emitToast("success", `Deleted saved view ${viewName}.`);
-      onRefresh();
-    } catch (failure) {
-      setError(String(failure?.message ?? failure));
-    }
-    setDeleting(false);
-  };
-  return jsxs("section", { className: "dockyard-feature-card", "data-saved-views-screen": project.id, children: [
-    jsxs("div", { className: "dockyard-section-head", children: [
-      jsxs("div", { children: [
-        jsx("h2", { children: "Saved views" }),
-        jsx("p", { children: "Display preferences over canonical project work. Saved views change how canonical work is displayed; they do not run automations, assign work or expand permissions." })
-      ] }),
-      jsx(StatusTag, { tone: "neutral", label: `${number(savedList.length)} saved` })
-    ] }),
-    jsxs("div", { className: "dockyard-saved-views-layout", children: [
-      jsx("div", {
-        className: "dockyard-saved-views",
-        children: savedList.length > 0 ? savedList.map((saved) => jsxs("button", { type: "button", className: (appliedName ?? selectedView) === saved.name ? "active" : "", "data-saved-view": saved.name, onClick: () => recall(saved), children: [
-          jsxs("span", { children: [jsx("strong", { children: saved.name }), jsx("small", { children: `${readableLabel(saved.layout, "Board")} / ${readableLabel(saved.filters?.status)}` })] }),
-          jsx(Icon, { name: "chevron" })
-        ] }, saved.name)) : jsx("p", { className: "dockyard-meta", children: "No saved views yet." })
-      }),
-      jsxs("div", { className: "dockyard-saved-view-editor", "data-saved-view-editor": true, children: [
-        jsxs("div", { className: "dockyard-section-head", children: [
-          jsxs("div", { children: [jsx("h2", { children: selectedView ? "Edit saved view" : "Create saved view" }), jsx("p", { children: "Persist a bounded lens over canonical project work." })] }),
-          selectedView ? jsx(StatusTag, { tone: "info", label: "loaded" }) : null
-        ] }),
-        jsx("label", { htmlFor: "dockyard-view-name", children: "Name" }),
-        jsx("input", { id: "dockyard-view-name", value: name, onChange: (event) => setName(event.target.value) }),
-        jsx("label", { htmlFor: "dockyard-view-layout", children: "Layout" }),
-        jsx("select", { id: "dockyard-view-layout", value: layout, onChange: (event) => setLayout(event.target.value), children: [
-          jsx("option", { value: "board", children: "Board" }, "board"),
-          jsx("option", { value: "table", children: "Table" }, "table"),
-          jsx("option", { value: "timeline", children: "Timeline" }, "timeline")
-        ] }),
-        jsx("label", { htmlFor: "dockyard-view-status", children: "Status filter" }),
-        jsx("select", { id: "dockyard-view-status", value: statusFilter, onChange: (event) => setStatusFilter(event.target.value), children: [
-          jsx("option", { value: "backlog", children: "Backlog" }, "backlog"),
-          jsx("option", { value: "in_progress", children: "In progress" }, "in_progress"),
-          jsx("option", { value: "in_review", children: "In review" }, "in_review"),
-          jsx("option", { value: "blocked", children: "Blocked" }, "blocked"),
-          jsx("option", { value: "done", children: "Done" }, "done")
-        ] }),
-        recallNotice ? jsx("p", { className: "dockyard-inline-error", role: "alert", "data-recall-notice": true, children: recallNotice }) : null,
-        error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: error }) : null,
-        jsxs("div", { className: "dockyard-form-actions", children: [
-          jsx(Button, { action: "save-view", variant: "primary", disabled: saving || deleting || !name.trim(), onClick: save, children: saving ? "Saving..." : selectedView ? "Save view" : "Create view" }),
-          selectedView ? jsx(Button, { action: "delete-view", disabled: saving || deleting, onClick: () => setDeleteConfirm(true), children: deleting ? "Deleting..." : "Delete view" }) : null,
-          selectedView ? jsx(Button, { onClick: () => {
-            setSelectedView(null);
-            setName("");
-            setLayout("board");
-            setStatusFilter("in_progress");
-            setError(null);
-            setRecallNotice(null);
-          }, children: "Clear" }) : null
-        ] })
-      ] })
-    ] }),
-    overwriteConfirm ? jsx(ConfirmDialog, {
-      confirmKey: "overwrite-view",
-      title: `Overwrite saved view ${name.trim()}?`,
-      description: "An existing saved view with this name will be replaced by the current layout and filters.",
-      confirmLabel: "Overwrite view",
-      busy: saving,
-      onCancel: () => setOverwriteConfirm(false),
-      onConfirm: async () => {
-        setOverwriteConfirm(false);
-        await persist(name.trim());
-      }
-    }) : null,
-    deleteConfirm ? jsx(ConfirmDialog, {
-      confirmKey: "delete-view",
-      title: `Delete saved view ${selectedView}?`,
-      description: "This removes the stored display preference for this project. Canonical work is not affected.",
-      confirmLabel: "Delete view",
-      busy: deleting,
-      onCancel: () => setDeleteConfirm(false),
-      onConfirm: async () => {
-        setDeleteConfirm(false);
-        await remove();
-      }
-    }) : null
-  ] });
-}
-
-// hermes_dockyard_plugin/desktop/src/views/initiative.js
-function InitiativeView({ view, onRefresh }) {
-  const initiative = [...view.initiatives ?? []].sort((left, right) => (RISK_PRIORITY[left.risk] ?? 1) - (RISK_PRIORITY[right.risk] ?? 1))[0];
-  const project = view.project;
-  const stages = [
-    ["verify", "Verify state", "Confirm the project state and evidence source."],
-    ["detect", "Detect gap", initiative?.rationale || "Research the highest-value project gap."],
-    ["propose", "Create initiative", initiative?.expected_outcome || "Declare the expected outcome."],
-    ["prioritise", "Prioritise", `Priority ${number(initiative?.priority ?? 0)} with a recorded rationale.`],
-    ["approval", "Human approval", "Owner reviews the risk, evidence and validation contract."],
-    ["execute", "Build and verify", validationSummary(initiative?.validation_contract)],
-    ["release", "Release", "Release remains bounded by project policy."],
-    ["observe", "Observe outcome", "Measure whether the project improved."]
-  ];
-  const currentIndex = initiative?.status === "pending_approval" ? 4 : ["approved", "executing"].includes(initiative?.status) ? 5 : ["completed", "measured"].includes(initiative?.status) ? 7 : 2;
-  const [selectedStage, setSelectedStage] = useState(currentIndex);
-  const [freezeState, setFreezeState] = useState(null);
-  const [freezeConfirm, setFreezeConfirm] = useState(false);
-  const freeze = async () => {
-    if (!project) return;
-    setFreezeState("freezing");
-    try {
-      await api(`/projects/${encodeURIComponent(project.id)}/freeze`, { method: "POST", body: {} });
-      setFreezeState("frozen");
-      onRefresh();
-    } catch (failure) {
-      setFreezeState(String(failure?.message ?? failure));
-    }
-  };
-  if (!project || !initiative) return jsx(EmptyState, { title: "No initiative available", description: "A project initiative will appear here after it is proposed.", icon: "project" });
-  return jsxs("div", { "data-initiative-loop": initiative.ref, children: [
-    jsx(PageHead, {
-      title: initiative.title,
-      description: `${project.id} / ${initiative.ref} / one canonical improvement loop`,
-      status: initiative.status || "unknown",
-      onRefresh
-    }),
-    jsxs("div", { className: "dockyard-loop-layout", children: [
-      jsxs("section", { className: "dockyard-feature-card dockyard-loop-card", children: [
-        jsxs("div", { className: "dockyard-loop-head", children: [
-          jsxs("div", { children: [jsx("h2", { children: "Initiative loop" }), jsx("p", { children: "Select a stage to inspect its current evidence and state." })] }),
-          jsx(Button, { action: "freeze-project", variant: "danger", disabled: freezeState === "freezing" || freezeState === "frozen", onClick: () => setFreezeConfirm(true), children: freezeState === "freezing" ? "Freezing..." : freezeState === "frozen" ? "Project frozen" : "Freeze project" })
-        ] }),
-        jsx("div", {
-          className: "dockyard-loop-visual-wrap",
-          children: jsx("svg", {
-            viewBox: "0 0 1010 140",
-            role: "img",
-            "aria-label": "Initiative stages from verification to observed outcome",
-            "data-loop-visual": true,
-            children: stages.map(([key, label], index) => {
-              const x = 20 + index * 123;
-              const state = index < currentIndex ? "done" : index === currentIndex ? "current" : "queued";
-              return jsxs(Fragment, { children: [
-                index < stages.length - 1 ? jsx("path", { className: `dockyard-loop-edge ${state}`, d: `M${x + 105} 55H${x + 123}` }) : null,
-                jsx("rect", { className: `dockyard-loop-node ${state}`, x, y: 30, width: 105, height: 52, rx: 10 }),
-                jsx("text", { x: x + 52.5, y: 60, textAnchor: "middle", children: label })
-              ] }, key);
-            })
-          })
-        }),
-        jsx("div", {
-          className: "dockyard-stage-list",
-          children: stages.map(([key, label], index) => jsx("button", {
-            type: "button",
-            className: selectedStage === index ? "active" : "",
-            "data-initiative-stage": key,
-            onClick: () => setSelectedStage(index),
-            children: jsxs(Fragment, { children: [
-              jsx("span", { children: number(index + 1) }),
-              jsxs("span", { children: [jsx("strong", { children: label }), jsx("small", { children: index < currentIndex ? "Done" : index === currentIndex ? "Current gate" : "Queued" })] })
-            ] })
-          }, key))
-        })
-      ] }),
-      jsxs("aside", { className: "dockyard-feature-card dockyard-stage-detail", children: [
-        jsx("span", { className: "dockyard-card-label", children: "SELECTED STAGE" }),
-        jsx("h2", { children: stages[selectedStage][1] }),
-        jsx("p", { children: stages[selectedStage][2] }),
-        jsxs("div", { className: "dockyard-evidence-details", children: [
-          jsx("strong", { children: "Initiative evidence" }),
-          jsx("p", { children: initiative.rationale || "No rationale supplied." }),
-          jsx("p", { children: `Validation: ${validationSummary(initiative.validation_contract)}` })
-        ] }),
-        freezeState && !["freezing", "frozen"].includes(freezeState) ? jsx("p", { className: "dockyard-inline-error", children: freezeState }) : null
-      ] })
-    ] }),
-    freezeConfirm ? jsx(ConfirmDialog, {
-      confirmKey: "freeze-project",
-      title: "Freeze this project?",
-      description: "Freezing stops new execution until the project is explicitly resumed.",
-      confirmLabel: "Freeze project",
-      busy: freezeState === "freezing",
-      onCancel: () => setFreezeConfirm(false),
-      onConfirm: async () => {
-        setFreezeConfirm(false);
-        await freeze();
-      }
-    }) : null
-  ] });
-}
-
-// hermes_dockyard_plugin/desktop/src/project/objectives.js
-function GoalsManager({ project, goals, objectives, onRefresh }) {
-  const [rows, setRows] = useState(goals ?? []);
-  const [editor, setEditor] = useState(null);
-  const [form, setForm] = useState({ title: "", description: "", objective_ids: [] });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const encoded = encodeURIComponent(project.id);
-  const start = (goal = null) => {
-    setEditor(goal?.goal_id ?? "new");
-    setForm({
-      title: goal?.title ?? "",
-      description: goal?.description ?? "",
-      objective_ids: [...goal?.objective_ids ?? []]
-    });
-    setError(null);
-  };
-  const toggleObjective = (objectiveId) => setForm((current) => ({
-    ...current,
-    objective_ids: current.objective_ids.includes(objectiveId) ? current.objective_ids.filter((value) => value !== objectiveId) : [...current.objective_ids, objectiveId]
-  }));
-  const save = async () => {
-    if (!form.title.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const body = { ...form, title: form.title.trim(), description: form.description.trim() };
-      const saved = editor === "new" ? await api(`/projects/${encoded}/goals`, { method: "POST", body }) : await api(`/projects/${encoded}/goals/${encodeURIComponent(editor)}`, { method: "PATCH", body });
-      setRows((current) => editor === "new" ? [...current, saved] : current.map((goal) => goal.goal_id === saved.goal_id ? saved : goal));
-      setEditor(null);
-      onRefresh?.();
-    } catch (failure) {
-      setError(String(failure?.message ?? failure));
-    }
-    setBusy(false);
-  };
-  const move = async (goalId, direction) => {
-    const active2 = rows.filter((goal) => !goal.archived_at).sort((a, b) => a.position - b.position);
-    const index = active2.findIndex((goal) => goal.goal_id === goalId);
-    const target = index + direction;
-    if (index < 0 || target < 0 || target >= active2.length) return;
-    const reordered = [...active2];
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await api(`/projects/${encoded}/goals/order`, { method: "PUT", body: { goal_ids: reordered.map((goal) => goal.goal_id) } });
-      const archived2 = rows.filter((goal) => goal.archived_at);
-      setRows([...result.goals ?? [], ...archived2]);
-      onRefresh?.();
-    } catch (failure) {
-      setError(String(failure?.message ?? failure));
-    }
-    setBusy(false);
-  };
-  const lifecycle = async (goal, action) => {
-    setBusy(true);
-    setError(null);
-    try {
-      const saved = await api(`/projects/${encoded}/goals/${encodeURIComponent(goal.goal_id)}/${action}`, { method: "POST", body: {} });
-      setRows((current) => current.map((item) => item.goal_id === saved.goal_id ? saved : item));
-      onRefresh?.();
-    } catch (failure) {
-      setError(String(failure?.message ?? failure));
-    }
-    setBusy(false);
-  };
-  const objectiveName = (id) => objectives.find((item) => Number(item.id) === Number(id))?.name ?? `Objective ${id}`;
-  const active = rows.filter((goal) => !goal.archived_at).sort((a, b) => a.position - b.position);
-  const archived = rows.filter((goal) => goal.archived_at);
-  return jsxs("section", { className: "dockyard-feature-card", "data-goals-manager": true, children: [
-    jsxs("div", { className: "dockyard-section-head", children: [
-      jsxs("div", { children: [jsx("span", { className: "dockyard-card-label", children: "GOALS" }), jsx("h2", { children: `${active.length} active` }), jsx("p", { children: "Goals order outcomes. Objectives may stay unlinked." })] }),
-      jsx(Button, { action: "add-goal", variant: "primary", small: true, onClick: () => start(), children: "Add goal" })
-    ] }),
-    editor !== null ? jsxs("div", { className: "dockyard-inline-editor", "data-goal-editor": String(editor), children: [
-      jsxs("label", { children: [jsx("span", { children: "Title" }), jsx("input", { "data-goal-field": "title", value: form.title, onChange: (event) => setForm((current) => ({ ...current, title: event.target.value })) })] }),
-      jsxs("label", { children: [jsx("span", { children: "Description" }), jsx("textarea", { "data-goal-field": "description", rows: 3, value: form.description, onChange: (event) => setForm((current) => ({ ...current, description: event.target.value })) })] }),
-      jsxs("fieldset", { "data-goal-objectives": true, children: [
-        jsx("legend", { children: "Linked objectives (optional)" }),
-        ...(objectives ?? []).map((objective) => jsxs("label", { children: [jsx("input", { type: "checkbox", value: String(objective.id), checked: form.objective_ids.includes(Number(objective.id)), onChange: () => toggleObjective(Number(objective.id)) }), objective.name] }, String(objective.id)))
-      ] }),
-      jsxs("div", { className: "dockyard-form-actions", children: [
-        jsx(Button, { disabled: busy, onClick: () => setEditor(null), children: "Cancel" }),
-        jsx(Button, { action: "save-goal", variant: "primary", disabled: busy || !form.title.trim(), onClick: save, children: busy ? "Saving..." : editor === "new" ? "Create goal" : "Save goal" })
-      ] })
-    ] }) : null,
-    jsx("div", { className: "dockyard-objective-list", children: [...active, ...archived].map((goal, index) => jsxs("article", { "data-goal-row": goal.goal_id, className: goal.archived_at ? "archived" : "", children: [
-      jsxs("div", { className: "dockyard-objective-copy", children: [jsxs("span", { children: [jsx("strong", { children: goal.title }), jsx("small", { children: goal.description || "No description supplied." })] }), jsx(StatusTag, { tone: goal.archived_at ? "neutral" : "success", label: goal.archived_at ? "Archived" : `Order ${goal.position + 1}` })] }),
-      jsx("p", { children: goal.objective_ids?.length ? `Objectives: ${goal.objective_ids.map(objectiveName).join(", ")}` : "No linked objectives." }),
-      jsxs("div", { className: "dockyard-form-actions", children: goal.archived_at ? [
-        jsx(Button, { action: "restore-goal", small: true, disabled: busy, onClick: () => lifecycle(goal, "restore"), children: "Restore" }, "restore")
-      ] : [
-        jsx(Button, { action: "move-goal-up", small: true, disabled: busy || index === 0, onClick: () => move(goal.goal_id, -1), children: "Move up" }, "up"),
-        jsx(Button, { action: "move-goal-down", small: true, disabled: busy || index === active.length - 1, onClick: () => move(goal.goal_id, 1), children: "Move down" }, "down"),
-        jsx(Button, { action: "edit-goal", small: true, disabled: busy, onClick: () => start(goal), children: "Edit" }, "edit"),
-        jsx(Button, { action: "archive-goal", small: true, disabled: busy, onClick: () => lifecycle(goal, "archive"), children: "Archive" }, "archive")
-      ] })
-    ] }, goal.goal_id)) }),
-    error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: error }) : null
-  ] });
-}
-function ObjectivesPanel({ project, settings, objectives, goals, missionArchive, onRefresh }) {
-  const [mission, setMission] = useState(settings?.mission ?? "");
-  const [missionDraft, setMissionDraft] = useState(settings?.mission ?? "");
-  const [missionEditing, setMissionEditing] = useState(false);
-  const [history, setHistory] = useState(missionArchive ?? []);
-  const [items, setItems] = useState(objectives ?? []);
-  const [objectiveEditor, setObjectiveEditor] = useState(null);
-  const [objectiveForm, setObjectiveForm] = useState({ name: "", description: "", target: ">=1", severity: "medium" });
-  const [pending, setPending] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const [evaluating, setEvaluating] = useState(null);
-  const [evaluations, setEvaluations] = useState({});
-  const encoded = encodeURIComponent(project.id);
-  const startObjective = (objective = null) => {
-    setObjectiveEditor(objective?.id ?? "new");
-    setObjectiveForm({
-      name: objective?.name ?? "",
-      description: objective?.description ?? "",
-      target: objective?.target ?? ">=1",
-      severity: objective?.severity ?? "medium"
-    });
-    setError(null);
-  };
-  const saveMission = async () => {
-    const clean = missionDraft.trim();
-    if (!clean) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await api(`/projects/${encoded}/settings`, { method: "PATCH", body: { mission: clean } });
-      setMission(result?.mission ?? clean);
-      setMissionDraft(result?.mission ?? clean);
-      setMissionEditing(false);
-      onRefresh?.();
-    } catch (failure) {
-      setError(String(failure?.message ?? failure));
-    }
-    setBusy(false);
-  };
-  const saveObjective = async () => {
-    if (!objectiveForm.name.trim() || !objectiveForm.target.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const body = {
-        name: objectiveForm.name.trim(),
-        description: objectiveForm.description.trim(),
-        target: objectiveForm.target.trim(),
-        severity: objectiveForm.severity
-      };
-      if (objectiveEditor === "new") {
-        const created = await api(`/projects/${encoded}/objectives`, { method: "POST", body: { ...body, evaluator_type: "manual", window: "30d" } });
-        setItems((current) => [...current, created]);
-      } else {
-        const updated = await api(`/projects/${encoded}/objectives/${objectiveEditor}`, { method: "PATCH", body });
-        setItems((current) => current.map((item) => Number(item.id) === Number(objectiveEditor) ? updated : item));
-      }
-      setObjectiveEditor(null);
-      onRefresh?.();
-    } catch (failure) {
-      setError(String(failure?.message ?? failure));
-    }
-    setBusy(false);
-  };
-  const evaluateNow = async (objective) => {
-    setEvaluating(objective.id);
-    setError(null);
-    try {
-      const result = await api(`/projects/${encoded}/objectives/${objective.id}/evaluate`, { method: "POST" });
-      setEvaluations((current) => ({ ...current, [objective.id]: result }));
-      const refreshed = await api(`/projects/${encoded}/objectives`);
-      setItems(refreshed.objectives || []);
-      const state = result?.result?.state ?? "unknown";
-      emitToast(
-        state === "passed" ? "success" : "danger",
-        `Evaluate now (${objective.name}): ${readableLabel(state, "unknown")}.` + (state === "unknown" ? " No evidence was fabricated \u2014 the objective stays unproven." : "")
-      );
-      onRefresh?.();
-    } catch (failure) {
-      setEvaluations((current) => ({ ...current, [objective.id]: { error: String(failure?.message ?? failure) } }));
-    }
-    setEvaluating(null);
-  };
-  const applyDestructive = async () => {
-    if (!pending) return;
-    setBusy(true);
-    setError(null);
-    try {
-      if (pending.type === "archive-mission") {
-        const archived = await api(`/projects/${encoded}/mission/archive`, { method: "POST", body: {} });
-        setHistory((current) => [archived, ...current]);
-        setMission("");
-        setMissionDraft("");
-        setMissionEditing(false);
-      } else if (pending.type === "remove-mission") {
-        await api(`/projects/${encoded}/mission`, { method: "DELETE", body: {} });
-        setMission("");
-        setMissionDraft("");
-        setMissionEditing(false);
-      } else if (pending.type === "archive-objective") {
-        const archived = await api(`/projects/${encoded}/objectives/${pending.id}/archive`, { method: "POST", body: {} });
-        setItems((current) => current.map((item) => Number(item.id) === Number(pending.id) ? archived : item));
-      } else if (pending.type === "remove-objective") {
-        await api(`/projects/${encoded}/objectives/${pending.id}`, { method: "DELETE", body: {} });
-        setItems((current) => current.filter((item) => Number(item.id) !== Number(pending.id)));
-      }
-      setPending(null);
-      onRefresh?.();
-    } catch (failure) {
-      setError(String(failure?.message ?? failure));
-    }
-    setBusy(false);
-  };
-  const confirmation = pending ? {
-    "archive-mission": {
-      key: "archive-mission",
-      title: "Archive this mission?",
-      description: "The mission moves to history and is removed from the active project.",
-      label: "Archive mission"
-    },
-    "remove-mission": {
-      key: "remove-mission",
-      title: "Remove this mission?",
-      description: "The active mission is cleared without adding it to mission history.",
-      label: "Remove mission"
-    },
-    "archive-objective": {
-      key: `archive-objective-${pending.id}`,
-      title: "Archive this objective?",
-      description: "The objective remains visible in history but stops participating in active evaluation.",
-      label: "Archive objective"
-    },
-    "remove-objective": {
-      key: `remove-objective-${pending.id}`,
-      title: "Remove this objective?",
-      description: "This permanently removes the objective from the project.",
-      label: "Remove objective"
-    }
-  }[pending.type] : null;
-  return jsxs("div", { className: "dockyard-objectives-layout", children: [
-    jsx(GoalsManager, { project, goals, objectives: items, onRefresh }),
-    jsxs("section", { className: "dockyard-feature-card", "data-mission-manager": true, children: [
-      jsxs("div", { className: "dockyard-section-head", children: [
-        jsxs("div", { children: [jsx("span", { className: "dockyard-card-label", children: "MISSION" }), jsx("h2", { children: mission || "No active mission" })] }),
-        mission ? jsx(StatusTag, { tone: "success", label: "Active" }) : jsx(StatusTag, { tone: "neutral", label: "Not set" })
-      ] }),
-      missionEditing ? jsxs("div", { className: "dockyard-inline-editor", children: [
-        jsx("label", { htmlFor: "dockyard-mission-editor", children: "Mission statement" }),
-        jsx("textarea", { id: "dockyard-mission-editor", "data-mission-field": true, rows: 4, value: missionDraft, onInput: (event) => setMissionDraft(event.target.value), onChange: (event) => setMissionDraft(event.target.value) }),
-        jsxs("div", { className: "dockyard-form-actions", children: [
-          jsx(Button, { disabled: busy, onClick: () => {
-            setMissionDraft(mission);
-            setMissionEditing(false);
-          }, children: "Cancel" }),
-          jsx(Button, { action: "save-mission", variant: "primary", disabled: busy || !missionDraft.trim(), onClick: saveMission, children: busy ? "Saving..." : "Save mission" })
-        ] })
-      ] }) : jsxs("div", { className: "dockyard-form-actions", children: [
-        jsx(Button, { action: "edit-mission", onClick: () => {
-          setMissionDraft(mission);
-          setMissionEditing(true);
-        }, children: mission ? "Edit mission" : "Set mission" }),
-        mission ? jsx(Button, { action: "archive-mission", variant: "danger", onClick: () => setPending({ type: "archive-mission" }), children: "Archive" }) : null,
-        mission ? jsx(Button, { action: "remove-mission", variant: "danger", onClick: () => setPending({ type: "remove-mission" }), children: "Remove" }) : null
-      ] }),
-      history.length > 0 ? jsxs("div", { className: "dockyard-mission-history", children: [
-        jsx("h3", { children: "Mission history" }),
-        history.map((entry) => jsxs("article", { children: [
-          jsx("strong", { children: entry.mission }),
-          jsx("span", { children: `Archived ${formatWhen(entry.archived_at) || "previously"} by ${entry.archived_by || "unknown"}` })
-        ] }, entry.archive_id))
-      ] }) : null
-    ] }),
-    jsxs("section", { className: "dockyard-feature-card", children: [
-      jsxs("div", { className: "dockyard-section-head", children: [
-        jsxs("div", { children: [jsx("span", { className: "dockyard-card-label", children: "OBJECTIVES" }), jsx("h2", { children: `${number(items.filter((item) => item.enabled !== false).length)} active` })] }),
-        jsx(Button, { action: "add-objective", variant: "primary", small: true, onClick: () => startObjective(), children: "Add objective" })
-      ] }),
-      objectiveEditor !== null ? jsxs("div", { className: "dockyard-inline-editor", "data-objective-editor": String(objectiveEditor), children: [
-        jsxs("label", { children: [jsx("span", { children: "Name" }), jsx("input", { "data-objective-field": "name", value: objectiveForm.name, onChange: (event) => setObjectiveForm((current) => ({ ...current, name: event.target.value })) })] }),
-        jsxs("label", { children: [jsx("span", { children: "Description" }), jsx("textarea", { "data-objective-field": "description", rows: 3, value: objectiveForm.description, onInput: (event) => setObjectiveForm((current) => ({ ...current, description: event.target.value })), onChange: (event) => setObjectiveForm((current) => ({ ...current, description: event.target.value })) })] }),
-        jsxs("div", { className: "dockyard-settings-grid", children: [
-          jsxs("label", { className: "dockyard-field", children: [jsx("span", { children: "Target" }), jsx("input", { "data-objective-field": "target", value: objectiveForm.target, onChange: (event) => setObjectiveForm((current) => ({ ...current, target: event.target.value })) })] }),
-          jsxs("label", { className: "dockyard-field", children: [jsx("span", { children: "Severity" }), jsx("select", { "data-objective-field": "severity", value: objectiveForm.severity, onChange: (event) => setObjectiveForm((current) => ({ ...current, severity: event.target.value })), children: ["info", "low", "medium", "high"].map((value) => jsx("option", { value, children: readableLabel(value) }, value)) })] })
-        ] }),
-        jsxs("div", { className: "dockyard-form-actions", children: [
-          jsx(Button, { disabled: busy, onClick: () => setObjectiveEditor(null), children: "Cancel" }),
-          jsx(Button, { action: "save-objective", variant: "primary", disabled: busy || !objectiveForm.name.trim() || !objectiveForm.target.trim(), onClick: saveObjective, children: busy ? "Saving..." : objectiveEditor === "new" ? "Create objective" : "Save objective" })
-        ] })
-      ] }) : null,
-      items.length > 0 ? jsx("div", { className: "dockyard-objective-list", children: items.map((objective) => jsxs("article", { "data-objective-row": objective.id, className: objective.enabled === false ? "archived" : "", children: [
-        jsxs("div", { className: "dockyard-objective-copy", children: [
-          jsxs("span", { children: [jsx("strong", { children: objective.name }), jsx("small", { children: objective.description || "No description supplied." })] }),
-          jsx(StatusTag, { tone: objective.enabled === false ? "neutral" : severityTone(objective.severity), label: objective.enabled === false ? "Archived" : readableLabel(objective.severity) })
-        ] }),
-        jsx("p", { children: `Target ${objective.target} / ${readableLabel(objective.evaluator_type, "Manual")} / ${objective.window || "30d"}` }),
-        jsx(ObjectiveEvidence, { objective, projectId: project.id, onSaved: async () => {
-          const refreshed = await api(`/projects/${encoded}/objectives`);
-          setItems(refreshed.objectives || []);
-          onRefresh?.();
-        } }),
-        jsxs("div", { className: "dockyard-objective-evaluate", children: [
-          jsx("button", { type: "button", className: "dockyard-button small", "data-action": "evaluate-objective", "data-objective-id": objective.id, disabled: objective.enabled === false || evaluating === objective.id, onClick: () => evaluateNow(objective), children: evaluating === objective.id ? "Evaluating..." : "Evaluate now" }),
-          jsx("span", { className: "dockyard-meta", children: "Evaluates this objective only. The full stewardship cycle is a separate action." })
-        ] }),
-        evaluations[objective.id] ? evaluations[objective.id].error ? jsx("p", { className: "dockyard-inline-error", role: "alert", "data-objective-evaluation": objective.id, children: evaluations[objective.id].error }) : jsx("p", { className: "dockyard-meta", "data-objective-evaluation": objective.id, children: [
-          `Last evaluation: ${readableLabel(evaluations[objective.id].result?.state, "unknown")}`,
-          evaluations[objective.id].result?.measured != null ? ` / measured ${evaluations[objective.id].result.measured}` : "",
-          evaluations[objective.id].result?.detail ? ` / ${evaluations[objective.id].result.detail}` : "",
-          evaluations[objective.id].recorded === false ? " (no new evidence recorded)" : ""
-        ].join("") }) : null,
-        jsxs("div", { className: "dockyard-form-actions", children: [
-          objective.enabled !== false ? jsx("button", { type: "button", className: "dockyard-button small", "data-action": "edit-objective", "data-objective-id": objective.id, onClick: () => startObjective(objective), children: "Edit" }) : null,
-          objective.enabled !== false ? jsx("button", { type: "button", className: "dockyard-button danger small", "data-action": "archive-objective", "data-objective-id": objective.id, onClick: () => setPending({ type: "archive-objective", id: objective.id }), children: "Archive" }) : null,
-          jsx("button", { type: "button", className: "dockyard-button danger small", "data-action": "remove-objective", "data-objective-id": objective.id, onClick: () => setPending({ type: "remove-objective", id: objective.id }), children: "Remove" })
-        ] })
-      ] }, String(objective.id))) }) : jsx("p", { className: "dockyard-meta", children: "No objectives are configured." })
-    ] }),
-    error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: error }) : null,
-    confirmation ? jsx(ConfirmDialog, { confirmKey: confirmation.key, title: confirmation.title, description: confirmation.description, confirmLabel: confirmation.label, busy, onConfirm: applyDestructive, onCancel: () => setPending(null) }) : null
-  ] });
-}
-
 // hermes_dockyard_plugin/desktop/src/project/content.js
 function ProjectContentPanel({ project, content, onRefresh }) {
   const [items, setItems] = useState(content ?? []);
@@ -15072,6 +15020,620 @@ function ProjectReportsPanel({ project, reports, onRefresh }) {
   ] });
 }
 
+// hermes_dockyard_plugin/desktop/src/project/saved-views.js
+function SavedViewsSection({ project, views, onApply, onClear, appliedName, onRefresh }) {
+  const [name, setName] = useState("");
+  const [layout, setLayout] = useState("board");
+  const [statusFilter, setStatusFilter] = useState("in_progress");
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState(null);
+  const [selectedView, setSelectedView] = useState(null);
+  const [overwriteConfirm, setOverwriteConfirm] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [recallNotice, setRecallNotice] = useState(null);
+  const encoded = encodeURIComponent(project.id);
+  const savedList = views ?? [];
+  const loadSavedView = (saved) => {
+    setSelectedView(saved.name);
+    setName(saved.name ?? "");
+    setLayout(saved.layout ?? "board");
+    setStatusFilter(saved.filters?.status ?? "in_progress");
+    setError(null);
+    setRecallNotice(null);
+  };
+  const recall = async (saved) => {
+    loadSavedView(saved);
+    try {
+      const result = await api(`/projects/${encoded}/views/${encodeURIComponent(saved.name)}/items`);
+      onApply({ name: saved.name, layout: saved.layout ?? "board", items: result.items ?? [] });
+    } catch (failure) {
+      setRecallNotice(`Could not run saved view ${saved.name}: ${String(failure?.message ?? failure)}`);
+    }
+  };
+  const persist = async (viewName) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await api(`/projects/${encoded}/views`, {
+        method: "PUT",
+        body: { name: viewName, layout, filters: { status: statusFilter }, shared: false }
+      });
+      setSelectedView(viewName);
+      if (appliedName && appliedName !== viewName) onClear();
+      emitToast("success", `Saved view ${viewName}.`);
+      onRefresh();
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    }
+    setSaving(false);
+  };
+  const save = () => {
+    const viewName = name.trim();
+    if (!viewName) return;
+    if (savedList.some((saved) => saved.name === viewName)) {
+      setOverwriteConfirm(true);
+      return;
+    }
+    persist(viewName);
+  };
+  const remove = async () => {
+    const viewName = selectedView;
+    if (!viewName) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await api(`/projects/${encoded}/views/${encodeURIComponent(viewName)}`, { method: "DELETE" });
+      if (appliedName === viewName) onClear();
+      setSelectedView(null);
+      setName("");
+      emitToast("success", `Deleted saved view ${viewName}.`);
+      onRefresh();
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    }
+    setDeleting(false);
+  };
+  return jsxs("section", { className: "dockyard-feature-card", "data-saved-views-screen": project.id, children: [
+    jsxs("div", { className: "dockyard-section-head", children: [
+      jsxs("div", { children: [
+        jsx("h2", { children: "Saved views" }),
+        jsx("p", { children: "Display preferences over canonical project work. Saved views change how canonical work is displayed; they do not run automations, assign work or expand permissions." })
+      ] }),
+      jsx(StatusTag, { tone: "neutral", label: `${number(savedList.length)} saved` })
+    ] }),
+    jsxs("div", { className: "dockyard-saved-views-layout", children: [
+      jsx("div", {
+        className: "dockyard-saved-views",
+        children: savedList.length > 0 ? savedList.map((saved) => jsxs("button", { type: "button", className: (appliedName ?? selectedView) === saved.name ? "active" : "", "data-saved-view": saved.name, onClick: () => recall(saved), children: [
+          jsxs("span", { children: [jsx("strong", { children: saved.name }), jsx("small", { children: `${readableLabel(saved.layout, "Board")} / ${readableLabel(saved.filters?.status)}` })] }),
+          jsx(Icon, { name: "chevron" })
+        ] }, saved.name)) : jsx("p", { className: "dockyard-meta", children: "No saved views yet." })
+      }),
+      jsxs("div", { className: "dockyard-saved-view-editor", "data-saved-view-editor": true, children: [
+        jsxs("div", { className: "dockyard-section-head", children: [
+          jsxs("div", { children: [jsx("h2", { children: selectedView ? "Edit saved view" : "Create saved view" }), jsx("p", { children: "Persist a bounded lens over canonical project work." })] }),
+          selectedView ? jsx(StatusTag, { tone: "info", label: "loaded" }) : null
+        ] }),
+        jsx("label", { htmlFor: "dockyard-view-name", children: "Name" }),
+        jsx("input", { id: "dockyard-view-name", value: name, onChange: (event) => setName(event.target.value) }),
+        jsx("label", { htmlFor: "dockyard-view-layout", children: "Layout" }),
+        jsx("select", { id: "dockyard-view-layout", value: layout, onChange: (event) => setLayout(event.target.value), children: [
+          jsx("option", { value: "board", children: "Board" }, "board"),
+          jsx("option", { value: "table", children: "Table" }, "table"),
+          jsx("option", { value: "timeline", children: "Timeline" }, "timeline")
+        ] }),
+        jsx("label", { htmlFor: "dockyard-view-status", children: "Status filter" }),
+        jsx("select", { id: "dockyard-view-status", value: statusFilter, onChange: (event) => setStatusFilter(event.target.value), children: [
+          jsx("option", { value: "backlog", children: "Backlog" }, "backlog"),
+          jsx("option", { value: "in_progress", children: "In progress" }, "in_progress"),
+          jsx("option", { value: "in_review", children: "In review" }, "in_review"),
+          jsx("option", { value: "blocked", children: "Blocked" }, "blocked"),
+          jsx("option", { value: "done", children: "Done" }, "done")
+        ] }),
+        recallNotice ? jsx("p", { className: "dockyard-inline-error", role: "alert", "data-recall-notice": true, children: recallNotice }) : null,
+        error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: error }) : null,
+        jsxs("div", { className: "dockyard-form-actions", children: [
+          jsx(Button, { action: "save-view", variant: "primary", disabled: saving || deleting || !name.trim(), onClick: save, children: saving ? "Saving..." : selectedView ? "Save view" : "Create view" }),
+          selectedView ? jsx(Button, { action: "delete-view", disabled: saving || deleting, onClick: () => setDeleteConfirm(true), children: deleting ? "Deleting..." : "Delete view" }) : null,
+          selectedView ? jsx(Button, { onClick: () => {
+            setSelectedView(null);
+            setName("");
+            setLayout("board");
+            setStatusFilter("in_progress");
+            setError(null);
+            setRecallNotice(null);
+          }, children: "Clear" }) : null
+        ] })
+      ] })
+    ] }),
+    overwriteConfirm ? jsx(ConfirmDialog, {
+      confirmKey: "overwrite-view",
+      title: `Overwrite saved view ${name.trim()}?`,
+      description: "An existing saved view with this name will be replaced by the current layout and filters.",
+      confirmLabel: "Overwrite view",
+      busy: saving,
+      onCancel: () => setOverwriteConfirm(false),
+      onConfirm: async () => {
+        setOverwriteConfirm(false);
+        await persist(name.trim());
+      }
+    }) : null,
+    deleteConfirm ? jsx(ConfirmDialog, {
+      confirmKey: "delete-view",
+      title: `Delete saved view ${selectedView}?`,
+      description: "This removes the stored display preference for this project. Canonical work is not affected.",
+      confirmLabel: "Delete view",
+      busy: deleting,
+      onCancel: () => setDeleteConfirm(false),
+      onConfirm: async () => {
+        setDeleteConfirm(false);
+        await remove();
+      }
+    }) : null
+  ] });
+}
+
+// hermes_dockyard_plugin/desktop/src/kanban/table.js
+var SAVED_VIEW_COLUMNS = Object.freeze([
+  { key: "ref", heading: "Ref", cell: (item) => item.ref },
+  { key: "title", heading: "Title", cell: (item) => item.title },
+  { key: "type", heading: "Type", cell: (item) => item.type || "task" },
+  { key: "status", heading: "Status", cell: (item) => item.status || "unknown" },
+  { key: "assignee", heading: "Assignee", cell: (item) => item.assignee || "Unassigned" }
+]);
+function WorkTable({ columns, items, groups, className, emptyText }) {
+  const live = (list) => (list ?? []).filter((item) => item.status !== "archived");
+  const rowsOf = (list) => live(list).map((item) => jsxs("tr", { "data-work-row": item.ref, children: columns.map((column) => jsx("td", { children: column.cell(item) }, column.key)) }, item.ref));
+  const total = groups ? groups.reduce((sum, group) => sum + live(group.items).length, 0) : (items ?? []).length;
+  if (total === 0) return jsx("p", { className: "dockyard-meta", "data-work-table-empty": true, children: emptyText ?? "No work items match this saved view." });
+  return jsxs("table", { className: ["dockyard-backlog-table", className].filter(Boolean).join(" "), "data-work-table": true, children: [
+    jsx("thead", { children: jsx("tr", { children: columns.map((column) => jsx("th", { scope: "col", children: column.heading }, column.key)) }) }),
+    jsx("tbody", { children: groups ? groups.map((group) => jsxs(Fragment, { children: [
+      jsx("tr", { className: "dy-kb-stage-row", "data-work-group": group.key, children: jsx("th", { scope: "colgroup", colSpan: columns.length, children: `${group.label} (${live(group.items).length})` }) }),
+      ...rowsOf(group.items)
+    ] }, group.key)) : rowsOf(items) })
+  ] });
+}
+
+// hermes_dockyard_plugin/desktop/src/kanban/model.js
+var DONE_STATUSES = Object.freeze(["done", "complete", "completed"]);
+var isDone = (status) => DONE_STATUSES.includes(status);
+var STAGES = Object.freeze([
+  { key: "backlog", label: "Backlog", statuses: ["backlog"] },
+  { key: "active", label: "In progress", statuses: ["in_progress", "executing", "active"] },
+  { key: "review", label: "Review", statuses: ["in_review", "review"] },
+  { key: "blocked", label: "Blocked", statuses: ["blocked"] },
+  { key: "done", label: "Done", statuses: DONE_STATUSES },
+  { key: "other", label: "Other states", statuses: null }
+]);
+function stageKeyOf(item) {
+  if (!item || item.status === "archived") return null;
+  const stage = STAGES.find((candidate) => candidate.statuses?.includes(item.status));
+  return stage ? stage.key : "other";
+}
+function groupByStage(items) {
+  const groups = Object.fromEntries(STAGES.map((stage) => [stage.key, []]));
+  for (const item of items ?? []) {
+    const key = stageKeyOf(item);
+    if (key) groups[key].push(item);
+  }
+  return groups;
+}
+var dropStatusOf = (stageKey) => STAGES.find((stage) => stage.key === stageKey)?.statuses?.[0] ?? null;
+var typeLabel = (type) => {
+  const value = String(type || "task");
+  return value.charAt(0).toUpperCase() + value.slice(1);
+};
+function initialsOf(name) {
+  const words2 = String(name ?? "").trim().split(/[\s._-]+/).filter(Boolean);
+  if (words2.length === 0) return "";
+  const first = words2[0][0];
+  const last = words2.length > 1 ? words2[words2.length - 1][0] : "";
+  return (first + last).toUpperCase();
+}
+function isOverdue(item, today) {
+  const due = String(item?.due ?? "").slice(0, 10);
+  if (!due || !today || isDone(item?.status)) return false;
+  return due < today;
+}
+var CHIP_GROUPS = Object.freeze({ blocked_by: "links", blocks: "links", initiative: "planning", milestone: "planning", objective: "planning" });
+var TAG_KEYS = Object.freeze(["links", "planning", "due", "labels"]);
+var TAG_LABELS = Object.freeze({ links: "Links", planning: "Planning", due: "Due", labels: "Labels" });
+var defaultTags = () => ({ links: true, planning: true, due: true, labels: true });
+function linkChip(kind, card) {
+  const word = kind === "blocked_by" ? "Blocked by" : "Blocks";
+  const done = isDone(card.status);
+  const status = String(card.status || "unknown").replaceAll("_", " ");
+  return {
+    key: `${kind}:${card.ref}`,
+    kind,
+    group: "links",
+    ref: card.ref,
+    // The type word is the linked item's own type. Done is written, not just coloured.
+    text: `${word} \xB7 ${typeLabel(card.type)} \xB7 ${card.ref} ${card.title || ""}`.trim() + (done ? " \xB7 Done" : ""),
+    title: `${card.ref} \u2014 ${card.title || "Untitled"} \xB7 ${typeLabel(card.type)} \xB7 ${status}`,
+    done,
+    target: { kind: "item", ref: card.ref }
+  };
+}
+function objectivesOfInitiative(roadmapProject, initiativeRef) {
+  const initiative = (roadmapProject?.initiatives ?? []).find((candidate) => candidate.ref === initiativeRef);
+  return initiative ? { initiative, objectives: initiative.objectives ?? [] } : { initiative: null, objectives: [] };
+}
+function chipsFor(item, data = {}) {
+  if (!item) return [];
+  const chips = [];
+  const entry = data.deps?.[item.ref];
+  for (const card of entry?.blocked_by ?? []) chips.push(linkChip("blocked_by", card));
+  for (const card of entry?.blocks ?? []) chips.push(linkChip("blocks", card));
+  if (item.initiative_ref) {
+    const initiative = (data.initiatives ?? []).find((candidate) => candidate.ref === item.initiative_ref);
+    chips.push({
+      key: `initiative:${item.initiative_ref}`,
+      kind: "initiative",
+      group: "planning",
+      ref: item.initiative_ref,
+      text: `Initiative \xB7 ${item.initiative_ref}${initiative?.title ? ` ${initiative.title}` : ""}`,
+      title: `${item.initiative_ref}${initiative?.title ? ` \u2014 ${initiative.title}` : ""}`,
+      target: { kind: "view", view: "initiative" }
+    });
+  }
+  for (const milestone of data.milestones ?? []) {
+    if (milestone.archived_at) continue;
+    if (!(milestone.item_refs ?? []).includes(item.ref)) continue;
+    chips.push({
+      key: `milestone:${milestone.id ?? milestone.name}`,
+      kind: "milestone",
+      group: "planning",
+      ref: null,
+      text: `Milestone \xB7 ${milestone.name}`,
+      title: `${milestone.name}${milestone.due ? ` \xB7 due ${milestone.due}` : ""}`,
+      target: { kind: "view", view: "milestones" }
+    });
+  }
+  if (item.initiative_ref) {
+    const { initiative, objectives } = objectivesOfInitiative(data.roadmapProject, item.initiative_ref);
+    for (const objective of objectives) {
+      const via = initiative?.title || item.initiative_ref;
+      const relationship = objective.relationship ? ` \xB7 ${objective.relationship}` : "";
+      chips.push({
+        key: `objective:${objective.id}:${item.initiative_ref}`,
+        kind: "objective",
+        group: "planning",
+        ref: null,
+        text: `Objective \xB7 ${objective.name} \xB7 via ${via}${relationship}`,
+        title: `${objective.name} \u2014 through initiative ${via}`,
+        target: { kind: "view", view: "objectives" }
+      });
+    }
+  }
+  return chips;
+}
+var visibleChips = (chips, tags) => chips.filter((chip2) => tags?.[CHIP_GROUPS[chip2.kind]] !== false);
+var CHIP_LIMIT = 3;
+function splitChips(chips, expanded) {
+  if (expanded || chips.length <= CHIP_LIMIT) return { shown: chips, hidden: 0 };
+  return { shown: chips.slice(0, CHIP_LIMIT), hidden: chips.length - CHIP_LIMIT };
+}
+var emptyFilters = () => ({ query: "", assignee: "", type: "", label: "" });
+var filtersActive = (filters) => Boolean(filters.query.trim() || filters.assignee || filters.type || filters.label);
+function filterOptions(items) {
+  const live = (items ?? []).filter((item) => item.status !== "archived");
+  const uniq = (values) => [...new Set(values.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
+  return {
+    assignees: uniq(live.map((item) => item.assignee)),
+    types: uniq(live.map((item) => item.type || "task")),
+    labels: uniq(live.flatMap((item) => item.labels ?? []))
+  };
+}
+function applyFilters(items, filters, chipsByRef = {}) {
+  const query = filters.query.trim().toLowerCase();
+  return (items ?? []).filter((item) => {
+    if (filters.assignee && (item.assignee || "") !== filters.assignee) return false;
+    if (filters.type && (item.type || "task") !== filters.type) return false;
+    if (filters.label && !(item.labels ?? []).includes(filters.label)) return false;
+    if (!query) return true;
+    if (String(item.ref).toLowerCase().includes(query) || String(item.title ?? "").toLowerCase().includes(query)) return true;
+    return (chipsByRef[item.ref] ?? []).some((chip2) => chip2.ref && String(chip2.ref).toLowerCase().includes(query));
+  });
+}
+
+// hermes_dockyard_plugin/desktop/src/kanban/board.js
+var SUB_TABS = [["board", "Board"], ["list", "List"], ["milestones", "Milestones"]];
+var todayIso = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+function Avatar({ name }) {
+  const initials2 = initialsOf(name);
+  return jsxs("span", { className: "dy-kb-who", children: [
+    jsx("span", { className: initials2 ? "dy-kb-avatar" : "dy-kb-avatar empty", "aria-hidden": true, children: initials2 }),
+    jsx("span", { children: name || "Unassigned" })
+  ] });
+}
+function Chip({ chip: chip2, onGo }) {
+  const common = { className: "dy-kb-chip", "data-kind": chip2.kind, "data-chip": chip2.key, title: chip2.title, "data-done": chip2.done ? "true" : void 0 };
+  return chip2.target ? jsx("button", { type: "button", ...common, onClick: () => onGo(chip2), children: jsx("span", { children: chip2.text }) }) : jsx("span", { ...common, children: jsx("span", { children: chip2.text }) });
+}
+function Chips({ item, chips, tags, expanded, onToggle, onGo, today }) {
+  const { shown, hidden } = splitChips(visibleChips(chips, tags), expanded);
+  const labels = tags.labels ? item.labels ?? [] : [];
+  const showDue = tags.due && item.due;
+  if (shown.length === 0 && hidden === 0 && labels.length === 0 && !showDue) return null;
+  const overdue = isOverdue(item, today);
+  return jsxs("div", { className: "dy-kb-chips", "data-card-chips": item.ref, children: [
+    ...shown.map((chip2) => jsx(Chip, { chip: chip2, onGo }, chip2.key)),
+    hidden > 0 || expanded && visibleChips(chips, tags).length > 3 ? jsx("button", {
+      type: "button",
+      className: "dy-kb-chip dy-kb-more",
+      "data-chips-toggle": item.ref,
+      "aria-expanded": Boolean(expanded),
+      "aria-label": expanded ? "Show fewer references" : `Show ${hidden} more ${plural(hidden, "reference")}`,
+      onClick: () => onToggle(item.ref),
+      children: jsx("span", { children: expanded ? "Show less" : `+${hidden}` })
+    }) : null,
+    showDue ? jsx("span", { className: "dy-kb-chip", "data-chip-due": item.ref, "data-overdue": overdue ? "true" : void 0, children: jsx("span", { children: `Due ${String(item.due).slice(0, 10)}${overdue ? " \xB7 Overdue" : ""}` }) }) : null,
+    ...labels.map((label) => jsx("span", { className: "dy-kb-chip", "data-chip-label": label, children: jsx("span", { children: label }) }, `label:${label}`))
+  ] });
+}
+function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onNavigate, appliedView, setAppliedView }) {
+  const [tab, setTab] = useState("board");
+  const [filters, setFilters] = useState(emptyFilters());
+  const [tags, setTags] = useState(defaultTags());
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState({});
+  const [expandedChips, setExpandedChips] = useState({});
+  const [draggedRef, setDraggedRef] = useState(null);
+  const [moving, setMoving] = useState(false);
+  const [deps, setDeps] = useState({ status: "loading", data: null });
+  const [roadmap, setRoadmap] = useState({ status: "loading", data: null });
+  const moveLock = useRef(false);
+  const boardRef = useRef(null);
+  const focusAfter = useRef(null);
+  const tagsRef = useRef(null);
+  const encoded = encodeURIComponent(project.id);
+  const today = todayIso();
+  useEffect(() => {
+    let live = true;
+    api(`/projects/${encoded}/work-dependencies`).then((result) => {
+      if (live) setDeps({ status: "ok", data: result?.dependencies ?? {} });
+    }).catch(() => {
+      if (live) setDeps({ status: "error", data: null });
+    });
+    return () => {
+      live = false;
+    };
+  }, [project.id, view.workItems]);
+  useEffect(() => {
+    let live = true;
+    api(`/roadmap?project_id=${encoded}`).then((result) => {
+      if (live) setRoadmap({ status: "ok", data: (result?.projects ?? [])[0] ?? null });
+    }).catch(() => {
+      if (live) setRoadmap({ status: "error", data: null });
+    });
+    return () => {
+      live = false;
+    };
+  }, [project.id, view.initiatives]);
+  useEffect(() => {
+    if (!tagsOpen) return void 0;
+    const onKey = (event) => {
+      if (event.key === "Escape") {
+        setTagsOpen(false);
+        tagsRef.current?.querySelector("[data-kanban-tags]")?.focus();
+      }
+    };
+    const onDown = (event) => {
+      if (tagsRef.current && !tagsRef.current.contains(event.target)) setTagsOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [tagsOpen]);
+  useEffect(() => {
+    const target = focusAfter.current;
+    if (!target) return;
+    focusAfter.current = null;
+    boardRef.current?.querySelector(`[data-board-${target.to}="${target.key}"]`)?.focus();
+  }, [collapsed]);
+  const allItems = view.workItems ?? [];
+  const baseItems = appliedView ? appliedView.items ?? [] : allItems;
+  const chipData = { deps: deps.data ?? {}, initiatives: view.initiatives ?? [], milestones: view.milestones ?? [], roadmapProject: roadmap.data };
+  const chipsByRef = Object.fromEntries(baseItems.map((item) => [item.ref, chipsFor(item, chipData)]));
+  const items = applyFilters(baseItems, filters, chipsByRef);
+  const options = filterOptions(baseItems);
+  const layout = appliedView?.layout ?? "board";
+  const liveCount = items.filter((item) => item.status !== "archived").length;
+  const transitionStatus = async (ref, status) => {
+    if (!project || !ref || !status || moveLock.current || !allItems.some((item) => item.ref === ref)) return;
+    moveLock.current = true;
+    setMoving(true);
+    setDraggedRef(null);
+    setWorkNotice(null);
+    try {
+      await api(`/projects/${encoded}/work-items/${encodeURIComponent(ref)}/transition`, { method: "POST", body: { status } });
+      const readback = await api(`/projects/${encoded}/work-items`);
+      if (!(readback.work_items ?? []).some((item) => item.ref === ref && item.status === status)) throw new Error("Canonical readback did not confirm the requested status");
+      if (appliedView) {
+        const result = await api(`/projects/${encoded}/views/${encodeURIComponent(appliedView.name)}/items`);
+        setAppliedView((current) => current?.name === appliedView.name ? { ...current, items: result.items ?? [] } : current);
+      }
+      onRefresh?.();
+      emitToast("success", `Work item moved to ${status.replaceAll("_", " ")}.`);
+    } catch (failure) {
+      setWorkNotice(`Could not complete move or refresh: ${String(failure?.message ?? failure)}. Refresh to confirm the canonical state before retrying.`);
+      onRefresh?.();
+    } finally {
+      moveLock.current = false;
+      setMoving(false);
+    }
+  };
+  const toggleColumn = (key) => {
+    const willCollapse = !collapsed[key];
+    focusAfter.current = { key, to: willCollapse ? "strip" : "collapse" };
+    setCollapsed((current) => ({ ...current, [key]: willCollapse }));
+  };
+  const toggleChips = (ref) => setExpandedChips((current) => ({ ...current, [ref]: !current[ref] }));
+  const openRef = (ref) => {
+    const target = allItems.find((item) => item.ref === ref);
+    if (target) onOpenItem(target);
+    else setWorkNotice(`Work item ${ref} is not in this project's board data.`);
+  };
+  const go = (chip2) => {
+    if (chip2.target.kind === "item") openRef(chip2.target.ref);
+    else if (chip2.target.view === "milestones") setTab("milestones");
+    else onNavigate(chip2.target.view);
+  };
+  const clearFilters = () => setFilters(emptyFilters());
+  const moveSelect = (item) => jsxs("select", { "aria-label": `Move ${item.ref}`, disabled: moving, value: "", onChange: (event) => transitionStatus(item.ref, event.target.value), children: [
+    jsx("option", { value: "", children: "Move to\u2026" }),
+    ...STAGES.filter((stage) => stage.statuses).map((stage) => jsx("option", { value: stage.statuses[0], children: stage.label }, stage.key))
+  ] });
+  const card = (item) => jsxs("article", {
+    className: "dockyard-work-card",
+    draggable: !moving,
+    "data-work-card": item.ref,
+    onDragStart: (event) => {
+      event.dataTransfer.setData("text/plain", item.ref);
+      setDraggedRef({ ref: item.ref, project: project.id });
+    },
+    onDragEnd: () => setDraggedRef(null),
+    children: [
+      // The first button on a card opens its details (relied on by existing tests).
+      jsxs("div", { className: "dy-kb-actions", children: [
+        jsx("button", { type: "button", className: "dockyard-button small", onClick: () => onOpenItem(item), children: "Open details" }),
+        moveSelect(item)
+      ] }),
+      jsxs("div", { className: "dy-kb-keyrow", children: [
+        jsx("span", { className: "dy-kb-key", children: item.ref }),
+        jsx("span", { className: "dockyard-work-type", children: item.type || "task" })
+      ] }),
+      jsx("h4", { children: item.title }),
+      jsx(Avatar, { name: item.assignee }),
+      jsx(Chips, { item, chips: chipsByRef[item.ref] ?? [], tags, expanded: Boolean(expandedChips[item.ref]), onToggle: toggleChips, onGo: go, today })
+    ]
+  }, item.ref);
+  const grouped = groupByStage(items);
+  const column = (stage) => {
+    const stageItems = grouped[stage.key];
+    const isCollapsed = Boolean(collapsed[stage.key]);
+    const droppable = Boolean(stage.statuses) && draggedRef?.project === project.id && !moving;
+    return jsxs("section", {
+      className: "dockyard-board-column",
+      "data-board-column": stage.key,
+      "data-collapsed": isCollapsed ? "true" : "false",
+      "data-drop-ready": isCollapsed && droppable ? "true" : void 0,
+      onDragOver: (event) => {
+        if (droppable) event.preventDefault();
+      },
+      onDrop: (event) => {
+        event.preventDefault();
+        const status = dropStatusOf(stage.key);
+        if (draggedRef?.project === project.id && status) transitionStatus(draggedRef.ref, status);
+        setDraggedRef(null);
+      },
+      children: isCollapsed ? [jsxs("button", {
+        type: "button",
+        className: "dy-kb-strip",
+        "data-board-strip": stage.key,
+        "aria-expanded": false,
+        "aria-label": `Expand ${stage.label}, ${number(stageItems.length)} ${plural(stageItems.length, "item")}`,
+        onClick: () => toggleColumn(stage.key),
+        children: [
+          jsx("span", { className: "dy-kb-strip-count", children: number(stageItems.length) }),
+          jsx("span", { className: "dy-kb-strip-label", children: stage.label })
+        ]
+      }, "strip")] : [
+        jsxs("header", { children: [
+          jsx("button", { type: "button", className: "dy-kb-collapse", "data-board-collapse": stage.key, "aria-expanded": true, "aria-label": `Collapse ${stage.label}`, onClick: () => toggleColumn(stage.key), children: jsx(Icon, { name: "chevrons-left" }) }),
+          jsx("h3", { children: stage.label }),
+          jsx("span", { children: number(stageItems.length) })
+        ] }, "header"),
+        jsx("div", { className: "dockyard-board-cards", children: stageItems.length > 0 ? stageItems.map(card) : jsx("p", { className: "dockyard-meta", children: "No work in this stage." }) }, "cards")
+      ]
+    }, stage.key);
+  };
+  const toolbar = jsxs("div", { className: "dy-kb-toolbar", "data-kanban-toolbar": true, children: [
+    jsxs("label", { className: "dy-kb-control dy-kb-search", children: [
+      jsx(Icon, { name: "search" }),
+      jsx("input", { type: "search", "aria-label": "Search work items", placeholder: "Search ref or title", value: filters.query, onChange: (event) => setFilters({ ...filters, query: event.target.value }) })
+    ] }),
+    ...[["assignee", "Filter by assignee", "All assignees", options.assignees], ["type", "Filter by type", "All types", options.types], ["label", "Filter by label", "All labels", options.labels]].map(([key, label, all, values]) => jsx("label", { className: "dy-kb-control", children: jsxs("select", { "aria-label": label, "data-kanban-filter": key, value: filters[key], onChange: (event) => setFilters({ ...filters, [key]: event.target.value }), children: [
+      jsx("option", { value: "", children: all }),
+      ...values.map((value) => jsx("option", { value, children: key === "type" ? typeLabel(value) : value }, value))
+    ] }) }, key)),
+    jsxs("div", { className: "dy-kb-tags", ref: tagsRef, children: [
+      jsx("button", { type: "button", className: "dy-kb-control dy-kb-button", "data-kanban-tags": true, "aria-expanded": tagsOpen, "aria-haspopup": "true", onClick: () => setTagsOpen(!tagsOpen), children: "Tags" }),
+      tagsOpen ? jsx("div", { className: "dy-kb-tags-panel", role: "group", "aria-label": "Show on cards", children: TAG_KEYS.map((key) => jsxs("label", { children: [
+        jsx("input", { type: "checkbox", "data-kanban-tag": key, checked: tags[key], onChange: () => setTags({ ...tags, [key]: !tags[key] }) }),
+        jsx("span", { children: TAG_LABELS[key] })
+      ] }, key)) }) : null
+    ] }),
+    jsx("button", { type: "button", className: "dy-kb-control dy-kb-button", "data-kanban-clear": true, disabled: !filtersActive(filters), onClick: clearFilters, children: "Clear filters" }),
+    jsx("span", { className: "dy-kb-count", "data-kanban-count": true, role: "status", children: `${number(liveCount)} ${plural(liveCount, "item")}` })
+  ] });
+  const notes = [
+    deps.status === "error" ? jsx("p", { className: "dy-kb-note", "data-kanban-note": "dependencies", role: "status", children: "Dependencies unavailable. Blocked by and Blocks are not shown." }, "deps") : null,
+    roadmap.status === "error" ? jsx("p", { className: "dy-kb-note", "data-kanban-note": "objectives", role: "status", children: "Objectives unavailable. Objective chips are not shown." }, "roadmap") : null
+  ];
+  const noMatch = baseItems.length > 0 && liveCount === 0 && filtersActive(filters);
+  const empty = noMatch ? jsxs("p", { className: "dy-kb-empty", "data-kanban-empty": "filters", children: ["No work matches these filters. ", jsx("button", { type: "button", className: "dockyard-button small", onClick: clearFilters, children: "Clear filters" })] }) : baseItems.length === 0 && !appliedView ? jsx("p", { className: "dy-kb-empty", "data-kanban-empty": "none", children: "This project has no work items yet. Add work from the Backlog tab." }) : null;
+  const board = jsxs("div", { className: "dockyard-board", ref: boardRef, tabIndex: 0, role: "region", "aria-label": "Kanban board", "data-kanban-board": true, children: STAGES.map(column) });
+  const stageLabel = Object.fromEntries(STAGES.map((stage) => [stage.key, stage.label]));
+  const chipCell = (item, kinds) => jsx("div", { className: "dy-kb-cell-chips", children: (chipsByRef[item.ref] ?? []).filter((chip2) => kinds.includes(chip2.kind)).map((chip2) => jsx(Chip, { chip: { ...chip2, text: chip2.text.replace(/^[^·]*· /, "") }, onGo: go }, chip2.key)) });
+  const listColumns = [
+    { key: "ref", heading: "Ref", cell: (item) => item.ref },
+    { key: "title", heading: "Title", cell: (item) => item.title },
+    { key: "type", heading: "Type", cell: (item) => item.type || "task" },
+    { key: "status", heading: "State", cell: (item) => readableLabel(item.status || "unknown", "unknown") },
+    { key: "assignee", heading: "Assignee", cell: (item) => item.assignee || "Unassigned" },
+    { key: "blocked_by", heading: "Blocked by", cell: (item) => chipCell(item, ["blocked_by"]) },
+    { key: "blocks", heading: "Blocks", cell: (item) => chipCell(item, ["blocks"]) },
+    { key: "initiative", heading: "Initiative", cell: (item) => chipCell(item, ["initiative"]) },
+    { key: "milestone", heading: "Milestone", cell: (item) => chipCell(item, ["milestone"]) },
+    { key: "objective", heading: "Objective", cell: (item) => chipCell(item, ["objective"]) },
+    { key: "due", heading: "Due", cell: (item) => item.due ? `${String(item.due).slice(0, 10)}${isOverdue(item, today) ? " \xB7 Overdue" : ""}` : "" },
+    { key: "move", heading: "Move", cell: (item) => moveSelect(item) }
+  ];
+  const list = jsx("div", { className: "dy-kb-list", children: jsx(WorkTable, {
+    columns: listColumns,
+    className: "dy-kb-table",
+    groups: STAGES.map((stage) => ({ key: stage.key, label: stageLabel[stage.key], items: grouped[stage.key] })).filter((group) => group.items.length > 0),
+    emptyText: "No work items to list."
+  }) });
+  const appliedNote = appliedView ? jsxs("div", { className: "dockyard-view-only-note", "data-applied-view-note": appliedView.name, children: [
+    jsx(Icon, { name: "eye" }),
+    jsx("span", { children: `Showing saved view "${appliedView.name}" (${readableLabel(layout, "Board")} layout${layout === "timeline" ? " \u2014 timeline is not available on Desktop, showing board" : ""}). ${number(baseItems.length)} matching ${plural(baseItems.length, "item")}.` }),
+    jsx("button", { type: "button", className: "dockyard-button small", "data-action": "clear-applied-view", onClick: () => setAppliedView(null), children: "Clear view" })
+  ] }) : jsxs("div", { className: "dockyard-view-only-note", "data-kanban-help": true, children: [
+    jsx(Icon, { name: "eye" }),
+    jsx("span", { children: "Drag an item to move it, or use its Move menu. The canonical work system validates every transition." })
+  ] });
+  const savedTable = jsxs("section", { className: "dockyard-feature-card", children: [
+    jsx("h2", { children: "Work items" }),
+    jsx(WorkTable, { columns: SAVED_VIEW_COLUMNS, items: baseItems })
+  ] });
+  const savedViews = jsx(SavedViewsSection, {
+    project,
+    views: view.views ?? [],
+    onApply: setAppliedView,
+    onClear: () => setAppliedView(null),
+    appliedName: appliedView?.name ?? null,
+    onRefresh
+  }, `${project.id}:saved-views`);
+  let body;
+  if (appliedView && layout === "table") body = [savedTable];
+  else if (tab === "milestones" && !appliedView) body = [jsx(PlanningPanel, { project, milestones: view.milestones ?? [], workItems: allItems, onRefresh })];
+  else body = [toolbar, ...notes, empty, tab === "list" && !appliedView ? list : board];
+  return jsxs("div", { className: "dockyard-board-wrap", "data-kanban-screen": true, "data-applied-view": appliedView?.name ?? void 0, children: [
+    appliedView ? null : jsx("nav", { className: "dy-kb-subtabs", "aria-label": "Kanban views", children: SUB_TABS.map(([key, label]) => jsx("button", { type: "button", className: "dy-kb-subtab", "data-kanban-tab": key, "aria-pressed": tab === key, onClick: () => setTab(key), children: label }, key)) }),
+    appliedNote,
+    ...body,
+    tab === "milestones" && !appliedView ? null : savedViews
+  ] });
+}
+
 // hermes_dockyard_plugin/desktop/src/project/dashboard.js
 function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap }) {
   const [projectView, setProjectView] = useState(initialView || "overview");
@@ -15112,9 +15674,6 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   const [selectedWorkItem, setSelectedWorkItem] = useState(null);
   const [workNotice, setWorkNotice] = useState(null);
   const [appliedView, setAppliedView] = useState(null);
-  const [draggedRef, setDraggedRef] = useState(null);
-  const [moving, setMoving] = useState(false);
-  const moveLock = useRef(false);
   const project = view.project;
   useEffect(() => {
     if (initialView) setProjectView(initialView);
@@ -15147,118 +15706,19 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
     ["reports", "Reports"],
     ["settings", "Settings"]
   ];
-  const columns = [
-    ["backlog", "Backlog", ["backlog"]],
-    ["active", "In progress", ["in_progress", "executing", "active"]],
-    ["review", "Review", ["in_review", "review"]],
-    ["blocked", "Blocked", ["blocked"]],
-    ["done", "Done", ["done", "complete", "completed"]],
-    ["other", "Other states", null]
-  ];
   const projectOptions = view.projects ?? [];
-  const transitionStatus = async (ref, status) => {
-    if (!project || !ref || !status || moveLock.current || !(view.workItems ?? []).some((item) => item.ref === ref)) return;
-    moveLock.current = true;
-    setMoving(true);
-    setDraggedRef(null);
-    setWorkNotice(null);
-    try {
-      await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}/transition`, {
-        method: "POST",
-        body: { status }
-      });
-      const readback = await api(`/projects/${encodeURIComponent(project.id)}/work-items`);
-      if (!(readback.work_items ?? []).some((item) => item.ref === ref && item.status === status)) throw new Error("Canonical readback did not confirm the requested status");
-      if (appliedView) {
-        const result = await api(`/projects/${encodeURIComponent(project.id)}/views/${encodeURIComponent(appliedView.name)}/items`);
-        setAppliedView((current) => current?.name === appliedView.name ? { ...current, items: result.items ?? [] } : current);
-      }
-      onRefresh?.();
-      emitToast("success", `Work item moved to ${status.replaceAll("_", " ")}.`);
-    } catch (failure) {
-      setWorkNotice(`Could not complete move or refresh: ${String(failure?.message ?? failure)}. Refresh to confirm the canonical state before retrying.`);
-      onRefresh?.();
-    } finally {
-      moveLock.current = false;
-      setMoving(false);
-    }
-  };
   let panel;
   if (projectView === "board") {
-    const boardItems = appliedView ? appliedView.items ?? [] : view.workItems ?? [];
-    const layout = appliedView?.layout ?? "board";
-    panel = jsxs("div", { className: "dockyard-board-wrap", "data-applied-view": appliedView?.name ?? void 0, children: [
-      appliedView ? jsxs("div", { className: "dockyard-view-only-note", "data-applied-view-note": appliedView.name, children: [
-        jsx(Icon, { name: "eye" }),
-        jsx("span", { children: `Showing saved view "${appliedView.name}" (${readableLabel(layout, "Board")} layout${layout === "timeline" ? " \u2014 timeline is not available on Desktop, showing board" : ""}). ${number(boardItems.length)} matching ${plural(boardItems.length, "item")}.` }),
-        jsx("button", { type: "button", className: "dockyard-button small", "data-action": "clear-applied-view", onClick: () => setAppliedView(null), children: "Clear view" })
-      ] }) : jsxs("div", { className: "dockyard-view-only-note", "data-kanban-help": true, children: [
-        jsx(Icon, { name: "eye" }),
-        jsx("span", { children: "Drag an item to move it, or use its Move menu. The canonical work system validates every transition." })
-      ] }),
-      layout === "table" ? jsxs("section", { className: "dockyard-feature-card", children: [
-        jsx("h2", { children: "Work items" }),
-        boardItems.length === 0 ? jsx("p", { className: "dockyard-meta", "data-work-table-empty": true, children: "No work items match this saved view." }) : jsxs("table", { className: "dockyard-backlog-table", "data-work-table": true, children: [
-          jsx("thead", { children: jsxs("tr", { children: ["Ref", "Title", "Type", "Status", "Assignee"].map((heading) => jsx("th", { children: heading }, heading)) }) }),
-          jsx("tbody", { children: boardItems.filter((item) => item.status !== "archived").map((item) => jsxs("tr", { "data-work-row": item.ref, children: [
-            jsx("td", { children: item.ref }),
-            jsx("td", { children: item.title }),
-            jsx("td", { children: item.type || "task" }),
-            jsx("td", { children: item.status || "unknown" }),
-            jsx("td", { children: item.assignee || "Unassigned" })
-          ] }, item.ref)) })
-        ] })
-      ] }) : jsx("div", {
-        className: "dockyard-board",
-        children: columns.map(([key, label, statuses]) => {
-          const items = statuses === null ? boardItems.filter((item) => item.status !== "archived" && !["backlog", "in_progress", "executing", "active", "in_review", "review", "blocked", "done", "complete", "completed"].includes(item.status)) : boardItems.filter((item) => item.status !== "archived" && statuses.includes(item.status));
-          return jsxs("section", {
-            className: "dockyard-board-column",
-            "data-board-column": key,
-            onDragOver: (event) => {
-              if (draggedRef?.project === project.id && !moving && statuses) event.preventDefault();
-            },
-            onDrop: (event) => {
-              event.preventDefault();
-              if (draggedRef?.project === project.id && statuses?.[0]) transitionStatus(draggedRef.ref, statuses[0]);
-              setDraggedRef(null);
-            },
-            children: [
-              jsxs("header", { children: [jsx("h3", { children: label }), jsx("span", { children: number(items.length) })] }),
-              jsx("div", {
-                className: "dockyard-board-cards",
-                children: items.length > 0 ? items.map((item) => jsxs("article", {
-                  className: "dockyard-work-card",
-                  draggable: !moving,
-                  "data-work-card": item.ref,
-                  onDragStart: (event) => {
-                    event.dataTransfer.setData("text/plain", item.ref);
-                    setDraggedRef({ ref: item.ref, project: project.id });
-                  },
-                  onDragEnd: () => setDraggedRef(null),
-                  children: [
-                    jsx("button", { type: "button", className: "dockyard-button small", onClick: () => setSelectedWorkItem(item), children: "Open details" }),
-                    jsx("select", { "aria-label": `Move ${item.ref}`, disabled: moving, value: "", onChange: (event) => transitionStatus(item.ref, event.target.value), children: [jsx("option", { value: "", children: "Move to\u2026" }), ...columns.filter(([, , states]) => states).map(([, label2, states]) => jsx("option", { value: states[0], children: label2 }, states[0]))] }),
-                    jsx("span", { className: "dockyard-work-type", children: item.type || "task" }),
-                    jsx("h4", { children: item.title }),
-                    jsxs("footer", { children: [jsx("span", { children: item.ref }), jsx("span", { children: item.assignee || "Unassigned" })] })
-                  ]
-                }, item.ref)) : jsx("p", { className: "dockyard-meta", children: "No work in this stage." })
-              })
-            ]
-          }, key);
-        })
-      }),
-      jsx(PlanningPanel, { project, milestones: view.milestones ?? [], workItems: view.workItems ?? [], onRefresh }),
-      jsx(SavedViewsSection, {
-        project,
-        views: view.views ?? [],
-        onApply: setAppliedView,
-        onClear: () => setAppliedView(null),
-        appliedName: appliedView?.name ?? null,
-        onRefresh
-      }, `${project.id}:saved-views`)
-    ] });
+    panel = jsx(KanbanScreen, {
+      project,
+      view,
+      onRefresh,
+      setWorkNotice,
+      appliedView,
+      setAppliedView,
+      onOpenItem: setSelectedWorkItem,
+      onNavigate: changeView
+    });
   } else if (projectView === "initiative") {
     panel = jsx(InitiativeView, { view, onRefresh });
   } else if (projectView === "objectives") {

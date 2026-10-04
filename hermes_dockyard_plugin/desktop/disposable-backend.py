@@ -62,6 +62,14 @@ _inbox_fixtures_spec = _il.spec_from_file_location(
 _inbox_fixtures = _il.module_from_spec(_inbox_fixtures_spec)
 _inbox_fixtures_spec.loader.exec_module(_inbox_fixtures)  # noqa: E402 (file-path load after env setup)
 _inbox_fixtures.seed_inbox_fixtures(service)
+
+# C2 Kanban fixtures: linked work, an initiative with an objective, a milestone,
+# mixed labels and far-past/far-future due dates. All in atlas-mobile.
+_kanban_fixtures_spec = _il.spec_from_file_location(
+    "_kanban_fixtures", Path(__file__).resolve().parent / "_kanban_fixtures.py")
+_kanban_fixtures = _il.module_from_spec(_kanban_fixtures_spec)
+_kanban_fixtures_spec.loader.exec_module(_kanban_fixtures)  # noqa: E402 (file-path load after env setup)
+_kanban_fixtures.seed_kanban_fixtures(service, adapter, roadmap)
 for _pid in ("legacy-integration",):
     service.disable(_pid, actor="fixture", interface="fixture")
 plugin_api._app = create_app(store, kanban_adapter=adapter,
