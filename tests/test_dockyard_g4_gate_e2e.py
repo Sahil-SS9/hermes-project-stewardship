@@ -23,7 +23,8 @@ from hermes_project_stewardship.persistence.store import Store  # noqa: E402
 def c(tmp_path):
     store = Store(tmp_path / "week.db")
     client = TestClient(
-        create_app(store, kanban_adapter=ReferenceKanbanAdapter(store))
+        create_app(store, auth_token="test-token", auth_principal="test-user", auth_principal_is_human=True, kanban_adapter=ReferenceKanbanAdapter(store)),
+        headers={"Authorization": "Bearer test-token"},
     )
     yield client
     store.close()

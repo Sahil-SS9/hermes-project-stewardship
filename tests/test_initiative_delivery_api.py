@@ -61,7 +61,7 @@ def _proposal(client: TestClient, project: str) -> str:
 
 def test_approval_to_canonical_execution_and_observation_flow(store, enabled):
     adapter = CanonicalBridgeAdapter(store)
-    client = TestClient(create_app(store, kanban_adapter=adapter))
+    client = TestClient(create_app(store, auth_token="test-token", auth_principal="test-user", auth_principal_is_human=True, kanban_adapter=adapter), headers={"Authorization": "Bearer test-token"})
     ref = _proposal(client, enabled)
 
     approved = client.post(
@@ -147,7 +147,7 @@ def test_approval_to_canonical_execution_and_observation_flow(store, enabled):
 
 def test_regression_blocks_canonical_work_and_schedules_one_observation(store, enabled):
     adapter = CanonicalBridgeAdapter(store)
-    client = TestClient(create_app(store, kanban_adapter=adapter))
+    client = TestClient(create_app(store, auth_token="test-token", auth_principal="test-user", auth_principal_is_human=True, kanban_adapter=adapter), headers={"Authorization": "Bearer test-token"})
     ref = _proposal(client, enabled)
     client.post(
         f"/stewardship/v1/initiatives/{ref}/approve",

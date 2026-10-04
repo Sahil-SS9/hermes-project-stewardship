@@ -14,13 +14,19 @@ from hermes_project_stewardship.persistence.canvas_plan_document import PlanDocu
 from hermes_project_stewardship.persistence.canvas_planning import CanvasPlanningService
 from hermes_project_stewardship.persistence.canvas_service import CanvasService
 
-def _api(tmp_path):
+def _api(tmp_path, *, trusted=False):
     from fastapi.testclient import TestClient
     from hermes_project_stewardship.api.server import create_app
     from hermes_project_stewardship.kanban import ReferenceKanbanAdapter
     from hermes_project_stewardship.persistence.store import Store
     store = Store(tmp_path / "b7.db")
-    client = TestClient(create_app(store, kanban_adapter=ReferenceKanbanAdapter(store)))
+    if trusted:
+        # Proposal decisions need a trusted caller (Q2 rule, Sahil 04/10/2026).
+        app = create_app(store, auth_token="test-token", auth_principal="test-user",
+                         auth_principal_is_human=True, kanban_adapter=ReferenceKanbanAdapter(store))
+        client = TestClient(app, headers={"Authorization": "Bearer test-token"})
+    else:
+        client = TestClient(create_app(store, kanban_adapter=ReferenceKanbanAdapter(store)))
     client.post("/stewardship/v1/projects/p7/enable", json={
         "project_id": "p7", "mission": "probe", "lead_profile": "l", "autonomy_level": 2})
     return client
@@ -168,7 +174,7 @@ def test_canvas_get_unknown_project_is_404(tmp_path):
 
 
 def test_proposal_decision_unknown_is_404(tmp_path):
-    client = _api(tmp_path)
+    client = _api(tmp_path, trusted=True)
     response = client.post("/stewardship/v1/canvas/proposals/nope/decision", json={"approve": True})
     assert response.status_code == 404
 
@@ -263,7 +269,7 @@ def test_implementation_document_saves_to_content_tab(store, svc, enabled):
 
 
 def test_backlog_creation_is_explicit_and_uses_canonical_endpoints(tmp_path):
-    client = _api(tmp_path)
+    client = _api(tmp_path, trusted=True)
     B = "/stewardship/v1"
     # seed a complete canvas through the REAL routes
     canvas = client.get(f"{B}/projects/p7/canvas").json()
@@ -307,7 +313,7 @@ def test_saving_the_document_twice_does_not_duplicate_content(store, svc, enable
 def test_backlog_steps_cannot_be_created_twice(tmp_path):
     # Kensei review: "Create backlog items" stayed enabled after confirming,
     # and a second confirm created a second copy of every item.
-    client = _api(tmp_path)
+    client = _api(tmp_path, trusted=True)
     B = "/stewardship/v1"
     canvas = client.get(f"{B}/projects/p7/canvas").json()
     objects = [

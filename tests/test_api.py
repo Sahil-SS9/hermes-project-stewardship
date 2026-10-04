@@ -20,8 +20,8 @@ from hermes_project_stewardship.api.middleware import RateLimitMiddleware  # noq
 @pytest.fixture()
 def env(tmp_path):
     store = Store(tmp_path / "api.db")
-    app = create_app(store, kanban_adapter=ReferenceKanbanAdapter(store))
-    c = TestClient(app)
+    app = create_app(store, auth_token="test-token", auth_principal="test-user", auth_principal_is_human=True, kanban_adapter=ReferenceKanbanAdapter(store))
+    c = TestClient(app, headers={"Authorization": "Bearer test-token"})
     yield c, store
     store.close()
 
