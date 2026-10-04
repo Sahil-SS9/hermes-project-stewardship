@@ -811,6 +811,57 @@ class StewardshipService:
         return project_id
 
     # ------------------------------------------------------------------ #
+    # Display choices for the whole app (dockyard_app_settings, key "ui") #
+    # ------------------------------------------------------------------ #
+    # Sahil 04/10 (demo feedback a): a Dashboard list can be folded, and it
+    # stays the way he left it. Like the last project, the choice lives here,
+    # never in browser storage (26/08 locked rule).
+
+    _UI_KEY = "ui"
+    # The Dashboard sections that can be folded. Unknown names are refused.
+    UI_FOLDABLE_SECTIONS = ("needs-you-now",)
+
+    def ui_settings(self) -> Dict[str, Any]:
+        """The app's display choices: {"collapsed": [section, ...]}."""
+        row = self.store._conn.execute(
+            "SELECT value_json FROM dockyard_app_settings WHERE key=?",
+            (self._UI_KEY,),
+        ).fetchone()
+        stored = self.store._uj(row["value_json"], {}) if row is not None else {}
+        collapsed = stored.get("collapsed") if isinstance(stored, dict) else None
+        if not isinstance(collapsed, list):
+            collapsed = []
+        return {"collapsed": [name for name in self.UI_FOLDABLE_SECTIONS if name in collapsed]}
+
+    def set_ui_settings(self, settings: Any, *, actor: str) -> Dict[str, Any]:
+        """Replace the app's display choices. Audited; an unchanged value is a no-op."""
+        if not isinstance(settings, dict) or set(settings) != {"collapsed"}:
+            raise ServiceError('ui settings must be {"collapsed": [section, ...]}')
+        collapsed = settings["collapsed"]
+        allowed = ", ".join(self.UI_FOLDABLE_SECTIONS)
+        if not isinstance(collapsed, list) or not all(
+                isinstance(name, str) and name in self.UI_FOLDABLE_SECTIONS for name in collapsed):
+            raise ServiceError(f"collapsed must list sections from: {allowed}")
+        value = {"collapsed": [name for name in self.UI_FOLDABLE_SECTIONS if name in collapsed]}
+        if value == self.ui_settings():
+            return value
+        now = iso(self._clock())
+        with self.store.tx() as cx:
+            cx.execute(
+                "INSERT INTO dockyard_app_settings(key, value_json, updated_at, updated_by)"
+                " VALUES(?, ?, ?, ?)"
+                " ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,"
+                " updated_at=excluded.updated_at, updated_by=excluded.updated_by",
+                (self._UI_KEY, self.store._j(value), now, actor),
+            )
+            cx.execute(
+                "INSERT INTO stewardship_audit_log(ts, actor, interface,"
+                " action, subject, detail_json) VALUES(?,?,?,?,?,?)",
+                (now, actor, "service", "ui_settings.updated", "app", self.store._j(value)),
+            )
+        return value
+
+    # ------------------------------------------------------------------ #
     # Goals                                                              #
     # ------------------------------------------------------------------ #
 

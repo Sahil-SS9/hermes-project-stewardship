@@ -20,6 +20,7 @@ import { api } from '../runtime/context.js'
 import { readableLabel } from '../data/loaders.js'
 import { EmptyState } from '../lib/ui.js'
 import { validationSummary } from '../data/loaders.js'
+import { unownedWork } from '../data/loaders.js'
 import { emitToast } from '../runtime/context.js'
 export function DiscoveredProfilePicker({ profiles = [], value = '', onChange, name, label = 'Hermes profile', disabled = false }) {
   const [search, setSearch] = useState('')
@@ -257,6 +258,26 @@ export function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
   useEffect(() => { setSubview('overview') }, [resetView])
   const [decision, setDecision] = useState(null)
   const [detailError, setDetailError] = useState('')
+  // Sahil 04/10: "Needs you now" folds open and closed, and stays the way he
+  // left it. The choice is saved in the backend (/settings/ui), never in the browser.
+  const [collapsed, setCollapsed] = useState(() => view.ui?.collapsed ?? [])
+  useEffect(() => { setCollapsed(view.ui?.collapsed ?? []) }, [view.ui])
+  const isFolded = (section) => collapsed.includes(section)
+  const toggleFold = (section) => {
+    const before = collapsed
+    const next = before.includes(section) ? before.filter((name) => name !== section) : [...before, section]
+    setCollapsed(next)
+    api('/settings/ui', { method: 'PUT', body: { collapsed: next }, quiet: true }).catch(() => {
+      setCollapsed(before)
+      emitToast('danger', 'That change was not saved. Try again.')
+    })
+  }
+  const needsFolded = isFolded('needs-you-now')
+  // Sahil 04/10 (demo feedback b): open work with no owner, per project. No bot picks it up.
+  const unowned = Object.entries(view.projectContext ?? {})
+    .map(([projectId, context]) => [projectId, unownedWork(context.workItems).length])
+    .filter(([, count]) => count > 0)
+  const unownedTotal = unowned.reduce((sum, [, count]) => sum + count, 0)
   const focusItem = selected === false ? null : selected ?? decisions[0] ?? null
   useEffect(() => {
     if (!focusItem?.ref || focusItem.kind !== 'initiative_approval') { setDecision(null); setDetailError(''); return undefined }
@@ -386,17 +407,34 @@ export function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
           ['on_track', 'On track'], ['at_risk', 'At risk'], ['stalled', 'Stalled'], ['idle', 'Idle'], ['unknown', 'Unverified'],
         ].map(([state, label]) => jsxs('span', { children: [jsx('i', { className: `dockyard-health-dot ${state}`, 'aria-hidden': true }), label] }, state)) }),
       ]}),
+      unownedTotal ? jsxs('div', { className: 'dockyard-soft-alert', 'data-unowned-alert': 'fleet', role: 'status', children: [
+        jsx(Icon, { name: 'user' }),
+        jsxs('div', { className: 'dockyard-soft-alert-body', children: [
+          jsx('strong', { children: `${number(unownedTotal)} ${plural(unownedTotal, 'work item')} ${unownedTotal === 1 ? 'has' : 'have'} no owner, so no bot will pick ${unownedTotal === 1 ? 'it' : 'them'} up.` }),
+          jsx('span', { className: 'dockyard-soft-alert-items', children: unowned.map(([projectId, count]) => jsx('button', { type: 'button', className: 'dockyard-soft-alert-item', 'data-unowned-project': projectId,
+            onClick: () => onOpen?.(`s3:unowned/${projectId}`), children: `${projectId} (${number(count)})` }, projectId)) }),
+        ] }),
+      ] }) : null,
       jsxs('div', { className: 'dockyard-command-layout', children: [
         jsxs('div', { className: 'dockyard-command-main', children: [
-          jsxs('section', { className: 'dockyard-command-section', children: [
+          jsxs('section', { className: 'dockyard-command-section', 'data-dashboard-section': 'needs-you-now', 'data-folded': needsFolded ? 'true' : 'false', children: [
             jsxs('div', { className: 'dockyard-section-head', children: [
-              jsxs('div', { children: [jsxs('h2', { children: [jsx(Icon, { name: 'triangle-alert' }), 'Needs you now'] }), jsx('p', { children: 'Decisions and blocked work, ranked by waiting age.' })] }),
+              jsxs('div', { children: [
+                jsx('h2', { children: jsxs('button', { type: 'button', className: 'dockyard-section-fold', 'data-section-fold': 'needs-you-now',
+                  'aria-expanded': !needsFolded, 'aria-controls': 'dy-needs-you-now', onClick: () => toggleFold('needs-you-now'), children: [
+                    jsx(Icon, { name: needsFolded ? 'chevron-right' : 'chevron-down' }),
+                    jsx(Icon, { name: 'triangle-alert' }),
+                    jsx('span', { children: 'Needs you now' }),
+                    jsx('span', { className: 'dockyard-section-count', 'data-section-count': 'needs-you-now', 'aria-hidden': true, children: number(rows.length) }),
+                    jsx('span', { className: 'dockyard-sr-only', children: `, ${number(rows.length)} ${plural(rows.length, 'item')}` }),
+                  ] }) }),
+                needsFolded ? null : jsx('p', { children: 'Decisions and blocked work, ranked by waiting age.' })] }),
               jsxs('div', { className: 'dockyard-command-section-actions', children: [
                 jsx(Button, { small: true, onClick: () => setSubview('issues'), children: 'View all issues' }),
                 jsx(Button, { small: true, onClick: onInbox, children: `View approvals (${number(waiting)})` }),
               ] }),
             ]}),
-            jsxs('div', { className: 'dockyard-command-table-wrap', children: [
+            jsxs('div', { className: 'dockyard-command-table-wrap', id: 'dy-needs-you-now', hidden: needsFolded, children: [
               jsxs('div', { className: 'dockyard-command-row dockyard-command-attention-head', role: 'row', children: [
                 jsx('span', { children: 'Type' }), jsx('span', { children: 'Item' }), jsx('span', { children: 'Project' }), jsx('span', { children: 'Impact' }), jsx('span', { children: 'Waiting' }),
               ]}),

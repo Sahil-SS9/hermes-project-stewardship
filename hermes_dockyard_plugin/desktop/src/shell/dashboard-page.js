@@ -12,6 +12,7 @@ import { loadBacklogData } from '../data/loaders.js'
 import { loadTeamsData } from '../data/loaders.js'
 import { loadOnboardData } from '../data/loaders.js'
 import { loadInboxData } from '../data/loaders.js'
+import { loadAppSettingsData } from '../data/loaders.js'
 import { api } from '../runtime/context.js'
 import { sortProjects } from '../data/loaders.js'
 import { jsx } from '../runtime/react.js'
@@ -27,6 +28,7 @@ import { InitiativeView } from '../views/initiative.js'
 import { InboxView } from '../views/inbox.js'
 import { WorkflowLibraryView } from '../views/workflow-library.js'
 import { NotificationsView } from '../views/notifications.js'
+import { AppSettingsView } from '../views/app-settings.js'
 import { RoadmapView } from '../views/roadmap.js'
 import { jsxs } from '../runtime/react.js'
 import { ConsoleBar } from '../lib/ui.js'
@@ -63,6 +65,9 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   // F-1/F-2: a top tab change is guarded like a project switch, and both
   // prompts can save (when the dirty panel offers a save handle).
   const [pendingTab, setPendingTab] = useState(null)
+  // A one-off filter for the Backlog, set by a deep link (the Dashboard's no-owner alert).
+  const [backlogPreset, setBacklogPreset] = useState(null)
+  useEffect(() => { if (tab !== 'backlog') setBacklogPreset(null) }, [tab])
   const dirtySaver = useRef(null)
   const [navSaving, setNavSaving] = useState(false)
   const markDirty = (projectId) => (dirty, saver) => { setDirtyProject(dirty ? projectId : null); dirtySaver.current = dirty ? (saver ?? null) : null }
@@ -128,7 +133,9 @@ export function DashboardPage({ inboxCss = '' } = {}) {
       : tab === 'roadmap'
         // RoadmapView loads its own scope; the shell only gates the tab.
         ? async () => ({})
-      : (tab === 'project' || tab === 'settings' || tab === 'workflows')
+      : tab === 'settings'
+        ? loadAppSettingsData
+      : (tab === 'project' || tab === 'workflows')
         ? () => loadProjectData(selectedProject)
       : tab === 'backlog'
         ? () => loadBacklogData(selectedProject)
@@ -290,6 +297,14 @@ export function DashboardPage({ inboxCss = '' } = {}) {
       setTab('project')
       return
     }
+    if (screen === 's3' && objectKind === 'unowned' && objectId) {
+      // The Dashboard's "no owner" alert: that project's Backlog, showing work with no owner.
+      setDeepLinkNotice(null)
+      setSelectedProject(objectId)
+      setBacklogPreset({ kind: 'unowned', projectId: objectId, at: Date.now() })
+      setTab('backlog')
+      return
+    }
     if (screen === 's1' && objectKind === 'project' && objectId) {
       setDeepLinkNotice(null)
       setSelectedProject(objectId)
@@ -337,14 +352,14 @@ export function DashboardPage({ inboxCss = '' } = {}) {
       notice: deepLinkNotice,
     }, `project:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
   } else if (tab === 'settings') {
-    content = jsx(ProjectDashboard, {
+    // Sahil 04/10 (demo feedback e): App settings. Project settings stay in the project.
+    content = jsx(AppSettingsView, {
       view: payload,
-      initialView: 'settings',
-      onSelectProject: selectProject,
-      onProjectDirty: markDirty(payload.project?.id ?? null),
+      selectedProject,
+      onOpenProjectSettings: () => requestTab('project', { entryView: 'settings' }),
+      onForgetProject: () => { lastProject.current.saved = null },
       onRefresh: refresh,
-      notice: deepLinkNotice,
-    }, `settings:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
+    }, 'app-settings')
   } else if (tab === 'workflows') {
     // Option A (Sahil 28/09): the top Workflows tab IS the library. Project
     // workflows live under Project > Workflows. Enablement and runs act on the
@@ -371,7 +386,7 @@ export function DashboardPage({ inboxCss = '' } = {}) {
       },
     }, `roadmap:${roadmap.version}`)
   } else if (tab === 'backlog') {
-    content = jsx(BacklogView, { view: payload, onRefresh: refresh })
+    content = jsx(BacklogView, { view: payload, onRefresh: refresh, preset: backlogPreset?.projectId === selectedProject ? backlogPreset : null })
   } else if (tab === 'teams') {
     content = jsx(TeamsView, { view: payload, onRefresh: refresh })
   } else if (tab === 'initiative') {

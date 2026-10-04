@@ -43,7 +43,7 @@ const statusText = (status) => {
 
 function Avatar({ name }) {
   const initials = initialsOf(name)
-  return jsx('span', { className: initials ? 'dy-kb-avatar' : 'dy-kb-avatar empty', title: name ? displayName(name) : 'Unassigned', 'aria-hidden': true, children: initials })
+  return jsx('span', { className: initials ? 'dy-kb-avatar' : 'dy-kb-avatar empty', title: name ? displayName(name) : 'No owner', 'aria-hidden': true, children: initials })
 }
 
 // The expanded part of a card: labelled sections, then the actions.
@@ -63,7 +63,7 @@ function CardBody({ id, item, facts, moves, moving, today, onMove, onOpenItem, o
   facts.milestones.forEach((milestone, index) => planning.push(row('Milestone', goto('Milestone', onMilestones, milestone.due ? `${milestone.name} · due ${shortDate(milestone.due, today)}` : milestone.name), {}, `milestone:${index}`)))
   facts.objectives.forEach((objective, index) => planning.push(row('Objective', jsxs('span', { children: [goto('Objective', () => onNavigate('objectives'), objective.name), jsx('span', { className: 'dy-kb-via', children: ' (through the initiative)' })] }), {}, `objective:${index}`)))
 
-  const details = [row('Assignee', item.assignee ? displayName(item.assignee) : 'Unassigned')]
+  const details = [row('Assignee', item.assignee ? displayName(item.assignee) : 'No owner')]
   if (facts.due) details.push(row('Due', facts.overdue ? `${shortDate(facts.due, today)} · Overdue` : shortDate(facts.due, today), facts.overdue ? { 'data-overdue': 'true' } : {}))
   if (facts.labels.length) details.push(row('Labels', facts.labels.join(', ')))
 
@@ -97,7 +97,7 @@ function Card({ item, facts, fields, open, moves, moving, today, onToggle, onDra
   return jsxs('article', { className: 'dockyard-work-card', 'data-work-card': item.ref, 'data-open': open ? 'true' : 'false', 'data-type': item.type || 'task',
     draggable: moves.targets.length > 0 && !moving, onDragStart, onDragEnd, children: [
     jsxs('button', { type: 'button', className: 'dy-kb-card-toggle', 'data-card-toggle': item.ref, 'aria-expanded': open, 'aria-controls': open ? bodyId : undefined,
-      'aria-label': `${typeLabel(item.type)} ${item.ref}: ${item.title}${fields.assignee ? `, ${item.assignee ? `assigned to ${displayName(item.assignee)}` : 'unassigned'}` : ''}`,
+      'aria-label': `${typeLabel(item.type)} ${item.ref}: ${item.title}${fields.assignee ? `, ${item.assignee ? `assigned to ${displayName(item.assignee)}` : 'no owner'}` : ''}`,
       'aria-describedby': hasSummary ? summaryId : undefined, onClick: () => onToggle(item.ref, !open), children: [
       jsxs('span', { className: 'dy-kb-card-top', children: [
         jsxs('span', { className: 'dy-kb-type', 'data-type': item.type || 'task', title: typeLabel(item.type), children: [jsx(Icon, { name: typeIcon(item.type) }), jsx('span', { children: typeLabel(item.type) })] }),
@@ -569,7 +569,7 @@ export function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenIt
     { key: 'title', heading: 'Title', cell: (item) => item.title },
     { key: 'type', heading: 'Type', cell: (item) => typeLabel(item.type) },
     { key: 'status', heading: 'State', cell: (item) => statusText(item.status) },
-    { key: 'assignee', heading: 'Assignee', cell: (item) => item.assignee ? displayName(item.assignee) : 'Unassigned' },
+    { key: 'assignee', heading: 'Assignee', cell: (item) => item.assignee ? displayName(item.assignee) : 'No owner' },
     { key: 'blocked_by', heading: 'Blocked by', cell: (item) => refsCell(facts(item).blockedBy) },
     { key: 'blocks', heading: 'Blocks', cell: (item) => refsCell(facts(item).blocks) },
     { key: 'initiative', heading: 'Initiative', cell: (item) => facts(item).initiative ? (facts(item).initiative.title || facts(item).initiative.ref) : '' },

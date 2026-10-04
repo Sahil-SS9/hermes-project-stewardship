@@ -296,7 +296,7 @@ export function WorkItemDetail({ item, projectId, profiles, initiatives = [], on
             })] }),
             jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Estimated days (optional)' }), jsx('input', { type: 'number', min: 0, step: 0.5, 'aria-label': 'Estimated days', placeholder: 'e.g. 2.5', value: draft?.estimate_days ?? '', onChange: (event) => setDraft({ ...draft, estimate_days: event.target.value }) })] }),
             jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Assignee (optional)' }), jsx('select', { 'aria-label': 'Assignee', value: draft?.assignee ?? '', disabled: busy, onChange: (event) => setDraft({ ...draft, assignee: event.target.value }), children: [
-              jsx('option', { value: '', children: 'Unassigned' }, 'none'),
+              jsx('option', { value: '', children: 'No owner' }, 'none'),
               ...(profiles ?? []).filter((profile) => profile.slug || profile.id || profile.name).map((profile) => { const value = profile.slug || profile.id || profile.name; return jsx('option', { value, disabled: profile.available === false && value !== draft?.assignee, children: profile.display_name || profile.name || value }, value) }),
               draft?.assignee && !(profiles ?? []).some((profile) => (profile.slug || profile.id || profile.name) === draft.assignee) ? jsx('option', { value: draft.assignee, children: `${draft.assignee} (current)` }, 'current-assignee') : null,
             ] })] }),

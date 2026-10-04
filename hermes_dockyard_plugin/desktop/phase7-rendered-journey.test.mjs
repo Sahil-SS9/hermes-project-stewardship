@@ -30,7 +30,9 @@ test('Phase 7 rendered settings + onboarding journeys with real data', { timeout
     await page.waitForTimeout(1200)
 
     // --- Settings: grouped sections with real membership/work data.
-    await page.locator('[data-tab="settings"]').click()
+    // Sahil 04/10: the top-bar tab is App settings now; a project's settings live in the project.
+    await page.locator('[data-tab="project"]').click()
+    await page.locator('[data-project-view="settings"]').click()
     await page.waitForTimeout(1500)
     const settingsText = await page.locator('body').innerText()
     assert.match(settingsText, /payments-relaunch/, 'settings renders the real project')

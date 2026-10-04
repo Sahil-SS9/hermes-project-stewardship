@@ -24,7 +24,9 @@ test('C8 Settings: three uppercase category labels over the unchanged configurat
     await page.getByRole('combobox', { name: 'Find project' }).fill(project)
     await page.getByRole('listbox', { name: 'Projects' }).getByRole('option', { name: project, exact: true }).click()
     await page.waitForTimeout(1200)
-    await page.locator('[data-tab="settings"]').click()
+    // Sahil 04/10: the top-bar tab is App settings now; a project's settings live in the project.
+    await page.locator('[data-tab="project"]').click()
+    await page.locator('[data-project-view="settings"]').click()
     await page.locator('[data-project-settings-form]').waitFor({ timeout: 8000 })
 
     // The three signed category labels render (CSS uppercases them).
@@ -60,7 +62,9 @@ test('Q3 Settings: "Maximum open initiatives" shows 5 when nothing is saved and 
     await page.getByRole('combobox', { name: 'Find project' }).fill(project)
     await page.getByRole('listbox', { name: 'Projects' }).getByRole('option', { name: project, exact: true }).click()
     await page.waitForTimeout(1200)
-    await page.locator('[data-tab="settings"]').click()
+    // Sahil 04/10: the top-bar tab is App settings now; a project's settings live in the project.
+    await page.locator('[data-tab="project"]').click()
+    await page.locator('[data-project-view="settings"]').click()
     await page.locator('[data-project-settings-form]').waitFor({ timeout: 8000 })
     return page.locator('[data-project-settings-form]').getByLabel('Maximum open initiatives').inputValue()
   }

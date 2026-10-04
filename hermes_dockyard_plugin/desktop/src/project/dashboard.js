@@ -153,7 +153,7 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
           jsx('p', { children: 'Live work, ownership and stage.' }),
           visibleWork.length > 0 ? jsx('div', { className: 'dockyard-overview-list', children:
             visibleWork.map((item) => jsxs('article', { children: [
-              jsxs('span', { children: [jsx('strong', { children: item.title || item.ref }), jsx('small', { children: `${item.ref} / ${item.assignee || 'Unassigned'}` })] }),
+              jsxs('span', { children: [jsx('strong', { children: item.title || item.ref }), jsx('small', { children: `${item.ref} / ${item.assignee || 'No owner'}` })] }),
               jsx(StatusTag, { tone: ['done', 'completed'].includes(item.status) ? 'success' : item.status === 'in_progress' ? 'info' : 'neutral', label: String(item.status || 'unknown').replaceAll('_', ' ') }),
             ]}, item.ref)),
           })

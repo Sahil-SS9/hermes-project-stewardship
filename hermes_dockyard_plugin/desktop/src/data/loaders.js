@@ -5,6 +5,14 @@ export const HEALTH_PRIORITY = Object.freeze({ critical: 0, frozen: 0, attention
 export const RISK_PRIORITY = Object.freeze({ critical: 0, high: 0, medium: 1, low: 2 })
 export const SEVERITY_PRIORITY = Object.freeze({ critical: 0, high: 0, error: 0, medium: 1, warning: 1, low: 2, info: 3 })
 
+// Sahil 04/10 (demo feedback b): work with no owner is never picked up by a
+// bot, so the screens say so. Open, non-epic work only: epics are never
+// assigned (their children carry the work), and finished work needs no owner.
+const FINISHED = new Set(['done', 'complete', 'completed', 'archived'])
+export function unownedWork(items) {
+  return (items ?? []).filter((item) => item && !item.assignee && (item.type || 'task') !== 'epic' && !FINISHED.has(item.status))
+}
+
 export function sortProjects(projects) {
   return [...projects].sort((left, right) => {
     const health = (HEALTH_PRIORITY[left.health] ?? 2) - (HEALTH_PRIORITY[right.health] ?? 2)
@@ -50,8 +58,11 @@ export async function loadDashboardData() {
   // P6 (review R2): the fleet groups live on /portfolio; /dashboard keeps
   // serving the legacy summary. Load both so the grouped read model renders
   // without losing workload/project context.
-  const [dashboard, portfolio, inbox, notifications, bots, workload] = await Promise.all([
+  const [dashboard, portfolio, inbox, notifications, bots, workload, ui] = await Promise.all([
     api('/dashboard'), api('/portfolio'), api('/inbox'), api('/notifications'), api('/bots'), api('/workload'),
+    // Display choices (folded lists) live in the backend. If they cannot be
+    // read, every list shows open, as before.
+    api('/settings/ui').catch(() => ({ collapsed: [] })),
   ])
   const entries = await Promise.all((dashboard.projects ?? []).map(async (project) => {
     const projectId = encodeURIComponent(project.id)
@@ -69,7 +80,25 @@ export async function loadDashboardData() {
     notifications,
     bots,
     workload,
+    ui: { collapsed: Array.isArray(ui?.collapsed) ? ui.collapsed : [] },
     projectContext: Object.fromEntries(entries),
+  }
+}
+
+// Sahil 04/10 (demo feedback e): App settings, for the whole app only.
+export async function loadAppSettingsData() {
+  const [dashboard, lastProject, ui, notifications] = await Promise.all([
+    api('/dashboard'),
+    api('/settings/last-project').catch(() => ({ project_id: null })),
+    api('/settings/ui').catch(() => ({ collapsed: [] })),
+    api('/settings/notifications/effective'),
+  ])
+  return {
+    ...dashboard,
+    projects: sortProjects(dashboard.projects ?? []),
+    lastProject: typeof lastProject?.project_id === 'string' ? lastProject.project_id : null,
+    ui: { collapsed: Array.isArray(ui?.collapsed) ? ui.collapsed : [] },
+    notificationPolicy: notifications?.effective ?? null,
   }
 }
 

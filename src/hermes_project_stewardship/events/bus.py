@@ -28,6 +28,10 @@ INITIATIVE_COMPLETED = "initiative.completed"
 INITIATIVE_REGRESSED = "initiative.regressed"
 PROJECT_CRITICAL = "project.critical"
 MUTATIONS_BLOCKED = "cycle.mutations_blocked"
+# Ownership of work (Sahil 04/10, demo feedback b): Hermes never dispatches
+# work with no owner, so the app says so, and stops saying so once it has one.
+WORK_UNOWNED = "work.unowned"
+WORK_OWNED = "work.owned"
 
 
 class EventBus:

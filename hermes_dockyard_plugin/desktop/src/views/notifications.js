@@ -23,6 +23,7 @@ const KIND_LABELS = {
   approval_required: 'Approvals',
   health_change: 'Health',
   alert: 'Alerts',
+  unowned_work: 'No owner',
 }
 const STATE_LABELS = { new: 'New', seen: 'Seen', resolved: 'Resolved' }
 const PAGE_SIZE = 50
@@ -184,7 +185,7 @@ export function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, 
             ['all', 'new', 'seen', 'resolved'].map((value) => jsx('option', { value, children: value === 'all' ? 'All states' : STATE_LABELS[value] }, value)) }) }),
         jsx('label', { className: 'dy-notif-filter', children:
           jsx('select', { 'aria-label': 'Filter by type', value: typeFilter, onChange: (e) => { setTypeFilter(e.target.value); setVisible(PAGE_SIZE) }, children:
-            [['all', 'All types'], ['approval_required', 'Approvals'], ['health_change', 'Health'], ['alert', 'Alerts'], ['other', 'Other']].map(([value, label]) => jsx('option', { value, children: label }, value)) }) }),
+            [['all', 'All types'], ['approval_required', 'Approvals'], ['health_change', 'Health'], ['alert', 'Alerts'], ['unowned_work', 'No owner'], ['other', 'Other']].map(([value, label]) => jsx('option', { value, children: label }, value)) }) }),
         jsx('label', { className: 'dy-notif-filter', children:
           jsx('select', { 'aria-label': 'Filter by severity', value: severityFilter, onChange: (e) => { setSeverityFilter(e.target.value); setVisible(PAGE_SIZE) }, children:
             [['all', 'All severities'], ...SEVERITIES.map((s) => [s, s])].map(([value, label]) => jsx('option', { value, children: label }, value)) }) }),

@@ -628,7 +628,8 @@ export function ConsoleBar({ tab, counts, onTab, onNewProject, projects = [], se
     ['inbox', 'Approval Inbox', counts.approvals],
     ['notifications', 'Notifications', counts.notifications],
     ['onboard', 'Onboard', null],
-    ['settings', 'Settings', null],
+    // Sahil 04/10: app-wide settings only; each project's settings live in the project.
+    ['settings', 'App settings', null],
   ]
   const moveTab = (event, index) => {
     let next = null

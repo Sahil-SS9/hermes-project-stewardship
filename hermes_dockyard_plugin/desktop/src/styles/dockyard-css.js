@@ -1605,6 +1605,26 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-command-section .dockyard-section-head { padding: 15px 17px; }
 .dockyard-root .dockyard-command-section h2 { margin: 0; color: var(--dy-text); font-size: 15px; }
 .dockyard-root .dockyard-command-section .dockyard-section-head p { margin: 3px 0 0; color: var(--dy-text-3); font-size: 11px; }
+/* A Dashboard list that folds (Sahil 04/10): the whole title is the button. */
+.dockyard-root .dockyard-section-fold { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; margin: -6px 0 -6px -8px; padding: 4px 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.dockyard-root .dockyard-section-fold:hover { background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-section-count { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.dockyard-root .dockyard-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* App settings (Sahil 04/10): the whole app only; project settings stay in the project. */
+.dockyard-root .dockyard-app-settings { display: grid; gap: 14px; max-width: 880px; }
+.dockyard-root .dockyard-app-settings-project { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 0; padding: 11px 13px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 13px; }
+.dockyard-root .dockyard-app-settings-section { display: grid; gap: 10px; padding: 15px 17px; border: 1px solid var(--dy-border); border-radius: 11px; background: var(--dy-surface); color: var(--dy-text); }
+.dockyard-root .dockyard-app-settings-section header h2 { margin: 0; font-size: 15px; }
+.dockyard-root .dockyard-app-settings-section header p, .dockyard-root .dockyard-app-settings-section > p { margin: 0; color: var(--dy-text-2); font-size: 13px; }
+.dockyard-root .dockyard-app-settings-section > button { justify-self: start; }
+.dockyard-root .dockyard-app-settings-check { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; font-size: 13px; cursor: pointer; }
+/* A gentle note, never a blocker (Sahil 04/10): work with no owner is never picked up by a bot. */
+.dockyard-root .dockyard-soft-alert { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 14px; padding: 11px 13px; border: 1px solid var(--dy-border); border-left: 3px solid var(--dy-warning); border-radius: 9px; background: var(--dy-surface); color: var(--dy-text); }
+.dockyard-root .dockyard-soft-alert > svg { flex: none; width: 17px; height: 17px; margin-top: 1px; color: var(--dy-text-2); }
+.dockyard-root .dockyard-soft-alert-body { display: grid; flex: 1; gap: 6px; min-width: 0; font-size: 13px; }
+.dockyard-root .dockyard-soft-alert-items { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--dy-text-2); font-size: 12px; }
+.dockyard-root .dockyard-soft-alert-item { min-height: 28px; padding: 3px 9px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface-subtle); color: var(--dy-text); font: inherit; font-size: 12px; cursor: pointer; }
+.dockyard-root .dockyard-soft-alert-item:hover { border-color: var(--dy-accent-border); }
 .dockyard-root .dockyard-command-table-wrap { overflow-x: auto; }
 .dockyard-root .dockyard-command-row { display: grid; align-items: center; gap: 10px; width: 100%; min-width: 760px; padding: 11px 17px; border: 0; border-top: 1px solid var(--dy-border); text-align: left; background: transparent; color: var(--dy-text); }
 .dockyard-root .dockyard-command-attention-head, .dockyard-root .dockyard-command-attention-row { grid-template-columns: 82px minmax(160px, 2fr) minmax(90px, 1fr) minmax(95px, 1fr) 68px; }

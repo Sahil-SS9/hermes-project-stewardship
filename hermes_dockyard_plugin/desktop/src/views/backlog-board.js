@@ -7,13 +7,15 @@
 import { jsx, jsxs } from '../runtime/react.js'
 import { readableLabel } from '../data/loaders.js'
 import { api } from '../runtime/context.js'
-import { Button, EmptyState, GROUP_LABELS, Icon, number, PageHead } from '../lib/ui.js'
+import { Button, EmptyState, GROUP_LABELS, Icon, number, PageHead, plural } from '../lib/ui.js'
 import { BacklogImportWizard } from './backlog-import-wizard.js'
 import { BacklogReasonModal } from './backlog-reason-modal.js'
 import { WorkItemDetail } from '../work-item/detail.js'
 
 export function BacklogBoard(ctx) {
   const {
+    NO_OWNER,
+    unowned,
     ROOT_TYPES,
     STATUS_LABELS,
     STATUS_OPTIONS,
@@ -164,6 +166,19 @@ export function BacklogBoard(ctx) {
       jsx(Button, { action: 'open-bulk-import', small: true, disabled: !canCreate, onClick: () => { setImportOpen(true); setImportRows(null); setImportValid(false); setImportError(null); setImportResult(null); setImportStep(1) }, children: 'Import' }),
       jsx(Button, { action: 'open-create-backlog-item', variant: 'primary', small: true, disabled: !canCreate, onClick: () => openCreate(), children: 'Create item' }),
     ]}),
+    // Sahil 04/10 (demo feedback b): a gentle note, never a blocker. Work with
+    // no owner is never picked up by a bot; each item opens so it can be given one.
+    unowned.length ? jsxs('div', { className: 'dockyard-soft-alert', 'data-unowned-alert': project.id, role: 'status', children: [
+      jsx(Icon, { name: 'user' }),
+      jsxs('div', { className: 'dockyard-soft-alert-body', children: [
+        jsx('strong', { children: `${number(unowned.length)} ${plural(unowned.length, 'work item')} ${unowned.length === 1 ? 'has' : 'have'} no owner, so no bot will pick ${unowned.length === 1 ? 'it' : 'them'} up.` }),
+        jsxs('span', { className: 'dockyard-soft-alert-items', children: [
+          ...unowned.slice(0, 5).map((item) => jsx('button', { type: 'button', className: 'dockyard-soft-alert-item', 'data-unowned-item': item.ref, onClick: () => setDetailItem(item), children: `${item.ref} ${item.title}` }, item.ref)),
+          unowned.length > 5 ? jsx('span', { children: `and ${number(unowned.length - 5)} more` }, 'more') : null,
+        ] }),
+      ] }),
+      hasUnassignedItems ? jsx(Button, { small: true, onClick: () => setColumnFilters((current) => ({ ...current, assignee: '__unassigned__' })), children: 'Show in the list' }) : null,
+    ] }) : null,
     // PROTOTYPE v4: bulk reassignment now lives in the selection popover;
     // preview/execute/retry handlers unchanged.
     bulkError ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: bulkError }) : null,
@@ -249,7 +264,7 @@ export function BacklogBoard(ctx) {
           jsx('span', { children: 'Assignee' }),
           jsx('select', { 'data-filter-field': 'assignee', 'aria-label': 'Filter by assignee', value: columnFilters.assignee, onChange: (event) => setColumnFilters((current) => ({ ...current, assignee: event.target.value })), children: [
             jsx('option', { value: '', children: 'All assignees' }),
-            hasUnassignedItems ? jsx('option', { value: '__unassigned__', children: 'Unassigned' }, 'unassigned') : null,
+            hasUnassignedItems ? jsx('option', { value: '__unassigned__', children: 'No owner' }, 'unassigned') : null,
             ...assigneeFilterValues.map((owner) => jsx('option', { value: owner, children: ownerLabel(owner) }, owner)),
           ] }),
         ] }),
@@ -387,7 +402,7 @@ export function BacklogBoard(ctx) {
               jsxs('span', { className: 'tree-who', children: [
                 cell === 'assignee'
                   ? jsxs('select', { autoFocus: true, className: 'cell-edit is-input', 'data-cell-input': 'assignee', value: item.assignee || '', onChange: (event) => { setEditing(null); assignItem(ref, event.target.value) }, onBlur: () => setEditing(null), children: [
-                      jsx('option', { value: '', children: 'Unassigned' }),
+                      jsx('option', { value: '', children: 'No owner' }),
                       ...(view.bots ?? []).map((bot) => jsx('option', { value: bot.id, children: bot.name || bot.id }, bot.id)),
                     ] })
                   : jsx('button', { type: 'button', className: 'cell-edit cell-who', 'data-cell': 'assignee', title: (item.type === 'epic') ? 'Epics are never assigned — their children carry the work' : 'Change assignee', disabled: (item.type || 'task') === 'epic', onClick: (event) => { event.stopPropagation(); if ((item.type || 'task') === 'epic') { flashCell(ref, 'assignee', 'Epics are never assigned — assign one of its children instead.'); return } setEditing({ ref, field: 'assignee' }) }, children: [
@@ -486,7 +501,8 @@ export function BacklogBoard(ctx) {
           })] }),
           jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Estimated days (optional)' }), jsx('input', { type: 'number', min: 0, step: 0.5, 'data-create-field': 'estimate_days', value: createForm.estimate_days, onInput: (event) => updateCreate('estimate_days', event.target.value), onChange: (event) => updateCreate('estimate_days', event.target.value), placeholder: 'e.g. 2.5' })] }),
           jsxs('label', { className: 'dockyard-field field-required', children: [jsx('span', { children: 'Assignee' }), jsx('select', { 'data-create-field': 'assignee', value: createForm.assignee, onChange: (event) => updateCreate('assignee', event.target.value), children: [
-            jsx('option', { value: '', children: 'Select a bot' }, 'none'),
+            jsx('option', { value: '', children: 'Choose an assignee' }, 'choose'),
+            jsx('option', { value: NO_OWNER, children: 'No owner' }, 'none'),
             ...(view.bots ?? []).map((bot) => jsx('option', { value: bot.id, children: bot.name || bot.id }, bot.id)),
           ]})] }),
           jsxs('label', { className: 'dockyard-field', children: [jsx('span', { className: 'field-optional-hint', children: 'Initiative' }), jsx('select', { 'data-create-field': 'initiative', value: createForm.initiative, onChange: (event) => updateCreate('initiative', event.target.value), children: [
@@ -499,7 +515,8 @@ export function BacklogBoard(ctx) {
           jsxs('label', { className: 'dockyard-field dockyard-field-wide field-required', children: [jsx('span', { children: 'Priority reason' }), jsx('textarea', { rows: 3, 'data-create-field': 'reason', value: createForm.reason, onInput: (event) => updateCreate('reason', event.target.value), onChange: (event) => updateCreate('reason', event.target.value), placeholder: 'Why should this item hold this rank?' })] }),
         ]}),
         createTouched.title && createForm.title.trim().length < 3 ? jsx('p', { className: 'create-help bad', 'data-create-help': 'title', children: 'Title must be at least 3 characters.' }) : null,
-        createTouched.assignee && !createForm.assignee ? jsx('p', { className: 'create-help bad', 'data-create-help': 'assignee', children: 'Every work item needs a bot assignee.' }) : null,
+        createTouched.assignee && !createForm.assignee ? jsx('p', { className: 'create-help bad', 'data-create-help': 'assignee', children: 'Choose an assignee, or No owner.' }) : null,
+        createForm.assignee === NO_OWNER ? jsx('p', { className: 'create-help', 'data-create-help': 'no-owner', children: 'No bot will pick this up until someone owns it.' }) : null,
         createTouched.reason && createForm.reason.trim().length < 4 ? jsx('p', { className: 'create-help bad', 'data-create-help': 'reason', children: 'A ranking reason is required — it becomes the audit record.' }) : null,
         jsx('p', { className: 'create-help', 'data-create-reqnote': true, children: '* required. Initial rank and priority reason are recorded in the backlog audit trail.' }),
         createError ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: createError }) : null,
