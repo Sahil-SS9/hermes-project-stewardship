@@ -100,6 +100,9 @@ export const THEME_CSS = `
 /* Placeholder text used the browser's own grey (#757575): below 4.5:1 in every
    theme, the default included. The theme's tertiary text passes everywhere. */
 .dockyard-root :is(input, textarea)::placeholder { color: var(--dy-text-3); opacity: 1; }
+/* Plain links had no colour and showed the browser's own (#0000ee light,
+   #9e9eff dark). They take the theme's accent text; classed links keep theirs. */
+.dockyard-root a:where(:not([class])) { color: var(--dy-accent-text); }
 ${FONT_FACES.join('\n')}
 ${THEMES.filter((theme) => theme.tokens).map(themeRule).join('\n')}
 /* Themes with a background: the art shows in the page gutters, the top bar is

@@ -165,9 +165,10 @@ export const SWITCHER_CSS = `
 .dockyard-root .dy-theme-preview .card i { display: block; height: 5px; border-radius: 3px; }
 .dockyard-root .dy-theme-preview .accent { position: absolute; right: 8px; bottom: 8px; width: 20px; height: 20px; border-radius: 6px; }
 .dockyard-root .dy-theme-preview.split { display: grid; grid-template-columns: 1fr 1fr; }
-.dockyard-root .dy-theme-name { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 2px; }
-.dockyard-root .dy-theme-name strong { font-size: 13px; }
-.dockyard-root .dy-theme-name span { color: var(--dy-text-3); font-size: 11px; text-transform: capitalize; }
+/* Name and kind on two fixed lines, so a long name never makes one card taller. */
+.dockyard-root .dy-theme-name { display: grid; gap: 1px; min-width: 0; padding: 0 2px; }
+.dockyard-root .dy-theme-name strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.dockyard-root .dy-theme-name span { color: var(--dy-text-3); font-size: 11px; text-transform: capitalize; white-space: nowrap; }
 .dockyard-root .dy-font-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .dockyard-root .dy-font-card {
   display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--dy-border); border-radius: 10px;
