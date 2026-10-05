@@ -18,8 +18,8 @@ test('searchable project context, requested discard target and retained project 
  await page.locator('[data-project-dashboard="mobile-client"]').waitFor();
  await page.locator('[data-project-view="board"]').click();
  await page.locator('[data-kanban-screen]').waitFor();
- // C2: milestone planning moved off the board; r6 opens it from the Milestones button in the views bar.
- await page.locator('[data-kanban-page="milestones"]').click();
+ // Sahil 05/10: milestones are managed with the project's Objectives, not on the Kanban.
+ await page.locator('[data-project-view="objectives"]').click();
  await page.locator('[data-planning-panel]').waitFor();
  await page.locator('[data-project-view="initiative"]').click();
  await page.getByRole('heading',{name:'No initiative available'}).waitFor();

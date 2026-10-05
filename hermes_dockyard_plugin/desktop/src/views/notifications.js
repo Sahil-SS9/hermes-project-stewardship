@@ -1,8 +1,9 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
-// Batch E5: notifications screen — filters, day groups, detail panel, settings
-// panel. Data comes from the real /notifications endpoints (E4); every action
-// goes through the api() helper so busy states and toasts stay consistent.
+// Batch E5: notifications screen — filters, day groups, detail panel. Data
+// comes from the real /notifications endpoints (E4); every action goes through
+// the api() helper so busy states and toasts stay consistent. Sahil 05/10: the
+// settings live only in App settings (NotificationSettings is shared from here).
 import { useState } from '../runtime/react.js'
 import { severityTone } from '../lib/ui.js'
 import { api } from '../runtime/context.js'
@@ -23,6 +24,7 @@ const KIND_LABELS = {
   approval_required: 'Approvals',
   health_change: 'Health',
   alert: 'Alerts',
+  unassigned_work: 'Unassigned',
 }
 const STATE_LABELS = { new: 'New', seen: 'Seen', resolved: 'Resolved' }
 const PAGE_SIZE = 50
@@ -43,7 +45,7 @@ function dayBucket(createdAt) {
   return 'Earlier'
 }
 
-export function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, onOpen }) {
+export function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, onOpen, onOpenSettings }) {
   const [stateFilter, setStateFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
   const [severityFilter, setSeverityFilter] = useState('all')
@@ -52,9 +54,6 @@ export function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, 
   const [resolveOpen, setResolveOpen] = useState(false)
   const [resolveNote, setResolveNote] = useState('')
   const [busyId, setBusyId] = useState(null)
-  const [settings, setSettings] = useState(view.settings ?? null)
-  const [settingsBusy, setSettingsBusy] = useState(false)
-  const [settingsError, setSettingsError] = useState(null)
   const [actionError, setActionError] = useState(null)
   const [visible, setVisible] = useState(PAGE_SIZE)
   // Rows the user marked seen / resolved this session: applied over the view
@@ -140,25 +139,6 @@ export function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, 
     }
     setBusyId(null)
   }
-  const saveSettings = async (patch) => {
-    setSettingsBusy(true)
-    setSettingsError(null)
-    // The read shape carries read-only annotations (ignored keys, the zone);
-    // the save contract accepts policy keys only.
-    const { ignored: _ignored, timezone: _timezone, ...base } = settings ?? {}
-    const next = { ...base, ...patch }
-    setSettings(next)
-    try {
-      const result = await api('/settings/notifications', {
-        method: 'PUT',
-        body: { actor_id: 'desktop', policy: next },
-      })
-      setSettings(result.policy ?? next)
-    } catch (failure) {
-      setSettingsError(String(failure?.message ?? failure))
-    }
-    setSettingsBusy(false)
-  }
 
   const groups = []
   for (const note of shown) {
@@ -184,7 +164,7 @@ export function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, 
             ['all', 'new', 'seen', 'resolved'].map((value) => jsx('option', { value, children: value === 'all' ? 'All states' : STATE_LABELS[value] }, value)) }) }),
         jsx('label', { className: 'dy-notif-filter', children:
           jsx('select', { 'aria-label': 'Filter by type', value: typeFilter, onChange: (e) => { setTypeFilter(e.target.value); setVisible(PAGE_SIZE) }, children:
-            [['all', 'All types'], ['approval_required', 'Approvals'], ['health_change', 'Health'], ['alert', 'Alerts'], ['other', 'Other']].map(([value, label]) => jsx('option', { value, children: label }, value)) }) }),
+            [['all', 'All types'], ['approval_required', 'Approvals'], ['health_change', 'Health'], ['alert', 'Alerts'], ['unassigned_work', 'Unassigned'], ['other', 'Other']].map(([value, label]) => jsx('option', { value, children: label }, value)) }) }),
         jsx('label', { className: 'dy-notif-filter', children:
           jsx('select', { 'aria-label': 'Filter by severity', value: severityFilter, onChange: (e) => { setSeverityFilter(e.target.value); setVisible(PAGE_SIZE) }, children:
             [['all', 'All severities'], ...SEVERITIES.map((s) => [s, s])].map(([value, label]) => jsx('option', { value, children: label }, value)) }) }),
@@ -239,9 +219,10 @@ export function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, 
             })
             : null,
         ]}),
-    all.length > 0 ? jsx(NotificationSettings, {
-      settings, busy: settingsBusy, error: settingsError, onSave: saveSettings,
-    }) : null,
+    jsxs('p', { className: 'dy-notif-settings-link', 'data-notification-settings-link': true, children: [
+      jsx('span', { children: 'Notification settings are in App settings.' }),
+      jsx(Button, { small: true, action: 'open-app-settings', onClick: onOpenSettings, children: 'Open App settings' }),
+    ]}),
     actionError ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: `Action failed: ${actionError}` }) : null,
   ]})
 }

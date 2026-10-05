@@ -135,9 +135,10 @@ export const INBOX_CSS = `
 .dockyard-root .dockyard-inbox-actions .spacer { flex: 1 1 auto; }
 /* Request-changes feedback form (R2): one required field, then submit. */
 .dockyard-root .dockyard-request-changes { display: grid; gap: 9px; padding: 13px; border: 1px solid var(--dy-accent-border); border-radius: 12px; background: var(--dy-accent-soft); }
-.dockyard-root .dockyard-request-changes label { color: var(--dy-text); font-size: 12px; font-weight: 650; }
-.dockyard-root .dockyard-request-changes input { min-height: 34px; padding: 6px 10px; border: 1px solid var(--dy-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12.5px; }
-.dockyard-root .dockyard-request-changes input:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
+/* Sahil 05/10: the label on top, then a box big enough to write real feedback in. */
+.dockyard-root .dockyard-request-changes-field { display: grid; gap: 6px; min-width: 0; color: var(--dy-text); font-size: 12px; font-weight: 650; }
+.dockyard-root .dockyard-request-changes textarea { box-sizing: border-box; width: 100%; min-height: 140px; padding: 10px 11px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 13px; font-weight: 400; line-height: 1.45; resize: vertical; }
+.dockyard-root .dockyard-request-changes textarea:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
 .dockyard-root .dockyard-request-changes-actions { display: flex; gap: 8px; }
 /* Narrow container: the list is alone; the detail opens full width. */
 @container dockyard (max-width: 820px) {

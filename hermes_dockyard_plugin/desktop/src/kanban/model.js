@@ -270,12 +270,12 @@ export function describeFilters(filters) {
   return parts.join(' · ')
 }
 
-// "Board · Assignee Ada Lovelace · Label mobile · Summary cards" for the views panel.
+// "Board · Assignee Ada Lovelace · Label mobile" for the views panel; "All cards open" when they are.
 export function describeDefinition(definition) {
   const parts = [definition.layout === 'list' ? 'List' : 'Board']
   const filters = describeFilters(definition.filters)
   if (filters) parts.push(filters)
-  if (definition.layout !== 'list') parts.push(definition.density === 'detailed' ? 'Expanded cards' : 'Summary cards')
+  if (definition.layout !== 'list' && definition.density === 'detailed') parts.push('All cards open')
   return parts.join(' · ')
 }
 

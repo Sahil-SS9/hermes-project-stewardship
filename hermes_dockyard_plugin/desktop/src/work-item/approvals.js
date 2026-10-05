@@ -218,7 +218,11 @@ export function ApprovalDetail({ item, onResolved, onBack }) {
         ]}),
       ] }) }),
       changesOpen ? jsxs('section', { className: 'dockyard-request-changes', 'data-request-changes-form': 'true', children: [
-        jsxs('label', { children: ['Feedback for the proposer ', jsx('input', { value: feedback, onChange: (event) => setFeedback(event.target.value), placeholder: 'What must change before approval' })] }),
+        // Sahil 05/10: the box sits under its label and is big enough to write real feedback in.
+        jsxs('label', { className: 'dockyard-request-changes-field', children: [
+          jsx('span', { children: 'Feedback for the proposer' }),
+          jsx('textarea', { value: feedback, rows: 6, onChange: (event) => setFeedback(event.target.value), placeholder: 'What must change before approval' }),
+        ] }),
         jsxs('div', { className: 'dockyard-request-changes-actions', children: [
           jsx(Button, { variant: 'primary', action: 'confirm-request-changes', disabled: busy || !feedback.trim(), onClick: requestChanges, children: busy ? 'Returning…' : 'Return to proposer' }),
           jsx(Button, { variant: 'quiet', disabled: busy, onClick: () => setChangesOpen(false), children: 'Cancel' }),

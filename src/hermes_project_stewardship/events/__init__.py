@@ -13,5 +13,7 @@ from .bus import (  # noqa: F401
     MUTATIONS_BLOCKED,
     PROJECT_CRITICAL,
     VERIFICATION_FAILED,
+    WORK_ASSIGNED,
+    WORK_UNASSIGNED,
     EventBus,
 )

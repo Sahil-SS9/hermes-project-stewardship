@@ -26,6 +26,8 @@ export const NOTIFICATIONS_CSS = `
 .dockyard-root .dy-notif-settings label { font-size: 12px; color: var(--dy-text-2); }
 .dockyard-root .dy-notif-settings select, .dockyard-root .dy-notif-settings input[type="time"] { border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); color: inherit; padding: 4px 8px; font: inherit; }
 .dockyard-root .dy-notif-settings .dy-notif-override-link { font-size: 12px; }
+/* Sahil 05/10: the settings live only in App settings; the screen points there. */
+.dockyard-root .dy-notif-settings-link { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 14px 0 0; color: var(--dy-text-2); font-size: 13px; }
 .dockyard-root .dy-notif-row-btn { display: block; width: 100%; box-sizing: border-box; cursor: pointer; text-align: left; background: transparent; border: 0; color: inherit; font: inherit; padding: 0; margin: 0; }
 .dockyard-root .dy-notif-row-btn:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
 .dockyard-root .dy-notif-row-inner { display: flex; gap: 10px; align-items: baseline; }

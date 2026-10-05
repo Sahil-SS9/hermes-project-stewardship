@@ -20,6 +20,7 @@ import base64
 import binascii
 import hashlib
 import json
+import logging
 import os
 from dataclasses import asdict
 from pathlib import Path
@@ -506,7 +507,9 @@ class QueuedWorkItemCreate(BaseModel):
     evidence_refs: List[str] = []
     creator_id: str
     creator_kind: str = "human"
-    assignee_id: str
+    # Sahil 04/10 (demo feedback b): an item may be unassigned. Hermes never
+    # dispatches unassigned work, and the screens say so.
+    assignee_id: Optional[str] = None
     assignee_kind: str = "bot"
     rank: int
     reason: str
@@ -1911,6 +1914,32 @@ def create_app(
         return _Actor(id=actor_id, display_name=actor_id,
                       kind=_ActorKind(actor_kind))
 
+    _FINISHED_STATUSES = {"done", "complete", "completed", "archived"}
+
+    def _tell_assignment(project_id: str, item: Dict[str, Any], *, before: Optional[str],
+                         actor_id: str, new: bool = False) -> None:
+        """Sahil 04/10 (demo feedback b): open unassigned work is never picked
+        up by a bot. Say so when an item starts unassigned or loses its
+        assignee, and stop saying so when it is assigned. The change itself
+        already happened, so a failure here is logged, never raised."""
+        from ..events.bus import WORK_ASSIGNED, WORK_UNASSIGNED
+
+        ref, after = item.get("ref"), item.get("assignee") or None
+        if not ref:
+            return
+        try:
+            if after and not before and not new:
+                bus.emit(WORK_ASSIGNED, project_id=project_id, subject=ref,
+                         payload={"to": after}, emitted_by=actor_id)
+            elif (not after and (new or before)
+                  and (item.get("type") or "task") != "epic"
+                  and item.get("status") not in _FINISHED_STATUSES):
+                bus.emit(WORK_UNASSIGNED, project_id=project_id, subject=ref,
+                         payload={"title": item.get("title") or ""}, emitted_by=actor_id)
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "could not record the assignment change of %s", ref)
+
     def _raise_work_error(exc: Exception) -> NoReturn:
         if isinstance(exc, CanonicalWorkPartialError):
             raise HTTPException(
@@ -1997,14 +2026,13 @@ def create_app(
     @router.post("/projects/{project_id}/work-items/{ref}/assign")
     def assign_work_item(project_id: str, ref: str, body: WorkItemAssign):
         try:
-            return work.assign_item(
-                project_id,
-                ref,
-                body.assignee_id,
-                actor=_actor(body.actor_id, body.actor_kind),
-            )
+            actor = _actor(body.actor_id, body.actor_kind)
+            before = (work.get(project_id, ref) or {}).get("assignee")
+            item = work.assign_item(project_id, ref, body.assignee_id, actor=actor)
         except Exception as exc:
             _raise_work_error(exc)
+        _tell_assignment(project_id, item, before=before, actor_id=actor.id)
+        return item
 
     @router.post("/projects/{project_id}/work-items/{ref}/dependencies")
     def add_work_dependency(project_id: str, ref: str, body: WorkItemDependency):
@@ -2096,6 +2124,7 @@ def create_app(
     def create_queued_work_item(project_id: str,
                                 body: QueuedWorkItemCreate):
         try:
+            creator = _actor(body.creator_id, body.creator_kind)
             item, entry = work.create_queued_item(
                 project_id,
                 title=body.title,
@@ -2103,8 +2132,9 @@ def create_app(
                 labels=body.labels,
                 evidence_refs=body.evidence_refs,
                 item_type=body.type,
-                creator=_actor(body.creator_id, body.creator_kind),
-                assignee=_target_actor(body.assignee_id, body.assignee_kind),
+                creator=creator,
+                assignee=(_target_actor(body.assignee_id.strip(), body.assignee_kind)
+                          if body.assignee_id and body.assignee_id.strip() else None),
                 rank=body.rank,
                 reason=body.reason,
                 initiative_ref=body.initiative_ref,
@@ -2115,6 +2145,7 @@ def create_app(
             )
         except Exception as exc:
             _raise_work_error(exc)
+        _tell_assignment(project_id, item, before=None, new=True, actor_id=creator.id)
         return {
             "ref": item["ref"],
             "id": item["id"],
@@ -2564,6 +2595,21 @@ def create_app(
         actor = _principal_id(body.get("actor_id") or "unknown")
         try:
             return {"policy": notification_engine.set_app_policy(policy, actor=actor)}
+        except ServiceError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    # The app's display choices (Sahil 04/10: a folded Dashboard list stays
+    # folded): kept in the backend, never in browser storage.
+    @router.get("/settings/ui")
+    def get_ui_settings():
+        return svc.ui_settings()
+
+    @router.put("/settings/ui")
+    def put_ui_settings(body: dict):
+        actor = _principal_id(body.get("actor_id") or "unknown")
+        settings = {key: value for key, value in body.items() if key != "actor_id"}
+        try:
+            return svc.set_ui_settings(settings, actor=actor)
         except ServiceError as exc:
             raise HTTPException(422, str(exc)) from None
 

@@ -768,7 +768,7 @@ class CanonicalWorkService:
         evidence_refs: list[str] | None = None,
         item_type: WorkItemType | str,
         creator: Actor,
-        assignee: Actor,
+        assignee: Actor | None,
         rank: int,
         reason: str,
         initiative_ref: str | None = None,
@@ -796,7 +796,8 @@ class CanonicalWorkService:
             raise ValueError("backlog rank must be at least 1")
         if len(reason.strip()) < 4:
             raise ValueError("backlog additions require a priority reason")
-        if creator.id == assignee.id:
+        # Unassigned is allowed (Sahil 04/10): Hermes never dispatches unassigned work.
+        if assignee is not None and creator.id == assignee.id:
             raise ValueError("assignee must be distinct from the creator")
         kind = self._kind(item_type)
         if estimate_days is not None:
@@ -833,7 +834,7 @@ class CanonicalWorkService:
             kind=kind,
             title=title.strip(),
             body=body.strip() if body else None,
-            assignee=assignee.id,
+            assignee=assignee.id if assignee is not None else None,
             created_by=creator.id,
             parent_id=parent_ref,
             idempotency_key=idempotency_key,
@@ -870,7 +871,7 @@ class CanonicalWorkService:
             action="backlog.item_created",
             subject=view["ref"],
             detail={
-                "assignee": assignee.id,
+                "assignee": assignee.id if assignee is not None else None,
                 "initiative_ref": relation,
                 "parent_ref": parent_ref,
                 "estimate_days": estimate_days,

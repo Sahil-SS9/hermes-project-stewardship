@@ -1238,7 +1238,8 @@ class QueuedItemBody(BaseModel):
     body: str | None = None
     labels: list[str] = []
     evidence_refs: list[str] = []
-    assignee_id: str
+    # Unassigned is allowed (Sahil 04/10): Hermes never dispatches unassigned work.
+    assignee_id: str | None = None
     assignee_kind: str = "bot"
     rank: int
     reason: str
@@ -2082,6 +2083,25 @@ async def put_notification_settings(body: dict) -> dict:
     return await _proxy(
         "PUT", "/stewardship/v1/settings/notifications",
         {"policy": body.get("policy"), "actor_id": _ACTOR_ID})
+
+
+# The app's display choices (Sahil 04/10): which Dashboard lists are folded.
+# Kept in the backend, never in browser storage. The caller never names the actor.
+class UiSettingsBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    collapsed: list[str]
+
+
+@plugin_api.get("/settings/ui")
+async def get_ui_settings() -> dict:
+    return await _proxy("GET", "/stewardship/v1/settings/ui")
+
+
+@plugin_api.put("/settings/ui")
+async def put_ui_settings(body: UiSettingsBody) -> dict:
+    return await _proxy(
+        "PUT", "/stewardship/v1/settings/ui",
+        {"collapsed": body.collapsed, "actor_id": _ACTOR_ID})
 
 
 @plugin_api.get("/settings/notifications/effective")

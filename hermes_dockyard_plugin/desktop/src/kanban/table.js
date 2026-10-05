@@ -1,22 +1,12 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
-// C2 Kanban: ONE table component, used by the List tab and by the saved-view
-// `table` layout. It keeps `data-work-table`, `data-work-row` and the
-// `dockyard-backlog-table` class (pinned by phase4-rendered-browser.test.mjs).
-// The saved-view layout passes the original five columns, so it looks and
-// tests exactly as before; the List tab passes more columns plus `className`.
+// C2 Kanban: ONE table component, used by the List layout (a saved view with
+// the `table` layout opens as the List). It keeps `data-work-table`,
+// `data-work-row` and the `dockyard-backlog-table` class (pinned by
+// phase4-rendered-browser.test.mjs).
 import { jsxs } from '../runtime/react.js'
 import { jsx } from '../runtime/react.js'
 import { Fragment } from '../runtime/react.js'
-
-// The five columns the saved-view table has always had.
-export const SAVED_VIEW_COLUMNS = Object.freeze([
-  { key: 'ref', heading: 'Ref', cell: (item) => item.ref },
-  { key: 'title', heading: 'Title', cell: (item) => item.title },
-  { key: 'type', heading: 'Type', cell: (item) => item.type || 'task' },
-  { key: 'status', heading: 'Status', cell: (item) => item.status || 'unknown' },
-  { key: 'assignee', heading: 'Assignee', cell: (item) => item.assignee || 'Unassigned' },
-])
 
 // columns: [{ key, heading, cell(item) }]
 // groups (optional): [{ key, label, items }] renders a labelled row per group.
