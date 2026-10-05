@@ -52,7 +52,9 @@ test('W5 live map attributes come from the canonical run projection', async () =
     .replace(/from '\.\.\/runtime\/react\.js'/g, `from '${path.join(dir, 'react-stub.js').replace(/\\/g, '/').replace(/^/, 'file://')}'`)
     .replace(/from '\.\/runtime\/context\.js'|from '\.\.\/runtime\/context\.js'/g, `from 'file://${path.join(dir, 'context-stub.js').replace(/\\\\/g, '/')}'`)
     .replace(/from '\.\.\/lib\/ui\.js'/g, `from 'file://${path.join(dir, 'ui-stub.js').replace(/\\\\/g, '/')}'`)
-    .replace(/from '\.\.\/\.\.\/workflow-canvas-mount\.js'/g, `from 'file://${path.join(dir, 'mount-stub.js').replace(/\\\\/g, '/')}'`);
+    .replace(/from '\.\.\/\.\.\/workflow-canvas-mount\.js'/g, `from 'file://${path.join(dir, 'mount-stub.js').replace(/\\\\/g, '/')}'`)
+    // The shared planning wording has no imports of its own, so the real file loads as is.
+    .replace(/from '\.\.\/lib\/plan-vocab\.js'/g, `from 'file://${path.join(HERE, 'src', 'lib', 'plan-vocab.js').replace(/\\\\/g, '/')}'`);
   const { __setRuns__ } = await import('file://' + path.join(dir, 'context-stub.js').replace(/\\\\/g, '/'));
   const runs = [{ run_key: 'r1', version: 1, status: 'running', nodes: [
     { node_id: 'a', title: 'Assemble', depends_on: [], human_gate: false, kind: 'task', status: 'done', task_ref: null, evidence_refs: [] },
