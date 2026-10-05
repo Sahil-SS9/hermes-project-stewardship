@@ -60,7 +60,9 @@ test('App settings: the whole app only; project settings are one click away; eve
     assert.equal(await page.locator('[data-opening-project]').getAttribute('data-opening-project'), PROJECT)
     await page.locator('[data-action="forget-last-project"]').click()
     await until(async () => (await api('/settings/last-project')).project_id === null, 'Forget it did not reach the backend')
-    assert.equal(await page.locator('[data-opening-project]').getAttribute('data-opening-project'), '')
+    // The screen changes when the browser has the server's reply, a moment
+    // after the server saved it (about 25 ms): wait for it, never read it at once.
+    await page.locator('[data-opening-project=""]').waitFor()
 
     // Dashboard: the same folded-list choice the Dashboard uses.
     const fold = page.locator('[data-app-setting-fold="needs-you-now"]')
