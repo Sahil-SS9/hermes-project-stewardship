@@ -2427,6 +2427,7 @@ var SWITCHER_CSS = `
   background: var(--dy-accent-soft); color: var(--dy-accent-text);
   font-size: 10.5px; font-weight: 750; letter-spacing: 0.02em; line-height: 1;
 }
+.dockyard-root .dy-sw-avatar[data-initials]::before { content: attr(data-initials); }
 .dockyard-root .dy-sw-avatar[data-all] { border-color: var(--dy-border); background: var(--dy-surface-strong); color: var(--dy-text-2); }
 .dockyard-root .dy-sw-avatar svg { width: 14px; height: 14px; }
 .dockyard-root .dy-sw-avatar.lg { width: 34px; height: 34px; border-radius: 9px; font-size: 12px; }
@@ -5701,8 +5702,9 @@ function ProjectAvatar({ project, all = false, size = "" }) {
   return jsx("span", {
     className: `dy-sw-avatar${size ? ` ${size}` : ""}`,
     "data-all": all ? "true" : void 0,
+    "data-initials": all ? void 0 : initials(projectName(project)),
     "aria-hidden": true,
-    children: all ? jsx(Icon, { name: "layers" }) : initials(projectName(project))
+    children: all ? jsx(Icon, { name: "layers" }) : null
   });
 }
 function useSwitcherList(projects, scope, { withAll = true } = {}) {
@@ -19085,24 +19087,27 @@ function DashboardPage({ inboxCss = "" } = {}) {
   const [switcherVariant, setSwitcherVariant] = useState(() => SWITCHER_VARIANTS.includes(review.current.get("switcher")) ? review.current.get("switcher") : "a");
   const [appearance, setAppearance] = useState({ theme: DEFAULT_THEME, font: DEFAULT_FONT });
   const [hostDark, setHostDark] = useState(() => hostIsDark());
-  useEffect(() => {
-    let live = true;
+  const appearanceAsked = useRef(false);
+  const askAppearance = () => {
+    if (appearanceAsked.current) return;
+    appearanceAsked.current = true;
     api("/settings/appearance").then(
       (saved) => {
-        if (live && saved) setAppearance({ theme: themeById(saved.theme).id, font: fontById(saved.font).id });
+        if (saved) setAppearance({ theme: themeById(saved.theme).id, font: fontById(saved.font).id });
       },
       () => {
       }
       // unavailable: the defaults stand
     );
+  };
+  useEffect(() => {
     const read = () => setHostDark(hostIsDark());
-    const watcher = new MutationObserver(read);
-    watcher.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-hermes-mode"] });
+    const watcher = typeof MutationObserver === "function" ? new MutationObserver(read) : null;
+    watcher?.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-hermes-mode"] });
     const media = window.matchMedia?.("(prefers-color-scheme: dark)");
     media?.addEventListener?.("change", read);
     return () => {
-      live = false;
-      watcher.disconnect();
+      watcher?.disconnect();
       media?.removeEventListener?.("change", read);
     };
   }, []);
@@ -19200,6 +19205,7 @@ function DashboardPage({ inboxCss = "" } = {}) {
     const loader = isAll && (ONE_PROJECT_TABS[tab] || tab === "workflows") ? async () => ({}) : tab === "workflows-library" ? async () => ({ workflows: (await api("/workflow-library")).workflows ?? [] }) : tab === "dashboard" ? loadDashboardData : tab === "roadmap" ? async () => ({}) : tab === "settings" ? loadAppSettingsData : tab === "project" || tab === "workflows" ? () => loadProjectData(selectedProject) : tab === "backlog" ? () => loadBacklogData(selectedProject) : tab === "teams" ? loadTeamsData : tab === "initiative" ? () => loadProjectData(selectedProject) : tab === "onboard" ? loadOnboardData : tab === "inbox" ? loadInboxData : async () => api("/notifications?limit=200");
     const loading = loader();
     if (!selectedProject) rememberedProject();
+    askAppearance();
     loading.then(
       (result) => {
         if (!current || serial !== loadSerial.current) return;

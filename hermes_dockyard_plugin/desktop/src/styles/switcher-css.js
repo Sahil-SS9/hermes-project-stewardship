@@ -29,6 +29,7 @@ export const SWITCHER_CSS = `
   background: var(--dy-accent-soft); color: var(--dy-accent-text);
   font-size: 10.5px; font-weight: 750; letter-spacing: 0.02em; line-height: 1;
 }
+.dockyard-root .dy-sw-avatar[data-initials]::before { content: attr(data-initials); }
 .dockyard-root .dy-sw-avatar[data-all] { border-color: var(--dy-border); background: var(--dy-surface-strong); color: var(--dy-text-2); }
 .dockyard-root .dy-sw-avatar svg { width: 14px; height: 14px; }
 .dockyard-root .dy-sw-avatar.lg { width: 34px; height: 34px; border-radius: 9px; font-size: 12px; }

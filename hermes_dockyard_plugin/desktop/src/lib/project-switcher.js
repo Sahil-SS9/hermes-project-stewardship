@@ -47,12 +47,16 @@ export function projectMeta(project) {
   return parts.join(' · ')
 }
 
+// Initials are drawn by CSS (attr()), not written as text: a project's name
+// reads exactly ("atlas-mobile", not "AM atlas-mobile") for screen readers,
+// copy and the journeys that read the switcher.
 export function ProjectAvatar({ project, all = false, size = '' }) {
   return jsx('span', {
     className: `dy-sw-avatar${size ? ` ${size}` : ''}`,
     'data-all': all ? 'true' : undefined,
+    'data-initials': all ? undefined : initials(projectName(project)),
     'aria-hidden': true,
-    children: all ? jsx(Icon, { name: 'layers' }) : initials(projectName(project)),
+    children: all ? jsx(Icon, { name: 'layers' }) : null,
   })
 }
 

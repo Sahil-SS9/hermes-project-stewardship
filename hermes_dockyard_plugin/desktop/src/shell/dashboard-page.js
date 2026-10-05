@@ -76,18 +76,24 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   // Desktop's own light/dark mode live (until now nothing set dark mode).
   const [appearance, setAppearance] = useState({ theme: DEFAULT_THEME, font: DEFAULT_FONT })
   const [hostDark, setHostDark] = useState(() => hostIsDark())
-  useEffect(() => {
-    let live = true
+  // Asked for once, right after the first data load starts: the dashboard
+  // stays the first request (same rule as the remembered project below).
+  const appearanceAsked = useRef(false)
+  const askAppearance = () => {
+    if (appearanceAsked.current) return
+    appearanceAsked.current = true
     api('/settings/appearance').then(
-      (saved) => { if (live && saved) setAppearance({ theme: themeById(saved.theme).id, font: fontById(saved.font).id }) },
+      (saved) => { if (saved) setAppearance({ theme: themeById(saved.theme).id, font: fontById(saved.font).id }) },
       () => {}, // unavailable: the defaults stand
     )
+  }
+  useEffect(() => {
     const read = () => setHostDark(hostIsDark())
-    const watcher = new MutationObserver(read)
-    watcher.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-hermes-mode'] })
+    const watcher = typeof MutationObserver === 'function' ? new MutationObserver(read) : null
+    watcher?.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-hermes-mode'] })
     const media = window.matchMedia?.('(prefers-color-scheme: dark)')
     media?.addEventListener?.('change', read)
-    return () => { live = false; watcher.disconnect(); media?.removeEventListener?.('change', read) }
+    return () => { watcher?.disconnect(); media?.removeEventListener?.('change', read) }
   }, [])
   const appearanceRef = useRef(appearance)
   appearanceRef.current = appearance
@@ -216,6 +222,7 @@ export function DashboardPage({ inboxCss = '' } = {}) {
     const loading = loader()
     // No project picked yet: ask for the remembered one alongside this load.
     if (!selectedProject) rememberedProject()
+    askAppearance()
     loading.then(
       (result) => {
         if (!current || serial !== loadSerial.current) return
