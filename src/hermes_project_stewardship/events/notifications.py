@@ -44,8 +44,8 @@ from ..events.bus import (
     INITIATIVE_REJECTED,
     PROJECT_CRITICAL,
     VERIFICATION_FAILED,
-    WORK_OWNED,
-    WORK_UNOWNED,
+    WORK_ASSIGNED,
+    WORK_UNASSIGNED,
 )
 from ..persistence.service import ServiceError, StewardshipService
 from ..persistence.store import Store, iso
@@ -60,7 +60,7 @@ _EVENT_MAP = {
     HEALTH_CHANGED: ("health_change", None),  # severity derived from target state
     APPROVAL_REQUIRED: ("approval_required", "high"),
     # A gentle note (medium: in the app, never a desktop pop-up by default).
-    WORK_UNOWNED: ("unowned_work", "medium"),
+    WORK_UNASSIGNED: ("unassigned_work", "medium"),
 }
 
 _AUTO_RESOLVE_EVENTS = (INITIATIVE_APPROVED, INITIATIVE_REJECTED)
@@ -583,7 +583,7 @@ class NotificationEngine:
         subject = event.get("subject")
         # Dedupe on WHAT happened, not which cycle saw it: subject is
         # deliberately excluded so repeat signals collapse inside the window.
-        if kind in ("approval_required", "unowned_work"):
+        if kind in ("approval_required", "unassigned_work"):
             # One open notification per item, whichever cycle or screen raised it.
             dedupe_key = f"{kind}:{subject or ''}"
         else:
@@ -604,7 +604,7 @@ class NotificationEngine:
             title=title,
             body=body,
             dedupe_key=dedupe_key,
-            ref=subject if kind in ("approval_required", "unowned_work") else None,
+            ref=subject if kind in ("approval_required", "unassigned_work") else None,
             delivered_at=delivered,
         )
 
@@ -654,15 +654,15 @@ class NotificationEngine:
             return f"{event.get('project_id')}: health {payload.get('from') or 'none'} → {payload.get('to')}"
         if etype == APPROVAL_REQUIRED:
             return f"Approval needed: {event.get('subject')}"
-        if etype == WORK_UNOWNED:
+        if etype == WORK_UNASSIGNED:
             title = payload.get("title")
-            return f"{event.get('subject')}{f' {title}' if title else ''} has no owner"
+            return f"{event.get('subject')}{f' {title}' if title else ''} is unassigned"
         return etype
 
     @staticmethod
     def _body(event: Dict[str, Any], kind: str, payload: Dict[str, Any]) -> str:
-        if event.get("event_type") == WORK_UNOWNED:
-            return "No bot will pick it up until someone owns it."
+        if event.get("event_type") == WORK_UNASSIGNED:
+            return "No bot will pick it up until it is assigned."
         parts = []
         if payload.get("score") is not None:
             parts.append(f"score={payload['score']}")
@@ -682,12 +682,12 @@ class NotificationEngine:
         etype = str(event.get("event_type"))
         ref = event.get("subject")
         project_id = event.get("project_id")
-        if etype == WORK_OWNED:
+        if etype == WORK_ASSIGNED:
             if ref and project_id:
                 self._auto_resolve_state(
-                    project_id, kinds=("unowned_work",),
-                    dedupe_key=f"unowned_work:{ref}", note=None,
-                    note_template="owner set: {ref}", note_ref=ref)
+                    project_id, kinds=("unassigned_work",),
+                    dedupe_key=f"unassigned_work:{ref}", note=None,
+                    note_template="assigned: {ref}", note_ref=ref)
             return
         if etype == HEALTH_CHANGED:
             if (event.get("payload") or {}).get("to") == "healthy":
@@ -1087,7 +1087,7 @@ class NotificationEngine:
             return "s1:dashboard"
         if "handoff" in kind or "a2a" in kind:
             return "s5:bot-teams"
-        if kind == "unowned_work" and ref:
+        if kind == "unassigned_work" and ref:
             return f"s2:work/{ref}"
         if project_id:
             return f"s2:project/{project_id}"

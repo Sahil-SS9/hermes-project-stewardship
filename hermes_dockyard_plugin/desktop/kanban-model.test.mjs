@@ -228,7 +228,8 @@ test('a saved view round-trips; views saved before r6 still open', () => {
 })
 
 test('views read as words, and new names never clash', () => {
-  assert.equal(m.describeDefinition(m.defaultDefinition()), 'Board · Summary cards')
+  assert.equal(m.describeDefinition(m.defaultDefinition()), 'Board')
+  assert.equal(m.describeDefinition({ ...m.defaultDefinition(), density: 'detailed' }), 'Board · All cards open')
   assert.equal(m.describeDefinition({ ...m.defaultDefinition(), layout: 'list', filters: { ...m.emptyFilters(), assignee: 'ada-lovelace', label: 'mobile' } }),
     'List · Assignee Ada Lovelace · Label mobile')
   assert.equal(m.freeName('Mine', ['Mine', 'Mine (2)']), 'Mine (3)')

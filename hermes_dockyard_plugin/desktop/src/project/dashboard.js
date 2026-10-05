@@ -27,6 +27,7 @@ import { FirstAssessmentCard } from '../views/dashboard.js'
 import { PageHead } from '../lib/ui.js'
 import { WorkItemDetail } from '../work-item/detail.js'
 import { KanbanScreen } from '../kanban/board.js'
+import { PlanningPanel } from './workflows.js'
 export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap }) {
   const [projectView, setProjectView] = useState(initialView || 'overview')
   // QA M-7: leaving the Planning view with unsaved board edits asks first.
@@ -100,7 +101,12 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
   } else if (projectView === 'initiative') {
     panel = jsx(InitiativeView, { view, onRefresh })
   } else if (projectView === 'objectives') {
-    panel = jsx(ObjectivesPanel, { project, settings: view.settings ?? {}, objectives: view.objectives ?? [], goals: view.goals ?? [], missionArchive: view.missionArchive ?? [], onRefresh }, project.id)
+    // Sahil 05/10: milestones left the Kanban. Until the single planning screen
+    // (demo feedback f), they are managed here, with the objectives.
+    panel = jsxs(Fragment, { children: [
+      jsx(ObjectivesPanel, { project, settings: view.settings ?? {}, objectives: view.objectives ?? [], goals: view.goals ?? [], missionArchive: view.missionArchive ?? [], onRefresh }, project.id),
+      jsx(PlanningPanel, { project, milestones: view.milestones ?? [], workItems: view.workItems ?? [], onRefresh }, 'milestones'),
+    ] })
   } else if (projectView === 'planning') {
     panel = jsx(PlanningCanvasPanel, { project, canvas: view.canvas, content: view.content ?? [], onRefresh, onDirty: onCanvasDirty }, project.id)
   } else if (projectView === 'workflows') {
@@ -153,7 +159,7 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
           jsx('p', { children: 'Live work, ownership and stage.' }),
           visibleWork.length > 0 ? jsx('div', { className: 'dockyard-overview-list', children:
             visibleWork.map((item) => jsxs('article', { children: [
-              jsxs('span', { children: [jsx('strong', { children: item.title || item.ref }), jsx('small', { children: `${item.ref} / ${item.assignee || 'No owner'}` })] }),
+              jsxs('span', { children: [jsx('strong', { children: item.title || item.ref }), jsx('small', { children: `${item.ref} / ${item.assignee || 'Unassigned'}` })] }),
               jsx(StatusTag, { tone: ['done', 'completed'].includes(item.status) ? 'success' : item.status === 'in_progress' ? 'info' : 'neutral', label: String(item.status || 'unknown').replaceAll('_', ' ') }),
             ]}, item.ref)),
           })

@@ -22,7 +22,6 @@ import { plural } from '../lib/ui.js'
 import { api } from '../runtime/context.js'
 import { emitToast } from '../runtime/context.js'
 import { readableLabel } from '../data/loaders.js'
-import { PlanningPanel } from '../project/workflows.js'
 import { WorkTable } from './table.js'
 import {
   STAGES, stageKeyOf, stageLabel, groupByStage, unplacedItems, dropStatusOf, movesFor, typeLabel, initialsOf,
@@ -43,11 +42,11 @@ const statusText = (status) => {
 
 function Avatar({ name }) {
   const initials = initialsOf(name)
-  return jsx('span', { className: initials ? 'dy-kb-avatar' : 'dy-kb-avatar empty', title: name ? displayName(name) : 'No owner', 'aria-hidden': true, children: initials })
+  return jsx('span', { className: initials ? 'dy-kb-avatar' : 'dy-kb-avatar empty', title: name ? displayName(name) : 'Unassigned', 'aria-hidden': true, children: initials })
 }
 
 // The expanded part of a card: labelled sections, then the actions.
-function CardBody({ id, item, facts, moves, moving, today, onMove, onOpenItem, onOpenRef, onNavigate, onMilestones }) {
+function CardBody({ id, item, facts, moves, moving, today, onMove, onOpenItem, onOpenRef, onNavigate }) {
   const linkRow = (card) => jsx('li', { children: jsxs('button', { type: 'button', className: 'dy-kb-link', 'data-link-ref': card.ref, 'data-done': card.done ? 'true' : undefined,
     title: `Open ${card.ref}`, onClick: () => onOpenRef(card.ref), children: [
       jsx('span', { className: 'dy-kb-key', children: card.ref }),
@@ -60,10 +59,10 @@ function CardBody({ id, item, facts, moves, moving, today, onMove, onOpenItem, o
 
   const planning = []
   if (facts.initiative) planning.push(row('Initiative', goto('Initiative', () => onNavigate('roadmap'), facts.initiative.title || facts.initiative.ref)))
-  facts.milestones.forEach((milestone, index) => planning.push(row('Milestone', goto('Milestone', onMilestones, milestone.due ? `${milestone.name} · due ${shortDate(milestone.due, today)}` : milestone.name), {}, `milestone:${index}`)))
+  facts.milestones.forEach((milestone, index) => planning.push(row('Milestone', goto('Milestone', () => onNavigate('objectives'), milestone.due ? `${milestone.name} · due ${shortDate(milestone.due, today)}` : milestone.name), {}, `milestone:${index}`)))
   facts.objectives.forEach((objective, index) => planning.push(row('Objective', jsxs('span', { children: [goto('Objective', () => onNavigate('objectives'), objective.name), jsx('span', { className: 'dy-kb-via', children: ' (through the initiative)' })] }), {}, `objective:${index}`)))
 
-  const details = [row('Assignee', item.assignee ? displayName(item.assignee) : 'No owner')]
+  const details = [row('Assignee', item.assignee ? displayName(item.assignee) : 'Unassigned')]
   if (facts.due) details.push(row('Due', facts.overdue ? `${shortDate(facts.due, today)} · Overdue` : shortDate(facts.due, today), facts.overdue ? { 'data-overdue': 'true' } : {}))
   if (facts.labels.length) details.push(row('Labels', facts.labels.join(', ')))
 
@@ -97,7 +96,7 @@ function Card({ item, facts, fields, open, moves, moving, today, onToggle, onDra
   return jsxs('article', { className: 'dockyard-work-card', 'data-work-card': item.ref, 'data-open': open ? 'true' : 'false', 'data-type': item.type || 'task',
     draggable: moves.targets.length > 0 && !moving, onDragStart, onDragEnd, children: [
     jsxs('button', { type: 'button', className: 'dy-kb-card-toggle', 'data-card-toggle': item.ref, 'aria-expanded': open, 'aria-controls': open ? bodyId : undefined,
-      'aria-label': `${typeLabel(item.type)} ${item.ref}: ${item.title}${fields.assignee ? `, ${item.assignee ? `assigned to ${displayName(item.assignee)}` : 'no owner'}` : ''}`,
+      'aria-label': `${typeLabel(item.type)} ${item.ref}: ${item.title}${fields.assignee ? `, ${item.assignee ? `assigned to ${displayName(item.assignee)}` : 'unassigned'}` : ''}`,
       'aria-describedby': hasSummary ? summaryId : undefined, onClick: () => onToggle(item.ref, !open), children: [
       jsxs('span', { className: 'dy-kb-card-top', children: [
         jsxs('span', { className: 'dy-kb-type', 'data-type': item.type || 'task', title: typeLabel(item.type), children: [jsx(Icon, { name: typeIcon(item.type) }), jsx('span', { children: typeLabel(item.type) })] }),
@@ -245,7 +244,6 @@ function ViewsPanel({ views, currentName, working, edited, startNew, busy, error
 const HELD = 'kanban-view'
 
 export function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onNavigate, appliedView, setAppliedView }) {
-  const [page, setPage] = useState('work')
   const [overrides, setOverrides] = useState({})
   const [collapsed, setCollapsed] = useState({})
   const [dragged, setDragged] = useState(null)
@@ -319,7 +317,7 @@ export function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenIt
   const setWorking = (next) => updateHeld((base) => ({ drafts: { ...base.drafts, [draftKey(currentName)]: next } }))
   const setFilters = (filters) => setWorking({ ...working, filters })
   const dropDraft = (name) => updateHeld((base) => { const drafts = { ...base.drafts }; delete drafts[draftKey(name)]; return { drafts } })
-  const selectView = (name) => { setPage('work'); setOverrides({}); updateHeld(() => ({ currentName: name })) }
+  const selectView = (name) => { setOverrides({}); updateHeld(() => ({ currentName: name })) }
 
   const allItems = view.workItems ?? []
   const factData = { deps: deps.data ?? {}, initiatives: view.initiatives ?? [], milestones: view.milestones ?? [], roadmapProject: roadmap.data }
@@ -434,7 +432,7 @@ export function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenIt
   const viewTab = (saved) => {
     const name = saved ? saved.name : null
     const label = saved ? saved.name : ALL_WORK
-    const active = page === 'work' && name === currentName
+    const active = name === currentName
     return jsxs('button', { type: 'button', className: 'dy-kb-viewtab', 'data-view-tab': label, 'aria-pressed': active, title: saved ? describeDefinition(definitionOf(saved)) : 'Everything, on the board', onClick: () => selectView(name), children: [
       jsx('span', { className: 'dy-kb-viewtab-name', children: label }),
       editedNames.has(name) ? jsx('span', { className: 'dy-kb-dot', 'aria-label': 'unsaved changes', role: 'img' }) : null,
@@ -447,7 +445,6 @@ export function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenIt
       jsxs('button', { type: 'button', className: 'dy-kb-viewtab dy-kb-viewtab-new', 'data-view-new': true, onClick: () => openPanel('new'), children: [jsx(Icon, { name: 'plus' }), jsx('span', { children: 'New view' })] }, 'new'),
     ]}),
     jsxs('div', { className: 'dy-kb-views-right', children: [
-      jsxs('button', { type: 'button', className: 'dy-kb-control dy-kb-button', 'data-kanban-page': 'milestones', 'aria-pressed': page === 'milestones', onClick: () => setPage(page === 'milestones' ? 'work' : 'milestones'), children: [jsx(Icon, { name: 'flag' }), 'Milestones'] }),
       jsxs('button', { type: 'button', className: 'dy-kb-control dy-kb-button', ref: manageRef, 'data-views-manage': true, 'aria-expanded': Boolean(panel), onClick: () => (panel ? setPanel(null) : openPanel('manage')), children: [jsx(Icon, { name: 'list-filter' }), 'Manage views'] }),
     ]}),
   ]})
@@ -471,7 +468,10 @@ export function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenIt
     jsx('button', { type: 'button', className: 'dy-kb-control dy-kb-button', 'data-kanban-clear': true, disabled: !filtersActive(filters), onClick: () => setFilters(emptyFilters()), children: 'Clear filters' }),
     jsx('span', { className: 'dy-kb-toolbar-gap', 'aria-hidden': true }),
     segmented('Layout', 'layout', working.layout, [['board', 'Board'], ['list', 'List']], (layout) => setWorking({ ...working, layout })),
-    working.layout === 'board' ? segmented('Cards', 'density', working.density, [['compact', 'Summary'], ['detailed', 'Expanded']], (density) => { setOverrides({}); setWorking({ ...working, density }) }) : null,
+    // Sahil 05/10: "Expanded" did not say what it did. One button opens (or closes) every card.
+    working.layout === 'board' ? jsxs('button', { type: 'button', className: 'dy-kb-control dy-kb-button', 'data-kanban-open-all': true, 'aria-pressed': working.density === 'detailed',
+      title: "Show every card's details without opening each one", onClick: () => { setOverrides({}); setWorking({ ...working, density: working.density === 'detailed' ? 'compact' : 'detailed' }) },
+      children: [jsx(Icon, { name: 'chevron-down' }), 'Open all cards'] }) : null,
     jsx('span', { className: 'dy-kb-count', 'data-kanban-count': true, role: 'status', children: `${number(liveCount)} ${plural(liveCount, 'item')}` }),
   ]})
 
@@ -522,7 +522,7 @@ export function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenIt
       onToggle: (ref, open) => setOverrides((current) => ({ ...current, [ref]: open })),
       onDragStart: (event) => { event.dataTransfer.setData('text/plain', item.ref); event.dataTransfer.effectAllowed = 'move'; setDragged({ ref: item.ref, project: project.id, from: stageKey, targets: moves.targets.map((target) => target.key) }) },
       onDragEnd: () => setDragged(null),
-      onMove: transitionStatus, onOpenItem, onOpenRef: openRef, onNavigate, onMilestones: () => setPage('milestones'),
+      onMove: transitionStatus, onOpenItem, onOpenRef: openRef, onNavigate,
     }, item.ref)
   }
   const column = (stage) => {
@@ -569,7 +569,7 @@ export function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenIt
     { key: 'title', heading: 'Title', cell: (item) => item.title },
     { key: 'type', heading: 'Type', cell: (item) => typeLabel(item.type) },
     { key: 'status', heading: 'State', cell: (item) => statusText(item.status) },
-    { key: 'assignee', heading: 'Assignee', cell: (item) => item.assignee ? displayName(item.assignee) : 'No owner' },
+    { key: 'assignee', heading: 'Assignee', cell: (item) => item.assignee ? displayName(item.assignee) : 'Unassigned' },
     { key: 'blocked_by', heading: 'Blocked by', cell: (item) => refsCell(facts(item).blockedBy) },
     { key: 'blocks', heading: 'Blocks', cell: (item) => refsCell(facts(item).blocks) },
     { key: 'initiative', heading: 'Initiative', cell: (item) => facts(item).initiative ? (facts(item).initiative.title || facts(item).initiative.ref) : '' },
@@ -582,9 +582,8 @@ export function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenIt
     groups: STAGES.map((stage) => ({ key: stage.key, label: stage.label, items: grouped[stage.key] })).filter((group) => group.items.length > 0),
     emptyText: 'No work items to list.' }) }, 'list')
 
-  const body = page === 'milestones'
-    ? [jsx(PlanningPanel, { project, milestones: view.milestones ?? [], workItems: allItems, onRefresh }, 'milestones')]
-    : [jsxs('div', { className: 'dy-kb-controls', children: [toolbar, editedStrip, help] }, 'controls'), ...notes, empty, working.layout === 'list' ? list : board]
+  // Milestones are managed with the project's Objectives (Sahil 05/10), not on the board.
+  const body = [jsxs('div', { className: 'dy-kb-controls', children: [toolbar, editedStrip, help] }, 'controls'), ...notes, empty, working.layout === 'list' ? list : board]
 
   return jsxs('div', { className: 'dockyard-board-wrap', 'data-kanban-screen': true, 'data-view': currentName ?? ALL_WORK, 'data-panel-open': panel ? 'true' : undefined, children: [
     viewsBar,

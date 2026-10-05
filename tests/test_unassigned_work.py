@@ -1,17 +1,17 @@
-"""Work with no owner: allowed, and never silent.
+"""Unassigned work: allowed, and never silent.
 
-Sahil's demo feedback (04/10, point b): a new Backlog item can be created with
-no owner, and an existing item can lose its owner. Hermes never dispatches work
-with no owner, so the app says so: a gentle notification (medium: in the app,
-not a desktop pop-up by default) that links to the item, one per item, which
-resolves itself as soon as the item has an owner.
+Sahil's demo feedback (04/10, point b; wording 05/10): a new Backlog item can be
+created unassigned, and an existing item can be unassigned. Hermes never
+dispatches unassigned work, so the app says so: a gentle notification (medium:
+in the app, not a desktop pop-up by default) that links to the item, one per
+item, which resolves itself as soon as the item is assigned.
 
 Rules pinned here:
-- POST /backlog/items without an assignee creates an item with no owner.
-- That raises one "unowned_work" notification for the item; an owned item raises none.
-- Removing the owner raises it; giving an owner resolves it ("owner set: <ref>").
+- POST /backlog/items without an assignee creates an unassigned item.
+- That raises one "unassigned_work" notification for the item; an assigned item raises none.
+- Unassigning raises it; assigning resolves it ("assigned: <ref>").
 - Epics never raise it (they are never assigned).
-- Repeating the removal while one is open does not stack a second notification.
+- Unassigning again while one is open does not stack a second notification.
 - A creator still cannot name themselves as the assignee.
 - Through the real plugin proxy the Desktop may omit the assignee.
 """
@@ -47,7 +47,7 @@ def _enable(store, *pids):
 
 @pytest.fixture()
 def client(tmp_path):
-    store = Store(tmp_path / "unowned.db")
+    store = Store(tmp_path / "unassigned.db")
     _enable(store, "p1")
     yield TestClient(create_app(store, kanban_adapter=ReferenceKanbanAdapter(store)))
     store.close()
@@ -70,46 +70,46 @@ def _assign(client, ref, assignee):
     return response.json()
 
 
-def _unowned(client, state=None):
-    params = {"kind": "unowned_work", **({"state": state} if state else {})}
+def _unassigned(client, state=None):
+    params = {"kind": "unassigned_work", **({"state": state} if state else {})}
     return client.get(f"{V}/notifications", params=params).json()["notifications"]
 
 
-def test_a_new_item_may_have_no_owner_and_the_app_says_so(client):
-    item = _create(client, "Nobody owns this yet")
+def test_a_new_item_may_be_unassigned_and_the_app_says_so(client):
+    item = _create(client, "Nobody has this yet")
     assert item["assignee"] is None
-    [note] = _unowned(client)
+    [note] = _unassigned(client)
     assert note["ref"] == item["ref"]
-    assert note["title"] == f"{item['ref']} Nobody owns this yet has no owner"
-    assert note["body"] == "No bot will pick it up until someone owns it."
+    assert note["title"] == f"{item['ref']} Nobody has this yet is unassigned"
+    assert note["body"] == "No bot will pick it up until it is assigned."
     assert note["severity"] == "medium"
     assert note["deep_link"] == f"s2:work/{item['ref']}"
 
 
-def test_an_owned_item_raises_nothing(client):
-    _create(client, "Owned from the start", assignee="worker")
-    assert _unowned(client) == []
+def test_an_assigned_item_raises_nothing(client):
+    _create(client, "Assigned from the start", assignee="worker")
+    assert _unassigned(client) == []
 
 
-def test_removing_the_owner_raises_it_and_giving_one_resolves_it(client):
-    item = _create(client, "Owned, then not", assignee="worker")
+def test_unassigning_raises_it_and_assigning_resolves_it(client):
+    item = _create(client, "Assigned, then not", assignee="worker")
     assert _assign(client, item["ref"], None)["assignee"] is None
-    [note] = _unowned(client)
+    [note] = _unassigned(client)
     assert note["state"] != "resolved"
     _assign(client, item["ref"], None)  # again, while it is still open: no second one
-    assert len(_unowned(client)) == 1
+    assert len(_unassigned(client)) == 1
     assert _assign(client, item["ref"], "worker")["assignee"] == "worker"
-    [resolved] = _unowned(client)
+    [resolved] = _unassigned(client)
     assert resolved["state"] == "resolved"
-    assert resolved["resolution_note"] == f"owner set: {item['ref']}"
-    _assign(client, item["ref"], "lead")  # owner to owner: nothing new
-    assert len(_unowned(client)) == 1
+    assert resolved["resolution_note"] == f"assigned: {item['ref']}"
+    _assign(client, item["ref"], "lead")  # assignee to assignee: nothing new
+    assert len(_unassigned(client)) == 1
 
 
 def test_epics_never_raise_it(client):
     epic = _create(client, "A whole programme", kind="epic")
     assert epic["assignee"] is None
-    assert _unowned(client) == []
+    assert _unassigned(client) == []
 
 
 def test_a_creator_still_cannot_assign_themselves(client):
@@ -126,7 +126,7 @@ def test_the_desktop_may_omit_the_assignee_through_the_real_proxy(tmp_path, monk
     monkeypatch.setenv("DOCKYARD_ACTOR_ID", "trusted-desktop")
     monkeypatch.delenv("STEWARD_RPC_TOKEN", raising=False)
     monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", TOKEN)
-    spec = importlib.util.spec_from_file_location("unowned_work_isolated_proxy", PROXY)
+    spec = importlib.util.spec_from_file_location("unassigned_work_isolated_proxy", PROXY)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     _enable(module._store, "p1")
@@ -136,10 +136,10 @@ def test_the_desktop_may_omit_the_assignee_through_the_real_proxy(tmp_path, monk
     host = FastAPI()
     host.include_router(module.plugin_api, prefix=BASE)
     proxy = TestClient(host)
-    # The exact body the Backlog create form sends for "No owner".
+    # The exact body the Backlog create form sends for "Unassigned".
     created = proxy.post(f"{BASE}/projects/p1/backlog/items", headers=HEADERS, json={
         "type": "task", "title": "Made in the Desktop", "body": None, "labels": [], "evidence_refs": [],
         "assignee_id": None, "assignee_kind": "bot", "initiative_ref": None, "parent_ref": None,
-        "estimate_days": None, "due": None, "rank": 1, "reason": "made with no owner"})
+        "estimate_days": None, "due": None, "rank": 1, "reason": "made unassigned"})
     assert created.status_code == 200, created.text
     assert created.json()["assignee"] is None

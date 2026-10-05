@@ -17,6 +17,12 @@ import { Icon } from '../lib/ui.js'
 import { Button } from '../lib/ui.js'
 import { ConfirmDialog } from '../lib/ui.js'
 import { readableLabel } from '../data/loaders.js'
+// What Content accepts (the backend checks again). Sahil 05/10: videos up to 25 MB.
+const EXTENSION_TYPES = { txt: 'text/plain', md: 'text/markdown', pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', mp4: 'video/mp4', webm: 'video/webm' }
+const mediaTypeOf = (file) => file?.type || EXTENSION_TYPES[String(file?.name ?? '').toLowerCase().split('.').pop()] || ''
+const limitOf = (mediaType) => (mediaType.startsWith('video/') ? 25 : 5) * 1024 * 1024
+const tooBig = (file) => Boolean(file) && file.size > limitOf(mediaTypeOf(file))
+
 export function ProjectContentPanel({ project, content, onRefresh }) {
   const [items, setItems] = useState(content ?? [])
   const [selected, setSelected] = useState(null)
@@ -27,14 +33,14 @@ export function ProjectContentPanel({ project, content, onRefresh }) {
   const [contentAction, setContentAction] = useState(null)
   const [actionBusy, setActionBusy] = useState(false)
   const encoded = encodeURIComponent(project.id)
-  // Sahil 04/10 (demo feedback g): a PDF shows through an object URL (Chromium
-  // will not frame a data: PDF). It is released when the selection changes.
-  const [pdfUrl, setPdfUrl] = useState(null)
+  // Sahil 04/10 (demo feedback g): a PDF or a video plays from an object URL
+  // (Chromium will not frame a data: PDF). It is released when the selection changes.
+  const [mediaUrl, setMediaUrl] = useState(null)
   useEffect(() => {
-    if (previewState !== 'ready' || selected?.preview_kind !== 'pdf' || !selected?.data_base64) { setPdfUrl(null); return undefined }
+    if (previewState !== 'ready' || !['pdf', 'video'].includes(selected?.preview_kind) || !selected?.data_base64) { setMediaUrl(null); return undefined }
     const bytes = Uint8Array.from(atob(selected.data_base64), (char) => char.charCodeAt(0))
-    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
-    setPdfUrl(url)
+    const url = URL.createObjectURL(new Blob([bytes], { type: selected.media_type }))
+    setMediaUrl(url)
     return () => URL.revokeObjectURL(url)
   }, [selected, previewState])
   const openPreview = async (item) => {
@@ -50,13 +56,12 @@ export function ProjectContentPanel({ project, content, onRefresh }) {
     }
   }
   const upload = async () => {
-    if (!file || file.size <= 0 || file.size > 5 * 1024 * 1024) return
+    if (!file || file.size <= 0 || tooBig(file)) return
     setUploading(true)
     setError(null)
     try {
-      const extension = file.name.toLowerCase().split('.').pop()
-      const mediaType = file.type || ({ txt: 'text/plain', md: 'text/markdown', pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' }[extension])
-      if (!mediaType) throw new Error('Choose a text, Markdown, PDF, PNG, JPEG or WebP file.')
+      const mediaType = mediaTypeOf(file)
+      if (!mediaType) throw new Error('Choose a text, Markdown, PDF, PNG, JPEG, WebP, MP4 or WebM file.')
       const contentBase64 = await fileAsBase64(file)
       const created = await api(`/projects/${encoded}/content`, {
         method: 'POST',
@@ -108,12 +113,12 @@ export function ProjectContentPanel({ project, content, onRefresh }) {
       jsxs('div', { className: 'dockyard-upload-panel', children: [
         jsxs('label', { className: 'dockyard-upload-dropzone', children: [
           jsx('span', { children: file ? file.name : 'Choose supporting content' }),
-          jsx('small', { children: file ? `${formatBytes(file.size)} selected` : 'Text, Markdown, PDF or image. Maximum 5 MB.' }),
-          jsx('input', { type: 'file', 'data-content-file': true, accept: '.txt,.md,.pdf,.png,.jpg,.jpeg,.webp,text/plain,text/markdown,application/pdf,image/png,image/jpeg,image/webp', onChange: (event) => { setFile(event.target.files?.[0] ?? null); setError(null) } }),
+          jsx('small', { children: file ? `${formatBytes(file.size)} selected` : 'Text, Markdown, PDF or image up to 5 MB, or an MP4 or WebM video up to 25 MB.' }),
+          jsx('input', { type: 'file', 'data-content-file': true, accept: '.txt,.md,.pdf,.png,.jpg,.jpeg,.webp,.mp4,.webm,text/plain,text/markdown,application/pdf,image/png,image/jpeg,image/webp,video/mp4,video/webm', onChange: (event) => { setFile(event.target.files?.[0] ?? null); setError(null) } }),
         ]}),
-        jsx(Button, { action: 'upload-project-content', variant: 'primary', disabled: uploading || !file || file.size <= 0 || file.size > 5 * 1024 * 1024, onClick: upload, children: uploading ? 'Uploading...' : 'Upload content' }),
+        jsx(Button, { action: 'upload-project-content', variant: 'primary', disabled: uploading || !file || file.size <= 0 || tooBig(file), onClick: upload, children: uploading ? 'Uploading...' : 'Upload content' }),
       ]}),
-      file && file.size > 5 * 1024 * 1024 ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: 'This file exceeds the 5 MB limit.' }) : null,
+      tooBig(file) ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: `This file exceeds the ${limitOf(mediaTypeOf(file)) / (1024 * 1024)} MB limit.` }) : null,
       error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
     ]}),
     jsxs('aside', { className: 'dockyard-feature-card dockyard-content-preview-card', children: [
@@ -124,12 +129,14 @@ export function ProjectContentPanel({ project, content, onRefresh }) {
         ? jsx('pre', { 'data-content-preview': true, className: 'dockyard-content-preview', children: selected.text || 'This text file is empty.' })
         : previewState === 'ready' && selected?.preview_kind === 'image' && selected.data_base64
           ? jsx('img', { 'data-content-preview': true, 'data-preview-kind': 'image', className: 'dockyard-content-image', alt: selected.filename, src: `data:${selected.media_type};base64,${selected.data_base64}` })
-        : previewState === 'ready' && selected?.preview_kind === 'pdf' && pdfUrl
-          ? jsx('iframe', { 'data-content-preview': true, 'data-preview-kind': 'pdf', className: 'dockyard-content-pdf', title: `PDF preview: ${selected.filename}`, src: pdfUrl })
+        : previewState === 'ready' && selected?.preview_kind === 'pdf' && mediaUrl
+          ? jsx('iframe', { 'data-content-preview': true, 'data-preview-kind': 'pdf', className: 'dockyard-content-pdf', title: `PDF preview: ${selected.filename}`, src: mediaUrl })
+        : previewState === 'ready' && selected?.preview_kind === 'video' && mediaUrl
+          ? jsx('video', { 'data-content-preview': true, 'data-preview-kind': 'video', className: 'dockyard-content-video', controls: true, preload: 'metadata', 'aria-label': `Video: ${selected.filename}`, src: mediaUrl })
         : previewState === 'ready'
           ? jsx('div', { 'data-content-preview': true, className: 'dockyard-report-placeholder', children: `Preview is not available for ${mediaTypeLabel(selected?.media_type)}. File metadata remains visible.` })
           : previewState === 'idle'
-            ? jsx('p', { className: 'dockyard-meta', children: 'Text, Markdown, images and PDFs show here. Other formats show verified metadata.' })
+            ? jsx('p', { className: 'dockyard-meta', children: 'Text, Markdown, images, PDFs and videos show here.' })
             : null,
       selected ? jsxs('div', { className: 'dockyard-form-actions', children: [
         selected.archived_at

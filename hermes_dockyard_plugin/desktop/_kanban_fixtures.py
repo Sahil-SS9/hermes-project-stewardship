@@ -77,6 +77,6 @@ def seed_kanban_fixtures(service, adapter, roadmap, *, owner: str) -> None:
     every_field = ["assignee", "links", "due", "labels", "planning"]
     dy.view_save(pid, "Ada's work", "board", actor=me, filters={
         "assignee": "ada-lovelace", "display": {"density": "compact", "fields": ["assignee", "links", "due", "labels"]}})
-    dy.view_save(pid, "Mobile, expanded", "board", actor=me, shared=True, filters={
+    dy.view_save(pid, "Mobile, all cards open", "board", actor=me, shared=True, filters={
         "labels": ["mobile"], "display": {"density": "detailed", "fields": every_field}})
     dy.view_save(pid, "Grace's bugs", "table", actor=grace, shared=True, filters={"types": ["bug"]})

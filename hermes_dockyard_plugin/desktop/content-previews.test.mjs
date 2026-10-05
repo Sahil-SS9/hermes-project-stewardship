@@ -1,5 +1,5 @@
-// Sahil's demo feedback (04/10, point g): images and PDFs show in the Content
-// tab. End-to-end through the REAL plugin bundle, proxy and backend (disposable
+// Sahil's demo feedback (04/10, point g; videos 05/10): images, PDFs and videos
+// show in the Content tab. End-to-end through the REAL plugin bundle, proxy and backend (disposable
 // data), project payments-relaunch: upload through the screen, open the item,
 // see the image drawn and the PDF framed from its exact stored bytes.
 // Headless Chromium cannot paint a PDF, so the PDF check is that the frame holds
@@ -12,8 +12,11 @@ const BASE = process.env.STEWARD_DESKTOP_URL
 const PROJECT = 'payments-relaunch'
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==', 'base64')
 const PDF = Buffer.from('%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n')
+// The EBML magic number the backend checks for WebM, then filler.
+const WEBM = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.alloc(20)])
+const MB = 1024 * 1024
 
-test('Content shows images and PDFs from their stored bytes', async () => {
+test('Content shows images, PDFs and videos from their stored bytes; videos may be 25 MB, other files 5 MB', async () => {
   assert.ok(BASE, 'Run via run-browser-suite.mjs')
   const browser = await chromium.launch({ headless: true })
   try {
@@ -50,6 +53,23 @@ test('Content shows images and PDFs from their stored bytes', async () => {
     assert.match(src, /^blob:/)
     const bytes = await page.evaluate(async (url) => Array.from(new Uint8Array(await (await fetch(url)).arrayBuffer())), src)
     assert.deepEqual(Buffer.from(bytes), PDF, 'the frame holds the stored PDF, byte for byte')
+
+    await (await upload('clip-preview.webm', 'video/webm', WEBM)).click()
+    const video = page.locator('[data-content-preview][data-preview-kind="video"]')
+    await video.waitFor()
+    assert.equal(await video.getAttribute('aria-label'), 'Video: clip-preview.webm')
+    assert.equal(await video.evaluate((node) => node.controls), true)
+    const videoBytes = await page.evaluate(async (url) => Array.from(new Uint8Array(await (await fetch(url)).arrayBuffer())), await video.getAttribute('src'))
+    assert.deepEqual(Buffer.from(videoBytes), WEBM, 'the player holds the stored video, byte for byte')
+
+    // Limits, before anything is sent: a 6 MB image is refused, a 6 MB video is fine.
+    const button = page.locator('[data-action="upload-project-content"]')
+    await page.locator('[data-content-file]').setInputFiles({ name: 'big.png', mimeType: 'image/png', buffer: Buffer.concat([PNG, Buffer.alloc(6 * MB)]) })
+    assert.match(await page.getByRole('alert').filter({ hasText: 'exceeds' }).innerText(), /This file exceeds the 5 MB limit\./)
+    assert.ok(await button.isDisabled())
+    await page.locator('[data-content-file]').setInputFiles({ name: 'long.webm', mimeType: 'video/webm', buffer: Buffer.concat([WEBM, Buffer.alloc(6 * MB)]) })
+    assert.equal(await page.getByRole('alert').filter({ hasText: 'exceeds' }).count(), 0)
+    assert.ok(await button.isEnabled())
 
     // Switching back to the image releases the PDF's object URL.
     await page.locator('[data-project-content-item]').filter({ hasText: 'pixel-preview.png' }).first().click()

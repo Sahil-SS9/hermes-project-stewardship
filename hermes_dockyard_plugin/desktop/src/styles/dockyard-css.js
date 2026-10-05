@@ -1610,9 +1610,10 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-section-fold:hover { background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-section-count { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .dockyard-root .dockyard-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-/* Content previews (Sahil 04/10): images and PDFs show in the Content tab. */
+/* Content previews (Sahil 04/10): images, PDFs and videos show in the Content tab. */
 .dockyard-root .dockyard-content-image { display: block; max-width: 100%; max-height: 520px; margin: 0 auto; object-fit: contain; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-content-pdf { display: block; width: 100%; height: 560px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); }
+.dockyard-root .dockyard-content-video { display: block; width: 100%; max-height: 520px; border-radius: 8px; background: var(--dy-surface-subtle); }
 /* App settings (Sahil 04/10): the whole app only; project settings stay in the project. */
 .dockyard-root .dockyard-app-settings { display: grid; gap: 14px; max-width: 880px; }
 .dockyard-root .dockyard-app-settings-project { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 0; padding: 11px 13px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 13px; }
@@ -1624,7 +1625,7 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-app-settings-section .dy-notif-settings { margin: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
 .dockyard-root .dockyard-app-settings-section .dy-notif-settings > h3 { display: none; }
 .dockyard-root .dockyard-app-settings-check { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; font-size: 13px; cursor: pointer; }
-/* A gentle note, never a blocker (Sahil 04/10): work with no owner is never picked up by a bot. */
+/* A gentle note, never a blocker (Sahil 04/10): unassigned work is never picked up by a bot. */
 .dockyard-root .dockyard-soft-alert { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 14px; padding: 11px 13px; border: 1px solid var(--dy-border); border-left: 3px solid var(--dy-warning); border-radius: 9px; background: var(--dy-surface); color: var(--dy-text); }
 .dockyard-root .dockyard-soft-alert > svg { flex: none; width: 17px; height: 17px; margin-top: 1px; color: var(--dy-text-2); }
 .dockyard-root .dockyard-soft-alert-body { display: grid; flex: 1; gap: 6px; min-width: 0; font-size: 13px; }

@@ -1238,7 +1238,7 @@ class QueuedItemBody(BaseModel):
     body: str | None = None
     labels: list[str] = []
     evidence_refs: list[str] = []
-    # No owner is allowed (Sahil 04/10): Hermes never dispatches unowned work.
+    # Unassigned is allowed (Sahil 04/10): Hermes never dispatches unassigned work.
     assignee_id: str | None = None
     assignee_kind: str = "bot"
     rank: int

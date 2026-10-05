@@ -146,15 +146,19 @@ test('E5: filters, day groups, detail actions, badge, settings, poller, keyboard
     const badge = await page.locator('[data-tab="notifications"] .dockyard-tab-count').count()
     assert.equal(badge, 0, 'no New badge after everything is seen')
 
-    // 7. Settings panel: change pop-up minimum severity and reload — the value persists.
-    await page.locator('[data-notification-settings]').waitFor()
+    // 7. Settings (Sahil 05/10: only in App settings). The Notifications screen
+    // points there; a change made there persists across a reload.
+    assert.equal(await page.locator('[data-notification-settings]').count(), 0, 'no settings panel on the Notifications screen')
+    await page.locator('[data-notification-settings-link] [data-action="open-app-settings"]').click()
+    await page.locator('[data-app-settings] [data-notification-settings]').waitFor()
     await page.locator('#dy-notif-popups-severity').selectOption('critical')
     await page.reload()
-    await openNotifications(page)
-    await page.locator('[data-notification-settings]').waitFor()
+    await page.locator('[data-tab="settings"]').click()
+    await page.locator('[data-app-settings] [data-notification-settings]').waitFor()
     assert.equal(await page.locator('#dy-notif-popups-severity').inputValue(), 'critical')
     // Restore the default for later runs.
     await page.locator('#dy-notif-popups-severity').selectOption('high')
+    await openNotifications(page)
 
     // 8. Poller: the in-app toast fallback fires for fresh pop-ups (host mock
     // has no notify). Seed the probe FIRST, reload, and let the prime tick

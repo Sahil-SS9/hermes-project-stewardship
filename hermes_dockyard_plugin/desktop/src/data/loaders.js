@@ -5,11 +5,11 @@ export const HEALTH_PRIORITY = Object.freeze({ critical: 0, frozen: 0, attention
 export const RISK_PRIORITY = Object.freeze({ critical: 0, high: 0, medium: 1, low: 2 })
 export const SEVERITY_PRIORITY = Object.freeze({ critical: 0, high: 0, error: 0, medium: 1, warning: 1, low: 2, info: 3 })
 
-// Sahil 04/10 (demo feedback b): work with no owner is never picked up by a
+// Sahil 04/10 (demo feedback b): unassigned work is never picked up by a
 // bot, so the screens say so. Open, non-epic work only: epics are never
-// assigned (their children carry the work), and finished work needs no owner.
+// assigned (their children carry the work), and finished work needs no assignee.
 const FINISHED = new Set(['done', 'complete', 'completed', 'archived'])
-export function unownedWork(items) {
+export function unassignedWork(items) {
   return (items ?? []).filter((item) => item && !item.assignee && (item.type || 'task') !== 'epic' && !FINISHED.has(item.status))
 }
 

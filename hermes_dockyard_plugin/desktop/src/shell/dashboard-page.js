@@ -65,7 +65,7 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   // F-1/F-2: a top tab change is guarded like a project switch, and both
   // prompts can save (when the dirty panel offers a save handle).
   const [pendingTab, setPendingTab] = useState(null)
-  // A one-off filter for the Backlog, set by a deep link (the Dashboard's no-owner alert).
+  // A one-off filter for the Backlog, set by a deep link (the Dashboard's unassigned-work alert).
   const [backlogPreset, setBacklogPreset] = useState(null)
   useEffect(() => { if (tab !== 'backlog') setBacklogPreset(null) }, [tab])
   const dirtySaver = useRef(null)
@@ -147,10 +147,7 @@ export function DashboardPage({ inboxCss = '' } = {}) {
         ? loadOnboardData
       : tab === 'inbox'
         ? loadInboxData
-        : async () => ({
-          ...(await api('/notifications?limit=200')),
-          settings: (await api('/settings/notifications/effective')).effective,
-        })
+        : async () => api('/notifications?limit=200')
     const loading = loader()
     // No project picked yet: ask for the remembered one alongside this load.
     if (!selectedProject) rememberedProject()
@@ -297,11 +294,11 @@ export function DashboardPage({ inboxCss = '' } = {}) {
       setTab('project')
       return
     }
-    if (screen === 's3' && objectKind === 'unowned' && objectId) {
-      // The Dashboard's "no owner" alert: that project's Backlog, showing work with no owner.
+    if (screen === 's3' && objectKind === 'unassigned' && objectId) {
+      // The Dashboard's unassigned-work alert: that project's Backlog, showing unassigned work.
       setDeepLinkNotice(null)
       setSelectedProject(objectId)
-      setBacklogPreset({ kind: 'unowned', projectId: objectId, at: Date.now() })
+      setBacklogPreset({ kind: 'unassigned', projectId: objectId, at: Date.now() })
       setTab('backlog')
       return
     }
@@ -394,7 +391,7 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   } else if (tab === 'inbox') {
     content = jsx(InboxView, { view: payload, onRefresh: refresh, focusRef: inboxFocusRef, onOpenProject: openDeepLink })
   } else {
-    content = jsx(NotificationsView, { view: payload, onRefresh: refresh, onAcknowledged: acknowledge, onOpen: openDeepLink })
+    content = jsx(NotificationsView, { view: payload, onRefresh: refresh, onAcknowledged: acknowledge, onOpen: openDeepLink, onOpenSettings: () => requestTab('settings') })
   }
 
   return jsxs('div', { className: 'dockyard-root', children: [

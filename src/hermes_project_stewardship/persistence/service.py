@@ -53,14 +53,22 @@ _CONTENT_TYPES = {
     "image/png": ".png",
     "image/jpeg": ".jpg",
     "image/webp": ".webp",
+    # Sahil 05/10 (demo feedback g): short videos, up to 25 MB (schema v37).
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
 }
 _MAX_CONTENT_BYTES = 5 * 1024 * 1024
+_MAX_VIDEO_BYTES = 25 * 1024 * 1024
 # What the Content tab can show, by media type (text is read as text).
-# Videos need a schema change first: project_content's CHECK allows only these.
 _MEDIA_PREVIEW_KINDS = {
     "image/png": "image", "image/jpeg": "image", "image/webp": "image",
-    "application/pdf": "pdf",
+    "application/pdf": "pdf", "video/mp4": "video", "video/webm": "video",
 }
+
+
+def _content_limit(media_type: str) -> int:
+    """The largest file a media type may be: 25 MB for videos, 5 MB otherwise."""
+    return _MAX_VIDEO_BYTES if media_type.startswith("video/") else _MAX_CONTENT_BYTES
 _TEXT_PREVIEW_BYTES = 100_000
 
 
@@ -1803,6 +1811,10 @@ class StewardshipService:
             "image/webp": len(content) >= 12
             and content.startswith(b"RIFF")
             and content[8:12] == b"WEBP",
+            # ISO base media (MP4): a box size, then "ftyp".
+            "video/mp4": len(content) >= 12 and content[4:8] == b"ftyp",
+            # Matroska/WebM: the EBML magic number.
+            "video/webm": content.startswith(b"\x1a\x45\xdf\xa3"),
         }
         if not signatures.get(media_type, False):
             raise ServiceError("project content does not match its declared media type")
@@ -1831,13 +1843,15 @@ class StewardshipService:
         clean_media_type = media_type.split(";", 1)[0].strip().lower()
         extension = _CONTENT_TYPES.get(clean_media_type)
         if extension is None:
-            raise ServiceError("supported project content types are text, Markdown, PDF and images")
+            raise ServiceError("supported project content types are text, Markdown, PDF, images and MP4 or WebM videos")
         if not isinstance(content, bytes):
             raise ServiceError("project content must be bytes")
         if not content:
             raise ServiceError("project content cannot be empty")
-        if len(content) > _MAX_CONTENT_BYTES:
-            raise ServiceError("project content cannot exceed 5 MB")
+        limit = _content_limit(clean_media_type)
+        if len(content) > limit:
+            kind = "videos" if clean_media_type.startswith("video/") else "project content"
+            raise ServiceError(f"{kind} cannot exceed {limit // (1024 * 1024)} MB")
         self._validate_content_bytes(clean_media_type, content)
 
         content_id = f"CONTENT-{uuid.uuid4().hex[:16].upper()}"
@@ -2056,7 +2070,7 @@ class StewardshipService:
             if (int(opened.st_dev), int(opened.st_ino)) != expected_identity:
                 raise ServiceError("project content file identity changed during verification")
             with os.fdopen(descriptor, "rb", closefd=False) as handle:
-                raw = handle.read(_MAX_CONTENT_BYTES + 1)
+                raw = handle.read(_content_limit(row["media_type"]) + 1)
         finally:
             os.close(descriptor)
         if len(raw) != int(row["size_bytes"]) or hashlib.sha256(raw).hexdigest() != row["sha256"]:
@@ -2093,7 +2107,7 @@ class StewardshipService:
         if (int(opened.st_dev), int(opened.st_ino)) != expected:
             raise ServiceError("project content file identity changed before removal")
         with os.fdopen(file_fd, "rb", closefd=False) as handle:
-            raw = handle.read(_MAX_CONTENT_BYTES + 1)
+            raw = handle.read(_content_limit(row["media_type"]) + 1)
         if len(raw) != int(row["size_bytes"]) or hashlib.sha256(raw).hexdigest() != row["sha256"]:
             raise ServiceError("project content failed its integrity check; removal refused")
 
@@ -2461,8 +2475,8 @@ class StewardshipService:
         metadata = self._content_metadata(row)
         kind = _MEDIA_PREVIEW_KINDS.get(row["media_type"])
         if kind is not None:
-            # Sahil 04/10 (demo feedback g): images and PDFs show in the
-            # Content tab. Same checks as text: the bytes are the stored file,
+            # Sahil 04/10 (demo feedback g): images, PDFs and videos show in
+            # the Content tab. Same checks as text: the bytes are the stored file,
             # untouched, and they must still match their declared type.
             self._validate_content_bytes(row["media_type"], raw)
             return {**metadata, "preview_kind": kind, "text": None, "truncated": False,

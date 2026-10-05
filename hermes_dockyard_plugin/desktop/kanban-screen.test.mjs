@@ -61,13 +61,15 @@ test('board: five columns, every live item placed, views bar, no sidebar, no pag
   assert.deepEqual(await page.locator('[data-board-column] h3').allInnerTexts(), Object.values(COLUMN))
   assert.equal(await page.locator('[data-work-card]').count(), d.live.length)
   assert.equal(await page.locator('[data-kanban-note="unplaced"]').count(), 0)
-  assert.deepEqual(await page.locator('[data-view-tab]').evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute('data-view-tab'))), ['All work', "Ada's work", "Grace's bugs", 'Mobile, expanded'])
+  assert.deepEqual(await page.locator('[data-view-tab]').evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute('data-view-tab'))), ['All work', "Ada's work", "Grace's bugs", 'Mobile, all cards open'])
   assert.equal(await page.locator('[data-view-tab="All work"]').getAttribute('aria-pressed'), 'true')
-  // C's sub-tabs became controls: Board or List, Summary or Expanded cards, and a Milestones button.
+  // C's sub-tabs became controls: Board or List, and one button that opens every card (Sahil 05/10:
+  // "Expanded" did not say what it did). Milestones are not on the board any more.
   assert.deepEqual(await page.locator('[data-kanban-layout]').allInnerTexts(), ['Board', 'List'])
   assert.equal(await page.locator('[data-kanban-layout="board"]').getAttribute('aria-pressed'), 'true')
-  assert.deepEqual(await page.locator('[data-kanban-density]').allInnerTexts(), ['Summary', 'Expanded'])
-  assert.equal(await page.locator('[data-kanban-page="milestones"]').count(), 1)
+  assert.equal((await page.locator('[data-kanban-open-all]').innerText()).trim(), 'Open all cards')
+  assert.equal(await page.locator('[data-kanban-open-all]').getAttribute('aria-pressed'), 'false')
+  assert.equal(await page.locator('[data-kanban-page], [data-planning-panel]').count(), 0)
   assert.equal(await page.locator('.dockyard-sidebar, [data-sidebar]').count(), 0)
   // Drag is never the only way to move: the board says how (kept from C's board).
   assert.match(await page.locator('[data-kanban-help]').innerText(), /open the card and use Move to/)
@@ -202,13 +204,13 @@ test('filters narrow the board; search finds linked items; nothing is stored in 
   await page.locator('[data-kanban-empty="filters"] button').click()
   assert.equal(await cards(), d.live.length)
 
-  await page.locator('[data-kanban-density="detailed"]').click()
+  await page.locator('[data-kanban-open-all]').click()
   await page.locator('[data-views-manage]').click()
   assert.equal(await page.locator('[data-signal="planning"]').count(), 0)
   await page.locator('[data-card-field="planning"]').check()
   assert.ok(await page.locator('[data-signal="planning"]').count() > 0, 'a card field shows on the board straight away')
   await page.keyboard.press('Escape')
-  await page.locator('[data-view-tab="Mobile, expanded"]').click()
+  await page.locator('[data-view-tab="Mobile, all cards open"]').click()
   assert.equal(await storage(page), before, 'no browser storage written')
   await page.reload({ waitUntil: 'networkidle' })
   await goToBoard(page)
@@ -281,10 +283,26 @@ test("List: C's columns, grouped by stage, linked items named, no sideways scrol
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true)
 }))
 
-test('Milestones holds the existing milestone panel; the board does not carry it', () => withBrowser(async (browser) => {
-  const { page } = await open(browser)
-  assert.equal(await page.locator('[data-planning-panel]').count(), 0)
-  await page.locator('[data-kanban-page="milestones"]').click()
+test('Open all cards opens every card and says so; a card can still be closed on its own', () => withBrowser(async (browser) => {
+  const { page, card } = await open(browser)
+  const d = await data()
+  const openAll = page.locator('[data-kanban-open-all]')
+  assert.equal(await page.locator('[data-card-body]').count(), 0, 'cards start closed')
+  await openAll.click()
+  assert.equal(await openAll.getAttribute('aria-pressed'), 'true')
+  assert.equal(await page.locator('[data-card-body]').count(), d.live.length, 'every card is open')
+  await card('Build setup screens').locator('[data-card-toggle]').click()
+  assert.equal(await page.locator('[data-card-body]').count(), d.live.length - 1, 'one card closes on its own')
+  await openAll.click()
+  assert.equal(await page.locator('[data-card-body]').count(), 0, 'pressing again closes every card')
+}))
+
+test('milestones are managed with the Objectives, not on the board; a card\'s milestone link goes there', () => withBrowser(async (browser) => {
+  const { page, card } = await open(browser)
+  assert.equal(await page.locator('[data-kanban-page], [data-planning-panel]').count(), 0)
+  await card('Build setup screens').locator('[data-card-toggle]').click()
+  await card('Build setup screens').getByRole('button', { name: /^Milestone: Beta launch/ }).click()
+  await page.locator('[data-project-view="objectives"].active').waitFor()
   await page.locator('[data-planning-panel]').waitFor()
   assert.ok(await page.locator('[data-milestone-row="Beta launch"]').isVisible())
   assert.equal(await page.locator('[data-board-column]').count(), 0)
@@ -354,7 +372,7 @@ test('views: save, save as new, rename, share, duplicate and delete, all through
 
   await page.locator(`[data-view-tab="Ada's work"]`).click()
   assert.equal(await page.locator('[data-kanban-filter="assignee"]').inputValue(), 'ada-lovelace')
-  await page.locator('[data-kanban-density="detailed"]').click()
+  await page.locator('[data-kanban-open-all]').click()
   assert.match(await page.locator('[data-view-edited]').innerText(), /Unsaved changes to "Ada's work"/)
   await page.locator('[data-view-edited] [data-view-save]').click()
   await page.locator('[data-view-edited]').waitFor({ state: 'detached' })

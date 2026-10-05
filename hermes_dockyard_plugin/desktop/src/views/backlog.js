@@ -2,7 +2,7 @@
 // Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 import { readableLabel } from '../data/loaders.js'
-import { unownedWork } from '../data/loaders.js'
+import { unassignedWork } from '../data/loaders.js'
 import { useState } from '../runtime/react.js'
 import { useRef } from '../runtime/react.js'
 import { useEffect } from '../runtime/react.js'
@@ -42,8 +42,8 @@ export {
   dockyardParentAccepts,
 } from './backlog-model.js'
 
-// The create form's owner choice: a bot, or deliberately no owner (Sahil 04/10).
-const NO_OWNER = '__none__'
+// The create form's assignee choice: a bot, or deliberately unassigned (Sahil 04/10).
+const UNASSIGNED = '__unassigned__'
 
 export function BacklogView({ view, onRefresh, preset }) {
   const [draggedRef, setDraggedRef] = useState(null)
@@ -65,8 +65,8 @@ export function BacklogView({ view, onRefresh, preset }) {
   const [sortDir, setSortDir] = useState(1)
   const [groupBy, setGroupBy] = useState('none')
   const [columnFilters, setColumnFilters] = useState({ type: '', status: '', initiative: '', assignee: '' })
-  // Opened from the Dashboard's "no owner" alert: show only work with no owner.
-  useEffect(() => { if (preset?.kind === 'unowned') setColumnFilters((current) => ({ ...current, assignee: '__unassigned__' })) }, [preset])
+  // Opened from the Dashboard's unassigned-work alert: show only unassigned work.
+  useEffect(() => { if (preset?.kind === 'unassigned') setColumnFilters((current) => ({ ...current, assignee: '__unassigned__' })) }, [preset])
   const [hiddenCols, setHiddenCols] = useState([])
   const [cmMenu, setCmMenu] = useState(null)
   const [collapsed, setCollapsed] = useState([])
@@ -165,9 +165,9 @@ export function BacklogView({ view, onRefresh, preset }) {
   const initiativeByRef = Object.fromEntries((view.initiatives ?? []).map((initiative) => [initiative.ref, initiative]))
   const botById = Object.fromEntries((view.bots ?? []).map((bot) => [bot.id, bot]))
   const initiativeLabel = (ref) => ref ? (initiativeByRef[ref]?.title || ref) : 'No initiative'
-  const ownerLabel = (id) => id ? (botById[id]?.name || id) : 'No owner'
-  // Sahil 04/10: open work with no owner is never picked up; the board says so.
-  const unowned = unownedWork(allItems)
+  const ownerLabel = (id) => id ? (botById[id]?.name || id) : 'Unassigned'
+  // Sahil 04/10: open unassigned work is never picked up; the board says so.
+  const unassigned = unassignedWork(allItems)
   const parentOf = {}
   const childrenOf = {}
   const allChildrenOf = {}
@@ -337,7 +337,7 @@ export function BacklogView({ view, onRefresh, preset }) {
     try {
       await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}/assign`, { method: 'POST', body: { assignee_id: bot || null } })
       setCellError(null)
-      emitToast('success', bot ? `${item.title} → ${bot}` : `${item.title} has no owner now.`)
+      emitToast('success', bot ? `${item.title} → ${bot}` : `${item.title} is now unassigned.`)
       onRefresh()
     } catch (failure) {
       flashCell(ref, 'assignee', String(failure?.message ?? failure).replace(/^\d+:\s*/, '').slice(0, 130))
@@ -496,7 +496,7 @@ export function BacklogView({ view, onRefresh, preset }) {
   const createFieldError = (key) => {
     if (!createTouched[key]) return null
     if (key === 'title' && createForm.title.trim().length < 3) return 'At least 3 characters.'
-    if (key === 'assignee' && !createForm.assignee) return 'Choose an assignee, or No owner.'
+    if (key === 'assignee' && !createForm.assignee) return 'Choose an assignee, or Unassigned.'
     if (key === 'reason' && createForm.reason.trim().length < 4) return 'A ranking reason is required (audit trail).'
     if (key === 'estimate_days' && !estimateValid) return 'Use a non-negative number of days.'
     if (key === 'type' && !availableCreateTypes.includes(createForm.type)) return 'Choose a supported type for this parent.'
@@ -533,7 +533,7 @@ export function BacklogView({ view, onRefresh, preset }) {
         body: createForm.body.trim() || null,
         labels: createForm.labels.split(',').map((label) => label.trim()).filter(Boolean),
         evidence_refs: createForm.evidence_refs.split(',').map((ref) => ref.trim()).filter(Boolean),
-        assignee_id: createForm.assignee === NO_OWNER ? null : createForm.assignee,
+        assignee_id: createForm.assignee === UNASSIGNED ? null : createForm.assignee,
         assignee_kind: 'bot',
         initiative_ref: createForm.initiative || null,
         parent_ref: createForm.parent || null,
@@ -653,8 +653,8 @@ export function BacklogView({ view, onRefresh, preset }) {
     }).catch(() => {})
   }
   return BacklogBoard({
-    NO_OWNER,
-    unowned,
+    UNASSIGNED,
+    unassigned,
     ROOT_TYPES,
     STATUS_LABELS,
     STATUS_OPTIONS,

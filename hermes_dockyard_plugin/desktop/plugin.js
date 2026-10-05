@@ -1745,9 +1745,10 @@ var DOCKYARD_CSS = `
 .dockyard-root .dockyard-section-fold:hover { background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-section-count { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .dockyard-root .dockyard-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-/* Content previews (Sahil 04/10): images and PDFs show in the Content tab. */
+/* Content previews (Sahil 04/10): images, PDFs and videos show in the Content tab. */
 .dockyard-root .dockyard-content-image { display: block; max-width: 100%; max-height: 520px; margin: 0 auto; object-fit: contain; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-content-pdf { display: block; width: 100%; height: 560px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); }
+.dockyard-root .dockyard-content-video { display: block; width: 100%; max-height: 520px; border-radius: 8px; background: var(--dy-surface-subtle); }
 /* App settings (Sahil 04/10): the whole app only; project settings stay in the project. */
 .dockyard-root .dockyard-app-settings { display: grid; gap: 14px; max-width: 880px; }
 .dockyard-root .dockyard-app-settings-project { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 0; padding: 11px 13px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 13px; }
@@ -1759,7 +1760,7 @@ var DOCKYARD_CSS = `
 .dockyard-root .dockyard-app-settings-section .dy-notif-settings { margin: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
 .dockyard-root .dockyard-app-settings-section .dy-notif-settings > h3 { display: none; }
 .dockyard-root .dockyard-app-settings-check { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; font-size: 13px; cursor: pointer; }
-/* A gentle note, never a blocker (Sahil 04/10): work with no owner is never picked up by a bot. */
+/* A gentle note, never a blocker (Sahil 04/10): unassigned work is never picked up by a bot. */
 .dockyard-root .dockyard-soft-alert { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 14px; padding: 11px 13px; border: 1px solid var(--dy-border); border-left: 3px solid var(--dy-warning); border-radius: 9px; background: var(--dy-surface); color: var(--dy-text); }
 .dockyard-root .dockyard-soft-alert > svg { flex: none; width: 17px; height: 17px; margin-top: 1px; color: var(--dy-text-2); }
 .dockyard-root .dockyard-soft-alert-body { display: grid; flex: 1; gap: 6px; min-width: 0; font-size: 13px; }
@@ -5288,7 +5289,7 @@ var HEALTH_PRIORITY = Object.freeze({ critical: 0, frozen: 0, attention: 0, degr
 var RISK_PRIORITY = Object.freeze({ critical: 0, high: 0, medium: 1, low: 2 });
 var SEVERITY_PRIORITY = Object.freeze({ critical: 0, high: 0, error: 0, medium: 1, warning: 1, low: 2, info: 3 });
 var FINISHED = /* @__PURE__ */ new Set(["done", "complete", "completed", "archived"]);
-function unownedWork(items) {
+function unassignedWork(items) {
   return (items ?? []).filter((item) => item && !item.assignee && (item.type || "task") !== "epic" && !FINISHED.has(item.status));
 }
 function sortProjects(projects) {
@@ -5585,7 +5586,9 @@ function mediaTypeLabel(value) {
     "application/pdf": "PDF",
     "image/png": "PNG image",
     "image/jpeg": "JPEG image",
-    "image/webp": "WebP image"
+    "image/webp": "WebP image",
+    "video/mp4": "MP4 video",
+    "video/webm": "WebM video"
   }[value] || readableLabel(value, "File");
 }
 function fileAsBase64(file) {
@@ -6895,7 +6898,7 @@ function WorkItemDetail({ item, projectId, profiles, initiatives = [], onClose, 
             })] }),
             jsxs("label", { className: "dockyard-field", children: [jsx("span", { children: "Estimated days (optional)" }), jsx("input", { type: "number", min: 0, step: 0.5, "aria-label": "Estimated days", placeholder: "e.g. 2.5", value: draft?.estimate_days ?? "", onChange: (event) => setDraft({ ...draft, estimate_days: event.target.value }) })] }),
             jsxs("label", { className: "dockyard-field", children: [jsx("span", { children: "Assignee (optional)" }), jsx("select", { "aria-label": "Assignee", value: draft?.assignee ?? "", disabled: busy, onChange: (event) => setDraft({ ...draft, assignee: event.target.value }), children: [
-              jsx("option", { value: "", children: "No owner" }, "none"),
+              jsx("option", { value: "", children: "Unassigned" }, "none"),
               ...(profiles ?? []).filter((profile) => profile.slug || profile.id || profile.name).map((profile) => {
                 const value = profile.slug || profile.id || profile.name;
                 return jsx("option", { value, disabled: profile.available === false && value !== draft?.assignee, children: profile.display_name || profile.name || value }, value);
@@ -7364,8 +7367,8 @@ function BacklogReasonModal(props) {
 // hermes_dockyard_plugin/desktop/src/views/backlog-board.js
 function BacklogBoard(ctx) {
   const {
-    NO_OWNER: NO_OWNER2,
-    unowned,
+    UNASSIGNED: UNASSIGNED2,
+    unassigned,
     ROOT_TYPES,
     STATUS_LABELS,
     STATUS_OPTIONS,
@@ -7523,15 +7526,15 @@ function BacklogBoard(ctx) {
       }, children: "Import" }),
       jsx(Button, { action: "open-create-backlog-item", variant: "primary", small: true, disabled: !canCreate, onClick: () => openCreate(), children: "Create item" })
     ] }),
-    // Sahil 04/10 (demo feedback b): a gentle note, never a blocker. Work with
-    // no owner is never picked up by a bot; each item opens so it can be given one.
-    unowned.length ? jsxs("div", { className: "dockyard-soft-alert", "data-unowned-alert": project.id, role: "status", children: [
+    // Sahil 04/10 (demo feedback b): a gentle note, never a blocker. Unassigned
+    // work is never picked up by a bot; each item opens so it can be assigned.
+    unassigned.length ? jsxs("div", { className: "dockyard-soft-alert", "data-unassigned-alert": project.id, role: "status", children: [
       jsx(Icon, { name: "user" }),
       jsxs("div", { className: "dockyard-soft-alert-body", children: [
-        jsx("strong", { children: `${number(unowned.length)} ${plural(unowned.length, "work item")} ${unowned.length === 1 ? "has" : "have"} no owner, so no bot will pick ${unowned.length === 1 ? "it" : "them"} up.` }),
+        jsx("strong", { children: `${number(unassigned.length)} ${plural(unassigned.length, "work item")} ${unassigned.length === 1 ? "is" : "are"} unassigned, so no bot will pick ${unassigned.length === 1 ? "it" : "them"} up.` }),
         jsxs("span", { className: "dockyard-soft-alert-items", children: [
-          ...unowned.slice(0, 5).map((item) => jsx("button", { type: "button", className: "dockyard-soft-alert-item", "data-unowned-item": item.ref, onClick: () => setDetailItem(item), children: `${item.ref} ${item.title}` }, item.ref)),
-          unowned.length > 5 ? jsx("span", { children: `and ${number(unowned.length - 5)} more` }, "more") : null
+          ...unassigned.slice(0, 5).map((item) => jsx("button", { type: "button", className: "dockyard-soft-alert-item", "data-unassigned-item": item.ref, onClick: () => setDetailItem(item), children: `${item.ref} ${item.title}` }, item.ref)),
+          unassigned.length > 5 ? jsx("span", { children: `and ${number(unassigned.length - 5)} more` }, "more") : null
         ] })
       ] }),
       hasUnassignedItems ? jsx(Button, { small: true, onClick: () => setColumnFilters((current) => ({ ...current, assignee: "__unassigned__" })), children: "Show in the list" }) : null
@@ -7678,7 +7681,7 @@ function BacklogBoard(ctx) {
           jsx("span", { children: "Assignee" }),
           jsx("select", { "data-filter-field": "assignee", "aria-label": "Filter by assignee", value: columnFilters.assignee, onChange: (event) => setColumnFilters((current) => ({ ...current, assignee: event.target.value })), children: [
             jsx("option", { value: "", children: "All assignees" }),
-            hasUnassignedItems ? jsx("option", { value: "__unassigned__", children: "No owner" }, "unassigned") : null,
+            hasUnassignedItems ? jsx("option", { value: "__unassigned__", children: "Unassigned" }, "unassigned") : null,
             ...assigneeFilterValues.map((owner) => jsx("option", { value: owner, children: ownerLabel(owner) }, owner))
           ] })
         ] }),
@@ -7863,7 +7866,7 @@ function BacklogBoard(ctx) {
                   setEditing(null);
                   assignItem(ref, event.target.value);
                 }, onBlur: () => setEditing(null), children: [
-                  jsx("option", { value: "", children: "No owner" }),
+                  jsx("option", { value: "", children: "Unassigned" }),
                   ...(view.bots ?? []).map((bot) => jsx("option", { value: bot.id, children: bot.name || bot.id }, bot.id))
                 ] }) : jsx("button", { type: "button", className: "cell-edit cell-who", "data-cell": "assignee", title: item.type === "epic" ? "Epics are never assigned \u2014 their children carry the work" : "Change assignee", disabled: (item.type || "task") === "epic", onClick: (event) => {
                   event.stopPropagation();
@@ -8035,11 +8038,11 @@ function BacklogBoard(ctx) {
                 jsx("span", { children: "Assignee" }),
                 jsx("select", { "data-create-field": "assignee", value: createForm.assignee, onChange: (event) => updateCreate("assignee", event.target.value), children: [
                   jsx("option", { value: "", children: "Choose an assignee" }, "choose"),
-                  jsx("option", { value: NO_OWNER2, children: "No owner" }, "none"),
+                  jsx("option", { value: UNASSIGNED2, children: "Unassigned" }, "unassigned"),
                   ...(view.bots ?? []).map((bot) => jsx("option", { value: bot.id, children: bot.name || bot.id }, bot.id))
                 ] }),
                 // The note sits under the field it explains (Sahil 04/10).
-                createForm.assignee === NO_OWNER2 ? jsx("small", { className: "create-help", "data-create-help": "no-owner", children: "No bot will pick this up until someone owns it." }) : null
+                createForm.assignee === UNASSIGNED2 ? jsx("small", { className: "create-help", "data-create-help": "unassigned", children: "No bot will pick this up until it is assigned." }) : null
               ] }),
               jsxs("label", { className: "dockyard-field", children: [jsx("span", { className: "field-optional-hint", children: "Initiative" }), jsx("select", { "data-create-field": "initiative", value: createForm.initiative, onChange: (event) => updateCreate("initiative", event.target.value), children: [
                 jsx("option", { value: "", children: "No initiative" }, "none"),
@@ -8051,7 +8054,7 @@ function BacklogBoard(ctx) {
               jsxs("label", { className: "dockyard-field dockyard-field-wide field-required", children: [jsx("span", { children: "Priority reason" }), jsx("textarea", { rows: 3, "data-create-field": "reason", value: createForm.reason, onInput: (event) => updateCreate("reason", event.target.value), onChange: (event) => updateCreate("reason", event.target.value), placeholder: "Why should this item hold this rank?" })] })
             ] }),
             createTouched.title && createForm.title.trim().length < 3 ? jsx("p", { className: "create-help bad", "data-create-help": "title", children: "Title must be at least 3 characters." }) : null,
-            createTouched.assignee && !createForm.assignee ? jsx("p", { className: "create-help bad", "data-create-help": "assignee", children: "Choose an assignee, or No owner." }) : null,
+            createTouched.assignee && !createForm.assignee ? jsx("p", { className: "create-help bad", "data-create-help": "assignee", children: "Choose an assignee, or Unassigned." }) : null,
             createTouched.reason && createForm.reason.trim().length < 4 ? jsx("p", { className: "create-help bad", "data-create-help": "reason", children: "A ranking reason is required \u2014 it becomes the audit record." }) : null,
             jsx("p", { className: "create-help", "data-create-reqnote": true, children: "* required. Initial rank and priority reason are recorded in the backlog audit trail." }),
             createError ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: createError }) : null
@@ -8067,7 +8070,7 @@ function BacklogBoard(ctx) {
 }
 
 // hermes_dockyard_plugin/desktop/src/views/backlog.js
-var NO_OWNER = "__none__";
+var UNASSIGNED = "__unassigned__";
 function BacklogView({ view, onRefresh, preset }) {
   const [draggedRef, setDraggedRef] = useState(null);
   const [pendingMove, setPendingMove] = useState(null);
@@ -8099,7 +8102,7 @@ function BacklogView({ view, onRefresh, preset }) {
   const [groupBy, setGroupBy] = useState("none");
   const [columnFilters, setColumnFilters] = useState({ type: "", status: "", initiative: "", assignee: "" });
   useEffect(() => {
-    if (preset?.kind === "unowned") setColumnFilters((current) => ({ ...current, assignee: "__unassigned__" }));
+    if (preset?.kind === "unassigned") setColumnFilters((current) => ({ ...current, assignee: "__unassigned__" }));
   }, [preset]);
   const [hiddenCols, setHiddenCols] = useState([]);
   const [cmMenu, setCmMenu] = useState(null);
@@ -8198,8 +8201,8 @@ function BacklogView({ view, onRefresh, preset }) {
   const initiativeByRef = Object.fromEntries((view.initiatives ?? []).map((initiative) => [initiative.ref, initiative]));
   const botById = Object.fromEntries((view.bots ?? []).map((bot) => [bot.id, bot]));
   const initiativeLabel = (ref) => ref ? initiativeByRef[ref]?.title || ref : "No initiative";
-  const ownerLabel = (id) => id ? botById[id]?.name || id : "No owner";
-  const unowned = unownedWork(allItems);
+  const ownerLabel = (id) => id ? botById[id]?.name || id : "Unassigned";
+  const unassigned = unassignedWork(allItems);
   const parentOf = {};
   const childrenOf = {};
   const allChildrenOf = {};
@@ -8377,7 +8380,7 @@ function BacklogView({ view, onRefresh, preset }) {
     try {
       await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}/assign`, { method: "POST", body: { assignee_id: bot || null } });
       setCellError(null);
-      emitToast("success", bot ? `${item.title} \u2192 ${bot}` : `${item.title} has no owner now.`);
+      emitToast("success", bot ? `${item.title} \u2192 ${bot}` : `${item.title} is now unassigned.`);
       onRefresh();
     } catch (failure) {
       flashCell(ref, "assignee", String(failure?.message ?? failure).replace(/^\d+:\s*/, "").slice(0, 130));
@@ -8554,7 +8557,7 @@ function BacklogView({ view, onRefresh, preset }) {
   const createFieldError = (key) => {
     if (!createTouched[key]) return null;
     if (key === "title" && createForm.title.trim().length < 3) return "At least 3 characters.";
-    if (key === "assignee" && !createForm.assignee) return "Choose an assignee, or No owner.";
+    if (key === "assignee" && !createForm.assignee) return "Choose an assignee, or Unassigned.";
     if (key === "reason" && createForm.reason.trim().length < 4) return "A ranking reason is required (audit trail).";
     if (key === "estimate_days" && !estimateValid) return "Use a non-negative number of days.";
     if (key === "type" && !availableCreateTypes.includes(createForm.type)) return "Choose a supported type for this parent.";
@@ -8583,7 +8586,7 @@ function BacklogView({ view, onRefresh, preset }) {
         body: createForm.body.trim() || null,
         labels: createForm.labels.split(",").map((label) => label.trim()).filter(Boolean),
         evidence_refs: createForm.evidence_refs.split(",").map((ref) => ref.trim()).filter(Boolean),
-        assignee_id: createForm.assignee === NO_OWNER ? null : createForm.assignee,
+        assignee_id: createForm.assignee === UNASSIGNED ? null : createForm.assignee,
         assignee_kind: "bot",
         initiative_ref: createForm.initiative || null,
         parent_ref: createForm.parent || null,
@@ -8730,8 +8733,8 @@ function BacklogView({ view, onRefresh, preset }) {
     });
   };
   return BacklogBoard({
-    NO_OWNER,
-    unowned,
+    UNASSIGNED,
+    unassigned,
     ROOT_TYPES,
     STATUS_LABELS,
     STATUS_OPTIONS,
@@ -12030,8 +12033,8 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
     });
   };
   const needsFolded = isFolded("needs-you-now");
-  const unowned = Object.entries(view.projectContext ?? {}).map(([projectId, context]) => [projectId, unownedWork(context.workItems).length]).filter(([, count]) => count > 0);
-  const unownedTotal = unowned.reduce((sum, [, count]) => sum + count, 0);
+  const unassigned = Object.entries(view.projectContext ?? {}).map(([projectId, context]) => [projectId, unassignedWork(context.workItems).length]).filter(([, count]) => count > 0);
+  const unassignedTotal = unassigned.reduce((sum, [, count]) => sum + count, 0);
   const focusItem = selected === false ? null : selected ?? decisions[0] ?? null;
   useEffect(() => {
     if (!focusItem?.ref || focusItem.kind !== "initiative_approval") {
@@ -12211,15 +12214,15 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
           ["unknown", "Unverified"]
         ].map(([state, label]) => jsxs("span", { children: [jsx("i", { className: `dockyard-health-dot ${state}`, "aria-hidden": true }), label] }, state)) })
       ] }),
-      unownedTotal ? jsxs("div", { className: "dockyard-soft-alert", "data-unowned-alert": "fleet", role: "status", children: [
+      unassignedTotal ? jsxs("div", { className: "dockyard-soft-alert", "data-unassigned-alert": "fleet", role: "status", children: [
         jsx(Icon, { name: "user" }),
         jsxs("div", { className: "dockyard-soft-alert-body", children: [
-          jsx("strong", { children: `${number(unownedTotal)} ${plural(unownedTotal, "work item")} ${unownedTotal === 1 ? "has" : "have"} no owner, so no bot will pick ${unownedTotal === 1 ? "it" : "them"} up.` }),
-          jsx("span", { className: "dockyard-soft-alert-items", children: unowned.map(([projectId, count]) => jsx("button", {
+          jsx("strong", { children: `${number(unassignedTotal)} ${plural(unassignedTotal, "work item")} ${unassignedTotal === 1 ? "is" : "are"} unassigned, so no bot will pick ${unassignedTotal === 1 ? "it" : "them"} up.` }),
+          jsx("span", { className: "dockyard-soft-alert-items", children: unassigned.map(([projectId, count]) => jsx("button", {
             type: "button",
             className: "dockyard-soft-alert-item",
-            "data-unowned-project": projectId,
-            onClick: () => onOpen?.(`s3:unowned/${projectId}`),
+            "data-unassigned-project": projectId,
+            onClick: () => onOpen?.(`s3:unassigned/${projectId}`),
             children: `${projectId} (${number(count)})`
           }, projectId)) })
         ] })
@@ -14776,6 +14779,10 @@ function PlanningPanel({ project, milestones, workItems, onRefresh }) {
 }
 
 // hermes_dockyard_plugin/desktop/src/project/content.js
+var EXTENSION_TYPES = { txt: "text/plain", md: "text/markdown", pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", mp4: "video/mp4", webm: "video/webm" };
+var mediaTypeOf = (file) => file?.type || EXTENSION_TYPES[String(file?.name ?? "").toLowerCase().split(".").pop()] || "";
+var limitOf = (mediaType) => (mediaType.startsWith("video/") ? 25 : 5) * 1024 * 1024;
+var tooBig = (file) => Boolean(file) && file.size > limitOf(mediaTypeOf(file));
 function ProjectContentPanel({ project, content, onRefresh }) {
   const [items, setItems] = useState(content ?? []);
   const [selected, setSelected] = useState(null);
@@ -14786,15 +14793,15 @@ function ProjectContentPanel({ project, content, onRefresh }) {
   const [contentAction, setContentAction] = useState(null);
   const [actionBusy, setActionBusy] = useState(false);
   const encoded = encodeURIComponent(project.id);
-  const [pdfUrl, setPdfUrl] = useState(null);
+  const [mediaUrl, setMediaUrl] = useState(null);
   useEffect(() => {
-    if (previewState !== "ready" || selected?.preview_kind !== "pdf" || !selected?.data_base64) {
-      setPdfUrl(null);
+    if (previewState !== "ready" || !["pdf", "video"].includes(selected?.preview_kind) || !selected?.data_base64) {
+      setMediaUrl(null);
       return void 0;
     }
     const bytes = Uint8Array.from(atob(selected.data_base64), (char) => char.charCodeAt(0));
-    const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-    setPdfUrl(url);
+    const url = URL.createObjectURL(new Blob([bytes], { type: selected.media_type }));
+    setMediaUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [selected, previewState]);
   const openPreview = async (item) => {
@@ -14810,13 +14817,12 @@ function ProjectContentPanel({ project, content, onRefresh }) {
     }
   };
   const upload = async () => {
-    if (!file || file.size <= 0 || file.size > 5 * 1024 * 1024) return;
+    if (!file || file.size <= 0 || tooBig(file)) return;
     setUploading(true);
     setError(null);
     try {
-      const extension = file.name.toLowerCase().split(".").pop();
-      const mediaType = file.type || { txt: "text/plain", md: "text/markdown", pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" }[extension];
-      if (!mediaType) throw new Error("Choose a text, Markdown, PDF, PNG, JPEG or WebP file.");
+      const mediaType = mediaTypeOf(file);
+      if (!mediaType) throw new Error("Choose a text, Markdown, PDF, PNG, JPEG, WebP, MP4 or WebM file.");
       const contentBase64 = await fileAsBase64(file);
       const created = await api(`/projects/${encoded}/content`, {
         method: "POST",
@@ -14868,22 +14874,22 @@ function ProjectContentPanel({ project, content, onRefresh }) {
       jsxs("div", { className: "dockyard-upload-panel", children: [
         jsxs("label", { className: "dockyard-upload-dropzone", children: [
           jsx("span", { children: file ? file.name : "Choose supporting content" }),
-          jsx("small", { children: file ? `${formatBytes(file.size)} selected` : "Text, Markdown, PDF or image. Maximum 5 MB." }),
-          jsx("input", { type: "file", "data-content-file": true, accept: ".txt,.md,.pdf,.png,.jpg,.jpeg,.webp,text/plain,text/markdown,application/pdf,image/png,image/jpeg,image/webp", onChange: (event) => {
+          jsx("small", { children: file ? `${formatBytes(file.size)} selected` : "Text, Markdown, PDF or image up to 5 MB, or an MP4 or WebM video up to 25 MB." }),
+          jsx("input", { type: "file", "data-content-file": true, accept: ".txt,.md,.pdf,.png,.jpg,.jpeg,.webp,.mp4,.webm,text/plain,text/markdown,application/pdf,image/png,image/jpeg,image/webp,video/mp4,video/webm", onChange: (event) => {
             setFile(event.target.files?.[0] ?? null);
             setError(null);
           } })
         ] }),
-        jsx(Button, { action: "upload-project-content", variant: "primary", disabled: uploading || !file || file.size <= 0 || file.size > 5 * 1024 * 1024, onClick: upload, children: uploading ? "Uploading..." : "Upload content" })
+        jsx(Button, { action: "upload-project-content", variant: "primary", disabled: uploading || !file || file.size <= 0 || tooBig(file), onClick: upload, children: uploading ? "Uploading..." : "Upload content" })
       ] }),
-      file && file.size > 5 * 1024 * 1024 ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: "This file exceeds the 5 MB limit." }) : null,
+      tooBig(file) ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: `This file exceeds the ${limitOf(mediaTypeOf(file)) / (1024 * 1024)} MB limit.` }) : null,
       error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: error }) : null
     ] }),
     jsxs("aside", { className: "dockyard-feature-card dockyard-content-preview-card", children: [
       jsx("span", { className: "dockyard-card-label", children: "PREVIEW" }),
       selected ? jsx("h2", { children: selected.filename }) : jsx("h2", { children: "Select a document" }),
       previewState === "loading" ? jsx("p", { children: "Loading preview..." }) : null,
-      previewState === "ready" && selected?.preview_kind === "text" ? jsx("pre", { "data-content-preview": true, className: "dockyard-content-preview", children: selected.text || "This text file is empty." }) : previewState === "ready" && selected?.preview_kind === "image" && selected.data_base64 ? jsx("img", { "data-content-preview": true, "data-preview-kind": "image", className: "dockyard-content-image", alt: selected.filename, src: `data:${selected.media_type};base64,${selected.data_base64}` }) : previewState === "ready" && selected?.preview_kind === "pdf" && pdfUrl ? jsx("iframe", { "data-content-preview": true, "data-preview-kind": "pdf", className: "dockyard-content-pdf", title: `PDF preview: ${selected.filename}`, src: pdfUrl }) : previewState === "ready" ? jsx("div", { "data-content-preview": true, className: "dockyard-report-placeholder", children: `Preview is not available for ${mediaTypeLabel(selected?.media_type)}. File metadata remains visible.` }) : previewState === "idle" ? jsx("p", { className: "dockyard-meta", children: "Text, Markdown, images and PDFs show here. Other formats show verified metadata." }) : null,
+      previewState === "ready" && selected?.preview_kind === "text" ? jsx("pre", { "data-content-preview": true, className: "dockyard-content-preview", children: selected.text || "This text file is empty." }) : previewState === "ready" && selected?.preview_kind === "image" && selected.data_base64 ? jsx("img", { "data-content-preview": true, "data-preview-kind": "image", className: "dockyard-content-image", alt: selected.filename, src: `data:${selected.media_type};base64,${selected.data_base64}` }) : previewState === "ready" && selected?.preview_kind === "pdf" && mediaUrl ? jsx("iframe", { "data-content-preview": true, "data-preview-kind": "pdf", className: "dockyard-content-pdf", title: `PDF preview: ${selected.filename}`, src: mediaUrl }) : previewState === "ready" && selected?.preview_kind === "video" && mediaUrl ? jsx("video", { "data-content-preview": true, "data-preview-kind": "video", className: "dockyard-content-video", controls: true, preload: "metadata", "aria-label": `Video: ${selected.filename}`, src: mediaUrl }) : previewState === "ready" ? jsx("div", { "data-content-preview": true, className: "dockyard-report-placeholder", children: `Preview is not available for ${mediaTypeLabel(selected?.media_type)}. File metadata remains visible.` }) : previewState === "idle" ? jsx("p", { className: "dockyard-meta", children: "Text, Markdown, images, PDFs and videos show here." }) : null,
       selected ? jsxs("div", { className: "dockyard-form-actions", children: [
         selected.archived_at ? jsx(Button, { action: "restore-project-content", disabled: actionBusy, onClick: () => setContentAction("restore"), children: "Restore" }) : jsx(Button, { action: "archive-project-content", disabled: actionBusy, onClick: () => setContentAction("archive"), children: "Archive" }),
         jsx(Button, { action: "remove-project-content", variant: "danger", disabled: actionBusy, onClick: () => setContentAction("remove"), children: "Remove file" })
@@ -15463,7 +15469,7 @@ function describeDefinition(definition) {
   const parts = [definition.layout === "list" ? "List" : "Board"];
   const filters = describeFilters(definition.filters);
   if (filters) parts.push(filters);
-  if (definition.layout !== "list") parts.push(definition.density === "detailed" ? "Expanded cards" : "Summary cards");
+  if (definition.layout !== "list" && definition.density === "detailed") parts.push("All cards open");
   return parts.join(" \xB7 ");
 }
 function freeName(base, taken) {
@@ -15484,9 +15490,9 @@ var statusText = (status) => {
 };
 function Avatar({ name }) {
   const initials2 = initialsOf(name);
-  return jsx("span", { className: initials2 ? "dy-kb-avatar" : "dy-kb-avatar empty", title: name ? displayName(name) : "No owner", "aria-hidden": true, children: initials2 });
+  return jsx("span", { className: initials2 ? "dy-kb-avatar" : "dy-kb-avatar empty", title: name ? displayName(name) : "Unassigned", "aria-hidden": true, children: initials2 });
 }
-function CardBody({ id, item, facts, moves, moving, today, onMove, onOpenItem, onOpenRef, onNavigate, onMilestones }) {
+function CardBody({ id, item, facts, moves, moving, today, onMove, onOpenItem, onOpenRef, onNavigate }) {
   const linkRow = (card) => jsx("li", { children: jsxs("button", {
     type: "button",
     className: "dy-kb-link",
@@ -15505,9 +15511,9 @@ function CardBody({ id, item, facts, moves, moving, today, onMove, onOpenItem, o
   const goto = (label, onClick, text) => jsx("button", { type: "button", className: "dy-kb-goto", "aria-label": `${label}: ${text}`, onClick, children: text });
   const planning = [];
   if (facts.initiative) planning.push(row("Initiative", goto("Initiative", () => onNavigate("roadmap"), facts.initiative.title || facts.initiative.ref)));
-  facts.milestones.forEach((milestone, index) => planning.push(row("Milestone", goto("Milestone", onMilestones, milestone.due ? `${milestone.name} \xB7 due ${shortDate(milestone.due, today)}` : milestone.name), {}, `milestone:${index}`)));
+  facts.milestones.forEach((milestone, index) => planning.push(row("Milestone", goto("Milestone", () => onNavigate("objectives"), milestone.due ? `${milestone.name} \xB7 due ${shortDate(milestone.due, today)}` : milestone.name), {}, `milestone:${index}`)));
   facts.objectives.forEach((objective, index) => planning.push(row("Objective", jsxs("span", { children: [goto("Objective", () => onNavigate("objectives"), objective.name), jsx("span", { className: "dy-kb-via", children: " (through the initiative)" })] }), {}, `objective:${index}`)));
-  const details = [row("Assignee", item.assignee ? displayName(item.assignee) : "No owner")];
+  const details = [row("Assignee", item.assignee ? displayName(item.assignee) : "Unassigned")];
   if (facts.due) details.push(row("Due", facts.overdue ? `${shortDate(facts.due, today)} \xB7 Overdue` : shortDate(facts.due, today), facts.overdue ? { "data-overdue": "true" } : {}));
   if (facts.labels.length) details.push(row("Labels", facts.labels.join(", ")));
   return jsxs("div", { className: "dy-kb-card-body", id, "data-card-body": item.ref, children: [
@@ -15548,7 +15554,7 @@ function Card({ item, facts, fields, open, moves, moving, today, onToggle, onDra
         "data-card-toggle": item.ref,
         "aria-expanded": open,
         "aria-controls": open ? bodyId : void 0,
-        "aria-label": `${typeLabel(item.type)} ${item.ref}: ${item.title}${fields.assignee ? `, ${item.assignee ? `assigned to ${displayName(item.assignee)}` : "no owner"}` : ""}`,
+        "aria-label": `${typeLabel(item.type)} ${item.ref}: ${item.title}${fields.assignee ? `, ${item.assignee ? `assigned to ${displayName(item.assignee)}` : "unassigned"}` : ""}`,
         "aria-describedby": hasSummary ? summaryId : void 0,
         onClick: () => onToggle(item.ref, !open),
         children: [
@@ -15748,7 +15754,6 @@ function ViewsPanel({
 }
 var HELD = "kanban-view";
 function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onNavigate, appliedView, setAppliedView }) {
-  const [page, setPage] = useState("work");
   const [overrides, setOverrides] = useState({});
   const [collapsed, setCollapsed] = useState({});
   const [dragged, setDragged] = useState(null);
@@ -15835,7 +15840,6 @@ function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onN
     return { drafts };
   });
   const selectView = (name) => {
-    setPage("work");
     setOverrides({});
     updateHeld(() => ({ currentName: name }));
   };
@@ -15955,7 +15959,7 @@ function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onN
   const viewTab = (saved) => {
     const name = saved ? saved.name : null;
     const label = saved ? saved.name : ALL_WORK;
-    const active = page === "work" && name === currentName;
+    const active = name === currentName;
     return jsxs("button", { type: "button", className: "dy-kb-viewtab", "data-view-tab": label, "aria-pressed": active, title: saved ? describeDefinition(definitionOf(saved)) : "Everything, on the board", onClick: () => selectView(name), children: [
       jsx("span", { className: "dy-kb-viewtab-name", children: label }),
       editedNames.has(name) ? jsx("span", { className: "dy-kb-dot", "aria-label": "unsaved changes", role: "img" }) : null
@@ -15968,7 +15972,6 @@ function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onN
       jsxs("button", { type: "button", className: "dy-kb-viewtab dy-kb-viewtab-new", "data-view-new": true, onClick: () => openPanel("new"), children: [jsx(Icon, { name: "plus" }), jsx("span", { children: "New view" })] }, "new")
     ] }),
     jsxs("div", { className: "dy-kb-views-right", children: [
-      jsxs("button", { type: "button", className: "dy-kb-control dy-kb-button", "data-kanban-page": "milestones", "aria-pressed": page === "milestones", onClick: () => setPage(page === "milestones" ? "work" : "milestones"), children: [jsx(Icon, { name: "flag" }), "Milestones"] }),
       jsxs("button", { type: "button", className: "dy-kb-control dy-kb-button", ref: manageRef, "data-views-manage": true, "aria-expanded": Boolean(panel), onClick: () => panel ? setPanel(null) : openPanel("manage"), children: [jsx(Icon, { name: "list-filter" }), "Manage views"] })
     ] })
   ] });
@@ -15994,9 +15997,18 @@ function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onN
     jsx("button", { type: "button", className: "dy-kb-control dy-kb-button", "data-kanban-clear": true, disabled: !filtersActive(filters), onClick: () => setFilters(emptyFilters()), children: "Clear filters" }),
     jsx("span", { className: "dy-kb-toolbar-gap", "aria-hidden": true }),
     segmented("Layout", "layout", working.layout, [["board", "Board"], ["list", "List"]], (layout) => setWorking({ ...working, layout })),
-    working.layout === "board" ? segmented("Cards", "density", working.density, [["compact", "Summary"], ["detailed", "Expanded"]], (density) => {
-      setOverrides({});
-      setWorking({ ...working, density });
+    // Sahil 05/10: "Expanded" did not say what it did. One button opens (or closes) every card.
+    working.layout === "board" ? jsxs("button", {
+      type: "button",
+      className: "dy-kb-control dy-kb-button",
+      "data-kanban-open-all": true,
+      "aria-pressed": working.density === "detailed",
+      title: "Show every card's details without opening each one",
+      onClick: () => {
+        setOverrides({});
+        setWorking({ ...working, density: working.density === "detailed" ? "compact" : "detailed" });
+      },
+      children: [jsx(Icon, { name: "chevron-down" }), "Open all cards"]
     }) : null,
     jsx("span", { className: "dy-kb-count", "data-kanban-count": true, role: "status", children: `${number(liveCount)} ${plural(liveCount, "item")}` })
   ] });
@@ -16049,8 +16061,7 @@ function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onN
       onMove: transitionStatus,
       onOpenItem,
       onOpenRef: openRef,
-      onNavigate,
-      onMilestones: () => setPage("milestones")
+      onNavigate
     }, item.ref);
   };
   const column = (stage) => {
@@ -16111,7 +16122,7 @@ function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onN
     { key: "title", heading: "Title", cell: (item) => item.title },
     { key: "type", heading: "Type", cell: (item) => typeLabel(item.type) },
     { key: "status", heading: "State", cell: (item) => statusText(item.status) },
-    { key: "assignee", heading: "Assignee", cell: (item) => item.assignee ? displayName(item.assignee) : "No owner" },
+    { key: "assignee", heading: "Assignee", cell: (item) => item.assignee ? displayName(item.assignee) : "Unassigned" },
     { key: "blocked_by", heading: "Blocked by", cell: (item) => refsCell(facts(item).blockedBy) },
     { key: "blocks", heading: "Blocks", cell: (item) => refsCell(facts(item).blocks) },
     { key: "initiative", heading: "Initiative", cell: (item) => facts(item).initiative ? facts(item).initiative.title || facts(item).initiative.ref : "" },
@@ -16126,7 +16137,7 @@ function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onN
     groups: STAGES.map((stage) => ({ key: stage.key, label: stage.label, items: grouped[stage.key] })).filter((group) => group.items.length > 0),
     emptyText: "No work items to list."
   }) }, "list");
-  const body = page === "milestones" ? [jsx(PlanningPanel, { project, milestones: view.milestones ?? [], workItems: allItems, onRefresh }, "milestones")] : [jsxs("div", { className: "dy-kb-controls", children: [toolbar, editedStrip, help] }, "controls"), ...notes, empty, working.layout === "list" ? list : board];
+  const body = [jsxs("div", { className: "dy-kb-controls", children: [toolbar, editedStrip, help] }, "controls"), ...notes, empty, working.layout === "list" ? list : board];
   return jsxs("div", { className: "dockyard-board-wrap", "data-kanban-screen": true, "data-view": currentName ?? ALL_WORK, "data-panel-open": panel ? "true" : void 0, children: [
     viewsBar,
     ...body,
@@ -16242,7 +16253,10 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   } else if (projectView === "initiative") {
     panel = jsx(InitiativeView, { view, onRefresh });
   } else if (projectView === "objectives") {
-    panel = jsx(ObjectivesPanel, { project, settings: view.settings ?? {}, objectives: view.objectives ?? [], goals: view.goals ?? [], missionArchive: view.missionArchive ?? [], onRefresh }, project.id);
+    panel = jsxs(Fragment, { children: [
+      jsx(ObjectivesPanel, { project, settings: view.settings ?? {}, objectives: view.objectives ?? [], goals: view.goals ?? [], missionArchive: view.missionArchive ?? [], onRefresh }, project.id),
+      jsx(PlanningPanel, { project, milestones: view.milestones ?? [], workItems: view.workItems ?? [], onRefresh }, "milestones")
+    ] });
   } else if (projectView === "planning") {
     panel = jsx(PlanningCanvasPanel, { project, canvas: view.canvas, content: view.content ?? [], onRefresh, onDirty: onCanvasDirty }, project.id);
   } else if (projectView === "workflows") {
@@ -16288,7 +16302,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
           visibleWork.length > 0 ? jsx("div", {
             className: "dockyard-overview-list",
             children: visibleWork.map((item) => jsxs("article", { children: [
-              jsxs("span", { children: [jsx("strong", { children: item.title || item.ref }), jsx("small", { children: `${item.ref} / ${item.assignee || "No owner"}` })] }),
+              jsxs("span", { children: [jsx("strong", { children: item.title || item.ref }), jsx("small", { children: `${item.ref} / ${item.assignee || "Unassigned"}` })] }),
               jsx(StatusTag, { tone: ["done", "completed"].includes(item.status) ? "success" : item.status === "in_progress" ? "info" : "neutral", label: String(item.status || "unknown").replaceAll("_", " ") })
             ] }, item.ref))
           }) : jsx("p", { className: "dockyard-meta", children: "No work items are attached." })
@@ -17024,6 +17038,8 @@ var NOTIFICATIONS_CSS = `
 .dockyard-root .dy-notif-settings label { font-size: 12px; color: var(--dy-text-2); }
 .dockyard-root .dy-notif-settings select, .dockyard-root .dy-notif-settings input[type="time"] { border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); color: inherit; padding: 4px 8px; font: inherit; }
 .dockyard-root .dy-notif-settings .dy-notif-override-link { font-size: 12px; }
+/* Sahil 05/10: the settings live only in App settings; the screen points there. */
+.dockyard-root .dy-notif-settings-link { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 14px 0 0; color: var(--dy-text-2); font-size: 13px; }
 .dockyard-root .dy-notif-row-btn { display: block; width: 100%; box-sizing: border-box; cursor: pointer; text-align: left; background: transparent; border: 0; color: inherit; font: inherit; padding: 0; margin: 0; }
 .dockyard-root .dy-notif-row-btn:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
 .dockyard-root .dy-notif-row-inner { display: flex; gap: 10px; align-items: baseline; }
@@ -17040,7 +17056,7 @@ var KIND_LABELS = {
   approval_required: "Approvals",
   health_change: "Health",
   alert: "Alerts",
-  unowned_work: "No owner"
+  unassigned_work: "Unassigned"
 };
 var STATE_LABELS = { new: "New", seen: "Seen", resolved: "Resolved" };
 var PAGE_SIZE = 50;
@@ -17058,7 +17074,7 @@ function dayBucket(createdAt) {
   if (diff === 1) return "Yesterday";
   return "Earlier";
 }
-function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, onOpen }) {
+function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, onOpen, onOpenSettings }) {
   const [stateFilter, setStateFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState("all");
@@ -17067,9 +17083,6 @@ function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, onOpen 
   const [resolveOpen, setResolveOpen] = useState(false);
   const [resolveNote, setResolveNote] = useState("");
   const [busyId, setBusyId] = useState(null);
-  const [settings, setSettings] = useState(view.settings ?? null);
-  const [settingsBusy, setSettingsBusy] = useState(false);
-  const [settingsError, setSettingsError] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [localStates, setLocalStates] = useState({});
@@ -17150,23 +17163,6 @@ function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, onOpen 
     }
     setBusyId(null);
   };
-  const saveSettings = async (patch) => {
-    setSettingsBusy(true);
-    setSettingsError(null);
-    const { ignored: _ignored, timezone: _timezone, ...base } = settings ?? {};
-    const next = { ...base, ...patch };
-    setSettings(next);
-    try {
-      const result = await api("/settings/notifications", {
-        method: "PUT",
-        body: { actor_id: "desktop", policy: next }
-      });
-      setSettings(result.policy ?? next);
-    } catch (failure) {
-      setSettingsError(String(failure?.message ?? failure));
-    }
-    setSettingsBusy(false);
-  };
   const groups = [];
   for (const note of shown) {
     const bucket = dayBucket(note.created_at);
@@ -17195,7 +17191,7 @@ function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, onOpen 
         jsx("label", { className: "dy-notif-filter", children: jsx("select", { "aria-label": "Filter by type", value: typeFilter, onChange: (e) => {
           setTypeFilter(e.target.value);
           setVisible(PAGE_SIZE);
-        }, children: [["all", "All types"], ["approval_required", "Approvals"], ["health_change", "Health"], ["alert", "Alerts"], ["unowned_work", "No owner"], ["other", "Other"]].map(([value, label]) => jsx("option", { value, children: label }, value)) }) }),
+        }, children: [["all", "All types"], ["approval_required", "Approvals"], ["health_change", "Health"], ["alert", "Alerts"], ["unassigned_work", "Unassigned"], ["other", "Other"]].map(([value, label]) => jsx("option", { value, children: label }, value)) }) }),
         jsx("label", { className: "dy-notif-filter", children: jsx("select", { "aria-label": "Filter by severity", value: severityFilter, onChange: (e) => {
           setSeverityFilter(e.target.value);
           setVisible(PAGE_SIZE);
@@ -17247,12 +17243,10 @@ function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, onOpen 
         onOpen
       }) : null
     ] }),
-    all.length > 0 ? jsx(NotificationSettings, {
-      settings,
-      busy: settingsBusy,
-      error: settingsError,
-      onSave: saveSettings
-    }) : null,
+    jsxs("p", { className: "dy-notif-settings-link", "data-notification-settings-link": true, children: [
+      jsx("span", { children: "Notification settings are in App settings." }),
+      jsx(Button, { small: true, action: "open-app-settings", onClick: onOpenSettings, children: "Open App settings" })
+    ] }),
     actionError ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: `Action failed: ${actionError}` }) : null
   ] });
 }
@@ -18319,10 +18313,7 @@ function DashboardPage({ inboxCss = "" } = {}) {
       setLoadScope(nextLoadScope);
     }
     setError(null);
-    const loader = tab === "workflows-library" ? async () => ({ workflows: (await api("/workflow-library")).workflows ?? [] }) : tab === "dashboard" ? loadDashboardData : tab === "roadmap" ? async () => ({}) : tab === "settings" ? loadAppSettingsData : tab === "project" || tab === "workflows" ? () => loadProjectData(selectedProject) : tab === "backlog" ? () => loadBacklogData(selectedProject) : tab === "teams" ? loadTeamsData : tab === "initiative" ? () => loadProjectData(selectedProject) : tab === "onboard" ? loadOnboardData : tab === "inbox" ? loadInboxData : async () => ({
-      ...await api("/notifications?limit=200"),
-      settings: (await api("/settings/notifications/effective")).effective
-    });
+    const loader = tab === "workflows-library" ? async () => ({ workflows: (await api("/workflow-library")).workflows ?? [] }) : tab === "dashboard" ? loadDashboardData : tab === "roadmap" ? async () => ({}) : tab === "settings" ? loadAppSettingsData : tab === "project" || tab === "workflows" ? () => loadProjectData(selectedProject) : tab === "backlog" ? () => loadBacklogData(selectedProject) : tab === "teams" ? loadTeamsData : tab === "initiative" ? () => loadProjectData(selectedProject) : tab === "onboard" ? loadOnboardData : tab === "inbox" ? loadInboxData : async () => api("/notifications?limit=200");
     const loading = loader();
     if (!selectedProject) rememberedProject();
     loading.then(
@@ -18475,10 +18466,10 @@ function DashboardPage({ inboxCss = "" } = {}) {
       setTab("project");
       return;
     }
-    if (screen === "s3" && objectKind === "unowned" && objectId) {
+    if (screen === "s3" && objectKind === "unassigned" && objectId) {
       setDeepLinkNotice(null);
       setSelectedProject(objectId);
-      setBacklogPreset({ kind: "unowned", projectId: objectId, at: Date.now() });
+      setBacklogPreset({ kind: "unassigned", projectId: objectId, at: Date.now() });
       setTab("backlog");
       return;
     }
@@ -18565,7 +18556,7 @@ function DashboardPage({ inboxCss = "" } = {}) {
   } else if (tab === "inbox") {
     content = jsx(InboxView, { view: payload, onRefresh: refresh, focusRef: inboxFocusRef, onOpenProject: openDeepLink });
   } else {
-    content = jsx(NotificationsView, { view: payload, onRefresh: refresh, onAcknowledged: acknowledge, onOpen: openDeepLink });
+    content = jsx(NotificationsView, { view: payload, onRefresh: refresh, onAcknowledged: acknowledge, onOpen: openDeepLink, onOpenSettings: () => requestTab("settings") });
   }
   return jsxs("div", { className: "dockyard-root", children: [
     jsxs("div", { className: "dockyard-shell", children: [

@@ -796,7 +796,7 @@ class CanonicalWorkService:
             raise ValueError("backlog rank must be at least 1")
         if len(reason.strip()) < 4:
             raise ValueError("backlog additions require a priority reason")
-        # No owner is allowed (Sahil 04/10): Hermes never dispatches unowned work.
+        # Unassigned is allowed (Sahil 04/10): Hermes never dispatches unassigned work.
         if assignee is not None and creator.id == assignee.id:
             raise ValueError("assignee must be distinct from the creator")
         kind = self._kind(item_type)

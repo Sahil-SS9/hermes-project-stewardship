@@ -507,8 +507,8 @@ class QueuedWorkItemCreate(BaseModel):
     evidence_refs: List[str] = []
     creator_id: str
     creator_kind: str = "human"
-    # Sahil 04/10 (demo feedback b): an item may have no owner. Hermes never
-    # dispatches unowned work, and the screens say so.
+    # Sahil 04/10 (demo feedback b): an item may be unassigned. Hermes never
+    # dispatches unassigned work, and the screens say so.
     assignee_id: Optional[str] = None
     assignee_kind: str = "bot"
     rank: int
@@ -1916,29 +1916,29 @@ def create_app(
 
     _FINISHED_STATUSES = {"done", "complete", "completed", "archived"}
 
-    def _tell_ownership(project_id: str, item: Dict[str, Any], *, before: Optional[str],
-                        actor_id: str, new: bool = False) -> None:
-        """Sahil 04/10 (demo feedback b): open work with no owner is never
-        picked up by a bot. Say so when an item starts without an owner or
-        loses its owner, and stop saying so when it gets one. The change
-        itself already happened, so a failure here is logged, never raised."""
-        from ..events.bus import WORK_OWNED, WORK_UNOWNED
+    def _tell_assignment(project_id: str, item: Dict[str, Any], *, before: Optional[str],
+                         actor_id: str, new: bool = False) -> None:
+        """Sahil 04/10 (demo feedback b): open unassigned work is never picked
+        up by a bot. Say so when an item starts unassigned or loses its
+        assignee, and stop saying so when it is assigned. The change itself
+        already happened, so a failure here is logged, never raised."""
+        from ..events.bus import WORK_ASSIGNED, WORK_UNASSIGNED
 
         ref, after = item.get("ref"), item.get("assignee") or None
         if not ref:
             return
         try:
             if after and not before and not new:
-                bus.emit(WORK_OWNED, project_id=project_id, subject=ref,
+                bus.emit(WORK_ASSIGNED, project_id=project_id, subject=ref,
                          payload={"to": after}, emitted_by=actor_id)
             elif (not after and (new or before)
                   and (item.get("type") or "task") != "epic"
                   and item.get("status") not in _FINISHED_STATUSES):
-                bus.emit(WORK_UNOWNED, project_id=project_id, subject=ref,
+                bus.emit(WORK_UNASSIGNED, project_id=project_id, subject=ref,
                          payload={"title": item.get("title") or ""}, emitted_by=actor_id)
         except Exception:
             logging.getLogger(__name__).exception(
-                "could not record the ownership change of %s", ref)
+                "could not record the assignment change of %s", ref)
 
     def _raise_work_error(exc: Exception) -> NoReturn:
         if isinstance(exc, CanonicalWorkPartialError):
@@ -2031,7 +2031,7 @@ def create_app(
             item = work.assign_item(project_id, ref, body.assignee_id, actor=actor)
         except Exception as exc:
             _raise_work_error(exc)
-        _tell_ownership(project_id, item, before=before, actor_id=actor.id)
+        _tell_assignment(project_id, item, before=before, actor_id=actor.id)
         return item
 
     @router.post("/projects/{project_id}/work-items/{ref}/dependencies")
@@ -2145,7 +2145,7 @@ def create_app(
             )
         except Exception as exc:
             _raise_work_error(exc)
-        _tell_ownership(project_id, item, before=None, new=True, actor_id=creator.id)
+        _tell_assignment(project_id, item, before=None, new=True, actor_id=creator.id)
         return {
             "ref": item["ref"],
             "id": item["id"],

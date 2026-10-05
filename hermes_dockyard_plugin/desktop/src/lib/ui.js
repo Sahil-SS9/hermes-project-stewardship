@@ -91,6 +91,8 @@ export function mediaTypeLabel(value) {
     'image/png': 'PNG image',
     'image/jpeg': 'JPEG image',
     'image/webp': 'WebP image',
+    'video/mp4': 'MP4 video',
+    'video/webm': 'WebM video',
   }[value] || readableLabel(value, 'File')
 }
 

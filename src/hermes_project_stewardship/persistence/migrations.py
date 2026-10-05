@@ -15,7 +15,7 @@ from typing import List
 # the edited v3). Later lanes take the next free number when they merge.
 # Never edit a released migration (v1-v17 shipped in v0.3.0); fix forward
 # with a new version instead. Batch R2 owns v35. Batch E owns v36.
-SCHEMA_VERSION = 36
+SCHEMA_VERSION = 37
 
 
 @dataclass(frozen=True)
@@ -1638,3 +1638,55 @@ MIGRATIONS: List[Migration] = [
         """,
     ),
 ]
+
+
+# Sahil 05/10 (demo feedback g): project content takes MP4 and WebM videos up to
+# 25 MB (other files keep their 5 MB limit, enforced by the service). SQLite
+# cannot change a CHECK in place, so the table is rebuilt exactly as v24 did:
+# every row and column is copied unchanged. The undo is v24's rebuild, word for
+# word: it restores the exact table v24 built (the schema guard compares
+# definitions) and, by that table's CHECK, refuses while any video row exists
+# rather than dropping it.
+MIGRATIONS.append(Migration(
+    version=37,
+    name="project content accepts MP4 and WebM videos up to 25 MB",
+    upgrade_sql="""
+        CREATE TABLE project_content_v37 (
+            content_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            filename TEXT NOT NULL,
+            stored_path TEXT NOT NULL,
+            media_type TEXT NOT NULL CHECK (media_type IN (
+                'text/plain','text/markdown','application/pdf',
+                'image/png','image/jpeg','image/webp',
+                'video/mp4','video/webm')),
+            size_bytes INTEGER NOT NULL CHECK (size_bytes BETWEEN 1 AND 26214400),
+            sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+            uploaded_by TEXT NOT NULL,
+            uploaded_at TEXT NOT NULL,
+            archived_at TEXT,
+            archived_by TEXT,
+            removal_state TEXT NOT NULL DEFAULT 'active'
+                CHECK (removal_state IN ('active','pending','quarantined','file_removed')),
+            file_dev INTEGER,
+            file_ino INTEGER,
+            removed_at TEXT,
+            removed_by TEXT,
+            UNIQUE(project_id, stored_path)
+        );
+        INSERT INTO project_content_v37(
+            content_id, project_id, filename, stored_path, media_type,
+            size_bytes, sha256, uploaded_by, uploaded_at, archived_at,
+            archived_by, removal_state, file_dev, file_ino, removed_at, removed_by
+        )
+        SELECT content_id, project_id, filename, stored_path, media_type,
+               size_bytes, sha256, uploaded_by, uploaded_at, archived_at,
+               archived_by, removal_state, file_dev, file_ino, removed_at, removed_by
+        FROM project_content;
+        DROP TABLE project_content;
+        ALTER TABLE project_content_v37 RENAME TO project_content;
+        CREATE INDEX idx_project_content_project_time
+            ON project_content(project_id, uploaded_at DESC);
+        """,
+    downgrade_sql=next(m.upgrade_sql for m in MIGRATIONS if m.version == 24),
+))

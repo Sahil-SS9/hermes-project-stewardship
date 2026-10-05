@@ -20,7 +20,7 @@ import { api } from '../runtime/context.js'
 import { readableLabel } from '../data/loaders.js'
 import { EmptyState } from '../lib/ui.js'
 import { validationSummary } from '../data/loaders.js'
-import { unownedWork } from '../data/loaders.js'
+import { unassignedWork } from '../data/loaders.js'
 import { emitToast } from '../runtime/context.js'
 export function DiscoveredProfilePicker({ profiles = [], value = '', onChange, name, label = 'Hermes profile', disabled = false }) {
   const [search, setSearch] = useState('')
@@ -273,11 +273,11 @@ export function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
     })
   }
   const needsFolded = isFolded('needs-you-now')
-  // Sahil 04/10 (demo feedback b): open work with no owner, per project. No bot picks it up.
-  const unowned = Object.entries(view.projectContext ?? {})
-    .map(([projectId, context]) => [projectId, unownedWork(context.workItems).length])
+  // Sahil 04/10 (demo feedback b): open unassigned work, per project. No bot picks it up.
+  const unassigned = Object.entries(view.projectContext ?? {})
+    .map(([projectId, context]) => [projectId, unassignedWork(context.workItems).length])
     .filter(([, count]) => count > 0)
-  const unownedTotal = unowned.reduce((sum, [, count]) => sum + count, 0)
+  const unassignedTotal = unassigned.reduce((sum, [, count]) => sum + count, 0)
   const focusItem = selected === false ? null : selected ?? decisions[0] ?? null
   useEffect(() => {
     if (!focusItem?.ref || focusItem.kind !== 'initiative_approval') { setDecision(null); setDetailError(''); return undefined }
@@ -407,12 +407,12 @@ export function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
           ['on_track', 'On track'], ['at_risk', 'At risk'], ['stalled', 'Stalled'], ['idle', 'Idle'], ['unknown', 'Unverified'],
         ].map(([state, label]) => jsxs('span', { children: [jsx('i', { className: `dockyard-health-dot ${state}`, 'aria-hidden': true }), label] }, state)) }),
       ]}),
-      unownedTotal ? jsxs('div', { className: 'dockyard-soft-alert', 'data-unowned-alert': 'fleet', role: 'status', children: [
+      unassignedTotal ? jsxs('div', { className: 'dockyard-soft-alert', 'data-unassigned-alert': 'fleet', role: 'status', children: [
         jsx(Icon, { name: 'user' }),
         jsxs('div', { className: 'dockyard-soft-alert-body', children: [
-          jsx('strong', { children: `${number(unownedTotal)} ${plural(unownedTotal, 'work item')} ${unownedTotal === 1 ? 'has' : 'have'} no owner, so no bot will pick ${unownedTotal === 1 ? 'it' : 'them'} up.` }),
-          jsx('span', { className: 'dockyard-soft-alert-items', children: unowned.map(([projectId, count]) => jsx('button', { type: 'button', className: 'dockyard-soft-alert-item', 'data-unowned-project': projectId,
-            onClick: () => onOpen?.(`s3:unowned/${projectId}`), children: `${projectId} (${number(count)})` }, projectId)) }),
+          jsx('strong', { children: `${number(unassignedTotal)} ${plural(unassignedTotal, 'work item')} ${unassignedTotal === 1 ? 'is' : 'are'} unassigned, so no bot will pick ${unassignedTotal === 1 ? 'it' : 'them'} up.` }),
+          jsx('span', { className: 'dockyard-soft-alert-items', children: unassigned.map(([projectId, count]) => jsx('button', { type: 'button', className: 'dockyard-soft-alert-item', 'data-unassigned-project': projectId,
+            onClick: () => onOpen?.(`s3:unassigned/${projectId}`), children: `${projectId} (${number(count)})` }, projectId)) }),
         ] }),
       ] }) : null,
       jsxs('div', { className: 'dockyard-command-layout', children: [
