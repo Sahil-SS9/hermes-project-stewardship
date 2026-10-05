@@ -2694,6 +2694,19 @@ var PLAN_CSS = `
 .dy-plan-loop li.stopped::before { content: '\xD7'; background: var(--dy-neutral-bg); color: var(--dy-neutral); border-color: transparent; }
 .dy-plan-loop li small { color: var(--dy-text-2); }
 .dy-plan-feedback { margin: 0 0 8px; padding: 8px 10px; border-left: 3px solid var(--dy-warning); background: var(--dy-warning-bg); color: var(--dy-text); font-size: 13px; }
+/* An objective's evidence history and human assessment form: a shared
+   component (work-item/detail.js) that never had styles of its own, so its
+   controls fell back to the browser's defaults. Dressed here like the drawer. */
+.dy-plan-drawer [data-objective-evidence] { padding: 8px 10px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 12px; }
+.dy-plan-drawer [data-objective-evidence] > summary { cursor: pointer; color: var(--dy-text); font-weight: 700; }
+.dy-plan-drawer [data-objective-evidence] p { margin: 6px 0 0; overflow-wrap: anywhere; }
+.dy-plan-drawer [data-objective-evidence] ul { display: grid; gap: 2px; margin: 6px 0 0; padding-left: 18px; overflow-wrap: anywhere; }
+.dy-plan-drawer [data-objective-evidence] form { display: grid; gap: 8px; margin-top: 10px; }
+.dy-plan-drawer [data-objective-evidence] label { display: grid; gap: 4px; color: var(--dy-text); font-weight: 700; }
+.dy-plan-drawer [data-objective-evidence] :is(input, select) { min-width: 0; padding: 6px 8px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-weight: 400; font-size: 13px; }
+.dy-plan-drawer [data-objective-evidence] button { justify-self: start; padding: 6px 12px; border: 1px solid var(--dy-action); border-radius: 8px; background: var(--dy-action); color: var(--dy-on-action); font: inherit; font-weight: 700; cursor: pointer; }
+.dy-plan-drawer [data-objective-evidence] button:disabled { border-color: var(--dy-control-border); background: var(--dy-surface); color: var(--dy-disabled-text); cursor: default; }
+.dy-plan-drawer [data-objective-evidence] :is(input, select, button):focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
 .dy-plan-risks { margin: 4px 0; padding-left: 18px; font-size: 12px; color: var(--dy-danger); }
 .dy-plan-inline { display: flex; gap: 6px; margin-top: 6px; }
 .dy-plan-inline select { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
