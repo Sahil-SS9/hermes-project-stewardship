@@ -159,7 +159,8 @@ export const PLAN_CSS = `
 @media (max-width: 1100px) {
   .dy-plan.with-drawer .dy-plan-main { grid-template-columns: minmax(0, 1fr); }
   .dy-plan-drawer { position: fixed; top: auto; right: 0; bottom: 0; left: 0; z-index: 35; max-height: 72vh; border-radius: 14px 14px 0 0; box-shadow: var(--dy-shadow); }
-  .dy-plan-sheet-backdrop { display: block; position: fixed; inset: 0; z-index: 34; background: rgba(10, 15, 25, .38); }
+  /* Same scrim as .dockyard-modal-layer. */
+  .dy-plan-sheet-backdrop { display: block; position: fixed; inset: 0; z-index: 34; background: rgba(12, 17, 28, .48); backdrop-filter: blur(3px); }
 }
 @media (max-width: 760px) {
   .dy-plan-columns { grid-template-columns: repeat(4, minmax(240px, 82vw)); scroll-snap-type: x mandatory; }

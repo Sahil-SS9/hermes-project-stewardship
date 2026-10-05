@@ -2814,7 +2814,8 @@ var PLAN_CSS = `
 @media (max-width: 1100px) {
   .dy-plan.with-drawer .dy-plan-main { grid-template-columns: minmax(0, 1fr); }
   .dy-plan-drawer { position: fixed; top: auto; right: 0; bottom: 0; left: 0; z-index: 35; max-height: 72vh; border-radius: 14px 14px 0 0; box-shadow: var(--dy-shadow); }
-  .dy-plan-sheet-backdrop { display: block; position: fixed; inset: 0; z-index: 34; background: rgba(10, 15, 25, .38); }
+  /* Same scrim as .dockyard-modal-layer. */
+  .dy-plan-sheet-backdrop { display: block; position: fixed; inset: 0; z-index: 34; background: rgba(12, 17, 28, .48); backdrop-filter: blur(3px); }
 }
 @media (max-width: 760px) {
   .dy-plan-columns { grid-template-columns: repeat(4, minmax(240px, 82vw)); scroll-snap-type: x mandatory; }
@@ -16439,62 +16440,61 @@ function buildPlan({ roadmap, initiatives, objectives, goals, milestones, settin
 }
 function planActions(projectId) {
   const p = enc(projectId);
-  const call = (path, method = "POST", body = {}) => api(path, { method, body, quiet: true });
-  const milestone = (name, rest = "") => `/projects/${p}/milestones/${enc(name)}${rest}`;
+  const quiet = true;
   return {
-    proposeInitiative: (form) => call(`/projects/${p}/initiatives`, "POST", {
+    proposeInitiative: (form) => api(`/projects/${p}/initiatives`, { method: "POST", quiet, body: {
       title: form.title.trim(),
       rationale: form.rationale.trim(),
       expected_outcome: form.expectedOutcome.trim(),
       risk: form.risk
-    }),
-    resubmitInitiative: (ref, form) => call(`/initiatives/${enc(ref)}/resubmit`, "POST", {
+    } }),
+    resubmitInitiative: (ref, form) => api(`/initiatives/${enc(ref)}/resubmit`, { method: "POST", quiet, body: {
       rationale: form.rationale.trim(),
       expected_outcome: form.expectedOutcome.trim(),
       risk: form.risk
-    }),
-    createMilestone: (form) => call(`/projects/${p}/milestones`, "POST", { name: form.title.trim(), due: form.due || null }),
-    renameMilestone: (name, next) => call(milestone(name, "/rename"), "POST", { new_name: next.trim() }),
-    updateMilestone: (name, patch) => call(milestone(name), "PATCH", patch),
-    archiveMilestone: (name) => call(milestone(name, "/archive")),
-    restoreMilestone: (name) => call(milestone(name, "/restore")),
-    milestoneDetail: (name) => api(milestone(name), { quiet: true }),
-    attachWork: (name, ref) => call(milestone(name, "/attach"), "POST", { ref }),
-    detachWork: (name, ref) => call(milestone(name, "/detach"), "POST", { ref }),
-    createObjective: (form) => call(`/projects/${p}/objectives`, "POST", {
+    } }),
+    createMilestone: (form) => api(`/projects/${p}/milestones`, { method: "POST", quiet, body: { name: form.title.trim(), due: form.due || null } }),
+    renameMilestone: (name, next) => api(`/projects/${p}/milestones/${enc(name)}/rename`, { method: "POST", quiet, body: { new_name: next.trim() } }),
+    updateMilestone: (name, patch) => api(`/projects/${p}/milestones/${enc(name)}`, { method: "PATCH", quiet, body: patch }),
+    archiveMilestone: (name) => api(`/projects/${p}/milestones/${enc(name)}/archive`, { method: "POST", quiet, body: {} }),
+    restoreMilestone: (name) => api(`/projects/${p}/milestones/${enc(name)}/restore`, { method: "POST", quiet, body: {} }),
+    milestoneDetail: (name) => api(`/projects/${p}/milestones/${enc(name)}`, { quiet }),
+    attachWork: (name, ref) => api(`/projects/${p}/milestones/${enc(name)}/attach`, { method: "POST", quiet, body: { ref } }),
+    detachWork: (name, ref) => api(`/projects/${p}/milestones/${enc(name)}/detach`, { method: "POST", quiet, body: { ref } }),
+    createObjective: (form) => api(`/projects/${p}/objectives`, { method: "POST", quiet, body: {
       name: form.title.trim(),
       description: form.description.trim(),
       target: form.target.trim(),
       severity: form.severity,
       evaluator_type: "manual",
       window: "30d"
-    }),
-    updateObjective: (id, form) => call(`/projects/${p}/objectives/${id}`, "PATCH", {
+    } }),
+    updateObjective: (id, form) => api(`/projects/${p}/objectives/${id}`, { method: "PATCH", quiet, body: {
       name: form.title.trim(),
       description: form.description.trim(),
       target: form.target.trim(),
       severity: form.severity
-    }),
-    archiveObjective: (id) => call(`/projects/${p}/objectives/${id}/archive`),
-    removeObjective: (id) => call(`/projects/${p}/objectives/${id}`, "DELETE"),
-    evaluateObjective: (id) => call(`/projects/${p}/objectives/${id}/evaluate`),
-    createGoal: (form) => call(`/projects/${p}/goals`, "POST", {
+    } }),
+    archiveObjective: (id) => api(`/projects/${p}/objectives/${id}/archive`, { method: "POST", quiet, body: {} }),
+    removeObjective: (id) => api(`/projects/${p}/objectives/${id}`, { method: "DELETE", quiet, body: {} }),
+    evaluateObjective: (id) => api(`/projects/${p}/objectives/${id}/evaluate`, { method: "POST", quiet }),
+    createGoal: (form) => api(`/projects/${p}/goals`, { method: "POST", quiet, body: {
       title: form.title.trim(),
       description: form.description.trim(),
       objective_ids: form.objectiveIds
-    }),
-    updateGoal: (id, patch) => call(`/projects/${p}/goals/${enc(id)}`, "PATCH", patch),
-    orderGoals: (ids) => call(`/projects/${p}/goals/order`, "PUT", { goal_ids: ids }),
-    archiveGoal: (id) => call(`/projects/${p}/goals/${enc(id)}/archive`),
-    restoreGoal: (id) => call(`/projects/${p}/goals/${enc(id)}/restore`),
-    linkMilestone: (ref, milestoneId, relationship) => call(`/projects/${p}/initiatives/${enc(ref)}/milestones`, "POST", { milestone_id: Number(milestoneId), relationship }),
-    unlinkMilestone: (ref, milestoneId) => call(`/projects/${p}/initiatives/${enc(ref)}/milestones/${Number(milestoneId)}`, "DELETE"),
-    linkObjective: (ref, objectiveId, relationship) => call(`/projects/${p}/objectives/${Number(objectiveId)}/initiatives`, "POST", { initiative_ref: ref, relationship }),
-    unlinkObjective: (ref, objectiveId) => call(`/projects/${p}/objectives/${Number(objectiveId)}/initiatives/${enc(ref)}`, "DELETE"),
-    saveMission: (text) => call(`/projects/${p}/settings`, "PATCH", { mission: text.trim() }),
-    archiveMission: () => call(`/projects/${p}/mission/archive`),
-    removeMission: () => call(`/projects/${p}/mission`, "DELETE"),
-    freeze: () => call(`/projects/${p}/freeze`)
+    } }),
+    updateGoal: (id, patch) => api(`/projects/${p}/goals/${enc(id)}`, { method: "PATCH", quiet, body: patch }),
+    orderGoals: (ids) => api(`/projects/${p}/goals/order`, { method: "PUT", quiet, body: { goal_ids: ids } }),
+    archiveGoal: (id) => api(`/projects/${p}/goals/${enc(id)}/archive`, { method: "POST", quiet, body: {} }),
+    restoreGoal: (id) => api(`/projects/${p}/goals/${enc(id)}/restore`, { method: "POST", quiet, body: {} }),
+    linkMilestone: (ref, milestoneId, relationship) => api(`/projects/${p}/initiatives/${enc(ref)}/milestones`, { method: "POST", quiet, body: { milestone_id: Number(milestoneId), relationship } }),
+    unlinkMilestone: (ref, milestoneId) => api(`/projects/${p}/initiatives/${enc(ref)}/milestones/${Number(milestoneId)}`, { method: "DELETE", quiet, body: {} }),
+    linkObjective: (ref, objectiveId, relationship) => api(`/projects/${p}/objectives/${Number(objectiveId)}/initiatives`, { method: "POST", quiet, body: { initiative_ref: ref, relationship } }),
+    unlinkObjective: (ref, objectiveId) => api(`/projects/${p}/objectives/${Number(objectiveId)}/initiatives/${enc(ref)}`, { method: "DELETE", quiet, body: {} }),
+    saveMission: (text) => api(`/projects/${p}/settings`, { method: "PATCH", quiet, body: { mission: text.trim() } }),
+    archiveMission: () => api(`/projects/${p}/mission/archive`, { method: "POST", quiet, body: {} }),
+    removeMission: () => api(`/projects/${p}/mission`, { method: "DELETE", quiet, body: {} }),
+    freeze: () => api(`/projects/${p}/freeze`, { method: "POST", quiet, body: {} })
   };
 }
 
