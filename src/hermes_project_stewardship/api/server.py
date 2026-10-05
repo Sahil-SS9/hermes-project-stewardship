@@ -1949,6 +1949,14 @@ def create_app(
             _raise_work_error(exc)
         return {"work_items": items}
 
+    @router.get("/projects/{project_id}/work-dependencies")
+    def work_dependencies(project_id: str):
+        # Read-only: what blocks each item and what it blocks (Kanban chips).
+        try:
+            return {"dependencies": work.dependency_map(project_id)}
+        except Exception as exc:
+            _raise_work_error(exc)
+
     @router.post("/projects/{project_id}/work-items")
     def create_work_item(project_id: str, body: WorkItemCreate):
         try:

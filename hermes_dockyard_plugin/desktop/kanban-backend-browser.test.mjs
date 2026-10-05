@@ -22,6 +22,8 @@ test('real backend Kanban transition readback, audit actor and project isolation
   await page.locator(`[data-work-card="${ref}"]`).dragTo(page.locator('[data-board-column="active"]'));
   await page.getByText('Work item moved to in progress.',{exact:true}).waitFor();
   assert.equal((await get('/projects/payments-relaunch/work-items')).work_items.find(i=>i.ref===ref).status,'in_progress');
+  // r6: Move lives in the expanded card (the keyboard alternative to dragging).
+  await page.locator(`[data-card-toggle="${ref}"]`).click();
   await page.getByRole('combobox',{name:`Move ${ref}`,exact:true}).selectOption('in_review');
   await page.locator(`[data-board-column="review"] [data-work-card="${ref}"]`).waitFor();
   const detail=await get(`/projects/payments-relaunch/work-items/${ref}`);

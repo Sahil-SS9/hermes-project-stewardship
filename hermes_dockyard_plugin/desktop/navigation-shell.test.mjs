@@ -17,7 +17,9 @@ test('searchable project context, requested discard target and retained project 
  await page.locator('[data-project-switch-confirm]').getByRole('button',{name:'Discard',exact:true}).click();
  await page.locator('[data-project-dashboard="mobile-client"]').waitFor();
  await page.locator('[data-project-view="board"]').click();
- await page.locator('[data-saved-views-screen]').waitFor();
+ await page.locator('[data-kanban-screen]').waitFor();
+ // C2: milestone planning moved off the board; r6 opens it from the Milestones button in the views bar.
+ await page.locator('[data-kanban-page="milestones"]').click();
  await page.locator('[data-planning-panel]').waitFor();
  await page.locator('[data-project-view="initiative"]').click();
  await page.getByRole('heading',{name:'No initiative available'}).waitFor();
@@ -56,6 +58,8 @@ test('Kanban drag reads back, keyboard alternative and errors never claim succes
  await page.locator('[data-work-card="HDY-13"]').dragTo(page.locator('[data-board-column="active"]'));
  await page.getByText('Work item moved to in progress.',{exact:true}).waitFor();
  await page.locator('[data-board-column="active"] [data-work-card="HDY-13"]').waitFor();
+ // r6: Move lives in the expanded card (the keyboard alternative to dragging).
+ await page.locator('[data-card-toggle="HDY-13"]').click();
  await page.getByRole('combobox',{name:'Move HDY-13'}).selectOption('blocked');
  await page.locator('[data-board-column="blocked"] [data-work-card="HDY-13"]').waitFor();
  assert.deepEqual(errors,[]);

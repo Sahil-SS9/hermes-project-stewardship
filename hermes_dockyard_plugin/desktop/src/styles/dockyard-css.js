@@ -725,31 +725,6 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-overview-list .dockyard-status-tag { max-width: 118px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dockyard-root .dockyard-overview-list.activity article { grid-template-columns: 1fr; }
 .dockyard-root .dockyard-card-label { color: var(--dy-text-3); font-size: 10px; font-weight: 760; }
-.dockyard-root .dockyard-board-wrap { overflow-x: auto; padding-bottom: 6px; }
-.dockyard-root .dockyard-board { display: grid; grid-template-columns: repeat(4, minmax(240px, 1fr)); gap: 12px; min-width: 1040px; }
-.dockyard-root .dockyard-board-column { min-height: 360px; border: 1px solid var(--dy-border); border-radius: 13px; background: var(--dy-surface-subtle); }
-.dockyard-root .dockyard-board-column > header { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 11px; }
-.dockyard-root .dockyard-board-column h3 { margin: 0; font-size: 13px; }
-.dockyard-root .dockyard-board-column header span { color: var(--dy-text-3); font-size: 11px; }
-.dockyard-root .dockyard-board-cards { padding: 0 9px 10px; }
-.dockyard-root .dockyard-work-card {
-  display: block;
-  width: 100%;
-  margin-bottom: 9px;
-  padding: 12px;
-  border: 1px solid var(--dy-border);
-  border-radius: 10px;
-  background: var(--dy-surface);
-  color: var(--dy-text);
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
-  transition: border-color .16s ease, background .16s ease, transform .16s ease;
-}
-.dockyard-root .dockyard-work-card:hover { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); transform: translateY(-1px); }
-.dockyard-root .dockyard-work-card h4 { margin: 8px 0 12px; font-size: 13px; line-height: 1.35; }
-.dockyard-root .dockyard-work-card footer { display: flex; justify-content: space-between; gap: 8px; color: var(--dy-text-3); font-size: 10px; }
-.dockyard-root .dockyard-work-type { color: var(--dy-accent-text); font-size: 9px; font-weight: 780; text-transform: uppercase; }
 .dockyard-root .dockyard-policy-summary { margin: 15px 0 0; padding: 13px; overflow: auto; border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font: 11px/1.5 ui-monospace, monospace; }
 .dockyard-root .dockyard-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .dockyard-root .dockyard-section-head h2,

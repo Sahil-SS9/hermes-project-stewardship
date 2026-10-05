@@ -189,83 +189,88 @@ test('phase 4 real Desktop journeys: objectives, reports, saved views', { timeou
     });
 
     // -------------------------------------------------------------- saved views
+    // r6 (Sahil's C2 review, 04/10): views sit in a bar above the board. Changing
+    // the layout or filters marks the view edited, with Save, Save as new view and
+    // Reset; the Manage views panel renames, shares and deletes. Saving changes to
+    // your own view no longer asks first (the edited strip is the explicit step);
+    // deleting still does. Same journey as before.
     await t.test('saved views: save → recall → overwrite → delete → reload → isolation', async () => {
+      const viewPuts = async () => (await apiCalls()).filter((call) => call.method === 'PUT' && /\/views$/.test(call.path));
+      const tabs = () => page.locator('[data-view-tab]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-view-tab')));
       await page.click('[data-tab="project"]');
       await page.click('[data-project-view="board"]');
-      await page.waitForSelector('[data-saved-views-screen]', { timeout: 20000 });
-      await page.waitForSelector('[data-saved-view="Release focus"]', { timeout: 10000 });
+      await page.waitForSelector('[data-kanban-screen]', { timeout: 20000 });
+      await page.waitForSelector('[data-view-tab="Release focus"]', { timeout: 10000 });
+      const putsBefore = (await viewPuts()).length;
 
-      // Recall applies the stored filter to the board.
-      await page.click('[data-saved-view="Release focus"]');
-      await page.waitForSelector('[data-applied-view-note]', { timeout: 10000 });
-      const applied = await page.locator('[data-applied-view-note]').textContent();
-      assert.match(applied, /Release focus/, 'applied view note must name the recalled view');
-      await page.waitForSelector('[data-work-row="HDY-12"], [data-work-card="HDY-12"]', { timeout: 10000 });
+      // Recall applies the stored filter to the board, and the board names the view.
+      await page.click('[data-view-tab="Release focus"]');
+      await page.waitForSelector('[data-kanban-screen][data-view="Release focus"]', { timeout: 10000 });
+      assert.equal(await page.locator('[data-view-tab="Release focus"]').getAttribute('aria-pressed'), 'true');
+      assert.match(await page.locator('[data-kanban-status-filter]').innerText(), /In progress/, 'the stored status filter is shown');
+      await page.waitForSelector('[data-work-card="HDY-12"]', { timeout: 10000 });
       const boardText = await page.locator('.dockyard-board-wrap').textContent();
       assert.match(boardText, /HDY-12/, 'recalled view must keep matching items visible');
       assert(!/HDY-13/.test(boardText), 'recalled view must hide non-matching items');
 
-      // Save (create) a new named view with the table layout.
-      await page.fill('#dockyard-view-name', 'Done audit');
-      await page.selectOption('#dockyard-view-layout', 'table');
-      await page.selectOption('#dockyard-view-status', 'done');
-      await page.click('[data-action="save-view"]');
-      await page.waitForTimeout(400);
-      let calls = await apiCalls();
-      let puts = calls.filter((call) => call.method === 'PUT' && /\/views$/.test(call.path));
+      // Save as a new view with the List layout: what you see is what is saved.
+      await page.click('[data-kanban-layout="list"]');
+      await page.waitForSelector('[data-view-edited="Release focus"]', { timeout: 10000 });
+      await page.click('[data-view-save-as]');
+      await page.fill('[data-view-new-name]', 'Release table');
+      await page.click('[data-view-create]');
+      await page.waitForSelector('[data-view-tab="Release table"][aria-pressed="true"]', { timeout: 10000 });
+      let puts = (await viewPuts()).slice(putsBefore);
       assert.equal(puts.length, 1, 'saving a new view must PUT once');
-      assert.deepEqual(puts[0].body, { name: 'Done audit', layout: 'table', filters: { status: 'done' }, shared: false }, 'view save payload drifted');
-      await page.waitForSelector('[data-saved-view="Done audit"]', { timeout: 10000 });
+      assert.deepEqual(puts[0].body, { name: 'Release table', layout: 'table', shared: false, filters: {
+        display: { density: 'compact', fields: ['assignee', 'links', 'due', 'labels'] }, status: ['in_progress'] } }, 'view save payload drifted');
+      await page.click('[data-views-close]');
 
-      // Recall it: table layout + done filter are both applied.
-      await page.click('[data-saved-view="Done audit"]');
+      // Recall it: the List layout and the stored status filter both apply.
       await page.waitForSelector('[data-work-table]', { timeout: 10000 });
       const tableText = await page.locator('[data-work-table]').textContent();
-      assert.match(tableText, /HDY-14/, 'table layout must show matching done items');
-      assert(!/HDY-12/.test(tableText), 'table layout must not show other statuses');
+      assert.match(tableText, /HDY-12/, 'the List must show the matching item');
+      assert(!/HDY-13|HDY-14/.test(tableText), 'the List must not show other statuses');
 
-      // Overwrite requires the confirmation dialog.
-      await page.selectOption('#dockyard-view-layout', 'board');
-      await page.selectOption('#dockyard-view-status', 'backlog');
-      await page.click('[data-action="save-view"]');
-      await page.waitForSelector('[data-destructive-confirm="overwrite-view"]', { timeout: 10000 });
-      await page.click('[data-destructive-confirm="overwrite-view"] [data-action="confirm-destructive-action"]');
-      await page.waitForSelector('[data-destructive-confirm="overwrite-view"]', { state: 'detached', timeout: 10000 });
-      await page.waitForTimeout(200);
-      calls = await apiCalls();
-      puts = calls.filter((call) => call.method === 'PUT' && /\/views$/.test(call.path));
+      // Overwrite: change the view, then Save. The stored definition is replaced.
+      await page.click('[data-kanban-layout="board"]');
+      await page.waitForSelector('[data-view-edited="Release table"]', { timeout: 10000 });
+      await page.click('[data-view-edited] [data-view-save]');
+      await page.waitForSelector('[data-view-edited]', { state: 'detached', timeout: 10000 });
+      puts = (await viewPuts()).slice(putsBefore);
       assert.equal(puts.length, 2, 'overwrite must PUT the updated definition');
-      assert.deepEqual(puts[1].body.filters, { status: 'backlog' }, 'overwritten filters were not updated');
+      assert.deepEqual([puts[1].body.name, puts[1].body.layout, puts[1].body.filters.status], ['Release table', 'board', ['in_progress']], 'overwritten view was not updated');
+      assert.equal(puts.some((call) => call.body.name === 'Release focus'), false, 'the original view is unchanged');
 
-      // Reload persistence: the view survives a full page reload.
+      // Reload persistence: the view lives in the backend, so it survives a full reload.
       await page.reload({ waitUntil: 'load' });
       await page.waitForSelector('[data-tab="project"]', { timeout: 20000 });
       await page.click('[data-tab="project"]');
       await page.click('[data-project-view="board"]');
-      await page.waitForSelector('[data-saved-view="Done audit"]', { timeout: 20000 });
+      await page.waitForSelector('[data-view-tab="Release table"]', { timeout: 20000 });
+      assert.equal(await page.locator('[data-view-tab="All work"]').getAttribute('aria-pressed'), 'true', 'a reload starts on All work');
 
-      // Project isolation: the view never leaks into the other project.
+      // Project isolation: the views never leak into the other project.
       await selectProject('mobile-client');
-      await page.waitForTimeout(600);
-      const other = await page.locator('[data-saved-views-screen]').textContent();
-      assert(!/Done audit/.test(other), 'saved views leaked across projects');
-      assert(!/Release focus/.test(other), 'saved views leaked across projects');
+      await page.waitForSelector('[data-project-dashboard="mobile-client"] [data-kanban-screen]', { timeout: 15000 });
+      assert.deepEqual(await tabs(), ['All work'], 'saved views leaked across projects');
       await selectProject('payments-relaunch');
-      await page.waitForSelector('[data-saved-view="Done audit"]', { timeout: 15000 });
+      await page.waitForSelector('[data-view-tab="Release table"]', { timeout: 15000 });
 
-      // Delete requires confirmation and clears the stale selection.
-      await page.click('[data-saved-view="Done audit"]');
-      await page.waitForTimeout(200);
-      await page.click('[data-action="delete-view"]');
-      await page.waitForSelector('[data-destructive-confirm="delete-view"]', { timeout: 10000 });
-      await page.click('[data-destructive-confirm="delete-view"] [data-action="confirm-destructive-action"]');
-      await page.waitForSelector('[data-destructive-confirm="delete-view"]', { state: 'detached', timeout: 10000 });
-      await page.waitForTimeout(300);
-      calls = await apiCalls();
-      assert(calls.some((call) => call.method === 'DELETE' && /\/views\/Done%20audit$/.test(call.path)), 'delete was not sent');
-      assert.equal(await page.locator('[data-saved-view="Done audit"]').count(), 0, 'deleted view still listed');
-      const nameValue = await page.locator('#dockyard-view-name').inputValue();
-      assert.equal(nameValue, '', 'stale selection was not cleared after delete');
+      // Delete asks first; deleting the current view falls back to All work.
+      const viewDeletes = async () => (await apiCalls()).filter((call) => call.method === 'DELETE' && /\/views\//.test(call.path)).length;
+      const deletesBefore = await viewDeletes();
+      await page.click('[data-view-tab="Release table"]');
+      await page.click('[data-views-manage]');
+      await page.click('[data-view-row="Release table"] [data-view-delete]');
+      await page.waitForSelector('[data-view-delete-confirm="Release table"]', { timeout: 10000 });
+      assert.equal(await viewDeletes(), deletesBefore, 'nothing is deleted before the confirmation');
+      await page.click('[data-view-delete-confirm="Release table"]');
+      await page.waitForSelector('[data-view-row="Release table"]', { state: 'detached', timeout: 10000 });
+      const calls = await apiCalls();
+      assert(calls.some((call) => call.method === 'DELETE' && /\/views\/Release%20table$/.test(call.path)), 'delete was not sent');
+      assert.deepEqual(await tabs(), ['All work', 'Release focus'], 'deleted view still listed');
+      assert.equal(await page.locator('[data-view-tab="All work"]').getAttribute('aria-pressed'), 'true', 'stale selection was not cleared after delete');
     });
 
     assert.deepEqual(pageErrors, [], `page errors during journeys: ${pageErrors.join(' | ')}`);

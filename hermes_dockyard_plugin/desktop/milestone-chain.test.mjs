@@ -210,6 +210,8 @@ test('milestone journey: real UI drives real HTTP through proxy to backend', asy
     await waitFor('[data-project-view="board"]');
     await click('[data-project-view="board"]');
     await waitFor('[data-project-dashboard]');
+    // C2: milestone planning moved off the board; r6 opens it from the Milestones button in the views bar.
+    await click('[data-kanban-page="milestones"]');
     await waitFor('[data-planning-panel]');
 
     // Before any milestone exists the panel must show the honest empty state.
@@ -232,6 +234,7 @@ test('milestone journey: real UI drives real HTTP through proxy to backend', asy
     await click('[data-tab="project"]');
     await waitFor('[data-project-view="board"]');
     await click('[data-project-view="board"]');
+    await click('[data-kanban-page="milestones"]');
     const milestoneRow = await waitFor('[data-milestone-row="Chain Release"]', 12000);
     assert(
       milestoneRow,
@@ -267,6 +270,7 @@ test('milestone journey: real UI drives real HTTP through proxy to backend', asy
     await click('[data-tab="project"]');
     await waitFor('[data-project-view="board"]');
     await click('[data-project-view="board"]');
+    await click('[data-kanban-page="milestones"]');
     const renamedRow = await waitFor('[data-milestone-row="Chain Shipped"]', 12000);
     assert(
       renamedRow,

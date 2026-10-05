@@ -9,14 +9,8 @@ import { Button } from '../lib/ui.js'
 import { useDialogFocusManager } from '../lib/ui.js'
 import { EmptyState } from '../lib/ui.js'
 import { healthDetails } from '../lib/ui.js'
-import { api } from '../runtime/context.js'
-import { emitToast } from '../runtime/context.js'
 import { Icon } from '../lib/ui.js'
-import { readableLabel } from '../data/loaders.js'
 import { number } from '../lib/ui.js'
-import { plural } from '../lib/ui.js'
-import { PlanningPanel } from '../project/workflows.js'
-import { SavedViewsSection } from '../project/saved-views.js'
 import { InitiativeView } from '../views/initiative.js'
 import { ObjectivesPanel } from '../project/objectives.js'
 import { PlanningCanvasPanel } from '../project/canvas.js'
@@ -32,6 +26,7 @@ import { formatWhen } from '../lib/ui.js'
 import { FirstAssessmentCard } from '../views/dashboard.js'
 import { PageHead } from '../lib/ui.js'
 import { WorkItemDetail } from '../work-item/detail.js'
+import { KanbanScreen } from '../kanban/board.js'
 export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap }) {
   const [projectView, setProjectView] = useState(initialView || 'overview')
   // QA M-7: leaving the Planning view with unsaved board edits asks first.
@@ -62,9 +57,6 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
   // layout until it is cleared. Recall never invents rows client-side: the
   // item list comes from the stored query run through the backend.
   const [appliedView, setAppliedView] = useState(null)
-  const [draggedRef, setDraggedRef] = useState(null)
-  const [moving, setMoving] = useState(false)
-  const moveLock = useRef(false)
   const project = view.project
   // Tab-driven entry points (Objectives/Work/Reports/Settings/Workflows)
   // focus the matching sub-view; manual sub-view clicks are free afterwards
@@ -95,106 +87,16 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
   const views = [
     ['overview', 'Overview'], ['board', 'Kanban'], ['objectives', 'Objectives'], ['planning', 'Planning'], ['workflows', 'Workflows'], ['content', 'Content'], ['activity', 'Activity'], ['initiative', 'Initiatives'], ['reports', 'Reports'], ['settings', 'Settings'],
   ]
-  const columns = [
-    ['backlog', 'Backlog', ['backlog']],
-    ['active', 'In progress', ['in_progress', 'executing', 'active']],
-    ['review', 'Review', ['in_review', 'review']],
-    ['blocked', 'Blocked', ['blocked']],
-    ['done', 'Done', ['done', 'complete', 'completed']],
-    ['other', 'Other states', null],
-  ]
   const projectOptions = view.projects ?? []
-  const transitionStatus = async (ref, status) => {
-    if (!project || !ref || !status || moveLock.current || !(view.workItems ?? []).some(item => item.ref === ref)) return
-    moveLock.current = true
-    setMoving(true)
-    setDraggedRef(null)
-    setWorkNotice(null)
-    try {
-      // The plugin proxy supplies configured DOCKYARD_ACTOR_ID attribution.
-      await api(`/projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(ref)}/transition`, {
-        method: 'POST', body: { status },
-      })
-      const readback = await api(`/projects/${encodeURIComponent(project.id)}/work-items`)
-      if (!(readback.work_items ?? []).some(item => item.ref === ref && item.status === status)) throw new Error('Canonical readback did not confirm the requested status')
-      if (appliedView) {
-        const result = await api(`/projects/${encodeURIComponent(project.id)}/views/${encodeURIComponent(appliedView.name)}/items`)
-        setAppliedView(current => current?.name === appliedView.name ? { ...current, items: result.items ?? [] } : current)
-      }
-      onRefresh?.()
-      emitToast('success', `Work item moved to ${status.replaceAll('_', ' ')}.`)
-    } catch (failure) {
-      setWorkNotice(`Could not complete move or refresh: ${String(failure?.message ?? failure)}. Refresh to confirm the canonical state before retrying.`)
-      onRefresh?.()
-    } finally {
-      moveLock.current = false
-      setMoving(false)
-    }
-  }
   let panel
   if (projectView === 'board') {
-    const boardItems = appliedView ? (appliedView.items ?? []) : (view.workItems ?? [])
-    const layout = appliedView?.layout ?? 'board'
-    panel = jsxs('div', { className: 'dockyard-board-wrap', 'data-applied-view': appliedView?.name ?? undefined, children: [
-      appliedView ? jsxs('div', { className: 'dockyard-view-only-note', 'data-applied-view-note': appliedView.name, children: [
-        jsx(Icon, { name: 'eye' }),
-        jsx('span', { children: `Showing saved view "${appliedView.name}" (${readableLabel(layout, 'Board')} layout${layout === 'timeline' ? ' — timeline is not available on Desktop, showing board' : ''}). ${number(boardItems.length)} matching ${plural(boardItems.length, 'item')}.` }),
-        jsx('button', { type: 'button', className: 'dockyard-button small', 'data-action': 'clear-applied-view', onClick: () => setAppliedView(null), children: 'Clear view' }),
-      ]}) : jsxs('div', { className: 'dockyard-view-only-note', 'data-kanban-help': true, children: [
-        jsx(Icon, { name: 'eye' }),
-        jsx('span', { children: 'Drag an item to move it, or use its Move menu. The canonical work system validates every transition.' }),
-      ]}),
-      layout === 'table'
-        ? jsxs('section', { className: 'dockyard-feature-card', children: [
-            jsx('h2', { children: 'Work items' }),
-            boardItems.length === 0
-              ? jsx('p', { className: 'dockyard-meta', 'data-work-table-empty': true, children: 'No work items match this saved view.' })
-              : jsxs('table', { className: 'dockyard-backlog-table', 'data-work-table': true, children: [
-                  jsx('thead', { children: jsxs('tr', { children: ['Ref', 'Title', 'Type', 'Status', 'Assignee'].map((heading) => jsx('th', { children: heading }, heading)) }) }),
-                  jsx('tbody', { children: boardItems.filter((item) => item.status !== 'archived').map((item) => jsxs('tr', { 'data-work-row': item.ref, children: [
-                    jsx('td', { children: item.ref }),
-                    jsx('td', { children: item.title }),
-                    jsx('td', { children: item.type || 'task' }),
-                    jsx('td', { children: item.status || 'unknown' }),
-                    jsx('td', { children: item.assignee || 'Unassigned' }),
-                  ]}, item.ref)) }),
-                ]}),
-          ]})
-        : jsx('div', { className: 'dockyard-board', children:
-            columns.map(([key, label, statuses]) => {
-              const items = statuses === null
-                ? boardItems.filter((item) => item.status !== 'archived' &&
-                    !['backlog', 'in_progress', 'executing', 'active', 'in_review', 'review', 'blocked', 'done', 'complete', 'completed'].includes(item.status))
-                : boardItems.filter((item) => item.status !== 'archived' && statuses.includes(item.status))
-              return jsxs('section', { className: 'dockyard-board-column', 'data-board-column': key,
-                onDragOver: (event) => { if (draggedRef?.project === project.id && !moving && statuses) event.preventDefault() },
-                onDrop: (event) => { event.preventDefault(); if (draggedRef?.project === project.id && statuses?.[0]) transitionStatus(draggedRef.ref, statuses[0]); setDraggedRef(null) }, children: [
-                jsxs('header', { children: [jsx('h3', { children: label }), jsx('span', { children: number(items.length) })] }),
-                jsx('div', { className: 'dockyard-board-cards', children:
-                  items.length > 0
-                    ? items.map((item) => jsxs('article', { className: 'dockyard-work-card', draggable: !moving, 'data-work-card': item.ref,
-                      onDragStart: (event) => { event.dataTransfer.setData('text/plain', item.ref); setDraggedRef({ ref: item.ref, project: project.id }) }, onDragEnd: () => setDraggedRef(null), children: [
-                        jsx('button', { type: 'button', className: 'dockyard-button small', onClick: () => setSelectedWorkItem(item), children: 'Open details' }),
-                        jsx('select', { 'aria-label': `Move ${item.ref}`, disabled: moving, value: '', onChange: (event) => transitionStatus(item.ref, event.target.value), children: [jsx('option', { value: '', children: 'Move to…' }), ...columns.filter(([, , states]) => states).map(([, label, states]) => jsx('option', { value: states[0], children: label }, states[0]))] }),
-                        jsx('span', { className: 'dockyard-work-type', children: item.type || 'task' }),
-                        jsx('h4', { children: item.title }),
-                        jsxs('footer', { children: [jsx('span', { children: item.ref }), jsx('span', { children: item.assignee || 'Unassigned' })] }),
-                      ]}, item.ref))
-                    : jsx('p', { className: 'dockyard-meta', children: 'No work in this stage.' }),
-                }),
-              ]}, key)
-            }),
-          }),
-      jsx(PlanningPanel, { project, milestones: view.milestones ?? [], workItems: view.workItems ?? [], onRefresh }),
-      jsx(SavedViewsSection, {
-        project,
-        views: view.views ?? [],
-        onApply: setAppliedView,
-        onClear: () => setAppliedView(null),
-        appliedName: appliedView?.name ?? null,
-        onRefresh,
-      }, `${project.id}:saved-views`),
-    ]})
+    // C2: the Kanban screen lives in src/kanban/. appliedView stays here so a
+    // saved view survives a switch to another project tab and back.
+    panel = jsx(KanbanScreen, {
+      project, view, onRefresh, setWorkNotice, appliedView, setAppliedView,
+      onOpenItem: setSelectedWorkItem,
+      onNavigate: changeView,
+    })
   } else if (projectView === 'initiative') {
     panel = jsx(InitiativeView, { view, onRefresh })
   } else if (projectView === 'objectives') {
