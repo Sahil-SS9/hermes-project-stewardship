@@ -215,7 +215,14 @@ test('R6+R2+R1: panel carries the full decision context; request changes require
   await form.waitFor()
   const submit = form.getByRole('button', { name: /Return to proposer/ })
   assert.equal(await submit.isDisabled(), true, 'request changes must require feedback')
-  await form.locator('input').first().fill(feedback)
+  // Sahil 05/10: the box sits under its label, spans the form, and is big enough to write in.
+  const box = form.getByRole('textbox', { name: 'Feedback for the proposer' })
+  const [labelBox, fieldBox, formBox] = [
+    await form.getByText('Feedback for the proposer', { exact: true }).boundingBox(), await box.boundingBox(), await form.boundingBox()]
+  assert.ok(fieldBox.y >= labelBox.y + labelBox.height - 1, 'the box is under its label, not beside it')
+  assert.ok(fieldBox.height >= 120, `the box is big enough to write in (height ${fieldBox.height})`)
+  assert.ok(fieldBox.width >= formBox.width - 40, `the box spans the form (${fieldBox.width} of ${formBox.width})`)
+  await box.fill(feedback)
   await submit.click()
   await page.locator('[data-toast-region]').getByText(/Returned to the proposer/).first().waitFor()
   // R2 + focus contract: the item leaves the list; focus lands on a row.
