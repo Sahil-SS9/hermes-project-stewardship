@@ -11,6 +11,8 @@ import { jsx } from '../runtime/react.js'
 import { StatusTag } from '../lib/ui.js'
 import { number } from '../lib/ui.js'
 import { Button } from '../lib/ui.js'
+import { forecastLine } from '../lib/plan-vocab.js'
+import { riskLine } from '../lib/plan-vocab.js'
 export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary }) {
   const [name, setName] = useState('release')
   const [title, setTitle] = useState('Draft release plan')
@@ -287,17 +289,6 @@ export function PlanningPanel({ project, milestones, workItems, onRefresh }) {
   const updateDue = (m) => act(
     `/projects/${encodeURIComponent(project.id)}/milestones/${encodeURIComponent(m.name)}`,
     { due: detail?.dueValue || null }, 'PATCH')
-  const forecastLine = (fc) => {
-    if (!fc) return 'Forecast unavailable.'
-    if (fc.state === 'complete') return 'Forecast: complete.'
-    if (fc.state === 'insufficient_history') {
-      return `Forecast: insufficient history (${fc.sample_size ?? 0} completions in the last ${fc.assumptions?.window_weeks ?? 4} complete weeks; needs ${fc.assumptions?.min_sample ?? 8}).`
-    }
-    if (fc.state === 'not_comparable') return 'Forecast: work history is not comparable.'
-    const range = fc.range_weeks ?? {}
-    const upper = range.upper_open_ended ? 'open-ended (a zero-throughput week was observed)' : `${range.upper} weeks`
-    return `Forecast: ~${fc.central_weeks} weeks central (range ${range.lower}–${upper}); ${fc.sample_size} completions. A count-based scenario, not a delivery promise.`
-  }
   return jsxs('section', { className: 'dockyard-feature-card', 'data-planning-panel': true, children: [
     jsx('h2', { children: 'Milestone planning' }),
     notice && jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: notice }),
@@ -324,15 +315,7 @@ export function PlanningPanel({ project, milestones, workItems, onRefresh }) {
               ? jsx('p', { className: 'dockyard-meta', children: `Assignee WIP: ${Object.entries(d.assignee_wip).map(([who, n]) => `${who}: ${n}`).join(', ')} (item counts).` }, 'wip')
               : jsx('p', { className: 'dockyard-meta', children: 'No in-progress assignments.' }, 'no-wip'),
             (d.risks ?? []).length > 0
-              ? jsx('ul', { className: 'dockyard-planning-risks', children: d.risks.map((risk, index) => jsxs('li', { 'data-risk-kind': risk.kind, children: [
-                  risk.kind === 'dependency_blocker' && risk.item
-                    ? `${risk.item} blocked by ${(risk.blockers ?? []).join(', ')} — owner ${risk.owner || 'unassigned'}`
-                    : risk.kind === 'overdue_item' && risk.item
-                      ? `${risk.item} overdue — owner ${risk.owner || 'unassigned'}`
-                      : risk.kind === 'milestone_overdue'
-                        ? `Milestone past its due date with ${risk.remaining} item(s) remaining.`
-                        : risk.kind,
-                ] }, `${risk.kind}:${risk.item ?? 'risk'}:${index}`)) }, 'risks')
+              ? jsx('ul', { className: 'dockyard-planning-risks', children: d.risks.map((risk, index) => jsxs('li', { 'data-risk-kind': risk.kind, children: [riskLine(risk)] }, `${risk.kind}:${risk.item ?? 'risk'}:${index}`)) }, 'risks')
               : jsx('p', { className: 'dockyard-meta', children: 'No blocking risks recorded.' }, 'no-risks'),
             jsx('p', { className: 'dockyard-planning-forecast', children: forecastLine(d.forecast) }, 'forecast'),
             jsxs('div', { className: 'dockyard-inline-editor', children: [

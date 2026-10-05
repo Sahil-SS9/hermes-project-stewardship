@@ -6,6 +6,7 @@ import { THEME_CSS } from '../styles/themes.js'
 import { SWITCHER_CSS } from '../styles/switcher-css.js'
 import { WORKFLOW_LIBRARY_CSS } from '../styles/workflow-css.js'
 import { ROADMAP_CSS } from '../styles/roadmap-css.js'
+import { PLAN_CSS } from '../styles/plan-css.js'
 import { SETTINGS_CSS } from '../styles/settings-css.js'
 import { KANBAN_CSS } from '../styles/kanban-css.js'
 import workflowCanvasCss from '../../workflow-canvas-css.js'
@@ -106,6 +107,8 @@ export function useDockyardStyles() {
   useStylesheet('dy-wf-stylesheet', 'dyWfStylesheet', workflowCanvasCss)
   // Sahil 05/10 (design round d): the global project switcher.
   useStylesheet('dy-switcher-stylesheet', 'dySwitcherStylesheet', SWITCHER_CSS)
+  // Design round f prototype (05/10): the one Plan screen inside a project.
+  useStylesheet('dy-plan-stylesheet', 'dyPlanStylesheet', PLAN_CSS)
   // Sahil 05/10 (design round d + h): colour themes, backgrounds and fonts.
   // Last, so a chosen theme's colours win over every block above.
   useStylesheet('dy-theme-stylesheet', 'dyThemeStylesheet', THEME_CSS)

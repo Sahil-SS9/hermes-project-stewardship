@@ -30,20 +30,14 @@ import { number } from '../lib/ui.js'
 import { plural } from '../lib/ui.js'
 import { useDialogFocusManager } from '../lib/ui.js'
 import { loadRoadmapData } from '../data/loaders.js'
+import { BUCKETS } from '../lib/plan-vocab.js'
+import { GOAL_LABEL } from '../lib/plan-vocab.js'
+import { ICON } from '../lib/plan-vocab.js'
+import { OUTCOME_LABEL } from '../lib/plan-vocab.js'
+import { REL_LABEL } from '../lib/plan-vocab.js'
+import { RELATIONSHIPS } from '../lib/plan-vocab.js'
 
-const BUCKETS = [
-  ['planned', 'Planned'],
-  ['building', 'Building'],
-  ['ready_for_review', 'Ready for review'],
-  ['complete', 'Complete'],
-]
-const GOAL_LABEL = { met: 'Met', at_risk: 'At risk', unknown: 'Unknown evidence', unproven: 'Unproven' }
-const OUTCOME_LABEL = { passed: 'Passed', failed: 'Failed', stale: 'Stale', unknown: 'Unknown', not_applicable: 'Not applicable' }
-const REL_LABEL = { delivers: 'delivers', depends_on: 'depends on', supports: 'supports', measures: 'measures', unblocks: 'unblocks' }
 const CONTRACT_STATUS = { active: 'Active', paused: 'Paused', done: 'Done', cleared: 'Cleared' }
-const ICON = { project: 'P', initiative: 'I', milestone: 'M', work: 'W', objective: 'O', goal: 'G' }
-// "Open" lands on the item's own project screen view.
-const OPEN_VIEW = { project: 'overview', initiative: 'initiative', milestone: 'board', objective: 'objectives', goal: 'objectives' }
 
 // Link… flows. Choices are re-read for the one project the row belongs to, so
 // a stale or cross-project list is never offered; the human picks both the
@@ -52,7 +46,7 @@ const LINK_KIND = {
   milestone: {
     title: 'Link a milestone to an initiative',
     itemLabel: 'Milestone',
-    relationships: ['delivers', 'depends_on'],
+    relationships: RELATIONSHIPS.milestone,
     items: (project) => (project.unlinked?.milestones ?? []).map((row) => ({ id: String(row.id), label: row.name })),
     submit: (projectId, itemId, ref, relationship) => api(
       `/projects/${encodeURIComponent(projectId)}/initiatives/${encodeURIComponent(ref)}/milestones`,
@@ -61,7 +55,7 @@ const LINK_KIND = {
   objective: {
     title: 'Link an objective to an initiative',
     itemLabel: 'Objective',
-    relationships: ['supports', 'measures', 'unblocks'],
+    relationships: RELATIONSHIPS.objective,
     items: (project) => (project.unlinked?.objectives ?? []).map((row) => ({ id: String(row.id), label: row.name })),
     submit: (projectId, itemId, ref, relationship) => api(
       `/projects/${encodeURIComponent(projectId)}/objectives/${encodeURIComponent(itemId)}/initiatives`,
@@ -242,7 +236,8 @@ function contractFacts(entry, goalTitle) {
 
 // The drawer always reads the project the selected node belongs to.
 function drawerBody(sel, project, contract, onOpen) {
-  const open = { project: project.id, entryView: OPEN_VIEW[sel.type] }
+  // "Open" lands on the project, or on the item itself inside its Plan screen.
+  const open = { project: project.id, entryView: sel.type === 'project' ? 'overview' : `plan:${sel.type}:${sel.id}` }
   const initiativeOf = (ref) => (project.initiatives ?? []).find((row) => row.ref === ref)
   if (sel.type === 'project') {
     return {

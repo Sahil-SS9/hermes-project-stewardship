@@ -11,8 +11,6 @@ import { EmptyState } from '../lib/ui.js'
 import { healthDetails } from '../lib/ui.js'
 import { Icon } from '../lib/ui.js'
 import { number } from '../lib/ui.js'
-import { InitiativeView } from '../views/initiative.js'
-import { ObjectivesPanel } from '../project/objectives.js'
 import { PlanningCanvasPanel } from '../project/canvas.js'
 import { ExecutableWorkflowsPanel } from '../project/workflows.js'
 import { ProjectContentPanel } from '../project/content.js'
@@ -27,9 +25,17 @@ import { FirstAssessmentCard } from '../views/dashboard.js'
 import { PageHead } from '../lib/ui.js'
 import { WorkItemDetail } from '../work-item/detail.js'
 import { KanbanScreen } from '../kanban/board.js'
-import { PlanningPanel } from './workflows.js'
+import { PlanScreen } from './plan/plan-screen.js'
+import { parsePlanFocus } from './plan/plan-screen.js'
+
+// Design round f: the old Objectives and Initiatives tabs (and the milestone
+// panel) are one Plan tab. Their names still land on it, and
+// "plan:<kind>:<id>" opens it on one item (the Roadmap's Open).
+const planView = (entry) => (parsePlanFocus(entry) || ['objectives', 'initiative'].includes(entry) ? 'plan' : entry)
+
 export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap }) {
-  const [projectView, setProjectView] = useState(initialView || 'overview')
+  const [projectView, setProjectView] = useState(planView(initialView) || 'overview')
+  const [planFocus, setPlanFocus] = useState(() => parsePlanFocus(initialView))
   // QA M-7: leaving the Planning view with unsaved board edits asks first.
   const [canvasDirty, setCanvasDirty] = useState(false)
   const [pendingView, setPendingView] = useState(null)
@@ -63,7 +69,7 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
   // focus the matching sub-view; manual sub-view clicks are free afterwards
   // because this effect only runs when the entry target changes.
   useEffect(() => {
-    if (initialView) setProjectView(initialView)
+    if (initialView) { setProjectView(planView(initialView)); setPlanFocus(parsePlanFocus(initialView)) }
   }, [initialView])
   // P6.4 (review R3): a deep link targeting an exact work ref opens that
   // ref's drawer on arrival (or surfaces an explicit notice when the ref is
@@ -86,7 +92,7 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
   if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Connect a project before opening the project dashboard.', icon: 'project' })
   const [healthTone, healthLabel] = healthDetails(project.health)
   const views = [
-    ['overview', 'Overview'], ['board', 'Kanban'], ['objectives', 'Objectives'], ['planning', 'Planning'], ['workflows', 'Workflows'], ['content', 'Content'], ['activity', 'Activity'], ['initiative', 'Initiatives'], ['reports', 'Reports'], ['settings', 'Settings'],
+    ['overview', 'Overview'], ['plan', 'Plan'], ['board', 'Kanban'], ['planning', 'Planning'], ['workflows', 'Workflows'], ['content', 'Content'], ['activity', 'Activity'], ['reports', 'Reports'], ['settings', 'Settings'],
   ]
   const projectOptions = view.projects ?? []
   let panel
@@ -98,15 +104,10 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
       onOpenItem: setSelectedWorkItem,
       onNavigate: changeView,
     })
-  } else if (projectView === 'initiative') {
-    panel = jsx(InitiativeView, { view, onRefresh })
-  } else if (projectView === 'objectives') {
-    // Sahil 05/10: milestones left the Kanban. Until the single planning screen
-    // (demo feedback f), they are managed here, with the objectives.
-    panel = jsxs(Fragment, { children: [
-      jsx(ObjectivesPanel, { project, settings: view.settings ?? {}, objectives: view.objectives ?? [], goals: view.goals ?? [], missionArchive: view.missionArchive ?? [], onRefresh }, project.id),
-      jsx(PlanningPanel, { project, milestones: view.milestones ?? [], workItems: view.workItems ?? [], onRefresh }, 'milestones'),
-    ] })
+  } else if (projectView === 'plan') {
+    // Design round f (Sahil 04/10, feedback f): one screen for initiatives,
+    // milestones, objectives, goals and the mission. It loads its own data.
+    panel = jsx(PlanScreen, { project, focus: planFocus, onFocusConsumed: () => setPlanFocus(null), onOpenRoadmap }, project.id)
   } else if (projectView === 'planning') {
     panel = jsx(PlanningCanvasPanel, { project, canvas: view.canvas, content: view.content ?? [], onRefresh, onDirty: onCanvasDirty }, project.id)
   } else if (projectView === 'workflows') {
