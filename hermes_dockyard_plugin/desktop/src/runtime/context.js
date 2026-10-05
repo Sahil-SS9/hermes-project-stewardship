@@ -2,6 +2,8 @@
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 import { useEffect } from './react.js'
 import { DOCKYARD_CSS } from '../styles/dockyard-css.js'
+import { THEME_CSS } from '../styles/themes.js'
+import { SWITCHER_CSS } from '../styles/switcher-css.js'
 import { WORKFLOW_LIBRARY_CSS } from '../styles/workflow-css.js'
 import { ROADMAP_CSS } from '../styles/roadmap-css.js'
 import { SETTINGS_CSS } from '../styles/settings-css.js'
@@ -102,4 +104,9 @@ export function useDockyardStyles() {
   // Without it every `var(--dy-wf-*)` fill resolves to nothing and the nodes
   // paint solid black (measured regression, 2026-09-22).
   useStylesheet('dy-wf-stylesheet', 'dyWfStylesheet', workflowCanvasCss)
+  // Sahil 05/10 (design round d): the global project switcher.
+  useStylesheet('dy-switcher-stylesheet', 'dySwitcherStylesheet', SWITCHER_CSS)
+  // Sahil 05/10 (design round d + h): colour themes, backgrounds and fonts.
+  // Last, so a chosen theme's colours win over every block above.
+  useStylesheet('dy-theme-stylesheet', 'dyThemeStylesheet', THEME_CSS)
 }

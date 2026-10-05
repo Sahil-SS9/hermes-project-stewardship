@@ -16,6 +16,7 @@ export const DOCKYARD_CSS = `
   --dy-control-border: ${LIGHT_TOKENS.controlBorder};
   --dy-action: ${LIGHT_TOKENS.action};
   --dy-action-hover: ${LIGHT_TOKENS.actionHover};
+  --dy-on-action: ${LIGHT_TOKENS.onAction};
   --dy-accent-text: ${LIGHT_TOKENS.accentText};
   --dy-accent-soft: ${LIGHT_TOKENS.accentSoft};
   --dy-accent-border: ${LIGHT_TOKENS.accentBorder};
@@ -59,6 +60,7 @@ export const DOCKYARD_CSS = `
     --dy-control-border: ${DARK_TOKENS.controlBorder};
     --dy-action: ${DARK_TOKENS.action};
     --dy-action-hover: ${DARK_TOKENS.actionHover};
+    --dy-on-action: ${DARK_TOKENS.onAction};
     --dy-accent-text: ${DARK_TOKENS.accentText};
     --dy-accent-soft: ${DARK_TOKENS.accentSoft};
     --dy-accent-border: ${DARK_TOKENS.accentBorder};
@@ -124,7 +126,7 @@ export const DOCKYARD_CSS = `
   place-items: center;
   border-radius: 8px;
   background: var(--dy-action);
-  color: #ffffff;
+  color: var(--dy-on-action);
 }
 .dockyard-root .dockyard-brand-mark svg { width: 18px; height: 18px; }
 .dockyard-root .dockyard-brand-copy { display: grid; gap: 1px; }
@@ -237,8 +239,8 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-button:hover { background: var(--dy-surface-subtle); border-color: var(--dy-control-border); }
 .dockyard-root .dockyard-button:active { transform: translateY(1px); }
 .dockyard-root .dockyard-button svg { width: 15px; height: 15px; }
-.dockyard-root .dockyard-button.primary { color: #ffffff; background: var(--dy-action); border-color: var(--dy-action); }
-.dockyard-root .dockyard-button.primary:hover { color: #ffffff; background: var(--dy-action-hover); border-color: var(--dy-action-hover); }
+.dockyard-root .dockyard-button.primary { color: var(--dy-on-action); background: var(--dy-action); border-color: var(--dy-action); }
+.dockyard-root .dockyard-button.primary:hover { color: var(--dy-on-action); background: var(--dy-action-hover); border-color: var(--dy-action-hover); }
 .dockyard-root .dockyard-button.small { min-height: 34px; padding: 6px 10px; font-size: 12px; }
 .dockyard-root .dockyard-console-action { flex: 0 0 auto; white-space: nowrap; }
 .dockyard-root .dockyard-button:disabled {
@@ -950,7 +952,7 @@ export const DOCKYARD_CSS = `
 .dockyard-root .tree-who { flex: none; width: 118px; }
 .dockyard-root .cell-who { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--dy-text-2); width: 100%; min-width: 0; }
 .dockyard-root .cell-who:hover { color: var(--dy-text); }
-.dockyard-root .tree-avatar { flex: none; width: 19px; height: 19px; display: inline-grid; place-items: center; border-radius: 6px; color: #fff; background: var(--dy-info); font-size: 8px; font-weight: 800; }
+.dockyard-root .tree-avatar { flex: none; width: 19px; height: 19px; display: inline-grid; place-items: center; border-radius: 6px; color: var(--dy-surface); background: var(--dy-info); font-size: 8px; font-weight: 800; }
 .dockyard-root .tree-avatar.none { background: var(--dy-neutral-bg); color: var(--dy-text-3); border: 1px dashed var(--dy-control-border); }
 .dockyard-root .who-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dockyard-root .tree-due { flex: none; width: 86px; display: inline-flex; justify-content: flex-end; position: relative; }
@@ -1375,7 +1377,7 @@ export const DOCKYARD_CSS = `
   place-items: center;
   border: 2px solid var(--dy-surface);
   border-radius: 8px;
-  color: #ffffff;
+  color: var(--dy-surface);
   background: var(--dy-info);
   font-size: 9px;
   font-weight: 800;

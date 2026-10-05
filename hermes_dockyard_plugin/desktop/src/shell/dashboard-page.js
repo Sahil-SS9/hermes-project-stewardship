@@ -5,6 +5,9 @@ import { useStylesheet } from '../runtime/context.js'
 import { useState } from '../runtime/react.js'
 import { useRef } from '../runtime/react.js'
 import { useEffect } from '../runtime/react.js'
+import { useMemo } from '../runtime/react.js'
+import { Fragment } from '../runtime/react.js'
+import { emitToast } from '../runtime/context.js'
 import { TOAST_EVENT } from '../runtime/context.js'
 import { loadDashboardData } from '../data/loaders.js'
 import { loadProjectData } from '../data/loaders.js'
@@ -36,11 +39,71 @@ import { ToastRegion } from '../lib/ui.js'
 import { useDialogFocusManager } from '../lib/ui.js'
 import { Button } from '../lib/ui.js'
 import { OnboardingWizard } from '../lib/ui.js'
+import { ALL_PROJECTS } from '../lib/project-switcher.js'
+import { SWITCHER_VARIANTS } from '../lib/project-switcher.js'
+import { ProjectChooser } from '../lib/project-switcher.js'
+import { ScopeNote } from '../lib/project-switcher.js'
+import { SwitcherStrip } from '../lib/project-switcher.js'
+import { projectName } from '../lib/project-switcher.js'
+import { scopeDashboard } from '../data/scope.js'
+import { scopeInbox } from '../data/scope.js'
+import { hiddenNotifications } from '../data/scope.js'
+import { DEFAULT_FONT } from '../styles/themes.js'
+import { DEFAULT_THEME } from '../styles/themes.js'
+import { fontById } from '../styles/themes.js'
+import { hostIsDark } from '../styles/themes.js'
+import { themeById } from '../styles/themes.js'
+import { themeMode } from '../styles/themes.js'
+import { DesignReviewBar } from './design-review.js'
+// Sahil 04/10 (demo feedback d): screens that work on one project ask for one
+// while the switcher is on All projects.
+const ONE_PROJECT_TABS = Object.freeze({ project: 'Projects', backlog: 'Backlog', initiative: 'Initiative' })
 export function DashboardPage({ inboxCss = '' } = {}) {
   useDockyardStyles()
   useStylesheet('dy-inbox-stylesheet', 'dyInboxStylesheet', inboxCss)
   const [tab, setTab] = useState('dashboard')
+  // The switcher's choice: a project id, or ALL_PROJECTS ("*").
   const [selectedProject, setSelectedProject] = useState(null)
+  const isAll = selectedProject === ALL_PROJECTS
+  // Design round 05/10 (prototype): ?switcher=a|b|c picks the direction shown,
+  // ?review=1 adds the review bar. Removed when Sahil has picked.
+  const review = useRef(null)
+  review.current ??= new URLSearchParams(globalThis.location?.search ?? '')
+  const [switcherVariant, setSwitcherVariant] = useState(() =>
+    SWITCHER_VARIANTS.includes(review.current.get('switcher')) ? review.current.get('switcher') : 'a')
+  // Sahil 05/10 (demo feedback h): theme and typeface for the whole app, kept
+  // in the backend (/settings/appearance). Match Hermes follows Hermes
+  // Desktop's own light/dark mode live (until now nothing set dark mode).
+  const [appearance, setAppearance] = useState({ theme: DEFAULT_THEME, font: DEFAULT_FONT })
+  const [hostDark, setHostDark] = useState(() => hostIsDark())
+  useEffect(() => {
+    let live = true
+    api('/settings/appearance').then(
+      (saved) => { if (live && saved) setAppearance({ theme: themeById(saved.theme).id, font: fontById(saved.font).id }) },
+      () => {}, // unavailable: the defaults stand
+    )
+    const read = () => setHostDark(hostIsDark())
+    const watcher = new MutationObserver(read)
+    watcher.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-hermes-mode'] })
+    const media = window.matchMedia?.('(prefers-color-scheme: dark)')
+    media?.addEventListener?.('change', read)
+    return () => { live = false; watcher.disconnect(); media?.removeEventListener?.('change', read) }
+  }, [])
+  const appearanceRef = useRef(appearance)
+  appearanceRef.current = appearance
+  const changeAppearance = async (patch) => {
+    const before = appearanceRef.current
+    setAppearance({ ...before, ...patch })
+    try {
+      const saved = await api('/settings/appearance', { method: 'PUT', body: patch, quiet: true })
+      setAppearance({ theme: themeById(saved?.theme).id, font: fontById(saved?.font).id })
+      return true
+    } catch {
+      setAppearance(before)
+      emitToast('danger', 'That change was not saved. Try again.')
+      return false
+    }
+  }
   const [projectOptions, setProjectOptions] = useState([])
   const [projectEntryView, setProjectEntryView] = useState('overview')
   // Roadmap scope: 'all' (the signed default) or one project. Every request
@@ -126,7 +189,9 @@ export function DashboardPage({ inboxCss = '' } = {}) {
       setLoadScope(nextLoadScope)
     }
     setError(null)
-    const loader = tab === 'workflows-library'
+    const loader = isAll && (ONE_PROJECT_TABS[tab] || tab === 'workflows')
+    ? async () => ({})
+    : tab === 'workflows-library'
     ? async () => ({ workflows: (await api('/workflow-library')).workflows ?? [] })
     : tab === 'dashboard'
       ? loadDashboardData
@@ -159,12 +224,11 @@ export function DashboardPage({ inboxCss = '' } = {}) {
           const options = sortProjects(result.projects)
           setProjectOptions(options)
           if (!selectedProject && options.length) {
-            // First pick: the remembered project when it is still listed,
-            // otherwise the project needing most attention (as before).
-            const fallback = result.project?.id || options[0].id
+            // First pick: the remembered choice (a project still listed, or
+            // All projects); otherwise All projects (Sahil 05/10, design d).
             rememberedProject().then((saved) => {
               if (!current || serial !== loadSerial.current) return
-              const pick = saved && options.some((option) => option.id === saved) ? saved : fallback
+              const pick = saved === ALL_PROJECTS || (saved && options.some((option) => option.id === saved)) ? saved : ALL_PROJECTS
               lastProject.current.auto = pick
               setSelectedProject(pick)
             })
@@ -187,8 +251,9 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   }, [tab, selectedProject, requestVersion])
 
   const refresh = () => setRequestVersion((version) => version + 1)
+  // Sahil 04/10 (demo feedback d): the switcher scopes every screen; picking a
+  // project (or All projects) keeps you on the screen you are on.
   const selectProject = (projectId) => {
-    // An open Roadmap follows the global picker, the current project included.
     if (projectId === selectedProject) { if (tab === 'roadmap') showRoadmap(projectId); return }
     if (dirtyProject && dirtyProject !== projectId) {
       setPendingProject(projectId)
@@ -196,16 +261,18 @@ export function DashboardPage({ inboxCss = '' } = {}) {
     }
     setDirtyProject(null)
     setSelectedProject(projectId)
-    if (tab === 'roadmap') showRoadmap(projectId ?? 'all')
-    if (tab === 'dashboard' || tab === 'notifications' || tab === 'inbox' || tab === 'onboard') setTab('project')
+    if (tab === 'roadmap') showRoadmap(projectId)
   }
+  const showAllProjects = () => selectProject(ALL_PROJECTS)
   // opts.entryView / opts.project let a guarded switch land on a specific
   // project view (or owner project) once the unsaved-changes prompt clears.
   const pendingTabOpts = useRef({})
   const goTab = (next, opts = {}) => {
     if (opts.project) setSelectedProject(opts.project)
     if (next === 'project') setProjectEntryView(opts.entryView ?? 'overview')
-    if (next === 'roadmap') showRoadmap(opts.roadmapScope ?? 'all')
+    // The Roadmap follows the switcher; "View in Roadmap" moves the switcher too.
+    if (next === 'roadmap' && opts.roadmapScope) setSelectedProject(opts.roadmapScope === 'all' ? ALL_PROJECTS : opts.roadmapScope)
+    if (next === 'roadmap') showRoadmap(opts.roadmapScope ?? selectedProject)
     if (next === 'dashboard') setDashboardHomeVersion((value) => value + 1)
     setTab(next)
   }
@@ -222,7 +289,6 @@ export function DashboardPage({ inboxCss = '' } = {}) {
     if (project) {
       setSelectedProject(project)
       if (tab === 'roadmap') showRoadmap(project)
-      if (tab === 'dashboard' || tab === 'notifications' || tab === 'inbox' || tab === 'onboard') setTab('project')
     } else if (nextTab) { const opts = pendingTabOpts.current; pendingTabOpts.current = {}; goTab(nextTab, opts) }
   }
   const discardProjectChange = continueNav
@@ -327,14 +393,28 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   }
 
   const payload = data?.tab === tab && data.projectId === selectedProject ? data.payload : null
+  const scoped = useMemo(() => {
+    if (!payload || isAll || !selectedProject) return null
+    if (tab === 'dashboard') return scopeDashboard(payload, selectedProject)
+    if (tab === 'inbox') return scopeInbox(payload, selectedProject)
+    return null
+  }, [payload, tab, selectedProject, isAll])
+  const scopeLabel = isAll ? 'All projects' : projectName(projectOptions.find((project) => project.id === selectedProject) ?? { id: selectedProject })
+  const scopeNote = (hidden, noun) => (!isAll && selectedProject
+    ? jsx(ScopeNote, { name: scopeLabel, hidden, noun, onShowAll: showAllProjects }, 'scope-note') : null)
   const activeError = error?.tab === tab ? error.error : null
   let content
-  if (activeError) {
+  if (isAll && ONE_PROJECT_TABS[tab]) {
+    content = jsx(ProjectChooser, { projects: projectOptions, screen: ONE_PROJECT_TABS[tab], onPick: selectProject, onNewProject: () => setOnboardingOpen(true) })
+  } else if (activeError) {
     content = jsx(ErrorState, { error: activeError, onRetry: refresh })
   } else if (!payload) {
     content = jsx(LoadingState, {})
   } else if (tab === 'dashboard') {
-    content = jsx(DashboardView, { view: payload, onInbox: () => setTab('inbox'), onRefresh: refresh, onOpen: openDeepLink, resetView: dashboardHomeVersion })
+    content = jsxs(Fragment, { children: [
+      scopeNote(scoped?.hidden ?? 0, 'items that need you'),
+      jsx(DashboardView, { view: scoped?.view ?? payload, onInbox: () => setTab('inbox'), onRefresh: refresh, onOpen: openDeepLink, resetView: dashboardHomeVersion }, 'dashboard'),
+    ] })
   } else if (tab === 'project') {
     content = jsx(ProjectDashboard, {
       view: payload,
@@ -352,7 +432,9 @@ export function DashboardPage({ inboxCss = '' } = {}) {
     // Sahil 04/10 (demo feedback e): App settings. Project settings stay in the project.
     content = jsx(AppSettingsView, {
       view: payload,
-      selectedProject,
+      selectedProject: isAll ? null : selectedProject,
+      appearance,
+      onAppearance: changeAppearance,
       onOpenProjectSettings: () => requestTab('project', { entryView: 'settings' }),
       onForgetProject: () => { lastProject.current.saved = null },
       onRefresh: refresh,
@@ -362,26 +444,32 @@ export function DashboardPage({ inboxCss = '' } = {}) {
     // workflows live under Project > Workflows. Enablement and runs act on the
     // project selected in the global picker, never an implicit first project.
     content = jsx(WorkflowLibraryView, {
-      projectId: selectedProject,
+      projectId: isAll ? null : selectedProject,
       onOpenBuilder: (row) => {
         // Quan M1: guarded like every other tab switch (no silent loss of edits).
         const owner = row?.owner_project_id
         requestTab('project', { entryView: 'workflows', project: owner && owner !== selectedProject ? owner : undefined })
       },
-    }, `workflow-library:${selectedProject ?? 'none'}`)
+    }, `workflow-library:${isAll ? 'all' : selectedProject ?? 'none'}`)
   } else if (tab === 'onboard') {
     content = jsx(OnboardPanel, { view: payload, onOpen: () => setOnboardingOpen(true), onRefresh: refresh })
   } else if (tab === 'roadmap') {
     // The view owns its scope after mounting; the shell re-mounts it (new
     // version key) for "View in Roadmap", the tab bar (All) and the picker.
-    content = jsx(RoadmapView, {
-      initialScope: roadmap.scope,
-      onRefresh: refresh,
-      onOpen: ({ project, entryView, workRef }) => {
-        if (workRef) setPendingWorkRef(workRef)
-        requestTab('project', { project, entryView })
-      },
-    }, `roadmap:${roadmap.version}`)
+    // Sahil 04/10 (demo feedback d, f): the Roadmap follows the switcher; its
+    // own picker is gone.
+    const roadmapScope = isAll || !selectedProject ? 'all' : selectedProject
+    content = jsxs(Fragment, { children: [
+      scopeNote(0, 'items'),
+      jsx(RoadmapView, {
+        initialScope: roadmapScope,
+        onRefresh: refresh,
+        onOpen: ({ project, entryView, workRef }) => {
+          if (workRef) setPendingWorkRef(workRef)
+          requestTab('project', { project, entryView })
+        },
+      }, `roadmap:${roadmapScope}:${roadmap.version}`),
+    ] })
   } else if (tab === 'backlog') {
     content = jsx(BacklogView, { view: payload, onRefresh: refresh, preset: backlogPreset?.projectId === selectedProject ? backlogPreset : null })
   } else if (tab === 'teams') {
@@ -389,16 +477,31 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   } else if (tab === 'initiative') {
     content = jsx(InitiativeView, { view: payload, onRefresh: refresh })
   } else if (tab === 'inbox') {
-    content = jsx(InboxView, { view: payload, onRefresh: refresh, focusRef: inboxFocusRef, onOpenProject: openDeepLink })
+    content = jsxs(Fragment, { children: [
+      scopeNote(scoped?.hidden ?? 0, 'approvals'),
+      jsx(InboxView, { view: scoped?.view ?? payload, onRefresh: refresh, focusRef: inboxFocusRef, onOpenProject: openDeepLink }, 'inbox'),
+    ] })
   } else {
-    content = jsx(NotificationsView, { view: payload, onRefresh: refresh, onAcknowledged: acknowledge, onOpen: openDeepLink, onOpenSettings: () => requestTab('settings') })
+    content = jsxs(Fragment, { children: [
+      scopeNote(hiddenNotifications(payload, selectedProject), 'notifications'),
+      jsx(NotificationsView, { view: payload, scopeProjectId: isAll ? null : selectedProject, onRefresh: refresh, onAcknowledged: acknowledge, onOpen: openDeepLink, onOpenSettings: () => requestTab('settings') }, 'notifications'),
+    ] })
   }
 
-  return jsxs('div', { className: 'dockyard-root', children: [
+  const theme = themeById(appearance.theme)
+  return jsxs('div', {
+    className: 'dockyard-root',
+    'data-theme': themeMode(theme.id, hostDark),
+    'data-dy-theme': theme.id,
+    'data-dy-art': theme.art ? 'true' : undefined,
+    'data-dy-font': appearance.font !== DEFAULT_FONT ? appearance.font : undefined,
+    children: [
     jsxs('div', { className: 'dockyard-shell', children: [
       jsx(ConsoleBar, { tab, counts, projects: projectOptions, selectedProject, onProjectChange: selectProject,
-        onTab: requestTab,
+        onTab: requestTab, switcher: switcherVariant,
         onNewProject: () => setOnboardingOpen(true), onOpen: openDeepLink }),
+      switcherVariant === 'c' && projectOptions.length > 0
+        ? jsx(SwitcherStrip, { projects: projectOptions, scope: selectedProject, onChange: selectProject }) : null,
       jsx('main', {
         id: 'dockyard-panel',
         role: 'tabpanel',
@@ -420,5 +523,7 @@ export function DashboardPage({ inboxCss = '' } = {}) {
       ]}),
     ]}) : null,
     onboardingOpen ? jsx(OnboardingWizard, { onClose: () => setOnboardingOpen(false), onComplete: completeOnboarding }) : null,
+    review.current.get('review') === '1'
+      ? jsx(DesignReviewBar, { variant: switcherVariant, onVariant: setSwitcherVariant, appearance, onAppearance: changeAppearance }) : null,
   ]})
 }

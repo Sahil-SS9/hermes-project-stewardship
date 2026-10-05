@@ -42,7 +42,7 @@ export const ROADMAP_CSS = `
 .dy-rm-disclosure { flex: 0 0 20px; width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid var(--dy-border); border-radius: 4px; background: var(--dy-surface); color: var(--dy-text-2); padding: 0; font-size: 12px; line-height: 1; }
 .dy-rm-disclosure.blank { visibility: hidden; }
 .dy-rm-icon { flex: 0 0 22px; display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid var(--dy-border); border-radius: 5px; background: var(--dy-surface); color: var(--dy-text-2); font-size: 9px; font-weight: 800; }
-.dy-rm-icon.project { border-radius: 50%; border-color: var(--dy-action); background: var(--dy-action); color: #fff; }
+.dy-rm-icon.project { border-radius: 50%; border-color: var(--dy-action); background: var(--dy-action); color: var(--dy-on-action); }
 .dy-rm-icon.initiative { border-radius: 50%; }
 .dy-rm-icon.work { border-style: dashed; }
 .dy-rm-copy { min-width: 0; flex: 1; }

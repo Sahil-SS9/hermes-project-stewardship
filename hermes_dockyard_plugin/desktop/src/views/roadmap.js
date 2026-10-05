@@ -441,7 +441,8 @@ function LinkDialog({ kind, projectId, projectLabel, onClose, onDone }) {
 // Roadmap", or the global picker while this tab is open). onOpen({ project,
 // entryView, workRef }) asks the shell to open the item's own project screen.
 export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
-  const [scope, setScope] = useState(initialScope)
+  // The scope is the switcher's; a new scope re-mounts the view (shell key).
+  const [scope] = useState(initialScope)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -453,7 +454,6 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
   const [linkDialog, setLinkDialog] = useState(null)
   const [contract, setContract] = useState(null)
   const [refreshTick, setRefreshTick] = useState(0)
-  const [pickerProjects, setPickerProjects] = useState([])
   const loadSerial = useRef(0)
 
   const load = async () => {
@@ -463,7 +463,6 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
       const result = await loadRoadmapData(scope === 'all' ? null : scope)
       if (serial !== loadSerial.current) return
       setData(result)
-      if (scope === 'all') setPickerProjects((result.projects ?? []).map(({ id, label }) => ({ id, label })))
     } catch (failure) {
       if (serial === loadSerial.current) setError(String(failure?.message ?? failure))
     } finally {
@@ -471,15 +470,6 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
     }
   }
   useEffect(() => { void load() }, [scope])
-  // The scope picker lists every project even when the view opened on one.
-  useEffect(() => {
-    if (scope === 'all' || pickerProjects.length) return undefined
-    let current = true
-    loadRoadmapData(null)
-      .then((result) => { if (current) setPickerProjects((result.projects ?? []).map(({ id, label }) => ({ id, label }))) })
-      .catch(() => { /* the picker still offers All projects and the current project */ })
-    return () => { current = false }
-  }, [scope])
   // The goal contract loads for the goal in the drawer, from that goal's project.
   useEffect(() => {
     if (selection?.type !== 'goal' || selection.goal?.unavailable === 'archived') return undefined
@@ -492,12 +482,6 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
     return () => { current = false }
   }, [selection?.node, refreshTick])
 
-  const changeScope = (next) => {
-    setSelection(null)
-    if (next === scope) return
-    setData(null)
-    setScope(next)
-  }
   const projects = data?.projects ?? []
   const canWrite = data?.can_write === true
   const matches = useMemo(() => {
@@ -697,7 +681,7 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
     : error
       ? jsx(ErrorState, { error, onRetry: load })
       : !visibleProjects.length
-        ? jsx(EmptyState, { title: 'No projects match this view', description: 'Adjust the search, the attention filter, or the project picker.' })
+        ? jsx(EmptyState, { title: 'No projects match this view', description: 'Adjust the search, the attention filter, or the project in the switcher.' })
         : jsxs('div', { className: `dy-rm-shell${body ? '' : ' full'}`, children: [
             jsxs('section', { className: 'dy-rm-tree', role: 'tree', 'aria-label': 'Project roadmap tree', onKeyDown: treeKeydown, 'data-rm-tree': true, children: [
               jsxs('header', { className: 'dy-rm-tree-head', children: [
@@ -709,8 +693,6 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
             body ? jsx(Drawer, { type: selection.type, body, onClose: () => setSelection(null), onOpen }) : null,
           ]})
 
-  const known = pickerProjects.length ? pickerProjects : projects.map(({ id, label }) => ({ id, label }))
-  const options = scope !== 'all' && !known.some((project) => project.id === scope) ? [...known, { id: scope, label: scope }] : known
   return jsxs('div', { className: 'dy-rm-page', 'data-roadmap-screen': true, children: [
     jsx(PageHead, {
       title: 'Roadmap',
@@ -718,17 +700,11 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
       onRefresh: () => { void load(); onRefresh?.() },
       status: error ? 'Load failed' : null,
     }),
-    // Filters in the signed v4 order: project, search, attention, Reset.
+    // Filters in the signed v4 order: search, attention, Reset (the project
+    // moved to the global switcher, Sahil 04/10).
     // Every control shares one height, radius and font (roadmap-css.js).
     jsxs('div', { className: 'dy-rm-toolbar', role: 'group', 'aria-label': 'Roadmap filters', children: [
-      jsxs('label', { className: 'dy-rm-control dy-rm-scope', children: [
-        jsx('span', { className: 'dy-rm-scope-label', children: 'Project' }),
-        jsx('select', { value: scope, onChange: (event) => changeScope(event.target.value), 'aria-label': 'Roadmap project picker', children: [
-          jsx('option', { value: 'all', children: 'All projects' }, 'all'),
-          ...options.map((project) => jsx('option', { value: project.id, children: project.label ?? project.id }, project.id)),
-        ] }),
-        jsx(Icon, { name: 'chevron-down' }),
-      ] }),
+      // Sahil 04/10 (demo feedback d): the project comes from the global switcher.
       jsxs('label', { className: 'dy-rm-control dy-rm-search', children: [
         jsx(Icon, { name: 'search' }),
         jsx('input', { type: 'search', placeholder: 'Search the roadmap', value: search, onChange: (event) => setSearch(event.target.value), 'aria-label': 'Search the roadmap' }),
@@ -737,7 +713,7 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
         jsx('input', { type: 'checkbox', checked: attentionOnly, onChange: (event) => setAttentionOnly(event.target.checked) }),
         jsx('span', { children: 'Needs attention only' }),
       ] }),
-      jsx('button', { type: 'button', className: 'dy-rm-control dy-rm-reset', onClick: () => { setSearch(''); setAttentionOnly(false); setOpenNodes(new Set()); changeScope('all') }, children: 'Reset' }),
+      jsx('button', { type: 'button', className: 'dy-rm-control dy-rm-reset', onClick: () => { setSearch(''); setAttentionOnly(false); setOpenNodes(new Set()) }, children: 'Reset' }),
     ]}),
     content,
     linkDialog ? jsx(LinkDialog, {

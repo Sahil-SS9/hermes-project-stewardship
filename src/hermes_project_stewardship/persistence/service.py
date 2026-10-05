@@ -16,6 +16,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sqlite3
 import stat
 import tempfile
@@ -766,9 +767,12 @@ class StewardshipService:
     # the choice lives here, never in browser storage (26/08 locked rule).
 
     _LAST_PROJECT_KEY = "last_project"
+    # Sahil 05/10 (demo feedback d): the switcher also offers "All projects".
+    # "*" can never be a project id, so the choice cannot clash with a project.
+    ALL_PROJECTS = "*"
 
     def last_project(self) -> Optional[str]:
-        """The last project chosen in the app, or None.
+        """The last project chosen in the app ("*" for All projects), or None.
 
         A saved project that is no longer configured reads as None, so the app
         never opens on a project that no longer exists.
@@ -782,6 +786,8 @@ class StewardshipService:
         project_id = self.store._uj(row["value_json"], {}).get("project_id")
         if not isinstance(project_id, str):
             return None
+        if project_id == self.ALL_PROJECTS:
+            return project_id
         known = self.store._conn.execute(
             "SELECT 1 FROM project_stewardship WHERE project_id=?", (project_id,)
         ).fetchone()
@@ -794,8 +800,9 @@ class StewardshipService:
         """
         if project_id is not None:
             if not isinstance(project_id, str) or not project_id:
-                raise ServiceError("project_id must be a project id or null")
-            self._require_known(project_id)
+                raise ServiceError('project_id must be a project id, "*" (All projects) or null')
+            if project_id != self.ALL_PROJECTS:
+                self._require_known(project_id)
         stored = self.store._conn.execute(
             "SELECT value_json FROM dockyard_app_settings WHERE key=?",
             (self._LAST_PROJECT_KEY,),
@@ -872,6 +879,60 @@ class StewardshipService:
                 "INSERT INTO stewardship_audit_log(ts, actor, interface,"
                 " action, subject, detail_json) VALUES(?,?,?,?,?,?)",
                 (now, actor, "service", "ui_settings.updated", "app", self.store._j(value)),
+            )
+        return value
+
+    # ------------------------------------------------------------------ #
+    # Appearance for the whole app (dockyard_app_settings, "appearance")   #
+    # ------------------------------------------------------------------ #
+    # Sahil 05/10 (demo feedback h): colour themes with their backgrounds,
+    # and a typeface. Like every display choice, kept here, never in browser
+    # storage (26/08 locked rule). The app owns the list of themes and fonts;
+    # an id it no longer knows falls back to the default there.
+
+    _APPEARANCE_KEY = "appearance"
+    APPEARANCE_DEFAULTS = {"theme": "auto", "font": "system"}
+    _APPEARANCE_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,31}")
+
+    def appearance(self) -> Dict[str, str]:
+        """The app's theme and font: {"theme": id, "font": id}."""
+        row = self.store._conn.execute(
+            "SELECT value_json FROM dockyard_app_settings WHERE key=?",
+            (self._APPEARANCE_KEY,),
+        ).fetchone()
+        stored = self.store._uj(row["value_json"], {}) if row is not None else {}
+        value = dict(self.APPEARANCE_DEFAULTS)
+        if isinstance(stored, dict):
+            for key in value:
+                if isinstance(stored.get(key), str) and self._APPEARANCE_ID.fullmatch(stored[key]):
+                    value[key] = stored[key]
+        return value
+
+    def set_appearance(self, settings: Any, *, actor: str) -> Dict[str, str]:
+        """Change the theme and/or font. Audited; an unchanged value is a no-op."""
+        allowed = set(self.APPEARANCE_DEFAULTS)
+        if not isinstance(settings, dict) or not settings or not set(settings) <= allowed:
+            raise ServiceError('appearance must be {"theme": id} and/or {"font": id}')
+        for key, choice in settings.items():
+            if not isinstance(choice, str) or not self._APPEARANCE_ID.fullmatch(choice):
+                raise ServiceError(f"{key} must be a short id: lowercase letters, digits and dashes")
+        current = self.appearance()
+        value = {**current, **settings}
+        if value == current:
+            return value
+        now = iso(self._clock())
+        with self.store.tx() as cx:
+            cx.execute(
+                "INSERT INTO dockyard_app_settings(key, value_json, updated_at, updated_by)"
+                " VALUES(?, ?, ?, ?)"
+                " ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,"
+                " updated_at=excluded.updated_at, updated_by=excluded.updated_by",
+                (self._APPEARANCE_KEY, self.store._j(value), now, actor),
+            )
+            cx.execute(
+                "INSERT INTO stewardship_audit_log(ts, actor, interface,"
+                " action, subject, detail_json) VALUES(?,?,?,?,?,?)",
+                (now, actor, "service", "appearance.updated", "app", self.store._j(value)),
             )
         return value
 

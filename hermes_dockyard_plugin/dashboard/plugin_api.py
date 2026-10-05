@@ -2104,6 +2104,27 @@ async def put_ui_settings(body: UiSettingsBody) -> dict:
         {"collapsed": body.collapsed, "actor_id": _ACTOR_ID})
 
 
+# Sahil 05/10 (demo feedback h): the app's theme and typeface. The backend
+# validates the ids; the caller never names the actor.
+class AppearanceBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    theme: str | None = None
+    font: str | None = None
+
+
+@plugin_api.get("/settings/appearance")
+async def get_appearance() -> dict:
+    return await _proxy("GET", "/stewardship/v1/settings/appearance")
+
+
+@plugin_api.put("/settings/appearance")
+async def put_appearance(body: AppearanceBody) -> dict:
+    choices = {key: value for key, value in (("theme", body.theme), ("font", body.font)) if value is not None}
+    return await _proxy(
+        "PUT", "/stewardship/v1/settings/appearance",
+        {**choices, "actor_id": _ACTOR_ID})
+
+
 @plugin_api.get("/settings/notifications/effective")
 async def effective_notification_settings(
     project_id: str | None = None,

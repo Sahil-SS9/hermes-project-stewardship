@@ -1,6 +1,7 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 import { LUCIDE_ICON_NODES } from '../../lucide-icons.js'
+import { ProjectSwitcher } from './project-switcher.js'
 import { jsxs } from '../runtime/react.js'
 import { jsx } from '../runtime/react.js'
 import { readableLabel } from '../data/loaders.js'
@@ -619,7 +620,7 @@ export function ProjectPicker({ projects, selectedProject, onChange }) {
   ]})
 }
 
-export function ConsoleBar({ tab, counts, onTab, onNewProject, projects = [], selectedProject, onProjectChange, onOpen }) {
+export function ConsoleBar({ tab, counts, onTab, onNewProject, projects = [], selectedProject, onProjectChange, onOpen, switcher = 'a' }) {
   // P3: the project context is persistent in the shell, not repeated in each panel.
   const tabs = [
     ['dashboard', 'Dashboard', null],
@@ -645,16 +646,20 @@ export function ConsoleBar({ tab, counts, onTab, onNewProject, projects = [], se
     onTab(nextKey)
     document.getElementById(`dockyard-tab-${nextKey}`)?.focus()
   }
-  return jsxs('header', { className: 'dockyard-consolebar', children: [
-    jsxs('div', { className: 'dockyard-brand', children: [
-      jsx('span', { className: 'dockyard-brand-mark', children: jsx(Icon, { name: 'dock' }) }),
-      jsxs('span', { className: 'dockyard-brand-copy', children: [
-        jsx('strong', { children: 'Dockyard' }),
-        jsx('span', { children: 'Fleet oversight' }),
+  // Sahil 04/10 (demo feedback d): one global project switcher, next to the
+  // brand (A, B) or in its own row under the bar (C, rendered by the shell).
+  return jsxs('header', { className: 'dockyard-consolebar', 'data-switcher-variant': switcher, children: [
+    jsxs('div', { className: 'dockyard-brand-zone', children: [
+      jsxs('div', { className: 'dockyard-brand', children: [
+        jsx('span', { className: 'dockyard-brand-mark', children: jsx(Icon, { name: 'dock' }) }),
+        jsxs('span', { className: 'dockyard-brand-copy', children: [
+          jsx('strong', { children: 'Dockyard' }),
+          jsx('span', { children: 'Fleet oversight' }),
+        ]}),
       ]}),
+      projects.length > 0 ? jsx(ProjectSwitcher, { variant: switcher, projects, scope: selectedProject, onChange: onProjectChange, onNewProject }) : null,
     ]}),
     jsx(FleetSearch, { onOpen }),
-    projects.length > 0 ? jsx(ProjectPicker, { projects, selectedProject, onChange: onProjectChange }) : null,
     jsx('nav', { className: 'dockyard-tabs', role: 'tablist', 'aria-label': 'Dockyard sections', children:
       tabs.map(([key, label, count], index) => jsxs('button', {
         id: `dockyard-tab-${key}`,

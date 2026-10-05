@@ -2613,6 +2613,21 @@ def create_app(
         except ServiceError as exc:
             raise HTTPException(422, str(exc)) from None
 
+    # Sahil 05/10 (demo feedback h): the app's theme and typeface. Kept in the
+    # backend, never in browser storage; the fold setting above is separate.
+    @router.get("/settings/appearance")
+    def get_appearance():
+        return svc.appearance()
+
+    @router.put("/settings/appearance")
+    def put_appearance(body: dict):
+        actor = _principal_id(body.get("actor_id") or "unknown")
+        settings = {key: value for key, value in body.items() if key != "actor_id"}
+        try:
+            return svc.set_appearance(settings, actor=actor)
+        except ServiceError as exc:
+            raise HTTPException(422, str(exc)) from None
+
     @router.get("/settings/notifications/effective")
     def get_effective_notification_settings(project_id: Optional[str] = None):
         try:

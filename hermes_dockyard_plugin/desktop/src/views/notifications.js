@@ -45,11 +45,13 @@ function dayBucket(createdAt) {
   return 'Earlier'
 }
 
-export function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, onOpen, onOpenSettings }) {
+export function NotificationsView({ view, scopeProjectId = null, onRefresh, onAcknowledged: onChanged, onOpen, onOpenSettings }) {
   const [stateFilter, setStateFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
   const [severityFilter, setSeverityFilter] = useState('all')
-  const [projectFilter, setProjectFilter] = useState('all')
+  // Sahil 04/10 (demo feedback d): the global switcher picks the project;
+  // this screen's own project picker is gone. Fleet-wide notes show under All.
+  const projectFilter = scopeProjectId ?? 'all'
   const [selectedId, setSelectedId] = useState(null)
   const [resolveOpen, setResolveOpen] = useState(false)
   const [resolveNote, setResolveNote] = useState('')
@@ -67,13 +69,6 @@ export function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, 
     if (override === 'seen') return { ...note, state: 'seen', acked: true }
     return { ...note, state: 'resolved', resolved_at: note.resolved_at ?? new Date().toISOString(), resolved_by: note.resolved_by ?? 'desktop', resolution: 'manual' }
   })
-  const projects = []
-  for (const note of all) {
-    const key = note.project || 'Fleet'
-    if (!projects.some((p) => p.key === key)) {
-      projects.push({ key, count: all.filter((n) => (n.project || 'Fleet') === key).length })
-    }
-  }
   const filtered = all.filter((note) => {
     if (stateFilter !== 'all' && (note.state ?? (note.acked ? 'seen' : 'new')) !== stateFilter) return false
     if (typeFilter !== 'all') {
@@ -168,9 +163,6 @@ export function NotificationsView({ view, onRefresh, onAcknowledged: onChanged, 
         jsx('label', { className: 'dy-notif-filter', children:
           jsx('select', { 'aria-label': 'Filter by severity', value: severityFilter, onChange: (e) => { setSeverityFilter(e.target.value); setVisible(PAGE_SIZE) }, children:
             [['all', 'All severities'], ...SEVERITIES.map((s) => [s, s])].map(([value, label]) => jsx('option', { value, children: label }, value)) }) }),
-        jsx('label', { className: 'dy-notif-filter', children:
-          jsx('select', { 'aria-label': 'Filter by project', value: projectFilter, onChange: (e) => { setProjectFilter(e.target.value); setVisible(PAGE_SIZE) }, children:
-            [['all', 'All projects'], ...projects.map((p) => [p.key, `${p.key} (${p.count})`])].map(([value, label]) => jsx('option', { value, children: label }, value)) }) }),
       ]}),
       jsx('span', { className: 'dy-notif-spacer' }),
       jsx(Button, {
