@@ -16010,7 +16010,7 @@ function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onN
     jsx("span", { className: "dy-kb-toolbar-gap", "aria-hidden": true }),
     segmented("Layout", "layout", working.layout, [["board", "Board"], ["list", "List"]], (layout) => setWorking({ ...working, layout })),
     // Sahil 05/10: "Expanded" did not say what it did. One button opens (or closes) every card.
-    working.layout === "board" ? jsxs("button", {
+    working.layout === "board" ? jsx("button", {
       type: "button",
       className: "dy-kb-control dy-kb-button",
       "data-kanban-open-all": true,
