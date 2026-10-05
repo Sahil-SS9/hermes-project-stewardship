@@ -1745,6 +1745,18 @@ var DOCKYARD_CSS = `
 .dockyard-root .dockyard-section-fold:hover { background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-section-count { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .dockyard-root .dockyard-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* Milestone planning, with the Objectives since Sahil 05/10. It never had rules of its
+   own, so name, due date and count ran together; now one readable row per milestone. */
+.dockyard-root .dockyard-planning-table { display: grid; gap: 6px; margin-top: 12px; }
+.dockyard-root .dockyard-planning-row { border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface); }
+.dockyard-root .dockyard-planning-toggle { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 16px; width: 100%; min-height: 40px; padding: 8px 12px; border: 0; border-radius: 9px; background: transparent; color: var(--dy-text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.dockyard-root .dockyard-planning-toggle:hover { background: var(--dy-surface-subtle); }
+.dockyard-root .dockyard-planning-name { min-width: 0; overflow-wrap: anywhere; font-weight: 650; }
+.dockyard-root .dockyard-planning-toggle > span:not(.dockyard-planning-name) { color: var(--dy-text-2); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dockyard-root .dockyard-milestone-overdue .dockyard-planning-toggle > span:nth-child(2) { color: var(--dy-danger); }
+.dockyard-root .dockyard-planning-detail { display: grid; gap: 8px; padding: 4px 12px 12px; }
+.dockyard-root .dockyard-planning-risks { margin: 0; padding-left: 18px; font-size: 12px; }
+.dockyard-root .dockyard-planning-forecast { margin: 0; color: var(--dy-text-2); font-size: 12px; }
 /* Content previews (Sahil 04/10): images, PDFs and videos show in the Content tab. */
 .dockyard-root .dockyard-content-image { display: block; max-width: 100%; max-height: 520px; margin: 0 auto; object-fit: contain; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-content-pdf { display: block; width: 100%; height: 560px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); }
@@ -16008,7 +16020,7 @@ function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onN
         setOverrides({});
         setWorking({ ...working, density: working.density === "detailed" ? "compact" : "detailed" });
       },
-      children: [jsx(Icon, { name: "chevron-down" }), "Open all cards"]
+      children: "Open all cards"
     }) : null,
     jsx("span", { className: "dy-kb-count", "data-kanban-count": true, role: "status", children: `${number(liveCount)} ${plural(liveCount, "item")}` })
   ] });

@@ -471,7 +471,7 @@ export function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenIt
     // Sahil 05/10: "Expanded" did not say what it did. One button opens (or closes) every card.
     working.layout === 'board' ? jsxs('button', { type: 'button', className: 'dy-kb-control dy-kb-button', 'data-kanban-open-all': true, 'aria-pressed': working.density === 'detailed',
       title: "Show every card's details without opening each one", onClick: () => { setOverrides({}); setWorking({ ...working, density: working.density === 'detailed' ? 'compact' : 'detailed' }) },
-      children: [jsx(Icon, { name: 'chevron-down' }), 'Open all cards'] }) : null,
+      children: 'Open all cards' }) : null,
     jsx('span', { className: 'dy-kb-count', 'data-kanban-count': true, role: 'status', children: `${number(liveCount)} ${plural(liveCount, 'item')}` }),
   ]})
 
