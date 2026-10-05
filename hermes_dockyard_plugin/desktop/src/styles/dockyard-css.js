@@ -1475,7 +1475,7 @@ export const DOCKYARD_CSS = `
   .dockyard-root .dockyard-brand { grid-column: 1; grid-row: 1; }
   .dockyard-root .dockyard-tabs { flex-wrap: wrap; grid-column: 1 / -1; grid-row: 2; width: 100%; }
   .dockyard-root .dockyard-tab { padding-right: 8px; padding-left: 8px; }
-  .dockyard-root .dockyard-console-action { grid-column: 3; grid-row: 1; width: 38px; padding: 6px; justify-content: center; }
+  .dockyard-root .dockyard-console-action { width: 38px; padding: 6px; justify-content: center; }
   .dockyard-root .dockyard-brand-copy { display: none; }
   .dockyard-root .dockyard-console-action-label { display: none; }
   .dockyard-root .dockyard-console-action svg { flex: 0 0 auto; margin: 0; }
@@ -1732,7 +1732,9 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-brand { grid-area: brand; }
 .dockyard-root .dockyard-fleet-search { grid-area: search; position: relative; min-width: 0; max-width: 440px; justify-self: center; width: 100%; }
 .dockyard-root .dockyard-project-switcher { grid-area: project; }
-.dockyard-root .dockyard-console-action { grid-area: action; }
+/* New project + Onboard existing project (Sahil 05/10) share the action slot. */
+.dockyard-root .dockyard-brand-zone { grid-area: brand; }
+.dockyard-root .dockyard-console-actions { grid-area: action; display: flex; align-items: center; gap: 8px; }
 .dockyard-root .dockyard-tabs { flex-wrap: wrap; grid-area: tabs; overflow-x: auto; width: 100%; background: transparent; border-top: 1px solid var(--dy-border); border-radius: 0; padding: 7px 0 0; }
 .dockyard-root .dockyard-tab[aria-selected='true'] { background: transparent; box-shadow: none; color: var(--dy-accent-text); }
 .dockyard-root .dockyard-fleet-search input { width: 100%; min-height: 38px; padding: 7px 48px 7px 13px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text); font: inherit; font-size: 12px; }

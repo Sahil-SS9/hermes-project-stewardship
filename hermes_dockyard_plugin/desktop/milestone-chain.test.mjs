@@ -202,11 +202,14 @@ test('milestone journey: real UI drives real HTTP through proxy to backend', asy
 
     // 3. drive the REAL UI into the Delivery view (the milestone planning
     //    panel lives there since the HPS desktop journeys; project>Planning
-    //    now hosts the planning canvas). 'chain-project' is the only enabled
-    //    project, so the tab's first-project default selects it and
-    //    loadProjectData runs the full nine-fetch fan-out (including
-    //    GET /projects/:id/milestones) through the real proxy -> backend chain.
+    //    now hosts the planning canvas). The app opens on All projects
+    //    (Sahil 05/10), so the Projects tab asks for a project; choosing
+    //    'chain-project' (the only enabled project) makes loadProjectData run
+    //    the full nine-fetch fan-out (including GET /projects/:id/milestones)
+    //    through the real proxy -> backend chain.
     await click('[data-tab="project"]');
+    await waitFor('[data-choose-project="chain-project"]');
+    await click('[data-choose-project="chain-project"]');
     await waitFor('[data-project-view="board"]');
     await click('[data-project-view="board"]');
     await waitFor('[data-project-dashboard]');

@@ -30,6 +30,7 @@ import { readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { DASHBOARD, REPO, buildDesktopBundle, chromium } from './planning-canvas-test-bundle.mjs';
+import { pickProject } from './test-support/project-scope.mjs';
 
 // The vocabulary is read from the REAL persistence module, not retyped: if the
 // schema ever changes, this file follows it instead of drifting.
@@ -219,6 +220,8 @@ async function openPlanning(page, host) {
   await page.goto(`${host.base}/desktop`, { waitUntil: 'load' });
   await page.addScriptTag({ url: `${host.base}/api/bundle.js` });
   await page.waitForSelector('[data-tab="project"]', { timeout: 20000 });
+  // Sahil 05/10: Dockyard opens on All projects; pick the project first.
+  await pickProject(page, PROJECT);
   await page.click('[data-tab="project"]');
   await page.waitForSelector('[data-project-view="planning"]', { timeout: 20000 });
   await page.click('[data-project-view="planning"]');
@@ -513,6 +516,8 @@ test('Planning canvas v6: computed styles resolve per kind in light and dark', {
       await page.goto(`${host.base}/desktop`, { waitUntil: 'load' });
       await page.addScriptTag({ url: `${host.base}/api/bundle.js` });
       await page.waitForSelector('[data-tab="project"]', { timeout: 20000 });
+      // Sahil 05/10: the app opens on All projects; pick the project first.
+      await pickProject(page, PROJECT);
       // The Desktop host's own theme switch: the root attribute, nothing injected.
       if (theme === 'dark') {
         await page.evaluate(() => document.querySelector('.dockyard-root')?.setAttribute('data-theme', 'dark'));

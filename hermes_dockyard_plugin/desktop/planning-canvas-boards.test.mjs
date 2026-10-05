@@ -25,6 +25,7 @@ import http from 'node:http';
 import { rmSync } from 'node:fs';
 import { test } from 'node:test';
 import { buildDesktopBundle, chromium } from './planning-canvas-test-bundle.mjs';
+import { pickProject } from './test-support/project-scope.mjs';
 
 const PROJECT = 'p1';
 const MODELS = { available: true, default: { provider: 'main', model: 'main-model' }, providers: [{ slug: 'openai-codex', name: 'Codex', models: ['gpt-5.6-sol'] }, { slug: 'local', name: 'Local', models: ['qwen-3'] }] };
@@ -207,6 +208,11 @@ function startHost(bundleCode) {
           else payload = { content_id: decodeURIComponent(hit[1]), ...image };
         } else if (path === '/canvas/models') {
           payload = clone(MODELS);
+        } else if (path === '/settings/last-project') {
+          // The real server's remembered project (GET/PUT, api/server.py): a
+          // person's pick in the switcher saves it (Sahil 05/10 design d).
+          if (req.method === 'PUT') state.lastProject = body.project_id ?? null;
+          payload = { project_id: state.lastProject ?? null };
         } else if (path === '/dashboard') payload = { projects: [{ id: PROJECT, name: 'P1', health: 'healthy', work: {} }], owed_decisions: 0, totals: {} };
         else if (path === '/onboard/discover') payload = { profiles: [] };
         else if (path.endsWith('/content')) payload = { content: [] };
@@ -234,6 +240,8 @@ async function openPlanning(page, host) {
   await page.goto(`${host.base}/desktop`, { waitUntil: 'load' });
   await page.addScriptTag({ url: `${host.base}/api/bundle.js` });
   await page.waitForSelector('[data-tab="project"]', { timeout: 20000 });
+  // Sahil 05/10: Dockyard opens on All projects; pick the project first.
+  await pickProject(page, PROJECT);
   await page.click('[data-tab="project"]');
   await page.waitForSelector('[data-project-view="planning"]', { timeout: 20000 });
   await page.click('[data-project-view="planning"]');

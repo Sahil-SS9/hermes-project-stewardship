@@ -22,6 +22,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
+import { pickProject } from './test-support/project-scope.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = join(HERE, '..', '..')
@@ -152,6 +153,8 @@ test('Desktop canvas: computed styles resolve in light and dark (no black boxes)
       await page.goto(`${host.base}/desktop`, { waitUntil: 'load' })
       await page.addScriptTag({ url: `${host.base}/api/bundle.js` })
       await page.waitForSelector('[data-tab="project"]')
+      // Sahil 05/10: the app opens on All projects; pick the project first.
+      await pickProject(page, 'p1')
       // The theme switch the Desktop host itself uses is the root's own
       // attribute. Nothing about the CSS is injected by this test.
       if (theme === 'dark') {

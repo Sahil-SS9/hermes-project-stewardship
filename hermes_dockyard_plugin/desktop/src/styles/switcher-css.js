@@ -1,8 +1,8 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
-// Design round d (05/10): the global project switcher (A breadcrumb, B palette,
-// C project row), the "Showing one project" note and the project chooser.
-// Colours come only from the shared tokens, so every theme applies.
+// Design round d (05/10): the global project switcher (Sahil chose the
+// breadcrumb, direction A), the "Showing one project" note and the project
+// chooser. Colours come only from the shared tokens, so every theme applies.
 export const SWITCHER_CSS = `
 /* The top bar sits above the page, so its menus are never covered by cards. */
 .dockyard-root .dockyard-consolebar { position: relative; z-index: 30; }
@@ -21,8 +21,7 @@ export const SWITCHER_CSS = `
 .dockyard-root .dy-sw-trigger-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dockyard-root .dy-sw-caret { display: inline-grid; color: var(--dy-text-3); }
 .dockyard-root .dy-sw-caret svg,
-.dockyard-root .dy-sw-check svg,
-.dockyard-root .dy-sw-chip svg { width: 14px; height: 14px; }
+.dockyard-root .dy-sw-check svg { width: 14px; height: 14px; }
 .dockyard-root .dy-sw-avatar {
   flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px;
   border: 1px solid var(--dy-accent-border); border-radius: 7px;
@@ -58,57 +57,14 @@ export const SWITCHER_CSS = `
 .dockyard-root .dy-sw-dot.danger, .dockyard-root .dy-sw-health.danger .dy-sw-dot { background: var(--dy-danger); }
 .dockyard-root .dy-sw-health { display: inline-flex; flex: none; align-items: center; gap: 6px; color: var(--dy-text-2); font-size: 11.5px; white-space: nowrap; }
 .dockyard-root .dy-sw-empty { margin: 0; padding: 14px 16px; color: var(--dy-text-3); font-size: 12.5px; }
-.dockyard-root .dy-sw-foot { padding: 6px; border-top: 1px solid var(--dy-border); }
+/* "New project" then "Onboard existing project", one per line. */
+.dockyard-root .dy-sw-foot { display: grid; gap: 2px; padding: 6px; border-top: 1px solid var(--dy-border); }
 .dockyard-root .dy-sw-foot-action {
   display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 6px 10px;
   border: 0; border-radius: 8px; background: transparent; color: var(--dy-text-2); cursor: pointer; font-size: 13px; font-weight: 600;
 }
-.dockyard-root .dy-sw-palette-foot .dy-sw-foot-action { width: auto; }
 .dockyard-root .dy-sw-foot-action:hover { background: var(--dy-surface-subtle); color: var(--dy-text); }
 .dockyard-root .dy-sw-foot-action svg { width: 15px; height: 15px; }
-
-/* B: palette */
-.dockyard-root .dy-sw-b { margin-left: 6px; }
-.dockyard-root .dy-sw-b .dy-sw-trigger { border-color: var(--dy-border); background: var(--dy-surface-subtle); padding-right: 6px; }
-.dockyard-root .dy-sw-b .dy-sw-trigger:hover { border-color: var(--dy-control-border); }
-.dockyard-root .dy-sw-kbd,
-.dockyard-root .dy-sw-palette-foot kbd {
-  padding: 1px 6px; border: 1px solid var(--dy-border); border-bottom-width: 2px; border-radius: 5px;
-  background: var(--dy-surface); color: var(--dy-text-2); font: inherit; font-size: 10.5px; font-weight: 650; white-space: nowrap;
-}
-.dockyard-root .dy-sw-palette-foot kbd { margin: 0 2px; }
-.dockyard-root .dy-sw-palette-layer {
-  position: fixed; inset: 0; z-index: 200; display: grid; align-items: start; justify-items: center;
-  padding: 11vh 16px 16px; background: rgba(8, 11, 18, 0.5);
-}
-.dockyard-root .dy-sw-palette {
-  display: grid; width: min(600px, 100%); overflow: hidden; border: 1px solid var(--dy-border); border-radius: 14px;
-  background: var(--dy-surface); box-shadow: 0 30px 90px rgba(0, 0, 0, 0.36);
-}
-.dockyard-root .dy-sw-palette .dy-sw-search { padding: 15px 18px; }
-.dockyard-root .dy-sw-palette .dy-sw-search svg { width: 18px; height: 18px; }
-.dockyard-root .dy-sw-palette .dy-sw-search input { font-size: 16px; }
-.dockyard-root .dy-sw-palette .dy-sw-options { max-height: min(430px, 58vh); padding: 8px; }
-.dockyard-root .dy-sw-palette .dy-sw-option { min-height: 56px; padding: 8px 10px; gap: 12px; }
-.dockyard-root .dy-sw-palette .dy-sw-option-copy strong { font-size: 14px; }
-.dockyard-root .dy-sw-palette-foot {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 6px 8px 6px 14px;
-  border-top: 1px solid var(--dy-border); color: var(--dy-text-3); font-size: 11.5px;
-}
-
-/* C: project row under the top bar */
-.dockyard-root .dy-sw-strip { display: flex; align-items: center; gap: 6px; margin: -18px 0 24px; padding: 0 4px; }
-.dockyard-root .dy-sw-strip-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
-.dockyard-root .dy-sw-chip {
-  display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 4px 12px 4px 4px;
-  border: 1px solid var(--dy-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text-2);
-  cursor: pointer; font-size: 12.5px; font-weight: 650; white-space: nowrap; transition: border-color 120ms ease, background 120ms ease;
-}
-.dockyard-root .dy-sw-chip:hover { border-color: var(--dy-control-border); color: var(--dy-text); }
-.dockyard-root .dy-sw-chip[aria-checked="true"] { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); color: var(--dy-accent-text); }
-.dockyard-root .dy-sw-chip .dy-sw-avatar { width: 24px; height: 24px; border-radius: 999px; font-size: 9.5px; }
-.dockyard-root .dy-sw-chip.more { padding: 4px 10px 4px 12px; }
-.dockyard-root .dy-sw-strip .dy-sw-popover { left: 0; }
 
 /* "Showing one project" note, on screens that follow the switcher */
 .dockyard-root .dy-scope-note {
@@ -132,25 +88,6 @@ export const SWITCHER_CSS = `
 .dockyard-root .dy-chooser-go { display: inline-grid; color: var(--dy-text-3); }
 .dockyard-root .dy-chooser-go svg { width: 16px; height: 16px; }
 .dockyard-root .dy-chooser-empty { display: flex; align-items: center; gap: 12px; color: var(--dy-text-2); }
-
-/* Design review bar (prototype only); the page keeps room so nothing hides under it. */
-.dockyard-root:has(.dy-review-bar) .dockyard-shell { padding-bottom: 110px; }
-.dockyard-root .dy-review-bar {
-  position: fixed; left: 16px; bottom: 16px; z-index: 150; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  max-width: calc(100vw - 32px); padding: 8px 10px; border: 1px dashed var(--dy-control-border); border-radius: 12px;
-  background: var(--dy-surface); color: var(--dy-text); box-shadow: 0 12px 34px rgba(0, 0, 0, 0.22); font-size: 12px;
-}
-.dockyard-root .dy-review-bar strong { color: var(--dy-text-2); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
-.dockyard-root .dy-review-bar label { display: inline-flex; align-items: center; gap: 6px; color: var(--dy-text-2); }
-.dockyard-root .dy-review-bar select {
-  min-height: 30px; padding: 3px 8px; border: 1px solid var(--dy-control-border); border-radius: 7px;
-  background: var(--dy-surface); color: var(--dy-text); font: inherit;
-}
-.dockyard-root .dy-review-seg { display: inline-flex; padding: 2px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); }
-.dockyard-root .dy-review-seg button { min-width: 30px; min-height: 26px; padding: 2px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--dy-text-2); cursor: pointer; font-weight: 700; }
-.dockyard-root .dy-review-seg button[aria-pressed="true"] { background: var(--dy-action); color: var(--dy-on-action); }
-.dockyard-root .dy-review-bar[data-collapsed] > :not(.dy-review-toggle) { display: none; }
-.dockyard-root .dy-review-toggle { border: 0; background: transparent; color: var(--dy-text-2); cursor: pointer; font-weight: 700; }
 
 /* App settings: theme gallery and typeface */
 .dockyard-root .dy-theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 12px; }

@@ -237,7 +237,10 @@ export function ToastRegion({ toasts, onDismiss }) {
   })
 }
 
-export function OnboardingWizard({ onClose, onComplete }) {
+// intent: which button opened the wizard, 'new' (New project) or 'existing'
+// (Onboard existing project, Sahil 05/10). It only changes the heading label;
+// the steps, discovery and the host's create-or-connect check are the same.
+export function OnboardingWizard({ onClose, onComplete, intent = 'new' }) {
   useDialogFocusManager('[data-onboarding-wizard]')
   const [step, setStep] = useState(1)
   const [projectId, setProjectId] = useState('')
@@ -373,20 +376,21 @@ export function OnboardingWizard({ onClose, onComplete }) {
       'aria-modal': true,
       'aria-labelledby': 'dockyard-onboarding-title',
       'data-onboarding-wizard': true,
+      'data-onboarding-intent': intent === 'existing' ? 'existing' : 'new',
       children: [
         jsxs('header', { className: 'dockyard-onboarding-head', children: [
           jsxs('div', { children: [
-            jsx('span', { className: 'dockyard-card-label', children: 'NEW PROJECT' }),
+            jsx('span', { className: 'dockyard-card-label', children: intent === 'existing' ? 'EXISTING PROJECT' : 'NEW PROJECT' }),
             jsx('h2', { id: 'dockyard-onboarding-title', children: 'Bring a project into Dockyard' }),
             jsx('p', { children: 'Four bounded steps. Nothing runs until the final review.' }),
           ]}),
           jsx('button', { type: 'button', className: 'dockyard-modal-close', 'aria-label': 'Close onboarding', disabled: submitting, onClick: onClose, children: '×' }),
         ]}),
         jsx('div', { className: 'dockyard-wizard-progress', role: 'progressbar', 'aria-label': 'Onboarding progress', 'aria-valuemin': 1, 'aria-valuemax': 4, 'aria-valuenow': step, children:
-          steps.map(([label, detail], index) => jsxs('div', { key: `step-${index}`, className: index + 1 <= step ? 'complete' : '', children: [
+          steps.map(([label, detail], index) => jsxs('div', { className: index + 1 <= step ? 'complete' : '', children: [
             jsx('span', { children: number(index + 1) }),
             jsxs('span', { children: [jsx('strong', { children: label }), jsx('small', { children: detail })] }),
-          ]})),
+          ]}, `step-${index}`)),
         }),
         jsxs('div', { className: 'dockyard-wizard-body', children: [
           jsxs('div', { className: step === 1 ? 'dockyard-wizard-step active' : 'dockyard-wizard-step', hidden: step !== 1, 'data-wizard-step': '1', children: [
@@ -445,7 +449,8 @@ export function OnboardingWizard({ onClose, onComplete }) {
             jsx('h3', { children: 'Lead ownership' }),
             jsx('p', { children: 'Assign the specialist profile accountable for the project.' }),
             jsx('label', { htmlFor: 'dockyard-lead-profile', children: 'Lead profile' }),
-            jsx('select', { id: 'dockyard-lead-profile', 'data-field': 'lead-profile', value: leadProfile, onChange: (event) => setLeadProfile(event.target.value), children: [
+            // jsxs: a fixed placeholder plus the profiles (keyed), like the other static lists here.
+            jsxs('select', { id: 'dockyard-lead-profile', 'data-field': 'lead-profile', value: leadProfile, onChange: (event) => setLeadProfile(event.target.value), children: [
               jsx('option', { value: '', children: 'Select a lead profile' }),
               ...(discovered?.profiles ?? []).map((profile) => jsx('option', {
                 value: profile.name,
@@ -596,32 +601,10 @@ export function FleetSearch({ onOpen }) {
   ]})
 }
 
-export function ProjectPicker({ projects, selectedProject, onChange }) {
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const [active, setActive] = useState(0)
-  const trigger = useRef(null)
-  const results = projects.filter((p) => `${p.name || ''} ${p.id}`.toLowerCase().includes(query.toLowerCase()))
-  const selected = projects.find((p) => p.id === selectedProject)
-  const close = () => { setOpen(false); trigger.current?.focus() }
-  const choose = (p) => { if (p) onChange(p.id); close() }
-  return jsxs('div', { className: 'dockyard-project-switcher', style: { position: 'relative' }, onBlur: (e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false) }, children: [
-    jsx('button', { ref: trigger, type: 'button', className: 'dockyard-button', 'aria-label': 'Project context', 'aria-haspopup': 'listbox', 'aria-expanded': open, onClick: () => { setOpen(!open); setQuery(''); setActive(0) }, children: selected?.name || selectedProject || 'Choose project' }),
-    open ? jsxs('div', { className: 'dockyard-feature-card', style: { position: 'absolute', zIndex: 100, top: '100%', right: 0, width: 'min(320px, 85vw)' }, children: [
-      jsx('input', { autoFocus: true, role: 'combobox', 'aria-label': 'Find project', 'aria-expanded': true, 'aria-controls': 'dockyard-project-options', 'aria-autocomplete': 'list', 'aria-activedescendant': results[active] ? `dockyard-project-option-${active}` : undefined, value: query,
-        onChange: (e) => { setQuery(e.target.value); setActive(0) }, onKeyDown: (e) => {
-          if (e.key === 'Escape') { e.preventDefault(); close() }
-          if (e.key === 'Enter') { e.preventDefault(); choose(results[active]) }
-          if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) { e.preventDefault(); setActive(e.key === 'Home' ? 0 : e.key === 'End' ? Math.max(0, results.length - 1) : Math.max(0, Math.min(results.length - 1, active + (e.key === 'ArrowDown' ? 1 : -1)))) }
-        } }),
-      jsx('div', { role: 'listbox', id: 'dockyard-project-options', 'aria-label': 'Projects', style: { maxHeight: 260, overflowY: 'auto' }, children: results.map((p, i) => jsx('button', { type: 'button', role: 'option', id: `dockyard-project-option-${i}`, 'aria-selected': p.id === selectedProject, className: `dockyard-button ${i === active ? 'primary' : ''}`, style: { display: 'block', width: '100%' }, onMouseDown: (e) => e.preventDefault(), onClick: () => choose(p), children: p.name || p.id }, p.id)) }),
-      results.length ? null : jsx('p', { role: 'status', children: 'No matching projects' }),
-    ]}) : null,
-  ]})
-}
-
-export function ConsoleBar({ tab, counts, onTab, onNewProject, projects = [], selectedProject, onProjectChange, onOpen, switcher = 'a' }) {
+export function ConsoleBar({ tab, counts, onTab, onNewProject, onOnboardExisting, projects = [], selectedProject, onProjectChange, onOpen }) {
   // P3: the project context is persistent in the shell, not repeated in each panel.
+  // Sahil 05/10: the Onboard tab became the "Onboard existing project" button
+  // beside New project; both open the onboarding wizard.
   const tabs = [
     ['dashboard', 'Dashboard', null],
     ['project', 'Projects', null],
@@ -630,7 +613,6 @@ export function ConsoleBar({ tab, counts, onTab, onNewProject, projects = [], se
     ['workflows', 'Workflows', null],
     ['inbox', 'Approval Inbox', counts.approvals],
     ['notifications', 'Notifications', counts.notifications],
-    ['onboard', 'Onboard', null],
     // Sahil 04/10: app-wide settings only; each project's settings live in the project.
     ['settings', 'App settings', null],
   ]
@@ -646,9 +628,8 @@ export function ConsoleBar({ tab, counts, onTab, onNewProject, projects = [], se
     onTab(nextKey)
     document.getElementById(`dockyard-tab-${nextKey}`)?.focus()
   }
-  // Sahil 04/10 (demo feedback d): one global project switcher, next to the
-  // brand (A, B) or in its own row under the bar (C, rendered by the shell).
-  return jsxs('header', { className: 'dockyard-consolebar', 'data-switcher-variant': switcher, children: [
+  // Sahil 04/10 (demo feedback d): one global project switcher, next to the brand.
+  return jsxs('header', { className: 'dockyard-consolebar', children: [
     jsxs('div', { className: 'dockyard-brand-zone', children: [
       jsxs('div', { className: 'dockyard-brand', children: [
         jsx('span', { className: 'dockyard-brand-mark', children: jsx(Icon, { name: 'dock' }) }),
@@ -657,7 +638,7 @@ export function ConsoleBar({ tab, counts, onTab, onNewProject, projects = [], se
           jsx('span', { children: 'Fleet oversight' }),
         ]}),
       ]}),
-      projects.length > 0 ? jsx(ProjectSwitcher, { variant: switcher, projects, scope: selectedProject, onChange: onProjectChange, onNewProject }) : null,
+      projects.length > 0 ? jsx(ProjectSwitcher, { projects, scope: selectedProject, onChange: onProjectChange, onNewProject, onOnboardExisting }) : null,
     ]}),
     jsx(FleetSearch, { onOpen }),
     jsx('nav', { className: 'dockyard-tabs', role: 'tablist', 'aria-label': 'Dockyard sections', children:
@@ -678,14 +659,28 @@ export function ConsoleBar({ tab, counts, onTab, onNewProject, projects = [], se
         ],
       }, key)),
     }),
-    jsx(Button, {
-      action: 'open-onboarding',
-      variant: 'primary dockyard-console-action',
-      small: true,
-      ariaLabel: 'New project',
-      onClick: onNewProject,
-      children: jsxs(Fragment, { children: [jsx(Icon, { name: 'project' }), jsx('span', { className: 'dockyard-console-action-label', children: 'New project' })] }),
-    }),
+    // Primary: New project. Secondary: Onboard existing project (Sahil 05/10).
+    // Narrow widths show the icons only; the names stay as labels and tooltips.
+    jsxs('div', { className: 'dockyard-console-actions', children: [
+      jsx(Button, {
+        action: 'open-onboarding',
+        variant: 'primary dockyard-console-action',
+        small: true,
+        ariaLabel: 'New project',
+        data: { title: 'New project' },
+        onClick: onNewProject,
+        children: jsxs(Fragment, { children: [jsx(Icon, { name: 'project' }), jsx('span', { className: 'dockyard-console-action-label', children: 'New project' })] }),
+      }),
+      jsx(Button, {
+        action: 'open-onboard-existing',
+        variant: 'dockyard-console-action',
+        small: true,
+        ariaLabel: 'Onboard existing project',
+        data: { title: 'Onboard existing project' },
+        onClick: onOnboardExisting,
+        children: jsxs(Fragment, { children: [jsx(Icon, { name: 'folder-open' }), jsx('span', { className: 'dockyard-console-action-label', children: 'Onboard existing project' })] }),
+      }),
+    ]}),
   ]})
 }
 

@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {fixtureBrowser} from './browser-harness.mjs';
+import {pickProject} from './test-support/project-scope.mjs';
 
 // W3/W4 rendered journeys: the library screen and per-project enablement run
 // through the real plugin bundle against the disposable phase4 host. The host's
@@ -10,6 +11,8 @@ import {fixtureBrowser} from './browser-harness.mjs';
 test('W3 library: create global workflow, filter by scope, archive and restore', async()=>fixtureBrowser(async(page)=>{
  // Option A: Project > Workflows keeps a library entry point that lands on
  // the top Workflows tab, and the top tab opens the library directly.
+ // Sahil 05/10: the app opens on All projects; pick the project first.
+ await pickProject(page,'payments-relaunch');
  await page.locator('[data-tab="project"]').click();
  await page.locator('[data-project-view="workflows"]').click();
  await page.locator('[data-workflow-library-entry] [data-action="open-workflow-library"]').waitFor();
@@ -52,6 +55,9 @@ test('W3 library: create global workflow, filter by scope, archive and restore',
 }));
 
 test('W4 toggle drives enablement: off refuses a run, on starts it, and errors surface', async()=>fixtureBrowser(async(page)=>{
+ // Enablement is per project, so the library shows the toggle once a project
+ // is picked (Sahil 05/10: every screen follows the switcher).
+ await pickProject(page,'payments-relaunch');
  await page.locator('[data-tab="workflows"]').click();
  await page.locator('[data-workflow-library-screen]').waitFor();
  await page.locator('[data-action="library-create"]').click();

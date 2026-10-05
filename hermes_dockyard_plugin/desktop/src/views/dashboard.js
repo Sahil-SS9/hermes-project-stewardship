@@ -386,7 +386,7 @@ export function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
         waiting > 0 ? jsx(Button, { variant: 'primary', onClick: onInbox, children: `Review ${number(waiting)} ${plural(waiting, 'decision')}` }) : null,
       ]}),
     ]}),
-    empty ? jsx(EmptyState, { title: 'No projects under watch', description: 'Use New project above to connect your first project.', icon: 'project' }) :
+    empty ? jsx(EmptyState, { title: 'No projects under watch', description: 'Use New project or Onboard existing project above to bring in your first project.', icon: 'project' }) :
     jsxs(Fragment, { children: [
       jsxs('section', { className: 'dockyard-command-metrics', 'aria-label': 'Fleet summary', children: [
         metric('PROJECTS', number(projects.length), `${number(projects.filter((p) => p.status === 'at_risk').length)} at risk`, 'folders', 'info', () => setSubview('projects')),

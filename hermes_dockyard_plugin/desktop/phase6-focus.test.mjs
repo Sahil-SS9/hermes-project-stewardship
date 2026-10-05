@@ -174,8 +174,10 @@ async function createRuntime() {
 test('ConfirmDialog: initial focus inside, Tab/Shift+Tab contained, Escape restores the trigger', async () => {
   const { doc, pressKey, focusAndActivate } = await createRuntime();
 
-  // Real user flow: project tab -> Objectives view -> mission Archive.
+  // Real user flow: project tab -> choose the project (Sahil 05/10: the app
+  // opens on All projects) -> Objectives view -> mission Archive.
   await focusAndActivate('[data-tab="project"]');
+  await focusAndActivate('[data-choose-project="demo-project"]');
   await focusAndActivate('[data-project-view="objectives"]');
   const trigger = await focusAndActivate('[data-action="archive-mission"]');
 
@@ -231,6 +233,7 @@ test('OnboardingWizard: initial focus inside, Tab contained, Escape restores the
 test('ConfirmDialog busy state: Escape is inert while a destructive action is applying', async () => {
   const { doc, pressKey, focusAndActivate } = await createRuntime();
   await focusAndActivate('[data-tab="project"]');
+  await focusAndActivate('[data-choose-project="demo-project"]');
   await focusAndActivate('[data-project-view="objectives"]');
   await focusAndActivate('[data-action="archive-mission"]');
   const dialog = doc.querySelector('[data-destructive-confirm]');

@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {fixtureBrowser} from './browser-harness.mjs';
+import {pickProject} from './test-support/project-scope.mjs';
 
 test('searchable project context, requested discard target and retained project routes', async()=>fixtureBrowser(async(page)=>{
  const select=async(id)=>{await page.getByRole('button',{name:'Project context',exact:true}).click(); await page.getByRole('combobox',{name:'Find project'}).fill(id); await page.getByRole('listbox',{name:'Projects'}).getByRole('option',{name:id,exact:true}).click();};
@@ -49,8 +50,10 @@ test('Open workflow library with unsaved changes asks first; Cancel keeps the ta
 test('Kanban drag reads back, keyboard alternative and errors never claim success', async()=>fixtureBrowser(async(page,base)=>{
  const errors=[]; page.on('pageerror',e=>errors.push(String(e)));
  await page.getByRole('button',{name:'Project context',exact:true}).waitFor();
+ // Sahil 05/10: the app opens on All projects; the board needs a project.
+ await pickProject(page,'payments-relaunch');
  const initiallySelected = await page.getByRole('button',{name:'Project context',exact:true}).innerText();
- assert.notEqual(initiallySelected, 'Choose project');
+ assert.equal(initiallySelected, 'payments-relaunch');
  await page.locator('[data-tab="notifications"]').click();
  assert.equal(await page.getByRole('button',{name:'Project context',exact:true}).innerText(), initiallySelected);
  await page.locator('[data-tab="project"]').click();

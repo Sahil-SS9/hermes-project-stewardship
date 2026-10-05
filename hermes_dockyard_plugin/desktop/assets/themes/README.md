@@ -1,7 +1,7 @@
 # Dockyard themes: sources, licences and how the assets are made
 
-Design round d + h (Sahil's demo feedback 04/10, round started 05/10). Prototype only
-(branch proto/dh-r1) until Sahil picks which themes ship.
+Design round d + h (Sahil's demo feedback 04/10, round started 05/10). Sahil 05/10: all nine
+themes ship (plus Match Hermes, the default), with the background art made to stand out more.
 
 ## Themes
 
@@ -43,17 +43,28 @@ HPSUI2 applied its recipes to `argon-fluid.png`. That file was rejected 05/10: i
 third-party website (logo and title "OSTAVER", menu "ABOUT / WORK / EXPERTISE / CONTACT", tagline,
 scroll cue), so it has rendered text and is not Sahil's artwork.
 
-Recipe (v6 wallpaper rules: 42% opacity, 4px blur, saturation 0.9, brightness 0.78, one veil), baked
-at 1440x810 with ImageMagick, then AVIF quality 62 (2-4 KB each; JPEG at 6x the size showed banding):
+Recipe: v6's wallpaper rules (blur 4px, saturation 0.9, brightness 0.78, one veil in the theme's page
+colour), baked at 1440x810 with ImageMagick, then AVIF quality 62 (4-7 KB each; JPEG at 6x the size
+showed banding). v6 used 42% art under a 55-65% veil. 05/10: Sahil asked for the art to stand out a
+bit more, so each theme now takes the strongest setting on the path towards 75% art / veil 30-42%
+that keeps a 5% margin over the contrast minimums below, capped near double the v6 visibility
+(luminance spread):
 
-    convert -size 1440x810 xc:<theme bg> \( <art> [-modulate 100,<sat>,<hue>] -resize 1440x810^ \
-      -gravity center -extent 1440x810 -virtual-pixel edge -blur 0x4 -modulate 78,90,100 \) \
-      -compose dissolve -define compose:args=42 -composite \
-      \( -size 1440x810 "gradient:rgba(<veil>,0.55)-rgba(<veil>,0.65)" \) -compose over -composite -strip <id>.png
-    convert <id>.png -quality 62 <id>.avif
+| Theme | Art | Veil (top-bottom) | Visibility vs v6 |
+|---|---|---|---|
+| cobalt | 52% | 47.5-58.1% | 1.8x (its bright core is the limit) |
+| estuary | 54% | 45.6-56.4% | 2.0x |
+| burgundy | 55% | 45-55.8% | 2.1x |
+| violet | 55% | 45-55.8% | 2.1x |
+| ember | 54% | 46.3-57% | 2.0x |
+| neon | 55% | 45-55.8% | 2.1x |
+| grove | 56% | 44.4-55.2% | 2.1x |
 
-Brightest point of each baked background (blurred 12.5% sample) is in `theme-palettes.py`
-(`ART_BRIGHTEST`); body text keeps at least 7:1 and secondary text 4.5:1 even over that point.
+`python3 bake-backgrounds.py [SOURCE_DIR]` re-bakes all seven from the sources above (default
+`/home/kensei/HPS-UI-Concepts-v5/assets`) and prints each image's brightest point (blurred 12.5%
+sample, measured on the shipped AVIF). Those go in `theme-palettes.py` (`ART_BRIGHTEST`), whose gate
+keeps body text at 7:1 or more and secondary text at 4.5:1 or more even over that point
+(`tests/test_theme_palettes.py` runs the gate).
 
 ## Fonts
 

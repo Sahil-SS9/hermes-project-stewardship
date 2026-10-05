@@ -21,6 +21,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { pickProject } from './test-support/project-scope.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..', '..');
@@ -110,6 +111,8 @@ test('phase 4 real Desktop journeys: objectives, reports, saved views', { timeou
     await t.test('objectives: create → edit → evaluate now → archive', async () => {
       await page.goto(`${BASE}/desktop`, { waitUntil: 'load' });
       await page.waitForSelector('[data-tab="dashboard"]', { timeout: 20000 });
+      // Sahil 05/10: Dockyard opens on All projects; pick the project first.
+      await pickProject(page, 'payments-relaunch');
       await page.click('[data-tab="project"]');
       await page.click('[data-project-view="objectives"]');
       await page.waitForSelector('[data-objective-row="1"]', { timeout: 20000 });
@@ -245,6 +248,8 @@ test('phase 4 real Desktop journeys: objectives, reports, saved views', { timeou
       // Reload persistence: the view lives in the backend, so it survives a full reload.
       await page.reload({ waitUntil: 'load' });
       await page.waitForSelector('[data-tab="project"]', { timeout: 20000 });
+      // This fixture host does not remember the pick, so the reload opens All projects.
+      await pickProject(page, 'payments-relaunch');
       await page.click('[data-tab="project"]');
       await page.click('[data-project-view="board"]');
       await page.waitForSelector('[data-view-tab="Release table"]', { timeout: 20000 });

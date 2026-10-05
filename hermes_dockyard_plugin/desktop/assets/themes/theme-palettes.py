@@ -6,6 +6,8 @@ Sources (Sahil-approved, read 05/10):
   Violet Signal, Ember Spectrum. v6 rules: neutral text layer, ONE contrasting
   brand accent per theme, status colours semantic only (never re-tinted),
   wallpaper 42% / blur 4px / saturation 0.9 / brightness 0.78 / one veil.
+  05/10: Sahil asked for the art to stand out more; per-theme strengths are in
+  bake-backgrounds.py (about double the v6 visibility, within this gate).
 - /home/sahil/Desktop/HPSUI/HPSUI2/index.html (21/09 16:04): Neon Block Night,
   Kodama Grove Night.
 Values marked v6/hpsui2 are copied; the rest are derived to fill Dockyard's
@@ -120,8 +122,9 @@ THEMES = {
         neutral='#cfcab4', neutralBg='#2c3322', focus='#e4efb9', disabledText='#cdcca9', disabledBg='#2a3421'),
 }
 # Brightest pixel of each baked wallpaper (12.5% downsample, blurred), from dh-art/*.png.
-ART_BRIGHTEST = {'cobalt': '#302516', 'estuary': '#213214', 'burgundy': '#32180c', 'violet': '#30153a',
-                 'ember': '#362310', 'neon': '#0a3a0e', 'grove': '#283716'}
+# Measured on the shipped AVIFs by bake-backgrounds.py (05/10: art strengthened, Sahil).
+ART_BRIGHTEST = {'cobalt': '#464018', 'estuary': '#364d1e', 'burgundy': '#52280d', 'violet': '#14384f',
+                 'ember': '#503a15', 'neon': '#06530f', 'grove': '#3b4d1b'}
 
 def pairs(t):
     pages = [('page', t['bg'])] + ([('brightest art', ART_BRIGHTEST[t['art']])] if t.get('art') else [])

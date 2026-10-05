@@ -3,7 +3,8 @@ import { test } from 'node:test'
 import { chromium } from './browser-harness.mjs'
 const BASE = process.env.STEWARD_DESKTOP_URL || 'http://127.0.0.1:19500/desktop'
 const API = process.env.STEWARD_API_URL || 'http://127.0.0.1:19500/api/plugins/hermes-dockyard'
-const tabs = ['dashboard','project','roadmap','backlog','workflows','inbox','notifications','onboard','settings']
+// Sahil 05/10: the Onboard tab became the "Onboard existing project" button beside New project.
+const tabs = ['dashboard','project','roadmap','backlog','workflows','inbox','notifications','settings']
 test('Phase 3 rendered Desktop: scope isolation, dirty switching, keyboard and narrow layout', {timeout:120000}, async()=>{
  const browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1280,height:820}});
  const errors=[];page.on('pageerror',e=>errors.push(String(e)));
@@ -27,7 +28,8 @@ test('Phase 3 rendered Desktop: scope isolation, dirty switching, keyboard and n
   assert.equal(await page.locator('[data-tab="dashboard"]').getAttribute('aria-selected'),'true');
   await page.locator('[data-tab="dashboard"]').focus();await page.keyboard.press('ArrowRight');
   assert.equal(await page.evaluate(()=>document.activeElement?.dataset.tab),'project');
-  await page.locator('[data-project-view="overview"].active').waitFor();
+  // Sahil 05/10: the app opens on All projects, so Projects asks for one first.
+  await page.locator('[data-project-chooser="Projects"]').waitFor();
   assert.equal(await page.locator('[data-tab="project"]').getAttribute('aria-selected'),'true');
   assert.equal(await page.locator('[data-tab="dashboard"]').getAttribute('aria-selected'),'false');
   await select('payments-relaunch');

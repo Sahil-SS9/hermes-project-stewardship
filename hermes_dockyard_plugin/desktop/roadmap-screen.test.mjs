@@ -10,6 +10,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
+import { ALL_PROJECTS, pickProject } from './test-support/project-scope.mjs'
 
 const require = createRequire(fileURLToPath(new URL('../dashboard/package.json', import.meta.url)))
 const { chromium } = require('playwright')
@@ -18,8 +19,12 @@ const BASE = process.env.STEWARD_DESKTOP_URL || 'http://127.0.0.1:19500/desktop'
 const projectRow = (page, id) => page.locator(`[data-rm-node="project:${id}"]`)
 const firstOf = (page, prefix) => page.locator(`[data-rm-node^="${prefix}:"]`).first()
 
-async function openRoadmap(page) {
+// Sahil 04/10 + 05/10: the Roadmap follows the global switcher (its own
+// project picker went). Journeys that need every project set the switcher to
+// All projects first; the default test opens it as it comes.
+async function openRoadmap(page, { pickAll = true } = {}) {
   await page.goto(BASE)
+  if (pickAll) await pickProject(page, ALL_PROJECTS)
   await page.getByRole('tab', { name: 'Roadmap' }).click()
   await page.locator('[data-roadmap-screen]').waitFor()
   await page
@@ -33,10 +38,11 @@ test('Roadmap: all projects by default, drill-down, drawer, contract, Open, keyb
   const errors = []
   page.on('pageerror', (error) => errors.push(String(error)))
   try {
-    await openRoadmap(page)
+    await openRoadmap(page, { pickAll: false })
 
-    // 1. Signed default: All projects, whatever the global picker holds; nothing expanded.
-    assert.equal(await page.locator('[data-roadmap-screen] select[aria-label="Roadmap project picker"]').inputValue(), 'all')
+    // 1. Default with nothing remembered: the switcher is on All projects, so
+    //    is the Roadmap; nothing expanded.
+    assert.equal(await page.locator('.dy-sw-trigger').getAttribute('data-scope'), ALL_PROJECTS)
     assert.equal(await page.locator('.dy-rm-tree-head strong').innerText(), 'All projects')
     assert.equal(await page.locator('[data-rm-node^="initiative:"]').count(), 0, 'nothing expanded on load')
 
@@ -103,15 +109,9 @@ test('Roadmap: all projects by default, drill-down, drawer, contract, Open, keyb
   }
 })
 
-test('Roadmap: View in Roadmap opens that project; the global picker re-scopes', { timeout: 120000 }, async () => {
+test('Roadmap: View in Roadmap opens that project; the global switcher re-scopes', { timeout: 120000 }, async () => {
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
-  const picker = page.getByRole('button', { name: 'Project context', exact: true })
-  const pick = async (id) => {
-    await picker.click()
-    await page.getByRole('combobox', { name: 'Find project' }).fill(id)
-    await page.getByRole('listbox', { name: 'Projects' }).getByRole('option', { name: id, exact: true }).click()
-  }
   const showsAll = () => page
     .waitForFunction(() => document.querySelectorAll('[data-rm-node^="project:"]').length >= 2)
     .catch(() => assert.fail('the Roadmap did not show all projects'))
@@ -122,25 +122,25 @@ test('Roadmap: View in Roadmap opens that project; the global picker re-scopes',
         return rows.length === 1 && rows[0].getAttribute('data-rm-node') === `project:${want}`
       }, id)
       .catch(() => assert.fail(`the Roadmap did not narrow to ${id}`))
-    assert.equal(await page.locator('[data-roadmap-screen] select[aria-label="Roadmap project picker"]').inputValue(), id)
+    assert.equal(await page.locator('.dy-sw-trigger').getAttribute('data-scope'), id, 'the switcher holds the project')
   }
   try {
     // View in Roadmap: opens on the project it was clicked from.
+    const current = 'payments-relaunch'
     await page.goto(BASE)
+    await pickProject(page, current)
     await page.getByRole('tab', { name: /^Project/ }).click()
-    const current = (await picker.innerText()).trim()
     await page.locator('[data-roadmap-link] a').click()
     await page.locator('[data-roadmap-screen]').waitFor()
     await scopedTo(current)
-    // The global picker re-scopes an open Roadmap: another project, then the
-    // one it already holds (the Roadmap reopens on All, so that narrows too).
-    const other = current === 'atlas-mobile' ? 'mobile-client' : 'atlas-mobile'
-    for (const id of [other, other]) {
-      await page.getByRole('button', { name: 'Reset' }).click()
-      await showsAll()
-      await pick(id)
-      await scopedTo(id)
-    }
+    // The switcher re-scopes an open Roadmap: another project, All projects,
+    // then back (Sahil 04/10: one switcher; the Roadmap's own picker went).
+    await pickProject(page, 'atlas-mobile')
+    await scopedTo('atlas-mobile')
+    await pickProject(page, ALL_PROJECTS)
+    await showsAll()
+    await pickProject(page, current)
+    await scopedTo(current)
   } finally {
     await browser.close()
   }
@@ -229,9 +229,9 @@ test('Roadmap: filter controls are one consistent size, wide and on a phone', { 
         }),
         pageWidth: document.documentElement.scrollWidth,
       }))
-      const [scope, search, attention, reset] = toolbar.controls
-      assert.equal(toolbar.controls.length, 4, `${width}: project, search, attention, Reset`)
-      assert.match(scope.name, /dy-rm-scope/, `${width}: signed order starts with the project picker`)
+      // The project picker moved to the global switcher (Sahil 04/10).
+      const [search, attention, reset] = toolbar.controls
+      assert.equal(toolbar.controls.length, 3, `${width}: search, attention, Reset`)
       assert.match(search.name, /dy-rm-search/)
       assert.match(attention.name, /dy-rm-attention/)
       assert.match(reset.name, /dy-rm-reset/)

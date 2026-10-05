@@ -153,13 +153,6 @@ export async function loadProjectData(projectId) {
   }
 }
 
-export async function loadOnboardData() {
-  const dashboard = await api('/dashboard')
-  const projects = sortProjects(dashboard.projects ?? [])
-  const discovery = await api('/onboard/discover')
-  return { ...dashboard, projects, profiles: discovery.profiles ?? [] }
-}
-
 export async function loadBacklogData(projectId) {
   const dashboard = await api('/dashboard')
   const projects = sortProjects(dashboard.projects ?? [])

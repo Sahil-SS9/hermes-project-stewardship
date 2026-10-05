@@ -957,7 +957,15 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
     dom.window.close();
   };
 
-  return { dom, loaded, contributions, calls, navigations, clipboardWrites, data, deferred, jsdomMessages, mount, flush, click, setValue, setFile, dispose };
+  // Sahil 05/10: the app opens on All projects. Journeys that need a project
+  // pick it through the switcher, as a person does (payments-relaunch is the
+  // project the old startup rule opened: it needs the most attention here).
+  const pickProject = async (id, ms = 80) => {
+    await click('.dy-sw-trigger');
+    await click(`[data-project-option="${id}"]`, ms);
+  };
+
+  return { dom, loaded, contributions, calls, navigations, clipboardWrites, data, deferred, jsdomMessages, mount, flush, click, pickProject, setValue, setFile, dispose };
 }
 
 async function testStylesAndPopulatedDashboard() {
@@ -1103,6 +1111,7 @@ async function testReferenceBenchmarkApprovalCardsAndReject() {
 async function testProjectDashboardScreen() {
   const runtime = await createRuntime();
   await runtime.mount();
+  await runtime.pickProject('payments-relaunch');
   await runtime.click('[data-tab="project"]', 80);
   const doc = runtime.dom.window.document;
   assert(doc.querySelector('[data-project-dashboard]'), 'project dashboard screen is missing');
@@ -1207,6 +1216,7 @@ async function testProjectDashboardScreen() {
 async function testMissionObjectiveManagementAndDestructiveGates() {
   const runtime = await createRuntime();
   await runtime.mount();
+  await runtime.pickProject('payments-relaunch');
   await runtime.click('[data-tab="project"]', 80);
   await runtime.click('[data-project-view="objectives"]');
   const doc = runtime.dom.window.document;
@@ -1276,6 +1286,7 @@ async function testMissionObjectiveManagementAndDestructiveGates() {
 async function testProjectContentVisibilityPreviewAndUpload() {
   const runtime = await createRuntime();
   await runtime.mount();
+  await runtime.pickProject('payments-relaunch');
   await runtime.click('[data-tab="project"]', 80);
   await runtime.click('[data-project-view="content"]');
   const doc = runtime.dom.window.document;
@@ -1308,6 +1319,7 @@ async function testProjectContentVisibilityPreviewAndUpload() {
 async function testProjectLifecycleStateAndConfirmedActions() {
   const runtime = await createRuntime();
   await runtime.mount();
+  await runtime.pickProject('payments-relaunch');
   await runtime.click('[data-tab="project"]', 80);
   await runtime.click('[data-project-view="settings"]');
   const doc = runtime.dom.window.document;
@@ -1372,6 +1384,7 @@ async function testPhase5ManagementJourneys() {
   await runtime.mount();
   // Milestone controls live within the project (planning view) after the
   // approved shell removed the global Delivery tab.
+  await runtime.pickProject('payments-relaunch');
   await runtime.click('[data-tab="project"]', 80);
   await runtime.click('[data-project-view="board"]', 60);
   // Sahil 05/10: milestones are managed with the project's Objectives, not on the Kanban.
@@ -1486,6 +1499,7 @@ async function testPhase5ManagementJourneys() {
 async function testBacklogBoardAndReasonGate() {
   const runtime = await createRuntime();
   await runtime.mount();
+  await runtime.pickProject('payments-relaunch');
   await runtime.click('[data-tab="backlog"]', 80);
   const doc = runtime.dom.window.document;
   assert(doc.querySelector('[data-backlog-board]'), 'prioritised backlog screen is missing');
@@ -1508,6 +1522,7 @@ async function testBacklogBoardAndReasonGate() {
 async function testBacklogCreateFormValidationAndReadback() {
   const runtime = await createRuntime();
   await runtime.mount();
+  await runtime.pickProject('payments-relaunch');
   await runtime.click('[data-tab="backlog"]', 80);
   const doc = runtime.dom.window.document;
   await runtime.click('[data-action="open-create-backlog-item"]');
@@ -1577,6 +1592,7 @@ async function testBacklogCreateFormValidationAndReadback() {
 async function testBacklogBulkReassignment() {
   const runtime = await createRuntime();
   await runtime.mount();
+  await runtime.pickProject('payments-relaunch');
   await runtime.click('[data-tab="backlog"]', 80);
   const doc = runtime.dom.window.document;
   const first = doc.querySelector('[data-bulk-select="HDY-13"]');
@@ -1653,6 +1669,7 @@ async function testInitiativeLoopScreen() {
   await runtime.mount();
   // Initiative surface lives within the project after the approved shell
   // removed the global Delivery tab.
+  await runtime.pickProject('payments-relaunch');
   await runtime.click('[data-tab="project"]', 120);
   await runtime.click('[data-project-view="initiative"]', 60);
   const doc = runtime.dom.window.document;
@@ -1674,6 +1691,7 @@ async function testSavedViewsScreenAndCreator() {
   await runtime.mount();
   // r6 (Sahil's C2 review): saved views are a views bar above the Kanban board,
   // with a Manage views side panel. They are display preferences only.
+  await runtime.pickProject('payments-relaunch');
   await runtime.click('[data-tab="project"]', 120);
   await runtime.click('[data-project-view="board"]', 60);
   const doc = runtime.dom.window.document;
@@ -2024,6 +2042,7 @@ async function testFirstAssessmentCompletionAction() {
   const runtime = await createRuntime();
   await runtime.mount();
   await runtime.flush(60);
+  await runtime.pickProject('payments-relaunch');
   await runtime.click('[data-tab="project"]', 100);
   const doc = runtime.dom.window.document;
   // The Objectives tab opens the project screen focused on objectives; the
@@ -2074,6 +2093,8 @@ async function testContrastMetadata() {
 async function writeSnapshot(tab, target, { onboarding = false, prepare = null } = {}) {
   const runtime = await createRuntime();
   await runtime.mount();
+  // Project screens need a project (Sahil 05/10: the app opens on All projects).
+  if (['project', 'backlog', 'initiative'].includes(tab)) await runtime.pickProject('payments-relaunch');
   if (tab !== 'dashboard') await runtime.click(`[data-tab="${tab}"]`);
   if (onboarding) await runtime.click('[data-action="open-onboarding"]');
   if (prepare) await prepare(runtime);
@@ -2273,6 +2294,7 @@ async function testActualObjectiveEvidence() {
   const runtime = await createRuntime({ objectivePayload: payload });
   try {
     await runtime.mount();
+    await runtime.pickProject('payments-relaunch');
     await runtime.click('[data-tab="project"]', 80);
     await runtime.click('[data-project-view="objectives"]');
     const doc = runtime.dom.window.document;

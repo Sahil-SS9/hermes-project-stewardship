@@ -19,6 +19,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { pickProject } from './test-support/project-scope.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..', '..');
@@ -119,6 +120,8 @@ async function openWorkflows(page, host) {
   await page.goto(`${host.base}/desktop`, { waitUntil: 'load' })
   await page.addScriptTag({ url: `${host.base}/api/bundle.js` })
   await page.waitForSelector('[data-tab="project"]')
+  // Sahil 05/10: the app opens on All projects; pick the project first.
+  await pickProject(page, 'p1')
   // Option A: project workflows live under Project > Workflows.
   await page.click('[data-tab="project"]')
   await page.click('[data-project-view="workflows"]')

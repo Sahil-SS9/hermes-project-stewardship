@@ -5,7 +5,7 @@ import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath, pathToFileURL} from 'node:url';
 const here=path.dirname(fileURLToPath(import.meta.url));
 const repo=path.resolve(here,'../..');
 const {makeTestStateRoot,stateEnv,disposeTestState}=await import('./test-state-guard.mjs');
@@ -26,7 +26,9 @@ try {
  for(let n=0;;n++){try {if((await fetch(base+'/health')).ok)break;}catch{} if(n>100)throw Error('backend not ready');await new Promise(r=>setTimeout(r,100));}
  console.log('DISPOSABLE_BACKEND',await (await fetch(base+'/health')).json());
  const files=process.argv.slice(2).length ? process.argv.slice(2) : fs.readdirSync(here).filter(f=>f.endsWith('.test.mjs')).map(f=>path.join(here,f));
- const child=spawn(process.execPath,['--test','--test-concurrency=1',...files],{cwd:repo,env:{...testEnv,STEWARD_DESKTOP_URL:base+'/desktop',STEWARD_API_URL:base+'/api/plugins/hermes-dockyard'},stdio:'inherit'});
+ // Every file starts with nothing remembered (test-support/fresh-scope.mjs).
+ const freshScope=pathToFileURL(path.join(here,'test-support','fresh-scope.mjs')).href;
+ const child=spawn(process.execPath,['--import',freshScope,'--test','--test-concurrency=1',...files],{cwd:repo,env:{...testEnv,STEWARD_DESKTOP_URL:base+'/desktop',STEWARD_API_URL:base+'/api/plugins/hermes-dockyard'},stdio:'inherit'});
  const [code]=await once(child,'exit');
  // The practice server refuses and records every attempt to go online
  // (tests/offline_guard.py); one attempt fails the run, even if every test passed.

@@ -1,5 +1,6 @@
 // Batch E5 — Notifications screen end-to-end through the REAL plugin bundle and
-// REAL backend (disposable data): filters and counts, day grouping, the detail
+// REAL backend (disposable data): filters, the global switcher narrowing the
+// list to one project (the screen's own project filter went 04/10), day grouping, the detail
 // panel's actions (mark seen, resolve with note), mark all as seen, the badge
 // counts New only, settings save and reload, the pop-up poller through the
 // in-app toast fallback (the harness host has no notify), no duplicates after a
@@ -9,6 +10,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
+import { ALL_PROJECTS, pickProject, rememberedProject, restoreRememberedProject } from './test-support/project-scope.mjs'
 
 const require = createRequire(fileURLToPath(new URL('../dashboard/package.json', import.meta.url)))
 const { chromium } = require('playwright')
@@ -77,14 +79,30 @@ test('E5: filters, day groups, detail actions, badge, settings, poller, keyboard
     const rows = page.locator('.dockyard-notification-row')
     const allCount = await rows.count()
     assert.ok(allCount >= 2, 'at least the seeded rows are present')
+
+    // 1a. The screen's own project filter is gone (Sahil 04/10, design d): the
+    //     global switcher narrows Notifications and says so. The remembered
+    //     project is put back, so later steps and suites open as before.
+    assert.equal(await page.getByLabel('Filter by project').count(), 0, 'no project filter on the screen')
+    const headers = { 'x-hermes-session-token': TOKEN }
+    const remembered = await rememberedProject(API, headers)
+    await pickProject(page, 'payments-relaunch')
+    await page.locator('[data-scope-note]').waitFor()
+    await page.waitForFunction(() => {
+      const metas = [...document.querySelectorAll('.dockyard-notification-row .dockyard-meta')].map((node) => node.textContent)
+      return metas.length >= 2 && metas.every((meta) => meta.startsWith('payments-relaunch · '))
+    }).catch(() => assert.fail('the switcher narrows Notifications to payments-relaunch'))
+    await pickProject(page, ALL_PROJECTS)
+    await restoreRememberedProject(API, headers, remembered)
+    await page.waitForFunction((count) => document.querySelectorAll('.dockyard-notification-row').length === count, allCount)
+      .catch(() => assert.fail('All projects lists every row again'))
+    assert.equal(await page.locator('[data-scope-note]').count(), 0, 'no scope note on All projects')
+
     await page.getByLabel('Filter by type').selectOption('approval_required')
     const approvalCount = await rows.count()
     assert.ok(approvalCount >= 2 && approvalCount <= allCount)
     await page.getByLabel('Filter by severity').selectOption('high')
     await page.getByLabel('Filter by state').selectOption('new')
-    // Counts in the project filter carry per-project counts.
-    const projectOptions = await page.getByLabel('Filter by project').locator('option').allInnerTexts()
-    assert.ok(projectOptions.some((t) => /payments-relaunch \(\d+\)/.test(t)), 'project filter shows counts')
     // Filtered-empty state.
     await page.getByLabel('Filter by state').selectOption('resolved')
     if ((await rows.count()) === 0) {

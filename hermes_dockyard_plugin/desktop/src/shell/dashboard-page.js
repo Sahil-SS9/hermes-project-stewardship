@@ -13,7 +13,6 @@ import { loadDashboardData } from '../data/loaders.js'
 import { loadProjectData } from '../data/loaders.js'
 import { loadBacklogData } from '../data/loaders.js'
 import { loadTeamsData } from '../data/loaders.js'
-import { loadOnboardData } from '../data/loaders.js'
 import { loadInboxData } from '../data/loaders.js'
 import { loadAppSettingsData } from '../data/loaders.js'
 import { api } from '../runtime/context.js'
@@ -23,7 +22,6 @@ import { ErrorState } from '../lib/ui.js'
 import { LoadingState } from '../lib/ui.js'
 import { DashboardView } from '../views/dashboard.js'
 import { ProjectDashboard } from '../project/dashboard.js'
-import { OnboardPanel } from '../views/onboard.js'
 import { BacklogView } from '../views/backlog.js'
 import { TeamsView } from '../views/teams.js'
 // Teams is intentionally imported before Initiative for the legacy text probe.
@@ -40,10 +38,8 @@ import { useDialogFocusManager } from '../lib/ui.js'
 import { Button } from '../lib/ui.js'
 import { OnboardingWizard } from '../lib/ui.js'
 import { ALL_PROJECTS } from '../lib/project-switcher.js'
-import { SWITCHER_VARIANTS } from '../lib/project-switcher.js'
 import { ProjectChooser } from '../lib/project-switcher.js'
 import { ScopeNote } from '../lib/project-switcher.js'
-import { SwitcherStrip } from '../lib/project-switcher.js'
 import { projectName } from '../lib/project-switcher.js'
 import { scopeDashboard } from '../data/scope.js'
 import { scopeInbox } from '../data/scope.js'
@@ -54,7 +50,6 @@ import { fontById } from '../styles/themes.js'
 import { hostIsDark } from '../styles/themes.js'
 import { themeById } from '../styles/themes.js'
 import { themeMode } from '../styles/themes.js'
-import { DesignReviewBar } from './design-review.js'
 // Sahil 04/10 (demo feedback d): screens that work on one project ask for one
 // while the switcher is on All projects.
 const ONE_PROJECT_TABS = Object.freeze({ project: 'Projects', backlog: 'Backlog', initiative: 'Initiative' })
@@ -65,12 +60,6 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   // The switcher's choice: a project id, or ALL_PROJECTS ("*").
   const [selectedProject, setSelectedProject] = useState(null)
   const isAll = selectedProject === ALL_PROJECTS
-  // Design round 05/10 (prototype): ?switcher=a|b|c picks the direction shown,
-  // ?review=1 adds the review bar. Removed when Sahil has picked.
-  const review = useRef(null)
-  review.current ??= new URLSearchParams(globalThis.location?.search ?? '')
-  const [switcherVariant, setSwitcherVariant] = useState(() =>
-    SWITCHER_VARIANTS.includes(review.current.get('switcher')) ? review.current.get('switcher') : 'a')
   // Sahil 05/10 (demo feedback h): theme and typeface for the whole app, kept
   // in the backend (/settings/appearance). Match Hermes follows Hermes
   // Desktop's own light/dark mode live (until now nothing set dark mode).
@@ -118,7 +107,11 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   const [roadmap, setRoadmap] = useState({ scope: 'all', version: 0 })
   const showRoadmap = (scope) => setRoadmap(({ version }) => ({ scope, version: version + 1 }))
   const [dashboardHomeVersion, setDashboardHomeVersion] = useState(0)
-  const [onboardingOpen, setOnboardingOpen] = useState(false)
+  // The onboarding wizard: null (closed), 'new' (New project) or 'existing'
+  // (Onboard existing project, Sahil 05/10). Same wizard either way.
+  const [onboarding, setOnboarding] = useState(null)
+  const openNewProject = () => setOnboarding('new')
+  const openOnboardExisting = () => setOnboarding('existing')
   const [toasts, setToasts] = useState([])
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -143,8 +136,8 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   // Sahil 02/10: Dockyard reopens on the last project the person chose. The
   // choice is kept in the backend (GET/PUT /settings/last-project), never in
   // browser storage (26/08 locked rule). Only a person's choice is saved:
-  // the automatic first pick (the remembered project, or the project needing
-  // most attention) is not. It is requested once per app load, right after
+  // the automatic first pick (the remembered project, or All projects when
+  // nothing is remembered, Sahil 05/10) is not. It is requested once per app load, right after
   // the first load starts: the dashboard stays the first request (repro-live
   // fails the first GET) and the first pick waits for no extra round trip.
   const lastProject = useRef({ request: null, saved: null, auto: null })
@@ -156,7 +149,7 @@ export function DashboardPage({ inboxCss = '' } = {}) {
         memory.saved ??= saved
         return saved
       },
-      () => null, // unavailable: open on the default project as before
+      () => null, // unavailable: open on All projects, as when nothing is remembered
     )
     return memory.request
   }
@@ -214,8 +207,6 @@ export function DashboardPage({ inboxCss = '' } = {}) {
         ? loadTeamsData
       : tab === 'initiative'
         ? () => loadProjectData(selectedProject)
-      : tab === 'onboard'
-        ? loadOnboardData
       : tab === 'inbox'
         ? loadInboxData
         : async () => api('/notifications?limit=200')
@@ -311,7 +302,7 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   useDialogFocusManager(navPending ? '[data-project-switch-confirm] .dockyard-modal' : null)
   const dismissToast = (id) => setToasts((current) => current.filter((toast) => toast.id !== id))
   const completeOnboarding = (result) => {
-    setOnboardingOpen(false)
+    setOnboarding(null)
     setSelectedProject(result?.project_id ?? null)
     setTab('project')
   }
@@ -412,7 +403,7 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   const activeError = error?.tab === tab ? error.error : null
   let content
   if (isAll && ONE_PROJECT_TABS[tab]) {
-    content = jsx(ProjectChooser, { projects: projectOptions, screen: ONE_PROJECT_TABS[tab], onPick: selectProject, onNewProject: () => setOnboardingOpen(true) })
+    content = jsx(ProjectChooser, { projects: projectOptions, screen: ONE_PROJECT_TABS[tab], onPick: selectProject, onNewProject: openNewProject, onOnboardExisting: openOnboardExisting })
   } else if (activeError) {
     content = jsx(ErrorState, { error: activeError, onRetry: refresh })
   } else if (!payload) {
@@ -458,8 +449,6 @@ export function DashboardPage({ inboxCss = '' } = {}) {
         requestTab('project', { entryView: 'workflows', project: owner && owner !== selectedProject ? owner : undefined })
       },
     }, `workflow-library:${isAll ? 'all' : selectedProject ?? 'none'}`)
-  } else if (tab === 'onboard') {
-    content = jsx(OnboardPanel, { view: payload, onOpen: () => setOnboardingOpen(true), onRefresh: refresh })
   } else if (tab === 'roadmap') {
     // The view owns its scope after mounting; the shell re-mounts it (new
     // version key) for "View in Roadmap", the tab bar (All) and the picker.
@@ -505,10 +494,7 @@ export function DashboardPage({ inboxCss = '' } = {}) {
     children: [
     jsxs('div', { className: 'dockyard-shell', children: [
       jsx(ConsoleBar, { tab, counts, projects: projectOptions, selectedProject, onProjectChange: selectProject,
-        onTab: requestTab, switcher: switcherVariant,
-        onNewProject: () => setOnboardingOpen(true), onOpen: openDeepLink }),
-      switcherVariant === 'c' && projectOptions.length > 0
-        ? jsx(SwitcherStrip, { projects: projectOptions, scope: selectedProject, onChange: selectProject }) : null,
+        onTab: requestTab, onNewProject: openNewProject, onOnboardExisting: openOnboardExisting, onOpen: openDeepLink }),
       jsx('main', {
         id: 'dockyard-panel',
         role: 'tabpanel',
@@ -529,8 +515,6 @@ export function DashboardPage({ inboxCss = '' } = {}) {
         ]}),
       ]}),
     ]}) : null,
-    onboardingOpen ? jsx(OnboardingWizard, { onClose: () => setOnboardingOpen(false), onComplete: completeOnboarding }) : null,
-    review.current.get('review') === '1'
-      ? jsx(DesignReviewBar, { variant: switcherVariant, onVariant: setSwitcherVariant, appearance, onAppearance: changeAppearance }) : null,
+    onboarding ? jsx(OnboardingWizard, { intent: onboarding, onClose: () => setOnboarding(null), onComplete: completeOnboarding }) : null,
   ]})
 }
