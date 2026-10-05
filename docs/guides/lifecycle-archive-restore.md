@@ -59,15 +59,19 @@ disable,re-enable,archive,restore}` (`api/server.py`), and
 ## 3. Archive and restore
 
 Archive/restore exists for every management entity that this release exposes.
-Restore is the inverse of archive; archive never deletes.
+Restore is the inverse of archive; archive never deletes. Design round f
+(05/10/2026, Option B) added three narrow, audited ways to remove planning
+items for good; each needs the item archived (or, for an initiative, not yet
+approved) first.
 
 | Entity | Archive | Restore | Notes |
 |---|---|---|---|
 | Project | `POST /projects/{id}/archive` | `POST /projects/{id}/restore` | Lifecycle side effects apply. Canonical project, board, tasks and repository are untouched — Stewardship governs its own metadata only. |
 | Mission | `POST /projects/{id}/mission/archive` | — (restore is re-setting a mission) | `archived_missions` lists history; missions are single-instance metadata. |
-| Goal | `POST /projects/{id}/goals/{goal_id}/archive` | `.../restore` | Create/edit/reorder plus nullable objective linking (PM-0501). |
-| Objective | `POST /projects/{id}/objectives/{objective_id}/archive` | — (archived objectives are listed with `include_archived`) | Removal is archive in this release (PM-0504). |
-| Milestone | `POST /projects/{id}/milestones/{name}/archive` | `.../restore` | Removal is archive; milestone/work attribution is preserved. |
+| Goal | `POST /projects/{id}/goals/{goal_id}/archive` | `.../restore` | Create/edit/reorder plus nullable objective linking (PM-0501). An archived goal can be deleted for good with `DELETE /projects/{id}/goals/{goal_id}` (409 while active): its objective links and contract go, the objectives stay and can join another goal. Same `project_archive` capability as archive; audited as `goal.deleted`. |
+| Objective | `POST /projects/{id}/objectives/{objective_id}/archive` | — (archived objectives are listed with `include_archived`) | `DELETE /projects/{id}/objectives/{objective_id}` removes an objective and its links; the Desktop offers it only once archived. |
+| Milestone | `POST /projects/{id}/milestones/{name}/archive` | `.../restore` | An archived milestone can be deleted for good with `DELETE /projects/{id}/milestones/{name}` (409 while active): its work-item and initiative links go, the work items stay, and the name is free again. Same `project_archive` capability as archive; audited as `milestone.deleted` with what it held. |
+| Initiative | — | — | Never deleted: each keeps its approval record. Before approval it can be withdrawn with `POST /initiatives/{ref}/withdraw` (trusted caller only, like the decisions): it becomes `cancelled`, leaves the approval queue, frees its open-initiative slot and its title, and keeps its history. Approved or in-progress initiatives cannot be withdrawn. |
 | Workflow definition | `POST /projects/{id}/workflows/{name}/archive` | `.../restore` | Versions are explicit; runs are journaled. Saved Views stay visibly separate from executable workflow definitions (PM-0506). |
 | Managed content | `POST /projects/{id}/content/{content_id}/archive` | `.../restore` | Archive is metadata-only; the file remains in the managed root. |
 
@@ -130,10 +134,11 @@ Guarantees and honest limits:
 Not hidden follow-ups, and not blockers (plan §1.3 and §4):
 
 - permanent project metadata purge;
-- permanent milestone deletion and permanent workflow-definition deletion;
+- permanent deletion of an active milestone or goal (archive first), of any
+  initiative, and of workflow definitions;
+- stopping an initiative after approval;
 - workflow cloning and rich graphical workflow authoring;
 - repository or arbitrary filesystem deletion;
-- permanent objective removal beyond archive;
 - full Cartesian visual testing of every state/theme/width combination.
 
 `disable` is also deliberately non-destructive: it hides and denies access and

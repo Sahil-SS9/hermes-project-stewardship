@@ -618,6 +618,19 @@ class DockyardService:
         self._audit(actor=actor, action="milestone.restored", subject=name)
         return self.milestone_progress(project_id, name)
 
+    def milestone_delete(self, project_id: str, name: str, *, actor: Actor) -> Dict:
+        """Delete an archived milestone for good (design round f, Option B).
+
+        Archive first, then delete: an active milestone is refused. The work
+        items stay; only their grouping goes, as do the initiative links. The
+        name is free again. The audit row keeps what the milestone held.
+        """
+        held = self.dy.milestone_delete(project_id, name)
+        self._audit(actor=actor, action="milestone.deleted", subject=name,
+                    detail={"items": held["items"], "initiatives": held["initiatives"]})
+        return {"name": name, "deleted": True, "items": held["items"],
+                "initiatives": held["initiatives"]}
+
     # ------------------------------------------------------------------ #
     # Saved views (PM-05)                                                #
     # ------------------------------------------------------------------ #

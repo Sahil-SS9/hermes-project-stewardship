@@ -1169,6 +1169,37 @@ class StewardshipService:
         )
         return self._goal_dict(self._goal_row(project_id, goal_id))
 
+    def delete_goal(
+        self, project_id: str, goal_id: str, *, actor: str, interface: str
+    ) -> Dict[str, Any]:
+        """Delete an archived goal for good (design round f, Option B).
+
+        Only an archived goal can go, so a live goal is never one click from
+        loss. Its objective links and its contract cascade away
+        (``ON DELETE CASCADE``); the objectives themselves stay and are free
+        to join another goal. The audit row keeps what was deleted.
+        """
+        self._require(project_id)
+        row = self._goal_row(project_id, goal_id)
+        if row["archived_at"] is None:
+            raise ServiceError(
+                f"goal {goal_id} is not archived; archive it before deleting it")
+        objective_ids = self._goal_dict(row)["objective_ids"]
+        with self.store.tx() as cx:
+            gone = cx.execute(
+                "DELETE FROM project_goals"
+                " WHERE project_id=? AND goal_id=? AND archived_at IS NOT NULL",
+                (project_id, goal_id),
+            )
+            if gone.rowcount != 1:
+                raise ServiceError(f"goal {goal_id} changed state concurrently")
+        self.store.audit(
+            actor=actor, interface=interface, action="goal.deleted", subject=goal_id,
+            detail={"project_id": project_id, "title": row["title"],
+                    "objective_ids": objective_ids},
+        )
+        return {"goal_id": goal_id, "deleted": True, "objective_ids": objective_ids}
+
     # ------------------------------------------------------------------ #
     # Objectives                                                         #
     # ------------------------------------------------------------------ #
@@ -3182,6 +3213,62 @@ class StewardshipService:
             )
         return self.initiative_by_ref(ref)
 
+    # Statuses an initiative can be withdrawn from: it is still a proposal.
+    WITHDRAWABLE_STATUSES = (
+        InitiativeStatus.PENDING_APPROVAL.value,
+        InitiativeStatus.PROPOSED.value,
+        "changes_requested",
+    )
+
+    def withdraw_initiative(
+        self,
+        ref: str,
+        *,
+        actor: str,
+        interface: str,
+        reason: str = "",
+    ) -> Dict[str, Any]:
+        """Withdraw a proposal before approval (design round f, Option B).
+
+        The initiative becomes ``cancelled``: it leaves the approval queue,
+        frees its open-initiative slot and its title (no suppression window;
+        withdrawing is not a rejection), and keeps its record and audit
+        trail. ``approval_state`` becomes ``not_required`` because nothing
+        waits for a decision any more. Once approved, an initiative cannot be
+        withdrawn: its cards may already be on the project's board.
+        """
+        ini = self.initiative_by_ref(ref)
+        if ini["status"] == InitiativeStatus.CANCELLED.value:
+            return ini  # already withdrawn: same result, no second record
+        if ini["status"] not in self.WITHDRAWABLE_STATUSES:
+            raise ServiceError(
+                f"initiative {ref} can only be withdrawn before approval"
+                f" (status={ini['status']})")
+        reason_text = reason.strip()
+        now = iso(self._clock())
+        placeholders = ",".join("?" * len(self.WITHDRAWABLE_STATUSES))
+        with self.store.tx() as cx:
+            res = cx.execute(
+                "UPDATE project_initiatives SET status='cancelled',"
+                " approval_state='not_required', decision_revision=decision_revision+1,"
+                f" updated_at=? WHERE ref=? AND status IN ({placeholders})",
+                (now, ref, *self.WITHDRAWABLE_STATUSES),
+            )
+            if res.rowcount != 1:
+                current = cx.execute(
+                    "SELECT status FROM project_initiatives WHERE ref=?", (ref,)).fetchone()
+                if current is not None and current["status"] == "cancelled":
+                    return self.initiative_by_ref(ref)
+                raise ServiceError(f"initiative {ref} changed state concurrently")
+        self.store.audit(actor=actor, interface=interface,
+                         action="initiative.withdrawn", subject=ref,
+                         detail={"from_status": ini["status"], "reason": reason_text})
+        # The approval notification closes like it does for a decision.
+        self._notify_decisions(
+            "initiative.withdrawn", ref, ini["project_id"],
+            {"actor": actor, "interface": interface, "reason": reason_text})
+        return self.initiative_by_ref(ref)
+
     def add_initiative_comment(
         self, ref: str, *, actor: str, interface: str = "desktop", body: str = "",
     ) -> Dict[str, Any]:
@@ -3229,13 +3316,26 @@ class StewardshipService:
         outcome: Dict[str, Any],
         regressed: bool = False,
     ) -> Dict[str, Any]:
+        """Record delivery: approved or in progress -> completed/regressed.
+
+        Nothing else can be completed: not a proposal nobody approved, not a
+        withdrawn or rejected one. Repeating the same completion returns the
+        recorded result unchanged; switching a finished initiative between
+        completed and regressed is refused.
+        """
         new_status = InitiativeStatus.REGRESSED.value if regressed else InitiativeStatus.COMPLETED.value
         with self.store.tx() as cx:
-            cx.execute(
+            res = cx.execute(
                 "UPDATE project_initiatives SET status=?, outcome_json=?, completed_at=?"
-                " WHERE ref=?",
+                " WHERE ref=? AND status IN ('approved','executing')",
                 (new_status, self.store._j(outcome), iso(self._clock()), ref),
             )
+        if res.rowcount != 1:
+            current = self.initiative_by_ref(ref)
+            if current["status"] == new_status:
+                return current
+            raise ServiceError(
+                f"initiative {ref} cannot be completed from status={current['status']}")
         self.store.audit(
             actor="system",
             interface="outcome_evaluator",

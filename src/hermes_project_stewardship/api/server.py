@@ -389,6 +389,15 @@ class ResubmitAction(BaseModel):
     note: str = ""
 
 
+class WithdrawAction(BaseModel):
+    """Withdraw before approval (design round f, Option B, 05/10/2026)."""
+
+    model_config = ConfigDict(extra="forbid")
+    actor: str = ""  # ignored: the trusted caller withdraws (Q2, 03/10/2026)
+    interface: str = "rpc"
+    reason: str = Field(default="", max_length=2000)
+
+
 class InitiativeCommentAction(BaseModel):
     model_config = ConfigDict(extra="forbid")
     actor: str = ""
@@ -1106,6 +1115,18 @@ def create_app(
         except ServiceError as exc:
             raise HTTPException(404 if "unknown goal" in str(exc) else 409, str(exc)) from None
 
+    @router.delete("/projects/{project_id}/goals/{goal_id}")
+    def delete_goal(project_id: str, goal_id: str):
+        # Design round f, Option B: whoever may archive may delete, and only
+        # an archived goal can be deleted.
+        principal = _membership_authority("project_archive")
+        try:
+            return svc.delete_goal(
+                project_id, goal_id, actor=principal, interface="rpc"
+            )
+        except ServiceError as exc:
+            raise HTTPException(404 if "unknown goal" in str(exc) else 409, str(exc)) from None
+
     @router.get("/projects/{project_id}/objectives")
     def objectives(project_id: str, include_archived: bool = False):
         return {
@@ -1767,6 +1788,19 @@ def create_app(
         except ServiceError as exc:
             raise HTTPException(409, str(exc)) from None
 
+    @router.post("/initiatives/{ref}/withdraw")
+    def withdraw(ref: str, body: WithdrawAction, request: Request):
+        # Withdrawing takes an item out of the owner's approval queue, so it
+        # needs the same trusted caller as the decisions it pre-empts (Q2).
+        actor_id = _decision_actor(request)
+        try:
+            return svc.withdraw_initiative(
+                ref, actor=actor_id, interface=body.interface, reason=body.reason)
+        except ServiceError as exc:
+            raise HTTPException(
+                404 if str(exc).startswith("no such initiative") else 409, str(exc)
+            ) from None
+
     @router.get("/initiatives/{ref}/comments")
     def comments(ref: str):
         return {"comments": svc.initiative_comments(ref)}
@@ -2274,6 +2308,20 @@ def create_app(
             )
         except ValueError as exc:
             raise HTTPException(404 if "not found" in str(exc) else 409, str(exc)) from None
+
+    @router.delete("/projects/{project_id}/milestones/{name}")
+    def milestone_delete(project_id: str, name: str):
+        # Design round f, Option B: same trust as archive; archived only.
+        principal = _membership_authority("project_archive")
+        try:
+            svc.require_feature(project_id, "milestones")
+            return dy.milestone_delete(
+                project_id, name, actor=_actor(principal, "human")
+            )
+        except ValueError as exc:
+            # Match the not-found message by its ending: a milestone's own
+            # name may contain the words "not found".
+            raise HTTPException(404 if str(exc).endswith(" not found") else 409, str(exc)) from None
 
     @router.post("/projects/{project_id}/milestones/{name}/detach")
     def milestone_detach(project_id: str, name: str, body: MilestoneAttach):

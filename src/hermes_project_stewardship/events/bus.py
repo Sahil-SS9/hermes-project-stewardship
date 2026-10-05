@@ -23,6 +23,9 @@ INITIATIVE_PROPOSED = "initiative.proposed"
 APPROVAL_REQUIRED = "initiative.approval_required"
 INITIATIVE_APPROVED = "initiative.approved"
 INITIATIVE_REJECTED = "initiative.rejected"
+# Design round f, Option B (Sahil, 05/10/2026): the proposer withdraws an
+# initiative before anyone approves it. Not a reviewer decision.
+INITIATIVE_WITHDRAWN = "initiative.withdrawn"
 INITIATIVE_STARTED = "initiative.started"
 INITIATIVE_COMPLETED = "initiative.completed"
 INITIATIVE_REGRESSED = "initiative.regressed"

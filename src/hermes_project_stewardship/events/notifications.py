@@ -21,7 +21,8 @@ Legacy shapes are normalised on write and read:
 
 Auto-resolve (matching on dedupe_key/subject within the project):
 - ``approval_required`` for X resolves when a decision event for X arrives
-  (INITIATIVE_APPROVED / INITIATIVE_REJECTED / INITIATIVE_CHANGES_REQUESTED);
+  (INITIATIVE_APPROVED / INITIATIVE_REJECTED / INITIATIVE_CHANGES_REQUESTED),
+  or when the proposer withdraws X before approval (INITIATIVE_WITHDRAWN);
 - ``health_change`` / ``alert`` for P resolve when HEALTH_CHANGED with
   ``to='healthy'`` arrives for P.
 
@@ -42,6 +43,7 @@ from ..events.bus import (
     HEALTH_CHANGED,
     INITIATIVE_APPROVED,
     INITIATIVE_REJECTED,
+    INITIATIVE_WITHDRAWN,
     PROJECT_CRITICAL,
     VERIFICATION_FAILED,
     WORK_ASSIGNED,
@@ -63,12 +65,13 @@ _EVENT_MAP = {
     WORK_UNASSIGNED: ("unassigned_work", "medium"),
 }
 
-_AUTO_RESOLVE_EVENTS = (INITIATIVE_APPROVED, INITIATIVE_REJECTED)
+_AUTO_RESOLVE_EVENTS = (INITIATIVE_APPROVED, INITIATIVE_REJECTED, INITIATIVE_WITHDRAWN)
 INITIATIVE_CHANGES_REQUESTED = "initiative.changes_requested"
 AUTO_RESOLVE_NOTE = {
     INITIATIVE_APPROVED: "initiative approved: {ref}",
     INITIATIVE_REJECTED: "initiative rejected: {ref}",
     INITIATIVE_CHANGES_REQUESTED: "changes requested: {ref}",
+    INITIATIVE_WITHDRAWN: "initiative withdrawn: {ref}",
 }
 
 DEFAULT_EFFECTIVE_POLICY: Dict[str, Any] = {

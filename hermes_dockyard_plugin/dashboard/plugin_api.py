@@ -655,6 +655,15 @@ async def restore_project_goal(project_id: str, goal_id: str) -> dict:
     )
 
 
+@plugin_api.delete("/projects/{project_id}/goals/{goal_id}")
+async def delete_project_goal(project_id: str, goal_id: str) -> dict:
+    # Design round f, Option B: archived goals only (the backend refuses others).
+    return await _proxy(
+        "DELETE",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/goals/{quote(goal_id, safe='')}",
+    )
+
+
 @plugin_api.get("/projects/{project_id}/objectives")
 async def project_objectives(
     project_id: str, include_archived: bool = True
@@ -1220,6 +1229,13 @@ class ResubmitBody(BaseModel):
     note: str = ""
 
 
+class WithdrawBody(BaseModel):
+    # Design round f, Option B. Like the decision bodies, the caller never
+    # names the actor: the backend takes it from this proxy's vouching.
+    model_config = ConfigDict(extra="forbid")
+    reason: str = ""
+
+
 class InitiativeCommentBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     body: str = ""
@@ -1381,6 +1397,15 @@ async def restore_milestone(project_id: str, name: str) -> dict:
         "POST",
         f"/stewardship/v1/projects/{quote(project_id, safe='')}/milestones/{quote(name, safe='')}/restore",
         {},
+    )
+
+
+@plugin_api.delete("/projects/{project_id}/milestones/{name}")
+async def delete_milestone(project_id: str, name: str) -> dict:
+    # Design round f, Option B: archived milestones only (the backend refuses others).
+    return await _proxy(
+        "DELETE",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/milestones/{quote(name, safe='')}",
     )
 
 
@@ -1632,6 +1657,15 @@ async def resubmit(ref: str, body: ResubmitBody) -> dict:
     r = quote(ref, safe="")
     payload = {**body.model_dump(exclude_none=True), "actor": _ACTOR_ID, "interface": "dockyard:human"}
     return await _proxy("POST", f"/stewardship/v1/initiatives/{r}/resubmit", payload)
+
+
+@plugin_api.post("/initiatives/{ref}/withdraw")
+async def withdraw(ref: str, body: WithdrawBody | None = None) -> dict:
+    r = quote(ref, safe="")
+    payload = {"interface": "dockyard:human"}
+    if body is not None and body.reason:
+        payload["reason"] = body.reason
+    return await _proxy("POST", f"/stewardship/v1/initiatives/{r}/withdraw", payload)
 
 
 @plugin_api.get("/initiatives/{ref}/comments")

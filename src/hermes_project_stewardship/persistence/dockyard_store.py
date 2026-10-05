@@ -622,6 +622,34 @@ class DockyardStore:
             if changed.rowcount != 1:
                 raise ValueError(f"milestone {name} not found")
 
+    def milestone_delete(self, project_id: str, name: str) -> Dict[str, List[str]]:
+        """Delete an archived milestone; returns what it held.
+
+        Its item and initiative links cascade (``ON DELETE CASCADE``). The
+        archived-only rule is enforced here too, so no caller can skip it,
+        and the returned lists are read in the same transaction as the delete.
+        """
+        with self.store.tx() as cx:
+            row = cx.execute(
+                "SELECT id, archived_at FROM dockyard_milestones"
+                " WHERE project_id=? AND name=?", (project_id, name),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"milestone {name} not found")
+            if row["archived_at"] is None:
+                raise ValueError(
+                    f"milestone {name} is not archived; archive it before deleting it")
+            items = [str(r["item_ref"]) for r in cx.execute(
+                "SELECT item_ref FROM dockyard_milestone_items WHERE milestone_id=?"
+                " ORDER BY item_ref", (row["id"],),
+            ).fetchall()]
+            initiatives = [str(r["initiative_ref"]) for r in cx.execute(
+                "SELECT initiative_ref FROM initiative_milestones WHERE milestone_id=?"
+                " ORDER BY initiative_ref", (row["id"],),
+            ).fetchall()]
+            cx.execute("DELETE FROM dockyard_milestones WHERE id=?", (row["id"],))
+        return {"items": items, "initiatives": initiatives}
+
     # ------------------------------------------------------------------ #
     # Saved views (PM-05)                                                #
     # ------------------------------------------------------------------ #
