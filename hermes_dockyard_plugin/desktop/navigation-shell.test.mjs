@@ -19,11 +19,13 @@ test('searchable project context, requested discard target and retained project 
  await page.locator('[data-project-dashboard="mobile-client"]').waitFor();
  await page.locator('[data-project-view="board"]').click();
  await page.locator('[data-kanban-screen]').waitFor();
- // Sahil 05/10: milestones are managed with the project's Objectives, not on the Kanban.
- await page.locator('[data-project-view="objectives"]').click();
- await page.locator('[data-planning-panel]').waitFor();
- await page.locator('[data-project-view="initiative"]').click();
- await page.getByRole('heading',{name:'No initiative available'}).waitFor();
+ // Design round f: one Vision tab replaced the Objectives and Initiatives
+ // tabs and the milestone panel (Sahil 05/10 named it Vision).
+ assert.equal(await page.locator('[data-project-view="objectives"], [data-project-view="initiative"]').count(), 0);
+ assert.equal((await page.locator('[data-project-view="plan"]').innerText()).trim(), 'Vision');
+ await page.locator('[data-project-view="plan"]').click();
+ await page.locator('[data-plan-screen="mobile-client"] [data-plan-section="milestone"]').waitFor();
+ await page.getByRole('heading',{name:'Vision',exact:true}).waitFor();
 }));
 
 test('Open workflow library with unsaved changes asks first; Cancel keeps the tab (Quan M1)', async()=>fixtureBrowser(async(page)=>{

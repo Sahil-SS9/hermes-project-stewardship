@@ -176,7 +176,7 @@ const POPULATED = {
   },
   milestones: {
     'demo-project': { milestones: [] },
-    'payments-relaunch': { milestones: [{ name: 'Launch', due: '2026-10-01', closed: false, archived_at: null, archived_by: null, item_refs: [], total: 0, done: 0 }] },
+    'payments-relaunch': { milestones: [{ id: 1, name: 'Launch', due: '2026-10-01', closed: false, archived_at: null, archived_by: null, item_refs: [], total: 0, done: 0 }] },
   },
   missionArchive: {
     'demo-project': { missions: [] },
@@ -330,6 +330,10 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
     const method = init.method || 'GET';
     const body = init.body || {};
     calls.push({ path, method, body: init.body });
+    // Route on the path alone; the Vision screen (design round f) reads its
+    // lists with ?include_archived=true and the Roadmap with ?project_id=.
+    const query = new URLSearchParams(path.includes('?') ? path.slice(path.indexOf('?') + 1) : '');
+    path = path.split('?')[0];
     if (method !== 'GET' && failMutationPath === path) {
       throw new Error('Synthetic mutation failure');
     }
@@ -770,8 +774,9 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
     const milestoneCollectionMutation = path.match(/^\/projects\/([^/]+)\/milestones$/);
     if (method === 'POST' && milestoneCollectionMutation) {
       const projectId = decodeURIComponent(milestoneCollectionMutation[1]);
-      const row = { name: init.body.name, due: init.body.due, closed: false, archived_at: null, archived_by: null, item_refs: [], total: 0, done: 0 };
       data.milestones[projectId] ??= { milestones: [] };
+      const id = Math.max(0, ...data.milestones[projectId].milestones.map((item) => Number(item.id) || 0)) + 1;
+      const row = { id, name: init.body.name, due: init.body.due, closed: false, archived_at: null, archived_by: null, item_refs: [], total: 0, done: 0 };
       data.milestones[projectId].milestones.push(row);
       return clone(row);
     }
@@ -809,6 +814,21 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
     if (milestonesRead) {
       const projectId = decodeURIComponent(milestonesRead[1]);
       return clone(data.milestones?.[projectId] ?? { milestones: [] });
+    }
+    // The Roadmap read model for one project, as the Vision screen reads it:
+    // the initiatives with no links yet and no linked work.
+    if (method === 'GET' && path === '/roadmap') {
+      const projectId = query.get('project_id');
+      return {
+        projects: [{
+          id: projectId, label: projectId,
+          initiatives: (data.initiatives[projectId]?.initiatives ?? []).map((row) => ({
+            ref: row.ref, title: row.title, governance: row.status, milestones: [], objectives: [], delivery: { state: 'no_linked_work' },
+          })),
+          goals: [],
+        }],
+        can_write: true,
+      };
     }
     const canvasRead = path.match(/^\/projects\/([^/]+)\/canvas$/);
     if (canvasRead) {
@@ -1116,14 +1136,12 @@ async function testProjectDashboardScreen() {
   const doc = runtime.dom.window.document;
   assert(doc.querySelector('[data-project-dashboard]'), 'project dashboard screen is missing');
   assert.match(doc.body.textContent, /Checkout reliability rebuild/);
-  assert.equal(doc.querySelectorAll('[data-project-view]').length, 10, 'project dashboard must expose ten supported views including retained initiatives');
-  // Phase 4: the Objectives tab opens the project screen focused on the
-  // objectives sub-view; the sub-view bar still reaches the overview.
-  // Projects land on Overview (owner decision); the objectives sub-view is
+  assert.equal(doc.querySelectorAll('[data-project-view]').length, 9, 'project dashboard must expose nine supported views (design round f: one Vision tab replaced Objectives and Initiatives)');
+  // Projects land on Overview (owner decision); the Vision screen is
   // reachable from the project view bar.
   assert(doc.querySelector('[data-project-view].active')?.getAttribute('data-project-view'), 'overview', 'Projects must land on Overview');
-  await runtime.click('[data-project-view="objectives"]', 60);
-  assert(doc.querySelector('[data-project-view="objectives"].active') || doc.body.textContent.includes('OBJECTIVES'), 'Objectives sub-view did not open from the project view bar');
+  await runtime.click('[data-project-view="plan"]', 60);
+  assert(doc.querySelector('[data-project-view="plan"].active') && doc.querySelector('[data-plan-screen="payments-relaunch"]'), 'Vision did not open from the project view bar');
   await runtime.click('[data-project-view="overview"]', 60);
   await runtime.click('[data-project-view="overview"]', 60);
   assert(doc.querySelector('[data-project-visual]'), 'project overview is missing work visualisation');
@@ -1218,68 +1236,103 @@ async function testMissionObjectiveManagementAndDestructiveGates() {
   await runtime.mount();
   await runtime.pickProject('payments-relaunch');
   await runtime.click('[data-tab="project"]', 80);
-  await runtime.click('[data-project-view="objectives"]');
+  // Design round f: the mission, goals and objectives are managed on the
+  // project's Vision screen (one tab for what the Objectives tab held).
+  await runtime.click('[data-project-view="plan"]', 80);
   const doc = runtime.dom.window.document;
+  const row = (kind, id) => `[data-plan-row="${kind}"][data-plan-id="${id}"]`;
+  const posted = (method, path) => runtime.calls.some((call) => call.method === method && call.path === path);
 
-  assert(doc.querySelector('[data-objective-evidence]'), 'objective evidence/history is missing');
-  assert.match(doc.querySelector('[data-objective-evidence]').textContent, /Unknown|unknown/);
-  assert(doc.querySelector('[data-goals-manager]'), 'goal manager is missing');
-  assert.equal(doc.querySelectorAll('[data-goal-row]').length, 2, 'active goals did not render');
-  assert.match(doc.querySelector('[data-goal-row="GOAL-DEMO1"]').textContent, /Checkout reliability/, 'linked objective was not rendered on its goal');
-  assert.match(doc.querySelector('[data-goal-row="GOAL-DEMO2"]').textContent, /No linked objectives/, 'nullable objective relationship was not visible');
-  assert(doc.querySelector('[data-mission-manager]'), 'mission manager is missing');
-  assert.equal(doc.querySelectorAll('[data-objective-row]').length, 2, 'active and archived objectives did not render');
-  assert.match(doc.body.textContent, /Stabilise the legacy checkout/);
+  await runtime.click(`${row('objective', 11)} .dy-plan-row-open`, 40);
+  assert(doc.querySelector('[data-objective-evidence="11"]'), 'objective evidence/history is missing');
+  assert.match(doc.querySelector('[data-objective-evidence="11"]').textContent, /Unknown|unknown/);
+  assert.equal(doc.querySelectorAll('[data-plan-row="goal"]').length, 2, 'active goals did not render');
+  await runtime.click(`${row('goal', 'GOAL-DEMO1')} .dy-plan-row-open`, 40);
+  assert.match(doc.querySelector('[data-plan-drawer="goal"]').textContent, /Checkout reliability/, 'linked objective was not rendered on its goal');
+  await runtime.click(`${row('goal', 'GOAL-DEMO2')} .dy-plan-row-open`, 40);
+  assert.match(doc.querySelector('[data-plan-drawer="goal"]').textContent, /No objectives yet/, 'nullable objective relationship was not visible');
+  assert(doc.querySelector('[data-plan-mission]'), 'mission strip is missing');
+  assert.equal(doc.querySelectorAll('[data-plan-row="objective"]').length, 1, 'only the active objective shows by default');
+  await runtime.click('[data-plan-show-archived]', 40);
+  assert.equal(doc.querySelectorAll('[data-plan-row="objective"]').length, 2, 'active and archived objectives did not render');
+  await runtime.click('[data-plan-show-archived]', 40);
+  await runtime.click('[data-plan-menu="mission"]', 20);
+  await runtime.click('[data-plan-menu-item="history"]', 40);
+  assert.match(doc.querySelector('[data-plan-mission-history]')?.textContent ?? '', /Stabilise the legacy checkout/);
 
-  await runtime.click('[data-action="add-goal"]');
-  await runtime.setValue('[data-goal-field="title"]', 'Preserve objective history');
-  const objectiveChoice = doc.querySelector('[data-goal-objectives] input[value="12"]');
-  assert(objectiveChoice, 'goal editor did not expose optional objective linking');
+  // A new objective, then a goal it measures. The goal form offers active
+  // objectives that are not already in a goal (one goal per objective).
+  await runtime.click('[data-plan-menu="new"]', 20);
+  await runtime.click('[data-plan-menu-item="objective"]', 40);
+  await runtime.setValue('[data-plan-dialog="create-objective"] [data-plan-field="title"]', 'Refund latency');
+  await runtime.click('[data-action="plan-create-objective"]', 80);
+  const objectiveCreate = runtime.calls.find((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/objectives');
+  assert.equal(objectiveCreate?.body?.name, 'Refund latency', 'objective create payload was not sent');
+  await runtime.click('[data-plan-menu="new"]', 20);
+  await runtime.click('[data-plan-menu-item="goal"]', 40);
+  await runtime.setValue('[data-plan-dialog="create-goal"] [data-plan-field="title"]', 'Preserve objective history');
+  assert(doc.querySelector('[data-plan-goal-objective="11"]')?.disabled, 'an objective that already measures a goal must not be offered');
+  const objectiveChoice = doc.querySelector('[data-plan-goal-objective="13"]');
+  assert(objectiveChoice && !objectiveChoice.disabled, 'goal editor did not expose optional objective linking');
   objectiveChoice.click();
   await runtime.flush(20);
-  await runtime.click('[data-action="save-goal"]', 50);
+  await runtime.click('[data-action="plan-create-goal"]', 80);
   const goalCreate = runtime.calls.find((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/goals');
-  assert.deepEqual(goalCreate?.body?.objective_ids, [12], 'goal create did not preserve the selected objective ids');
-  assert.equal(doc.querySelectorAll('[data-objective-row]').length, 2, 'linking a goal removed or hid an objective');
+  assert.deepEqual(goalCreate?.body?.objective_ids, [13], 'goal create did not preserve the selected objective ids');
+  assert.equal(doc.querySelectorAll('[data-plan-row="objective"]').length, 2, 'linking a goal removed or hid an objective');
 
-  await runtime.click('[data-goal-row="GOAL-DEMO1"] [data-action="move-goal-down"]', 40);
+  // Order, archive and restore a goal; archive and restore ask first.
+  await runtime.click(`${row('goal', 'GOAL-DEMO1')} .dy-plan-row-open`, 40);
+  await runtime.click('[data-plan-drawer="goal"] [data-action="plan-goal-down"]', 60);
   const order = runtime.calls.find((call) => call.method === 'PUT' && call.path === '/projects/payments-relaunch/goals/order');
   assert.deepEqual(order?.body?.goal_ids?.slice(0, 2), ['GOAL-DEMO2', 'GOAL-DEMO1'], 'goal order was not sent explicitly');
-  await runtime.click('[data-goal-row="GOAL-DEMO1"] [data-action="archive-goal"]', 40);
-  assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/goals/GOAL-DEMO1/archive'), 'goal archive was not sent');
-  await runtime.click('[data-goal-row="GOAL-DEMO1"] [data-action="restore-goal"]', 40);
-  assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/goals/GOAL-DEMO1/restore'), 'goal restore was not sent');
+  await runtime.click('[data-plan-drawer="goal"] [data-action="plan-archive-goal"]', 40);
+  assert(doc.querySelector('[data-destructive-confirm="plan-archive"]'), 'goal archive did not ask for confirmation');
+  assert(!posted('POST', '/projects/payments-relaunch/goals/GOAL-DEMO1/archive'), 'goal archive mutated before confirmation');
+  await runtime.click('[data-action="confirm-destructive-action"]', 60);
+  assert(posted('POST', '/projects/payments-relaunch/goals/GOAL-DEMO1/archive'), 'goal archive was not sent');
+  await runtime.click('[data-plan-show-archived]', 40);
+  await runtime.click(`${row('goal', 'GOAL-DEMO1')} [data-plan-menu="row-goal"]`, 20);
+  await runtime.click('[data-plan-menu-item="restore"]', 40);
+  await runtime.click('[data-action="confirm-destructive-action"]', 60);
+  assert(posted('POST', '/projects/payments-relaunch/goals/GOAL-DEMO1/restore'), 'goal restore was not sent');
 
-  await runtime.click('[data-action="edit-mission"]');
-  await runtime.setValue('[data-mission-field]', 'Make checkout recovery measurable');
-  await runtime.click('[data-action="save-mission"]', 50);
+  // Mission: edited in place, kept across tab navigation, archived only after confirmation.
+  await runtime.click('[data-action="plan-mission-edit"]', 20);
+  await runtime.setValue('[data-plan-mission-input]', 'Make checkout recovery measurable');
+  await runtime.click('[data-action="plan-mission-save"]', 60);
   const missionPatch = runtime.calls.find((call) => call.method === 'PATCH' && call.path === '/projects/payments-relaunch/settings' && call.body?.mission === 'Make checkout recovery measurable');
   assert(missionPatch, 'mission edit PATCH was not sent');
   await runtime.click('[data-project-view="overview"]', 50);
-  await runtime.click('[data-project-view="objectives"]', 50);
-  assert.match(doc.querySelector('[data-mission-manager]')?.textContent || '', /Make checkout recovery measurable/, 'saved mission disappeared after tab navigation');
-
-  await runtime.click('[data-action="archive-mission"]');
+  await runtime.click('[data-project-view="plan"]', 80);
+  assert.match(doc.querySelector('[data-plan-mission]')?.textContent || '', /Make checkout recovery measurable/, 'saved mission disappeared after tab navigation');
+  await runtime.click('[data-plan-menu="mission"]', 20);
+  await runtime.click('[data-plan-menu-item="archive"]', 40);
   assert(doc.querySelector('[data-destructive-confirm="archive-mission"]'), 'mission archive did not ask for confirmation');
-  assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/mission/archive'), 'mission archive mutated before confirmation');
+  assert(!posted('POST', '/projects/payments-relaunch/mission/archive'), 'mission archive mutated before confirmation');
   await runtime.click('[data-action="confirm-destructive-action"]', 60);
-  assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/mission/archive'), 'mission archive POST was not sent');
+  assert(posted('POST', '/projects/payments-relaunch/mission/archive'), 'mission archive POST was not sent');
 
-  await runtime.click('[data-action="edit-objective"][data-objective-id="11"]');
-  await runtime.setValue('[data-objective-field="description"]', 'Keep every payment retry safe.');
-  await runtime.click('[data-action="save-objective"]', 50);
+  // Objective: edit; archive and delete each ask first.
+  await runtime.click(`${row('objective', 11)} .dy-plan-row-open`, 40);
+  await runtime.click('[data-plan-drawer="objective"] [data-action="plan-edit"]', 40);
+  await runtime.setValue('[data-plan-dialog="edit-objective"] [data-plan-field="description"]', 'Keep every payment retry safe.');
+  await runtime.click('[data-action="plan-edit-objective"]', 60);
   assert(runtime.calls.some((call) => call.method === 'PATCH' && call.path === '/projects/payments-relaunch/objectives/11'), 'objective edit PATCH was not sent');
-
-  await runtime.click('[data-action="archive-objective"][data-objective-id="11"]');
-  assert(doc.querySelector('[data-destructive-confirm="archive-objective-11"]'), 'objective archive did not ask for confirmation');
+  await runtime.click(`${row('objective', 11)} [data-plan-menu="row-objective"]`, 20);
+  await runtime.click('[data-plan-menu-item="archive"]', 40);
+  assert(doc.querySelector('[data-destructive-confirm="plan-archive"]'), 'objective archive did not ask for confirmation');
+  assert(!posted('POST', '/projects/payments-relaunch/objectives/11/archive'), 'objective archive mutated before confirmation');
   await runtime.click('[data-action="confirm-destructive-action"]', 50);
-  assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/objectives/11/archive'), 'objective archive POST was not sent');
-
-  await runtime.click('[data-action="remove-objective"][data-objective-id="12"]');
-  assert(doc.querySelector('[data-destructive-confirm="remove-objective-12"]'), 'objective removal did not ask for confirmation');
-  assert(!runtime.calls.some((call) => call.method === 'DELETE' && call.path === '/projects/payments-relaunch/objectives/12'), 'objective removal mutated before confirmation');
+  assert(posted('POST', '/projects/payments-relaunch/objectives/11/archive'), 'objective archive POST was not sent');
+  // Only an archived objective can be deleted; it shows with the archived items.
+  if (!doc.querySelector('[data-plan-show-archived]').checked) await runtime.click('[data-plan-show-archived]', 40);
+  await runtime.click(`${row('objective', 12)} [data-plan-menu="row-objective"]`, 20);
+  await runtime.click('[data-plan-menu-item="delete"]', 40);
+  assert(doc.querySelector('[data-destructive-confirm="plan-delete"]'), 'objective removal did not ask for confirmation');
+  assert(!posted('DELETE', '/projects/payments-relaunch/objectives/12'), 'objective removal mutated before confirmation');
   await runtime.click('[data-action="confirm-destructive-action"]', 50);
-  assert(runtime.calls.some((call) => call.method === 'DELETE' && call.path === '/projects/payments-relaunch/objectives/12'), 'objective removal DELETE was not sent');
+  assert(posted('DELETE', '/projects/payments-relaunch/objectives/12'), 'objective removal DELETE was not sent');
   await runtime.dispose();
 }
 
@@ -1382,44 +1435,41 @@ async function testProjectLifecycleStateAndConfirmedActions() {
 async function testPhase5ManagementJourneys() {
   const runtime = await createRuntime();
   await runtime.mount();
-  // Milestone controls live within the project (planning view) after the
-  // approved shell removed the global Delivery tab.
+  // Milestones are managed on the project's Vision screen (design round f),
+  // not on the Kanban and not in a separate panel.
   await runtime.pickProject('payments-relaunch');
   await runtime.click('[data-tab="project"]', 80);
   await runtime.click('[data-project-view="board"]', 60);
-  // Sahil 05/10: milestones are managed with the project's Objectives, not on the Kanban.
-  await runtime.click('[data-project-view="objectives"]', 60);
+  await runtime.click('[data-project-view="plan"]', 80);
   const doc = runtime.dom.window.document;
+  const drawer = '[data-plan-drawer="milestone"]';
 
-  assert(doc.querySelector('[data-action="create-milestone"]'), 'milestone create control is missing');
-  await runtime.setValue('[data-milestone-name]', 'Verification');
-  await runtime.click('[data-action="create-milestone"]', 80);
+  await runtime.click('[data-plan-menu="new"]', 20);
+  await runtime.click('[data-plan-menu-item="milestone"]', 40);
+  await runtime.setValue('[data-plan-dialog="create-milestone"] [data-plan-field="title"]', 'Verification');
+  await runtime.click('[data-action="plan-create-milestone"]', 80);
   assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/milestones' && call.body.name === 'Verification'), 'milestone create did not reach proxy');
-  await runtime.click('[data-milestone-row="Launch"] .dockyard-planning-toggle', 60);
-  assert(doc.querySelector('[data-action="rename-milestone"]'), 'milestone rename control is missing');
-  assert(doc.querySelector('[data-action="close-milestone"]'), 'milestone close control is missing');
-  assert(doc.querySelector('[data-action="archive-milestone"]'), 'milestone archive control is missing');
-  assert(doc.querySelector('[data-action="attach-milestone-scope"]'), 'milestone scope control is missing');
-  await runtime.setValue('[data-milestone-edit-due="Launch"]', '2026-11-15');
-  await runtime.click('[data-action="update-milestone-due"]', 80);
+  await runtime.click('[data-plan-row="milestone"][data-plan-id="1"] .dy-plan-row-open', 60);
+  for (const [action, what] of [['plan-edit', 'rename and due date'], ['plan-close-milestone', 'close'], ['plan-archive-milestone', 'archive'], ['plan-attach-work', 'scope']]) {
+    assert(doc.querySelector(`${drawer} [data-action="${action}"]`), `milestone ${what} control is missing`);
+  }
+  await runtime.click(`${drawer} [data-action="plan-edit"]`, 40);
+  await runtime.setValue('[data-plan-dialog="edit-milestone"] [data-plan-field="due"]', '2026-11-15');
+  await runtime.click('[data-action="plan-edit-milestone"]', 80);
   assert(runtime.calls.some((call) => call.method === 'PATCH' && call.path === '/projects/payments-relaunch/milestones/Launch' && call.body.due === '2026-11-15'), 'existing milestone due-date edit did not reach proxy');
-  await runtime.click('[data-milestone-row="Launch"] .dockyard-planning-toggle', 60);
-  await runtime.setValue('[data-milestone-rename="Launch"]', 'Launch verified');
-  await runtime.click('[data-action="rename-milestone"]', 80);
+  await runtime.click(`${drawer} [data-action="plan-edit"]`, 40);
+  await runtime.setValue('[data-plan-dialog="edit-milestone"] [data-plan-field="title"]', 'Launch verified');
+  await runtime.click('[data-action="plan-edit-milestone"]', 80);
   assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/milestones/Launch/rename' && call.body.new_name === 'Launch verified'), 'milestone rename did not execute');
-  await runtime.click('[data-milestone-row="Launch verified"] .dockyard-planning-toggle', 60);
-  await runtime.click('[data-action="close-milestone"]', 80);
-  await runtime.click('[data-milestone-row="Launch verified"] .dockyard-planning-toggle', 60);
-  await runtime.click('[data-action="reopen-milestone"]', 80);
-  await runtime.click('[data-milestone-row="Launch verified"] .dockyard-planning-toggle', 60);
-  await runtime.setValue('[data-milestone-scope="Launch verified"]', 'HDY-12');
-  await runtime.click('[data-action="attach-milestone-scope"]', 80);
-  await runtime.click('[data-milestone-row="Launch verified"] .dockyard-planning-toggle', 60);
-  await runtime.click('[data-action="detach-milestone-scope"]', 80);
-  await runtime.click('[data-milestone-row="Launch verified"] .dockyard-planning-toggle', 60);
-  await runtime.click('[data-action="archive-milestone"]', 80);
-  await runtime.click('[data-milestone-row="Launch verified"] .dockyard-planning-toggle', 60);
-  await runtime.click('[data-action="restore-milestone"]', 80);
+  await runtime.click(`${drawer} [data-action="plan-close-milestone"]`, 80);
+  await runtime.click(`${drawer} [data-action="plan-reopen-milestone"]`, 80);
+  await runtime.setValue(`${drawer} [data-plan-attach-choice]`, 'HDY-12');
+  await runtime.click(`${drawer} [data-action="plan-attach-work"]`, 80);
+  await runtime.click(`${drawer} [data-plan-detach="HDY-12"]`, 80);
+  await runtime.click(`${drawer} [data-action="plan-archive-milestone"]`, 40);
+  await runtime.click('[data-action="confirm-destructive-action"]', 80);
+  await runtime.click(`${drawer} [data-action="plan-restore-milestone"]`, 40);
+  await runtime.click('[data-action="confirm-destructive-action"]', 80);
   const milestoneCalls = runtime.calls.filter((call) => call.path.includes('/milestones/Launch%20verified'));
   assert(milestoneCalls.some((call) => call.method === 'PATCH' && call.body.closed === true), 'milestone close did not execute');
   assert(milestoneCalls.some((call) => call.method === 'PATCH' && call.body.closed === false), 'milestone reopen did not execute');
@@ -1667,22 +1717,25 @@ async function testBotTeamsScreen() {
 async function testInitiativeLoopScreen() {
   const runtime = await createRuntime();
   await runtime.mount();
-  // Initiative surface lives within the project after the approved shell
-  // removed the global Delivery tab.
+  // Design round f (Sahil 05/10): the Initiatives tab's loop diagram became a
+  // short stage list in each initiative's details on the Vision screen; the
+  // safe Freeze control moved to Vision's "More" menu.
   await runtime.pickProject('payments-relaunch');
   await runtime.click('[data-tab="project"]', 120);
-  await runtime.click('[data-project-view="initiative"]', 60);
+  await runtime.click('[data-project-view="plan"]', 80);
   const doc = runtime.dom.window.document;
-  assert(doc.querySelector('[data-initiative-loop]'), 'initiative loop screen is missing');
-  assert(doc.querySelector('svg[data-loop-visual]'), 'initiative loop visualisation is missing');
-  assert(doc.querySelectorAll('[data-initiative-stage]').length >= 7, 'canonical loop stages are incomplete');
-  assert(doc.querySelector('[data-action="freeze-project"]'), 'safe freeze control is missing');
-  await runtime.click('[data-action="freeze-project"]');
+  await runtime.click('[data-plan-row="initiative"][data-plan-id="INI-DEMO-2"] .dy-plan-row-open', 60);
+  const stages = doc.querySelectorAll('[data-plan-drawer="initiative"] [data-plan-loop="INI-DEMO-2"] li');
+  assert(stages.length >= 7, 'canonical loop stages are incomplete');
+  assert.equal(doc.querySelectorAll('[data-plan-loop="INI-DEMO-2"] li[aria-current="step"]').length, 1, 'exactly one stage is current');
+  assert.match(doc.querySelector('[data-plan-drawer="initiative"]').textContent, /Support requests drop when refunds are self-service/);
+  await runtime.click('[data-plan-menu="plan-more"]', 20);
+  assert(doc.querySelector('[data-plan-menu-item="freeze"]'), 'safe freeze control is missing');
+  await runtime.click('[data-plan-menu-item="freeze"]', 40);
   assert(doc.querySelector('[data-destructive-confirm="freeze-project"]'), 'Freeze did not ask for confirmation');
   assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/freeze'), 'Freeze mutated state before confirmation');
   await runtime.click('[data-action="cancel-destructive-action"]');
   assert(!runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/freeze'), 'Cancelling Freeze still mutated state');
-  assert.match(doc.body.textContent, /Support requests drop when refunds are self-service/);
   await runtime.dispose();
 }
 
@@ -2045,8 +2098,7 @@ async function testFirstAssessmentCompletionAction() {
   await runtime.pickProject('payments-relaunch');
   await runtime.click('[data-tab="project"]', 100);
   const doc = runtime.dom.window.document;
-  // The Objectives tab opens the project screen focused on objectives; the
-  // first-assessment card lives on the project overview.
+  // The first-assessment card lives on the project overview.
   await runtime.click('[data-project-view="overview"]', 60);
   const card = doc.querySelector('[data-first-assessment]');
   assert(card, 'project dashboard lacks the first read-only assessment card');
@@ -2112,7 +2164,7 @@ async function testChromiumLayouts() {
     dashboard: TMPDIR + '/dockyard-dashboard.html',
     project: TMPDIR + '/dockyard-project.html',
     projectSettings: TMPDIR + '/dockyard-project-settings.html',
-    projectObjectives: TMPDIR + '/dockyard-project-objectives.html',
+    projectVision: TMPDIR + '/dockyard-project-vision.html',
     projectContent: TMPDIR + '/dockyard-project-content.html',
     projectBoardDetail: TMPDIR + '/dockyard-project-board-detail.html',
     projectReports: TMPDIR + '/dockyard-project-reports.html',
@@ -2131,7 +2183,8 @@ async function testChromiumLayouts() {
   await writeSnapshot('dashboard', snapshots.dashboard);
   await writeSnapshot('project', snapshots.project, { prepare: (runtime) => runtime.click('[data-project-view="overview"]') });
   await writeSnapshot('project', snapshots.projectSettings, { prepare: (runtime) => runtime.click('[data-project-view="settings"]') });
-  await writeSnapshot('project', snapshots.projectObjectives, { prepare: (runtime) => runtime.click('[data-project-view="objectives"]') });
+  // Design round f: the Vision tab replaced Objectives and Initiatives.
+  await writeSnapshot('project', snapshots.projectVision, { prepare: (runtime) => runtime.click('[data-project-view="plan"]', 80) });
   await writeSnapshot('project', snapshots.projectContent, { prepare: async (runtime) => {
     await runtime.click('[data-project-view="content"]');
     await runtime.click('[data-project-content-item="CONTENT-DEMO1"]', 50);
@@ -2154,8 +2207,15 @@ async function testChromiumLayouts() {
     await runtime.click('[data-action="open-bot-sessions"][data-bot-id="octacon-bot"]', 50);
     await runtime.click('[data-bot-session="sess-octacon-1"]', 50);
   } });
-  await writeSnapshot('project', snapshots.initiative, { prepare: (runtime) => runtime.click('[data-project-view="initiative"]') });
-  await writeSnapshot('project', snapshots.initiativeFreeze, { prepare: async (runtime) => { await runtime.click('[data-project-view="initiative"]'); await runtime.click('[data-action="freeze-project"]'); } });
+  await writeSnapshot('project', snapshots.initiative, { prepare: async (runtime) => {
+    await runtime.click('[data-project-view="plan"]', 80);
+    await runtime.click('[data-plan-row="initiative"][data-plan-id="INI-DEMO-2"] .dy-plan-row-open', 60);
+  } });
+  await writeSnapshot('project', snapshots.initiativeFreeze, { prepare: async (runtime) => {
+    await runtime.click('[data-project-view="plan"]', 80);
+    await runtime.click('[data-plan-menu="plan-more"]', 20);
+    await runtime.click('[data-plan-menu-item="freeze"]', 40);
+  } });
   await writeSnapshot('workflows', snapshots.workflows);
   await writeSnapshot('inbox', snapshots.inbox, { prepare: (runtime) => runtime.click('[data-inbox-ref="INI-DEMO-2"]') });
   await writeSnapshot('inbox', snapshots.inboxReject, { prepare: async (runtime) => { await runtime.click('[data-inbox-ref="INI-DEMO-2"]'); await runtime.click('[data-inbox-panel="true"] [data-action="reject"]'); } });
@@ -2171,8 +2231,8 @@ async function testChromiumLayouts() {
     { name: 'project-1400-light', file: snapshots.project, width: 1400, height: 1000, scheme: 'light' },
     { name: 'project-settings-700-light', file: snapshots.projectSettings, width: 700, height: 1000, scheme: 'light' },
     { name: 'project-settings-1400-dark', file: snapshots.projectSettings, width: 1400, height: 1000, scheme: 'dark' },
-    { name: 'project-objectives-700-dark', file: snapshots.projectObjectives, width: 700, height: 1000, scheme: 'dark' },
-    { name: 'project-objectives-1400-light', file: snapshots.projectObjectives, width: 1400, height: 1000, scheme: 'light' },
+    { name: 'project-vision-700-dark', file: snapshots.projectVision, width: 700, height: 1000, scheme: 'dark' },
+    { name: 'project-vision-1400-light', file: snapshots.projectVision, width: 1400, height: 1000, scheme: 'light' },
     { name: 'project-content-700-light', file: snapshots.projectContent, width: 700, height: 1000, scheme: 'light' },
     { name: 'project-content-1400-dark', file: snapshots.projectContent, width: 1400, height: 1000, scheme: 'dark' },
     { name: 'project-board-detail-1200-light', file: snapshots.projectBoardDetail, width: 1200, height: 900, scheme: 'light' },
@@ -2296,16 +2356,26 @@ async function testActualObjectiveEvidence() {
     await runtime.mount();
     await runtime.pickProject('payments-relaunch');
     await runtime.click('[data-tab="project"]', 80);
-    await runtime.click('[data-project-view="objectives"]');
+    // Design round f: objectives live on the Vision screen; each one's
+    // evidence history opens with its details.
+    await runtime.click('[data-project-view="plan"]', 80);
     const doc = runtime.dom.window.document;
-    const rows = [...doc.querySelectorAll('[data-objective-evidence]')];
-    assert.equal(rows.length, 4);
-    for (const state of ['passed', 'failed', 'stale', 'unknown']) assert(rows.some(row => row.textContent.toLowerCase().includes(state)));
-    assert(rows.some(row => row.textContent.includes('ticket:1')));
-    assert.equal(doc.querySelectorAll('[data-objective-evidence] script').length, 0);
-    assert([...doc.querySelectorAll('[data-objective-evidence] button')].every(button => button.disabled), 'unauthenticated assessment controls must fail closed');
+    const ids = [...doc.querySelectorAll('[data-plan-row="objective"]')].map((row) => row.getAttribute('data-plan-id'));
+    assert.equal(ids.length, 4, 'every objective from the actual API payload is listed');
+    const rows = [];
+    for (const id of ids) {
+      await runtime.click(`[data-plan-row="objective"][data-plan-id="${id}"] .dy-plan-row-open`, 40);
+      const evidence = doc.querySelector(`[data-plan-drawer="objective"] [data-objective-evidence="${id}"]`);
+      assert(evidence, `objective ${id} evidence/history is missing from its details`);
+      rows.push({ text: evidence.textContent, scripts: evidence.querySelectorAll('script').length,
+        buttons: [...evidence.querySelectorAll('button')].map((button) => button.disabled) });
+      if (process.env.PHASE2_RENDER_HTML) evidence.open = true;
+    }
+    for (const state of ['passed', 'failed', 'stale', 'unknown']) assert(rows.some(row => row.text.toLowerCase().includes(state)));
+    assert(rows.some(row => row.text.includes('ticket:1')));
+    assert.equal(rows.reduce((sum, row) => sum + row.scripts, 0), 0);
+    assert(rows.flatMap((row) => row.buttons).every(Boolean), 'unauthenticated assessment controls must fail closed');
     if (process.env.PHASE2_RENDER_HTML) {
-      rows.forEach(row => { row.open = true; });
       writeFileSync(process.env.PHASE2_RENDER_HTML, runtime.dom.serialize());
     }
   } finally { await runtime.dispose(); }

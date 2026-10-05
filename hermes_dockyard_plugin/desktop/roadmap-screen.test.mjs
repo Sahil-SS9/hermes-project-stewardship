@@ -96,12 +96,16 @@ test('Roadmap: all projects by default, drill-down, drawer, contract, Open, keyb
     assert.equal(await page.locator('[data-rm-node^="initiative:"]').count(), 0, 'reset collapses the tree')
     assert.equal(await page.getByRole('checkbox', { name: /Needs attention only/i }).isChecked(), false)
 
-    // 8. Open jumps to the item's own screen: the initiative opens Project > Initiatives.
+    // 8. Open jumps to the item's own screen: the initiative opens on the
+    //    project's Vision screen with its details showing (design round f).
     await projectRow(page, 'payments-relaunch').click()
     await firstOf(page, 'initiative').click()
     await page.locator('[data-rm-drawer="initiative"]').waitFor()
+    const opened = await page.locator('[data-rm-drawer="initiative"] h2, [data-rm-drawer="initiative"] h3').first().innerText()
     await page.locator('[data-action="roadmap-open"]').click()
-    await page.locator('[data-project-view="initiative"][aria-pressed="true"]').waitFor()
+    await page.locator('[data-project-view="plan"][aria-pressed="true"]').waitFor()
+    await page.locator('[data-plan-drawer="initiative"]').waitFor()
+    assert.equal(await page.locator('[data-plan-drawer="initiative"] h3').innerText(), opened)
 
     assert.deepEqual(errors, [])
   } finally {

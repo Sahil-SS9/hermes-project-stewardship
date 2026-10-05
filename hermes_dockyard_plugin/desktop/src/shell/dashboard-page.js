@@ -24,8 +24,6 @@ import { DashboardView } from '../views/dashboard.js'
 import { ProjectDashboard } from '../project/dashboard.js'
 import { BacklogView } from '../views/backlog.js'
 import { TeamsView } from '../views/teams.js'
-// Teams is intentionally imported before Initiative for the legacy text probe.
-import { InitiativeView } from '../views/initiative.js'
 import { InboxView } from '../views/inbox.js'
 import { WorkflowLibraryView } from '../views/workflow-library.js'
 import { NotificationsView } from '../views/notifications.js'
@@ -52,7 +50,7 @@ import { themeById } from '../styles/themes.js'
 import { themeMode } from '../styles/themes.js'
 // Sahil 04/10 (demo feedback d): screens that work on one project ask for one
 // while the switcher is on All projects.
-const ONE_PROJECT_TABS = Object.freeze({ project: 'Projects', backlog: 'Backlog', initiative: 'Initiative' })
+const ONE_PROJECT_TABS = Object.freeze({ project: 'Projects', backlog: 'Backlog' })
 export function DashboardPage({ inboxCss = '' } = {}) {
   useDockyardStyles()
   useStylesheet('dy-inbox-stylesheet', 'dyInboxStylesheet', inboxCss)
@@ -205,8 +203,6 @@ export function DashboardPage({ inboxCss = '' } = {}) {
         ? () => loadBacklogData(selectedProject)
       : tab === 'teams'
         ? loadTeamsData
-      : tab === 'initiative'
-        ? () => loadProjectData(selectedProject)
       : tab === 'inbox'
         ? loadInboxData
         : async () => api('/notifications?limit=200')
@@ -470,8 +466,6 @@ export function DashboardPage({ inboxCss = '' } = {}) {
     content = jsx(BacklogView, { view: payload, onRefresh: refresh, preset: backlogPreset?.projectId === selectedProject ? backlogPreset : null })
   } else if (tab === 'teams') {
     content = jsx(TeamsView, { view: payload, onRefresh: refresh })
-  } else if (tab === 'initiative') {
-    content = jsx(InitiativeView, { view: payload, onRefresh: refresh })
   } else if (tab === 'inbox') {
     content = jsxs(Fragment, { children: [
       scopeNote(scoped?.hidden ?? 0, 'approvals'),

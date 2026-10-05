@@ -69,7 +69,7 @@ test('board: five columns, every live item placed, views bar, no sidebar, no pag
   assert.equal(await page.locator('[data-kanban-layout="board"]').getAttribute('aria-pressed'), 'true')
   assert.equal((await page.locator('[data-kanban-open-all]').innerText()).trim(), 'Open all cards')
   assert.equal(await page.locator('[data-kanban-open-all]').getAttribute('aria-pressed'), 'false')
-  assert.equal(await page.locator('[data-kanban-page], [data-planning-panel]').count(), 0)
+  assert.equal(await page.locator('[data-kanban-page], [data-plan-screen]').count(), 0)
   assert.equal(await page.locator('.dockyard-sidebar, [data-sidebar]').count(), 0)
   // Drag is never the only way to move: the board says how (kept from C's board).
   assert.match(await page.locator('[data-kanban-help]').innerText(), /open the card and use Move to/)
@@ -297,14 +297,15 @@ test('Open all cards opens every card and says so; a card can still be closed on
   assert.equal(await page.locator('[data-card-body]').count(), 0, 'pressing again closes every card')
 }))
 
-test('milestones are managed with the Objectives, not on the board; a card\'s milestone link goes there', () => withBrowser(async (browser) => {
+test('milestones are managed on the Vision screen, not on the board; a card\'s milestone link opens it there', () => withBrowser(async (browser) => {
   const { page, card } = await open(browser)
-  assert.equal(await page.locator('[data-kanban-page], [data-planning-panel]').count(), 0)
+  assert.equal(await page.locator('[data-kanban-page], [data-plan-screen]').count(), 0)
   await card('Build setup screens').locator('[data-card-toggle]').click()
   await card('Build setup screens').getByRole('button', { name: /^Milestone: Beta launch/ }).click()
-  await page.locator('[data-project-view="objectives"].active').waitFor()
-  await page.locator('[data-planning-panel]').waitFor()
-  assert.ok(await page.locator('[data-milestone-row="Beta launch"]').isVisible())
+  // Design round f: the link lands on that milestone's details in Vision.
+  await page.locator('[data-project-view="plan"].active').waitFor()
+  await page.locator('[data-plan-drawer="milestone"]').waitFor()
+  assert.equal(await page.locator('[data-plan-drawer="milestone"] h3').innerText(), 'Beta launch')
   assert.equal(await page.locator('[data-board-column]').count(), 0)
 }))
 

@@ -15,9 +15,10 @@
 //
 // Failure-detection property: if a milestone proxy route is removed, the
 // rest()-based journey gets a 404 and fails. If the frontend loading path is
-// removed (loadProjectData milestone fetch or the PlanningPanel render), the
+// removed (the Vision screen's milestone fetch or its milestone section), the
 // milestone row never renders or the false-empty message appears — both fail
-// the UI assertions.
+// the UI assertions. (Design round f: milestones moved from the Objectives
+// tab's planning panel to the Vision screen.)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -95,7 +96,7 @@ function evaluatePlugin(source, host) {
   return loaded;
 }
 
-const FALSE_EMPTY_MESSAGE = 'No milestones yet. Create one here with the form above; it appears in this panel for review.'; // kept in sync with PlanningPanel copy (Desktop is the creation surface)
+const FALSE_EMPTY_MESSAGE = 'No milestones yet. A milestone groups the work for one delivery date.'; // kept in sync with the Vision screen's empty milestone section
 
 test('milestone journey: real UI drives real HTTP through proxy to backend', async () => {
   // 1. spawn the real server (real backend + real proxy router + temp DB)
@@ -200,60 +201,78 @@ test('milestone journey: real UI drives real HTTP through proxy to backend', asy
       await wait(80);
     });
 
-    // 3. drive the REAL UI into the Delivery view (the milestone planning
-    //    panel lives there since the HPS desktop journeys; project>Planning
-    //    now hosts the planning canvas). The app opens on All projects
-    //    (Sahil 05/10), so the Projects tab asks for a project; choosing
-    //    'chain-project' (the only enabled project) makes loadProjectData run
-    //    the full nine-fetch fan-out (including GET /projects/:id/milestones)
-    //    through the real proxy -> backend chain.
+    // Rows on the Vision screen carry their kind and id; find one by its title.
+    const milestoneRow = (name) => [...doc.querySelectorAll('[data-plan-row="milestone"]')]
+      .find((row) => row.querySelector('.dy-plan-row-text strong')?.textContent === name) ?? null;
+    const waitForRow = async (name, timeoutMs = 12000) => {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        const row = milestoneRow(name);
+        if (row) return row;
+        await act(async () => { await wait(60); });
+      }
+      assert.fail(`timed out waiting for the milestone row: ${name}`);
+    };
+    const openVision = async () => {
+      await click('[data-tab="dashboard"]');
+      await click('[data-tab="project"]');
+      await waitFor('[data-project-view="board"]');
+      await click('[data-project-view="board"]');
+      await click('[data-project-view="plan"]');
+      await waitFor('[data-plan-screen="chain-project"] [data-plan-section="milestone"]', 12000);
+    };
+
+    // 3. drive the REAL UI into the Vision screen, where milestones live
+    //    since design round f (Sahil 05/10). The app opens on All projects,
+    //    so the Projects tab asks for a project; choosing 'chain-project'
+    //    (the only enabled project) loads it through the real proxy ->
+    //    backend chain, and the Vision screen fetches its milestones.
     await click('[data-tab="project"]');
     await waitFor('[data-choose-project="chain-project"]');
     await click('[data-choose-project="chain-project"]');
     await waitFor('[data-project-view="board"]');
     await click('[data-project-view="board"]');
     await waitFor('[data-project-dashboard]');
-    // Sahil 05/10: milestones are managed with the project's Objectives, not on the Kanban.
-    await click('[data-project-view="objectives"]');
-    await waitFor('[data-planning-panel]');
+    await click('[data-project-view="plan"]');
+    await waitFor('[data-plan-screen="chain-project"] [data-plan-section="milestone"]', 12000);
 
-    // Before any milestone exists the panel must show the honest empty state.
+    // Before any milestone exists the section must show the honest empty state.
     assert(
       doc.body.textContent.includes(FALSE_EMPTY_MESSAGE),
-      'planning panel did not render the documented empty state before any milestone exists',
+      'the Vision screen did not render the documented empty milestone state before any milestone exists',
     );
 
-    // 4. create a milestone through the real chain (the panel intentionally
-    //    has no create form; creation lives in the Dockyard dashboard).
+    // 4. create a milestone through the real chain.
     await rest('/projects/chain-project/milestones', {
       method: 'POST',
       body: JSON.stringify({ name: 'Chain Release', due: '2026-12-01', actor_id: 'sahil', actor_kind: 'human' }),
     });
 
-    // 5. drive a REAL UI reload: switch tab away and back. loadScope changes
-    //    force loadProjectData to re-run its milestone fetch through the
-    //    proxy. This is the frontend loading path under test.
-    await click('[data-tab="dashboard"]');
-    await click('[data-tab="project"]');
-    await waitFor('[data-project-view="board"]');
-    await click('[data-project-view="board"]');
-    await click('[data-project-view="objectives"]');
-    const milestoneRow = await waitFor('[data-milestone-row="Chain Release"]', 12000);
+    // 5. drive a REAL UI reload: leave the project and come back. The Vision
+    //    screen loads again and re-runs its milestone fetch through the proxy.
+    //    This is the frontend loading path under test.
+    await openVision();
+    const row = await waitForRow('Chain Release');
     assert(
-      milestoneRow,
-      'milestone created over the real chain is not rendered in the Planning view — frontend loading path or proxy route is broken',
+      row,
+      'milestone created over the real chain is not rendered on the Vision screen — frontend loading path or proxy route is broken',
     );
     assert(
       !doc.body.textContent.includes(FALSE_EMPTY_MESSAGE),
       'false-empty milestone state shown while the backend holds a milestone',
     );
 
-    // 6. UI-driven detail load: the row toggle issues GET milestone detail
-    //    through the real proxy and renders the scope breakdown.
-    await click('[data-milestone-row="Chain Release"] .dockyard-planning-toggle', 120);
+    // 6. UI-driven detail load: opening the row's details issues GET milestone
+    //    detail through the real proxy and renders the scope breakdown.
+    await act(async () => { row.querySelector('.dy-plan-row-open').click(); await wait(120); });
+    await waitFor('[data-plan-drawer="milestone"]');
+    const start = Date.now();
+    while (!/Scope:/.test(doc.querySelector('[data-plan-drawer="milestone"]')?.textContent ?? '') && Date.now() - start < 8000) {
+      await act(async () => { await wait(60); });
+    }
     assert(
-      /Scope:/.test(doc.querySelector('[data-milestone-row="Chain Release"]')?.textContent ?? ''),
-      'milestone detail did not load through the real chain when the row was expanded',
+      /Scope:/.test(doc.querySelector('[data-plan-drawer="milestone"]')?.textContent ?? ''),
+      'milestone detail did not load through the real chain when its details opened',
     );
 
     // 7. failure propagation over the real chain: an unknown milestone must
@@ -269,12 +288,8 @@ test('milestone journey: real UI drives real HTTP through proxy to backend', asy
       method: 'POST',
       body: JSON.stringify({ new_name: 'Chain Shipped', actor_id: 'sahil', actor_kind: 'human' }),
     });
-    await click('[data-tab="dashboard"]');
-    await click('[data-tab="project"]');
-    await waitFor('[data-project-view="board"]');
-    await click('[data-project-view="board"]');
-    await click('[data-project-view="objectives"]');
-    const renamedRow = await waitFor('[data-milestone-row="Chain Shipped"]', 12000);
+    await openVision();
+    const renamedRow = await waitForRow('Chain Shipped');
     assert(
       renamedRow,
       'renamed milestone did not render after a real UI reload — rename did not persist through the chain',

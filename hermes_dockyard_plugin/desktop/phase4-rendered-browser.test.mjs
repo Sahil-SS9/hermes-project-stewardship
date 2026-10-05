@@ -4,8 +4,8 @@
  * Boots the disposable phase4 host with the REAL candidate bundle (esbuild
  * from desktop/plugin.js) and drives the Desktop through rendered Chromium
  * journeys:
- *   1. objectives: create, edit, Evaluate now (selected objective only),
- *      archive, evidence read-back;
+ *   1. objectives (on the Vision screen since design round f): create, edit,
+ *      Evaluate now (selected objective only), archive, evidence read-back;
  *   2. reports: generate, open, Download Markdown with byte equality;
  *   3. saved views: save, recall (filters + layout), overwrite confirm,
  *      delete confirm, reload persistence, project isolation.
@@ -108,22 +108,26 @@ test('phase 4 real Desktop journeys: objectives, reports, saved views', { timeou
     };
 
     // ---------------------------------------------------------------- objectives
-    await t.test('objectives: create → edit → evaluate now → archive', async () => {
+    await t.test('objectives on Vision: create → edit → evaluate now → archive', async () => {
       await page.goto(`${BASE}/desktop`, { waitUntil: 'load' });
       await page.waitForSelector('[data-tab="dashboard"]', { timeout: 20000 });
       // Sahil 05/10: Dockyard opens on All projects; pick the project first.
       await pickProject(page, 'payments-relaunch');
       await page.click('[data-tab="project"]');
-      await page.click('[data-project-view="objectives"]');
-      await page.waitForSelector('[data-objective-row="1"]', { timeout: 20000 });
+      // Design round f: objectives live on the project's Vision screen.
+      await page.click('[data-project-view="plan"]');
+      const objectiveRow = (id) => page.locator(`[data-plan-row="objective"][data-plan-id="${id}"]`);
+      const drawer = page.locator('[data-plan-drawer="objective"]');
+      await objectiveRow(1).waitFor({ timeout: 20000 });
 
-      // Evaluate now: only the selected objective runs.
-      const row = page.locator('[data-objective-row="1"]');
-      await row.locator('[data-action="evaluate-objective"]').click();
-      await row.locator('[data-objective-evaluation="1"]').waitFor({ timeout: 15000 });
-      const note = await row.locator('[data-objective-evaluation="1"]').textContent();
+      // Evaluate now, from the objective's details: only that objective runs.
+      await objectiveRow(1).locator('.dy-plan-row-open').click();
+      await page.locator('[data-plan-drawer="objective"][data-plan-drawer-id="1"]').waitFor();
+      await drawer.locator('[data-action="plan-evaluate"]').click();
+      await page.locator('[data-plan-evaluation]').waitFor({ timeout: 15000 });
+      const note = await page.locator('[data-plan-evaluation]').textContent();
       assert.match(note, /Passed/, `evaluation result not rendered: ${note}`);
-      assert.match(note, /measured 1/, `measured value missing: ${note}`);
+      assert.match(note, /measured 1/i, `measured value missing: ${note}`);
 
       const callsAfterEvaluate = await apiCalls();
       const evaluations = callsAfterEvaluate.filter((call) => /\/objectives\/\d+\/evaluate$/.test(call.path) && call.method === 'POST');
@@ -131,41 +135,48 @@ test('phase 4 real Desktop journeys: objectives, reports, saved views', { timeou
       assert.match(evaluations[0].path, /\/objectives\/1\/evaluate$/, 'evaluate must target the selected objective only');
       assert.equal(evaluations.filter((call) => /\/objectives\/2\/evaluate$/.test(call.path)).length, 0, 'other objectives must not be evaluated');
 
-      // Evidence read-back reflects the new evaluation.
-      await page.waitForTimeout(300);
-      const refreshed = await page.locator('[data-objective-row="1"]').textContent();
-      assert.match(refreshed, /Passed/, 'refreshed evidence did not show the evaluation outcome');
+      // Evidence read-back reflects the new evaluation (it was Unknown before).
+      await page.waitForFunction(() => /Passed/.test(document.querySelector('[data-plan-row="objective"][data-plan-id="1"]')?.textContent ?? ''), null, { timeout: 10000 })
+        .catch(() => assert.fail('refreshed evidence did not show the evaluation outcome'));
 
-      // Create a new objective through the real form.
-      await page.click('[data-action="add-objective"]');
-      await page.fill('[data-objective-field="name"]', 'Latency budget under 300ms');
-      await page.fill('[data-objective-field="target"]', '<=300');
-      await page.click('[data-action="save-objective"]');
-      await page.waitForSelector('[data-objective-row="100"]', { timeout: 15000 });
+      // Create a new objective through the "+ New" form.
+      await page.click('[data-plan-menu="new"]');
+      await page.click('[data-plan-menu-item="objective"]');
+      await page.fill('[data-plan-dialog="create-objective"] [data-plan-field="title"]', 'Latency budget under 300ms');
+      await page.fill('[data-plan-dialog="create-objective"] [data-plan-field="target"]', '<=300');
+      await page.click('[data-action="plan-create-objective"]');
+      await objectiveRow(100).waitFor({ timeout: 15000 });
       let calls = await apiCalls();
       const created = calls.find((call) => call.method === 'POST' && /\/objectives$/.test(call.path));
       assert.equal(created?.body?.name, 'Latency budget under 300ms', 'objective create payload was not sent');
 
-      // Edit the new objective.
-      await page.locator('[data-objective-row="100"] [data-action="edit-objective"]').click();
-      await page.fill('[data-objective-field="name"]', 'Latency budget under 250ms');
-      await page.click('[data-action="save-objective"]');
-      await page.waitForTimeout(400);
+      // Edit the new objective from its details.
+      await objectiveRow(100).locator('.dy-plan-row-open').click();
+      await page.locator('[data-plan-drawer="objective"][data-plan-drawer-id="100"]').waitFor();
+      await drawer.locator('[data-action="plan-edit"]').click();
+      await page.fill('[data-plan-dialog="edit-objective"] [data-plan-field="title"]', 'Latency budget under 250ms');
+      await page.click('[data-action="plan-edit-objective"]');
+      await page.waitForSelector('[data-plan-dialog]', { state: 'detached', timeout: 10000 });
       calls = await apiCalls();
       const patched = calls.find((call) => call.method === 'PATCH' && /\/objectives\/100$/.test(call.path));
       assert.equal(patched?.body?.name, 'Latency budget under 250ms', 'objective edit payload was not sent');
 
-      // Archive objective 2 with confirmation.
-      await page.locator('[data-objective-row="2"] [data-action="archive-objective"]').click();
-      await page.waitForSelector('[data-destructive-confirm="archive-objective-2"]', { timeout: 10000 });
-      await page.click('[data-destructive-confirm="archive-objective-2"] [data-action="confirm-destructive-action"]');
-      await page.waitForSelector('[data-destructive-confirm="archive-objective-2"]', { state: 'detached', timeout: 10000 });
+      // Archive objective 2 with confirmation, from its row menu.
+      await objectiveRow(2).locator('[data-plan-menu="row-objective"]').click();
+      await page.click('[data-plan-menu-item="archive"]');
+      await page.waitForSelector('[data-destructive-confirm="plan-archive"]', { timeout: 10000 });
+      await page.click('[data-destructive-confirm="plan-archive"] [data-action="confirm-destructive-action"]');
+      await page.waitForSelector('[data-destructive-confirm="plan-archive"]', { state: 'detached', timeout: 10000 });
       calls = await apiCalls();
       assert(calls.some((call) => call.method === 'POST' && /\/objectives\/2\/archive$/.test(call.path)), 'archive was not sent');
-      const archived = await page.locator('[data-objective-row="2"]').textContent();
-      assert.match(archived, /Archived/, 'archived objective state did not render');
-      // Historical evidence survives archiving.
-      assert.match(archived, /passed/i, 'archived objective lost its historical evidence');
+      // Archived items sit under "Show finished and archived", evidence intact.
+      await objectiveRow(2).waitFor({ state: 'detached', timeout: 10000 });
+      await page.check('[data-plan-show-archived]');
+      assert.match(await objectiveRow(2).textContent(), /Archived/, 'archived objective state did not render');
+      await objectiveRow(2).locator('.dy-plan-row-open').click();
+      await page.locator('[data-plan-drawer="objective"][data-plan-drawer-id="2"]').waitFor();
+      assert.match(await drawer.locator('.dy-plan-facts').textContent(), /passed/i, 'archived objective lost its historical evidence');
+      await page.uncheck('[data-plan-show-archived]');
     });
 
     // ------------------------------------------------------------------ reports

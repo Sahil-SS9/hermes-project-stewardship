@@ -1,10 +1,13 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
-// PROTOTYPE (design round f, 05/10): the one Plan screen inside a project.
+// Design round f (Sahil 05/10): the Vision screen inside a project.
 // This module loads a project's plan and holds every write the screen makes.
-// Each write is an existing backend route, already used by the Objectives,
-// Initiatives, milestone and Roadmap screens: no new backend behaviour.
+// Each write is a backend route the other planning screens use, plus the
+// three Option B actions (withdraw an initiative before approval, delete an
+// archived milestone or goal) and Mark complete, which the browser dashboard
+// already had.
 import { api } from '../../runtime/context.js'
+import { CLOSED_STATUSES } from '../../lib/plan-vocab.js'
 import { GOAL_LABEL } from '../../lib/plan-vocab.js'
 import { GOAL_TONE } from '../../lib/plan-vocab.js'
 import { OUTCOME_LABEL } from '../../lib/plan-vocab.js'
@@ -18,6 +21,18 @@ const enc = encodeURIComponent
 export const needsReview = (initiative) => ['pending_approval', 'changes_requested'].includes(initiative?.status)
 export const isOverdue = (milestone, today = new Date().toISOString().slice(0, 10)) =>
   Boolean(milestone && !milestone.closed && !milestone.archived && milestone.due && milestone.due < today)
+// Finished or closed initiatives and archived items sit behind
+// "Show finished and archived"; nothing is hidden any other way.
+export const isClosed = (item) => item?.kind === 'initiative' && CLOSED_STATUSES.includes(item.status)
+export const isTucked = (item) => Boolean(item?.archived) || isClosed(item)
+// A withdrawn or rejected initiative never runs, so nothing new links to it.
+export const isLinkable = (initiative) => !['rejected', 'cancelled'].includes(initiative?.status)
+// Linked work not yet complete, from the Roadmap read model's delivery counts.
+// 0 when the work host is unavailable or nothing is linked.
+export function unfinishedWork(delivery) {
+  if (!delivery || delivery.state !== 'ok') return 0
+  return Math.max(0, (delivery.total ?? 0) - (delivery.complete ?? 0))
+}
 
 // An item reference is { kind, id }; ids compare as strings (refs, numbers).
 export const sameItem = (a, b) => Boolean(a && b && a.kind === b.kind && String(a.id) === String(b.id))
@@ -49,10 +64,10 @@ export async function loadPlan(projectId) {
     api(`/projects/${p}/missions/archive`).catch(() => ({ missions: [] })),
     api(`/projects/${p}/work-items`).catch(() => ({ work_items: [] })),
   ])
-  return buildPlan({ roadmap, initiatives, objectives, goals, milestones, settings, missions, work })
+  return buildPlan({ projectId, roadmap, initiatives, objectives, goals, milestones, settings, missions, work })
 }
 
-function buildPlan({ roadmap, initiatives, objectives, goals, milestones, settings, missions, work }) {
+function buildPlan({ projectId, roadmap, initiatives, objectives, goals, milestones, settings, missions, work }) {
   const project = roadmap?.projects?.[0] ?? null
   const read = new Map((project?.initiatives ?? []).map((row) => [row.ref, row]))
   const goalRead = new Map((project?.goals ?? []).map((row) => [row.id, row]))
@@ -74,6 +89,7 @@ function buildPlan({ roadmap, initiatives, objectives, goals, milestones, settin
     objectivesPassed: goalRead.get(goal.goal_id)?.objectives_passed ?? null,
   })).sort((a, b) => a.position - b.position)
   return {
+    projectId,
     label: project?.label ?? settings?.project_id ?? '',
     canWrite: roadmap?.can_write !== false,
     mission: settings?.mission ?? '',
@@ -86,6 +102,9 @@ function buildPlan({ roadmap, initiatives, objectives, goals, milestones, settin
       target: row.target ?? '>=1', severity: row.severity ?? 'medium', archived: row.enabled === false,
       outcome: row.evidence?.state ?? 'unknown', passRate: row.evidence?.pass_rate ?? null,
       samples: row.evidence?.sample_count ?? 0, window: row.window ?? '30d',
+      // The backend record, for the evidence history and the human assessment
+      // form (the same panel the old Objectives tab showed).
+      record: row,
       initiatives: objectiveLinks.get(row.id) ?? [],
       goals: goalRows.filter((goal) => goal.objectiveIds.includes(row.id)).map((goal) => ({ id: goal.id, title: goal.title })),
     })),
@@ -100,7 +119,6 @@ function buildPlan({ roadmap, initiatives, objectives, goals, milestones, settin
       return {
         kind: 'initiative', id: row.ref, ref: row.ref, title: row.title, status: row.status,
         risk: row.risk ?? 'low', rationale: row.rationale ?? '', expectedOutcome: row.expected_outcome ?? '',
-        priority: row.priority ?? 0,
         // The backend record, handed unchanged to the approval panel: the
         // Inbox gives it the same record, so a review shows the same facts.
         record: row,
@@ -113,27 +131,35 @@ function buildPlan({ roadmap, initiatives, objectives, goals, milestones, settin
   }
 }
 
-// Every write the Plan screen makes, in one place, so all three layouts share
-// the same behaviour. Each path is a literal, so the route guard
-// (tests/test_desktop_proxy_routes.py) checks every one against the proxy.
-// Bodies match the existing screens' calls. quiet: the screen reports each
-// change itself (a toast naming the item, or the error inline where the
-// person acted).
+// Every write the Vision screen makes, in one place. Each path is a literal,
+// so the route guard (tests/test_desktop_proxy_routes.py) checks every one
+// against the proxy. Bodies match the existing screens' calls. quiet: the
+// screen reports each change itself (a toast naming the item, or the error
+// inline where the person acted).
 export function planActions(projectId) {
   const p = enc(projectId)
   const quiet = true
   return {
+    // Checks are the initiative's validation contract. They go in `tests`,
+    // which the approval cards ("Validate: …") and automatic completion read;
+    // `steps` would replace the default board cards, so the form never sends it.
     proposeInitiative: (form) => api(`/projects/${p}/initiatives`, { method: 'POST', quiet, body: {
       title: form.title.trim(), rationale: form.rationale.trim(), expected_outcome: form.expectedOutcome.trim(), risk: form.risk,
+      ...(form.checks?.trim() ? { validation_contract: { tests: form.checks.trim() } } : {}),
     } }),
     resubmitInitiative: (ref, form) => api(`/initiatives/${enc(ref)}/resubmit`, { method: 'POST', quiet, body: {
       rationale: form.rationale.trim(), expected_outcome: form.expectedOutcome.trim(), risk: form.risk,
     } }),
+    // The proxy vouches for the signed-in person; the body never names them.
+    withdrawInitiative: (ref, reason) => api(`/initiatives/${enc(ref)}/withdraw`, { method: 'POST', quiet, body: reason ? { reason } : {} }),
+    // Same body as the browser dashboard's "Complete with verified outcome".
+    completeInitiative: (ref) => api(`/initiatives/${enc(ref)}/complete`, { method: 'POST', quiet, body: { verified: true, regressed: false } }),
     createMilestone: (form) => api(`/projects/${p}/milestones`, { method: 'POST', quiet, body: { name: form.title.trim(), due: form.due || null } }),
     renameMilestone: (name, next) => api(`/projects/${p}/milestones/${enc(name)}/rename`, { method: 'POST', quiet, body: { new_name: next.trim() } }),
     updateMilestone: (name, patch) => api(`/projects/${p}/milestones/${enc(name)}`, { method: 'PATCH', quiet, body: patch }),
     archiveMilestone: (name) => api(`/projects/${p}/milestones/${enc(name)}/archive`, { method: 'POST', quiet, body: {} }),
     restoreMilestone: (name) => api(`/projects/${p}/milestones/${enc(name)}/restore`, { method: 'POST', quiet, body: {} }),
+    deleteMilestone: (name) => api(`/projects/${p}/milestones/${enc(name)}`, { method: 'DELETE', quiet, body: {} }),
     milestoneDetail: (name) => api(`/projects/${p}/milestones/${enc(name)}`, { quiet }),
     attachWork: (name, ref) => api(`/projects/${p}/milestones/${enc(name)}/attach`, { method: 'POST', quiet, body: { ref } }),
     detachWork: (name, ref) => api(`/projects/${p}/milestones/${enc(name)}/detach`, { method: 'POST', quiet, body: { ref } }),
@@ -153,6 +179,7 @@ export function planActions(projectId) {
     orderGoals: (ids) => api(`/projects/${p}/goals/order`, { method: 'PUT', quiet, body: { goal_ids: ids } }),
     archiveGoal: (id) => api(`/projects/${p}/goals/${enc(id)}/archive`, { method: 'POST', quiet, body: {} }),
     restoreGoal: (id) => api(`/projects/${p}/goals/${enc(id)}/restore`, { method: 'POST', quiet, body: {} }),
+    deleteGoal: (id) => api(`/projects/${p}/goals/${enc(id)}`, { method: 'DELETE', quiet, body: {} }),
     linkMilestone: (ref, milestoneId, relationship) => api(`/projects/${p}/initiatives/${enc(ref)}/milestones`, { method: 'POST', quiet, body: { milestone_id: Number(milestoneId), relationship } }),
     unlinkMilestone: (ref, milestoneId) => api(`/projects/${p}/initiatives/${enc(ref)}/milestones/${Number(milestoneId)}`, { method: 'DELETE', quiet, body: {} }),
     linkObjective: (ref, objectiveId, relationship) => api(`/projects/${p}/objectives/${Number(objectiveId)}/initiatives`, { method: 'POST', quiet, body: { initiative_ref: ref, relationship } }),

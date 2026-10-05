@@ -1,14 +1,10 @@
-// GENERATED-STRUCTURE: hand-edited Desktop module. Plan screen styles only
-// (design round f prototype, 05/10). Appended where DOCKYARD_CSS is used
+// GENERATED-STRUCTURE: hand-edited Desktop module. Vision screen styles only
+// (design round f, 05/10). Appended where DOCKYARD_CSS is used
 // (runtime/context.js), same rule as the Roadmap, Settings and Kanban blocks.
 // Colours come only from the shell's --dy-* tokens, which every theme sets,
 // so no theme branch is needed here and no fallback colour can leak through.
 export const PLAN_CSS = `
 .dy-plan { display: grid; gap: 12px; min-width: 0; }
-.dy-plan-review-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px; border: 1px dashed var(--dy-accent-border); border-radius: 8px; background: var(--dy-accent-soft); color: var(--dy-accent-text); font-size: 12px; }
-.dy-plan-review-bar > span { font-weight: 700; margin-right: 4px; }
-.dy-plan-review-bar button { border: 1px solid var(--dy-control-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text); padding: 3px 10px; font: inherit; cursor: pointer; }
-.dy-plan-review-bar button[aria-pressed="true"] { background: var(--dy-action); border-color: var(--dy-action); color: var(--dy-on-action); font-weight: 700; }
 .dy-plan-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px; }
 .dy-plan-head h2 { margin: 0; font-size: 20px; }
 .dy-plan-head .dockyard-meta { margin: 2px 0 0; }
@@ -37,13 +33,12 @@ export const PLAN_CSS = `
 .dy-plan.with-drawer .dy-plan-main { grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); }
 
 /* Sections and rows */
-.dy-plan-outline, .dy-plan-review { display: grid; gap: 12px; min-width: 0; }
-.dy-plan-section, .dy-plan-column, .dy-plan-queue { border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); padding: 10px; min-width: 0; }
+.dy-plan-outline { display: grid; gap: 12px; min-width: 0; }
+.dy-plan-section { border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); padding: 10px; min-width: 0; }
 .dy-plan-section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .dy-plan-section-head h3 { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: 14px; }
 .dy-plan-section-head > :last-child { margin-left: auto; }
 .dy-plan-section-note { font-size: 11px; color: var(--dy-text-3); }
-.dy-plan-head-actions { display: inline-flex; gap: 6px; }
 .dy-plan-count { min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; text-align: center; }
 .dy-plan-empty { margin: 4px 0; font-size: 12px; color: var(--dy-text-3); }
 .dy-plan-rows { display: grid; gap: 2px; }
@@ -51,16 +46,12 @@ export const PLAN_CSS = `
 .dy-plan-row:hover { background: var(--dy-surface-subtle); }
 .dy-plan-row.selected { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
 .dy-plan-row.archived .dy-plan-row-text strong { color: var(--dy-text-3); text-decoration: line-through; }
-.dy-plan-row.dim { opacity: .38; }
-.dy-plan-row.depth-1 { margin-left: 26px; }
+/* Finished or closed initiatives keep their name readable: no strike-through. */
+.dy-plan-row.closed .dy-plan-row-text strong { color: var(--dy-text-2); }
 .dy-plan-row-open { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 4px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .dy-plan-row-text { display: grid; min-width: 0; }
 .dy-plan-row-text strong { font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
 .dy-plan-row-text small { font-size: 11px; color: var(--dy-text-2); }
-.dy-plan-rel { font-style: normal; font-weight: 500; color: var(--dy-text-3); }
-.dy-plan-row.compact { grid-template-columns: minmax(0, 1fr) auto; }
-.dy-plan-row.compact .dy-plan-row-status { grid-column: 1; grid-row: 2; padding-left: 34px; }
-.dy-plan-row.compact > .dockyard-button { grid-column: 2; grid-row: 2; }
 .dy-plan-glyph { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 6px; font-size: 11px; font-weight: 800; background: var(--dy-surface-subtle); color: var(--dy-text-2); border: 1px solid var(--dy-border); }
 .dy-plan-glyph.initiative { background: var(--dy-info-bg); color: var(--dy-info); }
 .dy-plan-glyph.milestone { background: var(--dy-warning-bg); color: var(--dy-warning); }
@@ -71,28 +62,12 @@ export const PLAN_CSS = `
 .dy-plan-menu { position: relative; display: inline-flex; }
 .dy-plan-menu-trigger { min-width: 30px; padding: 4px 8px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 13px; cursor: pointer; }
 .dy-plan-menu-trigger.primary { background: var(--dy-action); border-color: var(--dy-action); color: var(--dy-on-action); font-weight: 700; padding: 6px 12px; }
-.dy-plan-menu-trigger:focus-visible, .dy-plan-row-open:focus-visible, .dy-plan-review-bar button:focus-visible, .dy-plan-goalchip:focus-visible, .dy-plan-link-open:focus-visible, .dy-plan-unlink:focus-visible, .dy-plan-drawer-close:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
+.dy-plan-menu-trigger:focus-visible, .dy-plan-row-open:focus-visible, .dy-plan-link-open:focus-visible, .dy-plan-unlink:focus-visible, .dy-plan-drawer-close:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
 .dy-plan-menu-list { position: absolute; top: calc(100% + 4px); right: 0; z-index: 30; display: grid; min-width: 210px; padding: 4px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface-strong); box-shadow: var(--dy-shadow); }
 .dy-plan-menu-list button { padding: 7px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--dy-text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
 .dy-plan-menu-list button:hover, .dy-plan-menu-list button:focus-visible { background: var(--dy-surface-subtle); outline: none; }
 .dy-plan-menu-list button.danger { color: var(--dy-danger); }
 .dy-plan-menu-list button[disabled] { color: var(--dy-disabled-text); cursor: default; }
-
-/* Layout B: columns */
-.dy-plan-columns-wrap { display: grid; gap: 8px; min-width: 0; }
-.dy-plan-columns-hint { margin: 0; font-size: 12px; color: var(--dy-text-2); }
-.dy-plan-columns { display: grid; grid-template-columns: repeat(4, minmax(210px, 1fr)); gap: 10px; overflow-x: auto; padding-bottom: 4px; }
-.dy-plan-column-caption { margin: 0 0 2px; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--dy-text-3); }
-
-/* Layout C: review first */
-.dy-plan-queue { border-color: var(--dy-accent-border); }
-.dy-plan-queue-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
-.dy-plan-queue-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 2px 6px; border-radius: 8px; background: var(--dy-surface-subtle); }
-.dy-plan-goalstrip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.dy-plan-goalstrip-label { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--dy-text-3); }
-.dy-plan-goalchip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--dy-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; cursor: pointer; }
-.dy-plan-goalchip.selected { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
-.dy-plan-goalchip.archived strong { text-decoration: line-through; color: var(--dy-text-3); }
 
 /* Drawer */
 .dy-plan-drawer { position: sticky; top: 12px; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: calc(100vh - 140px); border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); overflow: hidden; }
@@ -130,6 +105,9 @@ export const PLAN_CSS = `
 .dy-plan-loop li.done::before { content: '✓'; background: var(--dy-success-bg); color: var(--dy-success); border-color: transparent; }
 .dy-plan-loop li.current { color: var(--dy-text); }
 .dy-plan-loop li.current::before { background: var(--dy-action); color: var(--dy-on-action); border-color: transparent; }
+/* Withdrawn or rejected: it stopped here, so the stage is marked, not current. */
+.dy-plan-loop li.stopped { color: var(--dy-text); }
+.dy-plan-loop li.stopped::before { content: '×'; background: var(--dy-neutral-bg); color: var(--dy-neutral); border-color: transparent; }
 .dy-plan-loop li small { color: var(--dy-text-2); }
 .dy-plan-feedback { margin: 0 0 8px; padding: 8px 10px; border-left: 3px solid var(--dy-warning); background: var(--dy-warning-bg); color: var(--dy-text); font-size: 13px; }
 .dy-plan-risks { margin: 4px 0; padding-left: 18px; font-size: 12px; color: var(--dy-danger); }
@@ -152,6 +130,7 @@ export const PLAN_CSS = `
 .dy-plan-checklist legend { padding: 0 4px; font-size: 12px; font-weight: 700; }
 .dy-plan-check.taken { color: var(--dy-text-3); }
 .dy-plan-check small { color: var(--dy-text-3); }
+.dy-plan-consequences { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13px; color: var(--dy-text); }
 .dy-plan-row-status { min-width: 0; }
 .dy-plan-row-status .dockyard-status-tag { white-space: normal; max-width: 100%; }
 .dy-plan-sheet-backdrop { display: none; }
@@ -163,8 +142,6 @@ export const PLAN_CSS = `
   .dy-plan-sheet-backdrop { display: block; position: fixed; inset: 0; z-index: 34; background: rgba(12, 17, 28, .48); backdrop-filter: blur(3px); }
 }
 @media (max-width: 760px) {
-  .dy-plan-columns { grid-template-columns: repeat(4, minmax(240px, 82vw)); scroll-snap-type: x mandatory; }
-  .dy-plan-column { scroll-snap-align: start; }
   .dy-plan-row { grid-template-columns: minmax(0, 1fr) auto; }
   .dy-plan-row .dy-plan-row-status { grid-column: 1; grid-row: 2; padding-left: 34px; }
   .dy-plan-search { min-width: 0; flex: 1 1 140px; }

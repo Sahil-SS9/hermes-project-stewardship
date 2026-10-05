@@ -319,12 +319,6 @@ export const DOCKYARD_CSS = `
   align-items: center;
   gap: 10px;
 }
-.dockyard-root .dockyard-objective-evaluate {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
 .dockyard-root .dockyard-project-head,
 .dockyard-root .dockyard-project-row {
   display: grid;
@@ -1232,28 +1226,6 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-handoff-list > div { padding: 9px 10px; border-radius: 8px; background: var(--dy-surface); }
 .dockyard-root .dockyard-handoff-list strong { display: block; font-size: 11px; }
 .dockyard-root .dockyard-handoff-list span { display: block; margin-top: 2px; color: var(--dy-text-3); font-size: 9px; }
-.dockyard-root .dockyard-loop-layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, .7fr); gap: 18px; }
-.dockyard-root .dockyard-loop-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
-.dockyard-root .dockyard-loop-head h2 { margin-top: 0; }
-.dockyard-root .dockyard-loop-visual-wrap { margin-top: 16px; overflow-x: auto; border: 1px solid var(--dy-border); border-radius: 11px; background: var(--dy-surface-subtle); }
-.dockyard-root .dockyard-loop-visual-wrap svg { width: 100%; min-width: 760px; height: auto; }
-.dockyard-root .dockyard-loop-node { fill: var(--dy-neutral-bg); stroke: var(--dy-neutral); stroke-width: 1.5; }
-.dockyard-root .dockyard-loop-node.done { fill: var(--dy-success-bg); stroke: var(--dy-success); }
-.dockyard-root .dockyard-loop-node.current { fill: var(--dy-warning-bg); stroke: var(--dy-warning); stroke-dasharray: 5 3; }
-.dockyard-root .dockyard-loop-edge { fill: none; stroke: var(--dy-border-strong, var(--dy-border)); stroke-width: 2; }
-.dockyard-root .dockyard-loop-edge.done { stroke: var(--dy-success); }
-.dockyard-root .dockyard-loop-edge.current { stroke: var(--dy-warning); stroke-dasharray: 5 4; }
-.dockyard-root .dockyard-loop-visual-wrap text { fill: var(--dy-text); font: 600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-.dockyard-root .dockyard-stage-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 14px; }
-.dockyard-root .dockyard-stage-list button { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 9px; align-items: center; padding: 9px 10px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface); color: var(--dy-text); text-align: left; cursor: pointer; }
-.dockyard-root .dockyard-stage-list button.active { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
-.dockyard-root .dockyard-stage-list button > span:first-child { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 7px; background: var(--dy-neutral-bg); color: var(--dy-neutral); font-size: 10px; }
-.dockyard-root .dockyard-stage-list strong,
-.dockyard-root .dockyard-stage-list small { display: block; }
-.dockyard-root .dockyard-stage-list strong { font-size: 11px; }
-.dockyard-root .dockyard-stage-list small { margin-top: 2px; color: var(--dy-text-3); font-size: 9px; }
-.dockyard-root .dockyard-stage-detail { align-self: start; }
-.dockyard-root .dockyard-stage-detail .dockyard-evidence-details { margin-top: 17px; }
 .dockyard-root .dockyard-saved-views-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(330px, .85fr); gap: 18px; margin-top: 18px; }
 .dockyard-root .dockyard-saved-views-layout > .dockyard-feature-card { align-self: start; }
 .dockyard-root .dockyard-saved-views-notice,
@@ -1321,28 +1293,12 @@ export const DOCKYARD_CSS = `
   line-height: 1.4;
 }
 .dockyard-root .dockyard-view-only-note svg { width: 17px; height: 17px; flex: 0 0 auto; }
-.dockyard-root .dockyard-objectives-layout { display: grid; gap: 16px; }
 .dockyard-root .dockyard-inline-editor { display: grid; gap: 9px; margin-top: 16px; padding: 14px; border: 1px solid var(--dy-accent-border); border-radius: 10px; background: var(--dy-accent-soft); }
 .dockyard-root .dockyard-inline-editor > label { display: grid; gap: 6px; color: var(--dy-text-2); font-size: 10px; font-weight: 730; }
 .dockyard-root .dockyard-inline-editor input,
 .dockyard-root .dockyard-inline-editor textarea,
 .dockyard-root .dockyard-inline-editor select { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; }
 .dockyard-root .dockyard-inline-editor textarea { resize: vertical; }
-.dockyard-root .dockyard-mission-history { display: grid; gap: 7px; margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--dy-border); }
-.dockyard-root .dockyard-mission-history h3 { margin: 0 0 2px; color: var(--dy-text); font-size: 12px; }
-.dockyard-root .dockyard-mission-history article { display: grid; gap: 3px; padding: 10px 11px; border-radius: 8px; background: var(--dy-surface-subtle); }
-.dockyard-root .dockyard-mission-history strong { color: var(--dy-text); font-size: 11px; }
-.dockyard-root .dockyard-mission-history span { color: var(--dy-text-3); font-size: 9px; }
-.dockyard-root .dockyard-objective-list { display: grid; gap: 9px; margin-top: 16px; }
-.dockyard-root .dockyard-objective-list > article { padding: 13px 14px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface-subtle); }
-.dockyard-root .dockyard-objective-list > article.archived { border-style: dashed; }
-.dockyard-root .dockyard-objective-copy { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.dockyard-root .dockyard-objective-copy > span:first-child { min-width: 0; }
-.dockyard-root .dockyard-objective-copy strong,
-.dockyard-root .dockyard-objective-copy small { display: block; overflow-wrap: anywhere; }
-.dockyard-root .dockyard-objective-copy strong { color: var(--dy-text); font-size: 13px; }
-.dockyard-root .dockyard-objective-copy small { margin-top: 4px; color: var(--dy-text-2); font-size: 10px; line-height: 1.4; }
-.dockyard-root .dockyard-objective-list > article > p { margin: 9px 0 0; color: var(--dy-text-3); font-size: 10px; }
 .dockyard-root .dockyard-content-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr); gap: 16px; align-items: start; }
 .dockyard-root .dockyard-content-list { display: grid; gap: 7px; margin-top: 16px; }
 .dockyard-root .dockyard-content-list button { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; padding: 11px 12px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text); text-align: left; cursor: pointer; }
@@ -1432,16 +1388,6 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-comment-form input:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
 .dockyard-root .dockyard-initiative-revision { display: grid; gap: 9px; padding: 11px; border: 1px solid var(--dy-accent-border); border-radius: 9px; background: var(--dy-accent-soft); }
 .dockyard-root .dockyard-initiative-revision input { min-height: 34px; padding: 6px 10px; border: 1px solid var(--dy-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
-.dockyard-root .dockyard-evidence-details {
-  margin-top: 14px;
-  padding: 14px 15px;
-  border: 1px solid var(--dy-border);
-  border-radius: 10px;
-  background: var(--dy-surface-subtle);
-  color: var(--dy-text-2);
-  font-size: 12px;
-}
-.dockyard-root .dockyard-evidence-details[hidden] { display: none; }
 .dockyard-root .dockyard-feed-group { box-shadow: 0 4px 18px rgba(31, 42, 68, 0.04); }
 @container dockyard (min-width: 821px) and (max-width: 1350px) {
   .dockyard-root .dockyard-main-grid .dockyard-project-head,
@@ -1449,9 +1395,6 @@ export const DOCKYARD_CSS = `
     grid-template-columns: minmax(180px, 1.35fr) 100px minmax(160px, 1fr) 80px;
     gap: 12px;
   }
-}
-@container dockyard (max-width: 1200px) {
-  .dockyard-root .dockyard-loop-layout { grid-template-columns: 1fr; }
 }
 @container dockyard (max-width: 980px) {
   .dockyard-root .dockyard-main-grid { grid-template-columns: 1fr; }
@@ -1490,7 +1433,6 @@ export const DOCKYARD_CSS = `
   .dockyard-root .dockyard-session-layout { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-workload-card,
   .dockyard-root .dockyard-teams-layout,
-  .dockyard-root .dockyard-loop-layout,
   .dockyard-root .dockyard-saved-views-layout { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-backlog-item { grid-template-columns: 42px minmax(0, 1fr); }
   .dockyard-root .dockyard-backlog-item > .dockyard-status-tag,
@@ -1504,7 +1446,6 @@ export const DOCKYARD_CSS = `
   .dockyard-root .dockyard-settings-grid { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-field-wide { grid-column: auto; }
   .dockyard-root .dockyard-bot-grid,
-  .dockyard-root .dockyard-stage-list { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-upload-panel,
   .dockyard-root .dockyard-detail-grid { grid-template-columns: 1fr; }
 }
@@ -1612,18 +1553,6 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-section-fold:hover { background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-section-count { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .dockyard-root .dockyard-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-/* Milestone planning, with the Objectives since Sahil 05/10. It never had rules of its
-   own, so name, due date and count ran together; now one readable row per milestone. */
-.dockyard-root .dockyard-planning-table { display: grid; gap: 6px; margin-top: 12px; }
-.dockyard-root .dockyard-planning-row { border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface); }
-.dockyard-root .dockyard-planning-toggle { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 16px; width: 100%; min-height: 40px; padding: 8px 12px; border: 0; border-radius: 9px; background: transparent; color: var(--dy-text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
-.dockyard-root .dockyard-planning-toggle:hover { background: var(--dy-surface-subtle); }
-.dockyard-root .dockyard-planning-name { min-width: 0; overflow-wrap: anywhere; font-weight: 650; }
-.dockyard-root .dockyard-planning-toggle > span:not(.dockyard-planning-name) { color: var(--dy-text-2); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.dockyard-root .dockyard-milestone-overdue .dockyard-planning-toggle > span:nth-child(2) { color: var(--dy-danger); }
-.dockyard-root .dockyard-planning-detail { display: grid; gap: 8px; padding: 4px 12px 12px; }
-.dockyard-root .dockyard-planning-risks { margin: 0; padding-left: 18px; font-size: 12px; }
-.dockyard-root .dockyard-planning-forecast { margin: 0; color: var(--dy-text-2); font-size: 12px; }
 /* Content previews (Sahil 04/10): images, PDFs and videos show in the Content tab. */
 .dockyard-root .dockyard-content-image { display: block; max-width: 100%; max-height: 520px; margin: 0 auto; object-fit: contain; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-content-pdf { display: block; width: 100%; height: 560px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); }

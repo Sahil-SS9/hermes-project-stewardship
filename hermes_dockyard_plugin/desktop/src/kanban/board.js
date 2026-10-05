@@ -58,9 +58,11 @@ function CardBody({ id, item, facts, moves, moving, today, onMove, onOpenItem, o
   const goto = (label, onClick, text) => jsx('button', { type: 'button', className: 'dy-kb-goto', 'aria-label': `${label}: ${text}`, onClick, children: text })
 
   const planning = []
-  if (facts.initiative) planning.push(row('Initiative', goto('Initiative', () => onNavigate('roadmap'), facts.initiative.title || facts.initiative.ref)))
-  facts.milestones.forEach((milestone, index) => planning.push(row('Milestone', goto('Milestone', () => onNavigate('objectives'), milestone.due ? `${milestone.name} · due ${shortDate(milestone.due, today)}` : milestone.name), {}, `milestone:${index}`)))
-  facts.objectives.forEach((objective, index) => planning.push(row('Objective', jsxs('span', { children: [goto('Objective', () => onNavigate('objectives'), objective.name), jsx('span', { className: 'dy-kb-via', children: ' (through the initiative)' })] }), {}, `objective:${index}`)))
+  // Each planning link opens that item on the project's Vision screen
+  // ("plan:<kind>:<id>", the same entry the Roadmap's Open uses).
+  if (facts.initiative) planning.push(row('Initiative', goto('Initiative', () => onNavigate(`plan:initiative:${facts.initiative.ref}`), facts.initiative.title || facts.initiative.ref)))
+  facts.milestones.forEach((milestone, index) => planning.push(row('Milestone', goto('Milestone', () => onNavigate(`plan:milestone:${milestone.id}`), milestone.due ? `${milestone.name} · due ${shortDate(milestone.due, today)}` : milestone.name), {}, `milestone:${index}`)))
+  facts.objectives.forEach((objective, index) => planning.push(row('Objective', jsxs('span', { children: [goto('Objective', () => onNavigate(`plan:objective:${objective.id}`), objective.name), jsx('span', { className: 'dy-kb-via', children: ' (through the initiative)' })] }), {}, `objective:${index}`)))
 
   const details = [row('Assignee', item.assignee ? displayName(item.assignee) : 'Unassigned')]
   if (facts.due) details.push(row('Due', facts.overdue ? `${shortDate(facts.due, today)} · Overdue` : shortDate(facts.due, today), facts.overdue ? { 'data-overdue': 'true' } : {}))

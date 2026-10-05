@@ -456,12 +456,6 @@ var DOCKYARD_CSS = `
   align-items: center;
   gap: 10px;
 }
-.dockyard-root .dockyard-objective-evaluate {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
 .dockyard-root .dockyard-project-head,
 .dockyard-root .dockyard-project-row {
   display: grid;
@@ -1369,28 +1363,6 @@ var DOCKYARD_CSS = `
 .dockyard-root .dockyard-handoff-list > div { padding: 9px 10px; border-radius: 8px; background: var(--dy-surface); }
 .dockyard-root .dockyard-handoff-list strong { display: block; font-size: 11px; }
 .dockyard-root .dockyard-handoff-list span { display: block; margin-top: 2px; color: var(--dy-text-3); font-size: 9px; }
-.dockyard-root .dockyard-loop-layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, .7fr); gap: 18px; }
-.dockyard-root .dockyard-loop-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
-.dockyard-root .dockyard-loop-head h2 { margin-top: 0; }
-.dockyard-root .dockyard-loop-visual-wrap { margin-top: 16px; overflow-x: auto; border: 1px solid var(--dy-border); border-radius: 11px; background: var(--dy-surface-subtle); }
-.dockyard-root .dockyard-loop-visual-wrap svg { width: 100%; min-width: 760px; height: auto; }
-.dockyard-root .dockyard-loop-node { fill: var(--dy-neutral-bg); stroke: var(--dy-neutral); stroke-width: 1.5; }
-.dockyard-root .dockyard-loop-node.done { fill: var(--dy-success-bg); stroke: var(--dy-success); }
-.dockyard-root .dockyard-loop-node.current { fill: var(--dy-warning-bg); stroke: var(--dy-warning); stroke-dasharray: 5 3; }
-.dockyard-root .dockyard-loop-edge { fill: none; stroke: var(--dy-border-strong, var(--dy-border)); stroke-width: 2; }
-.dockyard-root .dockyard-loop-edge.done { stroke: var(--dy-success); }
-.dockyard-root .dockyard-loop-edge.current { stroke: var(--dy-warning); stroke-dasharray: 5 4; }
-.dockyard-root .dockyard-loop-visual-wrap text { fill: var(--dy-text); font: 600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-.dockyard-root .dockyard-stage-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 14px; }
-.dockyard-root .dockyard-stage-list button { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 9px; align-items: center; padding: 9px 10px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface); color: var(--dy-text); text-align: left; cursor: pointer; }
-.dockyard-root .dockyard-stage-list button.active { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
-.dockyard-root .dockyard-stage-list button > span:first-child { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 7px; background: var(--dy-neutral-bg); color: var(--dy-neutral); font-size: 10px; }
-.dockyard-root .dockyard-stage-list strong,
-.dockyard-root .dockyard-stage-list small { display: block; }
-.dockyard-root .dockyard-stage-list strong { font-size: 11px; }
-.dockyard-root .dockyard-stage-list small { margin-top: 2px; color: var(--dy-text-3); font-size: 9px; }
-.dockyard-root .dockyard-stage-detail { align-self: start; }
-.dockyard-root .dockyard-stage-detail .dockyard-evidence-details { margin-top: 17px; }
 .dockyard-root .dockyard-saved-views-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(330px, .85fr); gap: 18px; margin-top: 18px; }
 .dockyard-root .dockyard-saved-views-layout > .dockyard-feature-card { align-self: start; }
 .dockyard-root .dockyard-saved-views-notice,
@@ -1458,28 +1430,12 @@ var DOCKYARD_CSS = `
   line-height: 1.4;
 }
 .dockyard-root .dockyard-view-only-note svg { width: 17px; height: 17px; flex: 0 0 auto; }
-.dockyard-root .dockyard-objectives-layout { display: grid; gap: 16px; }
 .dockyard-root .dockyard-inline-editor { display: grid; gap: 9px; margin-top: 16px; padding: 14px; border: 1px solid var(--dy-accent-border); border-radius: 10px; background: var(--dy-accent-soft); }
 .dockyard-root .dockyard-inline-editor > label { display: grid; gap: 6px; color: var(--dy-text-2); font-size: 10px; font-weight: 730; }
 .dockyard-root .dockyard-inline-editor input,
 .dockyard-root .dockyard-inline-editor textarea,
 .dockyard-root .dockyard-inline-editor select { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; }
 .dockyard-root .dockyard-inline-editor textarea { resize: vertical; }
-.dockyard-root .dockyard-mission-history { display: grid; gap: 7px; margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--dy-border); }
-.dockyard-root .dockyard-mission-history h3 { margin: 0 0 2px; color: var(--dy-text); font-size: 12px; }
-.dockyard-root .dockyard-mission-history article { display: grid; gap: 3px; padding: 10px 11px; border-radius: 8px; background: var(--dy-surface-subtle); }
-.dockyard-root .dockyard-mission-history strong { color: var(--dy-text); font-size: 11px; }
-.dockyard-root .dockyard-mission-history span { color: var(--dy-text-3); font-size: 9px; }
-.dockyard-root .dockyard-objective-list { display: grid; gap: 9px; margin-top: 16px; }
-.dockyard-root .dockyard-objective-list > article { padding: 13px 14px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface-subtle); }
-.dockyard-root .dockyard-objective-list > article.archived { border-style: dashed; }
-.dockyard-root .dockyard-objective-copy { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.dockyard-root .dockyard-objective-copy > span:first-child { min-width: 0; }
-.dockyard-root .dockyard-objective-copy strong,
-.dockyard-root .dockyard-objective-copy small { display: block; overflow-wrap: anywhere; }
-.dockyard-root .dockyard-objective-copy strong { color: var(--dy-text); font-size: 13px; }
-.dockyard-root .dockyard-objective-copy small { margin-top: 4px; color: var(--dy-text-2); font-size: 10px; line-height: 1.4; }
-.dockyard-root .dockyard-objective-list > article > p { margin: 9px 0 0; color: var(--dy-text-3); font-size: 10px; }
 .dockyard-root .dockyard-content-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr); gap: 16px; align-items: start; }
 .dockyard-root .dockyard-content-list { display: grid; gap: 7px; margin-top: 16px; }
 .dockyard-root .dockyard-content-list button { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; padding: 11px 12px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text); text-align: left; cursor: pointer; }
@@ -1569,16 +1525,6 @@ var DOCKYARD_CSS = `
 .dockyard-root .dockyard-comment-form input:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
 .dockyard-root .dockyard-initiative-revision { display: grid; gap: 9px; padding: 11px; border: 1px solid var(--dy-accent-border); border-radius: 9px; background: var(--dy-accent-soft); }
 .dockyard-root .dockyard-initiative-revision input { min-height: 34px; padding: 6px 10px; border: 1px solid var(--dy-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
-.dockyard-root .dockyard-evidence-details {
-  margin-top: 14px;
-  padding: 14px 15px;
-  border: 1px solid var(--dy-border);
-  border-radius: 10px;
-  background: var(--dy-surface-subtle);
-  color: var(--dy-text-2);
-  font-size: 12px;
-}
-.dockyard-root .dockyard-evidence-details[hidden] { display: none; }
 .dockyard-root .dockyard-feed-group { box-shadow: 0 4px 18px rgba(31, 42, 68, 0.04); }
 @container dockyard (min-width: 821px) and (max-width: 1350px) {
   .dockyard-root .dockyard-main-grid .dockyard-project-head,
@@ -1586,9 +1532,6 @@ var DOCKYARD_CSS = `
     grid-template-columns: minmax(180px, 1.35fr) 100px minmax(160px, 1fr) 80px;
     gap: 12px;
   }
-}
-@container dockyard (max-width: 1200px) {
-  .dockyard-root .dockyard-loop-layout { grid-template-columns: 1fr; }
 }
 @container dockyard (max-width: 980px) {
   .dockyard-root .dockyard-main-grid { grid-template-columns: 1fr; }
@@ -1627,7 +1570,6 @@ var DOCKYARD_CSS = `
   .dockyard-root .dockyard-session-layout { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-workload-card,
   .dockyard-root .dockyard-teams-layout,
-  .dockyard-root .dockyard-loop-layout,
   .dockyard-root .dockyard-saved-views-layout { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-backlog-item { grid-template-columns: 42px minmax(0, 1fr); }
   .dockyard-root .dockyard-backlog-item > .dockyard-status-tag,
@@ -1641,7 +1583,6 @@ var DOCKYARD_CSS = `
   .dockyard-root .dockyard-settings-grid { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-field-wide { grid-column: auto; }
   .dockyard-root .dockyard-bot-grid,
-  .dockyard-root .dockyard-stage-list { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-upload-panel,
   .dockyard-root .dockyard-detail-grid { grid-template-columns: 1fr; }
 }
@@ -1749,18 +1690,6 @@ var DOCKYARD_CSS = `
 .dockyard-root .dockyard-section-fold:hover { background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-section-count { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .dockyard-root .dockyard-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-/* Milestone planning, with the Objectives since Sahil 05/10. It never had rules of its
-   own, so name, due date and count ran together; now one readable row per milestone. */
-.dockyard-root .dockyard-planning-table { display: grid; gap: 6px; margin-top: 12px; }
-.dockyard-root .dockyard-planning-row { border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface); }
-.dockyard-root .dockyard-planning-toggle { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 16px; width: 100%; min-height: 40px; padding: 8px 12px; border: 0; border-radius: 9px; background: transparent; color: var(--dy-text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
-.dockyard-root .dockyard-planning-toggle:hover { background: var(--dy-surface-subtle); }
-.dockyard-root .dockyard-planning-name { min-width: 0; overflow-wrap: anywhere; font-weight: 650; }
-.dockyard-root .dockyard-planning-toggle > span:not(.dockyard-planning-name) { color: var(--dy-text-2); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.dockyard-root .dockyard-milestone-overdue .dockyard-planning-toggle > span:nth-child(2) { color: var(--dy-danger); }
-.dockyard-root .dockyard-planning-detail { display: grid; gap: 8px; padding: 4px 12px 12px; }
-.dockyard-root .dockyard-planning-risks { margin: 0; padding-left: 18px; font-size: 12px; }
-.dockyard-root .dockyard-planning-forecast { margin: 0; color: var(--dy-text-2); font-size: 12px; }
 /* Content previews (Sahil 04/10): images, PDFs and videos show in the Content tab. */
 .dockyard-root .dockyard-content-image { display: block; max-width: 100%; max-height: 520px; margin: 0 auto; object-fit: contain; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-content-pdf { display: block; width: 100%; height: 560px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); }
@@ -2660,10 +2589,6 @@ var ROADMAP_CSS = `
 // hermes_dockyard_plugin/desktop/src/styles/plan-css.js
 var PLAN_CSS = `
 .dy-plan { display: grid; gap: 12px; min-width: 0; }
-.dy-plan-review-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px; border: 1px dashed var(--dy-accent-border); border-radius: 8px; background: var(--dy-accent-soft); color: var(--dy-accent-text); font-size: 12px; }
-.dy-plan-review-bar > span { font-weight: 700; margin-right: 4px; }
-.dy-plan-review-bar button { border: 1px solid var(--dy-control-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text); padding: 3px 10px; font: inherit; cursor: pointer; }
-.dy-plan-review-bar button[aria-pressed="true"] { background: var(--dy-action); border-color: var(--dy-action); color: var(--dy-on-action); font-weight: 700; }
 .dy-plan-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px; }
 .dy-plan-head h2 { margin: 0; font-size: 20px; }
 .dy-plan-head .dockyard-meta { margin: 2px 0 0; }
@@ -2692,13 +2617,12 @@ var PLAN_CSS = `
 .dy-plan.with-drawer .dy-plan-main { grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); }
 
 /* Sections and rows */
-.dy-plan-outline, .dy-plan-review { display: grid; gap: 12px; min-width: 0; }
-.dy-plan-section, .dy-plan-column, .dy-plan-queue { border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); padding: 10px; min-width: 0; }
+.dy-plan-outline { display: grid; gap: 12px; min-width: 0; }
+.dy-plan-section { border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); padding: 10px; min-width: 0; }
 .dy-plan-section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .dy-plan-section-head h3 { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: 14px; }
 .dy-plan-section-head > :last-child { margin-left: auto; }
 .dy-plan-section-note { font-size: 11px; color: var(--dy-text-3); }
-.dy-plan-head-actions { display: inline-flex; gap: 6px; }
 .dy-plan-count { min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; text-align: center; }
 .dy-plan-empty { margin: 4px 0; font-size: 12px; color: var(--dy-text-3); }
 .dy-plan-rows { display: grid; gap: 2px; }
@@ -2706,16 +2630,12 @@ var PLAN_CSS = `
 .dy-plan-row:hover { background: var(--dy-surface-subtle); }
 .dy-plan-row.selected { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
 .dy-plan-row.archived .dy-plan-row-text strong { color: var(--dy-text-3); text-decoration: line-through; }
-.dy-plan-row.dim { opacity: .38; }
-.dy-plan-row.depth-1 { margin-left: 26px; }
+/* Finished or closed initiatives keep their name readable: no strike-through. */
+.dy-plan-row.closed .dy-plan-row-text strong { color: var(--dy-text-2); }
 .dy-plan-row-open { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 4px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .dy-plan-row-text { display: grid; min-width: 0; }
 .dy-plan-row-text strong { font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
 .dy-plan-row-text small { font-size: 11px; color: var(--dy-text-2); }
-.dy-plan-rel { font-style: normal; font-weight: 500; color: var(--dy-text-3); }
-.dy-plan-row.compact { grid-template-columns: minmax(0, 1fr) auto; }
-.dy-plan-row.compact .dy-plan-row-status { grid-column: 1; grid-row: 2; padding-left: 34px; }
-.dy-plan-row.compact > .dockyard-button { grid-column: 2; grid-row: 2; }
 .dy-plan-glyph { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 6px; font-size: 11px; font-weight: 800; background: var(--dy-surface-subtle); color: var(--dy-text-2); border: 1px solid var(--dy-border); }
 .dy-plan-glyph.initiative { background: var(--dy-info-bg); color: var(--dy-info); }
 .dy-plan-glyph.milestone { background: var(--dy-warning-bg); color: var(--dy-warning); }
@@ -2726,28 +2646,12 @@ var PLAN_CSS = `
 .dy-plan-menu { position: relative; display: inline-flex; }
 .dy-plan-menu-trigger { min-width: 30px; padding: 4px 8px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 13px; cursor: pointer; }
 .dy-plan-menu-trigger.primary { background: var(--dy-action); border-color: var(--dy-action); color: var(--dy-on-action); font-weight: 700; padding: 6px 12px; }
-.dy-plan-menu-trigger:focus-visible, .dy-plan-row-open:focus-visible, .dy-plan-review-bar button:focus-visible, .dy-plan-goalchip:focus-visible, .dy-plan-link-open:focus-visible, .dy-plan-unlink:focus-visible, .dy-plan-drawer-close:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
+.dy-plan-menu-trigger:focus-visible, .dy-plan-row-open:focus-visible, .dy-plan-link-open:focus-visible, .dy-plan-unlink:focus-visible, .dy-plan-drawer-close:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
 .dy-plan-menu-list { position: absolute; top: calc(100% + 4px); right: 0; z-index: 30; display: grid; min-width: 210px; padding: 4px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface-strong); box-shadow: var(--dy-shadow); }
 .dy-plan-menu-list button { padding: 7px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--dy-text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
 .dy-plan-menu-list button:hover, .dy-plan-menu-list button:focus-visible { background: var(--dy-surface-subtle); outline: none; }
 .dy-plan-menu-list button.danger { color: var(--dy-danger); }
 .dy-plan-menu-list button[disabled] { color: var(--dy-disabled-text); cursor: default; }
-
-/* Layout B: columns */
-.dy-plan-columns-wrap { display: grid; gap: 8px; min-width: 0; }
-.dy-plan-columns-hint { margin: 0; font-size: 12px; color: var(--dy-text-2); }
-.dy-plan-columns { display: grid; grid-template-columns: repeat(4, minmax(210px, 1fr)); gap: 10px; overflow-x: auto; padding-bottom: 4px; }
-.dy-plan-column-caption { margin: 0 0 2px; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--dy-text-3); }
-
-/* Layout C: review first */
-.dy-plan-queue { border-color: var(--dy-accent-border); }
-.dy-plan-queue-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
-.dy-plan-queue-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 2px 6px; border-radius: 8px; background: var(--dy-surface-subtle); }
-.dy-plan-goalstrip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.dy-plan-goalstrip-label { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--dy-text-3); }
-.dy-plan-goalchip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--dy-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; cursor: pointer; }
-.dy-plan-goalchip.selected { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
-.dy-plan-goalchip.archived strong { text-decoration: line-through; color: var(--dy-text-3); }
 
 /* Drawer */
 .dy-plan-drawer { position: sticky; top: 12px; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: calc(100vh - 140px); border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); overflow: hidden; }
@@ -2785,6 +2689,9 @@ var PLAN_CSS = `
 .dy-plan-loop li.done::before { content: '\u2713'; background: var(--dy-success-bg); color: var(--dy-success); border-color: transparent; }
 .dy-plan-loop li.current { color: var(--dy-text); }
 .dy-plan-loop li.current::before { background: var(--dy-action); color: var(--dy-on-action); border-color: transparent; }
+/* Withdrawn or rejected: it stopped here, so the stage is marked, not current. */
+.dy-plan-loop li.stopped { color: var(--dy-text); }
+.dy-plan-loop li.stopped::before { content: '\xD7'; background: var(--dy-neutral-bg); color: var(--dy-neutral); border-color: transparent; }
 .dy-plan-loop li small { color: var(--dy-text-2); }
 .dy-plan-feedback { margin: 0 0 8px; padding: 8px 10px; border-left: 3px solid var(--dy-warning); background: var(--dy-warning-bg); color: var(--dy-text); font-size: 13px; }
 .dy-plan-risks { margin: 4px 0; padding-left: 18px; font-size: 12px; color: var(--dy-danger); }
@@ -2807,6 +2714,7 @@ var PLAN_CSS = `
 .dy-plan-checklist legend { padding: 0 4px; font-size: 12px; font-weight: 700; }
 .dy-plan-check.taken { color: var(--dy-text-3); }
 .dy-plan-check small { color: var(--dy-text-3); }
+.dy-plan-consequences { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13px; color: var(--dy-text); }
 .dy-plan-row-status { min-width: 0; }
 .dy-plan-row-status .dockyard-status-tag { white-space: normal; max-width: 100%; }
 .dy-plan-sheet-backdrop { display: none; }
@@ -2818,8 +2726,6 @@ var PLAN_CSS = `
   .dy-plan-sheet-backdrop { display: block; position: fixed; inset: 0; z-index: 34; background: rgba(12, 17, 28, .48); backdrop-filter: blur(3px); }
 }
 @media (max-width: 760px) {
-  .dy-plan-columns { grid-template-columns: repeat(4, minmax(240px, 82vw)); scroll-snap-type: x mandatory; }
-  .dy-plan-column { scroll-snap-align: start; }
   .dy-plan-row { grid-template-columns: minmax(0, 1fr) auto; }
   .dy-plan-row .dy-plan-row-status { grid-column: 1; grid-row: 2; padding-left: 34px; }
   .dy-plan-search { min-width: 0; flex: 1 1 140px; }
@@ -7692,6 +7598,43 @@ function WorkItemDetail({ item, projectId, profiles, initiatives = [], onClose, 
       ]
     }) : null
   });
+}
+function ObjectiveEvidence({ objective, projectId, onSaved }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const evidence = objective.evidence || {};
+  const state = objective.enabled === false ? "not_applicable" : evidence.state || "unknown";
+  const save2 = async (event) => {
+    event.preventDefault();
+    const fields = new FormData(event.currentTarget);
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`/projects/${encodeURIComponent(projectId)}/objectives/${objective.id}/assessment`, {
+        method: "POST",
+        body: { passed: fields.get("result") === "passed", evidence: [String(fields.get("evidence") || "")], detail: String(fields.get("detail") || ""), expires_at: fields.get("expiry") ? new Date(String(fields.get("expiry"))).toISOString() : null }
+      });
+      await onSaved();
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    }
+    setBusy(false);
+  };
+  return jsxs("details", { "data-objective-evidence": objective.id, children: [
+    jsx("summary", { children: `Result: ${readableLabel(state)} \xB7 Evidence/history` }),
+    jsx("p", { children: evidence.detail || "Insufficient data: no recorded evidence." }),
+    jsx("p", { children: `Evidence age: ${evidence.evidence_age_seconds == null ? "unavailable" : Math.floor(evidence.evidence_age_seconds) + " seconds"} \xB7 Window: ${objective.window || "30d"} \xB7 Samples: ${evidence.sample_count || 0} \xB7 Pass rate: ${evidence.pass_rate == null ? "insufficient data" : Math.round(evidence.pass_rate * 100) + "%"}` }),
+    jsx("ul", { children: (evidence.history || []).map((sample, index) => jsx("li", { children: `${sample.recorded_at} \xB7 ${sample.state} \xB7 ${sample.verified_actor || sample.actor || sample.source_evidence?.source || "objective evaluator"}${sample.source === "evaluate-now" ? " (Evaluate now)" : ""} \xB7 ${sample.detail || ""} \xB7 ${JSON.stringify(sample.evidence || sample.source_evidence || {})}` }, index)) }),
+    objective.evaluator_type === "manual" && objective.enabled !== false ? jsxs("form", { onSubmit: save2, children: [
+      jsxs("label", { children: ["Result ", jsx("select", { name: "result", children: ["passed", "failed"].map((value) => jsx("option", { value, children: value }, value)) })] }),
+      jsxs("label", { children: ["Evidence reference ", jsx("input", { name: "evidence", required: true, maxLength: 500 })] }),
+      jsxs("label", { children: ["Assessment note ", jsx("input", { name: "detail", maxLength: 2e3 })] }),
+      jsxs("label", { children: ["Expires at (local time) ", jsx("input", { name: "expiry", type: "datetime-local" })] }),
+      jsx("button", { type: "submit", disabled: busy || !objective.can_record_assessment, children: busy ? "Saving and verifying\u2026" : "Record human assessment" }),
+      !objective.can_record_assessment ? jsx("p", { children: "Read-only: a dedicated authenticated human principal is required to record assessments." }) : null
+    ] }) : null,
+    error ? jsx("p", { role: "alert", children: error }) : null
+  ] });
 }
 
 // hermes_dockyard_plugin/desktop/src/views/backlog-import-wizard.js
@@ -14649,57 +14592,6 @@ function mountDesktopWorkflowCanvas(host2, projectId, workflowName, definition, 
   }, handlers.pollMs ?? 6e4);
 }
 
-// hermes_dockyard_plugin/desktop/src/lib/plan-vocab.js
-var ICON = Object.freeze({ project: "P", initiative: "I", milestone: "M", work: "W", objective: "O", goal: "G" });
-var KIND_LABEL = Object.freeze({ initiative: "Initiative", milestone: "Milestone", objective: "Objective", goal: "Goal" });
-var BUCKETS = Object.freeze([["planned", "Planned"], ["building", "Building"], ["ready_for_review", "Ready for review"], ["complete", "Complete"]]);
-var STATUS_LABEL = Object.freeze({
-  proposed: "Proposed",
-  pending_approval: "Waiting for approval",
-  changes_requested: "Changes requested",
-  approved: "Approved",
-  executing: "In progress",
-  completed: "Complete",
-  regressed: "Regressed",
-  rejected: "Rejected",
-  cancelled: "Cancelled"
-});
-var STATUS_TONE = Object.freeze({
-  proposed: "info",
-  pending_approval: "warning",
-  changes_requested: "warning",
-  approved: "info",
-  executing: "info",
-  completed: "success",
-  regressed: "danger",
-  rejected: "neutral",
-  cancelled: "neutral"
-});
-var OPEN_STATUSES = Object.freeze(["proposed", "pending_approval", "changes_requested", "approved", "executing"]);
-var GOAL_LABEL = Object.freeze({ met: "Met", at_risk: "At risk", unknown: "Unknown evidence", unproven: "Unproven" });
-var GOAL_TONE = Object.freeze({ met: "success", at_risk: "danger", unknown: "neutral", unproven: "neutral" });
-var OUTCOME_LABEL = Object.freeze({ passed: "Passed", failed: "Failed", stale: "Stale", unknown: "Unknown", not_applicable: "Not applicable" });
-var OUTCOME_TONE = Object.freeze({ passed: "success", failed: "danger", stale: "warning", unknown: "neutral", not_applicable: "neutral" });
-var REL_LABEL = Object.freeze({ delivers: "delivers", depends_on: "depends on", supports: "supports", measures: "measures", unblocks: "unblocks" });
-var RELATIONSHIPS = Object.freeze({ milestone: Object.freeze(["delivers", "depends_on"]), objective: Object.freeze(["supports", "measures", "unblocks"]) });
-function forecastLine(fc) {
-  if (!fc) return "Forecast unavailable.";
-  if (fc.state === "complete") return "Forecast: complete.";
-  if (fc.state === "insufficient_history") {
-    return `Forecast: insufficient history (${fc.sample_size ?? 0} completions in the last ${fc.assumptions?.window_weeks ?? 4} complete weeks; needs ${fc.assumptions?.min_sample ?? 8}).`;
-  }
-  if (fc.state === "not_comparable") return "Forecast: work history is not comparable.";
-  const range = fc.range_weeks ?? {};
-  const upper = range.upper_open_ended ? "open-ended (a zero-throughput week was observed)" : `${range.upper} weeks`;
-  return `Forecast: ~${fc.central_weeks} weeks central (range ${range.lower}\u2013${upper}); ${fc.sample_size} completions. A count-based scenario, not a delivery promise.`;
-}
-function riskLine(risk) {
-  if (risk.kind === "dependency_blocker" && risk.item) return `${risk.item} blocked by ${(risk.blockers ?? []).join(", ")} \u2014 owner ${risk.owner || "unassigned"}`;
-  if (risk.kind === "overdue_item" && risk.item) return `${risk.item} overdue \u2014 owner ${risk.owner || "unassigned"}`;
-  if (risk.kind === "milestone_overdue") return `Milestone past its due date with ${risk.remaining} item(s) remaining.`;
-  return risk.kind;
-}
-
 // hermes_dockyard_plugin/desktop/src/project/workflows.js
 function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary }) {
   const [name, setName] = useState("release");
@@ -15517,7 +15409,7 @@ function cardFacts(item, data = {}, today = null) {
   const blockedBy = (entry.blocked_by ?? []).map(link);
   const blocks = (entry.blocks ?? []).map(link);
   const initiative = item.initiative_ref ? { ref: item.initiative_ref, title: (data.initiatives ?? []).find((candidate) => candidate.ref === item.initiative_ref)?.title ?? "" } : null;
-  const milestones = (data.milestones ?? []).filter((milestone) => !milestone.archived_at && (milestone.item_refs ?? []).includes(item.ref)).map((milestone) => ({ name: milestone.name, due: milestone.due ?? null }));
+  const milestones = (data.milestones ?? []).filter((milestone) => !milestone.archived_at && (milestone.item_refs ?? []).includes(item.ref)).map((milestone) => ({ id: milestone.id, name: milestone.name, due: milestone.due ?? null }));
   const objectives = item.initiative_ref ? objectivesOfInitiative(data.roadmapProject, item.initiative_ref).objectives.map((objective) => ({ id: objective.id, name: objective.name, relationship: objective.relationship ?? null })) : [];
   const due = item.due ? String(item.due).slice(0, 10) : null;
   return {
@@ -15672,9 +15564,9 @@ function CardBody({ id, item, facts, moves, moving, today, onMove, onOpenItem, o
   const row = (label, value, extra = {}, key = label) => jsxs("div", { className: "dy-kb-row", ...extra, children: [jsx("dt", { children: label }), jsx("dd", { children: value })] }, key);
   const goto = (label, onClick, text) => jsx("button", { type: "button", className: "dy-kb-goto", "aria-label": `${label}: ${text}`, onClick, children: text });
   const planning = [];
-  if (facts.initiative) planning.push(row("Initiative", goto("Initiative", () => onNavigate("roadmap"), facts.initiative.title || facts.initiative.ref)));
-  facts.milestones.forEach((milestone, index) => planning.push(row("Milestone", goto("Milestone", () => onNavigate("objectives"), milestone.due ? `${milestone.name} \xB7 due ${shortDate(milestone.due, today)}` : milestone.name), {}, `milestone:${index}`)));
-  facts.objectives.forEach((objective, index) => planning.push(row("Objective", jsxs("span", { children: [goto("Objective", () => onNavigate("objectives"), objective.name), jsx("span", { className: "dy-kb-via", children: " (through the initiative)" })] }), {}, `objective:${index}`)));
+  if (facts.initiative) planning.push(row("Initiative", goto("Initiative", () => onNavigate(`plan:initiative:${facts.initiative.ref}`), facts.initiative.title || facts.initiative.ref)));
+  facts.milestones.forEach((milestone, index) => planning.push(row("Milestone", goto("Milestone", () => onNavigate(`plan:milestone:${milestone.id}`), milestone.due ? `${milestone.name} \xB7 due ${shortDate(milestone.due, today)}` : milestone.name), {}, `milestone:${index}`)));
+  facts.objectives.forEach((objective, index) => planning.push(row("Objective", jsxs("span", { children: [goto("Objective", () => onNavigate(`plan:objective:${objective.id}`), objective.name), jsx("span", { className: "dy-kb-via", children: " (through the initiative)" })] }), {}, `objective:${index}`)));
   const details = [row("Assignee", item.assignee ? displayName(item.assignee) : "Unassigned")];
   if (facts.due) details.push(row("Due", facts.overdue ? `${shortDate(facts.due, today)} \xB7 Overdue` : shortDate(facts.due, today), facts.overdue ? { "data-overdue": "true" } : {}));
   if (facts.labels.length) details.push(row("Labels", facts.labels.join(", ")));
@@ -16327,10 +16219,71 @@ function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onN
   ] });
 }
 
+// hermes_dockyard_plugin/desktop/src/lib/plan-vocab.js
+var ICON = Object.freeze({ project: "P", initiative: "I", milestone: "M", work: "W", objective: "O", goal: "G" });
+var KIND_LABEL = Object.freeze({ initiative: "Initiative", milestone: "Milestone", objective: "Objective", goal: "Goal" });
+var BUCKETS = Object.freeze([["planned", "Planned"], ["building", "Building"], ["ready_for_review", "Ready for review"], ["complete", "Complete"]]);
+var STATUS_LABEL = Object.freeze({
+  proposed: "Proposed",
+  pending_approval: "Waiting for approval",
+  changes_requested: "Changes requested",
+  approved: "Approved",
+  executing: "In progress",
+  completed: "Complete",
+  regressed: "Regressed",
+  rejected: "Rejected",
+  cancelled: "Withdrawn"
+});
+var STATUS_TONE = Object.freeze({
+  proposed: "info",
+  pending_approval: "warning",
+  changes_requested: "warning",
+  approved: "info",
+  executing: "info",
+  completed: "success",
+  regressed: "danger",
+  rejected: "neutral",
+  cancelled: "neutral"
+});
+var OPEN_STATUSES = Object.freeze(["proposed", "pending_approval", "changes_requested", "approved", "executing"]);
+var WITHDRAWABLE_STATUSES = Object.freeze(["proposed", "pending_approval", "changes_requested"]);
+var COMPLETABLE_STATUSES = Object.freeze(["approved", "executing"]);
+var CLOSED_STATUSES = Object.freeze(["completed", "regressed", "rejected", "cancelled"]);
+var GOAL_LABEL = Object.freeze({ met: "Met", at_risk: "At risk", unknown: "Unknown evidence", unproven: "Unproven" });
+var GOAL_TONE = Object.freeze({ met: "success", at_risk: "danger", unknown: "neutral", unproven: "neutral" });
+var OUTCOME_LABEL = Object.freeze({ passed: "Passed", failed: "Failed", stale: "Stale", unknown: "Unknown", not_applicable: "Not applicable" });
+var OUTCOME_TONE = Object.freeze({ passed: "success", failed: "danger", stale: "warning", unknown: "neutral", not_applicable: "neutral" });
+var REL_LABEL = Object.freeze({ delivers: "delivers", depends_on: "depends on", supports: "supports", measures: "measures", unblocks: "unblocks" });
+var RELATIONSHIPS = Object.freeze({ milestone: Object.freeze(["delivers", "depends_on"]), objective: Object.freeze(["supports", "measures", "unblocks"]) });
+function forecastLine(fc) {
+  if (!fc) return "Forecast unavailable.";
+  if (fc.state === "complete") return "Forecast: complete.";
+  if (fc.state === "insufficient_history") {
+    return `Forecast: insufficient history (${fc.sample_size ?? 0} completions in the last ${fc.assumptions?.window_weeks ?? 4} complete weeks; needs ${fc.assumptions?.min_sample ?? 8}).`;
+  }
+  if (fc.state === "not_comparable") return "Forecast: work history is not comparable.";
+  const range = fc.range_weeks ?? {};
+  const upper = range.upper_open_ended ? "open-ended (a zero-throughput week was observed)" : `${range.upper} weeks`;
+  return `Forecast: ~${fc.central_weeks} weeks central (range ${range.lower}\u2013${upper}); ${fc.sample_size} completions. A count-based scenario, not a delivery promise.`;
+}
+function riskLine(risk) {
+  if (risk.kind === "dependency_blocker" && risk.item) return `${risk.item} blocked by ${(risk.blockers ?? []).join(", ")} \u2014 owner ${risk.owner || "unassigned"}`;
+  if (risk.kind === "overdue_item" && risk.item) return `${risk.item} overdue \u2014 owner ${risk.owner || "unassigned"}`;
+  if (risk.kind === "milestone_overdue") return `Milestone past its due date with ${risk.remaining} item(s) remaining.`;
+  return risk.kind;
+}
+
 // hermes_dockyard_plugin/desktop/src/project/plan/plan-data.js
 var enc = encodeURIComponent;
 var needsReview = (initiative) => ["pending_approval", "changes_requested"].includes(initiative?.status);
 var isOverdue2 = (milestone, today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)) => Boolean(milestone && !milestone.closed && !milestone.archived && milestone.due && milestone.due < today);
+var isClosed = (item) => item?.kind === "initiative" && CLOSED_STATUSES.includes(item.status);
+var isTucked = (item) => Boolean(item?.archived) || isClosed(item);
+var isLinkable = (initiative) => !["rejected", "cancelled"].includes(initiative?.status);
+function unfinishedWork(delivery) {
+  if (!delivery || delivery.state !== "ok") return 0;
+  return Math.max(0, (delivery.total ?? 0) - (delivery.complete ?? 0));
+}
 var sameItem = (a, b) => Boolean(a && b && a.kind === b.kind && String(a.id) === String(b.id));
 var listOf = (plan, kind) => ({ initiative: plan.initiatives, milestone: plan.milestones, objective: plan.objectives, goal: plan.goals })[kind] ?? [];
 var findItem = (plan, ref) => plan && ref ? listOf(plan, ref.kind).find((row) => sameItem(row, ref)) ?? null : null;
@@ -16353,9 +16306,9 @@ async function loadPlan(projectId) {
     api(`/projects/${p}/missions/archive`).catch(() => ({ missions: [] })),
     api(`/projects/${p}/work-items`).catch(() => ({ work_items: [] }))
   ]);
-  return buildPlan({ roadmap, initiatives, objectives, goals, milestones, settings, missions, work });
+  return buildPlan({ projectId, roadmap, initiatives, objectives, goals, milestones, settings, missions, work });
 }
-function buildPlan({ roadmap, initiatives, objectives, goals, milestones, settings, missions, work }) {
+function buildPlan({ projectId, roadmap, initiatives, objectives, goals, milestones, settings, missions, work }) {
   const project = roadmap?.projects?.[0] ?? null;
   const read = new Map((project?.initiatives ?? []).map((row) => [row.ref, row]));
   const goalRead = new Map((project?.goals ?? []).map((row) => [row.id, row]));
@@ -16380,6 +16333,7 @@ function buildPlan({ roadmap, initiatives, objectives, goals, milestones, settin
     objectivesPassed: goalRead.get(goal.goal_id)?.objectives_passed ?? null
   })).sort((a, b) => a.position - b.position);
   return {
+    projectId,
     label: project?.label ?? settings?.project_id ?? "",
     canWrite: roadmap?.can_write !== false,
     mission: settings?.mission ?? "",
@@ -16399,6 +16353,9 @@ function buildPlan({ roadmap, initiatives, objectives, goals, milestones, settin
       passRate: row.evidence?.pass_rate ?? null,
       samples: row.evidence?.sample_count ?? 0,
       window: row.window ?? "30d",
+      // The backend record, for the evidence history and the human assessment
+      // form (the same panel the old Objectives tab showed).
+      record: row,
       initiatives: objectiveLinks.get(row.id) ?? [],
       goals: goalRows.filter((goal) => goal.objectiveIds.includes(row.id)).map((goal) => ({ id: goal.id, title: goal.title }))
     })),
@@ -16426,7 +16383,6 @@ function buildPlan({ roadmap, initiatives, objectives, goals, milestones, settin
         risk: row.risk ?? "low",
         rationale: row.rationale ?? "",
         expectedOutcome: row.expected_outcome ?? "",
-        priority: row.priority ?? 0,
         // The backend record, handed unchanged to the approval panel: the
         // Inbox gives it the same record, so a review shows the same facts.
         record: row,
@@ -16442,22 +16398,31 @@ function planActions(projectId) {
   const p = enc(projectId);
   const quiet = true;
   return {
+    // Checks are the initiative's validation contract. They go in `tests`,
+    // which the approval cards ("Validate: …") and automatic completion read;
+    // `steps` would replace the default board cards, so the form never sends it.
     proposeInitiative: (form) => api(`/projects/${p}/initiatives`, { method: "POST", quiet, body: {
       title: form.title.trim(),
       rationale: form.rationale.trim(),
       expected_outcome: form.expectedOutcome.trim(),
-      risk: form.risk
+      risk: form.risk,
+      ...form.checks?.trim() ? { validation_contract: { tests: form.checks.trim() } } : {}
     } }),
     resubmitInitiative: (ref, form) => api(`/initiatives/${enc(ref)}/resubmit`, { method: "POST", quiet, body: {
       rationale: form.rationale.trim(),
       expected_outcome: form.expectedOutcome.trim(),
       risk: form.risk
     } }),
+    // The proxy vouches for the signed-in person; the body never names them.
+    withdrawInitiative: (ref, reason) => api(`/initiatives/${enc(ref)}/withdraw`, { method: "POST", quiet, body: reason ? { reason } : {} }),
+    // Same body as the browser dashboard's "Complete with verified outcome".
+    completeInitiative: (ref) => api(`/initiatives/${enc(ref)}/complete`, { method: "POST", quiet, body: { verified: true, regressed: false } }),
     createMilestone: (form) => api(`/projects/${p}/milestones`, { method: "POST", quiet, body: { name: form.title.trim(), due: form.due || null } }),
     renameMilestone: (name, next) => api(`/projects/${p}/milestones/${enc(name)}/rename`, { method: "POST", quiet, body: { new_name: next.trim() } }),
     updateMilestone: (name, patch) => api(`/projects/${p}/milestones/${enc(name)}`, { method: "PATCH", quiet, body: patch }),
     archiveMilestone: (name) => api(`/projects/${p}/milestones/${enc(name)}/archive`, { method: "POST", quiet, body: {} }),
     restoreMilestone: (name) => api(`/projects/${p}/milestones/${enc(name)}/restore`, { method: "POST", quiet, body: {} }),
+    deleteMilestone: (name) => api(`/projects/${p}/milestones/${enc(name)}`, { method: "DELETE", quiet, body: {} }),
     milestoneDetail: (name) => api(`/projects/${p}/milestones/${enc(name)}`, { quiet }),
     attachWork: (name, ref) => api(`/projects/${p}/milestones/${enc(name)}/attach`, { method: "POST", quiet, body: { ref } }),
     detachWork: (name, ref) => api(`/projects/${p}/milestones/${enc(name)}/detach`, { method: "POST", quiet, body: { ref } }),
@@ -16487,6 +16452,7 @@ function planActions(projectId) {
     orderGoals: (ids) => api(`/projects/${p}/goals/order`, { method: "PUT", quiet, body: { goal_ids: ids } }),
     archiveGoal: (id) => api(`/projects/${p}/goals/${enc(id)}/archive`, { method: "POST", quiet, body: {} }),
     restoreGoal: (id) => api(`/projects/${p}/goals/${enc(id)}/restore`, { method: "POST", quiet, body: {} }),
+    deleteGoal: (id) => api(`/projects/${p}/goals/${enc(id)}`, { method: "DELETE", quiet, body: {} }),
     linkMilestone: (ref, milestoneId, relationship) => api(`/projects/${p}/initiatives/${enc(ref)}/milestones`, { method: "POST", quiet, body: { milestone_id: Number(milestoneId), relationship } }),
     unlinkMilestone: (ref, milestoneId) => api(`/projects/${p}/initiatives/${enc(ref)}/milestones/${Number(milestoneId)}`, { method: "DELETE", quiet, body: {} }),
     linkObjective: (ref, objectiveId, relationship) => api(`/projects/${p}/objectives/${Number(objectiveId)}/initiatives`, { method: "POST", quiet, body: { initiative_ref: ref, relationship } }),
@@ -16596,7 +16562,7 @@ function Field({ id, label, required, error, hint, children }) {
   ] });
 }
 var blank = (kind, item) => ({
-  initiative: { title: item?.title ?? "", rationale: item?.rationale ?? "", expectedOutcome: item?.expectedOutcome ?? "", risk: item?.risk ?? "low" },
+  initiative: { title: item?.title ?? "", rationale: item?.rationale ?? "", expectedOutcome: item?.expectedOutcome ?? "", risk: item?.risk ?? "low", checks: "" },
   milestone: { title: item?.title ?? "", due: item?.due ?? "", closed: Boolean(item?.closed) },
   objective: { title: item?.title ?? "", description: item?.description ?? "", target: item?.target ?? ">=1", severity: item?.severity ?? "medium" },
   goal: { title: item?.title ?? "", description: item?.description ?? "", objectiveIds: item?.objectiveIds ?? [] }
@@ -16683,7 +16649,15 @@ function ItemForm({ kind, mode = "create", item, plan, actions, linkTo, onClose,
       mode === "create" ? field("title", "Title", jsx("input", input("title", { autoComplete: "off" })), { required: true }) : null,
       field("rationale", "Why it matters", jsx("textarea", input("rationale", { rows: 3 })), { required: true }),
       field("expectedOutcome", "Expected outcome", jsx("textarea", input("expectedOutcome", { rows: 2 })), { hint: "What should be true when it is done." }),
-      field("risk", "Risk", jsx("select", { ...input("risk"), children: options(RISKS) }), { required: true })
+      field("risk", "Risk", jsx("select", { ...input("risk"), children: options(RISKS) }), { required: true }),
+      // The backend cannot add checks later (resubmit keeps them as they are),
+      // so the box is offered when proposing only.
+      mode === "create" ? field(
+        "checks",
+        "How we\u2019ll know it worked",
+        jsx("textarea", input("checks", { rows: 2, placeholder: "For example: the test suite passes and sign-ups recover to 40 a day." })),
+        { hint: "Optional. Reviewers see these checks. Hermes can only finish an initiative by itself when it has them; without them, mark it complete when the work is done." }
+      ) : null
     ],
     milestone: () => [
       field("title", "Name", jsx("input", input("title", { autoComplete: "off" })), { required: true }),
@@ -16817,6 +16791,47 @@ function Confirm({ spec, onCancel, onDone }) {
     }
   });
 }
+function ActionDialog({ spec, onCancel, onDone }) {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState(null);
+  const submit = async () => {
+    setBusy(true);
+    setFailure(null);
+    try {
+      await spec.run(reason.trim());
+      emitToast("success", spec.done);
+      onDone();
+    } catch (error) {
+      setFailure(errorText(error));
+      setBusy(false);
+    }
+  };
+  const id = `dy-plan-${spec.key}-reason`;
+  return jsx(PlanDialog, {
+    dialogKey: spec.key,
+    eyebrow: spec.eyebrow,
+    title: spec.title,
+    busy,
+    onClose: onCancel,
+    actions: [
+      jsx(Button, { onClick: onCancel, disabled: busy, children: "Cancel" }, "cancel"),
+      jsx(Button, { variant: spec.variant ?? "primary", action: `plan-${spec.key}-confirm`, disabled: busy, onClick: submit, children: busy ? "Working\u2026" : spec.label }, "confirm")
+    ],
+    children: jsxs("div", { className: "dy-plan-form", children: [
+      jsx("ul", { className: "dy-plan-consequences", children: spec.lines.filter(Boolean).map((line) => jsx("li", { children: line }, line)) }),
+      spec.reasonLabel ? jsx(Field, { id, label: spec.reasonLabel, children: jsx("textarea", {
+        id,
+        rows: 2,
+        value: reason,
+        "data-plan-field": "reason",
+        maxLength: 2e3,
+        onChange: (event) => setReason(event.target.value)
+      }) }) : null,
+      failure ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: failure }) : null
+    ] })
+  });
+}
 function MissionStrip({ plan, actions, onChanged, onConfirm }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(plan.mission);
@@ -16887,13 +16902,20 @@ var LOOP = [
   ["verify", "Verify state", () => "Confirm the project state and evidence source."],
   ["detect", "Detect gap", (i) => i.rationale || "Research the highest-value project gap."],
   ["propose", "Create initiative", (i) => i.expectedOutcome || "Declare the expected outcome."],
-  ["prioritise", "Prioritise", (i) => `Priority ${number(i.priority)} with a recorded rationale.`],
-  ["approval", "Human approval", () => "Owner reviews the risk, evidence and validation contract."],
-  ["execute", "Build and verify", (i) => validationSummary(i.record.validation_contract)],
+  // No priority number: nothing can set one (the API has no field for it).
+  ["prioritise", "Prioritise", () => "Counted against the project\u2019s open-initiative limit."],
+  ["approval", "Human approval", () => "Owner reviews the risk, evidence and checks."],
+  ["execute", "Build and verify", (i) => checksOf(i.record.validation_contract) ?? "No checks recorded: mark it complete when the work is done."],
   ["release", "Release", () => "Release remains bounded by project policy."],
   ["observe", "Observe outcome", () => "Measure whether the project improved."]
 ];
-var loopIndex = (status) => ["pending_approval", "changes_requested"].includes(status) ? 4 : ["approved", "executing"].includes(status) ? 5 : ["completed", "regressed"].includes(status) ? 7 : 2;
+var STOPPED = { rejected: "Rejected at approval.", cancelled: "Withdrawn before approval." };
+var loopIndex = (status) => ["pending_approval", "changes_requested", "rejected", "cancelled"].includes(status) ? 4 : ["approved", "executing"].includes(status) ? 5 : ["completed", "regressed"].includes(status) ? 7 : 2;
+function checksOf(contract) {
+  const steps = Array.isArray(contract?.steps) ? contract.steps.filter(Boolean) : [];
+  const tests = typeof contract?.tests === "string" ? contract.tests.trim() : "";
+  return steps.length || tests ? validationSummary(contract) : null;
+}
 function Section2({ title, action, children, readOnly }) {
   return jsxs("section", { className: "dy-plan-drawer-section", children: [
     jsxs("header", { children: [jsx("h4", { children: title }), readOnly ? null : action] }),
@@ -17006,7 +17028,7 @@ function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
     };
   }, []);
   const readOnly = ui.readOnly;
-  const live = !readOnly && !item.archived;
+  const live = !readOnly && !item.archived && (item.kind !== "initiative" || isLinkable(item));
   const open = (kind, id) => () => ui.open({ kind, id });
   const linkButton = (target, label = "+ Link") => live ? jsx(Button, { small: true, action: `plan-link-${target}`, onClick: () => ui.link(item, target), children: label }) : null;
   const unlink = (title, description, run, label = "Unlink") => readOnly ? null : () => ui.confirm({ key: "plan-unlink", title, description, label, done: "Link removed.", run });
@@ -17040,9 +17062,16 @@ function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
   let footer = [];
   if (item.kind === "initiative") {
     const stage = loopIndex(item.status);
+    const stopped = STOPPED[item.status];
+    const checks = checksOf(item.record.validation_contract);
     tags.push(jsx(Tag, { children: `${item.risk} risk` }, "risk"));
     body = [
-      jsx(Facts, { rows: [["Why", item.rationale || "\u2014"], ["Expected outcome", item.expectedOutcome || "\u2014"], ["Reference", item.ref]] }, "facts"),
+      jsx(Facts, { rows: [
+        ["Why", item.rationale || "\u2014"],
+        ["Expected outcome", item.expectedOutcome || "\u2014"],
+        ["Checks", checks ?? "None recorded"],
+        ["Reference", item.ref]
+      ] }, "facts"),
       item.status === "changes_requested" ? jsxs(Section2, { title: "Changes requested", children: [
         jsx(ChangesFeedback, { refId: item.ref }),
         readOnly ? null : jsx(Button, { small: true, variant: "primary", action: "plan-revise", onClick: () => ui.edit(item), children: "Revise and resubmit" })
@@ -17080,20 +17109,27 @@ function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
         ...BUCKETS.map(([key, label]) => jsxs("span", { children: [jsx("strong", { children: number(item.delivery[key] ?? 0) }), label] }, key)),
         item.delivery.blocked > 0 ? jsxs("span", { className: "blocked", children: [jsx("strong", { children: number(item.delivery.blocked) }), "Blocked"] }, "blocked") : null
       ] }) }, "delivery"),
-      jsx("p", { className: "dy-plan-note", "data-plan-no-delete": true, children: "Initiatives are not deleted: each keeps its approval record. A reviewer can reject one or ask for changes." }, "nodelete"),
-      jsx(Section2, { title: "Where it is in the loop", children: jsx("ol", { className: "dy-plan-loop", "data-plan-loop": item.ref, children: LOOP.map(([key, label, text], index) => jsxs("li", {
-        className: index < stage ? "done" : index === stage ? "current" : "",
+      jsx("p", { className: "dy-plan-note", "data-plan-no-delete": true, children: WITHDRAWABLE_STATUSES.includes(item.status) ? "Initiatives are not deleted: each keeps its approval record. Not needed any more? Withdraw it before approval." : "Initiatives are not deleted: each keeps its approval record." }, "nodelete"),
+      jsx(Section2, { title: "Stages", children: jsx("ol", { className: "dy-plan-loop", "data-plan-loop": item.ref, children: LOOP.map(([key, label, text], index) => jsxs("li", {
+        className: index < stage ? "done" : index === stage ? stopped ? "stopped" : "current" : "",
         "aria-current": index === stage ? "step" : void 0,
-        children: [jsx("strong", { children: label }), index === stage ? jsx("small", { children: text(item) }) : null]
+        children: [jsx("strong", { children: label }), index === stage ? jsx("small", { children: stopped ?? text(item) }) : null]
       }, key)) }) }, "loop")
     ];
+    footer = [
+      COMPLETABLE_STATUSES.includes(item.status) ? jsx(Button, { variant: "primary", action: "plan-complete", onClick: () => ui.complete(item), children: "Mark complete\u2026" }, "complete") : null,
+      WITHDRAWABLE_STATUSES.includes(item.status) ? jsx(Button, { variant: "danger", action: "plan-withdraw", onClick: () => ui.withdraw(item), children: "Withdraw\u2026" }, "withdraw") : null
+    ].filter(Boolean);
   } else if (item.kind === "milestone") {
     body = [
       jsx(Facts, { rows: [["Due", item.due ?? "No due date"], ["Progress", `${number(item.done)} of ${number(item.total)} work items done`]] }, "facts"),
       jsx(Section2, { title: "Initiatives", readOnly, action: linkButton("initiative"), children: jsx(Links, { empty: "Not linked to an initiative yet.", rows: initiativeRows(item.initiatives, "milestone") }) }, "initiatives"),
       jsx(MilestoneWork, { milestone: item, plan, actions, onChanged, readOnly }, "work")
     ];
-    footer = item.archived ? [jsx(Button, { action: "plan-restore-milestone", onClick: () => ui.restore(item), children: "Restore" }, "restore")] : [
+    footer = item.archived ? [
+      jsx(Button, { action: "plan-restore-milestone", onClick: () => ui.restore(item), children: "Restore" }, "restore"),
+      jsx(Button, { variant: "danger", action: "plan-delete-milestone", onClick: () => ui.remove(item), children: "Delete for good\u2026" }, "delete")
+    ] : [
       jsx(Button, { variant: "primary", action: "plan-edit", onClick: () => ui.edit(item), children: "Edit" }, "edit"),
       jsx(Button, {
         action: item.closed ? "plan-reopen-milestone" : "plan-close-milestone",
@@ -17134,6 +17170,10 @@ function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
         ["Evidence", item.samples ? `${number(item.samples)} result(s) in ${item.window}${item.passRate !== null ? `, ${Math.round(item.passRate * 100)}% passed` : ""}` : `None yet (${item.window} window)`]
       ] }, "facts"),
       evaluation ? jsx("p", { className: "dy-plan-note", role: "status", "data-plan-evaluation": true, children: evaluation }, "evaluation") : null,
+      // Evidence history and, for a manual objective, the human assessment
+      // form: the old Objectives tab's panel, unchanged (it fails closed
+      // without an authenticated human).
+      item.record ? jsx(ObjectiveEvidence, { objective: item.record, projectId: plan.projectId, onSaved: onChanged }, "evidence") : null,
       // The backend allows each objective in one goal.
       jsx(Section2, { title: "Goal it measures", readOnly, action: goal ? null : linkButton("goal", "+ Add"), children: jsx(Links, {
         empty: "Not part of a goal yet. An objective can measure one goal.",
@@ -17188,7 +17228,10 @@ function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
         })
       }) }, "objectives")
     ];
-    footer = item.archived ? [jsx(Button, { action: "plan-restore-goal", onClick: () => ui.restore(item), children: "Restore" }, "restore")] : [
+    footer = item.archived ? [
+      jsx(Button, { action: "plan-restore-goal", onClick: () => ui.restore(item), children: "Restore" }, "restore"),
+      jsx(Button, { variant: "danger", action: "plan-delete-goal", onClick: () => ui.remove(item), children: "Delete for good\u2026" }, "delete")
+    ] : [
       jsx(Button, { variant: "primary", action: "plan-edit", onClick: () => ui.edit(item), children: "Edit" }, "edit"),
       jsx(Button, { action: "plan-goal-up", disabled: busy || index <= 0, onClick: () => move(-1), children: "Move up" }, "up"),
       jsx(Button, { action: "plan-goal-down", disabled: busy || index >= active.length - 1, onClick: () => move(1), children: "Move down" }, "down"),
@@ -17208,15 +17251,15 @@ function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
 }
 
 // hermes_dockyard_plugin/desktop/src/project/plan/plan-screen.js
-var LAYOUTS = [["A", "Outline"], ["B", "Columns"], ["C", "Review first"]];
 var KINDS = ["initiative", "milestone", "objective", "goal"];
 var PLURAL = { initiative: "Initiatives", milestone: "Milestones", objective: "Objectives", goal: "Goals" };
 var EMPTY = {
-  initiative: "No initiatives yet. Propose one: it waits for approval before work starts.",
+  initiative: "No open initiatives. Propose one: it waits for approval before work starts.",
   milestone: "No milestones yet. A milestone groups the work for one delivery date.",
   objective: "No objectives yet. An objective is evidence that the work made a difference.",
   goal: "No goals yet. A goal is met when its objectives pass."
 };
+var TUCKED = "Show finished and archived";
 function parsePlanFocus(entry) {
   const match = /^plan:(initiative|milestone|objective|goal):(.+)$/.exec(String(entry ?? ""));
   return match ? { kind: match[1], id: match[2] } : null;
@@ -17229,28 +17272,6 @@ function summaryOf(item) {
   if (item.kind === "objective") return [`target ${item.target}`, `${item.severity} severity`, linked].join(" \xB7 ");
   return [plural3(item.objectiveIds.length, "objective"), item.objectivesPassed !== null ? `${number(item.objectivesPassed)} passing` : null].filter(Boolean).join(" \xB7 ");
 }
-function neighbours(item) {
-  if (item.kind === "goal") return item.objectiveIds.map((id) => ["objective", id]);
-  if (item.kind === "objective") return [...item.goals.map((g) => ["goal", g.id]), ...item.initiatives.map((link) => ["initiative", link.ref])];
-  if (item.kind === "initiative") return [...item.milestones.map((m) => ["milestone", m.id]), ...item.objectives.map((o) => ["objective", o.id])];
-  return item.initiatives.map((link) => ["initiative", link.ref]);
-}
-var RANK = { goal: 0, objective: 1, initiative: 2, milestone: 3 };
-function traceOf(plan, ref) {
-  const start = findItem(plan, ref);
-  const seen = /* @__PURE__ */ new Set();
-  if (!start) return seen;
-  const walk = (item, direction) => {
-    seen.add(`${item.kind}:${item.id}`);
-    for (const [kind, id] of neighbours(item)) {
-      const step = Math.sign(RANK[kind] - RANK[item.kind]);
-      const next = findItem(plan, { kind, id });
-      if (next && (direction === 0 || step === direction) && !seen.has(`${kind}:${id}`)) walk(next, step);
-    }
-  };
-  walk(start, 0);
-  return seen;
-}
 function rowMenu(item, ui) {
   if (ui.readOnly) return null;
   const entry = (id, label, onSelect, danger) => ({ id, label, onSelect, danger });
@@ -17258,9 +17279,12 @@ function rowMenu(item, ui) {
   if (item.kind === "initiative") {
     if (item.status === "pending_approval") items.push(entry("review", "Review\u2026", () => ui.review(item)));
     if (item.status === "changes_requested") items.push(entry("revise", "Revise and resubmit\u2026", () => ui.edit(item)));
-    items.push(entry("link-milestone", "Link a milestone\u2026", () => ui.link(item, "milestone")), entry("link-objective", "Link an objective\u2026", () => ui.link(item, "objective")));
+    if (isLinkable(item)) items.push(entry("link-milestone", "Link a milestone\u2026", () => ui.link(item, "milestone")), entry("link-objective", "Link an objective\u2026", () => ui.link(item, "objective")));
+    if (COMPLETABLE_STATUSES.includes(item.status)) items.push(entry("complete", "Mark complete\u2026", () => ui.complete(item)));
+    if (WITHDRAWABLE_STATUSES.includes(item.status)) items.push(entry("withdraw", "Withdraw\u2026", () => ui.withdraw(item), true));
   } else if (item.archived) {
-    items.push(item.kind === "objective" ? entry("delete", "Delete for good\u2026", () => ui.remove(item), true) : entry("restore", "Restore\u2026", () => ui.restore(item)));
+    if (item.kind !== "objective") items.push(entry("restore", "Restore\u2026", () => ui.restore(item)));
+    items.push(entry("delete", "Delete for good\u2026", () => ui.remove(item), true));
   } else {
     items.push(entry("edit", "Edit\u2026", () => ui.edit(item)));
     items.push(item.kind === "goal" ? entry("link-objective", "Add an objective\u2026", () => ui.link(item, "objective")) : entry("link-initiative", "Link to an initiative\u2026", () => ui.link(item, "initiative")));
@@ -17268,21 +17292,18 @@ function rowMenu(item, ui) {
   }
   return jsx(Menu, { label: `Actions for ${item.title}`, trigger: "\u22EF", action: `row-${item.kind}`, items });
 }
-function Row({ item, ui, selected, dim = false, compact = false, depth = 0, relationship }) {
+function Row({ item, ui, selected }) {
   const status = statusOf(item);
   const quick = ui.readOnly || item.kind !== "initiative" ? null : item.status === "pending_approval" ? jsx(Button, { small: true, variant: "primary", action: "plan-row-review", onClick: () => ui.review(item), children: "Review" }) : item.status === "changes_requested" ? jsx(Button, { small: true, action: "plan-row-revise", onClick: () => ui.edit(item), children: "Revise" }) : null;
   return jsxs("div", {
-    className: ["dy-plan-row", selected && "selected", item.archived && "archived", dim && "dim", compact && "compact", depth && `depth-${depth}`].filter(Boolean).join(" "),
+    className: ["dy-plan-row", selected && "selected", item.archived && "archived", isClosed(item) && "closed"].filter(Boolean).join(" "),
     "data-plan-row": item.kind,
     "data-plan-id": String(item.id),
     role: "listitem",
     children: [
       jsxs("button", { type: "button", className: "dy-plan-row-open", "aria-pressed": selected, onClick: () => ui.open(item), children: [
         jsx(KindGlyph, { kind: item.kind }),
-        jsxs("span", { className: "dy-plan-row-text", children: [
-          jsxs("strong", { children: [relationship ? jsx("em", { className: "dy-plan-rel", children: `${REL_LABEL[relationship] ?? relationship} \xB7 ` }) : null, item.title] }),
-          jsx("small", { children: summaryOf(item) })
-        ] })
+        jsxs("span", { className: "dy-plan-row-text", children: [jsx("strong", { children: item.title }), jsx("small", { children: summaryOf(item) })] })
       ] }),
       jsx("span", { className: "dy-plan-row-status", children: jsx(StatusTag, { tone: status.tone, label: status.label }) }),
       quick,
@@ -17290,99 +17311,18 @@ function Row({ item, ui, selected, dim = false, compact = false, depth = 0, rela
     ]
   });
 }
-function Rows({ items, ui, selected, empty, row = {} }) {
-  return items.length ? jsx("div", { className: "dy-plan-rows", role: "list", children: items.map((item) => jsx(Row, { item, ui, selected: sameItem(item, selected), ...row, dim: row.dim?.(item) }, `${item.kind}:${item.id}`)) }) : jsx("p", { className: "dy-plan-empty", children: empty });
-}
-function SectionHead({ title, kind, count, ui, note, actions }) {
+function SectionHead({ kind, count, ui, note }) {
   return jsxs("header", { className: "dy-plan-section-head", children: [
-    jsxs("h3", { children: [kind ? jsx(KindGlyph, { kind }) : null, title ?? PLURAL[kind], jsx("span", { className: "dy-plan-count", children: number(count) })] }),
+    jsxs("h3", { children: [jsx(KindGlyph, { kind }), PLURAL[kind], jsx("span", { className: "dy-plan-count", children: number(count) })] }),
     note ? jsx("span", { className: "dy-plan-section-note", children: note }) : null,
-    ui.readOnly ? null : actions ?? (kind ? jsx(Button, { small: true, action: `plan-new-${kind}`, onClick: () => ui.create(kind), children: kind === "initiative" ? "+ Propose" : "+ New" }) : null)
+    ui.readOnly ? null : jsx(Button, { small: true, action: `plan-new-${kind}`, onClick: () => ui.create(kind), children: kind === "initiative" ? "+ Propose" : "+ New" })
   ] });
 }
-function OutlineLayout({ lists, ui, selected, openNote }) {
-  return jsx("div", { className: "dy-plan-outline", "data-plan-layout-body": "A", children: KINDS.map((kind) => jsxs("section", { className: "dy-plan-section", "data-plan-section": kind, "aria-label": PLURAL[kind], children: [
+function Outline({ lists, ui, selected, openNote }) {
+  return jsx("div", { className: "dy-plan-outline", children: KINDS.map((kind) => jsxs("section", { className: "dy-plan-section", "data-plan-section": kind, "aria-label": PLURAL[kind], children: [
     jsx(SectionHead, { kind, count: lists[kind].length, ui, note: kind === "initiative" ? openNote : null }),
-    jsx(Rows, { items: lists[kind], ui, selected, empty: EMPTY[kind] })
+    lists[kind].length ? jsx("div", { className: "dy-plan-rows", role: "list", children: lists[kind].map((item) => jsx(Row, { item, ui, selected: sameItem(item, selected) }, `${item.kind}:${item.id}`)) }) : jsx("p", { className: "dy-plan-empty", children: EMPTY[kind] })
   ] }, kind)) });
-}
-var COLUMNS = [["goal", "Why"], ["objective", "How we know"], ["initiative", "What we do"], ["milestone", "When it lands"]];
-function ColumnsLayout({ plan, lists, ui, selected, openNote }) {
-  const trace = useMemo(() => traceOf(plan, selected), [plan, selected]);
-  const picked = findItem(plan, selected);
-  return jsxs("div", { className: "dy-plan-columns-wrap", "data-plan-layout-body": "B", children: [
-    jsx("p", { className: "dy-plan-columns-hint", children: picked ? `Showing what is linked to \u201C${picked.title}\u201D. Pick it again or press Escape to clear.` : "Pick a card to see everything linked to it." }),
-    jsx("div", { className: "dy-plan-columns", children: COLUMNS.map(([kind, caption]) => jsxs("section", { className: "dy-plan-column", "data-plan-section": kind, "aria-label": PLURAL[kind], children: [
-      jsx("p", { className: "dy-plan-column-caption", children: caption }),
-      jsx(SectionHead, { kind, count: lists[kind].length, ui, note: kind === "initiative" ? openNote : null }),
-      jsx(Rows, { items: lists[kind], ui, selected, empty: EMPTY[kind], row: { compact: true, dim: (item) => Boolean(picked) && !trace.has(`${kind}:${item.id}`) } })
-    ] }, kind)) })
-  ] });
-}
-function attentionOf(item, ui) {
-  if (item.archived) return null;
-  if (item.kind === "initiative") {
-    if (item.status === "pending_approval") return ["Waiting for your approval", "Review", () => ui.review(item), "primary"];
-    if (item.status === "changes_requested") return ["Changes were requested: revise and resubmit", "Revise", () => ui.edit(item)];
-    if (OPEN_STATUSES.includes(item.status) && !item.objectives.length) return ["Nothing measures it yet: link an objective", "Link", () => ui.link(item, "objective")];
-    return null;
-  }
-  if (item.kind === "milestone") {
-    if (isOverdue2(item)) return [`Overdue since ${item.due}: ${number(item.total - item.done)} item(s) left`, "Open", () => ui.open(item)];
-    return !item.closed && !item.initiatives.length ? ["Not linked to an initiative", "Link", () => ui.link(item, "initiative")] : null;
-  }
-  if (item.kind === "objective") {
-    if (item.outcome === "failed") return ["Failing its target", "Open", () => ui.open(item)];
-    return !item.initiatives.length ? ["Not linked to an initiative", "Link", () => ui.link(item, "initiative")] : null;
-  }
-  return item.state === "at_risk" ? ["At risk", "Open", () => ui.open(item)] : null;
-}
-function ReviewLayout({ lists, ui, selected, openNote }) {
-  const queue = KINDS.flatMap((kind) => lists[kind].map((item) => [item, attentionOf(item, ui)]).filter(([, why]) => why));
-  const linked = (kind) => new Set(lists.initiative.flatMap((i) => i[`${kind}s`].map((link) => link.id)));
-  const [milestones, objectives] = [linked("milestone"), linked("objective")];
-  const loose = [...lists.milestone.filter((m) => !milestones.has(m.id)), ...lists.objective.filter((o) => !objectives.has(o.id))];
-  const child = (kind, initiative) => initiative[`${kind}s`].map((link) => {
-    const item = lists[kind].find((row) => row.id === link.id);
-    return item ? jsx(Row, { item, ui, depth: 1, relationship: link.relationship, selected: sameItem(item, selected) }, `${initiative.id}:${kind}:${item.id}`) : null;
-  });
-  return jsxs("div", { className: "dy-plan-review", "data-plan-layout-body": "C", children: [
-    jsxs("section", { className: "dy-plan-queue", "data-plan-queue": true, "aria-label": "Needs your attention", children: [
-      jsx(SectionHead, { title: "Needs your attention", count: queue.length, ui }),
-      queue.length === 0 ? jsx("p", { className: "dy-plan-empty", children: "Nothing needs a decision. Every initiative is decided, measured and on time." }) : jsx("ol", { className: "dy-plan-queue-list", children: queue.map(([item, [why, label, onAct, variant]]) => jsxs("li", { "data-plan-queue-item": `${item.kind}:${item.id}`, children: [
-        jsx(KindGlyph, { kind: item.kind }),
-        jsx("button", { type: "button", className: "dy-plan-row-open", onClick: () => ui.open(item), children: jsxs("span", { className: "dy-plan-row-text", children: [jsx("strong", { children: item.title }), jsx("small", { children: why })] }) }),
-        ui.readOnly ? null : jsx(Button, { small: true, variant, action: `plan-queue-${label.toLowerCase()}`, onClick: onAct, children: label })
-      ] }, `${item.kind}:${item.id}`)) })
-    ] }),
-    lists.goal.length ? jsxs("section", { className: "dy-plan-goalstrip", "aria-label": "Goals", "data-plan-section": "goal", children: [
-      jsx("span", { className: "dy-plan-goalstrip-label", children: "Goals" }),
-      ...lists.goal.map((goal) => jsxs("button", {
-        type: "button",
-        className: ["dy-plan-goalchip", sameItem(goal, selected) && "selected", goal.archived && "archived"].filter(Boolean).join(" "),
-        "data-plan-row": "goal",
-        "data-plan-id": goal.id,
-        onClick: () => ui.open(goal),
-        children: [jsx("strong", { children: goal.title }), jsx(StatusTag, statusOf(goal))]
-      }, goal.id)),
-      ui.readOnly ? null : jsx(Button, { small: true, action: "plan-new-goal", onClick: () => ui.create("goal"), children: "+ Goal" })
-    ] }) : null,
-    jsxs("section", { className: "dy-plan-section", "data-plan-section": "initiative", "aria-label": "Plan by initiative", children: [
-      jsx(SectionHead, { kind: "initiative", count: lists.initiative.length, ui, note: openNote }),
-      lists.initiative.length ? jsx("div", { className: "dy-plan-rows", role: "list", children: lists.initiative.flatMap((initiative) => [
-        jsx(Row, { item: initiative, ui, selected: sameItem(initiative, selected) }, initiative.id),
-        ...child("milestone", initiative),
-        ...child("objective", initiative)
-      ]) }) : jsx("p", { className: "dy-plan-empty", children: EMPTY.initiative })
-    ] }),
-    jsxs("section", { className: "dy-plan-section", "data-plan-section": "loose", "aria-label": "Not linked to an initiative", children: [
-      jsx(SectionHead, { title: "Not linked to an initiative", count: loose.length, ui, actions: jsxs("span", { className: "dy-plan-head-actions", children: [
-        jsx(Button, { small: true, action: "plan-new-milestone", onClick: () => ui.create("milestone"), children: "+ Milestone" }),
-        jsx(Button, { small: true, action: "plan-new-objective", onClick: () => ui.create("objective"), children: "+ Objective" })
-      ] }) }),
-      jsx(Rows, { items: loose, ui, selected, empty: "Every milestone and objective belongs to an initiative." })
-    ] })
-  ] });
 }
 function ReviewDialog({ initiative, projectId, onClose, onResolved }) {
   const item = { ref: initiative.ref, title: initiative.title, risk: initiative.risk, project: projectId, detail: initiative.record };
@@ -17402,12 +17342,12 @@ function ReviewDialog({ initiative, projectId, onClose, onResolved }) {
 function PlanScreen({ project, focus, onFocusConsumed, onOpenRoadmap }) {
   const [plan, setPlan] = useState(null);
   const [failure, setFailure] = useState(null);
-  const [layout, setLayout] = useState("A");
   const [selected, setSelected] = useState(null);
   const [dialog, setDialog] = useState(null);
   const [confirm, setConfirm] = useState(null);
+  const [action, setAction] = useState(null);
   const [query, setQuery] = useState("");
-  const [showArchived, setShowArchived] = useState(false);
+  const [showTucked, setShowTucked] = useState(false);
   const actions = useMemo(() => planActions(project.id), [project.id]);
   const reload = useCallback(async () => {
     try {
@@ -17427,7 +17367,7 @@ function PlanScreen({ project, focus, onFocusConsumed, onOpenRoadmap }) {
     const item = findItem(plan, focus);
     if (item) {
       setSelected({ kind: item.kind, id: item.id });
-      if (item.archived) setShowArchived(true);
+      if (isTucked(item)) setShowTucked(true);
     }
     onFocusConsumed?.();
   }, [focus, plan]);
@@ -17441,27 +17381,62 @@ function PlanScreen({ project, focus, onFocusConsumed, onOpenRoadmap }) {
   }, [selected]);
   if (!plan) {
     return jsxs("section", { className: "dockyard-feature-card", "data-plan-screen": failure ? "error" : "loading", "aria-busy": !failure, children: failure ? [
-      jsx("h2", { children: "Plan" }),
-      jsx("p", { className: "dockyard-inline-error", role: "alert", children: `The plan could not be loaded: ${failure}` }),
+      jsx("h2", { children: "Vision" }),
+      jsx("p", { className: "dockyard-inline-error", role: "alert", children: `Vision could not be loaded: ${failure}` }),
       jsx(Button, { action: "plan-retry", onClick: reload, children: "Try again" })
-    ] : [jsx("p", { className: "dockyard-meta", children: "Loading the plan\u2026" })] });
+    ] : [jsx("p", { className: "dockyard-meta", children: "Loading Vision\u2026" })] });
   }
   const noun = (item) => KIND_LABEL[item.kind].toLowerCase();
+  const eyebrow = (item) => `Initiative \xB7 ${item.ref}`;
   const ui = {
     readOnly: !plan.canWrite,
-    // In Columns, picking the traced card again clears the trace.
-    open: (item) => setSelected((current) => layout === "B" && sameItem(current, item) ? null : { kind: item.kind, id: item.id }),
+    open: (item) => setSelected({ kind: item.kind, id: item.id }),
     create: (kind, linkTo) => setDialog({ type: "form", kind, mode: "create", linkTo }),
     edit: (item) => setDialog({ type: "form", kind: item.kind, mode: "edit", item }),
     link: (item, target) => setDialog({ type: "link", from: item, target }),
     review: (item) => setDialog({ type: "review", item }),
     confirm: setConfirm,
+    // Before approval only (the backend refuses later states). The record stays.
+    withdraw: (item) => setAction({
+      key: "withdraw",
+      eyebrow: eyebrow(item),
+      title: `Withdraw \u201C${item.title}\u201D?`,
+      label: "Withdraw",
+      variant: "danger",
+      lines: [
+        "It stops waiting for approval and frees its open slot.",
+        `It is not deleted: it keeps its record and stays under ${TUCKED}.`,
+        "This cannot be undone. To try again later, propose it again."
+      ],
+      reasonLabel: "Reason",
+      done: `Withdrew \u201C${item.title}\u201D.`,
+      run: (reason) => actions.withdrawInitiative(item.ref, reason)
+    }),
+    // Approved or in progress only. Same call as the browser dashboard's Complete.
+    complete: (item) => {
+      const open = unfinishedWork(item.delivery);
+      setAction({
+        key: "complete",
+        eyebrow: eyebrow(item),
+        title: `Mark \u201C${item.title}\u201D complete?`,
+        label: "Mark complete",
+        variant: "primary",
+        lines: [
+          "Use this when the work is done.",
+          open ? `${plural3(open, "linked work item")} ${open === 1 ? "is" : "are"} not finished yet.` : null,
+          "Its own board tasks that are still open are marked done.",
+          `It frees its open slot and moves under ${TUCKED}. Its objectives keep measuring whether it worked.`
+        ],
+        done: `Marked \u201C${item.title}\u201D complete.`,
+        run: () => actions.completeInitiative(item.ref)
+      });
+    },
     archive: (item) => setConfirm({
       key: "plan-archive",
       title: `Archive this ${noun(item)}?`,
       label: "Archive",
       done: `${KIND_LABEL[item.kind]} archived.`,
-      description: item.kind === "objective" ? `\u201C${item.title}\u201D stops being evaluated and leaves the plan. It can then be deleted for good.` : `\u201C${item.title}\u201D is hidden from the plan${item.kind === "milestone" ? " and the Roadmap" : ""}. Restore it any time from Show archived.`,
+      description: item.kind === "objective" ? `\u201C${item.title}\u201D stops being evaluated and leaves Vision. It can then be deleted for good.` : `\u201C${item.title}\u201D is hidden from Vision${item.kind === "milestone" ? " and the Roadmap" : ""}. Restore it, or delete it for good, from ${TUCKED}.`,
       run: () => ({ milestone: () => actions.archiveMilestone(item.name), objective: () => actions.archiveObjective(item.id), goal: () => actions.archiveGoal(item.id) })[item.kind]()
     }),
     restore: (item) => setConfirm({
@@ -17469,54 +17444,54 @@ function PlanScreen({ project, focus, onFocusConsumed, onOpenRoadmap }) {
       title: `Restore this ${noun(item)}?`,
       label: "Restore",
       done: `${KIND_LABEL[item.kind]} restored.`,
-      description: `\u201C${item.title}\u201D returns to the plan.`,
+      description: `\u201C${item.title}\u201D returns to Vision.`,
       run: () => item.kind === "milestone" ? actions.restoreMilestone(item.name) : actions.restoreGoal(item.id)
     }),
+    // Archived items only (the backend refuses anything else).
     remove: (item) => setConfirm({
       key: "plan-delete",
-      title: "Delete this objective for good?",
+      title: `Delete this ${noun(item)} for good?`,
       label: "Delete",
-      done: "Objective deleted.",
-      description: `\u201C${item.title}\u201D and its links to goals and initiatives are removed. This cannot be undone.`,
-      run: () => actions.removeObjective(item.id),
+      done: `${KIND_LABEL[item.kind]} deleted.`,
+      description: {
+        objective: `\u201C${item.title}\u201D and its links to goals and initiatives are removed. This cannot be undone.`,
+        milestone: `\u201C${item.title}\u201D and its links to initiatives are removed. Its work items stay, no longer grouped under it, and the name is free to use again. This cannot be undone.`,
+        goal: `\u201C${item.title}\u201D is removed. Its objectives stay and can join another goal. This cannot be undone.`
+      }[item.kind],
+      run: () => ({ objective: () => actions.removeObjective(item.id), milestone: () => actions.deleteMilestone(item.name), goal: () => actions.deleteGoal(item.id) })[item.kind](),
       after: () => setSelected(null)
     })
   };
   const needle = query.trim().toLowerCase();
-  const lists = Object.fromEntries(KINDS.map((kind) => [kind, listOf(plan, kind).filter((item) => (showArchived || !item.archived) && item.title.toLowerCase().includes(needle))]));
+  const lists = Object.fromEntries(KINDS.map((kind) => [kind, listOf(plan, kind).filter((item) => (showTucked || !isTucked(item)) && item.title.toLowerCase().includes(needle))]));
   const openCount = plan.initiatives.filter((row) => OPEN_STATUSES.includes(row.status)).length;
   const openNote = `${number(openCount)} of ${number(plan.maxOpenInitiatives)} open allowed`;
   const reviewCount = plan.initiatives.filter(needsReview).length;
-  const archivedCount = KINDS.reduce((sum, kind) => sum + listOf(plan, kind).filter((row) => row.archived).length, 0);
+  const tuckedCount = KINDS.reduce((sum, kind) => sum + listOf(plan, kind).filter(isTucked).length, 0);
   const selectedItem = findItem(plan, selected);
-  const Layout = { A: OutlineLayout, B: ColumnsLayout, C: ReviewLayout }[layout];
   const done = () => {
     setDialog(null);
     reload();
   };
-  return jsxs("section", { className: `dy-plan${selectedItem ? " with-drawer" : ""}`, "data-plan-screen": project.id, "data-plan-layout": layout, children: [
-    jsxs("div", { className: "dy-plan-review-bar", "data-design-review": "plan", role: "group", "aria-label": "Design review: Plan layout", children: [
-      jsx("span", { children: "Design review \xB7 Plan layout" }),
-      ...LAYOUTS.map(([key, label]) => jsx("button", { type: "button", "aria-pressed": layout === key, "data-plan-layout-choice": key, onClick: () => setLayout(key), children: `${key} \xB7 ${label}` }, key))
-    ] }),
+  return jsxs("section", { className: `dy-plan${selectedItem ? " with-drawer" : ""}`, "data-plan-screen": project.id, children: [
     jsxs("header", { className: "dy-plan-head", children: [
       jsxs("div", { children: [
-        jsx("h2", { children: "Plan" }),
+        jsx("h2", { children: "Vision" }),
         jsx("p", { className: "dockyard-meta", children: `Initiatives, milestones, objectives and goals for ${plan.label}. The Roadmap shows them across all projects.` })
       ] }),
       jsxs("div", { className: "dy-plan-toolbar", children: [
         reviewCount ? jsx(Tag, { tone: "warning", data: { "data-plan-review-count": reviewCount }, children: `${number(reviewCount)} to review` }) : null,
-        jsx("input", { type: "search", className: "dy-plan-search", placeholder: "Find in plan", "aria-label": "Find in plan", "data-plan-search": true, value: query, onChange: (event) => setQuery(event.target.value) }),
+        jsx("input", { type: "search", className: "dy-plan-search", placeholder: "Find in Vision", "aria-label": "Find in Vision", "data-plan-search": true, value: query, onChange: (event) => setQuery(event.target.value) }),
         jsxs("label", { className: "dy-plan-check", children: [
-          jsx("input", { type: "checkbox", "data-plan-show-archived": true, checked: showArchived, onChange: (event) => setShowArchived(event.target.checked) }),
-          `Show archived${archivedCount ? ` (${number(archivedCount)})` : ""}`
+          jsx("input", { type: "checkbox", "data-plan-show-archived": true, checked: showTucked, onChange: (event) => setShowTucked(event.target.checked) }),
+          `${TUCKED}${tuckedCount ? ` (${number(tuckedCount)})` : ""}`
         ] }),
         ui.readOnly ? null : jsx(Menu, { label: "Create", trigger: "+ New", action: "new", variant: "primary", items: KINDS.map((kind) => ({
           id: kind,
           label: kind === "initiative" ? "Propose an initiative\u2026" : `New ${KIND_LABEL[kind].toLowerCase()}\u2026`,
           onSelect: () => ui.create(kind)
         })) }),
-        jsx(Menu, { label: "More plan actions", trigger: "\u22EF", action: "plan-more", items: [
+        jsx(Menu, { label: "More Vision actions", trigger: "\u22EF", action: "plan-more", items: [
           onOpenRoadmap ? { id: "roadmap", label: "Open the Roadmap (all projects)", onSelect: onOpenRoadmap } : null,
           ui.readOnly ? null : { id: "freeze", label: "Freeze project\u2026", danger: true, onSelect: () => setConfirm({
             key: "freeze-project",
@@ -17529,11 +17504,11 @@ function PlanScreen({ project, focus, onFocusConsumed, onOpenRoadmap }) {
         ] })
       ] })
     ] }),
-    ui.readOnly ? jsx("p", { className: "dy-plan-note", role: "status", children: "Read-only: this session can view the plan but not change it." }) : null,
+    ui.readOnly ? jsx("p", { className: "dy-plan-note", role: "status", children: "Read-only: this session can view Vision but not change it." }) : null,
     failure ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: `Last refresh failed: ${failure}` }) : null,
     jsx(MissionStrip, { plan, actions, onChanged: reload, onConfirm: setConfirm }, `${project.id}:${plan.mission}`),
     jsxs("div", { className: "dy-plan-main", children: [
-      jsx(Layout, { plan, lists, ui, selected, openNote }),
+      jsx(Outline, { lists, ui, selected, openNote }),
       // Narrow screens show the drawer as a bottom sheet; the backdrop closes it.
       selectedItem ? jsx("div", { className: "dy-plan-sheet-backdrop", "aria-hidden": true, onClick: () => setSelected(null) }) : null,
       selectedItem ? jsx(PlanDrawer, { item: selectedItem, plan, actions, ui, onClose: () => setSelected(null), onChanged: reload }, `${selectedItem.kind}:${selectedItem.id}`) : null
@@ -17553,12 +17528,16 @@ function PlanScreen({ project, focus, onFocusConsumed, onOpenRoadmap }) {
     confirm ? jsx(Confirm, { spec: confirm, onCancel: () => setConfirm(null), onDone: () => {
       setConfirm(null);
       reload();
+    } }) : null,
+    action ? jsx(ActionDialog, { spec: action, onCancel: () => setAction(null), onDone: () => {
+      setAction(null);
+      reload();
     } }) : null
   ] });
 }
 
 // hermes_dockyard_plugin/desktop/src/project/dashboard.js
-var planView = (entry) => parsePlanFocus(entry) || ["objectives", "initiative"].includes(entry) ? "plan" : entry;
+var planView = (entry) => parsePlanFocus(entry) || ["objectives", "initiative", "vision"].includes(entry) ? "plan" : entry;
 function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap }) {
   const [projectView, setProjectView] = useState(planView(initialView) || "overview");
   const [planFocus, setPlanFocus] = useState(() => parsePlanFocus(initialView));
@@ -17571,6 +17550,11 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
       return;
     }
     setProjectView(key);
+  };
+  const openView = (entry) => {
+    const focus = parsePlanFocus(entry);
+    if (focus) setPlanFocus(focus);
+    changeView(planView(entry));
   };
   const canvasSaver = useRef(null);
   const [viewSaving, setViewSaving] = useState(false);
@@ -17624,7 +17608,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   const [healthTone, healthLabel] = healthDetails(project.health);
   const views = [
     ["overview", "Overview"],
-    ["plan", "Plan"],
+    ["plan", "Vision"],
     ["board", "Kanban"],
     ["planning", "Planning"],
     ["workflows", "Workflows"],
@@ -17644,7 +17628,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
       appliedView,
       setAppliedView,
       onOpenItem: setSelectedWorkItem,
-      onNavigate: changeView
+      onNavigate: openView
     });
   } else if (projectView === "plan") {
     panel = jsx(PlanScreen, { project, focus: planFocus, onFocusConsumed: () => setPlanFocus(null), onOpenRoadmap }, project.id);
@@ -18074,108 +18058,6 @@ function TeamsView({ view, onRefresh }) {
         ] }) : jsx("div", { className: "dockyard-transcript-placeholder", children: sessionState === "loading-transcript" ? "Loading transcript..." : "Select a session to inspect its transcript." })
       ] })
     ] }) : null
-  ] });
-}
-
-// hermes_dockyard_plugin/desktop/src/views/initiative.js
-function InitiativeView({ view, onRefresh }) {
-  const initiative = [...view.initiatives ?? []].sort((left, right) => (RISK_PRIORITY[left.risk] ?? 1) - (RISK_PRIORITY[right.risk] ?? 1))[0];
-  const project = view.project;
-  const stages = [
-    ["verify", "Verify state", "Confirm the project state and evidence source."],
-    ["detect", "Detect gap", initiative?.rationale || "Research the highest-value project gap."],
-    ["propose", "Create initiative", initiative?.expected_outcome || "Declare the expected outcome."],
-    ["prioritise", "Prioritise", `Priority ${number(initiative?.priority ?? 0)} with a recorded rationale.`],
-    ["approval", "Human approval", "Owner reviews the risk, evidence and validation contract."],
-    ["execute", "Build and verify", validationSummary(initiative?.validation_contract)],
-    ["release", "Release", "Release remains bounded by project policy."],
-    ["observe", "Observe outcome", "Measure whether the project improved."]
-  ];
-  const currentIndex = initiative?.status === "pending_approval" ? 4 : ["approved", "executing"].includes(initiative?.status) ? 5 : ["completed", "measured"].includes(initiative?.status) ? 7 : 2;
-  const [selectedStage, setSelectedStage] = useState(currentIndex);
-  const [freezeState, setFreezeState] = useState(null);
-  const [freezeConfirm, setFreezeConfirm] = useState(false);
-  const freeze = async () => {
-    if (!project) return;
-    setFreezeState("freezing");
-    try {
-      await api(`/projects/${encodeURIComponent(project.id)}/freeze`, { method: "POST", body: {} });
-      setFreezeState("frozen");
-      onRefresh();
-    } catch (failure) {
-      setFreezeState(String(failure?.message ?? failure));
-    }
-  };
-  if (!project || !initiative) return jsx(EmptyState, { title: "No initiative available", description: "A project initiative will appear here after it is proposed.", icon: "project" });
-  return jsxs("div", { "data-initiative-loop": initiative.ref, children: [
-    jsx(PageHead, {
-      title: initiative.title,
-      description: `${project.id} / ${initiative.ref} / one canonical improvement loop`,
-      status: initiative.status || "unknown",
-      onRefresh
-    }),
-    jsxs("div", { className: "dockyard-loop-layout", children: [
-      jsxs("section", { className: "dockyard-feature-card dockyard-loop-card", children: [
-        jsxs("div", { className: "dockyard-loop-head", children: [
-          jsxs("div", { children: [jsx("h2", { children: "Initiative loop" }), jsx("p", { children: "Select a stage to inspect its current evidence and state." })] }),
-          jsx(Button, { action: "freeze-project", variant: "danger", disabled: freezeState === "freezing" || freezeState === "frozen", onClick: () => setFreezeConfirm(true), children: freezeState === "freezing" ? "Freezing..." : freezeState === "frozen" ? "Project frozen" : "Freeze project" })
-        ] }),
-        jsx("div", {
-          className: "dockyard-loop-visual-wrap",
-          children: jsx("svg", {
-            viewBox: "0 0 1010 140",
-            role: "img",
-            "aria-label": "Initiative stages from verification to observed outcome",
-            "data-loop-visual": true,
-            children: stages.map(([key, label], index) => {
-              const x = 20 + index * 123;
-              const state = index < currentIndex ? "done" : index === currentIndex ? "current" : "queued";
-              return jsxs(Fragment, { children: [
-                index < stages.length - 1 ? jsx("path", { className: `dockyard-loop-edge ${state}`, d: `M${x + 105} 55H${x + 123}` }) : null,
-                jsx("rect", { className: `dockyard-loop-node ${state}`, x, y: 30, width: 105, height: 52, rx: 10 }),
-                jsx("text", { x: x + 52.5, y: 60, textAnchor: "middle", children: label })
-              ] }, key);
-            })
-          })
-        }),
-        jsx("div", {
-          className: "dockyard-stage-list",
-          children: stages.map(([key, label], index) => jsx("button", {
-            type: "button",
-            className: selectedStage === index ? "active" : "",
-            "data-initiative-stage": key,
-            onClick: () => setSelectedStage(index),
-            children: jsxs(Fragment, { children: [
-              jsx("span", { children: number(index + 1) }),
-              jsxs("span", { children: [jsx("strong", { children: label }), jsx("small", { children: index < currentIndex ? "Done" : index === currentIndex ? "Current gate" : "Queued" })] })
-            ] })
-          }, key))
-        })
-      ] }),
-      jsxs("aside", { className: "dockyard-feature-card dockyard-stage-detail", children: [
-        jsx("span", { className: "dockyard-card-label", children: "SELECTED STAGE" }),
-        jsx("h2", { children: stages[selectedStage][1] }),
-        jsx("p", { children: stages[selectedStage][2] }),
-        jsxs("div", { className: "dockyard-evidence-details", children: [
-          jsx("strong", { children: "Initiative evidence" }),
-          jsx("p", { children: initiative.rationale || "No rationale supplied." }),
-          jsx("p", { children: `Validation: ${validationSummary(initiative.validation_contract)}` })
-        ] }),
-        freezeState && !["freezing", "frozen"].includes(freezeState) ? jsx("p", { className: "dockyard-inline-error", children: freezeState }) : null
-      ] })
-    ] }),
-    freezeConfirm ? jsx(ConfirmDialog, {
-      confirmKey: "freeze-project",
-      title: "Freeze this project?",
-      description: "Freezing stops new execution until the project is explicitly resumed.",
-      confirmLabel: "Freeze project",
-      busy: freezeState === "freezing",
-      onCancel: () => setFreezeConfirm(false),
-      onConfirm: async () => {
-        setFreezeConfirm(false);
-        await freeze();
-      }
-    }) : null
   ] });
 }
 
@@ -19782,7 +19664,7 @@ function hiddenNotifications(view, projectId) {
 }
 
 // hermes_dockyard_plugin/desktop/src/shell/dashboard-page.js
-var ONE_PROJECT_TABS = Object.freeze({ project: "Projects", backlog: "Backlog", initiative: "Initiative" });
+var ONE_PROJECT_TABS = Object.freeze({ project: "Projects", backlog: "Backlog" });
 function DashboardPage({ inboxCss = "" } = {}) {
   useDockyardStyles();
   useStylesheet("dy-inbox-stylesheet", "dyInboxStylesheet", inboxCss);
@@ -19908,7 +19790,7 @@ function DashboardPage({ inboxCss = "" } = {}) {
       setLoadScope(nextLoadScope);
     }
     setError(null);
-    const loader = isAll && (ONE_PROJECT_TABS[tab] || tab === "workflows") ? async () => ({}) : tab === "workflows-library" ? async () => ({ workflows: (await api("/workflow-library")).workflows ?? [] }) : tab === "dashboard" ? loadDashboardData : tab === "roadmap" ? async () => ({}) : tab === "settings" ? loadAppSettingsData : tab === "project" || tab === "workflows" ? () => loadProjectData(selectedProject) : tab === "backlog" ? () => loadBacklogData(selectedProject) : tab === "teams" ? loadTeamsData : tab === "initiative" ? () => loadProjectData(selectedProject) : tab === "inbox" ? loadInboxData : async () => api("/notifications?limit=200");
+    const loader = isAll && (ONE_PROJECT_TABS[tab] || tab === "workflows") ? async () => ({}) : tab === "workflows-library" ? async () => ({ workflows: (await api("/workflow-library")).workflows ?? [] }) : tab === "dashboard" ? loadDashboardData : tab === "roadmap" ? async () => ({}) : tab === "settings" ? loadAppSettingsData : tab === "project" || tab === "workflows" ? () => loadProjectData(selectedProject) : tab === "backlog" ? () => loadBacklogData(selectedProject) : tab === "teams" ? loadTeamsData : tab === "inbox" ? loadInboxData : async () => api("/notifications?limit=200");
     const loading = loader();
     if (!selectedProject) rememberedProject();
     askAppearance();
@@ -20163,8 +20045,6 @@ function DashboardPage({ inboxCss = "" } = {}) {
     content = jsx(BacklogView, { view: payload, onRefresh: refresh, preset: backlogPreset?.projectId === selectedProject ? backlogPreset : null });
   } else if (tab === "teams") {
     content = jsx(TeamsView, { view: payload, onRefresh: refresh });
-  } else if (tab === "initiative") {
-    content = jsx(InitiativeView, { view: payload, onRefresh: refresh });
   } else if (tab === "inbox") {
     content = jsxs(Fragment, { children: [
       scopeNote(scoped?.hidden ?? 0, "approvals"),

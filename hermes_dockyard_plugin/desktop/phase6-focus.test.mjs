@@ -168,22 +168,37 @@ async function createRuntime() {
     return element;
   };
 
-  return { dom, doc, pressKey, click, focusAndActivate, jsdomMessages };
+  // The Vision screen loads its data after the tab opens: wait for a control.
+  const waitFor = async (selector, timeoutMs = 4000) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const element = doc.querySelector(selector);
+      if (element) return element;
+      await act(async () => { await wait(20); });
+    }
+    assert.fail(`timed out waiting for: ${selector}`);
+  };
+
+  return { dom, doc, pressKey, click, focusAndActivate, waitFor, jsdomMessages };
 }
 
 test('ConfirmDialog: initial focus inside, Tab/Shift+Tab contained, Escape restores the trigger', async () => {
-  const { doc, pressKey, focusAndActivate } = await createRuntime();
+  const { doc, pressKey, focusAndActivate, waitFor } = await createRuntime();
 
   // Real user flow: project tab -> choose the project (Sahil 05/10: the app
-  // opens on All projects) -> Objectives view -> mission Archive.
+  // opens on All projects) -> Vision (design round f) -> the mission's ⋯
+  // menu -> Archive mission. The menu hands focus back to its trigger before
+  // the dialog opens, so that trigger is the control focus must return to.
   await focusAndActivate('[data-tab="project"]');
   await focusAndActivate('[data-choose-project="demo-project"]');
-  await focusAndActivate('[data-project-view="objectives"]');
-  const trigger = await focusAndActivate('[data-action="archive-mission"]');
+  await focusAndActivate('[data-project-view="plan"]');
+  await waitFor('[data-plan-menu="mission"]');
+  const trigger = await focusAndActivate('[data-plan-menu="mission"]');
+  await focusAndActivate('[data-plan-menu-item="archive"]');
 
-  const dialog = doc.querySelector('[data-destructive-confirm]');
+  const dialog = doc.querySelector('[data-destructive-confirm="archive-mission"]');
   assert(dialog, 'ConfirmDialog did not mount');
-  assert.strictEqual(trigger.getAttribute('data-action'), 'archive-mission');
+  assert.strictEqual(trigger.getAttribute('data-plan-menu'), 'mission');
 
   // 1. Initial focus: inside the dialog, never left on the page.
   const initial = doc.activeElement;
@@ -231,12 +246,14 @@ test('OnboardingWizard: initial focus inside, Tab contained, Escape restores the
 });
 
 test('ConfirmDialog busy state: Escape is inert while a destructive action is applying', async () => {
-  const { doc, pressKey, focusAndActivate } = await createRuntime();
+  const { doc, pressKey, focusAndActivate, waitFor } = await createRuntime();
   await focusAndActivate('[data-tab="project"]');
   await focusAndActivate('[data-choose-project="demo-project"]');
-  await focusAndActivate('[data-project-view="objectives"]');
-  await focusAndActivate('[data-action="archive-mission"]');
-  const dialog = doc.querySelector('[data-destructive-confirm]');
+  await focusAndActivate('[data-project-view="plan"]');
+  await waitFor('[data-plan-menu="mission"]');
+  await focusAndActivate('[data-plan-menu="mission"]');
+  await focusAndActivate('[data-plan-menu-item="archive"]');
+  const dialog = doc.querySelector('[data-destructive-confirm="archive-mission"]');
   assert(dialog, 'ConfirmDialog did not mount');
   // The mission-archive path is async; while a request is in flight the
   // Cancel/confirm buttons are disabled. Tab containment must still hold

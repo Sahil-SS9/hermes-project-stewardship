@@ -1,8 +1,7 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
-// PROTOTYPE (design round f, 05/10): shared parts of the Plan screen. Every
-// layout (A outline, B columns, C review first) uses these same menus,
-// dialogs and forms, so the layouts differ only in arrangement.
+// Design round f (Sahil 05/10): shared parts of the Vision screen: menus,
+// dialogs and forms.
 import { emitToast } from '../../runtime/context.js'
 import { useEffect } from '../../runtime/react.js'
 import { useRef } from '../../runtime/react.js'
@@ -68,7 +67,7 @@ export function Menu({ label, trigger, items, action, variant = '' }) {
   ] })
 }
 
-// One modal frame for every Plan dialog (same classes as ConfirmDialog).
+// One modal frame for every Vision dialog (same classes as ConfirmDialog).
 export function PlanDialog({ dialogKey, eyebrow, title, onClose, busy = false, children, actions, wide = false }) {
   useDialogFocusManager(`[data-plan-dialog="${dialogKey}"]`)
   return jsx('div', {
@@ -95,7 +94,7 @@ function Field({ id, label, required, error, hint, children }) {
 }
 
 const blank = (kind, item) => ({
-  initiative: { title: item?.title ?? '', rationale: item?.rationale ?? '', expectedOutcome: item?.expectedOutcome ?? '', risk: item?.risk ?? 'low' },
+  initiative: { title: item?.title ?? '', rationale: item?.rationale ?? '', expectedOutcome: item?.expectedOutcome ?? '', risk: item?.risk ?? 'low', checks: '' },
   milestone: { title: item?.title ?? '', due: item?.due ?? '', closed: Boolean(item?.closed) },
   objective: { title: item?.title ?? '', description: item?.description ?? '', target: item?.target ?? '>=1', severity: item?.severity ?? 'medium' },
   goal: { title: item?.title ?? '', description: item?.description ?? '', objectiveIds: item?.objectiveIds ?? [] },
@@ -167,6 +166,10 @@ export function ItemForm({ kind, mode = 'create', item, plan, actions, linkTo, o
       field('rationale', 'Why it matters', jsx('textarea', input('rationale', { rows: 3 })), { required: true }),
       field('expectedOutcome', 'Expected outcome', jsx('textarea', input('expectedOutcome', { rows: 2 })), { hint: 'What should be true when it is done.' }),
       field('risk', 'Risk', jsx('select', { ...input('risk'), children: options(RISKS) }), { required: true }),
+      // The backend cannot add checks later (resubmit keeps them as they are),
+      // so the box is offered when proposing only.
+      mode === 'create' ? field('checks', 'How we’ll know it worked', jsx('textarea', input('checks', { rows: 2, placeholder: 'For example: the test suite passes and sign-ups recover to 40 a day.' })),
+        { hint: 'Optional. Reviewers see these checks. Hermes can only finish an initiative by itself when it has them; without them, mark it complete when the work is done.' }) : null,
     ],
     milestone: () => [
       field('title', 'Name', jsx('input', input('title', { autoComplete: 'off' })), { required: true }),
@@ -295,6 +298,36 @@ export function Confirm({ spec, onCancel, onDone }) {
       setBusy(true); setFailure(null)
       try { await spec.run(); emitToast('success', spec.done); onDone(); spec.after?.() } catch (error) { setFailure(errorText(error)); setBusy(false) }
     },
+  })
+}
+
+// An initiative step that changes its state: Withdraw (with an optional
+// reason for the record) or Mark complete. Not a plain delete, so it has its
+// own dialog: the confirm button takes the step's tone, and the text says
+// exactly what happens.
+// spec: { key, eyebrow, title, lines: string[], label, variant, reasonLabel?, done, run(reason) }
+export function ActionDialog({ spec, onCancel, onDone }) {
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState(null)
+  const submit = async () => {
+    setBusy(true); setFailure(null)
+    try { await spec.run(reason.trim()); emitToast('success', spec.done); onDone() } catch (error) { setFailure(errorText(error)); setBusy(false) }
+  }
+  const id = `dy-plan-${spec.key}-reason`
+  return jsx(PlanDialog, {
+    dialogKey: spec.key, eyebrow: spec.eyebrow, title: spec.title, busy, onClose: onCancel,
+    actions: [
+      jsx(Button, { onClick: onCancel, disabled: busy, children: 'Cancel' }, 'cancel'),
+      jsx(Button, { variant: spec.variant ?? 'primary', action: `plan-${spec.key}-confirm`, disabled: busy, onClick: submit, children: busy ? 'Working…' : spec.label }, 'confirm'),
+    ],
+    children: jsxs('div', { className: 'dy-plan-form', children: [
+      jsx('ul', { className: 'dy-plan-consequences', children: spec.lines.filter(Boolean).map((line) => jsx('li', { children: line }, line)) }),
+      spec.reasonLabel ? jsx(Field, { id, label: spec.reasonLabel, children: jsx('textarea', {
+        id, rows: 2, value: reason, 'data-plan-field': 'reason', maxLength: 2000, onChange: (event) => setReason(event.target.value),
+      }) }) : null,
+      failure ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: failure }) : null,
+    ] }),
   })
 }
 

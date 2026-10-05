@@ -1,16 +1,18 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
-// One vocabulary for the planning screens (the Roadmap, the project Plan
+// One vocabulary for the planning screens (the Roadmap, the project Vision
 // screen and the milestone panel), so no two screens name a state, a link or
 // a forecast differently.
 export const ICON = Object.freeze({ project: 'P', initiative: 'I', milestone: 'M', work: 'W', objective: 'O', goal: 'G' })
 export const KIND_LABEL = Object.freeze({ initiative: 'Initiative', milestone: 'Milestone', objective: 'Objective', goal: 'Goal' })
 export const BUCKETS = Object.freeze([['planned', 'Planned'], ['building', 'Building'], ['ready_for_review', 'Ready for review'], ['complete', 'Complete']])
 // Initiative states (domain/constants.py InitiativeStatus, plus changes_requested).
+// Only a withdrawal sets 'cancelled' (design round f, Option B), so it reads
+// "Withdrawn".
 export const STATUS_LABEL = Object.freeze({
   proposed: 'Proposed', pending_approval: 'Waiting for approval', changes_requested: 'Changes requested',
   approved: 'Approved', executing: 'In progress', completed: 'Complete', regressed: 'Regressed',
-  rejected: 'Rejected', cancelled: 'Cancelled',
+  rejected: 'Rejected', cancelled: 'Withdrawn',
 })
 export const STATUS_TONE = Object.freeze({
   proposed: 'info', pending_approval: 'warning', changes_requested: 'warning', approved: 'info', executing: 'info',
@@ -18,6 +20,12 @@ export const STATUS_TONE = Object.freeze({
 })
 // The states the backend counts against the open-initiative limit.
 export const OPEN_STATUSES = Object.freeze(['proposed', 'pending_approval', 'changes_requested', 'approved', 'executing'])
+// What a person can do next, by state (the backend enforces the same sets):
+// withdraw a proposal before approval; mark approved or in-progress work complete.
+export const WITHDRAWABLE_STATUSES = Object.freeze(['proposed', 'pending_approval', 'changes_requested'])
+export const COMPLETABLE_STATUSES = Object.freeze(['approved', 'executing'])
+// Finished or closed initiatives: shown only with "Show finished and archived".
+export const CLOSED_STATUSES = Object.freeze(['completed', 'regressed', 'rejected', 'cancelled'])
 export const GOAL_LABEL = Object.freeze({ met: 'Met', at_risk: 'At risk', unknown: 'Unknown evidence', unproven: 'Unproven' })
 export const GOAL_TONE = Object.freeze({ met: 'success', at_risk: 'danger', unknown: 'neutral', unproven: 'neutral' })
 export const OUTCOME_LABEL = Object.freeze({ passed: 'Passed', failed: 'Failed', stale: 'Stale', unknown: 'Unknown', not_applicable: 'Not applicable' })

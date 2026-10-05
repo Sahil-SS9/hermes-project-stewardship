@@ -136,7 +136,8 @@ export function cardFacts(item, data = {}, today = null) {
     : null
   const milestones = (data.milestones ?? [])
     .filter((milestone) => !milestone.archived_at && (milestone.item_refs ?? []).includes(item.ref))
-    .map((milestone) => ({ name: milestone.name, due: milestone.due ?? null }))
+    // The id lets the card's link open this milestone on the Vision screen.
+    .map((milestone) => ({ id: milestone.id, name: milestone.name, due: milestone.due ?? null }))
   // Objective: only through the item's initiative. No initiative, no objective.
   const objectives = item.initiative_ref
     ? objectivesOfInitiative(data.roadmapProject, item.initiative_ref).objectives.map((objective) => ({ id: objective.id, name: objective.name, relationship: objective.relationship ?? null }))

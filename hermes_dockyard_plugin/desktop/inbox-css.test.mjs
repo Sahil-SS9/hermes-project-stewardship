@@ -34,8 +34,9 @@ test('the approval block left dockyard-css.js with it (move, not copy)', () => {
     '.dockyard-approval-list must live in inbox-css.js now')
   assert.doesNotMatch(DOCKYARD_CSS, /\.dockyard-root \.dockyard-approval-row\b/,
     '.dockyard-approval-row must live in inbox-css.js now')
-  // Shared classes stay behind (initiative.js + dashboard.js still use them).
-  assert.match(DOCKYARD_CSS, /\.dockyard-root \.dockyard-evidence-details\b/, 'shared evidence-details stays in dockyard-css')
+  // Shared classes stay behind (views/dashboard.js still uses the comment thread).
+  // evidence-details went with the old Initiatives screen (design round f): no screen uses it.
+  assert.doesNotMatch(DOCKYARD_CSS, /\.dockyard-root \.dockyard-evidence-details\b/, 'evidence-details left with the Initiatives screen')
   assert.match(DOCKYARD_CSS, /\.dockyard-root \.dockyard-comment-thread\b/, 'shared comment-thread stays in dockyard-css')
 })
 

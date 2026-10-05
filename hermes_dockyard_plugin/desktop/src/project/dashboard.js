@@ -29,9 +29,10 @@ import { PlanScreen } from './plan/plan-screen.js'
 import { parsePlanFocus } from './plan/plan-screen.js'
 
 // Design round f: the old Objectives and Initiatives tabs (and the milestone
-// panel) are one Plan tab. Their names still land on it, and
-// "plan:<kind>:<id>" opens it on one item (the Roadmap's Open).
-const planView = (entry) => (parsePlanFocus(entry) || ['objectives', 'initiative'].includes(entry) ? 'plan' : entry)
+// panel) are one Vision tab (Sahil 05/10 named it; the whiteboards keep
+// "Planning"). Its view key stays 'plan', so older entry names still land on
+// it, and "plan:<kind>:<id>" opens it on one item (the Roadmap's Open).
+const planView = (entry) => (parsePlanFocus(entry) || ['objectives', 'initiative', 'vision'].includes(entry) ? 'plan' : entry)
 
 export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap }) {
   const [projectView, setProjectView] = useState(planView(initialView) || 'overview')
@@ -43,6 +44,13 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
     if (key === projectView) return
     if (projectView === 'planning' && canvasDirty) { setPendingView(key); return }
     setProjectView(key)
+  }
+  // A view key, or "plan:<kind>:<id>" to open one item on the Vision screen
+  // (the Kanban card links use it).
+  const openView = (entry) => {
+    const focus = parsePlanFocus(entry)
+    if (focus) setPlanFocus(focus)
+    changeView(planView(entry))
   }
   const canvasSaver = useRef(null)
   const [viewSaving, setViewSaving] = useState(false)
@@ -92,7 +100,7 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
   if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Connect a project before opening the project dashboard.', icon: 'project' })
   const [healthTone, healthLabel] = healthDetails(project.health)
   const views = [
-    ['overview', 'Overview'], ['plan', 'Plan'], ['board', 'Kanban'], ['planning', 'Planning'], ['workflows', 'Workflows'], ['content', 'Content'], ['activity', 'Activity'], ['reports', 'Reports'], ['settings', 'Settings'],
+    ['overview', 'Overview'], ['plan', 'Vision'], ['board', 'Kanban'], ['planning', 'Planning'], ['workflows', 'Workflows'], ['content', 'Content'], ['activity', 'Activity'], ['reports', 'Reports'], ['settings', 'Settings'],
   ]
   const projectOptions = view.projects ?? []
   let panel
@@ -102,11 +110,12 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
     panel = jsx(KanbanScreen, {
       project, view, onRefresh, setWorkNotice, appliedView, setAppliedView,
       onOpenItem: setSelectedWorkItem,
-      onNavigate: changeView,
+      onNavigate: openView,
     })
   } else if (projectView === 'plan') {
-    // Design round f (Sahil 04/10, feedback f): one screen for initiatives,
-    // milestones, objectives, goals and the mission. It loads its own data.
+    // Design round f (Sahil 04/10, feedback f): the Vision screen, one place
+    // for initiatives, milestones, objectives, goals and the mission. It loads
+    // its own data.
     panel = jsx(PlanScreen, { project, focus: planFocus, onFocusConsumed: () => setPlanFocus(null), onOpenRoadmap }, project.id)
   } else if (projectView === 'planning') {
     panel = jsx(PlanningCanvasPanel, { project, canvas: view.canvas, content: view.content ?? [], onRefresh, onDirty: onCanvasDirty }, project.id)

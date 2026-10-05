@@ -131,7 +131,7 @@ test('milestones come from item_refs and skip archived milestones', () => {
     { id: 2, name: 'Old one', item_refs: ['HDY-10'], archived_at: '2026-01-01' },
     { id: 3, name: 'Elsewhere', item_refs: ['HDY-99'] },
   ]
-  assert.deepEqual(m.cardFacts(item(), { milestones }).milestones, [{ name: 'Pilot release', due: '2099-03-01' }])
+  assert.deepEqual(m.cardFacts(item(), { milestones }).milestones, [{ id: 1, name: 'Pilot release', due: '2099-03-01' }])
 })
 
 test('an objective appears only through the initiative, and says how it relates', () => {

@@ -1,8 +1,8 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
-// PROTOTYPE (design round f, 05/10): the Plan screen's detail drawer. It opens
-// on demand (never a permanent inspector) and is always handed the item from
-// the latest plan, so it never shows a stale copy after a change.
+// Design round f: the Vision screen's detail drawer. It opens on demand
+// (never a permanent inspector) and is always handed the item from the
+// latest plan, so it never shows a stale copy after a change.
 import { api } from '../../runtime/context.js'
 import { emitToast } from '../../runtime/context.js'
 import { useEffect } from '../../runtime/react.js'
@@ -11,35 +11,50 @@ import { useState } from '../../runtime/react.js'
 import { jsx } from '../../runtime/react.js'
 import { jsxs } from '../../runtime/react.js'
 import { validationSummary } from '../../data/loaders.js'
+import { ObjectiveEvidence } from '../../work-item/detail.js'
 import { Button } from '../../lib/ui.js'
 import { StatusTag } from '../../lib/ui.js'
 import { number } from '../../lib/ui.js'
 import { BUCKETS } from '../../lib/plan-vocab.js'
+import { COMPLETABLE_STATUSES } from '../../lib/plan-vocab.js'
 import { KIND_LABEL } from '../../lib/plan-vocab.js'
 import { OUTCOME_LABEL } from '../../lib/plan-vocab.js'
 import { REL_LABEL } from '../../lib/plan-vocab.js'
+import { WITHDRAWABLE_STATUSES } from '../../lib/plan-vocab.js'
 import { forecastLine } from '../../lib/plan-vocab.js'
 import { riskLine } from '../../lib/plan-vocab.js'
+import { isLinkable } from './plan-data.js'
 import { statusOf } from './plan-data.js'
 import { KindGlyph } from './plan-ui.js'
 import { Tag } from './plan-ui.js'
 import { errorText } from './plan-ui.js'
 
 // The initiative loop that was the Initiatives tab, kept as a compact list
-// with the same stages and wording. Changes requested sits at the approval
-// gate, and a regression at Observe outcome (the old rule left both at 2).
+// with the same stages and wording. Sahil 05/10 asked how the stages are
+// created: they are not. Every initiative has these same eight, and its
+// status alone says where it is. Changes requested sits at the approval gate,
+// a regression at Observe outcome; a withdrawn or rejected one stopped at the
+// approval gate.
 const LOOP = [
   ['verify', 'Verify state', () => 'Confirm the project state and evidence source.'],
   ['detect', 'Detect gap', (i) => i.rationale || 'Research the highest-value project gap.'],
   ['propose', 'Create initiative', (i) => i.expectedOutcome || 'Declare the expected outcome.'],
-  ['prioritise', 'Prioritise', (i) => `Priority ${number(i.priority)} with a recorded rationale.`],
-  ['approval', 'Human approval', () => 'Owner reviews the risk, evidence and validation contract.'],
-  ['execute', 'Build and verify', (i) => validationSummary(i.record.validation_contract)],
+  // No priority number: nothing can set one (the API has no field for it).
+  ['prioritise', 'Prioritise', () => 'Counted against the project’s open-initiative limit.'],
+  ['approval', 'Human approval', () => 'Owner reviews the risk, evidence and checks.'],
+  ['execute', 'Build and verify', (i) => checksOf(i.record.validation_contract) ?? 'No checks recorded: mark it complete when the work is done.'],
   ['release', 'Release', () => 'Release remains bounded by project policy.'],
   ['observe', 'Observe outcome', () => 'Measure whether the project improved.'],
 ]
-const loopIndex = (status) => ['pending_approval', 'changes_requested'].includes(status) ? 4
+const STOPPED = { rejected: 'Rejected at approval.', cancelled: 'Withdrawn before approval.' }
+const loopIndex = (status) => ['pending_approval', 'changes_requested', 'rejected', 'cancelled'].includes(status) ? 4
   : ['approved', 'executing'].includes(status) ? 5 : ['completed', 'regressed'].includes(status) ? 7 : 2
+// The checks a proposal carries (its validation contract), or null.
+function checksOf(contract) {
+  const steps = Array.isArray(contract?.steps) ? contract.steps.filter(Boolean) : []
+  const tests = typeof contract?.tests === 'string' ? contract.tests.trim() : ''
+  return steps.length || tests ? validationSummary(contract) : null
+}
 
 function Section({ title, action, children, readOnly }) {
   return jsxs('section', { className: 'dy-plan-drawer-section', children: [
@@ -122,7 +137,7 @@ function MilestoneWork({ milestone, plan, actions, onChanged, readOnly }) {
 }
 
 // item: the live row; ui: the screen's shared actions ({ open, link, edit,
-// review, confirm, archive, restore, remove, readOnly }).
+// review, confirm, archive, restore, remove, withdraw, complete, readOnly }).
 export function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
   const [evaluation, setEvaluation] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -137,7 +152,9 @@ export function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
     return () => { if (document.contains(opener)) opener.focus() }
   }, [])
   const readOnly = ui.readOnly
-  const live = !readOnly && !item.archived
+  // New links only on live items: not archived, and not a withdrawn or
+  // rejected initiative (it never runs).
+  const live = !readOnly && !item.archived && (item.kind !== 'initiative' || isLinkable(item))
   const open = (kind, id) => () => ui.open({ kind, id })
   const linkButton = (target, label = '+ Link') => live ? jsx(Button, { small: true, action: `plan-link-${target}`, onClick: () => ui.link(item, target), children: label }) : null
   // An unlink keeps both items; only the link between them goes.
@@ -157,9 +174,12 @@ export function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
   let footer = []
   if (item.kind === 'initiative') {
     const stage = loopIndex(item.status)
+    const stopped = STOPPED[item.status]
+    const checks = checksOf(item.record.validation_contract)
     tags.push(jsx(Tag, { children: `${item.risk} risk` }, 'risk'))
     body = [
-      jsx(Facts, { rows: [['Why', item.rationale || '—'], ['Expected outcome', item.expectedOutcome || '—'], ['Reference', item.ref]] }, 'facts'),
+      jsx(Facts, { rows: [['Why', item.rationale || '—'], ['Expected outcome', item.expectedOutcome || '—'],
+        ['Checks', checks ?? 'None recorded'], ['Reference', item.ref]] }, 'facts'),
       item.status === 'changes_requested' ? jsxs(Section, { title: 'Changes requested', children: [
         jsx(ChangesFeedback, { refId: item.ref }),
         readOnly ? null : jsx(Button, { small: true, variant: 'primary', action: 'plan-revise', onClick: () => ui.edit(item), children: 'Revise and resubmit' }),
@@ -190,19 +210,28 @@ export function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
               ...BUCKETS.map(([key, label]) => jsxs('span', { children: [jsx('strong', { children: number(item.delivery[key] ?? 0) }), label] }, key)),
               item.delivery.blocked > 0 ? jsxs('span', { className: 'blocked', children: [jsx('strong', { children: number(item.delivery.blocked) }), 'Blocked'] }, 'blocked') : null,
             ] }) }, 'delivery'),
-      jsx('p', { className: 'dy-plan-note', 'data-plan-no-delete': true, children: 'Initiatives are not deleted: each keeps its approval record. A reviewer can reject one or ask for changes.' }, 'nodelete'),
-      jsx(Section, { title: 'Where it is in the loop', children: jsx('ol', { className: 'dy-plan-loop', 'data-plan-loop': item.ref, children: LOOP.map(([key, label, text], index) => jsxs('li', {
-        className: index < stage ? 'done' : index === stage ? 'current' : '', 'aria-current': index === stage ? 'step' : undefined,
-        children: [jsx('strong', { children: label }), index === stage ? jsx('small', { children: text(item) }) : null],
+      jsx('p', { className: 'dy-plan-note', 'data-plan-no-delete': true, children: WITHDRAWABLE_STATUSES.includes(item.status)
+        ? 'Initiatives are not deleted: each keeps its approval record. Not needed any more? Withdraw it before approval.'
+        : 'Initiatives are not deleted: each keeps its approval record.' }, 'nodelete'),
+      jsx(Section, { title: 'Stages', children: jsx('ol', { className: 'dy-plan-loop', 'data-plan-loop': item.ref, children: LOOP.map(([key, label, text], index) => jsxs('li', {
+        className: index < stage ? 'done' : index === stage ? (stopped ? 'stopped' : 'current') : '', 'aria-current': index === stage ? 'step' : undefined,
+        children: [jsx('strong', { children: label }), index === stage ? jsx('small', { children: stopped ?? text(item) }) : null],
       }, key)) }) }, 'loop'),
     ]
+    footer = [
+      COMPLETABLE_STATUSES.includes(item.status) ? jsx(Button, { variant: 'primary', action: 'plan-complete', onClick: () => ui.complete(item), children: 'Mark complete…' }, 'complete') : null,
+      WITHDRAWABLE_STATUSES.includes(item.status) ? jsx(Button, { variant: 'danger', action: 'plan-withdraw', onClick: () => ui.withdraw(item), children: 'Withdraw…' }, 'withdraw') : null,
+    ].filter(Boolean)
   } else if (item.kind === 'milestone') {
     body = [
       jsx(Facts, { rows: [['Due', item.due ?? 'No due date'], ['Progress', `${number(item.done)} of ${number(item.total)} work items done`]] }, 'facts'),
       jsx(Section, { title: 'Initiatives', readOnly, action: linkButton('initiative'), children: jsx(Links, { empty: 'Not linked to an initiative yet.', rows: initiativeRows(item.initiatives, 'milestone') }) }, 'initiatives'),
       jsx(MilestoneWork, { milestone: item, plan, actions, onChanged, readOnly }, 'work'),
     ]
-    footer = item.archived ? [jsx(Button, { action: 'plan-restore-milestone', onClick: () => ui.restore(item), children: 'Restore' }, 'restore')] : [
+    footer = item.archived ? [
+      jsx(Button, { action: 'plan-restore-milestone', onClick: () => ui.restore(item), children: 'Restore' }, 'restore'),
+      jsx(Button, { variant: 'danger', action: 'plan-delete-milestone', onClick: () => ui.remove(item), children: 'Delete for good…' }, 'delete'),
+    ] : [
       jsx(Button, { variant: 'primary', action: 'plan-edit', onClick: () => ui.edit(item), children: 'Edit' }, 'edit'),
       jsx(Button, { action: item.closed ? 'plan-reopen-milestone' : 'plan-close-milestone', disabled: busy,
         onClick: () => act(() => actions.updateMilestone(item.name, { closed: !item.closed }), item.closed ? 'Milestone reopened.' : 'Milestone closed.'), children: item.closed ? 'Reopen' : 'Close' }, 'close'),
@@ -232,6 +261,10 @@ export function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
       jsx(Facts, { rows: [['Description', item.description || '—'], ['Target', item.target],
         ['Evidence', item.samples ? `${number(item.samples)} result(s) in ${item.window}${item.passRate !== null ? `, ${Math.round(item.passRate * 100)}% passed` : ''}` : `None yet (${item.window} window)`]] }, 'facts'),
       evaluation ? jsx('p', { className: 'dy-plan-note', role: 'status', 'data-plan-evaluation': true, children: evaluation }, 'evaluation') : null,
+      // Evidence history and, for a manual objective, the human assessment
+      // form: the old Objectives tab's panel, unchanged (it fails closed
+      // without an authenticated human).
+      item.record ? jsx(ObjectiveEvidence, { objective: item.record, projectId: plan.projectId, onSaved: onChanged }, 'evidence') : null,
       // The backend allows each objective in one goal.
       jsx(Section, { title: 'Goal it measures', readOnly, action: goal ? null : linkButton('goal', '+ Add'), children: jsx(Links, {
         empty: 'Not part of a goal yet. An objective can measure one goal.',
@@ -267,7 +300,10 @@ export function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
         }),
       }) }, 'objectives'),
     ]
-    footer = item.archived ? [jsx(Button, { action: 'plan-restore-goal', onClick: () => ui.restore(item), children: 'Restore' }, 'restore')] : [
+    footer = item.archived ? [
+      jsx(Button, { action: 'plan-restore-goal', onClick: () => ui.restore(item), children: 'Restore' }, 'restore'),
+      jsx(Button, { variant: 'danger', action: 'plan-delete-goal', onClick: () => ui.remove(item), children: 'Delete for good…' }, 'delete'),
+    ] : [
       jsx(Button, { variant: 'primary', action: 'plan-edit', onClick: () => ui.edit(item), children: 'Edit' }, 'edit'),
       jsx(Button, { action: 'plan-goal-up', disabled: busy || index <= 0, onClick: () => move(-1), children: 'Move up' }, 'up'),
       jsx(Button, { action: 'plan-goal-down', disabled: busy || index >= active.length - 1, onClick: () => move(1), children: 'Move down' }, 'down'),
