@@ -328,7 +328,9 @@ export function WorkItemDetail({ item, projectId, profiles, initiatives = [], on
             jsx('h3', { children: `Activity · ${historyEntries.length}` }),
             jsxs('div', { className: 'dockyard-activity-actions', children: [
               historyEntries.length > 2 ? jsx('button', { type: 'button', className: 'dockyard-activity-expand', 'aria-expanded': activityExpanded, onClick: () => setActivityExpanded(!activityExpanded), children: activityExpanded ? 'Show less' : `View all ${historyEntries.length}` }) : null,
-              jsx('label', { className: 'dockyard-activity-scope', children: [
+              // jsxs: a static child list (jsx with an array made React warn
+              // "Each child in a list should have a unique key", seen 05/10).
+              jsxs('label', { className: 'dockyard-activity-scope', children: [
                 jsxs('span', { className: 'dockyard-field-shell dockyard-activity-scope-shell', children: [
                   jsx(Icon, { name: 'filter' }),
                   jsx('select', { 'data-activity-scope': true, 'aria-label': 'Activity scope', value: historyFilter, onChange: (event) => { setHistoryFilter(event.target.value); setActivityExpanded(false) }, children: [

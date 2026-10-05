@@ -116,7 +116,12 @@ export async function loadProjectData(projectId) {
   }
   if (!project) return { ...dashboard, project: null, projects }
   const encoded = encodeURIComponent(project.id)
-  const [settings, workItems, initiatives, objectives, goals, missionArchive, content, events, reports, milestones, workflows, views, canvas, discovery] = await Promise.all([
+  // C1 Overview: the header strip reads this project's row and its
+  // decisions and interventions from the fleet portfolio (the Dashboard's
+  // own rule, no second scoring). A failed portfolio read leaves the strip
+  // saying "Status unavailable" instead of taking the whole project down.
+  const portfolioRead = api('/portfolio').catch(() => null)
+  const [settings, workItems, initiatives, objectives, goals, missionArchive, content, events, reports, milestones, workflows, views, canvas, discovery, portfolio] = await Promise.all([
     api(`/projects/${encoded}/settings`),
     api(`/projects/${encoded}/work-items`),
     api(`/projects/${encoded}/initiatives`),
@@ -131,6 +136,7 @@ export async function loadProjectData(projectId) {
     api(`/projects/${encoded}/views`),
     api(`/projects/${encoded}/canvas`),
     api('/onboard/discover'),
+    portfolioRead,
   ])
   return {
     ...dashboard,
@@ -150,6 +156,7 @@ export async function loadProjectData(projectId) {
     views: views.views ?? [],
     canvas: canvas ?? { revision: 1, objects: [], connectors: [] },
     profiles: discovery.profiles ?? [],
+    portfolio,
   }
 }
 

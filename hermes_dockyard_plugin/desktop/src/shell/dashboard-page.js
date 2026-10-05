@@ -418,6 +418,8 @@ export function DashboardPage({ inboxCss = '' } = {}) {
       onRefresh: refresh,
       onOpenLibrary: () => requestTab('workflows'),
       onOpenRoadmap: () => requestTab('roadmap', { roadmapScope: payload.project?.id }),
+      // C1: the header strip's attention drawer opens approvals in the inbox.
+      onOpenLink: openDeepLink,
       pendingWorkRef,
       onPendingWorkConsumed: () => setPendingWorkRef(null),
       notice: deepLinkNotice,

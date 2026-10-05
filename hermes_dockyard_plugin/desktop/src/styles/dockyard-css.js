@@ -679,7 +679,7 @@ export const DOCKYARD_CSS = `
   color: var(--dy-text);
   font: inherit;
 }
-.dockyard-root .dockyard-project-tabs { display: flex; gap: 2px; margin-left: auto; }
+.dockyard-root .dockyard-project-tabs { display: flex; gap: 2px; margin-left: 0; }
 .dockyard-root .dockyard-project-tabs button {
   min-height: 36px;
   padding: 7px 11px;

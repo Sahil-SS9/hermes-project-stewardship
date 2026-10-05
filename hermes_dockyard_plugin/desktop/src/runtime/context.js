@@ -9,6 +9,7 @@ import { ROADMAP_CSS } from '../styles/roadmap-css.js'
 import { PLAN_CSS } from '../styles/plan-css.js'
 import { SETTINGS_CSS } from '../styles/settings-css.js'
 import { KANBAN_CSS } from '../styles/kanban-css.js'
+import { OVERVIEW_CSS } from '../styles/overview-css.js'
 import workflowCanvasCss from '../../workflow-canvas-css.js'
 export let _rest = null
 export let _os = null
@@ -109,6 +110,9 @@ export function useDockyardStyles() {
   useStylesheet('dy-switcher-stylesheet', 'dySwitcherStylesheet', SWITCHER_CSS)
   // Design round f prototype (05/10): the one Plan screen inside a project.
   useStylesheet('dy-plan-stylesheet', 'dyPlanStylesheet', PLAN_CSS)
+  // C1 Overview (05/10): the project header strip signed 16/09 and its
+  // "Needs attention" drawer (C1-owned, same rule as the blocks above).
+  useStylesheet('dy-overview-stylesheet', 'dyOverviewStylesheet', OVERVIEW_CSS)
   // Sahil 05/10 (design round d + h): colour themes, backgrounds and fonts.
   // Last, so a chosen theme's colours win over every block above.
   useStylesheet('dy-theme-stylesheet', 'dyThemeStylesheet', THEME_CSS)

@@ -22,11 +22,13 @@ import { WorkBar } from '../views/dashboard.js'
 import { InitiativeRevisionRow } from '../views/dashboard.js'
 import { formatWhen } from '../lib/ui.js'
 import { FirstAssessmentCard } from '../views/dashboard.js'
-import { PageHead } from '../lib/ui.js'
 import { WorkItemDetail } from '../work-item/detail.js'
 import { KanbanScreen } from '../kanban/board.js'
 import { PlanScreen } from './plan/plan-screen.js'
 import { parsePlanFocus } from './plan/plan-screen.js'
+import { ProjectHeaderStrip } from './header-strip.js'
+import { readStripReview } from './strip-review.js'
+import { StripReviewBar } from './strip-review.js'
 
 // Design round f: the old Objectives and Initiatives tabs (and the milestone
 // panel) are one Vision tab (Sahil 05/10 named it; the whiteboards keep
@@ -34,8 +36,11 @@ import { parsePlanFocus } from './plan/plan-screen.js'
 // it, and "plan:<kind>:<id>" opens it on one item (the Roadmap's Open).
 const planView = (entry) => (parsePlanFocus(entry) || ['objectives', 'initiative', 'vision'].includes(entry) ? 'plan' : entry)
 
-export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap }) {
+export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap, onOpenLink }) {
   const [projectView, setProjectView] = useState(planView(initialView) || 'overview')
+  // C1 design review (?review=1): the bar rewrites the page address, and this
+  // counter re-renders the screen so the new choice shows at once.
+  const [, setReviewTick] = useState(0)
   const [planFocus, setPlanFocus] = useState(() => parsePlanFocus(initialView))
   // QA M-7: leaving the Planning view with unsaved board edits asks first.
   const [canvasDirty, setCanvasDirty] = useState(false)
@@ -99,10 +104,23 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
   }
   if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Connect a project before opening the project dashboard.', icon: 'project' })
   const [healthTone, healthLabel] = healthDetails(project.health)
+  const review = readStripReview()
   const views = [
     ['overview', 'Overview'], ['plan', 'Vision'], ['board', 'Kanban'], ['planning', 'Planning'], ['workflows', 'Workflows'], ['content', 'Content'], ['activity', 'Activity'], ['reports', 'Reports'], ['settings', 'Settings'],
   ]
-  const projectOptions = view.projects ?? []
+  // C1: Open on a "Needs attention" item goes to the exact place to act.
+  const openAttentionItem = (item) => {
+    const target = item?.target ?? {}
+    if (target.kind === 'deep_link') { onOpenLink?.(target.link); return }
+    if (target.kind === 'work') {
+      const found = (view.workItems ?? []).find((entry) => entry.ref === target.ref)
+      setWorkNotice(found ? null : `Work item ${target.ref} is not in this project's board data.`)
+      setSelectedWorkItem(found ?? null)
+      return
+    }
+    if (target.kind === 'plan') { openView(target.entry); return }
+    if (target.kind === 'view') changeView(target.view)
+  }
   let panel
   if (projectView === 'board') {
     // C2: the Kanban screen lives in src/kanban/. appliedView stays here so a
@@ -145,7 +163,9 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
       .sort((left, right) => String(right.created_at || '').localeCompare(String(left.created_at || '')))
       .slice(0, 4)
     panel = jsxs(Fragment, { children: [
-      jsxs('div', { className: 'dockyard-project-grid', 'data-project-visual': true, children: [
+      // The two cards the header strip now repeats (mission + delivery bar,
+      // blocked count). Review choice: keep or drop.
+      review.cards === 'keep' ? jsxs('div', { className: 'dockyard-project-grid', 'data-overview-repeats': true, children: [
         jsxs('section', { className: 'dockyard-feature-card dockyard-project-hero', children: [
           jsx(StatusTag, { tone: healthTone, label: healthLabel }),
           jsx('h2', { children: view.settings?.mission || project.id }),
@@ -162,7 +182,7 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
           jsx('h2', { children: `${number(project.work?.blocked ?? 0)} blocked` }),
           jsx('p', { children: `${number(view.workItems?.length ?? 0)} work items and ${number(view.initiatives?.length ?? 0)} initiatives are attached to this project.` }),
         ]}),
-      ]}),
+      ]}, 'repeats') : null,
       jsxs('div', { className: 'dockyard-project-overview-grid', children: [
         jsxs('section', { className: 'dockyard-feature-card dockyard-overview-card', 'data-overview-work': true, children: [
           jsxs('header', { children: [jsx('h2', { children: 'Current work' }), jsx('span', { children: number(view.workItems?.length ?? 0) })] }),
@@ -198,25 +218,22 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
     ]})
   }
   return jsxs('div', { 'data-project-dashboard': project.id, children: [
-    jsx(PageHead, {
-      title: view.settings?.mission || project.id,
-      description: `Project dashboard / ${project.id}`,
-      status: project.health && project.health !== 'healthy' ? healthLabel : null,
-      onRefresh,
-    }),
-    projectView === 'overview' && jsx('div', { className: 'dockyard-view-only-note', 'data-roadmap-link': true, children:
-      jsx('a', { href: '#', onClick: (event) => { event.preventDefault(); onOpenRoadmap?.() }, children: 'View in Roadmap' }),
-    }),
+    review.active ? jsx(StripReviewBar, { review, onChange: () => setReviewTick((tick) => tick + 1) }) : null,
+    // C1 (signed 16/09): the header strip replaces the old page head on every
+    // tab. Overview always shows it in full; the working tabs follow the
+    // review choice. The project comes from the global switcher only (Sahil
+    // 04/10), so the strip and the tab bar carry no project picker.
+    jsx(ProjectHeaderStrip, {
+      project, view,
+      mode: projectView === 'overview' ? 'full' : review.strip,
+      onRefresh, onOpenRoadmap, onOpenItem: openAttentionItem,
+    }, `strip:${project.id}`),
     workNotice || notice ? jsxs('div', { className: 'dockyard-view-only-note', role: 'alert', 'data-deep-link-notice': true, children: [
       jsx(Icon, { name: 'alert' }),
       jsx('span', { children: workNotice || notice }),
     ]}) : null,
     jsx('p', { className: 'dockyard-inline-error', role: 'alert', 'data-deep-link-error': true, hidden: !(workNotice || notice), children: workNotice || notice }),
-    jsxs('div', { className: 'dockyard-project-toolbar', children: [
-      jsx('label', { children: 'Project' }),
-      jsx('select', { value: project.id, onChange: (event) => onSelectProject(event.target.value), children:
-        projectOptions.map((option) => jsx('option', { value: option.id, children: option.id }, option.id)),
-      }),
+    jsx('div', { className: 'dockyard-project-toolbar', children:
       jsx('nav', { className: 'dockyard-project-tabs', 'aria-label': 'Project views', children:
         views.map(([key, label]) => jsx('button', {
           type: 'button',
@@ -227,7 +244,7 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
           children: label,
         }, key)),
       }),
-    ]}),
+    }),
     panel,
     pendingView ? jsxs('section', { className: 'dockyard-modal-layer', 'data-view-switch-confirm': pendingView, children: [
       jsxs('div', { className: 'dockyard-modal', role: 'alertdialog', 'aria-modal': true, 'aria-label': 'Unsaved planning board changes',

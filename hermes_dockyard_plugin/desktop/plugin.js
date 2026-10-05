@@ -816,7 +816,7 @@ var DOCKYARD_CSS = `
   color: var(--dy-text);
   font: inherit;
 }
-.dockyard-root .dockyard-project-tabs { display: flex; gap: 2px; margin-left: auto; }
+.dockyard-root .dockyard-project-tabs { display: flex; gap: 2px; margin-left: 0; }
 .dockyard-root .dockyard-project-tabs button {
   min-height: 36px;
   padding: 7px 11px;
@@ -2994,6 +2994,109 @@ var KANBAN_CSS = `
 }
 `;
 
+// hermes_dockyard_plugin/desktop/src/styles/overview-css.js
+var OVERVIEW_CSS = `
+.dockyard-root .dy-ov-strip { display: grid; gap: 8px; min-width: 0; margin: 0 0 12px; }
+
+/* 1. Status banner: background, text and border keyed to the state. */
+.dockyard-root .dy-ov-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; padding: 6px 12px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-neutral-bg); color: var(--dy-neutral); font-size: 13px; line-height: 1.35; cursor: pointer; }
+.dockyard-root .dy-ov-banner:hover { filter: brightness(.98); }
+.dockyard-root .dy-ov-banner:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
+.dockyard-root .dy-ov-banner[data-tone="danger"] { background: var(--dy-danger-bg); color: var(--dy-danger); border-color: color-mix(in srgb, var(--dy-danger) 45%, transparent); }
+.dockyard-root .dy-ov-banner[data-tone="warning"] { background: var(--dy-warning-bg); color: var(--dy-warning); border-color: color-mix(in srgb, var(--dy-warning) 45%, transparent); }
+.dockyard-root .dy-ov-banner[data-tone="info"] { background: var(--dy-info-bg); color: var(--dy-info); border-color: color-mix(in srgb, var(--dy-info) 45%, transparent); }
+.dockyard-root .dy-ov-banner[data-tone="success"] { background: var(--dy-success-bg); color: var(--dy-success); border-color: color-mix(in srgb, var(--dy-success) 45%, transparent); }
+.dockyard-root .dy-ov-banner[data-tone="neutral"] { background: var(--dy-neutral-bg); color: var(--dy-neutral); border-color: var(--dy-border); }
+.dockyard-root .dy-ov-banner-left { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.dockyard-root .dy-ov-banner-left strong { flex: none; font-weight: 750; }
+.dockyard-root .dy-ov-mark { flex: none; align-self: center; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.dockyard-root .dy-ov-banner-summary { min-width: 0; color: var(--dy-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dockyard-root .dy-ov-banner-view { flex: none; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+
+/* 2. Eyebrow row: project, lead, evidence; recency and actions on the right. */
+.dockyard-root .dy-ov-eyebrow-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; min-width: 0; }
+.dockyard-root .dy-ov-eyebrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; margin: 0; color: var(--dy-text-3); font-size: 12px; }
+.dockyard-root .dy-ov-proj { color: var(--dy-text-2); font-weight: 750; letter-spacing: .02em; }
+.dockyard-root .dy-ov-sep { color: var(--dy-text-3); }
+.dockyard-root .dy-ov-evidence { display: inline-flex; align-items: center; gap: 5px; }
+.dockyard-root .dy-ov-evidence i { width: 7px; height: 7px; border-radius: 50%; background: var(--dy-neutral); }
+.dockyard-root .dy-ov-evidence[data-tone="danger"] i { background: var(--dy-danger); }
+.dockyard-root .dy-ov-evidence[data-tone="warning"] i { background: var(--dy-warning); }
+.dockyard-root .dy-ov-evidence[data-tone="success"] i { background: var(--dy-success); }
+.dockyard-root .dy-ov-meta { display: flex; align-items: center; gap: 12px; color: var(--dy-text-3); font-size: 12px; }
+.dockyard-root .dy-ov-meta a { color: var(--dy-accent-text); font-weight: 650; text-decoration: none; }
+.dockyard-root .dy-ov-meta a:hover { text-decoration: underline; }
+.dockyard-root .dy-ov-refresh { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text-2); cursor: pointer; }
+.dockyard-root .dy-ov-refresh:hover { background: var(--dy-surface-subtle); color: var(--dy-text); }
+.dockyard-root .dy-ov-refresh:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
+.dockyard-root .dy-ov-refresh svg { width: 14px; height: 14px; }
+
+/* 3. The mission as the one headline. */
+.dockyard-root .dy-ov-headline { margin: 0; color: var(--dy-text); font-size: 22px; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; }
+.dockyard-root .dy-ov-headline[data-strip-headline="missing"] { color: var(--dy-text-2); }
+
+/* 4. Delivery as a thin strip: %, bar, legend on one line where it fits. */
+.dockyard-root .dy-ov-progress { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; }
+.dockyard-root .dy-ov-pct { display: inline-flex; align-items: baseline; gap: 6px; color: var(--dy-text); font-size: 13px; font-weight: 750; white-space: nowrap; }
+.dockyard-root .dy-ov-pct small { color: var(--dy-text-3); font-size: 12px; font-weight: 500; }
+.dockyard-root .dy-ov-track { flex: 1 1 220px; display: flex; height: 6px; min-width: 120px; overflow: hidden; border-radius: 999px; background: var(--dy-surface-strong); }
+.dockyard-root .dy-ov-track > span { display: block; height: 100%; }
+.dockyard-root .dy-ov-track > .done, .dockyard-root .dy-ov-legend .done i { background: var(--dy-success); }
+.dockyard-root .dy-ov-track > .active, .dockyard-root .dy-ov-legend .active i { background: var(--dy-action); }
+.dockyard-root .dy-ov-track > .blocked, .dockyard-root .dy-ov-legend .blocked i { background: var(--dy-danger); }
+.dockyard-root .dy-ov-track > .backlog, .dockyard-root .dy-ov-legend .backlog i { background: var(--dy-neutral); }
+.dockyard-root .dy-ov-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; color: var(--dy-text-2); font-size: 11px; }
+.dockyard-root .dy-ov-legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.dockyard-root .dy-ov-legend i { width: 8px; height: 8px; border-radius: 2px; }
+
+/* The "Needs attention" drawer: a right-hand panel over the page. */
+.dockyard-root .dy-ov-attn-layer { place-items: stretch end; padding: 0; }
+.dockyard-root .dy-ov-attn-panel { display: grid; align-content: start; gap: 12px; width: min(420px, 100%); height: 100%; overflow-y: auto; padding: 18px; border-left: 1px solid var(--dy-border); background: var(--dy-surface); color: var(--dy-text); box-shadow: var(--dy-shadow); }
+.dockyard-root .dy-ov-attn-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dockyard-root .dy-ov-attn-panel h2 { margin: 0; font-size: 17px; }
+.dockyard-root .dy-ov-attn-close { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text-2); cursor: pointer; }
+.dockyard-root .dy-ov-attn-close:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
+.dockyard-root .dy-ov-attn-close svg { width: 15px; height: 15px; }
+.dockyard-root .dy-ov-attn-sub { margin: 0; color: var(--dy-text-2); font-size: 13px; }
+.dockyard-root .dy-ov-attn-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.dockyard-root .dy-ov-attn-item { overflow: hidden; border: 1px solid var(--dy-border); border-left: 4px solid var(--dy-neutral); border-radius: 8px; background: var(--dy-surface); }
+.dockyard-root .dy-ov-attn-item[data-tone="danger"] { border-left-color: var(--dy-danger); }
+.dockyard-root .dy-ov-attn-item[data-tone="warning"] { border-left-color: var(--dy-warning); }
+.dockyard-root .dy-ov-attn-item[data-tone="info"] { border-left-color: var(--dy-info); }
+.dockyard-root .dy-ov-attn-row { display: grid; gap: 2px; width: 100%; padding: 10px 12px; border: 0; background: transparent; color: var(--dy-text); font: inherit; text-align: left; cursor: pointer; }
+.dockyard-root .dy-ov-attn-row:hover { background: var(--dy-surface-subtle); }
+.dockyard-root .dy-ov-attn-row:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: -2px; }
+.dockyard-root .dy-ov-attn-row strong { font-size: 13px; overflow-wrap: anywhere; }
+.dockyard-root .dy-ov-attn-sev { color: var(--dy-neutral); font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.dockyard-root .dy-ov-attn-item[data-tone="danger"] .dy-ov-attn-sev { color: var(--dy-danger); }
+.dockyard-root .dy-ov-attn-item[data-tone="warning"] .dy-ov-attn-sev { color: var(--dy-warning); }
+.dockyard-root .dy-ov-attn-item[data-tone="info"] .dy-ov-attn-sev { color: var(--dy-info); }
+.dockyard-root .dy-ov-attn-note { color: var(--dy-text-2); font-size: 12px; }
+.dockyard-root .dy-ov-attn-detail { display: grid; gap: 10px; padding: 2px 12px 12px; }
+.dockyard-root .dy-ov-attn-detail dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 12px; }
+.dockyard-root .dy-ov-attn-detail dt { color: var(--dy-text-3); }
+.dockyard-root .dy-ov-attn-detail dd { margin: 0; color: var(--dy-text); }
+.dockyard-root .dy-ov-attn-detail .dockyard-button { justify-self: start; }
+.dockyard-root .dy-ov-attn-empty { margin: 0; padding: 12px; border: 1px dashed var(--dy-border); border-radius: 8px; color: var(--dy-text-2); font-size: 13px; }
+
+/* Design review only (?review=1): the bar that switches the open choices. */
+.dockyard-root .dy-ov-review { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0 0 10px; padding: 8px 12px; border: 1px dashed var(--dy-accent-border); border-radius: 8px; background: var(--dy-accent-soft); color: var(--dy-text); font-size: 12px; }
+.dockyard-root .dy-ov-review strong { font-weight: 800; }
+.dockyard-root .dy-ov-review [role="group"] { display: inline-flex; align-items: center; gap: 4px; }
+.dockyard-root .dy-ov-review button { padding: 3px 9px; border: 1px solid var(--dy-control-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text-2); font: inherit; cursor: pointer; }
+.dockyard-root .dy-ov-review button[aria-pressed="true"] { border-color: var(--dy-action); background: var(--dy-action); color: var(--dy-on-action); }
+
+@container dockyard (max-width: 640px) {
+  .dockyard-root .dy-ov-banner { align-items: flex-start; }
+  .dockyard-root .dy-ov-banner-left { flex-wrap: wrap; }
+  .dockyard-root .dy-ov-banner-summary { white-space: normal; }
+  .dockyard-root .dy-ov-headline { font-size: 19px; }
+  .dockyard-root .dy-ov-meta { width: 100%; justify-content: space-between; }
+  .dockyard-root .dy-ov-attn-layer { place-items: end stretch; }
+  .dockyard-root .dy-ov-attn-panel { width: 100%; height: auto; max-height: 85%; border-left: 0; border-top: 1px solid var(--dy-border); border-radius: 14px 14px 0 0; }
+}
+`;
+
 // hermes_dockyard_plugin/desktop/workflow-canvas-css.js
 var workflow_canvas_css_default = `
 /* ---- Workflow canvas: card + status token set ----------------------------
@@ -3789,6 +3892,7 @@ function useDockyardStyles() {
   useStylesheet("dy-wf-stylesheet", "dyWfStylesheet", workflow_canvas_css_default);
   useStylesheet("dy-switcher-stylesheet", "dySwitcherStylesheet", SWITCHER_CSS);
   useStylesheet("dy-plan-stylesheet", "dyPlanStylesheet", PLAN_CSS);
+  useStylesheet("dy-overview-stylesheet", "dyOverviewStylesheet", OVERVIEW_CSS);
   useStylesheet("dy-theme-stylesheet", "dyThemeStylesheet", THEME_CSS);
 }
 
@@ -6030,7 +6134,8 @@ async function loadProjectData(projectId) {
   }
   if (!project) return { ...dashboard, project: null, projects };
   const encoded = encodeURIComponent(project.id);
-  const [settings, workItems, initiatives, objectives, goals, missionArchive, content, events, reports, milestones, workflows, views, canvas, discovery] = await Promise.all([
+  const portfolioRead = api("/portfolio").catch(() => null);
+  const [settings, workItems, initiatives, objectives, goals, missionArchive, content, events, reports, milestones, workflows, views, canvas, discovery, portfolio] = await Promise.all([
     api(`/projects/${encoded}/settings`),
     api(`/projects/${encoded}/work-items`),
     api(`/projects/${encoded}/initiatives`),
@@ -6044,7 +6149,8 @@ async function loadProjectData(projectId) {
     api(`/projects/${encoded}/workflows`),
     api(`/projects/${encoded}/views`),
     api(`/projects/${encoded}/canvas`),
-    api("/onboard/discover")
+    api("/onboard/discover"),
+    portfolioRead
   ]);
   return {
     ...dashboard,
@@ -6063,7 +6169,8 @@ async function loadProjectData(projectId) {
     workflows: workflows.workflows ?? [],
     views: views.views ?? [],
     canvas: canvas ?? { revision: 1, objects: [], connectors: [] },
-    profiles: discovery.profiles ?? []
+    profiles: discovery.profiles ?? [],
+    portfolio
   };
 }
 async function loadBacklogData(projectId) {
@@ -7538,7 +7645,9 @@ function WorkItemDetail({ item, projectId, profiles, initiatives = [], onClose, 
             jsx("h3", { children: `Activity \xB7 ${historyEntries.length}` }),
             jsxs("div", { className: "dockyard-activity-actions", children: [
               historyEntries.length > 2 ? jsx("button", { type: "button", className: "dockyard-activity-expand", "aria-expanded": activityExpanded, onClick: () => setActivityExpanded(!activityExpanded), children: activityExpanded ? "Show less" : `View all ${historyEntries.length}` }) : null,
-              jsx("label", { className: "dockyard-activity-scope", children: [
+              // jsxs: a static child list (jsx with an array made React warn
+              // "Each child in a list should have a unique key", seen 05/10).
+              jsxs("label", { className: "dockyard-activity-scope", children: [
                 jsxs("span", { className: "dockyard-field-shell dockyard-activity-scope-shell", children: [
                   jsx(Icon, { name: "filter" }),
                   jsx("select", { "data-activity-scope": true, "aria-label": "Activity scope", value: historyFilter, onChange: (event) => {
@@ -17549,10 +17658,407 @@ function PlanScreen({ project, focus, onFocusConsumed, onOpenRoadmap }) {
   ] });
 }
 
+// hermes_dockyard_plugin/desktop/src/project/attention.js
+var STALLED_AFTER_DAYS = 14;
+var PHASE_LABEL = { paused: "Paused", frozen: "Frozen", disabled: "Disabled", archived: "Archived" };
+var plural4 = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+function joinAnd(parts) {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+function timeAgo(value, now = /* @__PURE__ */ new Date()) {
+  const at = Date.parse(value ?? "");
+  if (Number.isNaN(at)) return null;
+  const minutes = Math.max(0, Math.floor((now.getTime() - at) / 6e4));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 60) return `${days}d ago`;
+  return `${Math.floor(days / 30)} months ago`;
+}
+function lastActivity({ portfolioRow, events = [] }) {
+  const stamps = [portfolioRow?.last_activity, ...events.map((event) => event?.ts ?? event?.created_at)].map((value) => ({ value, at: Date.parse(value ?? "") })).filter((entry) => !Number.isNaN(entry.at));
+  if (stamps.length === 0) return null;
+  return stamps.reduce((newest, entry) => entry.at > newest.at ? entry : newest).value;
+}
+function deliveryCounts(work) {
+  const counts = {
+    done: Number(work?.done ?? 0),
+    active: Number(work?.active ?? 0),
+    blocked: Number(work?.blocked ?? 0),
+    backlog: Number(work?.backlog ?? 0)
+  };
+  const total = counts.done + counts.active + counts.blocked + counts.backlog;
+  const percent = total > 0 ? Math.round(counts.done / total * 100) : null;
+  return { ...counts, total, percent };
+}
+function overdueMilestones(milestones, now) {
+  return (milestones ?? []).filter((milestone) => {
+    if (!milestone || milestone.closed || milestone.archived_at) return false;
+    const due = Date.parse(milestone.due ?? "");
+    return !Number.isNaN(due) && due < now.getTime();
+  });
+}
+function projectAttention({ project, portfolio, milestones = [], now = /* @__PURE__ */ new Date() }) {
+  const id = project?.id;
+  const row = (portfolio?.projects ?? []).find((entry) => entry?.project_id === id) ?? null;
+  if (!id || !row) {
+    return {
+      available: false,
+      state: "unknown",
+      tone: "neutral",
+      label: "Status unavailable",
+      summary: "the attention check did not load. Refresh to try again.",
+      items: []
+    };
+  }
+  const groups = portfolio.groups ?? {};
+  const items = [];
+  for (const decision of groups.decisions ?? []) {
+    if (decision?.project !== id) continue;
+    items.push({
+      key: `approval:${decision.ref}`,
+      kind: "approval",
+      tone: "warning",
+      label: "Approval waiting",
+      title: decision.title || decision.ref,
+      ref: decision.ref,
+      note: `Initiative waiting for your decision${decision.risk ? ` (${decision.risk} risk)` : ""}.`,
+      ageDays: decision.age_days,
+      owner: null,
+      next: "Decide in the Approval inbox, where the fingerprint is shown.",
+      target: { kind: "deep_link", link: decision.deep_link || `s6:initiative/${decision.ref}` },
+      openLabel: "Open in Approval inbox"
+    });
+  }
+  for (const entry of groups.interventions ?? []) {
+    if (entry?.project !== id) continue;
+    const base = { ref: entry.ref, ageDays: entry.age_days, owner: entry.owner ?? null, next: entry.next_action ?? null };
+    if (entry.cause === "blocked_item") {
+      items.push({
+        ...base,
+        key: `blocked:${entry.ref}`,
+        kind: "blocked",
+        tone: "danger",
+        label: "Blocked",
+        title: `${entry.ref} \xB7 ${entry.title}`,
+        note: entry.detail || "Blocked without a recorded reason.",
+        target: { kind: "work", ref: entry.ref },
+        openLabel: "Open work item"
+      });
+    } else if (entry.cause === "overdue_item") {
+      items.push({
+        ...base,
+        key: `overdue:${entry.ref}`,
+        kind: "overdue",
+        tone: "warning",
+        label: "Overdue",
+        title: `${entry.ref} \xB7 ${entry.title}`,
+        note: entry.detail || "Past its due date and not done.",
+        target: { kind: "work", ref: entry.ref },
+        openLabel: "Open work item"
+      });
+    } else if (entry.cause === "evidence_stale") {
+      items.push({
+        ...base,
+        key: "evidence",
+        kind: "evidence",
+        tone: "warning",
+        label: "Evidence out of date",
+        title: entry.title || "The last health check is old",
+        note: entry.detail || "",
+        target: { kind: "view", view: "overview" },
+        openLabel: "Open the assessment"
+      });
+    } else if (entry.cause === "project_attention") {
+      const switchedOff = project.enabled === false || row.enabled === false;
+      items.push({
+        ...base,
+        key: "project",
+        kind: "project",
+        tone: "neutral",
+        label: switchedOff ? "Switched off" : PHASE_LABEL[project.phase ?? row.phase] ?? "Project state",
+        title: switchedOff ? "This project is switched off" : `This project is ${project.phase ?? row.phase}`,
+        note: switchedOff ? "Nothing runs for it until someone enables it again." : "Its lifecycle state needs a decision.",
+        target: { kind: "view", view: "settings" },
+        openLabel: "Open project settings"
+      });
+    }
+  }
+  for (const milestone of overdueMilestones(milestones, now)) {
+    items.push({
+      key: `milestone:${milestone.id}`,
+      kind: "milestone",
+      tone: "warning",
+      label: "Milestone overdue",
+      title: milestone.name,
+      ref: milestone.id,
+      note: `Due ${milestone.due} and still open${Number.isFinite(Number(milestone.total)) ? ` (${Number(milestone.done ?? 0)} of ${Number(milestone.total)} done)` : ""}.`,
+      ageDays: Math.max(0, Math.floor((now.getTime() - Date.parse(milestone.due)) / 864e5)),
+      owner: null,
+      next: "Review the date or close the milestone.",
+      target: { kind: "plan", entry: `plan:milestone:${milestone.id}` },
+      openLabel: "Open in Vision"
+    });
+  }
+  if (row.status === "stalled") {
+    items.push({
+      key: "stalled",
+      kind: "stalled",
+      tone: "warning",
+      label: "Stalled",
+      title: `No work has moved for ${STALLED_AFTER_DAYS} days or more`,
+      note: "There is open work, but nothing on it has changed.",
+      ageDays: null,
+      owner: null,
+      next: "Check the board and re-plan.",
+      target: { kind: "view", view: "board" },
+      openLabel: "Open Kanban"
+    });
+  }
+  const rank = { danger: 0, warning: 1, info: 2, neutral: 3, success: 4 };
+  items.sort((left, right) => rank[left.tone] - rank[right.tone] || (right.ageDays ?? 0) - (left.ageDays ?? 0));
+  const enabled = project.enabled ?? row.enabled;
+  const phase = project.phase ?? row.phase;
+  let state;
+  if (enabled === false) state = ["disabled", "neutral", "Disabled"];
+  else if (phase && phase !== "active") state = [phase, "neutral", PHASE_LABEL[phase] ?? phase];
+  else if (Number(row.items?.blocked ?? 0) > 0) state = ["blocked", "danger", "Blocked"];
+  else if (row.status === "at_risk") state = ["at_risk", "warning", "At risk"];
+  else if (row.status === "stalled") state = ["stalled", "warning", "Stalled"];
+  else if (items.some((item) => item.kind === "approval")) state = ["review", "info", "Needs review"];
+  else if (row.status === "idle") state = ["idle", "neutral", "Idle"];
+  else state = ["on_track", "success", "On track"];
+  const count = (kind) => items.filter((item) => item.kind === kind).length;
+  const countable = [
+    ["blocked", "blocked item"],
+    ["overdue", "overdue item"],
+    ["milestone", "overdue milestone"],
+    ["approval", "approval"]
+  ].filter(([kind]) => count(kind) > 0);
+  const sentences = [];
+  if (countable.length > 0) {
+    const total = countable.reduce((sum, [kind]) => sum + count(kind), 0);
+    sentences.push(`${joinAnd(countable.map(([kind, word]) => plural4(count(kind), word)))} ${total === 1 ? "needs" : "need"} you`);
+  }
+  if (count("stalled") > 0) sentences.push(`no work has moved for ${STALLED_AFTER_DAYS} days or more`);
+  const evidence = items.find((item) => item.kind === "evidence");
+  if (evidence) sentences.push(String(evidence.title).replace(/^Evidence/, "evidence"));
+  if (count("project") > 0 && sentences.length === 0) sentences.push(state[0] === "disabled" ? "nothing runs until it is enabled" : "its lifecycle state needs a decision");
+  let summary = sentences.join(" \xB7 ");
+  if (!summary) {
+    summary = state[0] === "idle" ? "nothing is in progress and no milestone is open" : PHASE_LABEL[state[0]] ? `the project is ${state[0]}` : "nothing needs you right now";
+  }
+  return { available: true, state: state[0], tone: state[1], label: state[2], summary, items };
+}
+
+// hermes_dockyard_plugin/desktop/src/project/header-strip.js
+var SEGMENTS = [
+  ["done", "done"],
+  ["active", "active"],
+  ["blocked", "blocked"],
+  ["backlog", "backlog"]
+];
+function ageText(days) {
+  if (typeof days !== "number" || !Number.isFinite(days)) return null;
+  if (days < 1) return "Under a day";
+  return `${number(days)} ${days === 1 ? "day" : "days"}`;
+}
+function AttentionDrawer({ projectId, attention, onClose, onOpenItem }) {
+  const [expanded, setExpanded] = useState(null);
+  useDialogFocusManager("[data-attention-drawer] .dy-ov-attn-panel");
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+  const items = attention.items;
+  const sub = !attention.available ? "The attention check did not load, so nothing is listed. Refresh to try again." : items.length === 0 ? `Nothing needs action in ${projectId} right now.` : `${number(items.length)} ${items.length === 1 ? "thing needs" : "things need"} action in ${projectId}. Most urgent first.`;
+  return jsx("section", {
+    className: "dockyard-modal-layer dy-ov-attn-layer",
+    "data-attention-drawer": projectId,
+    onClick: (event) => {
+      if (event.target === event.currentTarget) onClose();
+    },
+    children: jsxs("aside", {
+      className: "dy-ov-attn-panel",
+      role: "dialog",
+      "aria-modal": true,
+      "aria-labelledby": "dy-ov-attn-title",
+      children: [
+        jsxs("header", { children: [
+          jsx("h2", { id: "dy-ov-attn-title", children: "Needs attention" }),
+          jsx("button", { type: "button", className: "dy-ov-attn-close", "aria-label": "Close attention panel", "data-attention-close": true, onClick: onClose, children: jsx(Icon, { name: "x" }) })
+        ] }),
+        jsx("p", { className: "dy-ov-attn-sub", children: sub }),
+        items.length > 0 ? jsx("ul", { className: "dy-ov-attn-list", children: items.map((item, index) => {
+          const open = expanded === item.key;
+          const facts = [
+            ["Owner", item.owner],
+            ["Waiting", ageText(item.ageDays)],
+            ["Next step", item.next]
+          ].filter(([, value]) => value);
+          return jsxs("li", { className: "dy-ov-attn-item", "data-tone": item.tone, "data-attention-item": item.key, children: [
+            jsxs("button", {
+              type: "button",
+              className: "dy-ov-attn-row",
+              "aria-expanded": open,
+              "aria-controls": `dy-ov-attn-detail-${index}`,
+              onClick: () => setExpanded(open ? null : item.key),
+              children: [
+                jsx("span", { className: "dy-ov-attn-sev", children: item.label }),
+                jsx("strong", { children: item.title }),
+                item.note ? jsx("span", { className: "dy-ov-attn-note", children: item.note }) : null
+              ]
+            }),
+            open ? jsxs("div", { className: "dy-ov-attn-detail", id: `dy-ov-attn-detail-${index}`, children: [
+              facts.length > 0 ? jsx("dl", { children: facts.flatMap(([term, value]) => [
+                jsx("dt", { children: term }, `${term}-t`),
+                jsx("dd", { children: value }, `${term}-d`)
+              ]) }) : null,
+              jsx(Button, { variant: "primary", small: true, action: "attention-open", onClick: () => onOpenItem(item), children: item.openLabel })
+            ] }) : null
+          ] }, item.key);
+        }) }) : jsx("p", { className: "dy-ov-attn-empty", "data-attention-empty": true, children: attention.available ? "The banner turns amber or red when work is overdue, blocked or stalled, and blue when a decision waits for you." : "No status is shown rather than a guess." })
+      ]
+    })
+  });
+}
+function ProjectHeaderStrip({ project, view, mode = "full", onRefresh, onOpenRoadmap, onOpenItem }) {
+  const [open, setOpen] = useState(false);
+  const attention = projectAttention({ project, portfolio: view.portfolio, milestones: view.milestones ?? [] });
+  const delivery = deliveryCounts(project.work);
+  const portfolioRow = (view.portfolio?.projects ?? []).find((row) => row?.project_id === project.id) ?? null;
+  const recent = timeAgo(lastActivity({ portfolioRow, events: view.events ?? [] }));
+  const lead = view.settings?.owner?.lead_profile;
+  const mission = String(view.settings?.mission ?? "").trim();
+  const [healthTone, healthLabel] = healthDetails(project.health);
+  const legend = SEGMENTS.filter(([key]) => delivery[key] > 0);
+  const legendText = legend.map(([key, word]) => `${number(delivery[key])} ${word}`).join(", ");
+  const openDrawer = () => setOpen(true);
+  const sep = (key) => jsx("span", { className: "dy-ov-sep", "aria-hidden": true, children: "\xB7" }, key);
+  return jsxs(Fragment, { children: [
+    jsxs("header", { className: "dy-ov-strip", "data-project-strip": project.id, "data-strip-mode": mode, children: [
+      jsxs("div", {
+        className: "dy-ov-banner",
+        role: "button",
+        tabIndex: 0,
+        "data-tone": attention.tone,
+        "data-attention-state": attention.state,
+        "aria-haspopup": "dialog",
+        "aria-expanded": open,
+        "aria-label": `Project status: ${attention.label}. ${attention.summary.replace(/\.$/, "")}. Open attention details.`,
+        title: "Open attention details",
+        onClick: openDrawer,
+        onKeyDown: (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openDrawer();
+          }
+        },
+        children: [
+          jsxs("span", { className: "dy-ov-banner-left", children: [
+            jsx("span", { className: "dy-ov-mark", "aria-hidden": true }),
+            jsx("strong", { children: attention.label }),
+            jsx("span", { className: "dy-ov-banner-summary", children: `\u2014 ${attention.summary}` })
+          ] }),
+          jsx("span", { className: "dy-ov-banner-view", "aria-hidden": true, children: "View" })
+        ]
+      }),
+      jsxs("div", { className: "dy-ov-eyebrow-row", children: [
+        jsxs("p", { className: "dy-ov-eyebrow", children: [
+          jsx("span", { className: "dy-ov-proj", "data-strip-project": true, children: project.id }),
+          lead ? sep("lead-sep") : null,
+          lead ? jsx("span", { children: `Lead ${lead}` }, "lead") : null,
+          project.health !== "healthy" ? sep("evidence-sep") : null,
+          project.health !== "healthy" ? jsxs("span", { className: "dy-ov-evidence", "data-tone": healthTone, "data-strip-evidence": project.health ?? "unknown", children: [jsx("i", { "aria-hidden": true }), `Evidence: ${healthLabel}`] }, "evidence") : null
+        ] }),
+        jsxs("div", { className: "dy-ov-meta", children: [
+          jsx("span", { "data-strip-updated": true, children: recent ? `Updated ${recent}` : "No activity yet" }),
+          jsx("span", { "data-roadmap-link": true, children: jsx("a", { href: "#", onClick: (event) => {
+            event.preventDefault();
+            onOpenRoadmap?.();
+          }, children: "View in Roadmap" }) }),
+          jsx("button", { type: "button", className: "dy-ov-refresh", "data-action": "refresh", "aria-label": "Refresh", title: "Refresh", onClick: onRefresh, children: jsx(Icon, { name: "refresh" }) })
+        ] })
+      ] }),
+      // Slim (review choice for the working tabs): banner and eyebrow only.
+      mode === "full" ? jsx("h1", { className: "dy-ov-headline", "data-strip-headline": mission ? "mission" : "missing", children: mission || project.id }, "headline") : null,
+      mode === "full" ? jsxs("div", { className: "dy-ov-progress", "data-strip-progress": true, "data-project-visual": true, children: [
+        jsxs("span", { className: "dy-ov-pct", children: [
+          delivery.percent === null ? "No work yet" : `${delivery.percent}%`,
+          delivery.total > 0 ? jsx("small", { children: `complete \xB7 ${number(delivery.done)} of ${number(delivery.total)} work items` }) : null
+        ] }),
+        jsx("div", {
+          className: "dy-ov-track",
+          role: "img",
+          "aria-label": delivery.total > 0 ? `Delivery: ${legendText}` : "Delivery: no work items yet",
+          children: legend.map(([key]) => jsx("span", { className: key, style: { width: `${delivery[key] / delivery.total * 100}%` } }, key))
+        }),
+        legend.length > 0 ? jsx("div", { className: "dy-ov-legend", children: legend.map(([key, word]) => jsxs("span", { className: key, children: [jsx("i", { "aria-hidden": true }), `${number(delivery[key])} ${word}`] }, key)) }) : null
+      ] }, "progress") : null
+    ] }, "strip"),
+    open ? jsx(AttentionDrawer, {
+      projectId: project.id,
+      attention,
+      onClose: () => setOpen(false),
+      onOpenItem: (item) => {
+        setOpen(false);
+        onOpenItem?.(item);
+      }
+    }, "drawer") : null
+  ] });
+}
+
+// hermes_dockyard_plugin/desktop/src/project/strip-review.js
+var STRIP_REVIEW_DEFAULTS = { strip: "slim", cards: "trim" };
+function readStripReview(search = globalThis.location?.search ?? "") {
+  const params = new URLSearchParams(search);
+  const pick = (key, allowed) => allowed.includes(params.get(key)) ? params.get(key) : STRIP_REVIEW_DEFAULTS[key];
+  return {
+    active: params.get("review") === "1",
+    strip: pick("strip", ["full", "slim"]),
+    cards: pick("cards", ["keep", "trim"])
+  };
+}
+function writeStripReview(key, value) {
+  const url = new URL(globalThis.location.href);
+  url.searchParams.set(key, value);
+  globalThis.history.replaceState(globalThis.history.state, "", url);
+}
+function StripReviewBar({ review, onChange }) {
+  const group = (key, label, options) => jsxs("span", { role: "group", "aria-label": label, children: [
+    jsx("span", { children: `${label}:` }),
+    ...options.map(([value, text]) => jsx("button", {
+      type: "button",
+      "aria-pressed": review[key] === value,
+      "data-review-choice": `${key}:${value}`,
+      onClick: () => {
+        writeStripReview(key, value);
+        onChange?.();
+      },
+      children: text
+    }, value))
+  ] }, key);
+  return jsxs("div", { className: "dy-ov-review", "data-strip-review": true, children: [
+    jsx("strong", { children: "Design review" }),
+    group("strip", "Header on the other tabs", [["full", "Full strip (as signed)"], ["slim", "Slim strip"]]),
+    group("cards", "Overview cards", [["keep", "Keep all"], ["trim", "Drop the two repeats"]])
+  ] });
+}
+
 // hermes_dockyard_plugin/desktop/src/project/dashboard.js
 var planView = (entry) => parsePlanFocus(entry) || ["objectives", "initiative", "vision"].includes(entry) ? "plan" : entry;
-function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap }) {
+function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap, onOpenLink }) {
   const [projectView, setProjectView] = useState(planView(initialView) || "overview");
+  const [, setReviewTick] = useState(0);
   const [planFocus, setPlanFocus] = useState(() => parsePlanFocus(initialView));
   const [canvasDirty, setCanvasDirty] = useState(false);
   const [pendingView, setPendingView] = useState(null);
@@ -17619,6 +18125,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   }
   if (!project) return jsx(EmptyState, { title: "No project selected", description: "Connect a project before opening the project dashboard.", icon: "project" });
   const [healthTone, healthLabel] = healthDetails(project.health);
+  const review = readStripReview();
   const views = [
     ["overview", "Overview"],
     ["plan", "Vision"],
@@ -17630,7 +18137,24 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
     ["reports", "Reports"],
     ["settings", "Settings"]
   ];
-  const projectOptions = view.projects ?? [];
+  const openAttentionItem = (item) => {
+    const target = item?.target ?? {};
+    if (target.kind === "deep_link") {
+      onOpenLink?.(target.link);
+      return;
+    }
+    if (target.kind === "work") {
+      const found = (view.workItems ?? []).find((entry) => entry.ref === target.ref);
+      setWorkNotice(found ? null : `Work item ${target.ref} is not in this project's board data.`);
+      setSelectedWorkItem(found ?? null);
+      return;
+    }
+    if (target.kind === "plan") {
+      openView(target.entry);
+      return;
+    }
+    if (target.kind === "view") changeView(target.view);
+  };
   let panel;
   if (projectView === "board") {
     panel = jsx(KanbanScreen, {
@@ -17665,7 +18189,9 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
     const visibleInitiatives = [...view.initiatives ?? []].sort((left, right) => Number(right.priority ?? 0) - Number(left.priority ?? 0)).slice(0, 3);
     const visibleEvents = [...view.events ?? []].sort((left, right) => String(right.created_at || "").localeCompare(String(left.created_at || ""))).slice(0, 4);
     panel = jsxs(Fragment, { children: [
-      jsxs("div", { className: "dockyard-project-grid", "data-project-visual": true, children: [
+      // The two cards the header strip now repeats (mission + delivery bar,
+      // blocked count). Review choice: keep or drop.
+      review.cards === "keep" ? jsxs("div", { className: "dockyard-project-grid", "data-overview-repeats": true, children: [
         jsxs("section", { className: "dockyard-feature-card dockyard-project-hero", children: [
           jsx(StatusTag, { tone: healthTone, label: healthLabel }),
           jsx("h2", { children: view.settings?.mission || project.id }),
@@ -17682,7 +18208,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
           jsx("h2", { children: `${number(project.work?.blocked ?? 0)} blocked` }),
           jsx("p", { children: `${number(view.workItems?.length ?? 0)} work items and ${number(view.initiatives?.length ?? 0)} initiatives are attached to this project.` })
         ] })
-      ] }),
+      ] }, "repeats") : null,
       jsxs("div", { className: "dockyard-project-overview-grid", children: [
         jsxs("section", { className: "dockyard-feature-card dockyard-overview-card", "data-overview-work": true, children: [
           jsxs("header", { children: [jsx("h2", { children: "Current work" }), jsx("span", { children: number(view.workItems?.length ?? 0) })] }),
@@ -17718,33 +18244,27 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
     ] });
   }
   return jsxs("div", { "data-project-dashboard": project.id, children: [
-    jsx(PageHead, {
-      title: view.settings?.mission || project.id,
-      description: `Project dashboard / ${project.id}`,
-      status: project.health && project.health !== "healthy" ? healthLabel : null,
-      onRefresh
-    }),
-    projectView === "overview" && jsx("div", {
-      className: "dockyard-view-only-note",
-      "data-roadmap-link": true,
-      children: jsx("a", { href: "#", onClick: (event) => {
-        event.preventDefault();
-        onOpenRoadmap?.();
-      }, children: "View in Roadmap" })
-    }),
+    review.active ? jsx(StripReviewBar, { review, onChange: () => setReviewTick((tick) => tick + 1) }) : null,
+    // C1 (signed 16/09): the header strip replaces the old page head on every
+    // tab. Overview always shows it in full; the working tabs follow the
+    // review choice. The project comes from the global switcher only (Sahil
+    // 04/10), so the strip and the tab bar carry no project picker.
+    jsx(ProjectHeaderStrip, {
+      project,
+      view,
+      mode: projectView === "overview" ? "full" : review.strip,
+      onRefresh,
+      onOpenRoadmap,
+      onOpenItem: openAttentionItem
+    }, `strip:${project.id}`),
     workNotice || notice ? jsxs("div", { className: "dockyard-view-only-note", role: "alert", "data-deep-link-notice": true, children: [
       jsx(Icon, { name: "alert" }),
       jsx("span", { children: workNotice || notice })
     ] }) : null,
     jsx("p", { className: "dockyard-inline-error", role: "alert", "data-deep-link-error": true, hidden: !(workNotice || notice), children: workNotice || notice }),
-    jsxs("div", { className: "dockyard-project-toolbar", children: [
-      jsx("label", { children: "Project" }),
-      jsx("select", {
-        value: project.id,
-        onChange: (event) => onSelectProject(event.target.value),
-        children: projectOptions.map((option) => jsx("option", { value: option.id, children: option.id }, option.id))
-      }),
-      jsx("nav", {
+    jsx("div", {
+      className: "dockyard-project-toolbar",
+      children: jsx("nav", {
         className: "dockyard-project-tabs",
         "aria-label": "Project views",
         children: views.map(([key, label]) => jsx("button", {
@@ -17756,7 +18276,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
           children: label
         }, key))
       })
-    ] }),
+    }),
     panel,
     pendingView ? jsxs("section", { className: "dockyard-modal-layer", "data-view-switch-confirm": pendingView, children: [
       jsxs("div", {
@@ -20017,6 +20537,8 @@ function DashboardPage({ inboxCss = "" } = {}) {
       onRefresh: refresh,
       onOpenLibrary: () => requestTab("workflows"),
       onOpenRoadmap: () => requestTab("roadmap", { roadmapScope: payload.project?.id }),
+      // C1: the header strip's attention drawer opens approvals in the inbox.
+      onOpenLink: openDeepLink,
       pendingWorkRef,
       onPendingWorkConsumed: () => setPendingWorkRef(null),
       notice: deepLinkNotice
