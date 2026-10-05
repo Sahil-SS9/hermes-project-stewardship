@@ -149,7 +149,7 @@ test('Overview strip: on every project tab; approvals open in the Approval inbox
 
   await withPage({ width: 1280, height: 900 }, async (page) => {
     await openProject(page, decision.project)
-    for (const key of ['plan', 'board', 'workflows', 'content', 'activity', 'reports', 'settings', 'overview']) {
+    for (const key of ['plan', 'board', 'planning', 'workflows', 'content', 'activity', 'reports', 'settings', 'overview']) {
       await page.locator(`[data-project-view="${key}"]`).click()
       await page.locator(`[data-project-view="${key}"].active`).waitFor()
       assert.equal(await page.locator(`[data-project-strip="${decision.project}"] .dy-ov-banner`).count(), 1, `the banner is on the ${key} tab`)
