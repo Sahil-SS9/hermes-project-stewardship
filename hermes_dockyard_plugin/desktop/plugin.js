@@ -7204,7 +7204,7 @@ function BacklogImportWizard(props) {
                 a.remove();
                 setTimeout(() => URL.revokeObjectURL(a.href), 4e3);
               });
-            }, children: [jsx(Icon, { name: "download" }), "Download CSV template"] })
+            }, children: jsxs(Fragment, { children: [jsx(Icon, { name: "download" }), "Download CSV template"] }) })
           ] }),
           importColumnMetadata.length ? jsxs("details", { className: "import-column-reference", children: [
             jsx("summary", { children: `Column reference \xB7 ${importColumnMetadata.filter((column) => column.required).map((column) => column.name).join(", ")} required \xB7 ${importColumnMetadata.length} supported` }),

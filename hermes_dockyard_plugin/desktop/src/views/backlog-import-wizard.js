@@ -1,6 +1,6 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
-import { jsx, jsxs } from '../runtime/react.js'
+import { Fragment, jsx, jsxs } from '../runtime/react.js'
 import { Button } from '../lib/ui.js'
 import { Icon } from '../lib/ui.js'
 import { number } from '../lib/ui.js'
@@ -90,7 +90,7 @@ export function BacklogImportWizard(props) {
                   document.body.appendChild(a); a.click(); a.remove()
                   setTimeout(() => URL.revokeObjectURL(a.href), 4000)
                 })
-              }, children: [jsx(Icon, { name: 'download' }), 'Download CSV template'] }),
+              }, children: jsxs(Fragment, { children: [jsx(Icon, { name: 'download' }), 'Download CSV template'] }) }),
             ] }),
             importColumnMetadata.length ? jsxs('details', { className: 'import-column-reference', children: [
               jsx('summary', { children: `Column reference · ${importColumnMetadata.filter((column) => column.required).map((column) => column.name).join(', ')} required · ${importColumnMetadata.length} supported` }),
