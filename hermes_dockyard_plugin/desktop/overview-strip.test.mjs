@@ -5,6 +5,9 @@
 // to the exact place to act (work item drawer, Approval inbox), the strip is
 // on every project tab, dark mode changes its colours (part two of the
 // colour test), and at phone width the drawer is a bottom sheet.
+// Sahil 06/10 ("full strip + keep all"): the full strip on every tab, and
+// below the tabs Overview keeps every card it had, including the two the
+// strip repeats. No address flag can change either.
 //
 // The suite shares one backend, so other files' fixtures add up. Nothing here
 // hard-codes a count: expectations are worked out from the live API with the
@@ -39,11 +42,27 @@ async function expected(projectId) {
   return projectAttention({ project, portfolio, milestones: milestones.milestones ?? [] })
 }
 
-async function openProject(page, projectId) {
-  await page.goto(BASE)
+async function openProject(page, projectId, query = '') {
+  await page.goto(`${BASE}${query}`)
   await pickProject(page, projectId)
   await page.locator('[data-tab="project"]').click()
   await page.locator(`[data-project-strip="${projectId}"]`).waitFor()
+}
+
+// The full strip: banner, eyebrow row, mission headline, delivery strip.
+async function assertFullStrip(page, where) {
+  assert.equal(await page.locator('.dy-ov-strip .dy-ov-banner').count(), 1, `the banner is on ${where}`)
+  assert.equal(await page.locator('.dy-ov-strip .dy-ov-eyebrow-row').count(), 1, `the eyebrow row is on ${where}`)
+  assert.equal(await page.locator('.dy-ov-strip [data-strip-headline]').count(), 1, `the mission headline is on ${where}`)
+  assert.equal(await page.locator('.dy-ov-strip [data-strip-progress] .dy-ov-track').count(), 1, `the delivery strip is on ${where}`)
+}
+
+// Below the tabs, Overview keeps the two cards the strip repeats.
+async function assertOverviewCardsKept(page, project) {
+  const grid = page.locator('.dockyard-project-grid[data-project-visual]')
+  assert.equal(await grid.count(), 1, 'Overview keeps its first row of cards (Sahil 06/10: keep all)')
+  assert.equal(await grid.locator('.dockyard-project-hero .dockyard-work-visual[role="img"]').count(), 1, 'the mission card keeps its delivery bar')
+  assert.equal(await grid.locator('.dockyard-feature-card:not(.dockyard-project-hero) h2').innerText(), `${Number(project.work?.blocked ?? 0)} blocked`, 'the Current signals card keeps the blocked count')
 }
 
 const bannerColours = (page) => page.locator('.dy-ov-banner').evaluate((el) => {
@@ -82,9 +101,10 @@ test('Overview strip: banner from the backend, drawer by mouse and keyboard, Ope
     assert.equal(await banner.getAttribute('data-tone'), 'danger')
     const text = (await banner.innerText()).replace(/\s+/g, ' ')
     assert.ok(text.includes(want.label) && text.includes(want.summary), `banner says "${want.label} — ${want.summary}" (got "${text}")`)
-    assert.equal(await page.locator('[data-strip-headline]').count(), 1, 'the mission is the headline on Overview')
-    assert.equal(await page.locator('[data-project-visual] .dy-ov-track').count(), 1, 'the delivery strip is on Overview')
+    await assertFullStrip(page, 'Overview')
     assert.equal(await page.locator('.dockyard-project-toolbar select').count(), 0, 'no project picker beside the tabs: the global switcher is the only one')
+    const dashboardProject = ((await get('/dashboard')).projects ?? []).find((entry) => entry.id === projectId)
+    await assertOverviewCardsKept(page, dashboardProject)
 
     // Click opens the drawer; it lists exactly the backend's items, in order.
     await banner.click()
@@ -134,6 +154,8 @@ test('Overview strip: on every project tab; approvals open in the Approval inbox
       await page.locator(`[data-project-view="${key}"].active`).waitFor()
       assert.equal(await page.locator(`[data-project-strip="${decision.project}"] .dy-ov-banner`).count(), 1, `the banner is on the ${key} tab`)
       assert.equal(await page.locator('.dy-ov-banner').getAttribute('data-attention-state'), want.state, `same state on the ${key} tab`)
+      // Sahil 06/10: the full strip on every tab, not a slim one.
+      await assertFullStrip(page, `the ${key} tab`)
     }
     await page.locator('.dy-ov-banner').click()
     const row = page.locator(`[data-attention-item="approval:${decision.ref}"]`)
@@ -188,5 +210,21 @@ test('Overview strip: at phone width nothing overflows and the drawer is a botto
     await page.locator('[data-attention-drawer]').waitFor()
     const sheet = await page.locator('.dy-ov-attn-panel').evaluate((el) => { const box = el.getBoundingClientRect(); return { left: Math.round(box.left), width: Math.round(box.width), bottom: Math.round(box.bottom), vw: innerWidth, vh: innerHeight } })
     assert.deepEqual([sheet.left, sheet.width, sheet.bottom], [0, sheet.vw, sheet.vh], 'full-width sheet at the bottom of the screen')
+  })
+})
+
+test('Overview strip: no design-review bar, and the page address cannot slim the strip or drop cards', { timeout: 120000 }, async () => {
+  const dashboard = await get('/dashboard')
+  const project = (dashboard.projects ?? []).find((entry) => entry.enabled !== false && Number(entry.work?.blocked ?? 0) > 0)
+  assert.ok(project, 'the seeded data has a blocked project')
+  await withPage({ width: 1280, height: 900 }, async (page) => {
+    // The flags the 05/10 review prototype read. Sahil 06/10 picked; they are gone.
+    await openProject(page, project.id, '?review=1&strip=slim&cards=trim')
+    assert.equal(await page.locator('[data-strip-review]').count(), 0, 'no design-review bar')
+    await assertFullStrip(page, 'Overview')
+    await assertOverviewCardsKept(page, project)
+    await page.locator('[data-project-view="board"]').click()
+    await page.locator('[data-project-view="board"].active').waitFor()
+    await assertFullStrip(page, 'the Kanban tab')
   })
 })

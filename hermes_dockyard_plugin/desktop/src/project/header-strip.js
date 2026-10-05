@@ -3,7 +3,8 @@
 //
 // C1 Overview: the project header strip (signed by Sahil 16/09, "okay happy
 // with all this"; built 05/10). It replaces the old page head above the
-// project tabs, on every tab, so the tabs never move when you switch:
+// project tabs, in full on every tab (Sahil 06/10: "full strip + keep all"),
+// so the tabs never move when you switch:
 //   1. a thin status banner, coloured by state (red blocked, amber at risk,
 //      blue needs review, green on track, grey for idle or switched off);
 //      clicking it, or Enter / Space, opens the "Needs attention" drawer;
@@ -106,7 +107,7 @@ function AttentionDrawer({ projectId, attention, onClose, onOpenItem }) {
   })
 }
 
-export function ProjectHeaderStrip({ project, view, mode = 'full', onRefresh, onOpenRoadmap, onOpenItem }) {
+export function ProjectHeaderStrip({ project, view, onRefresh, onOpenRoadmap, onOpenItem }) {
   const [open, setOpen] = useState(false)
   const attention = projectAttention({ project, portfolio: view.portfolio, milestones: view.milestones ?? [] })
   const delivery = deliveryCounts(project.work)
@@ -119,7 +120,7 @@ export function ProjectHeaderStrip({ project, view, mode = 'full', onRefresh, on
   const legendText = legend.map(([key, word]) => `${number(delivery[key])} ${word}`).join(', ')
   const openDrawer = () => setOpen(true)
   const sep = (key) => jsx('span', { className: 'dy-ov-sep', 'aria-hidden': true, children: '·' }, key)
-  return jsxs(Fragment, { children: [jsxs('header', { className: 'dy-ov-strip', 'data-project-strip': project.id, 'data-strip-mode': mode, children: [
+  return jsxs(Fragment, { children: [jsxs('header', { className: 'dy-ov-strip', 'data-project-strip': project.id, children: [
     jsxs('div', {
       className: 'dy-ov-banner', role: 'button', tabIndex: 0,
       'data-tone': attention.tone, 'data-attention-state': attention.state,
@@ -153,9 +154,8 @@ export function ProjectHeaderStrip({ project, view, mode = 'full', onRefresh, on
         jsx('button', { type: 'button', className: 'dy-ov-refresh', 'data-action': 'refresh', 'aria-label': 'Refresh', title: 'Refresh', onClick: onRefresh, children: jsx(Icon, { name: 'refresh' }) }),
       ]}),
     ]}),
-    // Slim (review choice for the working tabs): banner and eyebrow only.
-    mode === 'full' ? jsx('h1', { className: 'dy-ov-headline', 'data-strip-headline': mission ? 'mission' : 'missing', children: mission || project.id }, 'headline') : null,
-    mode === 'full' ? jsxs('div', { className: 'dy-ov-progress', 'data-strip-progress': true, 'data-project-visual': true, children: [
+    jsx('h1', { className: 'dy-ov-headline', 'data-strip-headline': mission ? 'mission' : 'missing', children: mission || project.id }),
+    jsxs('div', { className: 'dy-ov-progress', 'data-strip-progress': true, children: [
       jsxs('span', { className: 'dy-ov-pct', children: [
         delivery.percent === null ? 'No work yet' : `${delivery.percent}%`,
         delivery.total > 0 ? jsx('small', { children: `complete · ${number(delivery.done)} of ${number(delivery.total)} work items` }) : null,
@@ -167,7 +167,7 @@ export function ProjectHeaderStrip({ project, view, mode = 'full', onRefresh, on
       }),
       legend.length > 0 ? jsx('div', { className: 'dy-ov-legend', children: legend.map(([key, word]) =>
         jsxs('span', { className: key, children: [jsx('i', { 'aria-hidden': true }), `${number(delivery[key])} ${word}`] }, key)) }) : null,
-    ]}, 'progress') : null,
+    ]}),
   ]}, 'strip'),
   open ? jsx(AttentionDrawer, {
     projectId: project.id, attention,

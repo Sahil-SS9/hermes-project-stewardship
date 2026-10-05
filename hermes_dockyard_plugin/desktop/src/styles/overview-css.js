@@ -89,13 +89,6 @@ export const OVERVIEW_CSS = `
 .dockyard-root .dy-ov-attn-detail .dockyard-button { justify-self: start; }
 .dockyard-root .dy-ov-attn-empty { margin: 0; padding: 12px; border: 1px dashed var(--dy-border); border-radius: 8px; color: var(--dy-text-2); font-size: 13px; }
 
-/* Design review only (?review=1): the bar that switches the open choices. */
-.dockyard-root .dy-ov-review { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0 0 10px; padding: 8px 12px; border: 1px dashed var(--dy-accent-border); border-radius: 8px; background: var(--dy-accent-soft); color: var(--dy-text); font-size: 12px; }
-.dockyard-root .dy-ov-review strong { font-weight: 800; }
-.dockyard-root .dy-ov-review [role="group"] { display: inline-flex; align-items: center; gap: 4px; }
-.dockyard-root .dy-ov-review button { padding: 3px 9px; border: 1px solid var(--dy-control-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text-2); font: inherit; cursor: pointer; }
-.dockyard-root .dy-ov-review button[aria-pressed="true"] { border-color: var(--dy-action); background: var(--dy-action); color: var(--dy-on-action); }
-
 @container dockyard (max-width: 640px) {
   .dockyard-root .dy-ov-banner { align-items: flex-start; }
   .dockyard-root .dy-ov-banner-left { flex-wrap: wrap; }

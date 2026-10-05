@@ -3079,13 +3079,6 @@ var OVERVIEW_CSS = `
 .dockyard-root .dy-ov-attn-detail .dockyard-button { justify-self: start; }
 .dockyard-root .dy-ov-attn-empty { margin: 0; padding: 12px; border: 1px dashed var(--dy-border); border-radius: 8px; color: var(--dy-text-2); font-size: 13px; }
 
-/* Design review only (?review=1): the bar that switches the open choices. */
-.dockyard-root .dy-ov-review { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0 0 10px; padding: 8px 12px; border: 1px dashed var(--dy-accent-border); border-radius: 8px; background: var(--dy-accent-soft); color: var(--dy-text); font-size: 12px; }
-.dockyard-root .dy-ov-review strong { font-weight: 800; }
-.dockyard-root .dy-ov-review [role="group"] { display: inline-flex; align-items: center; gap: 4px; }
-.dockyard-root .dy-ov-review button { padding: 3px 9px; border: 1px solid var(--dy-control-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text-2); font: inherit; cursor: pointer; }
-.dockyard-root .dy-ov-review button[aria-pressed="true"] { border-color: var(--dy-action); background: var(--dy-action); color: var(--dy-on-action); }
-
 @container dockyard (max-width: 640px) {
   .dockyard-root .dy-ov-banner { align-items: flex-start; }
   .dockyard-root .dy-ov-banner-left { flex-wrap: wrap; }
@@ -17931,7 +17924,7 @@ function AttentionDrawer({ projectId, attention, onClose, onOpenItem }) {
     })
   });
 }
-function ProjectHeaderStrip({ project, view, mode = "full", onRefresh, onOpenRoadmap, onOpenItem }) {
+function ProjectHeaderStrip({ project, view, onRefresh, onOpenRoadmap, onOpenItem }) {
   const [open, setOpen] = useState(false);
   const attention = projectAttention({ project, portfolio: view.portfolio, milestones: view.milestones ?? [] });
   const delivery = deliveryCounts(project.work);
@@ -17945,7 +17938,7 @@ function ProjectHeaderStrip({ project, view, mode = "full", onRefresh, onOpenRoa
   const openDrawer = () => setOpen(true);
   const sep = (key) => jsx("span", { className: "dy-ov-sep", "aria-hidden": true, children: "\xB7" }, key);
   return jsxs(Fragment, { children: [
-    jsxs("header", { className: "dy-ov-strip", "data-project-strip": project.id, "data-strip-mode": mode, children: [
+    jsxs("header", { className: "dy-ov-strip", "data-project-strip": project.id, children: [
       jsxs("div", {
         className: "dy-ov-banner",
         role: "button",
@@ -17989,9 +17982,8 @@ function ProjectHeaderStrip({ project, view, mode = "full", onRefresh, onOpenRoa
           jsx("button", { type: "button", className: "dy-ov-refresh", "data-action": "refresh", "aria-label": "Refresh", title: "Refresh", onClick: onRefresh, children: jsx(Icon, { name: "refresh" }) })
         ] })
       ] }),
-      // Slim (review choice for the working tabs): banner and eyebrow only.
-      mode === "full" ? jsx("h1", { className: "dy-ov-headline", "data-strip-headline": mission ? "mission" : "missing", children: mission || project.id }, "headline") : null,
-      mode === "full" ? jsxs("div", { className: "dy-ov-progress", "data-strip-progress": true, "data-project-visual": true, children: [
+      jsx("h1", { className: "dy-ov-headline", "data-strip-headline": mission ? "mission" : "missing", children: mission || project.id }),
+      jsxs("div", { className: "dy-ov-progress", "data-strip-progress": true, children: [
         jsxs("span", { className: "dy-ov-pct", children: [
           delivery.percent === null ? "No work yet" : `${delivery.percent}%`,
           delivery.total > 0 ? jsx("small", { children: `complete \xB7 ${number(delivery.done)} of ${number(delivery.total)} work items` }) : null
@@ -18003,7 +17995,7 @@ function ProjectHeaderStrip({ project, view, mode = "full", onRefresh, onOpenRoa
           children: legend.map(([key]) => jsx("span", { className: key, style: { width: `${delivery[key] / delivery.total * 100}%` } }, key))
         }),
         legend.length > 0 ? jsx("div", { className: "dy-ov-legend", children: legend.map(([key, word]) => jsxs("span", { className: key, children: [jsx("i", { "aria-hidden": true }), `${number(delivery[key])} ${word}`] }, key)) }) : null
-      ] }, "progress") : null
+      ] })
     ] }, "strip"),
     open ? jsx(AttentionDrawer, {
       projectId: project.id,
@@ -18017,48 +18009,10 @@ function ProjectHeaderStrip({ project, view, mode = "full", onRefresh, onOpenRoa
   ] });
 }
 
-// hermes_dockyard_plugin/desktop/src/project/strip-review.js
-var STRIP_REVIEW_DEFAULTS = { strip: "slim", cards: "trim" };
-function readStripReview(search = globalThis.location?.search ?? "") {
-  const params = new URLSearchParams(search);
-  const pick = (key, allowed) => allowed.includes(params.get(key)) ? params.get(key) : STRIP_REVIEW_DEFAULTS[key];
-  return {
-    active: params.get("review") === "1",
-    strip: pick("strip", ["full", "slim"]),
-    cards: pick("cards", ["keep", "trim"])
-  };
-}
-function writeStripReview(key, value) {
-  const url = new URL(globalThis.location.href);
-  url.searchParams.set(key, value);
-  globalThis.history.replaceState(globalThis.history.state, "", url);
-}
-function StripReviewBar({ review, onChange }) {
-  const group = (key, label, options) => jsxs("span", { role: "group", "aria-label": label, children: [
-    jsx("span", { children: `${label}:` }),
-    ...options.map(([value, text]) => jsx("button", {
-      type: "button",
-      "aria-pressed": review[key] === value,
-      "data-review-choice": `${key}:${value}`,
-      onClick: () => {
-        writeStripReview(key, value);
-        onChange?.();
-      },
-      children: text
-    }, value))
-  ] }, key);
-  return jsxs("div", { className: "dy-ov-review", "data-strip-review": true, children: [
-    jsx("strong", { children: "Design review" }),
-    group("strip", "Header on the other tabs", [["full", "Full strip (as signed)"], ["slim", "Slim strip"]]),
-    group("cards", "Overview cards", [["keep", "Keep all"], ["trim", "Drop the two repeats"]])
-  ] });
-}
-
 // hermes_dockyard_plugin/desktop/src/project/dashboard.js
 var planView = (entry) => parsePlanFocus(entry) || ["objectives", "initiative", "vision"].includes(entry) ? "plan" : entry;
 function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap, onOpenLink }) {
   const [projectView, setProjectView] = useState(planView(initialView) || "overview");
-  const [, setReviewTick] = useState(0);
   const [planFocus, setPlanFocus] = useState(() => parsePlanFocus(initialView));
   const [canvasDirty, setCanvasDirty] = useState(false);
   const [pendingView, setPendingView] = useState(null);
@@ -18125,7 +18079,6 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   }
   if (!project) return jsx(EmptyState, { title: "No project selected", description: "Connect a project before opening the project dashboard.", icon: "project" });
   const [healthTone, healthLabel] = healthDetails(project.health);
-  const review = readStripReview();
   const views = [
     ["overview", "Overview"],
     ["plan", "Vision"],
@@ -18189,9 +18142,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
     const visibleInitiatives = [...view.initiatives ?? []].sort((left, right) => Number(right.priority ?? 0) - Number(left.priority ?? 0)).slice(0, 3);
     const visibleEvents = [...view.events ?? []].sort((left, right) => String(right.created_at || "").localeCompare(String(left.created_at || ""))).slice(0, 4);
     panel = jsxs(Fragment, { children: [
-      // The two cards the header strip now repeats (mission + delivery bar,
-      // blocked count). Review choice: keep or drop.
-      review.cards === "keep" ? jsxs("div", { className: "dockyard-project-grid", "data-overview-repeats": true, children: [
+      jsxs("div", { className: "dockyard-project-grid", "data-project-visual": true, children: [
         jsxs("section", { className: "dockyard-feature-card dockyard-project-hero", children: [
           jsx(StatusTag, { tone: healthTone, label: healthLabel }),
           jsx("h2", { children: view.settings?.mission || project.id }),
@@ -18208,7 +18159,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
           jsx("h2", { children: `${number(project.work?.blocked ?? 0)} blocked` }),
           jsx("p", { children: `${number(view.workItems?.length ?? 0)} work items and ${number(view.initiatives?.length ?? 0)} initiatives are attached to this project.` })
         ] })
-      ] }, "repeats") : null,
+      ] }),
       jsxs("div", { className: "dockyard-project-overview-grid", children: [
         jsxs("section", { className: "dockyard-feature-card dockyard-overview-card", "data-overview-work": true, children: [
           jsxs("header", { children: [jsx("h2", { children: "Current work" }), jsx("span", { children: number(view.workItems?.length ?? 0) })] }),
@@ -18244,15 +18195,13 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
     ] });
   }
   return jsxs("div", { "data-project-dashboard": project.id, children: [
-    review.active ? jsx(StripReviewBar, { review, onChange: () => setReviewTick((tick) => tick + 1) }) : null,
-    // C1 (signed 16/09): the header strip replaces the old page head on every
-    // tab. Overview always shows it in full; the working tabs follow the
-    // review choice. The project comes from the global switcher only (Sahil
-    // 04/10), so the strip and the tab bar carry no project picker.
+    // C1 (signed 16/09): the header strip replaces the old page head, in full
+    // on every tab (Sahil 06/10: "full strip + keep all"), so the tab bar never
+    // moves. The project comes from the global switcher only (Sahil 04/10), so
+    // the strip and the tab bar carry no project picker.
     jsx(ProjectHeaderStrip, {
       project,
       view,
-      mode: projectView === "overview" ? "full" : review.strip,
       onRefresh,
       onOpenRoadmap,
       onOpenItem: openAttentionItem
