@@ -504,7 +504,10 @@ export function BacklogBoard(ctx) {
             jsx('option', { value: '', children: 'Choose an assignee' }, 'choose'),
             jsx('option', { value: NO_OWNER, children: 'No owner' }, 'none'),
             ...(view.bots ?? []).map((bot) => jsx('option', { value: bot.id, children: bot.name || bot.id }, bot.id)),
-          ]})] }),
+          ]}),
+          // The note sits under the field it explains (Sahil 04/10).
+          createForm.assignee === NO_OWNER ? jsx('small', { className: 'create-help', 'data-create-help': 'no-owner', children: 'No bot will pick this up until someone owns it.' }) : null,
+          ] }),
           jsxs('label', { className: 'dockyard-field', children: [jsx('span', { className: 'field-optional-hint', children: 'Initiative' }), jsx('select', { 'data-create-field': 'initiative', value: createForm.initiative, onChange: (event) => updateCreate('initiative', event.target.value), children: [
             jsx('option', { value: '', children: 'No initiative' }, 'none'),
             ...(view.initiatives ?? []).map((initiative) => jsx('option', { value: initiative.ref, children: `${initiative.ref} / ${initiative.title}` }, initiative.ref)),
@@ -516,7 +519,6 @@ export function BacklogBoard(ctx) {
         ]}),
         createTouched.title && createForm.title.trim().length < 3 ? jsx('p', { className: 'create-help bad', 'data-create-help': 'title', children: 'Title must be at least 3 characters.' }) : null,
         createTouched.assignee && !createForm.assignee ? jsx('p', { className: 'create-help bad', 'data-create-help': 'assignee', children: 'Choose an assignee, or No owner.' }) : null,
-        createForm.assignee === NO_OWNER ? jsx('p', { className: 'create-help', 'data-create-help': 'no-owner', children: 'No bot will pick this up until someone owns it.' }) : null,
         createTouched.reason && createForm.reason.trim().length < 4 ? jsx('p', { className: 'create-help bad', 'data-create-help': 'reason', children: 'A ranking reason is required — it becomes the audit record.' }) : null,
         jsx('p', { className: 'create-help', 'data-create-reqnote': true, children: '* required. Initial rank and priority reason are recorded in the backlog audit trail.' }),
         createError ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: createError }) : null,
