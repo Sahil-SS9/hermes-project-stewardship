@@ -75,6 +75,33 @@ export function validateConnection(nodes: CanvasNode[], from: string, to: string
   return visit(from) ? 'Connection would create a cycle' : null;
 }
 
+export const NOT_IN_LATEST_PLAN = 'This step is not in the latest version of the workflow, so it cannot be changed here.';
+
+// Removing a step (07/10/2026, WORKFLOWS-R1.md finding 3). The steps after it
+// are re-linked to the steps before it, so the chain stays connected. Refused,
+// with the reason, when another step's condition checks it or a repeating step
+// would be left with no step before it (the engine rejects both).
+export function deletePlan(nodes: CanvasNode[], id: string): CanvasNode[] | string {
+  const target = nodes.find((n) => n.node_id === id);
+  if (!target) return NOT_IN_LATEST_PLAN;
+  const names = (list: CanvasNode[]) => list.map((n) => `"${n.title}"`).join(', ');
+  const checks = nodes.filter((n) => n.node_id !== id && n.when?.node === id);
+  if (checks.length) {
+    return checks.length === 1
+      ? `Can't delete "${target.title}": ${names(checks)} has a condition that checks it. Change or remove that condition first.`
+      : `Can't delete "${target.title}": ${names(checks)} have conditions that check it. Change or remove those conditions first.`;
+  }
+  const next = nodes.filter((n) => n.node_id !== id).map((n) => (n.depends_on.includes(id)
+    ? { ...n, depends_on: [...new Set(n.depends_on.flatMap((dep) => (dep === id ? target.depends_on : [dep])))].filter((dep) => dep !== n.node_id) }
+    : n));
+  const stranded = next.filter((n) => n.loop && n.depends_on.length === 0
+    && (nodes.find((m) => m.node_id === n.node_id)?.depends_on.length ?? 0) > 0);
+  if (stranded.length) {
+    return `Can't delete "${target.title}": ${names(stranded)} ${stranded.length === 1 ? 'repeats' : 'repeat'}, and a repeating step needs a step before it.`;
+  }
+  return next;
+}
+
 export interface CanvasHandlers {
   onApprove: (taskRef: string) => Promise<unknown> | void;
   onReject: (taskRef: string) => Promise<unknown> | void;
@@ -87,6 +114,15 @@ export interface CanvasHandlers {
   onExpand?: (taskRef: string) => Promise<ExpansionData | null>;
   // Persist the edited graph as a new workflow version through the host seam.
   onEdit?: (nodes: CanvasNode[]) => Promise<unknown> | void;
+  // The latest saved plan, which every edit starts from. The canvas may be
+  // showing a run (a frozen copy of the version it started with); building an
+  // edit from that copy saved a version without the steps added since
+  // (07/10/2026, WORKFLOWS-R1.md finding 14). Absent: edits start from what
+  // is shown.
+  editNodes?: () => CanvasNode[];
+  // Told which step is selected (null when none), so the host's toolbar can
+  // act on it (e.g. a new step follows the selected one).
+  onSelect?: (nodeId: string | null) => void;
   // Read-only canonical event history. If absent (e.g. definition-only
   // frames), playback stays disabled rather than inventing events.
   fetchTimeline?: (projectId: string, workflowName: string, runKey: string) => Promise<{ events?: Array<Record<string, unknown>> }>;
@@ -395,6 +431,12 @@ export function buildLayout(nodes: CanvasNode[], opts?: { laneOf?: (n: CanvasNod
 }
 
 // ---- mount ----
+// The mount's handle: call it to dispose; `refresh()` re-reads the frame from
+// fetchRuns without rebuilding the canvas, so the open step panel, the camera
+// and any selection survive new data (07/10/2026, finding 13: the Desktop
+// screen re-mounted the canvas on every data change).
+export type CanvasHandle = (() => void) & { refresh: () => void };
+
 export function mountWorkflowCanvas(
   host: HTMLElement,
   projectId: string,
@@ -402,7 +444,7 @@ export function mountWorkflowCanvas(
   fetchRuns: () => Promise<CanvasRun[]>,
   handlers: CanvasHandlers,
   pollMs = 8000,
-): () => void {
+): CanvasHandle {
   host.replaceChildren();
   // The scope class is carried by the mount host ITSELF: the canvas stylesheet
   // is scoped to `.dy-wf-scope`, so the canvas owns its own styling carrier
@@ -556,6 +598,17 @@ export function mountWorkflowCanvas(
   let originY = 0;
   let currentNodes: CanvasNode[] = [];
   let nodePositions: Record<string, CanvasPosition> = {};
+  // Drops whose save has not come back yet: drawn where they were dropped
+  // until the saved frame carries the same position (or the save fails).
+  const pendingPositions = new Map<string, { x: number; y: number }>();
+  // Size of the computed layout (the world also grows to fit saved positions).
+  let layoutW = 0;
+  let layoutH = 0;
+  // False until the first fit on a laid-out canvas; after that only the user
+  // moves the camera.
+  let cameraSet = false;
+  let renderedIds = new Set<string>();
+  let selectedId: string | null = null;
   let previousMobileLayout: boolean | null = null;
   let dragNode: string | null = null;
   let dragStart = { x: 0, y: 0, ox: 0, oy: 0 };
@@ -589,20 +642,23 @@ export function mountWorkflowCanvas(
     return { x: nums[0], y: nums[1] };
   };
 
-  const worldPoint = (clientX: number, clientY: number): { x: number; y: number } => {
-    let ox = 0;
-    let oy = 0;
+  // Screen pixels per canvas unit. 1 unless an ancestor is scaled (e.g. a host
+  // zoom factor); pointer deltas are divided by it so steps track the pointer.
+  const screenScale = (): { sx: number; sy: number; ox: number; oy: number } => {
     try {
       const ctm = svg.getScreenCTM();
-      if (ctm && isFinite(ctm.a) && isFinite(ctm.e) && isFinite(ctm.f)) {
-        ox = ctm.e;
-        oy = ctm.f;
+      if (ctm && isFinite(ctm.a) && ctm.a > 0 && isFinite(ctm.d) && ctm.d > 0 && isFinite(ctm.e) && isFinite(ctm.f)) {
+        return { sx: ctm.a, sy: ctm.d, ox: ctm.e, oy: ctm.f };
       }
     } catch {
-      ox = 0;
-      oy = 0;
+      /* no layout (jsdom) */
     }
-    return { x: (clientX - ox - panX) / zoom, y: (clientY - oy - panY) / zoom };
+    return { sx: 1, sy: 1, ox: 0, oy: 0 };
+  };
+
+  const worldPoint = (clientX: number, clientY: number): { x: number; y: number } => {
+    const { sx, sy, ox, oy } = screenScale();
+    return { x: ((clientX - ox) / sx - panX) / zoom, y: ((clientY - oy) / sy - panY) / zoom };
   };
 
   const writeNodePosition = (nodeId: string, g: SVGGElement, x: number, y: number) => {
@@ -647,14 +703,43 @@ export function mountWorkflowCanvas(
     writeNodePosition(session.nodeId, g, world.x - session.offsetX, world.y - session.offsetY);
   };
 
-  const commitNodePosition = async (nodeId: string) => {
+  // ---- edits ----
+  // Every edit starts from the latest plan (handlers.editNodes) and edits run
+  // one at a time, so a quick second edit never builds on a plan that lacks
+  // the first. Without editNodes, the last saved edit stands in until the next
+  // frame arrives.
+  let editQueue: Promise<unknown> = Promise.resolve();
+  let optimisticBase: CanvasNode[] | null = null;
+  const editBase = (): CanvasNode[] => handlers.editNodes?.() ?? optimisticBase ?? currentNodes;
+  const NOT_IN_PLAN = NOT_IN_LATEST_PLAN;
+  const runEdit = (build: (base: CanvasNode[]) => CanvasNode[] | string): Promise<void> => {
+    const next = editQueue.then(async () => {
+      const result = build(editBase());
+      if (typeof result === 'string') throw new Error(result);
+      await handlers.onEdit!(result);
+      if (!handlers.editNodes) optimisticBase = result;
+    });
+    editQueue = next.catch(() => undefined);
+    return next;
+  };
+  // Host errors arrive as "422: <reason>"; the reason is what a person needs.
+  const errorText = (error: unknown): string =>
+    String((error as Error)?.message ?? error ?? 'unknown error').replace(/^\d{3}:\s*/, '') || 'unknown error';
+
+  const commitNodePosition = (nodeId: string) => {
     const committed = nodePositions[nodeId];
-    if (!committed) return;
-    const nextNodes = currentNodes.map((item) => item.node_id === nodeId
-      ? { ...item, canvas_position: { x: committed.x, y: committed.y } } as CanvasNode
-      : item);
-    currentNodes = nextNodes;
-    await handlers.onEdit?.(nextNodes);
+    if (!committed || !handlers.onEdit) return;
+    const position = { x: committed.x, y: committed.y };
+    pendingPositions.set(nodeId, position);
+    void runEdit((base) => (base.some((item) => item.node_id === nodeId)
+      ? base.map((item) => (item.node_id === nodeId ? { ...item, canvas_position: position } : item))
+      : NOT_IN_PLAN))
+      .catch((error) => {
+        // Put the step back where the saved plan has it, and say why.
+        pendingPositions.delete(nodeId);
+        feedLog(`Couldn't save the move: ${errorText(error)}`);
+        if (lastRun) render(lastRun);
+      });
   };
 
   // One release path for a node drag. commit=false (pointercancel) leaves the
@@ -707,16 +792,17 @@ export function mountWorkflowCanvas(
     // rejects what it rejects. This only decides what to even ask for.
     // A release on the source node itself is a real (rejected) request and must
     // keep reporting its reason — validateConnection answers that first.
-    const error = validateConnection(currentNodes, from, to);
+    const error = validateConnection(editBase(), from, to);
     if (error) {
       feedLog(error);
       return;
     }
-    const nextNodes = currentNodes.map((item) => item.node_id === to
-      ? { ...item, depends_on: [...new Set([...item.depends_on, from])] }
-      : item);
-    currentNodes = nextNodes;
-    void handlers.onEdit?.(nextNodes);
+    void runEdit((base) => {
+      if (!base.some((item) => item.node_id === from) || !base.some((item) => item.node_id === to)) return NOT_IN_PLAN;
+      return validateConnection(base, from, to) ?? base.map((item) => (item.node_id === to
+        ? { ...item, depends_on: [...new Set([...item.depends_on, from])] }
+        : item));
+    }).catch((failure) => feedLog(`Couldn't save the connection: ${errorText(failure)}`));
   };
 
   // Camera. The SVG attribute is the source of truth; the same transform is
@@ -729,32 +815,87 @@ export function mountWorkflowCanvas(
     svg.setAttribute('data-lod', zoom > LOD_FULL ? 'full' : zoom < 0.75 ? 'map' : 'read');
   };
 
-  // P8.2: explicit zoom controls. Same clamps as the wheel path; fit reuses
-  // the fit-to-view computation; reset returns to identity.
+  // P8.2: explicit zoom controls. Same clamps as the wheel path.
+  //
+  // Camera model (07/10/2026). The svg has no viewBox: one canvas unit is one
+  // CSS pixel, and only pan and zoom move the view. The old viewBox was
+  // re-fitted to the graph on every render, so each save re-centred and
+  // re-scaled the whole drawing (a dropped step landed about half as far as it
+  // was dragged), steps lagged the pointer whenever that scale was not 1, and
+  // Fit applied the scale a second time and pushed steps off the edge
+  // (WORKFLOWS-R1.md finding 9). The graph is fitted once when it first has a
+  // size; after that the camera moves only when the person moves it.
   const ZOOM_STEP = 1.25;
   const ZOOM_MIN = 0.45;
   const ZOOM_MAX = 2.4;
-  const setZoom = (next: number) => {
-    zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+  // Fit may go below ZOOM_MIN so that a large graph still fits.
+  const FIT_MIN = 0.2;
+  const viewSize = () => ({ w: svg.clientWidth || 1300, h: svg.clientHeight || 760 });
+  // The world: the computed layout plus every drawn position (a saved or
+  // dropped position can sit outside the layout), with padding.
+  const measureWorld = () => {
+    let maxX = layoutW;
+    let maxY = layoutH;
+    let minX = 0;
+    let minY = 0;
+    for (const p of Object.values(nodePositions)) {
+      maxX = Math.max(maxX, p.x + NODE_W + PAD);
+      maxY = Math.max(maxY, p.y + NODE_H + PAD);
+      minX = Math.min(minX, p.x - PAD);
+      minY = Math.min(minY, p.y - PAD);
+    }
+    originX = minX;
+    originY = minY;
+    fullW = maxX - minX;
+    fullH = maxY - minY;
+  };
+  const centreAt = (z: number) => {
+    const { w, h } = viewSize();
+    zoom = z;
+    panX = (w - fullW * z) / 2 - originX * z;
+    panY = (h - fullH * z) / 2 - originY * z;
+  };
+  // Whole graph in view, never enlarged past 100%.
+  const fitView = () => {
+    measureWorld();
+    if (!fullW || !fullH) return;
+    const { w, h } = viewSize();
+    centreAt(Math.max(FIT_MIN, Math.min(w / fullW, h / fullH, 1)));
     apply();
+    updateMinimap();
+  };
+  // 100%: centred when the graph fits, else its top-left corner in view.
+  const resetView = () => {
+    measureWorld();
+    const { w, h } = viewSize();
+    centreAt(1);
+    if (fullW > w) panX = -originX;
+    if (fullH > h) panY = -originY;
+    apply();
+    updateMinimap();
+  };
+  // Zoom about the middle of the view. Zooming out never zooms in: below
+  // ZOOM_MIN (reachable through Fit) the floor is the current zoom.
+  const setZoom = (next: number) => {
+    const target = Math.min(ZOOM_MAX, Math.max(Math.min(ZOOM_MIN, zoom), next));
+    const { w, h } = viewSize();
+    const k = target / zoom;
+    panX = w / 2 - (w / 2 - panX) * k;
+    panY = h / 2 - (h / 2 - panY) * k;
+    zoom = target;
+    cameraSet = true;
+    apply();
+    updateMinimap();
   };
   zoomInBtn.addEventListener('click', () => setZoom(zoom * ZOOM_STEP));
   zoomOutBtn.addEventListener('click', () => setZoom(zoom / ZOOM_STEP));
   zoomResetBtn.addEventListener('click', () => {
-    zoom = 1;
-    panX = 0;
-    panY = 0;
-    apply();
+    cameraSet = true;
+    resetView();
   });
   zoomFitBtn.addEventListener('click', () => {
-    if (!fullW || !fullH) return;
-    const sw = svg.clientWidth || 1300;
-    const sh = svg.clientHeight || 760;
-    const s = Math.min(sw / fullW, sh / fullH, 2.4);
-    zoom = Math.max(ZOOM_MIN, s);
-    panX = (sw - fullW * zoom) / 2;
-    panY = (sh - fullH * zoom) / 2;
-    apply();
+    cameraSet = true;
+    fitView();
   });
 
   // ---- defs: arrow markers (inert) ----
@@ -1009,6 +1150,12 @@ export function mountWorkflowCanvas(
       } else if (e.key === 'Enter' && connectFrom && connectFrom !== n.node_id) {
         e.preventDefault();
         endConnectGesture(n.node_id);
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Same path as the panel's Delete button: it asks first, and the
+        // confirm button takes focus so Enter confirms.
+        e.preventDefault();
+        openPassport(n, g);
+        passport.querySelector<HTMLButtonElement>('[data-wf-delete-step]')?.click();
       }
     });
     g.addEventListener('pointerenter', dash); // intent preview [archify]
@@ -1047,6 +1194,9 @@ export function mountWorkflowCanvas(
       ? (timeline.length ? `Live · ${timeline.length} events` : 'Live')
       : `Event ${playbackIndex + 1}/${timeline.length}`;
     renderList(run);
+    // Remember which step had keyboard focus; the rebuilt step gets it back.
+    const active = (host.ownerDocument?.activeElement ?? null) as Element | null;
+    const focusedId = active && viewport.contains(active) ? (active.closest('.dy-wf-node')?.getAttribute('data-node-id') ?? null) : null;
     viewport.replaceChildren();
     viewport.appendChild(defs);
     if (!run || run.nodes.length === 0) {
@@ -1075,32 +1225,28 @@ export function mountWorkflowCanvas(
       : (n: CanvasNode) => (isExceptionNode(n) ? EXCEPTION_LANE_KEY : 'main-path');
     const mobileLayout = canvasWindow.innerWidth <= 640;
     svg.dataset.mobileLayout = String(mobileLayout);
-    if (previousMobileLayout !== null && previousMobileLayout !== mobileLayout) nodePositions = {};
     previousMobileLayout = mobileLayout;
     let layout = buildLayout(run.nodes, { laneOf, mobile: mobileLayout });
     if (!mobileLayout && layout.lanes.length < 2) layout = buildLayout(run.nodes);
-    const positions = nodePositions = Object.keys(nodePositions).length ? { ...layout.positions, ...nodePositions } : run.nodes.reduce((acc, item) => { if (item.canvas_position) acc[item.node_id] = { ...layout.positions[item.node_id], ...item.canvas_position }; return acc; }, { ...layout.positions } as Record<string, CanvasPosition>);
-    // The world must contain every node it renders. Persisted canvas_position
-    // values survive layout changes, so a stale drag can sit outside the
-    // computed layout box — the old code sized the viewBox from the layout
-    // alone and such a node was clipped by the frame (measured 2026-09-22).
-    let worldW = layout.width;
-    let worldH = layout.height;
-    let minX = 0;
-    let minY = 0;
-    for (const p of Object.values(positions)) {
-      worldW = Math.max(worldW, p.x + NODE_W + PAD);
-      worldH = Math.max(worldH, p.y + NODE_H + PAD);
-      minX = Math.min(minX, p.x - PAD);
-      minY = Math.min(minY, p.y - PAD);
+    // Positions come from the frame every time: the layout, then each step's
+    // saved position, then any drop whose save has not come back yet. Keeping
+    // the previous render's positions instead meant Auto layout (which clears
+    // saved positions) left every dragged step where it was (finding 6).
+    const positions: Record<string, CanvasPosition> = { ...layout.positions };
+    for (const item of run.nodes) {
+      if (item.canvas_position) positions[item.node_id] = { ...layout.positions[item.node_id], ...item.canvas_position };
+      const pending = pendingPositions.get(item.node_id);
+      if (!pending) continue;
+      const saved = item.canvas_position;
+      if (saved && Math.abs(saved.x - pending.x) < 0.5 && Math.abs(saved.y - pending.y) < 0.5) pendingPositions.delete(item.node_id);
+      else positions[item.node_id] = { ...positions[item.node_id], ...pending };
     }
-    worldW -= minX;
-    worldH -= minY;
-    fullW = worldW;
-    fullH = worldH;
-    originX = minX;
-    originY = minY;
-    svg.setAttribute('viewBox', `${minX} ${minY} ${worldW} ${worldH}`);
+    nodePositions = positions;
+    layoutW = layout.width;
+    layoutH = layout.height;
+    measureWorld();
+    const minX = originX;
+    const worldW = fullW;
 
     // Lane bands first (background of the whole world), so nodes and edges sit
     // on top. Every band is derived from the same layout the nodes use.
@@ -1165,8 +1311,34 @@ export function mountWorkflowCanvas(
       const p = positions[n.node_id];
       viewport.appendChild(buildNode(n, p, run, Boolean(handlers.onEdit)));
     }
-    apply();
-    updateMinimap();
+    // Keep the selection and keyboard focus on the same step across new data.
+    if (selectedId) {
+      const g = nodeEl(selectedId);
+      if (g) {
+        selectedEl = g;
+        g.classList.add('dy-wf-selected');
+        highlightRoute(selectedId);
+      } else closePassport();
+    }
+    if (focusedId) nodeEl(focusedId)?.focus();
+    // Camera: fit once, when the canvas first has a size; after that only the
+    // person moves it, except to bring a newly added step into view.
+    const ids = currentNodes.map((n) => n.node_id);
+    const added = renderedIds.size ? ids.filter((id) => !renderedIds.has(id)) : [];
+    renderedIds = new Set(ids);
+    const { w, h } = viewSize();
+    const outOfView = (p: CanvasPosition | undefined) => Boolean(p) && (
+      panX + p!.x * zoom < 0 || panY + p!.y * zoom < 0
+      || panX + (p!.x + NODE_W) * zoom > w || panY + (p!.y + NODE_H) * zoom > h);
+    if (!cameraSet) {
+      fitView();
+      cameraSet = svg.clientWidth > 0;
+    } else if (added.some((id) => outOfView(positions[id]))) {
+      fitView();
+    } else {
+      apply();
+      updateMinimap();
+    }
   };
 
   // ---- minimap ----
@@ -1174,10 +1346,11 @@ export function mountWorkflowCanvas(
     minimap.replaceChildren(miniViewport);
     if (fullW <= 0) return;
     const s = Math.min(170 / fullW, 104 / fullH);
-    const vx = (0 - panX) / zoom;
-    const vy = (0 - panY) / zoom;
-    const vw = (svg.clientWidth || 1300) / zoom;
-    const vh = (svg.clientHeight || 760) / zoom;
+    const { w: viewW, h: viewH } = viewSize();
+    const vx = (0 - panX) / zoom - originX;
+    const vy = (0 - panY) / zoom - originY;
+    const vw = viewW / zoom;
+    const vh = viewH / zoom;
     miniViewport.setAttribute('x', String(vx * s));
     miniViewport.setAttribute('y', String(vy * s));
     miniViewport.setAttribute('width', String(Math.max(10, vw * s)));
@@ -1203,12 +1376,16 @@ export function mountWorkflowCanvas(
   minimap.addEventListener('click', (e) => {
     const ev = e as MouseEvent;
     const r = minimap.getBoundingClientRect();
-    const fx = (ev.clientX - r.left) / 170;
-    const fy = (ev.clientY - r.top) / 104;
     if (fullW <= 0) return;
     const s = Math.min(170 / fullW, 104 / fullH);
-    panX = 650 - (fx * 170) / s * zoom;
-    panY = 380 - (fy * 104) / s * zoom;
+    // Centre the view on the clicked point of the world (the minimap draws the
+    // world from its top-left corner, originX/originY).
+    const wx = originX + (ev.clientX - r.left) / s;
+    const wy = originY + (ev.clientY - r.top) / s;
+    const { w, h } = viewSize();
+    panX = w / 2 - wx * zoom;
+    panY = h / 2 - wy * zoom;
+    cameraSet = true;
     apply();
     updateMinimap();
   });
@@ -1217,22 +1394,28 @@ export function mountWorkflowCanvas(
   let lastFrames: CanvasRun[] = [];
   let selectedEl: SVGGElement | null = null;
   let playbackIndex: number | null = null;
+  const nodeEl = (id: string): SVGGElement | null =>
+    [...viewport.querySelectorAll<SVGGElement>('.dy-wf-node')].find((g) => g.getAttribute('data-node-id') === id) ?? null;
+  // Selection owns a route highlight: unrelated nodes/connectors dim, while
+  // upstream and downstream dependency edges stay readable. This is derived
+  // from the same canonical depends_on graph; no visual-only relationships.
+  const highlightRoute = (id: string) => {
+    const related = new Set<string>([id]);
+    const byId = new Map(currentNodes.map((node) => [node.node_id, node]));
+    const walkUp = (nid: string) => { for (const dep of byId.get(nid)?.depends_on ?? []) if (!related.has(dep)) { related.add(dep); walkUp(dep); } };
+    const walkDown = (nid: string) => { for (const node of currentNodes) if (node.depends_on.includes(nid) && !related.has(node.node_id)) { related.add(node.node_id); walkDown(node.node_id); } };
+    walkUp(id); walkDown(id);
+    viewport.querySelectorAll<SVGGElement>('.dy-wf-node').forEach((node) => node.classList.toggle('dy-wf-route-dim', !related.has(node.getAttribute('data-node-id') ?? '')));
+    viewport.querySelectorAll<SVGPathElement>('.dy-wf-edge').forEach((edge) => edge.classList.toggle('dy-wf-route-edge', related.has(edge.dataset.from ?? '') && related.has(edge.dataset.to ?? '')));
+  };
   const openPassport = (n: CanvasNode, g?: SVGGElement | null) => {
     // unmistakable selection: clear previous, mark current
     if (selectedEl) selectedEl.classList.remove('dy-wf-selected');
     selectedEl = g ?? null;
     if (selectedEl) selectedEl.classList.add('dy-wf-selected');
-    // Selection owns a route highlight: unrelated nodes/connectors dim, while
-    // upstream and downstream dependency edges stay readable. This is derived
-    // from the same canonical depends_on graph; no visual-only relationships.
-    const selectedId = n.node_id;
-    const related = new Set<string>([selectedId]);
-    const byId = new Map(currentNodes.map((node) => [node.node_id, node]));
-    const walkUp = (id: string) => { for (const dep of byId.get(id)?.depends_on ?? []) if (!related.has(dep)) { related.add(dep); walkUp(dep); } };
-    const walkDown = (id: string) => { for (const node of currentNodes) if (node.depends_on.includes(id) && !related.has(node.node_id)) { related.add(node.node_id); walkDown(node.node_id); } };
-    walkUp(selectedId); walkDown(selectedId);
-    viewport.querySelectorAll<SVGGElement>('.dy-wf-node').forEach((node) => node.classList.toggle('dy-wf-route-dim', !related.has(node.getAttribute('data-node-id') ?? '')));
-    viewport.querySelectorAll<SVGPathElement>('.dy-wf-edge').forEach((edge) => edge.classList.toggle('dy-wf-route-edge', related.has(edge.dataset.from ?? '') && related.has(edge.dataset.to ?? '')));
+    selectedId = n.node_id;
+    handlers.onSelect?.(n.node_id);
+    highlightRoute(n.node_id);
     passport.replaceChildren();
     const status = n.status ?? 'pending';
     // Header: kind + status on one line, title below, close top-right.
@@ -1274,23 +1457,81 @@ export function mountWorkflowCanvas(
       if (!handlers.onEdit) return;
       const edit = elu<HTMLDivElement>('div', 'dy-wf-edit');
       edit.appendChild(elu('h4', '', 'Edit step'));
+      // Edit the saved plan's copy of the step: a run on screen may show an
+      // older title or links (finding 14).
+      const planned = editBase().find((item) => item.node_id === n.node_id);
+      if (!planned) {
+        edit.appendChild(elu('p', 'dy-wf-pp-note', 'This step is not in the latest version of the workflow, so it cannot be edited here.'));
+        passport.appendChild(edit);
+        return;
+      }
+      // Why a save or delete failed, in the panel where it was asked for
+      // (finding 10: a failed save only said "Save failed — retry").
+      const problem = elu<HTMLParagraphElement>('p', 'dy-wf-pp-error');
+      problem.setAttribute('role', 'alert');
+      problem.hidden = true;
+      const say = (text: string | null) => { problem.textContent = text ?? ''; problem.hidden = !text; };
       const field = (label: string, input: HTMLInputElement) => {
         const f = elu<HTMLLabelElement>('label', 'dy-wf-field');
         f.append(elu('span', '', label), input);
         edit.appendChild(f);
       };
-      const title = elu<HTMLInputElement>('input', 'dy-wf-edit-title'); title.value = n.title; title.setAttribute('aria-label', 'Node title');
-      const deps = elu<HTMLInputElement>('input', 'dy-wf-edit-deps'); deps.value = n.depends_on.join(', '); deps.placeholder = 'e.g. build, tests'; deps.setAttribute('aria-label', 'Dependencies');
-      const team = elu<HTMLInputElement>('input', 'dy-wf-edit-team'); team.value = n.phase_team ?? ''; team.placeholder = 'phase team override'; team.setAttribute('aria-label', 'Phase team override');
+      const title = elu<HTMLInputElement>('input', 'dy-wf-edit-title'); title.value = planned.title; title.setAttribute('aria-label', 'Node title');
+      const deps = elu<HTMLInputElement>('input', 'dy-wf-edit-deps'); deps.value = planned.depends_on.join(', '); deps.placeholder = 'e.g. build, tests'; deps.setAttribute('aria-label', 'Dependencies');
+      const team = elu<HTMLInputElement>('input', 'dy-wf-edit-team'); team.value = planned.phase_team ?? ''; team.placeholder = 'phase team override'; team.setAttribute('aria-label', 'Phase team override');
       field('Title', title); field('Depends on (step IDs)', deps); field('Phase team', team);
       const save = elu<HTMLButtonElement>('button', 'dy-btn primary', 'Save graph version'); save.type = 'button';
       save.addEventListener('click', async () => {
         const ids = new Set(deps.value.split(',').map((v) => v.trim()).filter(Boolean)); ids.delete(n.node_id);
-        const edited = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, title: title.value.trim() || item.title, depends_on: [...ids], phase_team: team.value.trim() || null } : item);
-        save.disabled = true; save.textContent = 'Saving…';
-        try { await handlers.onEdit!(edited); save.textContent = 'Saved ✓'; } catch { save.disabled = false; save.textContent = 'Save failed — retry'; }
+        save.disabled = true; save.textContent = 'Saving…'; say(null);
+        try {
+          await runEdit((base) => (base.some((item) => item.node_id === n.node_id)
+            ? base.map((item) => (item.node_id === n.node_id ? { ...item, title: title.value.trim() || item.title, depends_on: [...ids], phase_team: team.value.trim() || null } : item))
+            : NOT_IN_PLAN));
+          save.textContent = 'Saved ✓';
+        } catch (error) {
+          save.disabled = false; save.textContent = 'Save failed — retry';
+          say(`Couldn't save: ${errorText(error)}`);
+        }
       });
-      edit.appendChild(save);
+      // Delete (finding 3: there was no way to remove a step). Asks first; the
+      // steps after it are re-linked to the steps before it.
+      const remove = elu<HTMLButtonElement>('button', 'dy-btn danger', 'Delete step'); remove.type = 'button';
+      remove.dataset.wfDeleteStep = n.node_id;
+      const confirmRow = elu<HTMLDivElement>('div', 'dy-wf-delete-confirm');
+      confirmRow.hidden = true;
+      remove.addEventListener('click', () => {
+        say(null);
+        const verdict = deletePlan(editBase(), n.node_id);
+        if (typeof verdict === 'string') { confirmRow.hidden = true; say(verdict); return; }
+        const base = editBase();
+        const titleOf = (id: string) => `"${base.find((item) => item.node_id === id)?.title ?? id}"`;
+        const target = base.find((item) => item.node_id === n.node_id)!;
+        const followers = base.some((item) => item.depends_on.includes(n.node_id));
+        const effect = !followers ? ''
+          : target.depends_on.length ? ` The steps after it will follow ${target.depends_on.map(titleOf).join(' and ')} instead.`
+            : ' The steps after it will no longer wait for it.';
+        const yes = elu<HTMLButtonElement>('button', 'dy-btn danger', 'Delete'); yes.type = 'button';
+        yes.dataset.wfDeleteConfirm = n.node_id;
+        const no = elu<HTMLButtonElement>('button', 'dy-btn', 'Cancel'); no.type = 'button';
+        confirmRow.replaceChildren(elu('p', '', `Delete "${target.title}"?${effect}`), yes, no);
+        confirmRow.hidden = false;
+        no.addEventListener('click', () => { confirmRow.hidden = true; remove.focus(); });
+        yes.addEventListener('click', async () => {
+          yes.disabled = true; no.disabled = true;
+          try {
+            await runEdit((latest) => deletePlan(latest, n.node_id));
+            closePassport();
+          } catch (error) {
+            yes.disabled = false; no.disabled = false;
+            say(`Couldn't delete: ${errorText(error)}`);
+          }
+        });
+        yes.focus();
+      });
+      const actions = elu<HTMLDivElement>('div', 'dy-wf-edit-actions');
+      actions.append(save, remove);
+      edit.append(actions, confirmRow, problem);
       passport.appendChild(edit);
     };
     if (n.task_ref) {
@@ -1493,10 +1734,12 @@ export function mountWorkflowCanvas(
     // While a node drag owns the pointer, panning must not also consume it.
     if (dragSession) return;
     const ev = e as PointerEvent;
-    panX += ev.clientX - lastX;
-    panY += ev.clientY - lastY;
+    const { sx, sy } = screenScale();
+    panX += (ev.clientX - lastX) / sx;
+    panY += (ev.clientY - lastY) / sy;
     lastX = ev.clientX;
     lastY = ev.clientY;
+    cameraSet = true;
     apply();
     updateMinimap();
   });
@@ -1541,8 +1784,10 @@ export function mountWorkflowCanvas(
     e.preventDefault();
     const ev = e as WheelEvent;
     const rect = svg.getBoundingClientRect();
-    const cx = ev.clientX - rect.left;
-    const cy = ev.clientY - rect.top;
+    const { sx, sy } = screenScale();
+    const cx = (ev.clientX - rect.left) / sx;
+    const cy = (ev.clientY - rect.top) / sy;
+    cameraSet = true;
     host.classList.add('dy-wf-panning');
     if (wheelSettle) clearTimeout(wheelSettle);
     wheelSettle = setTimeout(() => host.classList.remove('dy-wf-panning'), 160);
@@ -1560,6 +1805,10 @@ export function mountWorkflowCanvas(
     passport.replaceChildren();
     if (selectedEl) selectedEl.classList.remove('dy-wf-selected');
     selectedEl = null;
+    if (selectedId !== null) {
+      selectedId = null;
+      handlers.onSelect?.(null);
+    }
     clearRoute();
   };
   const onKeyDown = (e: KeyboardEvent) => {
@@ -1709,6 +1958,8 @@ export function mountWorkflowCanvas(
         const frameSig = JSON.stringify(latest ?? null);
         if (frameSig !== lastFrameSig) {
           playbackIndex = null;
+          // A new frame carries whatever was last saved.
+          optimisticBase = null;
           render(latest);
           lastFrameSig = frameSig;
         }
@@ -1733,7 +1984,18 @@ export function mountWorkflowCanvas(
   };
   pollOnce();
   if (pollMs > 0) timer = setInterval(pollOnce, pollMs);
-  const onResize = () => { if (!disposed && lastRun) render(lastRun); };
+  // Resizing keeps the camera (the drawing stays where it is) unless the
+  // layout flips between phone and desktop, which moves every step.
+  const onResize = () => {
+    if (disposed || !lastRun) return;
+    if ((canvasWindow.innerWidth <= 640) !== previousMobileLayout) {
+      cameraSet = false;
+      render(lastRun);
+    } else if (!cameraSet) {
+      fitView();
+      cameraSet = svg.clientWidth > 0;
+    } else updateMinimap();
+  };
   canvasWindow.addEventListener('resize', onResize);
   // The host can change width without a window resize (the library sidebar
   // collapsing). Re-render on real host width changes only.
@@ -1761,8 +2023,9 @@ export function mountWorkflowCanvas(
     if (resizeFrame) canvasWindow.cancelAnimationFrame(resizeFrame);
     host.replaceChildren();
   });
-  return () => {
+  const dispose = () => {
     disposers.forEach((d) => d());
     disposers = [];
   };
+  return Object.assign(dispose, { refresh: () => { if (!disposed) pollOnce(); } });
 }

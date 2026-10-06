@@ -43,13 +43,20 @@ const toCanvasRun = (run) => ({
   })),
 })
 
+// definition and runs may be values, or functions that return the current
+// values. With functions, handle.refresh() redraws the same canvas from the
+// latest data; the Desktop screen used to re-mount the canvas on every data
+// change, which closed the open step panel and reset the zoom (07/10/2026,
+// WORKFLOWS-R1.md finding 13).
 export function mountDesktopWorkflowCanvas(host, projectId, workflowName, definition, runs, handlers = {}) {
-  const nodes = (definition?.nodes ?? []).map(toCanvasNode)
+  const read = (value) => (typeof value === 'function' ? value() : value)
   const fetchRuns = async () => {
-    const mapped = (runs ?? []).map(toCanvasRun)
+    const mapped = (read(runs) ?? []).map(toCanvasRun)
     // The shared canvas owns timeline fetching. Keeping it here would fetch
     // the same history twice on every poll and could race a newer frame.
-    return mapped.length ? mapped : [{ run_key: `definition:${workflowName}`, version: 0, status: 'definition', started_at: null, updated_at: null, nodes }]
+    if (mapped.length) return mapped
+    const nodes = (read(definition)?.nodes ?? []).map(toCanvasNode)
+    return [{ run_key: `definition:${workflowName}`, version: 0, status: 'definition', started_at: null, updated_at: null, nodes }]
   }
   return mountWorkflowCanvas(host, projectId, workflowName, fetchRuns, {
     onApprove: handlers.onApprove ?? (() => undefined),
@@ -57,6 +64,8 @@ export function mountDesktopWorkflowCanvas(host, projectId, workflowName, defini
     onRetry: handlers.onRetry,
     onExpand: handlers.onExpand,
     onEdit: handlers.onEdit,
+    editNodes: handlers.editNodes,
+    onSelect: handlers.onSelect,
     fetchTimeline: handlers.fetchTimeline,
   }, handlers.pollMs ?? 60000)
 }

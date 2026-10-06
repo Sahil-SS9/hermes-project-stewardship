@@ -1477,8 +1477,13 @@ export const DOCKYARD_CSS = `
 }
 @media (max-width: 640px) {
   .dockyard-root .dockyard-wf3 { display: block; }
-  .dockyard-root .dockyard-wf3-lib { display: none; }
-  .dockyard-root .dockyard-wf3-libtoggle, .dockyard-root .dockyard-wf3-libtoggle + .dockyard-wf3-sep { display: none; }
+  /* Phones: the library sits above the canvas and its list scrolls sideways.
+     It used to be hidden here, so no other workflow could be opened
+     (07/10/2026, WORKFLOWS-R1.md finding 5). The toggle still hides it. */
+  .dockyard-root .dockyard-wf3-lib { border-right: 0; border-bottom: 1px solid var(--dy-border); }
+  .dockyard-root .dockyard-wf3.lib-collapsed .dockyard-wf3-lib { display: none; }
+  .dockyard-root .dockyard-wf3-lib-list { display: flex; gap: 6px; overflow-x: auto; }
+  .dockyard-root .dockyard-wf3-lib-list button { flex: 0 0 auto; width: auto; max-width: 70vw; }
   .dockyard-root .dockyard-wf3-stage { min-width: 0; }
   .dockyard-root .dockyard-wf3-stage .dockyard-wf3-toolbar { overflow: visible; flex-wrap: wrap; justify-content: flex-start; gap: 4px; }
   .dockyard-root .dockyard-wf3-stage .dockyard-wf3-toolbar .dockyard-button { flex: 0 0 auto; min-height: 38px; padding-inline: 8px; white-space: nowrap; }

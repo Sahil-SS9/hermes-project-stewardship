@@ -130,6 +130,18 @@ test('lanes: a single resulting band is not drawn as a band', async () => {
 });
 
 // -------------------------------------------------- 2. world containment ----
+// Camera model (07/10/2026): the svg has no viewBox; the viewport transform is
+// the camera, and the first view fits the whole graph. These tests used to
+// read the auto-fitted viewBox; they now check what that window was for: a
+// saved position outside the layout is still on screen. jsdom has no layout,
+// so the canvas falls back to a 1300 x 760 view.
+const VIEW = { w: 1300, h: 760 };
+const NUM = /-?\d+(?:\.\d+)?(?:e[-+]?\d+)?/g;
+const onScreen = (host, id) => {
+  const [px, py, z] = (host.querySelector('.dy-wf-viewport').getAttribute('transform') || '').match(NUM).map(Number);
+  const [nx, ny] = (host.querySelector(`[data-node-id="${id}"]`).getAttribute('transform') || '').match(NUM).map(Number);
+  return { nx, ny, left: px + nx * z, top: py + ny * z, right: px + (nx + 208) * z, bottom: py + (ny + 72) * z };
+};
 
 test('world box contains a persisted position that sits outside the layout', async () => {
   // A stale drag far right/below its computed cell: the frame must still show
@@ -144,19 +156,13 @@ test('world box contains a persisted position that sits outside the layout', asy
     await settle();
     const host = dom.window.document.getElementById('host');
     const svg = host.querySelector('.dy-wf-svg');
-    const vb = (svg.getAttribute('viewBox') || '').split(/\s+/).map(Number);
-    assert.equal(vb.length, 4, 'viewBox is a four-number window');
-    const [minX, minY, w, h] = vb;
-    const nodeA = host.querySelector('[data-node-id="a"]');
-    const t = (nodeA.getAttribute('transform') || '').match(/-?\d+(?:\.\d+)?/g).map(Number);
-    const nx = t[0], ny = t[1];
-    // The node box (NODE_W x NODE_H) must sit inside the world window.
-    assert.ok(nx >= minX && nx + 208 <= minX + w,
-      `node a x-range [${nx}, ${nx + 208}] must be inside [${minX}, ${minX + w}]`);
-    assert.ok(ny >= minY && ny + 72 <= minY + h,
-      `node a y-range [${ny}, ${ny + 72}] must be inside [${minY}, ${minY + h}]`);
+    assert.equal(svg.getAttribute('viewBox'), null, 'no auto-fitted viewBox: the camera is the viewport transform');
+    const a = onScreen(host, 'a');
+    // The node box (NODE_W x NODE_H) must sit inside the first view.
+    assert.ok(a.left >= 0 && a.right <= VIEW.w, `node a spans x ${a.left}..${a.right}, view is 0..${VIEW.w}`);
+    assert.ok(a.top >= 0 && a.bottom <= VIEW.h, `node a spans y ${a.top}..${a.bottom}, view is 0..${VIEW.h}`);
     // And the persisted position is what rendered (no snap back to the grid).
-    assert.equal(nx, 1450);
+    assert.equal(a.nx, 1450);
   } finally { dispose(); restore(dom); }
 });
 
@@ -170,12 +176,14 @@ test('world box also contains positions above/left of the layout origin', async 
   try {
     await settle();
     const host = dom.window.document.getElementById('host');
-    const svg = host.querySelector('.dy-wf-svg');
-    const [minX, minY, w, h] = (svg.getAttribute('viewBox') || '').split(/\s+/).map(Number);
-    assert.ok(minX <= -120 && minY <= -40, 'the window origin follows the node');
-    assert.ok(-120 + 208 <= minX + w && -40 + 72 <= minY + h, 'and the node is inside it');
-    // The minimap dot is expressed in the same frame: not off-canvas.
-    const dots = [...host.querySelectorAll('.dy-wf-minimap rect')].filter((r) => r.getAttribute('x') !== null);
+    const a = onScreen(host, 'a');
+    assert.deepEqual([a.nx, a.ny], [-120, -40], 'the saved position is what rendered');
+    assert.ok(a.left >= 0 && a.top >= 0 && a.right <= VIEW.w && a.bottom <= VIEW.h,
+      `node a spans ${a.left},${a.top}..${a.right},${a.bottom}; view is ${VIEW.w} x ${VIEW.h}`);
+    // The minimap's node dots are drawn in the same frame: not off-map. (The
+    // view rectangle may extend past the world when the graph is centred.)
+    const dots = [...host.querySelectorAll('.dy-wf-minimap rect:not(.dy-wf-mini-view)')].filter((r) => r.getAttribute('x') !== null);
+    assert.ok(dots.length >= 2, 'one minimap dot per node');
     for (const dot of dots) {
       const x = Number(dot.getAttribute('x'));
       const y = Number(dot.getAttribute('y'));

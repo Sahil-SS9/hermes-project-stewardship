@@ -1614,8 +1614,13 @@ var DOCKYARD_CSS = `
 }
 @media (max-width: 640px) {
   .dockyard-root .dockyard-wf3 { display: block; }
-  .dockyard-root .dockyard-wf3-lib { display: none; }
-  .dockyard-root .dockyard-wf3-libtoggle, .dockyard-root .dockyard-wf3-libtoggle + .dockyard-wf3-sep { display: none; }
+  /* Phones: the library sits above the canvas and its list scrolls sideways.
+     It used to be hidden here, so no other workflow could be opened
+     (07/10/2026, WORKFLOWS-R1.md finding 5). The toggle still hides it. */
+  .dockyard-root .dockyard-wf3-lib { border-right: 0; border-bottom: 1px solid var(--dy-border); }
+  .dockyard-root .dockyard-wf3.lib-collapsed .dockyard-wf3-lib { display: none; }
+  .dockyard-root .dockyard-wf3-lib-list { display: flex; gap: 6px; overflow-x: auto; }
+  .dockyard-root .dockyard-wf3-lib-list button { flex: 0 0 auto; width: auto; max-width: 70vw; }
   .dockyard-root .dockyard-wf3-stage { min-width: 0; }
   .dockyard-root .dockyard-wf3-stage .dockyard-wf3-toolbar { overflow: visible; flex-wrap: wrap; justify-content: flex-start; gap: 4px; }
   .dockyard-root .dockyard-wf3-stage .dockyard-wf3-toolbar .dockyard-button { flex: 0 0 auto; min-height: 38px; padding-inline: 8px; white-space: nowrap; }
@@ -3399,6 +3404,19 @@ var workflow_canvas_css_default = `
 .dy-wf-scope .dy-wf-field input::placeholder { color: rgba(159, 178, 204, .55); }
 .dy-wf-scope .dy-wf-field input:focus { border-color: var(--dy-wf-accent); box-shadow: 0 0 0 3px rgba(106, 183, 255, .18); }
 .dy-wf-scope .dy-wf-edit > button { justify-self: start; }
+/* Panel buttons are styled here, not by the host: the Desktop screen has no
+   .dy-btn rules, so Save rendered as a bare browser button there. */
+.dy-wf-scope .dy-wf-edit-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.dy-wf-scope .dy-wf-edit button { min-height: 32px; padding: 6px 12px; border: 1px solid var(--dy-wf-glass-line); border-radius: 8px; background: rgba(4, 10, 22, .65); color: var(--dy-wf-card-text); font: 600 12.5px system-ui, sans-serif; cursor: pointer; }
+.dy-wf-scope .dy-wf-edit button.primary { border-color: var(--dy-wf-accent); background: rgba(106, 183, 255, .18); }
+.dy-wf-scope .dy-wf-edit button.danger { border-color: rgba(255, 120, 112, .55); color: #ff9d97; }
+.dy-wf-scope .dy-wf-edit button:disabled { opacity: .55; cursor: default; }
+.dy-wf-scope .dy-wf-edit button:focus-visible { outline: 2px solid var(--dy-wf-accent); outline-offset: 2px; }
+/* Delete asks first; a refused or failed save says why (findings 3 and 10). */
+.dy-wf-scope .dy-wf-delete-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px; border: 1px solid rgba(255, 120, 112, .45); border-radius: 8px; }
+.dy-wf-scope .dy-wf-delete-confirm p { flex: 1 0 100%; margin: 0; color: var(--dy-wf-card-text); font-size: 12.5px; line-height: 1.45; }
+.dy-wf-scope .dy-wf-pp-error { margin: 0; color: #ff9d97; font-size: 12.5px; line-height: 1.45; }
+.dy-wf-scope .dy-wf-delete-confirm[hidden], .dy-wf-scope .dy-wf-pp-error[hidden] { display: none; }
 .dy-wf-scope .dy-wf-passport > :last-child { margin-bottom: 16px; }
 .dy-wf-scope .dy-wf-empty { fill: var(--dy-wf-card-dim); font: 13px system-ui, sans-serif; }
 /* Lane bands (v6 composition): axis labels, never controls. The "exception"
@@ -13322,6 +13340,22 @@ function validateConnection(nodes, from, to) {
   };
   return visit(from) ? "Connection would create a cycle" : null;
 }
+var NOT_IN_LATEST_PLAN = "This step is not in the latest version of the workflow, so it cannot be changed here.";
+function deletePlan(nodes, id) {
+  const target = nodes.find((n) => n.node_id === id);
+  if (!target) return NOT_IN_LATEST_PLAN;
+  const names = (list) => list.map((n) => `"${n.title}"`).join(", ");
+  const checks = nodes.filter((n) => n.node_id !== id && n.when?.node === id);
+  if (checks.length) {
+    return checks.length === 1 ? `Can't delete "${target.title}": ${names(checks)} has a condition that checks it. Change or remove that condition first.` : `Can't delete "${target.title}": ${names(checks)} have conditions that check it. Change or remove those conditions first.`;
+  }
+  const next = nodes.filter((n) => n.node_id !== id).map((n) => n.depends_on.includes(id) ? { ...n, depends_on: [...new Set(n.depends_on.flatMap((dep) => dep === id ? target.depends_on : [dep]))].filter((dep) => dep !== n.node_id) } : n);
+  const stranded = next.filter((n) => n.loop && n.depends_on.length === 0 && (nodes.find((m) => m.node_id === n.node_id)?.depends_on.length ?? 0) > 0);
+  if (stranded.length) {
+    return `Can't delete "${target.title}": ${names(stranded)} ${stranded.length === 1 ? "repeats" : "repeat"}, and a repeating step needs a step before it.`;
+  }
+  return next;
+}
 var NODE_W = 208;
 var NODE_H = 72;
 var COL_GAP = 116;
@@ -13666,6 +13700,12 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   let originY = 0;
   let currentNodes = [];
   let nodePositions = {};
+  const pendingPositions = /* @__PURE__ */ new Map();
+  let layoutW = 0;
+  let layoutH = 0;
+  let cameraSet = false;
+  let renderedIds = /* @__PURE__ */ new Set();
+  let selectedId = null;
   let previousMobileLayout = null;
   let dragNode = null;
   let dragStart = { x: 0, y: 0, ox: 0, oy: 0 };
@@ -13678,20 +13718,19 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     if (nums.length < 2 || !isFinite(nums[0]) || !isFinite(nums[1])) return null;
     return { x: nums[0], y: nums[1] };
   };
-  const worldPoint = (clientX, clientY) => {
-    let ox = 0;
-    let oy = 0;
+  const screenScale = () => {
     try {
       const ctm = svg.getScreenCTM();
-      if (ctm && isFinite(ctm.a) && isFinite(ctm.e) && isFinite(ctm.f)) {
-        ox = ctm.e;
-        oy = ctm.f;
+      if (ctm && isFinite(ctm.a) && ctm.a > 0 && isFinite(ctm.d) && ctm.d > 0 && isFinite(ctm.e) && isFinite(ctm.f)) {
+        return { sx: ctm.a, sy: ctm.d, ox: ctm.e, oy: ctm.f };
       }
     } catch {
-      ox = 0;
-      oy = 0;
     }
-    return { x: (clientX - ox - panX) / zoom, y: (clientY - oy - panY) / zoom };
+    return { sx: 1, sy: 1, ox: 0, oy: 0 };
+  };
+  const worldPoint = (clientX, clientY) => {
+    const { sx, sy, ox, oy } = screenScale();
+    return { x: ((clientX - ox) / sx - panX) / zoom, y: ((clientY - oy) / sy - panY) / zoom };
   };
   const writeNodePosition = (nodeId, g, x, y) => {
     nodePositions[nodeId] = { x, y, depth: nodePositions[nodeId]?.depth ?? 0 };
@@ -13726,12 +13765,31 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     const world = worldPoint(e.clientX, e.clientY);
     writeNodePosition(session.nodeId, g, world.x - session.offsetX, world.y - session.offsetY);
   };
-  const commitNodePosition = async (nodeId) => {
+  let editQueue = Promise.resolve();
+  let optimisticBase = null;
+  const editBase = () => handlers.editNodes?.() ?? optimisticBase ?? currentNodes;
+  const NOT_IN_PLAN = NOT_IN_LATEST_PLAN;
+  const runEdit = (build) => {
+    const next = editQueue.then(async () => {
+      const result = build(editBase());
+      if (typeof result === "string") throw new Error(result);
+      await handlers.onEdit(result);
+      if (!handlers.editNodes) optimisticBase = result;
+    });
+    editQueue = next.catch(() => void 0);
+    return next;
+  };
+  const errorText2 = (error) => String(error?.message ?? error ?? "unknown error").replace(/^\d{3}:\s*/, "") || "unknown error";
+  const commitNodePosition = (nodeId) => {
     const committed = nodePositions[nodeId];
-    if (!committed) return;
-    const nextNodes = currentNodes.map((item) => item.node_id === nodeId ? { ...item, canvas_position: { x: committed.x, y: committed.y } } : item);
-    currentNodes = nextNodes;
-    await handlers.onEdit?.(nextNodes);
+    if (!committed || !handlers.onEdit) return;
+    const position = { x: committed.x, y: committed.y };
+    pendingPositions.set(nodeId, position);
+    void runEdit((base) => base.some((item) => item.node_id === nodeId) ? base.map((item) => item.node_id === nodeId ? { ...item, canvas_position: position } : item) : NOT_IN_PLAN).catch((error) => {
+      pendingPositions.delete(nodeId);
+      feedLog(`Couldn't save the move: ${errorText2(error)}`);
+      if (lastRun) render(lastRun);
+    });
   };
   const endDragSession = (e, commit) => {
     const session = dragSession;
@@ -13772,14 +13830,15 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       g.classList.remove("dy-wf-connecting");
     }
     if (!to) return;
-    const error = validateConnection(currentNodes, from, to);
+    const error = validateConnection(editBase(), from, to);
     if (error) {
       feedLog(error);
       return;
     }
-    const nextNodes = currentNodes.map((item) => item.node_id === to ? { ...item, depends_on: [.../* @__PURE__ */ new Set([...item.depends_on, from])] } : item);
-    currentNodes = nextNodes;
-    void handlers.onEdit?.(nextNodes);
+    void runEdit((base) => {
+      if (!base.some((item) => item.node_id === from) || !base.some((item) => item.node_id === to)) return NOT_IN_PLAN;
+      return validateConnection(base, from, to) ?? base.map((item) => item.node_id === to ? { ...item, depends_on: [.../* @__PURE__ */ new Set([...item.depends_on, from])] } : item);
+    }).catch((failure) => feedLog(`Couldn't save the connection: ${errorText2(failure)}`));
   };
   const apply = () => {
     viewport.setAttribute("transform", `translate(${panX} ${panY}) scale(${zoom})`);
@@ -13789,27 +13848,67 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   const ZOOM_STEP = 1.25;
   const ZOOM_MIN = 0.45;
   const ZOOM_MAX = 2.4;
-  const setZoom = (next) => {
-    zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+  const FIT_MIN = 0.2;
+  const viewSize = () => ({ w: svg.clientWidth || 1300, h: svg.clientHeight || 760 });
+  const measureWorld = () => {
+    let maxX = layoutW;
+    let maxY = layoutH;
+    let minX = 0;
+    let minY = 0;
+    for (const p of Object.values(nodePositions)) {
+      maxX = Math.max(maxX, p.x + NODE_W + PAD);
+      maxY = Math.max(maxY, p.y + NODE_H + PAD);
+      minX = Math.min(minX, p.x - PAD);
+      minY = Math.min(minY, p.y - PAD);
+    }
+    originX = minX;
+    originY = minY;
+    fullW = maxX - minX;
+    fullH = maxY - minY;
+  };
+  const centreAt = (z) => {
+    const { w, h } = viewSize();
+    zoom = z;
+    panX = (w - fullW * z) / 2 - originX * z;
+    panY = (h - fullH * z) / 2 - originY * z;
+  };
+  const fitView = () => {
+    measureWorld();
+    if (!fullW || !fullH) return;
+    const { w, h } = viewSize();
+    centreAt(Math.max(FIT_MIN, Math.min(w / fullW, h / fullH, 1)));
     apply();
+    updateMinimap();
+  };
+  const resetView = () => {
+    measureWorld();
+    const { w, h } = viewSize();
+    centreAt(1);
+    if (fullW > w) panX = -originX;
+    if (fullH > h) panY = -originY;
+    apply();
+    updateMinimap();
+  };
+  const setZoom = (next) => {
+    const target = Math.min(ZOOM_MAX, Math.max(Math.min(ZOOM_MIN, zoom), next));
+    const { w, h } = viewSize();
+    const k = target / zoom;
+    panX = w / 2 - (w / 2 - panX) * k;
+    panY = h / 2 - (h / 2 - panY) * k;
+    zoom = target;
+    cameraSet = true;
+    apply();
+    updateMinimap();
   };
   zoomInBtn.addEventListener("click", () => setZoom(zoom * ZOOM_STEP));
   zoomOutBtn.addEventListener("click", () => setZoom(zoom / ZOOM_STEP));
   zoomResetBtn.addEventListener("click", () => {
-    zoom = 1;
-    panX = 0;
-    panY = 0;
-    apply();
+    cameraSet = true;
+    resetView();
   });
   zoomFitBtn.addEventListener("click", () => {
-    if (!fullW || !fullH) return;
-    const sw = svg.clientWidth || 1300;
-    const sh = svg.clientHeight || 760;
-    const s = Math.min(sw / fullW, sh / fullH, 2.4);
-    zoom = Math.max(ZOOM_MIN, s);
-    panX = (sw - fullW * zoom) / 2;
-    panY = (sh - fullH * zoom) / 2;
-    apply();
+    cameraSet = true;
+    fitView();
   });
   const defs = sEl("defs", {});
   const mkMarker = (id, fillToken, fallback) => {
@@ -14050,6 +14149,10 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       } else if (e.key === "Enter" && connectFrom && connectFrom !== n.node_id) {
         e.preventDefault();
         endConnectGesture(n.node_id);
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        openPassport(n, g);
+        passport.querySelector("[data-wf-delete-step]")?.click();
       }
     });
     g.addEventListener("pointerenter", dash);
@@ -14090,6 +14193,8 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     }
     if (playbackLabel) playbackLabel.textContent = playbackIndex === null ? timeline.length ? `Live \xB7 ${timeline.length} events` : "Live" : `Event ${playbackIndex + 1}/${timeline.length}`;
     renderList(run);
+    const active = host2.ownerDocument?.activeElement ?? null;
+    const focusedId = active && viewport.contains(active) ? active.closest(".dy-wf-node")?.getAttribute("data-node-id") ?? null : null;
     viewport.replaceChildren();
     viewport.appendChild(defs);
     if (!run || run.nodes.length === 0) {
@@ -14109,31 +14214,24 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     const laneOf = assignments ? laneKeyOf : (n) => isExceptionNode(n) ? EXCEPTION_LANE_KEY : "main-path";
     const mobileLayout = canvasWindow.innerWidth <= 640;
     svg.dataset.mobileLayout = String(mobileLayout);
-    if (previousMobileLayout !== null && previousMobileLayout !== mobileLayout) nodePositions = {};
     previousMobileLayout = mobileLayout;
     let layout = buildLayout(run.nodes, { laneOf, mobile: mobileLayout });
     if (!mobileLayout && layout.lanes.length < 2) layout = buildLayout(run.nodes);
-    const positions = nodePositions = Object.keys(nodePositions).length ? { ...layout.positions, ...nodePositions } : run.nodes.reduce((acc, item) => {
-      if (item.canvas_position) acc[item.node_id] = { ...layout.positions[item.node_id], ...item.canvas_position };
-      return acc;
-    }, { ...layout.positions });
-    let worldW = layout.width;
-    let worldH = layout.height;
-    let minX = 0;
-    let minY = 0;
-    for (const p of Object.values(positions)) {
-      worldW = Math.max(worldW, p.x + NODE_W + PAD);
-      worldH = Math.max(worldH, p.y + NODE_H + PAD);
-      minX = Math.min(minX, p.x - PAD);
-      minY = Math.min(minY, p.y - PAD);
+    const positions = { ...layout.positions };
+    for (const item of run.nodes) {
+      if (item.canvas_position) positions[item.node_id] = { ...layout.positions[item.node_id], ...item.canvas_position };
+      const pending = pendingPositions.get(item.node_id);
+      if (!pending) continue;
+      const saved = item.canvas_position;
+      if (saved && Math.abs(saved.x - pending.x) < 0.5 && Math.abs(saved.y - pending.y) < 0.5) pendingPositions.delete(item.node_id);
+      else positions[item.node_id] = { ...positions[item.node_id], ...pending };
     }
-    worldW -= minX;
-    worldH -= minY;
-    fullW = worldW;
-    fullH = worldH;
-    originX = minX;
-    originY = minY;
-    svg.setAttribute("viewBox", `${minX} ${minY} ${worldW} ${worldH}`);
+    nodePositions = positions;
+    layoutW = layout.width;
+    layoutH = layout.height;
+    measureWorld();
+    const minX = originX;
+    const worldW = fullW;
     for (const lane of layout.lanes) {
       const band = sEl("rect", {
         x: minX,
@@ -14194,17 +14292,39 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       const p = positions[n.node_id];
       viewport.appendChild(buildNode(n, p, run, Boolean(handlers.onEdit)));
     }
-    apply();
-    updateMinimap();
+    if (selectedId) {
+      const g = nodeEl(selectedId);
+      if (g) {
+        selectedEl = g;
+        g.classList.add("dy-wf-selected");
+        highlightRoute(selectedId);
+      } else closePassport();
+    }
+    if (focusedId) nodeEl(focusedId)?.focus();
+    const ids = currentNodes.map((n) => n.node_id);
+    const added = renderedIds.size ? ids.filter((id) => !renderedIds.has(id)) : [];
+    renderedIds = new Set(ids);
+    const { w, h } = viewSize();
+    const outOfView = (p) => Boolean(p) && (panX + p.x * zoom < 0 || panY + p.y * zoom < 0 || panX + (p.x + NODE_W) * zoom > w || panY + (p.y + NODE_H) * zoom > h);
+    if (!cameraSet) {
+      fitView();
+      cameraSet = svg.clientWidth > 0;
+    } else if (added.some((id) => outOfView(positions[id]))) {
+      fitView();
+    } else {
+      apply();
+      updateMinimap();
+    }
   };
   const updateMinimap = () => {
     minimap.replaceChildren(miniViewport);
     if (fullW <= 0) return;
     const s = Math.min(170 / fullW, 104 / fullH);
-    const vx = (0 - panX) / zoom;
-    const vy = (0 - panY) / zoom;
-    const vw = (svg.clientWidth || 1300) / zoom;
-    const vh = (svg.clientHeight || 760) / zoom;
+    const { w: viewW, h: viewH } = viewSize();
+    const vx = (0 - panX) / zoom - originX;
+    const vy = (0 - panY) / zoom - originY;
+    const vw = viewW / zoom;
+    const vh = viewH / zoom;
     miniViewport.setAttribute("x", String(vx * s));
     miniViewport.setAttribute("y", String(vy * s));
     miniViewport.setAttribute("width", String(Math.max(10, vw * s)));
@@ -14226,41 +14346,48 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   minimap.addEventListener("click", (e) => {
     const ev = e;
     const r = minimap.getBoundingClientRect();
-    const fx = (ev.clientX - r.left) / 170;
-    const fy = (ev.clientY - r.top) / 104;
     if (fullW <= 0) return;
     const s = Math.min(170 / fullW, 104 / fullH);
-    panX = 650 - fx * 170 / s * zoom;
-    panY = 380 - fy * 104 / s * zoom;
+    const wx = originX + (ev.clientX - r.left) / s;
+    const wy = originY + (ev.clientY - r.top) / s;
+    const { w, h } = viewSize();
+    panX = w / 2 - wx * zoom;
+    panY = h / 2 - wy * zoom;
+    cameraSet = true;
     apply();
     updateMinimap();
   });
   let lastFrames = [];
   let selectedEl = null;
   let playbackIndex = null;
-  const openPassport = (n, g) => {
-    if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
-    selectedEl = g ?? null;
-    if (selectedEl) selectedEl.classList.add("dy-wf-selected");
-    const selectedId = n.node_id;
-    const related = /* @__PURE__ */ new Set([selectedId]);
+  const nodeEl = (id) => [...viewport.querySelectorAll(".dy-wf-node")].find((g) => g.getAttribute("data-node-id") === id) ?? null;
+  const highlightRoute = (id) => {
+    const related = /* @__PURE__ */ new Set([id]);
     const byId = new Map(currentNodes.map((node) => [node.node_id, node]));
-    const walkUp = (id) => {
-      for (const dep of byId.get(id)?.depends_on ?? []) if (!related.has(dep)) {
+    const walkUp = (nid) => {
+      for (const dep of byId.get(nid)?.depends_on ?? []) if (!related.has(dep)) {
         related.add(dep);
         walkUp(dep);
       }
     };
-    const walkDown = (id) => {
-      for (const node of currentNodes) if (node.depends_on.includes(id) && !related.has(node.node_id)) {
+    const walkDown = (nid) => {
+      for (const node of currentNodes) if (node.depends_on.includes(nid) && !related.has(node.node_id)) {
         related.add(node.node_id);
         walkDown(node.node_id);
       }
     };
-    walkUp(selectedId);
-    walkDown(selectedId);
+    walkUp(id);
+    walkDown(id);
     viewport.querySelectorAll(".dy-wf-node").forEach((node) => node.classList.toggle("dy-wf-route-dim", !related.has(node.getAttribute("data-node-id") ?? "")));
     viewport.querySelectorAll(".dy-wf-edge").forEach((edge) => edge.classList.toggle("dy-wf-route-edge", related.has(edge.dataset.from ?? "") && related.has(edge.dataset.to ?? "")));
+  };
+  const openPassport = (n, g) => {
+    if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
+    selectedEl = g ?? null;
+    if (selectedEl) selectedEl.classList.add("dy-wf-selected");
+    selectedId = n.node_id;
+    handlers.onSelect?.(n.node_id);
+    highlightRoute(n.node_id);
     passport.replaceChildren();
     const status = n.status ?? "pending";
     const head = elu("div", "dy-wf-pp-head");
@@ -14298,20 +14425,33 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       if (!handlers.onEdit) return;
       const edit = elu("div", "dy-wf-edit");
       edit.appendChild(elu("h4", "", "Edit step"));
+      const planned = editBase().find((item) => item.node_id === n.node_id);
+      if (!planned) {
+        edit.appendChild(elu("p", "dy-wf-pp-note", "This step is not in the latest version of the workflow, so it cannot be edited here."));
+        passport.appendChild(edit);
+        return;
+      }
+      const problem = elu("p", "dy-wf-pp-error");
+      problem.setAttribute("role", "alert");
+      problem.hidden = true;
+      const say = (text2) => {
+        problem.textContent = text2 ?? "";
+        problem.hidden = !text2;
+      };
       const field = (label, input) => {
         const f = elu("label", "dy-wf-field");
         f.append(elu("span", "", label), input);
         edit.appendChild(f);
       };
       const title = elu("input", "dy-wf-edit-title");
-      title.value = n.title;
+      title.value = planned.title;
       title.setAttribute("aria-label", "Node title");
       const deps = elu("input", "dy-wf-edit-deps");
-      deps.value = n.depends_on.join(", ");
+      deps.value = planned.depends_on.join(", ");
       deps.placeholder = "e.g. build, tests";
       deps.setAttribute("aria-label", "Dependencies");
       const team = elu("input", "dy-wf-edit-team");
-      team.value = n.phase_team ?? "";
+      team.value = planned.phase_team ?? "";
       team.placeholder = "phase team override";
       team.setAttribute("aria-label", "Phase team override");
       field("Title", title);
@@ -14322,18 +14462,64 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       save2.addEventListener("click", async () => {
         const ids = new Set(deps.value.split(",").map((v) => v.trim()).filter(Boolean));
         ids.delete(n.node_id);
-        const edited = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, title: title.value.trim() || item.title, depends_on: [...ids], phase_team: team.value.trim() || null } : item);
         save2.disabled = true;
         save2.textContent = "Saving\u2026";
+        say(null);
         try {
-          await handlers.onEdit(edited);
+          await runEdit((base) => base.some((item) => item.node_id === n.node_id) ? base.map((item) => item.node_id === n.node_id ? { ...item, title: title.value.trim() || item.title, depends_on: [...ids], phase_team: team.value.trim() || null } : item) : NOT_IN_PLAN);
           save2.textContent = "Saved \u2713";
-        } catch {
+        } catch (error) {
           save2.disabled = false;
           save2.textContent = "Save failed \u2014 retry";
+          say(`Couldn't save: ${errorText2(error)}`);
         }
       });
-      edit.appendChild(save2);
+      const remove = elu("button", "dy-btn danger", "Delete step");
+      remove.type = "button";
+      remove.dataset.wfDeleteStep = n.node_id;
+      const confirmRow = elu("div", "dy-wf-delete-confirm");
+      confirmRow.hidden = true;
+      remove.addEventListener("click", () => {
+        say(null);
+        const verdict = deletePlan(editBase(), n.node_id);
+        if (typeof verdict === "string") {
+          confirmRow.hidden = true;
+          say(verdict);
+          return;
+        }
+        const base = editBase();
+        const titleOf = (id) => `"${base.find((item) => item.node_id === id)?.title ?? id}"`;
+        const target = base.find((item) => item.node_id === n.node_id);
+        const followers = base.some((item) => item.depends_on.includes(n.node_id));
+        const effect2 = !followers ? "" : target.depends_on.length ? ` The steps after it will follow ${target.depends_on.map(titleOf).join(" and ")} instead.` : " The steps after it will no longer wait for it.";
+        const yes = elu("button", "dy-btn danger", "Delete");
+        yes.type = "button";
+        yes.dataset.wfDeleteConfirm = n.node_id;
+        const no = elu("button", "dy-btn", "Cancel");
+        no.type = "button";
+        confirmRow.replaceChildren(elu("p", "", `Delete "${target.title}"?${effect2}`), yes, no);
+        confirmRow.hidden = false;
+        no.addEventListener("click", () => {
+          confirmRow.hidden = true;
+          remove.focus();
+        });
+        yes.addEventListener("click", async () => {
+          yes.disabled = true;
+          no.disabled = true;
+          try {
+            await runEdit((latest) => deletePlan(latest, n.node_id));
+            closePassport();
+          } catch (error) {
+            yes.disabled = false;
+            no.disabled = false;
+            say(`Couldn't delete: ${errorText2(error)}`);
+          }
+        });
+        yes.focus();
+      });
+      const actions = elu("div", "dy-wf-edit-actions");
+      actions.append(save2, remove);
+      edit.append(actions, confirmRow, problem);
       passport.appendChild(edit);
     };
     if (n.task_ref) {
@@ -14498,10 +14684,12 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     if (!dragging) return;
     if (dragSession) return;
     const ev = e;
-    panX += ev.clientX - lastX;
-    panY += ev.clientY - lastY;
+    const { sx, sy } = screenScale();
+    panX += (ev.clientX - lastX) / sx;
+    panY += (ev.clientY - lastY) / sy;
     lastX = ev.clientX;
     lastY = ev.clientY;
+    cameraSet = true;
     apply();
     updateMinimap();
   });
@@ -14537,8 +14725,10 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     e.preventDefault();
     const ev = e;
     const rect = svg.getBoundingClientRect();
-    const cx = ev.clientX - rect.left;
-    const cy = ev.clientY - rect.top;
+    const { sx, sy } = screenScale();
+    const cx = (ev.clientX - rect.left) / sx;
+    const cy = (ev.clientY - rect.top) / sy;
+    cameraSet = true;
     host2.classList.add("dy-wf-panning");
     if (wheelSettle) clearTimeout(wheelSettle);
     wheelSettle = setTimeout(() => host2.classList.remove("dy-wf-panning"), 160);
@@ -14555,6 +14745,10 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     passport.replaceChildren();
     if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
     selectedEl = null;
+    if (selectedId !== null) {
+      selectedId = null;
+      handlers.onSelect?.(null);
+    }
     clearRoute();
   };
   const onKeyDown = (e) => {
@@ -14682,6 +14876,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       const frameSig = JSON.stringify(latest ?? null);
       if (frameSig !== lastFrameSig) {
         playbackIndex = null;
+        optimisticBase = null;
         render(latest);
         lastFrameSig = frameSig;
       }
@@ -14705,7 +14900,14 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   pollOnce();
   if (pollMs > 0) timer = setInterval(pollOnce, pollMs);
   const onResize = () => {
-    if (!disposed && lastRun) render(lastRun);
+    if (disposed || !lastRun) return;
+    if (canvasWindow.innerWidth <= 640 !== previousMobileLayout) {
+      cameraSet = false;
+      render(lastRun);
+    } else if (!cameraSet) {
+      fitView();
+      cameraSet = svg.clientWidth > 0;
+    } else updateMinimap();
   };
   canvasWindow.addEventListener("resize", onResize);
   let lastHostWidth = host2.clientWidth;
@@ -14734,10 +14936,13 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     if (resizeFrame) canvasWindow.cancelAnimationFrame(resizeFrame);
     host2.replaceChildren();
   });
-  return () => {
+  const dispose = () => {
     disposers.forEach((d) => d());
     disposers = [];
   };
+  return Object.assign(dispose, { refresh: () => {
+    if (!disposed) pollOnce();
+  } });
 }
 
 // hermes_dockyard_plugin/desktop/workflow-canvas-mount.js
@@ -14780,10 +14985,12 @@ var toCanvasRun = (run) => ({
   }))
 });
 function mountDesktopWorkflowCanvas(host2, projectId, workflowName, definition, runs, handlers = {}) {
-  const nodes = (definition?.nodes ?? []).map(toCanvasNode);
+  const read = (value) => typeof value === "function" ? value() : value;
   const fetchRuns = async () => {
-    const mapped = (runs ?? []).map(toCanvasRun);
-    return mapped.length ? mapped : [{ run_key: `definition:${workflowName}`, version: 0, status: "definition", started_at: null, updated_at: null, nodes }];
+    const mapped = (read(runs) ?? []).map(toCanvasRun);
+    if (mapped.length) return mapped;
+    const nodes = (read(definition)?.nodes ?? []).map(toCanvasNode);
+    return [{ run_key: `definition:${workflowName}`, version: 0, status: "definition", started_at: null, updated_at: null, nodes }];
   };
   return mountWorkflowCanvas(host2, projectId, workflowName, fetchRuns, {
     onApprove: handlers.onApprove ?? (() => void 0),
@@ -14791,11 +14998,14 @@ function mountDesktopWorkflowCanvas(host2, projectId, workflowName, definition, 
     onRetry: handlers.onRetry,
     onExpand: handlers.onExpand,
     onEdit: handlers.onEdit,
+    editNodes: handlers.editNodes,
+    onSelect: handlers.onSelect,
     fetchTimeline: handlers.fetchTimeline
   }, handlers.pollMs ?? 6e4);
 }
 
 // hermes_dockyard_plugin/desktop/src/project/workflows.js
+var NO_RUNS = [];
 function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary }) {
   const [name, setName] = useState("release");
   const [title, setTitle] = useState("Draft release plan");
@@ -14804,7 +15014,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
   const [phaseTeams, setPhaseTeams] = useState({});
   const canvasRef = useRef(null);
   const [selected, setSelected] = useState(workflows?.[0]?.name ?? "");
-  const [runs, setRuns] = useState([]);
+  const [runsFor, setRunsFor] = useState({ workflow: null, runs: NO_RUNS });
   const [error, setError] = useState(null);
   const [mode, setMode] = useState("live");
   const [validation, setValidation] = useState(null);
@@ -14824,9 +15034,19 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
       setLayoutPendingVersion(null);
     }
   }, [layoutPendingVersion, current?.versions?.length]);
-  const definition = current?.versions?.[current.versions.length - 1]?.definition ?? { nodes: [] };
-  const nodes = definition.nodes ?? [];
-  const currentCanvasNodes = () => nodes.map((n) => ({
+  const latestVersion = current?.versions?.[current.versions.length - 1] ?? null;
+  const planRef = useRef({ name: null, version: -1, nodes: [] });
+  if (current && latestVersion && (planRef.current.name !== current.name || latestVersion.version >= planRef.current.version)) {
+    planRef.current = { name: current.name, version: latestVersion.version, nodes: latestVersion.definition?.nodes ?? [] };
+  }
+  const nodes = planRef.current.name === current?.name ? planRef.current.nodes : [];
+  const runs = runsFor.workflow === current?.name ? runsFor.runs : NO_RUNS;
+  const runsReady = runsFor.workflow === current?.name;
+  const viewRef = useRef(null);
+  viewRef.current = { definition: { nodes }, runs: mode === "live" ? runs : NO_RUNS };
+  const selectedNodeRef = useRef(null);
+  const canvasHandle = useRef(null);
+  const currentCanvasNodes = () => planRef.current.nodes.map((n) => ({
     node_id: n.node_id ?? n.id,
     title: n.title ?? n.name ?? n.id,
     depends_on: n.depends_on ?? [],
@@ -14836,37 +15056,57 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     phase_team: n.phase_team ?? null,
     canvas_position: n.canvas_position ?? void 0
   }));
-  const storedById = new Map(nodes.map((n) => [n.node_id ?? n.id, n]));
-  const toDefinitionNodes = (editedNodes) => editedNodes.map(({ node_id, title: nodeTitle, depends_on, human_gate, task_ref, kind, phase_team, canvas_position }) => ({
-    ...storedById.get(node_id) ?? {},
-    id: node_id,
-    title: nodeTitle,
-    depends_on,
-    human_gate,
-    task_ref,
-    kind,
-    phase_team,
-    canvas_position
-  }));
+  const toDefinitionNodes = (editedNodes) => {
+    const storedById = new Map(planRef.current.nodes.map((n) => [n.node_id ?? n.id, n]));
+    return editedNodes.map(({ node_id, title: nodeTitle, depends_on, human_gate, task_ref, kind, phase_team, canvas_position }) => ({
+      ...storedById.get(node_id) ?? {},
+      id: node_id,
+      title: nodeTitle,
+      depends_on,
+      human_gate,
+      task_ref,
+      kind,
+      phase_team,
+      canvas_position
+    }));
+  };
+  const savePlan = async (editedNodes) => {
+    const workflow = planRef.current.name;
+    if (!workflow) throw new Error("No workflow is open.");
+    const saved = await api(`/projects/${encoded}/workflows/${encodeURIComponent(workflow)}/versions`, { method: "POST", body: { nodes: toDefinitionNodes(editedNodes) }, suppressErrorToast: true });
+    if (planRef.current.name === workflow && Number.isFinite(Number(saved?.version)) && Array.isArray(saved?.definition?.nodes)) {
+      planRef.current = { name: workflow, version: Number(saved.version), nodes: saved.definition.nodes };
+      viewRef.current = { ...viewRef.current, definition: { nodes: saved.definition.nodes } };
+    }
+    if (viewRef.current.runs.length) setMode("definition");
+    canvasHandle.current?.refresh();
+    onRefresh?.();
+    return saved;
+  };
   const loadRuns = async (workflow = current?.name) => {
     if (!workflow) return;
     try {
       const result = await api(`/projects/${encoded}/workflows/${encodeURIComponent(workflow)}/runs`);
-      setRuns(result.runs ?? []);
+      setRunsFor({ workflow, runs: result.runs ?? NO_RUNS });
     } catch (failure) {
+      setRunsFor({ workflow, runs: NO_RUNS });
       setError(String(failure?.message ?? failure));
     }
   };
   useEffect(() => {
     loadRuns();
-  }, [selected, workflows?.length]);
+  }, [current?.name, workflows?.length]);
+  const actionsRef = useRef(null);
+  actionsRef.current = { savePlan, loadRuns };
+  const canvasReady = Boolean(current) && (mode === "definition" || runsReady);
   useEffect(() => {
-    if (!canvasRef.current || !current) return void 0;
-    const visibleRuns = mode === "live" ? runs : [];
-    return mountDesktopWorkflowCanvas(canvasRef.current, project.id, current.name, definition, visibleRuns, {
-      onEdit: async (editedNodes) => {
-        await api(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/versions`, { method: "POST", body: { nodes: toDefinitionNodes(editedNodes) } });
-        onRefresh?.();
+    if (!canvasRef.current || !current || !canvasReady) return void 0;
+    const workflowName = current.name;
+    const handle = mountDesktopWorkflowCanvas(canvasRef.current, project.id, workflowName, () => viewRef.current.definition, () => viewRef.current.runs, {
+      onEdit: (editedNodes) => actionsRef.current.savePlan(editedNodes),
+      editNodes: () => planRef.current.nodes.map(toCanvasNode),
+      onSelect: (nodeId) => {
+        selectedNodeRef.current = nodeId;
       },
       // Gate decisions use the same canonical authority as the dashboard: the
       // reviewed decision fingerprint is submitted with the action, so a stale
@@ -14875,20 +15115,29 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
       onApprove: async (ref) => {
         const decision = await api(`/initiatives/${encodeURIComponent(ref)}/decision`);
         await api(`/initiatives/${encodeURIComponent(ref)}/approve`, { method: "POST", body: { expected_fingerprint: decision.fingerprint } });
-        await loadRuns(current.name);
+        await actionsRef.current.loadRuns(workflowName);
       },
       onReject: async (ref) => {
         const decision = await api(`/initiatives/${encodeURIComponent(ref)}/decision`);
         await api(`/initiatives/${encodeURIComponent(ref)}/reject`, { method: "POST", body: { expected_fingerprint: decision.fingerprint, reason: "Rejected from workflow gate review" } });
-        await loadRuns(current.name);
+        await actionsRef.current.loadRuns(workflowName);
       },
       onRetry: async (ref) => {
         await api(`/projects/${encoded}/work-items/${encodeURIComponent(ref)}/transition`, { method: "POST", body: { status: "backlog" } });
-        await loadRuns(current.name);
+        await actionsRef.current.loadRuns(workflowName);
       },
       fetchTimeline: async (pid, wname, runKey2) => api(`/projects/${encodeURIComponent(pid)}/workflows/${encodeURIComponent(wname)}/runs/${encodeURIComponent(runKey2)}/timeline`)
     });
-  }, [project.id, current?.name, current?.versions?.length, runs, mode]);
+    canvasHandle.current = handle;
+    return () => {
+      if (canvasHandle.current === handle) canvasHandle.current = null;
+      selectedNodeRef.current = null;
+      handle();
+    };
+  }, [project.id, current?.name, canvasReady]);
+  useEffect(() => {
+    canvasHandle.current?.refresh();
+  }, [runs, mode, latestVersion?.version]);
   const mutate = async (path, body = {}) => {
     setError(null);
     try {
@@ -14907,21 +15156,28 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     setSelected(name.trim());
     setTitle("");
   };
-  const persistNodes = (nextNodes) => {
-    if (!current) return Promise.resolve(false);
-    return mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/versions`, {
-      nodes: toDefinitionNodes(nextNodes)
-    });
+  const persistNodes = async (nextNodes) => {
+    if (!current) return false;
+    setError(null);
+    try {
+      await savePlan(nextNodes);
+      return true;
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+      return false;
+    }
   };
   const addNode = (gate) => {
-    const existingIds = new Set(currentCanvasNodes().map((n) => n.node_id));
-    let index = nodes.length + 1;
+    const nodesNow = currentCanvasNodes();
+    const existingIds = new Set(nodesNow.map((n) => n.node_id));
+    let index = nodesNow.length + 1;
     while (existingIds.has(gate ? `gate-${index}` : `step-${index}`)) index += 1;
     const id = gate ? `gate-${index}` : `step-${index}`;
-    persistNodes([...currentCanvasNodes(), {
+    const after = existingIds.has(selectedNodeRef.current) ? selectedNodeRef.current : nodesNow[nodesNow.length - 1]?.node_id;
+    persistNodes([...nodesNow, {
       node_id: id,
       title: gate ? `Gate ${index}` : `Step ${index}`,
-      depends_on: [],
+      depends_on: after ? [after] : [],
       human_gate: gate,
       task_ref: null,
       kind: gate ? "gate" : "task",
@@ -14931,7 +15187,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
   const autoLayout = async () => {
     if (!current || layoutPendingVersion !== null) return;
     setLayoutPendingVersion(current.versions.length);
-    if (!await persistNodes(currentCanvasNodes())) setLayoutPendingVersion(null);
+    if (!await persistNodes(currentCanvasNodes().map((n) => ({ ...n, canvas_position: void 0 })))) setLayoutPendingVersion(null);
   };
   const validateGraph = () => {
     const nodesNow = currentCanvasNodes();
@@ -14947,7 +15203,6 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
   };
   const statusFor = (run, node) => run?.nodes?.find((item) => item.node_id === (node.id || node.node_id))?.status ?? "pending";
   const latest = runs[0];
-  const latestVersion = current?.versions?.[current.versions.length - 1] ?? null;
   const needsAttention = (node) => node.status === "blocked" || node.status === "pending" && node.human_gate;
   const attentionCount = latest ? (latest.nodes ?? []).filter(needsAttention).length : 0;
   const startVersion = async (version) => {
@@ -14976,10 +15231,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
           className: item.name === current?.name ? "active" : "",
           "data-workflow-library-item": item.name,
           "data-action": "select-workflow",
-          onClick: () => {
-            setSelected(item.name);
-            loadRuns(item.name);
-          },
+          onClick: () => setSelected(item.name),
           children: [
             jsx("strong", { children: item.name }),
             jsx("small", { children: `v${item.versions[item.versions.length - 1].version}${item.archived_at ? " \xB7 archived" : ""}` })
@@ -15024,10 +15276,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
             ] }, `definition-${version.version}`)) })
           ] }) : null,
           current ? current.archived_at ? jsx(Button, { small: true, action: "restore-workflow", onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/restore`), children: "Restore" }) : jsx(Button, { small: true, action: "archive-workflow", variant: "danger", onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/archive`), children: "Archive" }) : null,
-          jsx(Button, { small: true, action: "inspect-workflow", disabled: !current, onClick: () => {
-            setSelected(current.name);
-            loadRuns(current.name);
-          }, children: "Refresh" })
+          jsx(Button, { small: true, action: "inspect-workflow", disabled: !current, onClick: () => loadRuns(current.name), children: "Refresh" })
         ] }),
         validation ? jsx("p", { className: "dockyard-wf3-validation", role: "status", "data-wf-validate-result": validation.ok ? "ok" : "issues", children: validation.text }) : null,
         layoutPendingVersion !== null ? jsx("p", { role: "status", "data-wf-layout-saving": true, children: "Saving layout version before the graph can be edited\u2026" }) : null,
@@ -15041,7 +15290,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
             jsx("ul", { "data-wf-live-map": latest.run_key, children: (latest.nodes ?? []).map((node) => jsx("li", { "data-wf-live-node": node.node_id, "data-wf-needs-attention": needsAttention(node) ? "true" : void 0, children: `${node.title} \u2014 ${node.status ?? "pending"}${node.assignee ? ` \xB7 ${node.assignee}` : ""}${needsAttention(node) ? " \xB7 needs attention" : ""}` }, node.node_id)) })
           ] })
         ] }) : jsx("p", { className: "dockyard-wf3-run dockyard-meta", "data-workflow-no-run": true, children: "No canonical run recorded. Start a run to see truthful state." }),
-        current ? jsx("div", { ref: canvasRef, className: "dockyard-workflow-graph", "data-workflow-canvas": current.name, role: "img", "aria-label": "Workflow planning graph", "aria-busy": layoutPendingVersion !== null, style: layoutPendingVersion !== null ? { pointerEvents: "none" } : void 0 }) : jsx("p", { className: "dockyard-meta", children: "No workflow selected." })
+        current ? jsx("div", { ref: canvasRef, className: "dockyard-workflow-graph", "data-workflow-canvas": current.name, role: "img", "aria-label": "Workflow planning graph", "aria-busy": layoutPendingVersion !== null || !canvasReady, style: layoutPendingVersion !== null ? { pointerEvents: "none" } : void 0 }) : jsx("p", { className: "dockyard-meta", children: "No workflow selected." })
       ] })
     ] })
   ] });

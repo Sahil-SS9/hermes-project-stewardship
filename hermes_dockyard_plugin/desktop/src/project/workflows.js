@@ -6,11 +6,13 @@ import { api } from '../runtime/context.js'
 import { useEffect } from '../runtime/react.js'
 import { mountDesktopWorkflowCanvas } from '../../workflow-canvas-mount.js'
 import { validateConnection } from '../../workflow-canvas-mount.js'
+import { toCanvasNode } from '../../workflow-canvas-mount.js'
 import { jsxs } from '../runtime/react.js'
 import { jsx } from '../runtime/react.js'
 import { StatusTag } from '../lib/ui.js'
 import { number } from '../lib/ui.js'
 import { Button } from '../lib/ui.js'
+const NO_RUNS = []
 export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary }) {
   const [name, setName] = useState('release')
   const [title, setTitle] = useState('Draft release plan')
@@ -19,7 +21,9 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   const [phaseTeams, setPhaseTeams] = useState({})
   const canvasRef = useRef(null)
   const [selected, setSelected] = useState(workflows?.[0]?.name ?? '')
-  const [runs, setRuns] = useState([])
+  // Runs belong to one workflow. Keyed by name so a newly opened workflow
+  // never shows the previous workflow's run while its own runs load.
+  const [runsFor, setRunsFor] = useState({ workflow: null, runs: NO_RUNS })
   const [error, setError] = useState(null)
   // v6 composition: the canvas is the surface. 'live' draws the latest
   // canonical run (the shipped default — statuses are read from the real run
@@ -43,11 +47,29 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
       setLayoutPendingVersion(null)
     }
   }, [layoutPendingVersion, current?.versions?.length])
-  const definition = current?.versions?.[current.versions.length - 1]?.definition ?? { nodes: [] }
-  const nodes = definition.nodes ?? []
-  // The persisted definition's nodes in the canvas's own vocabulary, so toolbar
-  // actions persist through the exact mapping the canvas edits use.
-  const currentCanvasNodes = () => nodes.map((n) => ({
+  const latestVersion = current?.versions?.[current.versions.length - 1] ?? null
+  // The latest saved plan of the open workflow: the newest version in the
+  // workflow list, or a save's own response when that is newer (the list is
+  // re-fetched after a save and lags behind it). Every edit, from the canvas
+  // or the toolbar, starts here. Edits used to start from whatever the canvas
+  // showed, so a drag on a run's view saved a version without the steps added
+  // since that run started (07/10/2026, WORKFLOWS-R1.md finding 14).
+  const planRef = useRef({ name: null, version: -1, nodes: [] })
+  if (current && latestVersion && (planRef.current.name !== current.name || latestVersion.version >= planRef.current.version)) {
+    planRef.current = { name: current.name, version: latestVersion.version, nodes: latestVersion.definition?.nodes ?? [] }
+  }
+  const nodes = planRef.current.name === current?.name ? planRef.current.nodes : []
+  const runs = runsFor.workflow === current?.name ? runsFor.runs : NO_RUNS
+  const runsReady = runsFor.workflow === current?.name
+  // What the canvas draws, read when it draws, so new data reaches the same
+  // canvas instead of a re-mounted one (finding 13).
+  const viewRef = useRef(null)
+  viewRef.current = { definition: { nodes }, runs: mode === 'live' ? runs : NO_RUNS }
+  const selectedNodeRef = useRef(null)
+  const canvasHandle = useRef(null)
+  // The saved plan's steps in the canvas's own vocabulary, so toolbar actions
+  // persist through the exact mapping the canvas edits use.
+  const currentCanvasNodes = () => planRef.current.nodes.map((n) => ({
     node_id: n.node_id ?? n.id,
     title: n.title ?? n.name ?? n.id,
     depends_on: n.depends_on ?? [],
@@ -60,31 +82,59 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   // Every save path (canvas edits and the toolbar) goes through here. The
   // canvas only manages the fields below; everything else on a stored step
   // (its loop, its condition, its instructions, anything added later) is
-  // carried over from the stored version. Rebuilding steps from a fixed field
+  // carried over from the saved plan. Rebuilding steps from a fixed field
   // list wiped them on every edit (06/10/2026, WORKFLOWS-R1.md bug 1).
-  const storedById = new Map(nodes.map((n) => [n.node_id ?? n.id, n]))
-  const toDefinitionNodes = (editedNodes) => editedNodes.map(({ node_id, title: nodeTitle, depends_on, human_gate, task_ref, kind, phase_team, canvas_position }) => ({
-    ...(storedById.get(node_id) ?? {}),
-    id: node_id, title: nodeTitle, depends_on, human_gate, task_ref, kind, phase_team, canvas_position,
-  }))
+  const toDefinitionNodes = (editedNodes) => {
+    const storedById = new Map(planRef.current.nodes.map((n) => [n.node_id ?? n.id, n]))
+    return editedNodes.map(({ node_id, title: nodeTitle, depends_on, human_gate, task_ref, kind, phase_team, canvas_position }) => ({
+      ...(storedById.get(node_id) ?? {}),
+      id: node_id, title: nodeTitle, depends_on, human_gate, task_ref, kind, phase_team, canvas_position,
+    }))
+  }
+  // One save path for the canvas and the toolbar. The response is the new
+  // version, so the plan is current before the list re-fetch lands. Errors
+  // are shown where the edit was made (the step panel, or the line above the
+  // toolbar), not as a second toast.
+  const savePlan = async (editedNodes) => {
+    const workflow = planRef.current.name
+    if (!workflow) throw new Error('No workflow is open.')
+    const saved = await api(`/projects/${encoded}/workflows/${encodeURIComponent(workflow)}/versions`, { method: 'POST', body: { nodes: toDefinitionNodes(editedNodes) }, suppressErrorToast: true })
+    if (planRef.current.name === workflow && Number.isFinite(Number(saved?.version)) && Array.isArray(saved?.definition?.nodes)) {
+      planRef.current = { name: workflow, version: Number(saved.version), nodes: saved.definition.nodes }
+      viewRef.current = { ...viewRef.current, definition: { nodes: saved.definition.nodes } }
+    }
+    // An edit made while a run is on screen changes the plan, not the run:
+    // show the plan so the change can be seen (finding 14).
+    if (viewRef.current.runs.length) setMode('definition')
+    canvasHandle.current?.refresh()
+    onRefresh?.()
+    return saved
+  }
   const loadRuns = async (workflow = current?.name) => {
     if (!workflow) return
-    try { const result = await api(`/projects/${encoded}/workflows/${encodeURIComponent(workflow)}/runs`); setRuns(result.runs ?? []) }
-    catch (failure) { setError(String(failure?.message ?? failure)) }
+    try {
+      const result = await api(`/projects/${encoded}/workflows/${encodeURIComponent(workflow)}/runs`)
+      setRunsFor({ workflow, runs: result.runs ?? NO_RUNS })
+    } catch (failure) {
+      setRunsFor({ workflow, runs: NO_RUNS })
+      setError(String(failure?.message ?? failure))
+    }
   }
-  useEffect(() => { loadRuns() }, [selected, workflows?.length])
+  // One runs request per opened workflow (opening used to ask twice: once
+  // from the library click and once from this effect).
+  useEffect(() => { loadRuns() }, [current?.name, workflows?.length])
+  // The canvas mounts once per open workflow, after that workflow's runs have
+  // loaded (the live view needs them), and is never rebuilt for new data.
+  const actionsRef = useRef(null)
+  actionsRef.current = { savePlan, loadRuns }
+  const canvasReady = Boolean(current) && (mode === 'definition' || runsReady)
   useEffect(() => {
-    if (!canvasRef.current || !current) return undefined
-    // Live mode renders the real canonical run (the mount falls back to the
-    // definition frame when no run exists); definition mode renders the stored
-    // plan with no run overlay. Same mount, same data source — a display
-    // choice only.
-    const visibleRuns = mode === 'live' ? runs : []
-    return mountDesktopWorkflowCanvas(canvasRef.current, project.id, current.name, definition, visibleRuns, {
-      onEdit: async (editedNodes) => {
-        await api(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/versions`, { method: 'POST', body: { nodes: toDefinitionNodes(editedNodes) } })
-        onRefresh?.()
-      },
+    if (!canvasRef.current || !current || !canvasReady) return undefined
+    const workflowName = current.name
+    const handle = mountDesktopWorkflowCanvas(canvasRef.current, project.id, workflowName, () => viewRef.current.definition, () => viewRef.current.runs, {
+      onEdit: (editedNodes) => actionsRef.current.savePlan(editedNodes),
+      editNodes: () => planRef.current.nodes.map(toCanvasNode),
+      onSelect: (nodeId) => { selectedNodeRef.current = nodeId },
       // Gate decisions use the same canonical authority as the dashboard: the
       // reviewed decision fingerprint is submitted with the action, so a stale
       // review can never approve something else. Retry re-queues via the
@@ -92,19 +142,30 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
       onApprove: async (ref) => {
         const decision = await api(`/initiatives/${encodeURIComponent(ref)}/decision`)
         await api(`/initiatives/${encodeURIComponent(ref)}/approve`, { method: 'POST', body: { expected_fingerprint: decision.fingerprint } })
-        await loadRuns(current.name)
+        await actionsRef.current.loadRuns(workflowName)
       },
       onReject: async (ref) => {
         const decision = await api(`/initiatives/${encodeURIComponent(ref)}/decision`)
         await api(`/initiatives/${encodeURIComponent(ref)}/reject`, { method: 'POST', body: { expected_fingerprint: decision.fingerprint, reason: 'Rejected from workflow gate review' } })
-        await loadRuns(current.name)
+        await actionsRef.current.loadRuns(workflowName)
       },
       onRetry: async (ref) => {
         await api(`/projects/${encoded}/work-items/${encodeURIComponent(ref)}/transition`, { method: 'POST', body: { status: 'backlog' } })
-        await loadRuns(current.name)
+        await actionsRef.current.loadRuns(workflowName)
       },
       fetchTimeline: async (pid, wname, runKey) => api(`/projects/${encodeURIComponent(pid)}/workflows/${encodeURIComponent(wname)}/runs/${encodeURIComponent(runKey)}/timeline`),
-    })  }, [project.id, current?.name, current?.versions?.length, runs, mode])
+    })
+    canvasHandle.current = handle
+    return () => {
+      if (canvasHandle.current === handle) canvasHandle.current = null
+      selectedNodeRef.current = null
+      handle()
+    }
+  }, [project.id, current?.name, canvasReady])
+  // New data reaches the mounted canvas without rebuilding it, so the open
+  // step panel, the selection and the zoom survive Refresh and saves
+  // (finding 13).
+  useEffect(() => { canvasHandle.current?.refresh() }, [runs, mode, latestVersion?.version])
   const mutate = async (path, body = {}) => {
     setError(null)
     try { await api(path, { method: 'POST', body }); onRefresh?.(); return true }
@@ -119,29 +180,34 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
     mutate(`/projects/${encoded}/workflows`, { name: name.trim(), nodes: [{ id: 'step-1', title: title.trim(), depends_on: [], human_gate: false, team: team || null, phase_team: phaseTeams['step-1'] || null }] })
     setSelected(name.trim()); setTitle('')
   }
-  // Toolbar actions persist through the SAME version contract the canvas uses.
-  const persistNodes = (nextNodes) => {
-    if (!current) return Promise.resolve(false)
-    return mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/versions`, {
-      nodes: toDefinitionNodes(nextNodes),
-    })
+  // Toolbar actions persist through the SAME save path the canvas uses.
+  const persistNodes = async (nextNodes) => {
+    if (!current) return false
+    setError(null)
+    try { await savePlan(nextNodes); return true }
+    catch (failure) { setError(String(failure?.message ?? failure)); return false }
   }
+  // A new step follows the selected step, or the last step when none is
+  // selected; it used to be added with no link at all (finding 8).
   const addNode = (gate) => {
-    const existingIds = new Set(currentCanvasNodes().map((n) => n.node_id))
-    let index = nodes.length + 1
+    const nodesNow = currentCanvasNodes()
+    const existingIds = new Set(nodesNow.map((n) => n.node_id))
+    let index = nodesNow.length + 1
     while (existingIds.has(gate ? `gate-${index}` : `step-${index}`)) index += 1
     const id = gate ? `gate-${index}` : `step-${index}`
-    persistNodes([...currentCanvasNodes(), {
-      node_id: id, title: gate ? `Gate ${index}` : `Step ${index}`, depends_on: [],
+    const after = existingIds.has(selectedNodeRef.current) ? selectedNodeRef.current : nodesNow[nodesNow.length - 1]?.node_id
+    persistNodes([...nodesNow, {
+      node_id: id, title: gate ? `Gate ${index}` : `Step ${index}`, depends_on: after ? [after] : [],
       human_gate: gate, task_ref: null, kind: gate ? 'gate' : 'task', phase_team: null,
     }])
   }
-  // Auto layout: dropping canvas_position lets the layout engine place every
-  // node by topology again. It writes the version, like any other edit.
+  // Auto layout clears every saved position so the layout places each step
+  // again. It used to save the positions unchanged, so dragged steps stayed
+  // where they were (finding 6).
   const autoLayout = async () => {
     if (!current || layoutPendingVersion !== null) return
     setLayoutPendingVersion(current.versions.length)
-    if (!await persistNodes(currentCanvasNodes())) setLayoutPendingVersion(null)
+    if (!await persistNodes(currentCanvasNodes().map((n) => ({ ...n, canvas_position: undefined })))) setLayoutPendingVersion(null)
   }
   const validateGraph = () => {
     const nodesNow = currentCanvasNodes()
@@ -159,7 +225,6 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   }
   const statusFor = (run, node) => run?.nodes?.find((item) => item.node_id === (node.id || node.node_id))?.status ?? 'pending'
   const latest = runs[0]
-  const latestVersion = current?.versions?.[current.versions.length - 1] ?? null
   // A node needs attention when it is blocked or a human gate is waiting —
   // the two states the run projection actually reports.
   const needsAttention = (node) => node.status === 'blocked' || (node.status === 'pending' && node.human_gate)
@@ -189,7 +254,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
           className: item.name === current?.name ? 'active' : '',
           'data-workflow-library-item': item.name,
           'data-action': 'select-workflow',
-          onClick: () => { setSelected(item.name); loadRuns(item.name) },
+          onClick: () => setSelected(item.name),
           children: [
             jsx('strong', { children: item.name }),
             jsx('small', { children: `v${item.versions[item.versions.length - 1].version}${item.archived_at ? ' · archived' : ''}` }),
@@ -236,7 +301,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
           current ? (current.archived_at
             ? jsx(Button, { small: true, action: 'restore-workflow', onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/restore`), children: 'Restore' })
             : jsx(Button, { small: true, action: 'archive-workflow', variant: 'danger', onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/archive`), children: 'Archive' })) : null,
-          jsx(Button, { small: true, action: 'inspect-workflow', disabled: !current, onClick: () => { setSelected(current.name); loadRuns(current.name) }, children: 'Refresh' }),
+          jsx(Button, { small: true, action: 'inspect-workflow', disabled: !current, onClick: () => loadRuns(current.name), children: 'Refresh' }),
         ]}),
         validation ? jsx('p', { className: 'dockyard-wf3-validation', role: 'status', 'data-wf-validate-result': validation.ok ? 'ok' : 'issues', children: validation.text }) : null,
         layoutPendingVersion !== null ? jsx('p', { role: 'status', 'data-wf-layout-saving': true, children: 'Saving layout version before the graph can be edited…' }) : null,
@@ -250,7 +315,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
             jsx('ul', { 'data-wf-live-map': latest.run_key, children: (latest.nodes ?? []).map((node) => jsx('li', { 'data-wf-live-node': node.node_id, 'data-wf-needs-attention': needsAttention(node) ? 'true' : undefined, children: `${node.title} — ${node.status ?? 'pending'}${node.assignee ? ` · ${node.assignee}` : ''}${needsAttention(node) ? ' · needs attention' : ''}` }, node.node_id)) }),
           ] }),
         ] }) : jsx('p', { className: 'dockyard-wf3-run dockyard-meta', 'data-workflow-no-run': true, children: 'No canonical run recorded. Start a run to see truthful state.' }),
-        current ? jsx('div', { ref: canvasRef, className: 'dockyard-workflow-graph', 'data-workflow-canvas': current.name, role: 'img', 'aria-label': 'Workflow planning graph', 'aria-busy': layoutPendingVersion !== null, style: layoutPendingVersion !== null ? { pointerEvents: 'none' } : undefined }) : jsx('p', { className: 'dockyard-meta', children: 'No workflow selected.' }),
+        current ? jsx('div', { ref: canvasRef, className: 'dockyard-workflow-graph', 'data-workflow-canvas': current.name, role: 'img', 'aria-label': 'Workflow planning graph', 'aria-busy': layoutPendingVersion !== null || !canvasReady, style: layoutPendingVersion !== null ? { pointerEvents: 'none' } : undefined }) : jsx('p', { className: 'dockyard-meta', children: 'No workflow selected.' }),
       ]}),
     ]}),
   ]})

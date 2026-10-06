@@ -329,6 +329,22 @@
     };
     return visit(from) ? "Connection would create a cycle" : null;
   }
+  var NOT_IN_LATEST_PLAN = "This step is not in the latest version of the workflow, so it cannot be changed here.";
+  function deletePlan(nodes, id) {
+    const target = nodes.find((n) => n.node_id === id);
+    if (!target) return NOT_IN_LATEST_PLAN;
+    const names = (list) => list.map((n) => `"${n.title}"`).join(", ");
+    const checks = nodes.filter((n) => n.node_id !== id && n.when?.node === id);
+    if (checks.length) {
+      return checks.length === 1 ? `Can't delete "${target.title}": ${names(checks)} has a condition that checks it. Change or remove that condition first.` : `Can't delete "${target.title}": ${names(checks)} have conditions that check it. Change or remove those conditions first.`;
+    }
+    const next = nodes.filter((n) => n.node_id !== id).map((n) => n.depends_on.includes(id) ? { ...n, depends_on: [...new Set(n.depends_on.flatMap((dep) => dep === id ? target.depends_on : [dep]))].filter((dep) => dep !== n.node_id) } : n);
+    const stranded = next.filter((n) => n.loop && n.depends_on.length === 0 && (nodes.find((m) => m.node_id === n.node_id)?.depends_on.length ?? 0) > 0);
+    if (stranded.length) {
+      return `Can't delete "${target.title}": ${names(stranded)} ${stranded.length === 1 ? "repeats" : "repeat"}, and a repeating step needs a step before it.`;
+    }
+    return next;
+  }
   var NODE_W = 208;
   var NODE_H = 72;
   var COL_GAP = 116;
@@ -673,6 +689,12 @@
     let originY = 0;
     let currentNodes = [];
     let nodePositions = {};
+    const pendingPositions = /* @__PURE__ */ new Map();
+    let layoutW = 0;
+    let layoutH = 0;
+    let cameraSet = false;
+    let renderedIds = /* @__PURE__ */ new Set();
+    let selectedId = null;
     let previousMobileLayout = null;
     let dragNode = null;
     let dragStart = { x: 0, y: 0, ox: 0, oy: 0 };
@@ -685,20 +707,19 @@
       if (nums.length < 2 || !isFinite(nums[0]) || !isFinite(nums[1])) return null;
       return { x: nums[0], y: nums[1] };
     };
-    const worldPoint = (clientX, clientY) => {
-      let ox = 0;
-      let oy = 0;
+    const screenScale = () => {
       try {
         const ctm = svg.getScreenCTM();
-        if (ctm && isFinite(ctm.a) && isFinite(ctm.e) && isFinite(ctm.f)) {
-          ox = ctm.e;
-          oy = ctm.f;
+        if (ctm && isFinite(ctm.a) && ctm.a > 0 && isFinite(ctm.d) && ctm.d > 0 && isFinite(ctm.e) && isFinite(ctm.f)) {
+          return { sx: ctm.a, sy: ctm.d, ox: ctm.e, oy: ctm.f };
         }
       } catch {
-        ox = 0;
-        oy = 0;
       }
-      return { x: (clientX - ox - panX) / zoom, y: (clientY - oy - panY) / zoom };
+      return { sx: 1, sy: 1, ox: 0, oy: 0 };
+    };
+    const worldPoint = (clientX, clientY) => {
+      const { sx, sy, ox, oy } = screenScale();
+      return { x: ((clientX - ox) / sx - panX) / zoom, y: ((clientY - oy) / sy - panY) / zoom };
     };
     const writeNodePosition = (nodeId, g, x, y) => {
       nodePositions[nodeId] = { x, y, depth: nodePositions[nodeId]?.depth ?? 0 };
@@ -733,12 +754,31 @@
       const world = worldPoint(e.clientX, e.clientY);
       writeNodePosition(session.nodeId, g, world.x - session.offsetX, world.y - session.offsetY);
     };
-    const commitNodePosition = async (nodeId) => {
+    let editQueue = Promise.resolve();
+    let optimisticBase = null;
+    const editBase = () => handlers.editNodes?.() ?? optimisticBase ?? currentNodes;
+    const NOT_IN_PLAN = NOT_IN_LATEST_PLAN;
+    const runEdit = (build) => {
+      const next = editQueue.then(async () => {
+        const result = build(editBase());
+        if (typeof result === "string") throw new Error(result);
+        await handlers.onEdit(result);
+        if (!handlers.editNodes) optimisticBase = result;
+      });
+      editQueue = next.catch(() => void 0);
+      return next;
+    };
+    const errorText = (error) => String(error?.message ?? error ?? "unknown error").replace(/^\d{3}:\s*/, "") || "unknown error";
+    const commitNodePosition = (nodeId) => {
       const committed = nodePositions[nodeId];
-      if (!committed) return;
-      const nextNodes = currentNodes.map((item) => item.node_id === nodeId ? { ...item, canvas_position: { x: committed.x, y: committed.y } } : item);
-      currentNodes = nextNodes;
-      await handlers.onEdit?.(nextNodes);
+      if (!committed || !handlers.onEdit) return;
+      const position = { x: committed.x, y: committed.y };
+      pendingPositions.set(nodeId, position);
+      void runEdit((base) => base.some((item) => item.node_id === nodeId) ? base.map((item) => item.node_id === nodeId ? { ...item, canvas_position: position } : item) : NOT_IN_PLAN).catch((error) => {
+        pendingPositions.delete(nodeId);
+        feedLog(`Couldn't save the move: ${errorText(error)}`);
+        if (lastRun) render(lastRun);
+      });
     };
     const endDragSession = (e, commit) => {
       const session = dragSession;
@@ -779,14 +819,15 @@
         g.classList.remove("dy-wf-connecting");
       }
       if (!to) return;
-      const error = validateConnection(currentNodes, from, to);
+      const error = validateConnection(editBase(), from, to);
       if (error) {
         feedLog(error);
         return;
       }
-      const nextNodes = currentNodes.map((item) => item.node_id === to ? { ...item, depends_on: [.../* @__PURE__ */ new Set([...item.depends_on, from])] } : item);
-      currentNodes = nextNodes;
-      void handlers.onEdit?.(nextNodes);
+      void runEdit((base) => {
+        if (!base.some((item) => item.node_id === from) || !base.some((item) => item.node_id === to)) return NOT_IN_PLAN;
+        return validateConnection(base, from, to) ?? base.map((item) => item.node_id === to ? { ...item, depends_on: [.../* @__PURE__ */ new Set([...item.depends_on, from])] } : item);
+      }).catch((failure) => feedLog(`Couldn't save the connection: ${errorText(failure)}`));
     };
     const apply = () => {
       viewport.setAttribute("transform", `translate(${panX} ${panY}) scale(${zoom})`);
@@ -796,27 +837,67 @@
     const ZOOM_STEP = 1.25;
     const ZOOM_MIN = 0.45;
     const ZOOM_MAX = 2.4;
-    const setZoom = (next) => {
-      zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+    const FIT_MIN = 0.2;
+    const viewSize = () => ({ w: svg.clientWidth || 1300, h: svg.clientHeight || 760 });
+    const measureWorld = () => {
+      let maxX = layoutW;
+      let maxY = layoutH;
+      let minX = 0;
+      let minY = 0;
+      for (const p of Object.values(nodePositions)) {
+        maxX = Math.max(maxX, p.x + NODE_W + PAD);
+        maxY = Math.max(maxY, p.y + NODE_H + PAD);
+        minX = Math.min(minX, p.x - PAD);
+        minY = Math.min(minY, p.y - PAD);
+      }
+      originX = minX;
+      originY = minY;
+      fullW = maxX - minX;
+      fullH = maxY - minY;
+    };
+    const centreAt = (z) => {
+      const { w, h } = viewSize();
+      zoom = z;
+      panX = (w - fullW * z) / 2 - originX * z;
+      panY = (h - fullH * z) / 2 - originY * z;
+    };
+    const fitView = () => {
+      measureWorld();
+      if (!fullW || !fullH) return;
+      const { w, h } = viewSize();
+      centreAt(Math.max(FIT_MIN, Math.min(w / fullW, h / fullH, 1)));
       apply();
+      updateMinimap();
+    };
+    const resetView = () => {
+      measureWorld();
+      const { w, h } = viewSize();
+      centreAt(1);
+      if (fullW > w) panX = -originX;
+      if (fullH > h) panY = -originY;
+      apply();
+      updateMinimap();
+    };
+    const setZoom = (next) => {
+      const target = Math.min(ZOOM_MAX, Math.max(Math.min(ZOOM_MIN, zoom), next));
+      const { w, h } = viewSize();
+      const k = target / zoom;
+      panX = w / 2 - (w / 2 - panX) * k;
+      panY = h / 2 - (h / 2 - panY) * k;
+      zoom = target;
+      cameraSet = true;
+      apply();
+      updateMinimap();
     };
     zoomInBtn.addEventListener("click", () => setZoom(zoom * ZOOM_STEP));
     zoomOutBtn.addEventListener("click", () => setZoom(zoom / ZOOM_STEP));
     zoomResetBtn.addEventListener("click", () => {
-      zoom = 1;
-      panX = 0;
-      panY = 0;
-      apply();
+      cameraSet = true;
+      resetView();
     });
     zoomFitBtn.addEventListener("click", () => {
-      if (!fullW || !fullH) return;
-      const sw = svg.clientWidth || 1300;
-      const sh = svg.clientHeight || 760;
-      const s = Math.min(sw / fullW, sh / fullH, 2.4);
-      zoom = Math.max(ZOOM_MIN, s);
-      panX = (sw - fullW * zoom) / 2;
-      panY = (sh - fullH * zoom) / 2;
-      apply();
+      cameraSet = true;
+      fitView();
     });
     const defs = sEl("defs", {});
     const mkMarker = (id, fillToken, fallback) => {
@@ -1057,6 +1138,10 @@
         } else if (e.key === "Enter" && connectFrom && connectFrom !== n.node_id) {
           e.preventDefault();
           endConnectGesture(n.node_id);
+        } else if (e.key === "Delete" || e.key === "Backspace") {
+          e.preventDefault();
+          openPassport(n, g);
+          passport.querySelector("[data-wf-delete-step]")?.click();
         }
       });
       g.addEventListener("pointerenter", dash);
@@ -1097,6 +1182,8 @@
       }
       if (playbackLabel) playbackLabel.textContent = playbackIndex === null ? timeline.length ? `Live \xB7 ${timeline.length} events` : "Live" : `Event ${playbackIndex + 1}/${timeline.length}`;
       renderList(run);
+      const active = host.ownerDocument?.activeElement ?? null;
+      const focusedId = active && viewport.contains(active) ? active.closest(".dy-wf-node")?.getAttribute("data-node-id") ?? null : null;
       viewport.replaceChildren();
       viewport.appendChild(defs);
       if (!run || run.nodes.length === 0) {
@@ -1116,31 +1203,24 @@
       const laneOf = assignments ? laneKeyOf : (n) => isExceptionNode(n) ? EXCEPTION_LANE_KEY : "main-path";
       const mobileLayout = canvasWindow.innerWidth <= 640;
       svg.dataset.mobileLayout = String(mobileLayout);
-      if (previousMobileLayout !== null && previousMobileLayout !== mobileLayout) nodePositions = {};
       previousMobileLayout = mobileLayout;
       let layout = buildLayout(run.nodes, { laneOf, mobile: mobileLayout });
       if (!mobileLayout && layout.lanes.length < 2) layout = buildLayout(run.nodes);
-      const positions = nodePositions = Object.keys(nodePositions).length ? { ...layout.positions, ...nodePositions } : run.nodes.reduce((acc, item) => {
-        if (item.canvas_position) acc[item.node_id] = { ...layout.positions[item.node_id], ...item.canvas_position };
-        return acc;
-      }, { ...layout.positions });
-      let worldW = layout.width;
-      let worldH = layout.height;
-      let minX = 0;
-      let minY = 0;
-      for (const p of Object.values(positions)) {
-        worldW = Math.max(worldW, p.x + NODE_W + PAD);
-        worldH = Math.max(worldH, p.y + NODE_H + PAD);
-        minX = Math.min(minX, p.x - PAD);
-        minY = Math.min(minY, p.y - PAD);
+      const positions = { ...layout.positions };
+      for (const item of run.nodes) {
+        if (item.canvas_position) positions[item.node_id] = { ...layout.positions[item.node_id], ...item.canvas_position };
+        const pending = pendingPositions.get(item.node_id);
+        if (!pending) continue;
+        const saved = item.canvas_position;
+        if (saved && Math.abs(saved.x - pending.x) < 0.5 && Math.abs(saved.y - pending.y) < 0.5) pendingPositions.delete(item.node_id);
+        else positions[item.node_id] = { ...positions[item.node_id], ...pending };
       }
-      worldW -= minX;
-      worldH -= minY;
-      fullW = worldW;
-      fullH = worldH;
-      originX = minX;
-      originY = minY;
-      svg.setAttribute("viewBox", `${minX} ${minY} ${worldW} ${worldH}`);
+      nodePositions = positions;
+      layoutW = layout.width;
+      layoutH = layout.height;
+      measureWorld();
+      const minX = originX;
+      const worldW = fullW;
       for (const lane of layout.lanes) {
         const band = sEl("rect", {
           x: minX,
@@ -1201,17 +1281,39 @@
         const p = positions[n.node_id];
         viewport.appendChild(buildNode(n, p, run, Boolean(handlers.onEdit)));
       }
-      apply();
-      updateMinimap();
+      if (selectedId) {
+        const g = nodeEl(selectedId);
+        if (g) {
+          selectedEl = g;
+          g.classList.add("dy-wf-selected");
+          highlightRoute(selectedId);
+        } else closePassport();
+      }
+      if (focusedId) nodeEl(focusedId)?.focus();
+      const ids = currentNodes.map((n) => n.node_id);
+      const added = renderedIds.size ? ids.filter((id) => !renderedIds.has(id)) : [];
+      renderedIds = new Set(ids);
+      const { w, h } = viewSize();
+      const outOfView = (p) => Boolean(p) && (panX + p.x * zoom < 0 || panY + p.y * zoom < 0 || panX + (p.x + NODE_W) * zoom > w || panY + (p.y + NODE_H) * zoom > h);
+      if (!cameraSet) {
+        fitView();
+        cameraSet = svg.clientWidth > 0;
+      } else if (added.some((id) => outOfView(positions[id]))) {
+        fitView();
+      } else {
+        apply();
+        updateMinimap();
+      }
     };
     const updateMinimap = () => {
       minimap.replaceChildren(miniViewport);
       if (fullW <= 0) return;
       const s = Math.min(170 / fullW, 104 / fullH);
-      const vx = (0 - panX) / zoom;
-      const vy = (0 - panY) / zoom;
-      const vw = (svg.clientWidth || 1300) / zoom;
-      const vh = (svg.clientHeight || 760) / zoom;
+      const { w: viewW, h: viewH } = viewSize();
+      const vx = (0 - panX) / zoom - originX;
+      const vy = (0 - panY) / zoom - originY;
+      const vw = viewW / zoom;
+      const vh = viewH / zoom;
       miniViewport.setAttribute("x", String(vx * s));
       miniViewport.setAttribute("y", String(vy * s));
       miniViewport.setAttribute("width", String(Math.max(10, vw * s)));
@@ -1233,41 +1335,48 @@
     minimap.addEventListener("click", (e) => {
       const ev = e;
       const r = minimap.getBoundingClientRect();
-      const fx = (ev.clientX - r.left) / 170;
-      const fy = (ev.clientY - r.top) / 104;
       if (fullW <= 0) return;
       const s = Math.min(170 / fullW, 104 / fullH);
-      panX = 650 - fx * 170 / s * zoom;
-      panY = 380 - fy * 104 / s * zoom;
+      const wx = originX + (ev.clientX - r.left) / s;
+      const wy = originY + (ev.clientY - r.top) / s;
+      const { w, h } = viewSize();
+      panX = w / 2 - wx * zoom;
+      panY = h / 2 - wy * zoom;
+      cameraSet = true;
       apply();
       updateMinimap();
     });
     let lastFrames = [];
     let selectedEl = null;
     let playbackIndex = null;
-    const openPassport = (n, g) => {
-      if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
-      selectedEl = g ?? null;
-      if (selectedEl) selectedEl.classList.add("dy-wf-selected");
-      const selectedId = n.node_id;
-      const related = /* @__PURE__ */ new Set([selectedId]);
+    const nodeEl = (id) => [...viewport.querySelectorAll(".dy-wf-node")].find((g) => g.getAttribute("data-node-id") === id) ?? null;
+    const highlightRoute = (id) => {
+      const related = /* @__PURE__ */ new Set([id]);
       const byId = new Map(currentNodes.map((node) => [node.node_id, node]));
-      const walkUp = (id) => {
-        for (const dep of byId.get(id)?.depends_on ?? []) if (!related.has(dep)) {
+      const walkUp = (nid) => {
+        for (const dep of byId.get(nid)?.depends_on ?? []) if (!related.has(dep)) {
           related.add(dep);
           walkUp(dep);
         }
       };
-      const walkDown = (id) => {
-        for (const node of currentNodes) if (node.depends_on.includes(id) && !related.has(node.node_id)) {
+      const walkDown = (nid) => {
+        for (const node of currentNodes) if (node.depends_on.includes(nid) && !related.has(node.node_id)) {
           related.add(node.node_id);
           walkDown(node.node_id);
         }
       };
-      walkUp(selectedId);
-      walkDown(selectedId);
+      walkUp(id);
+      walkDown(id);
       viewport.querySelectorAll(".dy-wf-node").forEach((node) => node.classList.toggle("dy-wf-route-dim", !related.has(node.getAttribute("data-node-id") ?? "")));
       viewport.querySelectorAll(".dy-wf-edge").forEach((edge) => edge.classList.toggle("dy-wf-route-edge", related.has(edge.dataset.from ?? "") && related.has(edge.dataset.to ?? "")));
+    };
+    const openPassport = (n, g) => {
+      if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
+      selectedEl = g ?? null;
+      if (selectedEl) selectedEl.classList.add("dy-wf-selected");
+      selectedId = n.node_id;
+      handlers.onSelect?.(n.node_id);
+      highlightRoute(n.node_id);
       passport.replaceChildren();
       const status = n.status ?? "pending";
       const head = elu("div", "dy-wf-pp-head");
@@ -1305,20 +1414,33 @@
         if (!handlers.onEdit) return;
         const edit = elu("div", "dy-wf-edit");
         edit.appendChild(elu("h4", "", "Edit step"));
+        const planned = editBase().find((item) => item.node_id === n.node_id);
+        if (!planned) {
+          edit.appendChild(elu("p", "dy-wf-pp-note", "This step is not in the latest version of the workflow, so it cannot be edited here."));
+          passport.appendChild(edit);
+          return;
+        }
+        const problem = elu("p", "dy-wf-pp-error");
+        problem.setAttribute("role", "alert");
+        problem.hidden = true;
+        const say = (text) => {
+          problem.textContent = text ?? "";
+          problem.hidden = !text;
+        };
         const field = (label2, input) => {
           const f = elu("label", "dy-wf-field");
           f.append(elu("span", "", label2), input);
           edit.appendChild(f);
         };
         const title = elu("input", "dy-wf-edit-title");
-        title.value = n.title;
+        title.value = planned.title;
         title.setAttribute("aria-label", "Node title");
         const deps = elu("input", "dy-wf-edit-deps");
-        deps.value = n.depends_on.join(", ");
+        deps.value = planned.depends_on.join(", ");
         deps.placeholder = "e.g. build, tests";
         deps.setAttribute("aria-label", "Dependencies");
         const team = elu("input", "dy-wf-edit-team");
-        team.value = n.phase_team ?? "";
+        team.value = planned.phase_team ?? "";
         team.placeholder = "phase team override";
         team.setAttribute("aria-label", "Phase team override");
         field("Title", title);
@@ -1329,18 +1451,64 @@
         save.addEventListener("click", async () => {
           const ids = new Set(deps.value.split(",").map((v) => v.trim()).filter(Boolean));
           ids.delete(n.node_id);
-          const edited = currentNodes.map((item) => item.node_id === n.node_id ? { ...item, title: title.value.trim() || item.title, depends_on: [...ids], phase_team: team.value.trim() || null } : item);
           save.disabled = true;
           save.textContent = "Saving\u2026";
+          say(null);
           try {
-            await handlers.onEdit(edited);
+            await runEdit((base) => base.some((item) => item.node_id === n.node_id) ? base.map((item) => item.node_id === n.node_id ? { ...item, title: title.value.trim() || item.title, depends_on: [...ids], phase_team: team.value.trim() || null } : item) : NOT_IN_PLAN);
             save.textContent = "Saved \u2713";
-          } catch {
+          } catch (error) {
             save.disabled = false;
             save.textContent = "Save failed \u2014 retry";
+            say(`Couldn't save: ${errorText(error)}`);
           }
         });
-        edit.appendChild(save);
+        const remove = elu("button", "dy-btn danger", "Delete step");
+        remove.type = "button";
+        remove.dataset.wfDeleteStep = n.node_id;
+        const confirmRow = elu("div", "dy-wf-delete-confirm");
+        confirmRow.hidden = true;
+        remove.addEventListener("click", () => {
+          say(null);
+          const verdict = deletePlan(editBase(), n.node_id);
+          if (typeof verdict === "string") {
+            confirmRow.hidden = true;
+            say(verdict);
+            return;
+          }
+          const base = editBase();
+          const titleOf = (id) => `"${base.find((item) => item.node_id === id)?.title ?? id}"`;
+          const target = base.find((item) => item.node_id === n.node_id);
+          const followers = base.some((item) => item.depends_on.includes(n.node_id));
+          const effect = !followers ? "" : target.depends_on.length ? ` The steps after it will follow ${target.depends_on.map(titleOf).join(" and ")} instead.` : " The steps after it will no longer wait for it.";
+          const yes = elu("button", "dy-btn danger", "Delete");
+          yes.type = "button";
+          yes.dataset.wfDeleteConfirm = n.node_id;
+          const no = elu("button", "dy-btn", "Cancel");
+          no.type = "button";
+          confirmRow.replaceChildren(elu("p", "", `Delete "${target.title}"?${effect}`), yes, no);
+          confirmRow.hidden = false;
+          no.addEventListener("click", () => {
+            confirmRow.hidden = true;
+            remove.focus();
+          });
+          yes.addEventListener("click", async () => {
+            yes.disabled = true;
+            no.disabled = true;
+            try {
+              await runEdit((latest) => deletePlan(latest, n.node_id));
+              closePassport();
+            } catch (error) {
+              yes.disabled = false;
+              no.disabled = false;
+              say(`Couldn't delete: ${errorText(error)}`);
+            }
+          });
+          yes.focus();
+        });
+        const actions = elu("div", "dy-wf-edit-actions");
+        actions.append(save, remove);
+        edit.append(actions, confirmRow, problem);
         passport.appendChild(edit);
       };
       if (n.task_ref) {
@@ -1505,10 +1673,12 @@
       if (!dragging) return;
       if (dragSession) return;
       const ev = e;
-      panX += ev.clientX - lastX;
-      panY += ev.clientY - lastY;
+      const { sx, sy } = screenScale();
+      panX += (ev.clientX - lastX) / sx;
+      panY += (ev.clientY - lastY) / sy;
       lastX = ev.clientX;
       lastY = ev.clientY;
+      cameraSet = true;
       apply();
       updateMinimap();
     });
@@ -1544,8 +1714,10 @@
       e.preventDefault();
       const ev = e;
       const rect = svg.getBoundingClientRect();
-      const cx = ev.clientX - rect.left;
-      const cy = ev.clientY - rect.top;
+      const { sx, sy } = screenScale();
+      const cx = (ev.clientX - rect.left) / sx;
+      const cy = (ev.clientY - rect.top) / sy;
+      cameraSet = true;
       host.classList.add("dy-wf-panning");
       if (wheelSettle) clearTimeout(wheelSettle);
       wheelSettle = setTimeout(() => host.classList.remove("dy-wf-panning"), 160);
@@ -1562,6 +1734,10 @@
       passport.replaceChildren();
       if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
       selectedEl = null;
+      if (selectedId !== null) {
+        selectedId = null;
+        handlers.onSelect?.(null);
+      }
       clearRoute();
     };
     const onKeyDown = (e) => {
@@ -1689,6 +1865,7 @@
         const frameSig = JSON.stringify(latest ?? null);
         if (frameSig !== lastFrameSig) {
           playbackIndex = null;
+          optimisticBase = null;
           render(latest);
           lastFrameSig = frameSig;
         }
@@ -1712,7 +1889,14 @@
     pollOnce();
     if (pollMs > 0) timer = setInterval(pollOnce, pollMs);
     const onResize = () => {
-      if (!disposed && lastRun) render(lastRun);
+      if (disposed || !lastRun) return;
+      if (canvasWindow.innerWidth <= 640 !== previousMobileLayout) {
+        cameraSet = false;
+        render(lastRun);
+      } else if (!cameraSet) {
+        fitView();
+        cameraSet = svg.clientWidth > 0;
+      } else updateMinimap();
     };
     canvasWindow.addEventListener("resize", onResize);
     let lastHostWidth = host.clientWidth;
@@ -1741,10 +1925,13 @@
       if (resizeFrame) canvasWindow.cancelAnimationFrame(resizeFrame);
       host.replaceChildren();
     });
-    return () => {
+    const dispose = () => {
       disposers.forEach((d) => d());
       disposers = [];
     };
+    return Object.assign(dispose, { refresh: () => {
+      if (!disposed) pollOnce();
+    } });
   }
 
   // src/app.ts

@@ -396,6 +396,19 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-wf-scope .dy-wf-field input::placeholder { color: rgba(159, 178, 204, .55); }
 .dy-wf-scope .dy-wf-field input:focus { border-color: var(--dy-wf-accent); box-shadow: 0 0 0 3px rgba(106, 183, 255, .18); }
 .dy-wf-scope .dy-wf-edit > button { justify-self: start; }
+/* Panel buttons are styled here, not by the host: the Desktop screen has no
+   .dy-btn rules, so Save rendered as a bare browser button there. */
+.dy-wf-scope .dy-wf-edit-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.dy-wf-scope .dy-wf-edit button { min-height: 32px; padding: 6px 12px; border: 1px solid var(--dy-wf-glass-line); border-radius: 8px; background: rgba(4, 10, 22, .65); color: var(--dy-wf-card-text); font: 600 12.5px system-ui, sans-serif; cursor: pointer; }
+.dy-wf-scope .dy-wf-edit button.primary { border-color: var(--dy-wf-accent); background: rgba(106, 183, 255, .18); }
+.dy-wf-scope .dy-wf-edit button.danger { border-color: rgba(255, 120, 112, .55); color: #ff9d97; }
+.dy-wf-scope .dy-wf-edit button:disabled { opacity: .55; cursor: default; }
+.dy-wf-scope .dy-wf-edit button:focus-visible { outline: 2px solid var(--dy-wf-accent); outline-offset: 2px; }
+/* Delete asks first; a refused or failed save says why (findings 3 and 10). */
+.dy-wf-scope .dy-wf-delete-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px; border: 1px solid rgba(255, 120, 112, .45); border-radius: 8px; }
+.dy-wf-scope .dy-wf-delete-confirm p { flex: 1 0 100%; margin: 0; color: var(--dy-wf-card-text); font-size: 12.5px; line-height: 1.45; }
+.dy-wf-scope .dy-wf-pp-error { margin: 0; color: #ff9d97; font-size: 12.5px; line-height: 1.45; }
+.dy-wf-scope .dy-wf-delete-confirm[hidden], .dy-wf-scope .dy-wf-pp-error[hidden] { display: none; }
 .dy-wf-scope .dy-wf-passport > :last-child { margin-bottom: 16px; }
 .dy-wf-scope .dy-wf-empty { fill: var(--dy-wf-card-dim); font: 13px system-ui, sans-serif; }
 /* Lane bands (v6 composition): axis labels, never controls. The "exception"
