@@ -2337,6 +2337,12 @@ async function testChromiumLayouts() {
         ? null
         : `${TMPDIR}/dockyard-${spec.name}.png`;
       if (screenshot) {
+        // Wait for two drawn frames first: a freshly launched headless Chromium
+        // can refuse a full-page screenshot ("Unable to capture screenshot")
+        // that is asked for before the page's first frame. It hit the first page
+        // here in 2 of 5 gate runs (06/10); a probe of this exact sequence failed
+        // 23 of 120 launches without the wait and 0 of 120 with it.
+        await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         await page.screenshot({ path: screenshot, fullPage: true });
       }
       assert.equal(browserErrors.length, 0, `${spec.name} browser warnings/errors: ${browserErrors.join(' | ')}`);
