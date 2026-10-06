@@ -23,7 +23,6 @@ import { emitToast } from '../runtime/context.js'
 import { _os } from '../runtime/context.js'
 import { Button } from '../lib/ui.js'
 import { Icon } from '../lib/ui.js'
-import { plural } from '../lib/ui.js'
 import { useDialogFocusManager } from '../lib/ui.js'
 import { reportDownloadFilename } from '../../download.js'
 import { downloadTextFile } from '../../download.js'
@@ -268,10 +267,6 @@ export function ProjectReportsPanel({ project, reports, onRefresh }) {
 
   return jsxs('section', { className: 'dy-rep', 'data-project-reports': true, children: [
     review.active ? jsx(ReportsReviewBar, { review, onChange: () => setReviewTick((tick) => tick + 1) }) : null,
-    jsxs('header', { className: 'dy-rep-head', children: [
-      jsx('h2', { children: 'Reports' }),
-      jsx('span', { className: 'dy-rep-count', children: plural(history.length, 'report') }),
-    ]}),
     jsx(ReportControls, {
       type, onType: setType, includeActivity, onActivity: setIncludeActivity,
       generating, onGenerate: generate, error,

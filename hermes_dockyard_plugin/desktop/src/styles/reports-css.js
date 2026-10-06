@@ -8,15 +8,12 @@
 // (reports-css.test.mjs checks every token used is defined in both themes).
 export const REPORTS_CSS = `
 .dockyard-root .dy-rep { display: grid; gap: 14px; min-width: 0; }
-.dockyard-root .dy-rep-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.dockyard-root .dy-rep-head h2 { margin: 0; color: var(--dy-text); font-size: 16px; }
-.dockyard-root .dy-rep-count { color: var(--dy-text-3); font-size: 12px; white-space: nowrap; }
 
 /* Generate: type, recent activity, the button, and what the report will hold. */
-.dockyard-root .dy-rep-controls { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); }
+.dockyard-root .dy-rep-controls { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); }
 .dockyard-root .dy-rep-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
 .dockyard-root .dy-rep-field { display: inline-flex; align-items: center; gap: 8px; color: var(--dy-text-2); font-size: 12px; font-weight: 700; }
-.dockyard-root .dy-rep-field select { height: 38px; min-width: 210px; padding: 0 10px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 13px; font-weight: 600; }
+.dockyard-root .dy-rep-field select { height: 40px; min-width: 210px; padding: 0 10px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 13px; font-weight: 600; }
 .dockyard-root .dy-rep-check { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; color: var(--dy-text); font-size: 13px; cursor: pointer; }
 .dockyard-root .dy-rep-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--dy-action); }
 .dockyard-root .dy-rep-check:has(input:disabled) { color: var(--dy-text-3); cursor: not-allowed; }
@@ -41,7 +38,7 @@ export const REPORTS_CSS = `
 .dockyard-root .dy-rep-pane { min-width: 0; padding: 20px 24px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); color: var(--dy-text); }
 
 /* The open report as a page. */
-.dockyard-root .dy-rep-doc { max-width: 860px; min-width: 0; }
+.dockyard-root .dy-rep-doc { max-width: 860px; min-width: 0; margin: 0 auto; }
 .dockyard-root .dy-rep-doc-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 16px; padding-bottom: 14px; border-bottom: 1px solid var(--dy-border); }
 .dockyard-root .dy-rep-doc-head > div:first-child { min-width: 0; }
 .dockyard-root .dy-rep-doc-head h2 { margin: 0; color: var(--dy-text); font-size: 20px; letter-spacing: -0.01em; overflow-wrap: anywhere; }
@@ -97,9 +94,8 @@ export const REPORTS_CSS = `
   .dockyard-root .dy-rep-side { grid-template-columns: minmax(0, 1fr); }
   .dockyard-root .dy-rep-pane { order: -1; }
   .dockyard-root .dy-rep-pane { padding: 16px; }
-  .dockyard-root .dy-rep-field { display: grid; flex: 1 1 100%; }
-  .dockyard-root .dy-rep-field select { width: 100%; min-width: 0; }
-  .dockyard-root .dy-rep-row .dockyard-button { flex: 1 1 100%; margin-left: 0; }
+  .dockyard-root .dy-rep-field { flex: 1 1 100%; }
+  .dockyard-root .dy-rep-field select { flex: 1 1 auto; width: auto; min-width: 0; }
   .dockyard-root .dy-rep-actions .dockyard-button { min-height: 40px; }
   .dockyard-root .dy-rep-facts { grid-template-columns: minmax(0, 1fr); }
   .dockyard-root .dy-rep-facts dd { border-top: 0; }
