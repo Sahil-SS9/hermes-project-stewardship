@@ -6,7 +6,6 @@ import { api } from '../runtime/context.js'
 import { useEffect } from '../runtime/react.js'
 import { mountDesktopWorkflowCanvas } from '../../workflow-canvas-mount.js'
 import { validateConnection } from '../../workflow-canvas-mount.js'
-import { toCanvasNode } from '../../workflow-canvas-mount.js'
 import { jsxs } from '../runtime/react.js'
 import { jsx } from '../runtime/react.js'
 import { StatusTag } from '../lib/ui.js'
@@ -78,6 +77,10 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
     kind: n.kind ?? (n.human_gate ? 'gate' : 'task'),
     phase_team: n.phase_team ?? null,
     canvas_position: n.canvas_position ?? undefined,
+    // Read-only here (never written back from these fields): the canvas needs
+    // them to refuse a delete that would break a condition or a loop.
+    when: n.when ?? null,
+    loop: n.loop ?? null,
   }))
   // Every save path (canvas edits and the toolbar) goes through here. The
   // canvas only manages the fields below; everything else on a stored step
@@ -126,14 +129,14 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   // The canvas mounts once per open workflow, after that workflow's runs have
   // loaded (the live view needs them), and is never rebuilt for new data.
   const actionsRef = useRef(null)
-  actionsRef.current = { savePlan, loadRuns }
+  actionsRef.current = { savePlan, loadRuns, planNodes: currentCanvasNodes }
   const canvasReady = Boolean(current) && (mode === 'definition' || runsReady)
   useEffect(() => {
     if (!canvasRef.current || !current || !canvasReady) return undefined
     const workflowName = current.name
     const handle = mountDesktopWorkflowCanvas(canvasRef.current, project.id, workflowName, () => viewRef.current.definition, () => viewRef.current.runs, {
       onEdit: (editedNodes) => actionsRef.current.savePlan(editedNodes),
-      editNodes: () => planRef.current.nodes.map(toCanvasNode),
+      editNodes: () => actionsRef.current.planNodes(),
       onSelect: (nodeId) => { selectedNodeRef.current = nodeId },
       // Gate decisions use the same canonical authority as the dashboard: the
       // reviewed decision fingerprint is submitted with the action, so a stale

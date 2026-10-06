@@ -95,6 +95,9 @@ const SAVE_PATHS = [
     applied: (nodes) => nodes['gate-5']?.human_gate === true },
   { label: 'moving a step', slug: 'move',
     act: async (page, name) => {
+      // Raw mouse moves do not scroll, and the canvas starts below the fold at
+      // 900 px tall: centre it first, or the press lands outside the window.
+      await page.locator(`[data-workflow-canvas="${name}"]`).evaluate((el) => el.scrollIntoView({ block: 'center' }))
       const box = await nodeIn(page, name, 'build').boundingBox()
       await page.mouse.move(box.x + 40, box.y + 20)
       await page.mouse.down()
@@ -104,6 +107,7 @@ const SAVE_PATHS = [
     applied: (nodes) => nodes.build.canvas_position != null },
   { label: 'linking two steps', slug: 'link',
     act: async (page, name) => {
+      await page.locator(`[data-workflow-canvas="${name}"]`).evaluate((el) => el.scrollIntoView({ block: 'center' }))
       const from = await page.locator(`[data-workflow-canvas="${name}"] [data-connect-from="build"]`).boundingBox()
       const to = await nodeIn(page, name, 'ship').boundingBox()
       await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)

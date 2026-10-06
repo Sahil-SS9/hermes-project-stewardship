@@ -66,6 +66,10 @@ test('browser canvas interactions persist positions, edges, validation feedback,
     assert.ok(edgeContract.every((edge) => edge.sourcePort === 'right' && edge.targetPort === 'left' && edge.marker?.includes('dyArrowDep') && edge.startAttached && edge.endAttached));
 
     const a = page.locator('[data-node-id="a"]')
+    // This test drives screen pixels at 100% zoom. The canvas now opens fitted
+    // to its host (07/10/2026 camera model), and this host is smaller than the
+    // graph, so set 100% first; the drag then moves the step 60/50 units.
+    await page.locator('[data-wf-action="zoom-reset"]').click()
     const box = await a.boundingBox(); assert.ok(box)
     // The node's authored position is the grid's first cell. With the S1
     // constants (PAD 64, NODE_W 208, COL_GAP 116) that is x=64, y=64; the test
@@ -83,6 +87,8 @@ test('browser canvas interactions persist positions, edges, validation feedback,
     const moved = await page.evaluate(() => globalThis.__edits.at(-1).find((n) => n.node_id === 'a'))
     assert.equal(moved.canvas_position.x, origin.x + 60)
     assert.equal(moved.canvas_position.y, origin.y + 50)
+    // Whole graph back in view for the clicks below (this host is small).
+    await page.locator('[data-wf-action="zoom-fit"]').click()
 
     const portA = page.locator('[data-connect-from="a"]')
     const b = page.locator('[data-node-id="b"]')

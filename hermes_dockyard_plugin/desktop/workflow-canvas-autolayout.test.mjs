@@ -51,7 +51,10 @@ test('W0-P2: after auto-layout node editor saves a new version without detaching
     await page.locator(`[data-workflow-definition-version]`).last().waitFor({ state: 'attached' });
     const definitions = page.locator(`[data-workflow-definitions="${name}"]`);
     await definitions.locator('summary').click();
-    await page.getByText('Edited via canvas', { exact: false }).last().waitFor();
+    // Wait inside the versions panel: since 07/10/2026 an edit made on a run's
+    // view switches the canvas to the plan, whose (hidden) list view also holds
+    // the new title, so a page-wide last() match is no longer the panel.
+    await definitions.getByText('Edited via canvas', { exact: false }).last().waitFor();
     assert.match(await definitions.innerText(), /Edited via canvas/);
     await page.locator('[data-action="wf-validate"]').click();
     assert.ok(await page.locator('[data-wf-validate-result]').isVisible());

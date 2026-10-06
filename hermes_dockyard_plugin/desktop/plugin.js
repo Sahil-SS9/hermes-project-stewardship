@@ -15054,7 +15054,11 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     task_ref: n.task_ref ?? null,
     kind: n.kind ?? (n.human_gate ? "gate" : "task"),
     phase_team: n.phase_team ?? null,
-    canvas_position: n.canvas_position ?? void 0
+    canvas_position: n.canvas_position ?? void 0,
+    // Read-only here (never written back from these fields): the canvas needs
+    // them to refuse a delete that would break a condition or a loop.
+    when: n.when ?? null,
+    loop: n.loop ?? null
   }));
   const toDefinitionNodes = (editedNodes) => {
     const storedById = new Map(planRef.current.nodes.map((n) => [n.node_id ?? n.id, n]));
@@ -15097,14 +15101,14 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     loadRuns();
   }, [current?.name, workflows?.length]);
   const actionsRef = useRef(null);
-  actionsRef.current = { savePlan, loadRuns };
+  actionsRef.current = { savePlan, loadRuns, planNodes: currentCanvasNodes };
   const canvasReady = Boolean(current) && (mode === "definition" || runsReady);
   useEffect(() => {
     if (!canvasRef.current || !current || !canvasReady) return void 0;
     const workflowName = current.name;
     const handle = mountDesktopWorkflowCanvas(canvasRef.current, project.id, workflowName, () => viewRef.current.definition, () => viewRef.current.runs, {
       onEdit: (editedNodes) => actionsRef.current.savePlan(editedNodes),
-      editNodes: () => planRef.current.nodes.map(toCanvasNode),
+      editNodes: () => actionsRef.current.planNodes(),
       onSelect: (nodeId) => {
         selectedNodeRef.current = nodeId;
       },
