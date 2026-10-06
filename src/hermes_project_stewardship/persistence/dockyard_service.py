@@ -885,6 +885,12 @@ class DockyardService:
         if activity_included:
             lines.extend(["", "## Recent activity", ""])
             if events:
+                initiative_names = {
+                    str(item.get("ref")): str(item.get("title") or "") for item in initiatives
+                }
+                work_names = {
+                    str(item_value(item, "ref")): str(item_value(item, "title") or "") for item in work_items
+                }
                 for event in events:
                     try:
                         payload = json.loads(event["payload_json"] or "{}")
@@ -894,7 +900,8 @@ class DockyardService:
                         payload = {}
                     parts = [
                         clean(words.event(event["event_type"], payload)),
-                        clean(event["subject"]),
+                        clean(words.detail(event["event_type"], event["subject"], payload,
+                                           initiatives=initiative_names, work=work_names)),
                         f"by {clean(words.actor(event['emitted_by'], payload))}",
                     ]
                     lines.append(

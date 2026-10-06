@@ -41,6 +41,13 @@ EVENT_WORDS = {
 }
 # initiative.approval_required for a proposal sent back in after changes.
 RESUBMITTED_WORDS = "Resubmitted for approval"
+_INITIATIVE_TYPES = frozenset(code for code in EVENT_WORDS if code.startswith("initiative."))
+# The Activity tab's words for a health state and for what started a check.
+HEALTH_WORDS = {"healthy": "Healthy", "watch": "Watch", "degraded": "Degraded",
+                "critical": "Critical", "unknown": "Not verified"}
+TRIGGER_WORDS = {"manual": "Run on request", "gateway": "Run from a chat command",
+                 "webhook": "Run by a webhook", "internal": "Run by Dockyard",
+                 "schedule": "Run on schedule", "scheduled": "Run on schedule"}
 
 WORK_STATUS_WORDS = {
     "backlog": "Backlog",
@@ -101,6 +108,48 @@ def policy(values: Optional[Mapping]) -> str:
     if not values:
         return "Default settings"
     return "; ".join(f"{sentence(key)}: {_value_words(values[key])}" for key in sorted(values))
+
+
+def _text(value: Any) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _named(ref: str, name: str) -> str:
+    return f"{ref} · {name}" if ref and name else (ref or name)
+
+
+def detail(event_type: Any, subject: Any, payload: Optional[Mapping] = None, *,
+           initiatives: Optional[Mapping] = None, work: Optional[Mapping] = None) -> str:
+    """What an event is about, as the Activity tab words it (its title).
+    `initiatives` and `work` map a ref to its title, for events that carry
+    only the ref. The cases in report-event-cases.json pin both sides."""
+    code = str(event_type or "")
+    payload = payload or {}
+    ref = "" if subject is None else str(subject)
+    if code in _INITIATIVE_TYPES:
+        return _named(ref, _text(payload.get("title")) or _text((initiatives or {}).get(ref)))
+    if code in ("work.assigned", "work.unassigned"):
+        return _named(ref, _text(payload.get("title")) or _text((work or {}).get(ref)))
+    if code == "project.health.changed":
+        before, after = _text(payload.get("from")), _text(payload.get("to"))
+        if not after:
+            return ""
+        health = lambda state: HEALTH_WORDS.get(state) or sentence(state)  # noqa: E731
+        return f"{health(before)} → {health(after)}" if before else health(after)
+    if code == "project.critical":
+        return "Health is critical"
+    if code == "stewardship.verification.failed":
+        found = payload.get("contradictions")
+        count = len(found) if isinstance(found, list) else 0
+        return f"{count} contradiction{'' if count == 1 else 's'} found" if count else "The evidence did not check out"
+    if code == "stewardship.reasoning.failed":
+        return "The proposal step stopped with an error"
+    if code == "stewardship.cycle.started":
+        trigger = _text(payload.get("trigger_type"))
+        return TRIGGER_WORDS.get(trigger) or (f"Run: {sentence(trigger).lower()}" if trigger else "Run")
+    if code == "cycle.mutations_blocked":
+        return _text(payload.get("reason"))
+    return ref
 
 
 def actor(emitted_by: Any, payload: Optional[Mapping] = None) -> str:

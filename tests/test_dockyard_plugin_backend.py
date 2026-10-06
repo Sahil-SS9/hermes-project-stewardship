@@ -693,7 +693,8 @@ def test_report_counts_waiting_initiatives_and_uses_plain_words(client):
                for line in table), table
     assert any(re.fullmatch(
         rf"- \d{{1,2}} [A-Z][a-z]{{2}} \d{{4}}, \d{{2}}:\d{{2}} UTC — Approval requested · "
-        rf"{re.escape(initiative['ref'])} · by .+", line) for line in lines)
+        rf"{re.escape(initiative['ref'])} · Tidy the release checklist · by System", line) for line in lines), \
+        [line for line in lines if "Approval requested" in line]
     assert not re.search(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", content), "no raw timestamps"
     assert not re.search(r"\b(initiative|work|stewardship)\.[a-z_.]+", content), "no event code names"
     assert "{" not in content and "_" not in content.split("## Configuration")[1].split("## Delivery")[0]

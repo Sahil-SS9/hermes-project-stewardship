@@ -6,7 +6,14 @@ the edges (bad dates, unknown codes, empty and nested policies).
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from hermes_project_stewardship.persistence import report_words as words
+
+# Shared with hermes_dockyard_plugin/desktop/report-words.test.mjs, which
+# checks the Activity tab (event-vocab.js) against the same cases.
+CASES = Path(__file__).resolve().parents[1] / "hermes_dockyard_plugin" / "desktop" / "test-support" / "report-event-cases.json"
 
 
 def test_dates_read_as_day_month_year_and_utc_time():
@@ -58,6 +65,29 @@ def test_sentence_matches_the_desktop_rule():
     assert words.sentence("project.content_uploaded") == "Project content uploaded"
     assert words.sentence("  a__b..c  ") == "A b c"
     assert words.sentence("") == ""
+
+
+def test_every_shared_case_reads_as_the_activity_tab_reads_it():
+    cases = json.loads(CASES.read_text(encoding="utf-8"))
+    assert len(cases) >= 20
+    for case in cases:
+        event = case["event"]
+        got = {
+            "label": words.event(event["event_type"], event["payload"]),
+            "title": words.detail(event["event_type"], event["subject"], event["payload"]),
+            "by": words.actor(event["emitted_by"], event["payload"]),
+        }
+        assert got == {"label": case["label"], "title": case["title"], "by": case["by"]}, event
+
+
+def test_detail_uses_the_projects_names_when_the_event_has_none():
+    # The tab finds a name in the project's initiatives or work items; the
+    # report has the same lists.
+    assert words.detail("initiative.approved", "INIT-2", {}, initiatives={"INIT-2": "Speed up checkout"}) == \
+        "INIT-2 · Speed up checkout"
+    assert words.detail("work.unassigned", "ATL-3", {}, work={"ATL-3": "Verify the build"}) == "ATL-3 · Verify the build"
+    assert words.detail("work.unassigned", "ATL-3", {}, initiatives={"ATL-3": "wrong list"}) == "ATL-3"
+    assert words.detail("initiative.approved", None, {}) == ""
 
 
 def test_who_did_it_matches_the_activity_tab():

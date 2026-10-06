@@ -27,6 +27,18 @@ test('each backend word is the Activity tab\'s label for that type', () => {
   assert.equal(describeEvent({ event_type: 'initiative.approval_required', payload: { resubmitted: true } }).label, resubmitted, 'a resubmitted proposal')
 })
 
+// The shared cases: tests/test_report_words.py checks the backend against
+// the same file, so a word changed on one side fails until the other follows.
+const cases = JSON.parse(readFileSync(fileURLToPath(new URL('./test-support/report-event-cases.json', import.meta.url)), 'utf8'))
+
+test('every shared case: the Activity tab gives the name, detail and "by" the backend writes', () => {
+  assert.ok(cases.length >= 20, 'the shared cases were read')
+  for (const { event, label, title, by } of cases) {
+    const row = describeEvent(event)
+    assert.deepEqual({ label: row.label, title: row.title, by: row.by }, { label, title, by }, JSON.stringify(event))
+  }
+})
+
 test('an unknown type and the "by" line follow the same rules on both sides', () => {
   // report_words.sentence and report_words.actor are pinned to these same
   // answers in tests/test_report_words.py.
