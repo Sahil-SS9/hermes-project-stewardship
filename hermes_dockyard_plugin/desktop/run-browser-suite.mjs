@@ -28,7 +28,11 @@ try {
  const files=process.argv.slice(2).length ? process.argv.slice(2) : fs.readdirSync(here).filter(f=>f.endsWith('.test.mjs')).map(f=>path.join(here,f));
  // Every file starts with nothing remembered (test-support/fresh-scope.mjs).
  const freshScope=pathToFileURL(path.join(here,'test-support','fresh-scope.mjs')).href;
- const child=spawn(process.execPath,['--import',freshScope,'--test','--test-concurrency=1',...files],{cwd:repo,env:{...testEnv,STEWARD_DESKTOP_URL:base+'/desktop',STEWARD_API_URL:base+'/api/plugins/hermes-dockyard'},stdio:'inherit'});
+ // HPS_BROWSER_LOG=<file>: also write the full report there. The gate runs this
+ // suite inside `hermes verify`, which keeps only the last 2,000 characters, so
+ // a failure early in the run lost its reason (repro-live.test.mjs, 06/10).
+ const fullReport=process.env.HPS_BROWSER_LOG ? ['--test-reporter=spec','--test-reporter-destination=stdout','--test-reporter=spec',`--test-reporter-destination=${process.env.HPS_BROWSER_LOG}`] : [];
+ const child=spawn(process.execPath,['--import',freshScope,'--test','--test-concurrency=1',...fullReport,...files],{cwd:repo,env:{...testEnv,STEWARD_DESKTOP_URL:base+'/desktop',STEWARD_API_URL:base+'/api/plugins/hermes-dockyard'},stdio:'inherit'});
  const [code]=await once(child,'exit');
  // The practice server refuses and records every attempt to go online
  // (tests/offline_guard.py); one attempt fails the run, even if every test passed.
