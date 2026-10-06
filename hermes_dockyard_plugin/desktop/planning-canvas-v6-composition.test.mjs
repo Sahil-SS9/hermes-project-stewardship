@@ -326,6 +326,10 @@ test('Planning canvas v6: drag, connect, zoom, remove and save all reach the rea
     const before = { x: Number(await card.getAttribute('data-canvas-x')), y: Number(await card.getAttribute('data-canvas-y')) };
 
     // --- drag: the position must change on the card AND on the wire ---------
+    // Raw mouse coordinates only reach what is on screen, and the board can
+    // start below the fold (under the project header strip): scroll it into
+    // view first, as a person would.
+    await canvas.locator('.dy-pc-stage').scrollIntoViewIfNeeded();
     const box = await card.boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + 20);
     await page.mouse.down();

@@ -1633,14 +1633,20 @@ for (const [label, width, height] of [['desktop', 1440, 900], ['phone', 390, 844
 // box takes the row, (c) colour dots, (d) ribbon readable when the APP is dark
 // and the board follows it, (e) full screen + Edit tips inside the frame,
 // (f) connect mode never drags the board.
-const findEmpty = (page, canvas) => canvas.locator('.dy-pc-stage').evaluate((stage) => {
-  const b = stage.getBoundingClientRect();
-  const ok = (el) => el && el.closest('.dy-pc-stage') && !el.closest('.dy-pc-obj, .dy-pc-chat, .dy-pc-drawer, button');
-  for (let y = b.top + 30; y < b.bottom - 30; y += 20) for (let x = b.left + 180; x < b.right - 30; x += 20) {
-    if (ok(document.elementFromPoint(x, y)) && ok(document.elementFromPoint(x - 150, y - 100))) return { x, y };
-  }
-  return null;
-});
+// Raw mouse coordinates only reach what is on screen, and the board can start
+// below the fold (it sits under the project header strip), so bring it into
+// view first, as a person would, then search the visible board.
+const findEmpty = async (page, canvas) => {
+  await canvas.locator('.dy-pc-stage').scrollIntoViewIfNeeded();
+  return canvas.locator('.dy-pc-stage').evaluate((stage) => {
+    const b = stage.getBoundingClientRect();
+    const ok = (el) => el && el.closest('.dy-pc-stage') && !el.closest('.dy-pc-obj, .dy-pc-chat, .dy-pc-drawer, button');
+    for (let y = b.top + 30; y < b.bottom - 30; y += 20) for (let x = b.left + 180; x < b.right - 30; x += 20) {
+      if (ok(document.elementFromPoint(x, y)) && ok(document.elementFromPoint(x - 150, y - 100))) return { x, y };
+    }
+    return null;
+  });
+};
 test('Owner feedback 01/10: editor rows, checklist width, colour dots, dark ribbon, full screen, connect without drag', { timeout: 180000 }, async () => {
   await withPage(1440, 900, async (page) => {
     const canvas = root(page);
