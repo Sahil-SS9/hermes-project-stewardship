@@ -899,48 +899,6 @@ var DOCKYARD_CSS = `
 .dockyard-root .dockyard-check-field small { margin-top: 3px; color: var(--dy-text-3); font-size: 10px; font-weight: 500; line-height: 1.35; }
 .dockyard-root .dockyard-settings-card > .dockyard-button { margin-top: 16px; }
 .dockyard-root .dockyard-inline-success { margin: 14px 0 0; color: var(--dy-success); font-size: 12px; font-weight: 650; }
-.dockyard-root .dockyard-reports-layout { display: grid; grid-template-columns: minmax(300px, .7fr) minmax(0, 1.3fr); gap: 18px; align-items: start; }
-.dockyard-root .dockyard-report-builder > .dockyard-field,
-.dockyard-root .dockyard-report-builder > .dockyard-check-field,
-.dockyard-root .dockyard-report-builder > .dockyard-button { margin-top: 14px; }
-.dockyard-root .dockyard-report-history-list { display: grid; gap: 7px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--dy-border); }
-.dockyard-root .dockyard-report-history-list h3 { margin: 0 0 3px; font-size: 13px; }
-.dockyard-root .dockyard-report-history-list button {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  width: 100%;
-  padding: 10px;
-  border: 1px solid var(--dy-border);
-  border-radius: 8px;
-  background: var(--dy-surface-subtle);
-  color: var(--dy-text);
-  text-align: left;
-  cursor: pointer;
-}
-.dockyard-root .dockyard-report-history-list button:hover,
-.dockyard-root .dockyard-report-history-list button.active { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
-.dockyard-root .dockyard-report-history-list strong,
-.dockyard-root .dockyard-report-history-list small { display: block; min-width: 0; overflow-wrap: anywhere; }
-.dockyard-root .dockyard-report-history-list strong { font-size: 11px; }
-.dockyard-root .dockyard-report-history-list small { margin-top: 3px; color: var(--dy-text-3); font-size: 9px; }
-.dockyard-root .dockyard-report-history-list svg { width: 14px; height: 14px; }
-.dockyard-root .dockyard-report-preview-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
-.dockyard-root .dockyard-report-preview-card h2 { margin: 4px 0 0; overflow-wrap: anywhere; }
-.dockyard-root .dockyard-report-preview {
-  max-height: 620px;
-  margin: 18px 0 0;
-  padding: 16px;
-  overflow: auto;
-  border: 1px solid var(--dy-border);
-  border-radius: 10px;
-  background: var(--dy-surface-subtle);
-  color: var(--dy-text-2);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font: 11px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace;
-}
 .dockyard-root .dockyard-report-placeholder { display: grid; place-items: center; min-height: 280px; margin-top: 18px; border: 1px dashed var(--dy-control-border); border-radius: 10px; color: var(--dy-text-3); text-align: center; }
 .dockyard-root .dockyard-report-placeholder svg { width: 28px; height: 28px; }
 .dockyard-root .dockyard-backlog-list { display: block; overflow: visible; border: 1px solid var(--dy-border); border-radius: 12px; background: var(--dy-surface); }
@@ -1566,7 +1524,6 @@ var DOCKYARD_CSS = `
   .dockyard-root .dockyard-metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dockyard-root .dockyard-portfolio-visual { grid-template-columns: 1fr; gap: 14px; }
   .dockyard-root .dockyard-project-grid { grid-template-columns: 1fr; }
-  .dockyard-root .dockyard-reports-layout,
   .dockyard-root .dockyard-session-layout { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-workload-card,
   .dockyard-root .dockyard-teams-layout,
@@ -3149,6 +3106,109 @@ var ACTIVITY_CSS = `
 }
 `;
 
+// hermes_dockyard_plugin/desktop/src/styles/reports-css.js
+var REPORTS_CSS = `
+.dockyard-root .dy-rep { display: grid; gap: 14px; min-width: 0; }
+.dockyard-root .dy-rep-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.dockyard-root .dy-rep-head h2 { margin: 0; color: var(--dy-text); font-size: 16px; }
+.dockyard-root .dy-rep-count { color: var(--dy-text-3); font-size: 12px; white-space: nowrap; }
+
+/* Generate: type, recent activity, the button, and what the report will hold. */
+.dockyard-root .dy-rep-controls { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); }
+.dockyard-root .dy-rep-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.dockyard-root .dy-rep-field { display: inline-flex; align-items: center; gap: 8px; color: var(--dy-text-2); font-size: 12px; font-weight: 700; }
+.dockyard-root .dy-rep-field select { height: 38px; min-width: 210px; padding: 0 10px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 13px; font-weight: 600; }
+.dockyard-root .dy-rep-check { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; color: var(--dy-text); font-size: 13px; cursor: pointer; }
+.dockyard-root .dy-rep-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--dy-action); }
+.dockyard-root .dy-rep-check:has(input:disabled) { color: var(--dy-text-3); cursor: not-allowed; }
+.dockyard-root .dy-rep-row .dockyard-button { margin-left: auto; }
+.dockyard-root .dy-rep-field select:focus-visible, .dockyard-root .dy-rep-check input:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
+.dockyard-root .dy-rep-hint { margin: 0; color: var(--dy-text-3); font-size: 12px; }
+.dockyard-root .dy-rep-controls .dockyard-inline-error { margin: 0; }
+
+/* Side by side: the list of past reports, and the open report beside it. */
+.dockyard-root .dy-rep-side { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.dockyard-root .dy-rep-list { display: grid; gap: 8px; min-width: 0; padding: 12px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); }
+.dockyard-root .dy-rep-list h3 { display: flex; align-items: center; justify-content: space-between; margin: 0 2px; color: var(--dy-text-2); font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.dockyard-root .dy-rep-list h3 span { color: var(--dy-text-3); }
+.dockyard-root .dy-rep-list ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.dockyard-root .dy-rep-list button { display: grid; gap: 2px; width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--dy-text); font: inherit; text-align: left; cursor: pointer; }
+.dockyard-root .dy-rep-list button:hover { background: var(--dy-surface-subtle); }
+.dockyard-root .dy-rep-list button[aria-current="true"] { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
+.dockyard-root .dy-rep-list button:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
+.dockyard-root .dy-rep-list strong { font-size: 13px; }
+.dockyard-root .dy-rep-list button span { color: var(--dy-text-3); font-size: 12px; }
+.dockyard-root .dy-rep-none { margin: 0; padding: 8px 2px; color: var(--dy-text-2); font-size: 13px; }
+.dockyard-root .dy-rep-pane { min-width: 0; padding: 20px 24px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); color: var(--dy-text); }
+
+/* The open report as a page. */
+.dockyard-root .dy-rep-doc { max-width: 860px; min-width: 0; }
+.dockyard-root .dy-rep-doc-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 16px; padding-bottom: 14px; border-bottom: 1px solid var(--dy-border); }
+.dockyard-root .dy-rep-doc-head > div:first-child { min-width: 0; }
+.dockyard-root .dy-rep-doc-head h2 { margin: 0; color: var(--dy-text); font-size: 20px; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.dockyard-root .dy-rep-meta { margin: 4px 0 0; color: var(--dy-text-2); font-size: 13px; }
+.dockyard-root .dy-rep-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.dockyard-root .dy-rep-body h3 { margin: 22px 0 8px; color: var(--dy-text); font-size: 14px; }
+.dockyard-root .dy-rep-body p { margin: 8px 0; color: var(--dy-text-2); font-size: 13px; line-height: 1.5; }
+.dockyard-root .dy-rep-facts { display: grid; grid-template-columns: minmax(150px, max-content) minmax(0, 1fr); margin: 8px 0; border: 1px solid var(--dy-border); border-radius: 8px; overflow: hidden; }
+.dockyard-root .dy-rep-facts > div { display: contents; }
+.dockyard-root .dy-rep-facts dt, .dockyard-root .dy-rep-facts dd { margin: 0; padding: 7px 12px; border-top: 1px solid var(--dy-border); font-size: 13px; }
+.dockyard-root .dy-rep-facts > div:first-child dt, .dockyard-root .dy-rep-facts > div:first-child dd { border-top: 0; }
+.dockyard-root .dy-rep-facts dt { background: var(--dy-surface-subtle); color: var(--dy-text-2); font-weight: 650; }
+.dockyard-root .dy-rep-facts dd { color: var(--dy-text); overflow-wrap: anywhere; }
+.dockyard-root .dy-rep-items { display: grid; gap: 6px; margin: 8px 0; padding-left: 20px; color: var(--dy-text); font-size: 13px; line-height: 1.45; }
+.dockyard-root .dy-rep-table-wrap { overflow-x: auto; margin: 8px 0; border: 1px solid var(--dy-border); border-radius: 8px; }
+.dockyard-root .dy-rep-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dockyard-root .dy-rep-table th { padding: 7px 12px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; font-weight: 800; letter-spacing: .05em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+.dockyard-root .dy-rep-table td { padding: 7px 12px; border-top: 1px solid var(--dy-border); color: var(--dy-text); vertical-align: top; }
+.dockyard-root .dy-rep-table td:first-child { color: var(--dy-text-2); white-space: nowrap; }
+.dockyard-root .dy-rep-state { display: grid; justify-items: center; gap: 10px; min-height: 220px; align-content: center; padding: 20px; color: var(--dy-text-2); font-size: 13px; text-align: center; }
+.dockyard-root .dy-rep-state p { max-width: 46ch; margin: 0; }
+.dockyard-root .dy-rep-state svg { width: 26px; height: 26px; color: var(--dy-text-3); }
+.dockyard-root .dy-rep-state[role="alert"] p { color: var(--dy-danger); font-weight: 650; }
+
+/* Table + side panel: past reports in a table; a row opens the report. */
+.dockyard-root .dy-rep-reports-wrap { overflow-x: auto; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); }
+.dockyard-root .dy-rep-reports { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dockyard-root .dy-rep-reports th { padding: 8px 14px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; font-weight: 800; letter-spacing: .05em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+.dockyard-root .dy-rep-reports td { height: 42px; padding: 0 14px; border-top: 1px solid var(--dy-border); color: var(--dy-text-2); white-space: nowrap; }
+.dockyard-root .dy-rep-reports tbody tr { cursor: pointer; }
+.dockyard-root .dy-rep-reports tbody tr:hover { background: var(--dy-surface-subtle); }
+.dockyard-root .dy-rep-reports tr[aria-current="true"] { background: var(--dy-accent-soft); }
+.dockyard-root .dy-rep-reports button { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0; border: 0; background: transparent; color: var(--dy-text); font: inherit; font-weight: 700; cursor: pointer; }
+.dockyard-root .dy-rep-reports button svg { width: 14px; height: 14px; color: var(--dy-text-3); }
+.dockyard-root .dy-rep-reports button:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; border-radius: 4px; }
+.dockyard-root .dy-rep-none-table { padding: 16px 14px; border: 1px dashed var(--dy-border); border-radius: 10px; }
+.dockyard-root .dy-rep-drawer-layer { place-items: stretch end; padding: 0; }
+.dockyard-root .dy-rep-drawer-panel { display: grid; align-content: start; gap: 12px; width: min(820px, 100%); height: 100%; overflow-y: auto; padding: 16px 24px 28px; border-left: 1px solid var(--dy-border); background: var(--dy-surface); color: var(--dy-text); box-shadow: var(--dy-shadow); }
+.dockyard-root .dy-rep-drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dockyard-root .dy-rep-drawer-head span { color: var(--dy-text-3); font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.dockyard-root .dy-rep-close { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text-2); cursor: pointer; }
+.dockyard-root .dy-rep-close svg { width: 16px; height: 16px; }
+.dockyard-root .dy-rep-close:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
+
+/* Design review bar (?review=1); removed with the losing layout after the pick. */
+.dockyard-root .dy-rep-review { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 12px; border: 1px dashed var(--dy-accent-border); border-radius: 10px; background: var(--dy-accent-soft); color: var(--dy-text); font-size: 12px; }
+.dockyard-root .dy-rep-review [role="group"] { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dockyard-root .dy-rep-review button { min-height: 32px; padding: 0 12px; border: 1px solid var(--dy-control-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text-2); font: inherit; cursor: pointer; }
+.dockyard-root .dy-rep-review button[aria-pressed="true"] { border-color: var(--dy-action); color: var(--dy-text); font-weight: 700; }
+.dockyard-root .dy-rep-review button:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
+
+@container dockyard (max-width: 640px) {
+  .dockyard-root .dy-rep-side { grid-template-columns: minmax(0, 1fr); }
+  .dockyard-root .dy-rep-pane { order: -1; }
+  .dockyard-root .dy-rep-pane { padding: 16px; }
+  .dockyard-root .dy-rep-field { display: grid; flex: 1 1 100%; }
+  .dockyard-root .dy-rep-field select { width: 100%; min-width: 0; }
+  .dockyard-root .dy-rep-row .dockyard-button { flex: 1 1 100%; margin-left: 0; }
+  .dockyard-root .dy-rep-actions .dockyard-button { min-height: 40px; }
+  .dockyard-root .dy-rep-facts { grid-template-columns: minmax(0, 1fr); }
+  .dockyard-root .dy-rep-facts dd { border-top: 0; }
+  .dockyard-root .dy-rep-drawer-layer { place-items: end stretch; }
+  .dockyard-root .dy-rep-drawer-panel { width: 100%; height: auto; max-height: 90%; padding: 14px 16px 22px; border-left: 0; border-top: 1px solid var(--dy-border); border-radius: 14px 14px 0 0; }
+}
+`;
+
 // hermes_dockyard_plugin/desktop/workflow-canvas-css.js
 var workflow_canvas_css_default = `
 /* ---- Workflow canvas: card + status token set ----------------------------
@@ -3946,6 +4006,7 @@ function useDockyardStyles() {
   useStylesheet("dy-plan-stylesheet", "dyPlanStylesheet", PLAN_CSS);
   useStylesheet("dy-overview-stylesheet", "dyOverviewStylesheet", OVERVIEW_CSS);
   useStylesheet("dy-activity-stylesheet", "dyActivityStylesheet", ACTIVITY_CSS);
+  useStylesheet("dy-reports-stylesheet", "dyReportsStylesheet", REPORTS_CSS);
   useStylesheet("dy-theme-stylesheet", "dyThemeStylesheet", THEME_CSS);
 }
 
@@ -15136,38 +15197,6 @@ function ProjectContentPanel({ project, content, onRefresh }) {
   ] });
 }
 
-// hermes_dockyard_plugin/desktop/download.js
-var MAX_SEGMENT = 60;
-function safeFilenameSegment(value, fallback = "") {
-  const cleaned = String(value ?? "").normalize("NFKD").replace(/[\u0300-\u036f]+/g, "").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/-{2,}/g, "-").replace(/^[-._]+/, "").replace(/[-._]+$/, "");
-  return cleaned.slice(0, MAX_SEGMENT) || fallback;
-}
-function reportDownloadFilename(projectId, report) {
-  const reportId = safeFilenameSegment(report?.report_id, "");
-  const title = safeFilenameSegment(report?.title, "");
-  const project = safeFilenameSegment(projectId, "project");
-  const parts = [project, title, reportId].filter(Boolean);
-  if (parts.length === 0) parts.push("report");
-  return `${parts.join("-")}.md`;
-}
-function downloadTextFile(content, filename, mediaType = "text/markdown;charset=utf-8") {
-  const doc = typeof globalThis !== "undefined" ? globalThis.document : null;
-  if (!doc || !doc.body) return false;
-  const blob = new Blob([String(content ?? "")], { type: mediaType });
-  const url = URL.createObjectURL(blob);
-  const anchor = doc.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.style.display = "none";
-  doc.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  const revoke = () => URL.revokeObjectURL(url);
-  if (typeof setTimeout === "function") setTimeout(revoke, 4e3);
-  else revoke();
-  return true;
-}
-
 // hermes_dockyard_plugin/desktop/src/project/settings-model.js
 var DEFAULT_MAX_OPEN_INITIATIVES = 5;
 function effectiveMaxOpenInitiatives(policies) {
@@ -15411,84 +15440,411 @@ function ProjectSettingsPanel({ project, settings, onRefresh, onDirty }) {
     ] })
   ] });
 }
+
+// hermes_dockyard_plugin/desktop/download.js
+var MAX_SEGMENT = 60;
+function safeFilenameSegment(value, fallback = "") {
+  const cleaned = String(value ?? "").normalize("NFKD").replace(/[\u0300-\u036f]+/g, "").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/-{2,}/g, "-").replace(/^[-._]+/, "").replace(/[-._]+$/, "");
+  return cleaned.slice(0, MAX_SEGMENT) || fallback;
+}
+function reportDownloadFilename(projectId, report) {
+  const reportId = safeFilenameSegment(report?.report_id, "");
+  const title = safeFilenameSegment(report?.title, "");
+  const project = safeFilenameSegment(projectId, "project");
+  const parts = [project, title, reportId].filter(Boolean);
+  if (parts.length === 0) parts.push("report");
+  return `${parts.join("-")}.md`;
+}
+function downloadTextFile(content, filename, mediaType = "text/markdown;charset=utf-8") {
+  const doc = typeof globalThis !== "undefined" ? globalThis.document : null;
+  if (!doc || !doc.body) return false;
+  const blob = new Blob([String(content ?? "")], { type: mediaType });
+  const url = URL.createObjectURL(blob);
+  const anchor = doc.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.style.display = "none";
+  doc.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  const revoke = () => URL.revokeObjectURL(url);
+  if (typeof setTimeout === "function") setTimeout(revoke, 4e3);
+  else revoke();
+  return true;
+}
+
+// hermes_dockyard_plugin/desktop/src/lib/report-vocab.js
+var REPORT_TYPES = Object.freeze([
+  { value: "executive", label: "Executive summary", sections: ["Configuration", "Delivery", "Risks and decisions"], work: false, activity: true },
+  { value: "delivery", label: "Delivery report", sections: ["Configuration", "Delivery"], work: true, activity: true },
+  { value: "risk", label: "Risk and decisions", sections: ["Configuration", "Risks and decisions"], work: false, activity: false },
+  { value: "full", label: "Full project report", sections: ["Configuration", "Delivery", "Risks and decisions"], work: true, activity: true }
+]);
+var ACTIVITY = "Recent activity";
+var sentence = (value) => {
+  const words2 = String(value ?? "").replace(/[._]+/g, " ").replace(/\s+/g, " ").trim();
+  return words2 ? words2[0].toUpperCase() + words2.slice(1) : "";
+};
+var reportType = (value) => REPORT_TYPES.find((type) => type.value === value) ?? null;
+var reportTypeLabel = (value) => reportType(value)?.label ?? (sentence(value) || "Report");
+var takesActivity = (value) => reportType(value)?.activity ?? false;
+function reportSections(value, includeActivity) {
+  const type = reportType(value);
+  if (!type) return [];
+  return type.activity && includeActivity ? [...type.sections, ACTIVITY] : [...type.sections];
+}
+function reportHint(value, includeActivity) {
+  const type = reportType(value);
+  if (!type) return "";
+  const parts = reportSections(value, includeActivity).map((section2) => section2 === "Delivery" && type.work ? "Delivery, with the work list" : section2);
+  return `Sections: ${parts.join(" \xB7 ")}${type.activity ? "" : ". Risk reports never include recent activity."}`;
+}
+function reportWhen(value, timeZone) {
+  if (!value) return "";
+  const at = new Date(value);
+  if (Number.isNaN(at.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone }).formatToParts(at);
+  const part = (name) => parts.find((entry) => entry.type === name)?.value ?? "";
+  return `${part("day")} ${part("month")} ${part("year")}, ${part("hour")}:${part("minute")}`;
+}
+var unescape = (text2) => text2.replace(/\\([|`])/g, "$1");
+var FACT = /^([A-Za-z][A-Za-z ()/-]{0,38}): (.+)$/;
+var SEPARATOR = /^\|(\s*:?-{3,}:?\s*\|)+$/;
+var cells = (line) => {
+  const inner = line.trim().replace(/^\|/, "").replace(/(?<!\\)\|$/, "");
+  return inner.split(/(?<!\\)\|/).map((cell) => unescape(cell.trim()));
+};
+function parseReport(markdown) {
+  const doc = { title: "", generated: "", generatedBy: "", blocks: [] };
+  let open = null;
+  const lines = String(markdown ?? "").replace(/\r\n?/g, "\n").split("\n");
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) {
+      open = null;
+      continue;
+    }
+    const top = doc.blocks.length === 0;
+    if (top && !doc.title && line.startsWith("# ")) {
+      doc.title = unescape(line.slice(2).trim());
+      continue;
+    }
+    if (top && !doc.generated && line.startsWith("Generated: ")) {
+      doc.generated = unescape(line.slice(11).trim());
+      continue;
+    }
+    if (top && !doc.generatedBy && line.startsWith("Generated by: ")) {
+      doc.generatedBy = unescape(line.slice(14).trim());
+      continue;
+    }
+    const heading = /^#{1,6} (.+)$/.exec(line);
+    if (heading) {
+      open = null;
+      doc.blocks.push({ kind: "heading", text: unescape(heading[1].trim()) });
+      continue;
+    }
+    if (line.startsWith("|")) {
+      if (open?.kind === "table") {
+        if (open.rows.length === 0 && SEPARATOR.test(line)) continue;
+        open.rows.push(cells(line));
+      } else {
+        open = { kind: "table", head: cells(line), rows: [] };
+        doc.blocks.push(open);
+      }
+      continue;
+    }
+    const bullet = /^[-*] (.*)$/.exec(line);
+    if (bullet) {
+      if (open?.kind !== "list") {
+        open = { kind: "list", items: [] };
+        doc.blocks.push(open);
+      }
+      const text2 = unescape(bullet[1].trim());
+      const fact = FACT.exec(text2);
+      open.items.push(fact ? { text: text2, label: fact[1], value: fact[2] } : { text: text2 });
+      continue;
+    }
+    open = null;
+    doc.blocks.push({ kind: "text", text: unescape(line) });
+  }
+  return doc;
+}
+
+// hermes_dockyard_plugin/desktop/src/project/reports-review.js
+var REPORTS_REVIEW_DEFAULTS = { reports: "side" };
+var LAYOUTS = [["side", "Side by side"], ["table", "Table + side panel"]];
+function readReportsReview(search = globalThis.location?.search ?? "") {
+  const params = new URLSearchParams(search);
+  const reports = params.get("reports");
+  return {
+    active: params.get("review") === "1",
+    reports: LAYOUTS.some(([value]) => value === reports) ? reports : REPORTS_REVIEW_DEFAULTS.reports
+  };
+}
+function writeReportsReview(key, value) {
+  const url = new URL(globalThis.location.href);
+  url.searchParams.set(key, value);
+  globalThis.history.replaceState(globalThis.history.state, "", url);
+}
+function ReportsReviewBar({ review, onChange }) {
+  return jsxs("div", { className: "dy-rep-review", "data-reports-review": true, children: [
+    jsx("strong", { children: "Design review" }),
+    jsxs("span", { role: "group", "aria-label": "Reports tab layout", children: [
+      jsx("span", { children: "Reports tab:" }),
+      ...LAYOUTS.map(([value, text2]) => jsx("button", {
+        type: "button",
+        "aria-pressed": review.reports === value,
+        "data-review-choice": `reports:${value}`,
+        onClick: () => {
+          writeReportsReview("reports", value);
+          onChange?.();
+        },
+        children: text2
+      }, value))
+    ] })
+  ] });
+}
+
+// hermes_dockyard_plugin/desktop/src/project/reports.js
+var byline = (report) => [reportWhen(report.generated_at), report.generated_by ? `by ${report.generated_by}` : ""].filter(Boolean).join(" \xB7 ");
+function ReportControls({ type, onType, includeActivity, onActivity, generating, onGenerate, error }) {
+  const allowed = takesActivity(type);
+  return jsxs("div", { className: "dy-rep-controls", "data-report-controls": true, children: [
+    jsxs("div", { className: "dy-rep-row", children: [
+      jsxs("label", { className: "dy-rep-field", children: [
+        jsx("span", { children: "Report type" }),
+        jsx("select", {
+          "data-report-type": true,
+          value: type,
+          onChange: (event) => onType(event.target.value),
+          children: REPORT_TYPES.map((entry) => jsx("option", { value: entry.value, children: entry.label }, entry.value))
+        })
+      ] }),
+      jsxs("label", { className: "dy-rep-check", "data-report-activity": true, children: [
+        // Risk reports never carry activity, so the box shows off there; the
+        // person's choice comes back for the other types.
+        jsx("input", { type: "checkbox", checked: allowed && includeActivity, disabled: !allowed, onChange: (event) => onActivity(event.target.checked) }),
+        jsx("span", { children: "Include recent activity" })
+      ] }),
+      jsx(Button, { action: "generate-report", variant: "primary", disabled: generating, onClick: onGenerate, children: generating ? "Generating\u2026" : "Generate report" })
+    ] }),
+    jsx("p", { className: "dy-rep-hint", "data-report-hint": true, children: reportHint(type, includeActivity) }),
+    error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: error }) : null
+  ] });
+}
+function ReportBlock({ block }) {
+  if (block.kind === "heading") return jsx("h3", { children: block.text });
+  if (block.kind === "text") return jsx("p", { children: block.text });
+  if (block.kind === "table") {
+    return jsx("div", { className: "dy-rep-table-wrap", children: jsxs("table", { className: "dy-rep-table", children: [
+      jsx("thead", { children: jsx("tr", { children: block.head.map((cell, index) => jsx("th", { scope: "col", children: cell }, index)) }) }),
+      jsx("tbody", { children: block.rows.map((row, index) => jsx("tr", { children: row.map((cell, column) => jsx("td", { children: cell }, column)) }, index)) })
+    ] }) });
+  }
+  if (block.items.every((item) => item.label)) {
+    return jsx("dl", { className: "dy-rep-facts", children: block.items.map((item, index) => jsxs("div", { children: [
+      jsx("dt", { children: item.label }),
+      jsx("dd", { children: item.value })
+    ] }, index)) });
+  }
+  return jsx("ul", { className: "dy-rep-items", children: block.items.map((item, index) => jsx("li", { children: item.text }, index)) });
+}
+function ReportPage({ report, onCopy, onDownload }) {
+  const doc = parseReport(report.content);
+  const when = reportWhen(report.generated_at) || doc.generated;
+  const by = report.generated_by || doc.generatedBy;
+  return jsxs("div", { className: "dy-rep-doc", "data-report-preview": report.report_id, children: [
+    jsxs("header", { className: "dy-rep-doc-head", children: [
+      jsxs("div", { children: [
+        jsx("h2", { id: "dy-rep-doc-title", children: doc.title || report.title }),
+        jsx("p", { className: "dy-rep-meta", "data-report-meta": true, children: `${reportTypeLabel(report.report_type)} \xB7 Generated ${when}${by ? ` by ${by}` : ""}` })
+      ] }),
+      jsxs("div", { className: "dy-rep-actions", children: [
+        jsx(Button, { action: "copy-report", small: true, onClick: onCopy, children: "Copy Markdown" }),
+        jsx(Button, { action: "download-report", small: true, onClick: onDownload, children: "Download Markdown" })
+      ] })
+    ] }),
+    jsx("div", { className: "dy-rep-body", children: doc.blocks.map((block, index) => jsx(ReportBlock, { block }, index)) })
+  ] });
+}
+function ReportBody({ state, history, onRetry, onCopy, onDownload }) {
+  if (state.openError) {
+    return jsxs("div", { className: "dy-rep-state", role: "alert", children: [
+      jsx("p", { children: `This report could not be opened: ${state.openError}` }),
+      jsx(Button, { action: "retry-report", small: true, onClick: onRetry, children: "Try again" })
+    ] });
+  }
+  if (state.report) return jsx(ReportPage, { report: state.report, onCopy, onDownload });
+  if (state.opening) return jsx("p", { className: "dy-rep-state", "aria-busy": true, children: "Opening the report\u2026" });
+  return jsxs("div", { className: "dy-rep-state", "data-report-empty": true, children: [
+    jsx(Icon, { name: "project" }),
+    jsx("p", { children: history.length > 0 ? "Pick a report from the list to read it here." : "No reports yet. Pick a type above and press Generate report. Reports are saved here, so you can read, copy or download them later." })
+  ] });
+}
+function ReportList({ history, openId, onOpen }) {
+  return jsxs("aside", { className: "dy-rep-list", "data-report-list": true, "aria-label": "Past reports", children: [
+    jsxs("h3", { children: ["Past reports", jsx("span", { children: history.length })] }),
+    history.length > 0 ? jsx("ul", { children: history.map((report) => jsx("li", { children: jsxs("button", {
+      type: "button",
+      "data-report-history": report.report_id,
+      "aria-current": report.report_id === openId ? "true" : void 0,
+      onClick: () => onOpen(report.report_id, { scroll: true }),
+      children: [jsx("strong", { children: reportTypeLabel(report.report_type) }), jsx("span", { children: byline(report) })]
+    }) }, report.report_id)) }) : jsx("p", { className: "dy-rep-none", children: "No reports yet." })
+  ] });
+}
+function ReportTable({ history, openId, onOpen }) {
+  if (history.length === 0) {
+    return jsx("p", { className: "dy-rep-none dy-rep-none-table", "data-report-list": true, children: "No reports yet. Pick a type above and press Generate report." });
+  }
+  return jsx("div", { className: "dy-rep-reports-wrap", "data-report-list": true, children: jsxs("table", { className: "dy-rep-reports", children: [
+    jsx("thead", { children: jsxs("tr", { children: [
+      jsx("th", { scope: "col", children: "Report" }),
+      jsx("th", { scope: "col", children: "Generated" }),
+      jsx("th", { scope: "col", children: "By" })
+    ] }) }),
+    jsx("tbody", { children: history.map((report) => jsxs("tr", {
+      "data-report-row": report.report_id,
+      "aria-current": report.report_id === openId ? "true" : void 0,
+      // The whole row opens the report; its button is the keyboard route.
+      onClick: () => onOpen(report.report_id),
+      children: [
+        jsx("td", { children: jsxs("button", { type: "button", "data-report-history": report.report_id, children: [
+          jsx("span", { children: reportTypeLabel(report.report_type) }),
+          jsx(Icon, { name: "chevron" })
+        ] }) }),
+        jsx("td", { children: reportWhen(report.generated_at) }),
+        jsx("td", { children: report.generated_by || "Unknown" })
+      ]
+    }, report.report_id)) })
+  ] }) });
+}
+function ReportDrawer({ onClose, children }) {
+  useDialogFocusManager("[data-report-drawer] .dy-rep-drawer-panel");
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+  return jsx("section", {
+    className: "dockyard-modal-layer dy-rep-drawer-layer",
+    "data-report-drawer": true,
+    onClick: (event) => {
+      if (event.target === event.currentTarget) onClose();
+    },
+    children: jsxs("aside", { className: "dy-rep-drawer-panel", role: "dialog", "aria-modal": true, "aria-labelledby": "dy-rep-doc-title", children: [
+      jsxs("header", { className: "dy-rep-drawer-head", children: [
+        jsx("span", { children: "Report" }),
+        jsx("button", { type: "button", className: "dy-rep-close", "aria-label": "Close report", "data-report-close": true, onClick: onClose, children: jsx(Icon, { name: "x" }) })
+      ] }),
+      children
+    ] })
+  });
+}
 function ProjectReportsPanel({ project, reports, onRefresh }) {
-  const [reportType, setReportType] = useState("executive");
+  const [, setReviewTick] = useState(0);
+  const review = readReportsReview();
+  const layout = review.reports;
+  const [type, setType] = useState("executive");
   const [includeActivity, setIncludeActivity] = useState(true);
   const [history, setHistory] = useState(reports);
-  const [selected, setSelected] = useState(null);
+  const [openId, setOpenId] = useState(null);
+  const [report, setReport] = useState(null);
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState(null);
+  const [drawer, setDrawer] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
-  const loadReport = async (reportId) => {
-    setError(null);
-    try {
-      setSelected(await api(`/projects/${encodeURIComponent(project.id)}/reports/${encodeURIComponent(reportId)}`));
-    } catch (failure) {
-      setError(String(failure?.message ?? failure));
+  const wanted = useRef(null);
+  const open = async (reportId, { scroll = false } = {}) => {
+    wanted.current = reportId;
+    setOpenId(reportId);
+    setOpenError(null);
+    if (layout === "table") setDrawer(true);
+    if (scroll) {
+      globalThis.requestAnimationFrame?.(() => {
+        const pane = document.querySelector("[data-report-pane]");
+        if (pane && pane.getBoundingClientRect().top < 0) pane.scrollIntoView?.({ block: "start" });
+      });
     }
+    if (report?.report_id === reportId) return;
+    setOpening(true);
+    try {
+      const loaded = await api(`/projects/${encodeURIComponent(project.id)}/reports/${encodeURIComponent(reportId)}`);
+      if (wanted.current === reportId) setReport(loaded);
+    } catch (failure) {
+      if (wanted.current === reportId) setOpenError(String(failure?.message ?? failure));
+    }
+    if (wanted.current === reportId) setOpening(false);
   };
+  useEffect(() => {
+    if (layout === "side" && !openId && history.length > 0) open(history[0].report_id);
+  }, [layout]);
   const generate = async () => {
     setGenerating(true);
     setError(null);
     try {
-      const report = await api(`/projects/${encodeURIComponent(project.id)}/reports`, {
+      const made = await api(`/projects/${encodeURIComponent(project.id)}/reports`, {
         method: "POST",
-        body: { report_type: reportType, include_activity: includeActivity }
+        body: { report_type: type, include_activity: includeActivity }
       });
-      setSelected(report);
-      setHistory((current) => [report, ...current.filter((item) => item.report_id !== report.report_id)]);
+      wanted.current = made.report_id;
+      setReport(made);
+      setOpenId(made.report_id);
+      setOpenError(null);
+      setOpening(false);
+      setHistory((current) => [made, ...current.filter((item) => item.report_id !== made.report_id)]);
+      if (layout === "table") setDrawer(true);
       onRefresh?.();
     } catch (failure) {
       setError(String(failure?.message ?? failure));
     }
     setGenerating(false);
   };
+  const shown = report && report.report_id === openId ? report : null;
   const copy = async () => {
-    const copied = selected?.content && _os?.writeClipboard ? await _os.writeClipboard(selected.content) : false;
+    const copied = shown?.content && _os?.writeClipboard ? await _os.writeClipboard(shown.content) : false;
     emitToast(copied ? "success" : "danger", copied ? "Report copied to clipboard" : "Clipboard is unavailable");
   };
   const download = () => {
-    if (!selected?.content) return;
-    const filename = reportDownloadFilename(project.id, selected);
-    const started = downloadTextFile(selected.content, filename);
-    emitToast(
-      started ? "success" : "danger",
-      started ? `Downloading ${filename}` : "Download could not start in this environment"
-    );
+    if (!shown?.content) return;
+    const filename = reportDownloadFilename(project.id, shown);
+    const started = downloadTextFile(shown.content, filename);
+    emitToast(started ? "success" : "danger", started ? `Downloading ${filename}` : "Download could not start in this environment");
   };
-  return jsxs("section", { className: "dockyard-reports-layout", "data-project-reports": true, children: [
-    jsxs("div", { className: "dockyard-feature-card dockyard-report-builder", children: [
-      jsx("h2", { children: "Generate report" }),
-      jsx("p", { children: "Create a durable Markdown snapshot from canonical project data." }),
-      jsxs("label", { className: "dockyard-field", children: [
-        jsx("span", { children: "Report type" }),
-        jsx("select", { "data-report-type": true, value: reportType, onChange: (event) => setReportType(event.target.value), children: [
-          jsx("option", { value: "executive", children: "Executive summary" }, "executive"),
-          jsx("option", { value: "delivery", children: "Delivery report" }, "delivery"),
-          jsx("option", { value: "risk", children: "Risk and decisions" }, "risk"),
-          jsx("option", { value: "full", children: "Full project report" }, "full")
-        ] })
-      ] }),
-      jsxs("label", { className: "dockyard-check-field", children: [
-        jsx("input", { type: "checkbox", checked: includeActivity, onChange: (event) => setIncludeActivity(event.target.checked) }),
-        jsxs("span", { children: [jsx("strong", { children: "Include recent activity" }), jsx("small", { children: "Includes attributed project events only." })] })
-      ] }),
-      error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: error }) : null,
-      jsx(Button, { action: "generate-report", variant: "primary", disabled: generating, onClick: generate, children: generating ? "Generating..." : "Generate report" }),
-      jsxs("div", { className: "dockyard-report-history-list", children: [
-        jsx("h3", { children: "Report history" }),
-        history.length > 0 ? history.map((report) => jsxs("button", { type: "button", "data-report-history": report.report_id, className: selected?.report_id === report.report_id ? "active" : "", onClick: () => loadReport(report.report_id), children: [
-          jsxs("span", { children: [jsx("strong", { children: report.title }), jsx("small", { children: `${report.report_type} / ${formatWhen(report.generated_at)}` })] }),
-          jsx(Icon, { name: "chevron" })
-        ] }, report.report_id)) : jsx("p", { className: "dockyard-meta", children: "No generated reports yet." })
-      ] })
+  const body = jsx(ReportBody, {
+    state: { report: shown, opening, openError },
+    history,
+    onRetry: () => open(openId),
+    onCopy: copy,
+    onDownload: download
+  });
+  return jsxs("section", { className: "dy-rep", "data-project-reports": true, children: [
+    review.active ? jsx(ReportsReviewBar, { review, onChange: () => setReviewTick((tick) => tick + 1) }) : null,
+    jsxs("header", { className: "dy-rep-head", children: [
+      jsx("h2", { children: "Reports" }),
+      jsx("span", { className: "dy-rep-count", children: plural2(history.length, "report") })
     ] }),
-    jsxs("article", { className: "dockyard-feature-card dockyard-report-preview-card", children: [
-      jsxs("header", { children: [
-        jsxs("div", { children: [jsx("span", { className: "dockyard-card-label", children: "REPORT PREVIEW" }), jsx("h2", { children: selected?.title || "Generate or open a report" })] }),
-        selected?.content ? jsx(Button, { action: "download-report", small: true, onClick: download, children: "Download Markdown" }) : null,
-        selected?.content ? jsx(Button, { action: "copy-report", small: true, onClick: copy, children: "Copy Markdown" }) : null
-      ] }),
-      selected?.content ? jsx("pre", { className: "dockyard-report-preview", "data-report-preview": true, children: selected.content }) : jsxs("div", { className: "dockyard-report-placeholder", children: [jsx(Icon, { name: "project" }), jsx("p", { children: "The report preview will appear here." })] })
+    jsx(ReportControls, {
+      type,
+      onType: setType,
+      includeActivity,
+      onActivity: setIncludeActivity,
+      generating,
+      onGenerate: generate,
+      error
+    }),
+    layout === "table" ? jsxs("div", { className: "dy-rep-tablelayout", "data-report-layout": "table", children: [
+      jsx(ReportTable, { history, openId, onOpen: open }),
+      drawer && openId ? jsx(ReportDrawer, { onClose: () => setDrawer(false), children: body }) : null
+    ] }) : jsxs("div", { className: "dy-rep-side", "data-report-layout": "side", children: [
+      jsx(ReportList, { history, openId, onOpen: open }),
+      jsx("article", { className: "dy-rep-pane", "data-report-pane": true, children: body })
     ] })
   ] });
 }
@@ -18105,20 +18461,20 @@ var KNOWN_EVENT_TYPES = Object.freeze([
   "work.unassigned"
 ]);
 var text = (value) => typeof value === "string" ? value.trim() : "";
-var sentence = (value) => {
+var sentence2 = (value) => {
   const words2 = String(value ?? "").replace(/[._]+/g, " ").replace(/\s+/g, " ").trim();
   return words2 ? words2[0].toUpperCase() + words2.slice(1) : "";
 };
 var plural5 = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
 var effect = (label, tone) => ({ label, tone });
-var healthWord = (state) => HEALTH_WORD[state] ?? sentence(state);
+var healthWord = (state) => HEALTH_WORD[state] ?? sentence2(state);
 var contradictions = (payload) => Array.isArray(payload.contradictions) ? payload.contradictions : [];
 var firstDetail = (list) => text(list.find((entry) => text(entry?.detail))?.detail);
 function describeInitiative(type, spec, ref, payload, ctx) {
   const initiative = ref ? (ctx.initiatives ?? []).find((entry) => entry?.ref === ref) : null;
   const name = text(payload.title) || text(initiative?.title);
   let note = "";
-  if (spec.note === "risk") note = text(payload.risk) ? `${sentence(payload.risk)} risk` : "";
+  if (spec.note === "risk") note = text(payload.risk) ? `${sentence2(payload.risk)} risk` : "";
   else if (spec.note) note = text(payload[spec.note]);
   const pending = initiative?.status === "pending_approval";
   return {
@@ -18218,7 +18574,7 @@ function describeType(type, subject, payload, ctx) {
       kind: "health",
       icon: "rotate-cw",
       label: "Stewardship check",
-      title: TRIGGER_WORD[trigger] ?? (trigger ? `Run: ${sentence(trigger).toLowerCase()}` : "Run"),
+      title: TRIGGER_WORD[trigger] ?? (trigger ? `Run: ${sentence2(trigger).toLowerCase()}` : "Run"),
       note: "",
       effect: null
     };
@@ -18226,7 +18582,7 @@ function describeType(type, subject, payload, ctx) {
   if (type === "cycle.mutations_blocked") {
     return { kind: "health", icon: "shield-alert", label: "Changes blocked", title: text(payload.reason), note: "", effect: effect("Nothing was changed", "neutral") };
   }
-  return { kind: "other", icon: "history", label: sentence(type) || "Project event", title: subject, note: "", effect: null };
+  return { kind: "other", icon: "history", label: sentence2(type) || "Project event", title: subject, note: "", effect: null };
 }
 function describeEvent(event, ctx = {}) {
   const type = String(event?.event_type ?? event?.type ?? "");

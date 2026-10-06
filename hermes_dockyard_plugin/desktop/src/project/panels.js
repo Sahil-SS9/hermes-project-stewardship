@@ -9,11 +9,6 @@ import { jsx } from '../runtime/react.js'
 import { StatusTag } from '../lib/ui.js'
 import { Fragment } from '../runtime/react.js'
 import { Button } from '../lib/ui.js'
-import { _os } from '../runtime/context.js'
-import { reportDownloadFilename } from '../../download.js'
-import { downloadTextFile } from '../../download.js'
-import { formatWhen } from '../lib/ui.js'
-import { Icon } from '../lib/ui.js'
 import { effectiveMaxOpenInitiatives } from './settings-model.js'
 export function ProjectSettingsPanel({ project, settings, onRefresh, onDirty }) {
   const buildForm = () => ({
@@ -240,95 +235,6 @@ export function ProjectSettingsPanel({ project, settings, onRefresh, onDirty }) 
           jsx(Button, { action: 'confirm-lifecycle-action', variant: ['disable', 'freeze', 'archive'].includes(pendingLifecycle) ? 'danger' : 'primary', disabled: lifecycleBusy, onClick: confirmLifecycle, children: lifecycleBusy ? 'Applying...' : `Confirm ${lifecycleCopy[pendingLifecycle]?.label || 'change'}` }),
         ]}),
       ]}),
-    ]}),
-  ]})
-}
-
-export function ProjectReportsPanel({ project, reports, onRefresh }) {
-  const [reportType, setReportType] = useState('executive')
-  const [includeActivity, setIncludeActivity] = useState(true)
-  const [history, setHistory] = useState(reports)
-  const [selected, setSelected] = useState(null)
-  const [generating, setGenerating] = useState(false)
-  const [error, setError] = useState(null)
-  const loadReport = async (reportId) => {
-    setError(null)
-    try {
-      setSelected(await api(`/projects/${encodeURIComponent(project.id)}/reports/${encodeURIComponent(reportId)}`))
-    } catch (failure) {
-      setError(String(failure?.message ?? failure))
-    }
-  }
-  const generate = async () => {
-    setGenerating(true)
-    setError(null)
-    try {
-      const report = await api(`/projects/${encodeURIComponent(project.id)}/reports`, {
-        method: 'POST', body: { report_type: reportType, include_activity: includeActivity },
-      })
-      setSelected(report)
-      setHistory((current) => [report, ...current.filter((item) => item.report_id !== report.report_id)])
-      onRefresh?.()
-    } catch (failure) {
-      setError(String(failure?.message ?? failure))
-    }
-    setGenerating(false)
-  }
-  const copy = async () => {
-    const copied = selected?.content && _os?.writeClipboard
-      ? await _os.writeClipboard(selected.content)
-      : false
-    emitToast(copied ? 'success' : 'danger', copied ? 'Report copied to clipboard' : 'Clipboard is unavailable')
-  }
-  const download = () => {
-    // Phase 4: download the exact generated Markdown the API returned. The
-    // filename is sanitised (Unicode titles, slashes and reserved characters
-    // must not reach the filesystem) and never derived from anything but the
-    // report metadata.
-    if (!selected?.content) return
-    const filename = reportDownloadFilename(project.id, selected)
-    const started = downloadTextFile(selected.content, filename)
-    emitToast(started ? 'success' : 'danger',
-      started ? `Downloading ${filename}` : 'Download could not start in this environment')
-  }
-  return jsxs('section', { className: 'dockyard-reports-layout', 'data-project-reports': true, children: [
-    jsxs('div', { className: 'dockyard-feature-card dockyard-report-builder', children: [
-      jsx('h2', { children: 'Generate report' }),
-      jsx('p', { children: 'Create a durable Markdown snapshot from canonical project data.' }),
-      jsxs('label', { className: 'dockyard-field', children: [
-        jsx('span', { children: 'Report type' }),
-        jsx('select', { 'data-report-type': true, value: reportType, onChange: (event) => setReportType(event.target.value), children: [
-          jsx('option', { value: 'executive', children: 'Executive summary' }, 'executive'),
-          jsx('option', { value: 'delivery', children: 'Delivery report' }, 'delivery'),
-          jsx('option', { value: 'risk', children: 'Risk and decisions' }, 'risk'),
-          jsx('option', { value: 'full', children: 'Full project report' }, 'full'),
-        ]}),
-      ]}),
-      jsxs('label', { className: 'dockyard-check-field', children: [
-        jsx('input', { type: 'checkbox', checked: includeActivity, onChange: (event) => setIncludeActivity(event.target.checked) }),
-        jsxs('span', { children: [jsx('strong', { children: 'Include recent activity' }), jsx('small', { children: 'Includes attributed project events only.' })] }),
-      ]}),
-      error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
-      jsx(Button, { action: 'generate-report', variant: 'primary', disabled: generating, onClick: generate, children: generating ? 'Generating...' : 'Generate report' }),
-      jsxs('div', { className: 'dockyard-report-history-list', children: [
-        jsx('h3', { children: 'Report history' }),
-        history.length > 0
-          ? history.map((report) => jsxs('button', { type: 'button', 'data-report-history': report.report_id, className: selected?.report_id === report.report_id ? 'active' : '', onClick: () => loadReport(report.report_id), children: [
-              jsxs('span', { children: [jsx('strong', { children: report.title }), jsx('small', { children: `${report.report_type} / ${formatWhen(report.generated_at)}` })] }),
-              jsx(Icon, { name: 'chevron' }),
-            ]}, report.report_id))
-          : jsx('p', { className: 'dockyard-meta', children: 'No generated reports yet.' }),
-      ]}),
-    ]}),
-    jsxs('article', { className: 'dockyard-feature-card dockyard-report-preview-card', children: [
-      jsxs('header', { children: [
-        jsxs('div', { children: [jsx('span', { className: 'dockyard-card-label', children: 'REPORT PREVIEW' }), jsx('h2', { children: selected?.title || 'Generate or open a report' })] }),
-        selected?.content ? jsx(Button, { action: 'download-report', small: true, onClick: download, children: 'Download Markdown' }) : null,
-        selected?.content ? jsx(Button, { action: 'copy-report', small: true, onClick: copy, children: 'Copy Markdown' }) : null,
-      ]}),
-      selected?.content
-        ? jsx('pre', { className: 'dockyard-report-preview', 'data-report-preview': true, children: selected.content })
-        : jsxs('div', { className: 'dockyard-report-placeholder', children: [jsx(Icon, { name: 'project' }), jsx('p', { children: 'The report preview will appear here.' })] }),
     ]}),
   ]})
 }

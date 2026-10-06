@@ -762,48 +762,6 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-check-field small { margin-top: 3px; color: var(--dy-text-3); font-size: 10px; font-weight: 500; line-height: 1.35; }
 .dockyard-root .dockyard-settings-card > .dockyard-button { margin-top: 16px; }
 .dockyard-root .dockyard-inline-success { margin: 14px 0 0; color: var(--dy-success); font-size: 12px; font-weight: 650; }
-.dockyard-root .dockyard-reports-layout { display: grid; grid-template-columns: minmax(300px, .7fr) minmax(0, 1.3fr); gap: 18px; align-items: start; }
-.dockyard-root .dockyard-report-builder > .dockyard-field,
-.dockyard-root .dockyard-report-builder > .dockyard-check-field,
-.dockyard-root .dockyard-report-builder > .dockyard-button { margin-top: 14px; }
-.dockyard-root .dockyard-report-history-list { display: grid; gap: 7px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--dy-border); }
-.dockyard-root .dockyard-report-history-list h3 { margin: 0 0 3px; font-size: 13px; }
-.dockyard-root .dockyard-report-history-list button {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  width: 100%;
-  padding: 10px;
-  border: 1px solid var(--dy-border);
-  border-radius: 8px;
-  background: var(--dy-surface-subtle);
-  color: var(--dy-text);
-  text-align: left;
-  cursor: pointer;
-}
-.dockyard-root .dockyard-report-history-list button:hover,
-.dockyard-root .dockyard-report-history-list button.active { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
-.dockyard-root .dockyard-report-history-list strong,
-.dockyard-root .dockyard-report-history-list small { display: block; min-width: 0; overflow-wrap: anywhere; }
-.dockyard-root .dockyard-report-history-list strong { font-size: 11px; }
-.dockyard-root .dockyard-report-history-list small { margin-top: 3px; color: var(--dy-text-3); font-size: 9px; }
-.dockyard-root .dockyard-report-history-list svg { width: 14px; height: 14px; }
-.dockyard-root .dockyard-report-preview-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
-.dockyard-root .dockyard-report-preview-card h2 { margin: 4px 0 0; overflow-wrap: anywhere; }
-.dockyard-root .dockyard-report-preview {
-  max-height: 620px;
-  margin: 18px 0 0;
-  padding: 16px;
-  overflow: auto;
-  border: 1px solid var(--dy-border);
-  border-radius: 10px;
-  background: var(--dy-surface-subtle);
-  color: var(--dy-text-2);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font: 11px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace;
-}
 .dockyard-root .dockyard-report-placeholder { display: grid; place-items: center; min-height: 280px; margin-top: 18px; border: 1px dashed var(--dy-control-border); border-radius: 10px; color: var(--dy-text-3); text-align: center; }
 .dockyard-root .dockyard-report-placeholder svg { width: 28px; height: 28px; }
 .dockyard-root .dockyard-backlog-list { display: block; overflow: visible; border: 1px solid var(--dy-border); border-radius: 12px; background: var(--dy-surface); }
@@ -1429,7 +1387,6 @@ export const DOCKYARD_CSS = `
   .dockyard-root .dockyard-metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dockyard-root .dockyard-portfolio-visual { grid-template-columns: 1fr; gap: 14px; }
   .dockyard-root .dockyard-project-grid { grid-template-columns: 1fr; }
-  .dockyard-root .dockyard-reports-layout,
   .dockyard-root .dockyard-session-layout { grid-template-columns: 1fr; }
   .dockyard-root .dockyard-workload-card,
   .dockyard-root .dockyard-teams-layout,

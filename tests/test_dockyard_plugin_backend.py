@@ -633,6 +633,72 @@ def test_project_settings_patch_and_report_history(client):
     assert fetched.json()["content"] == report["content"]
 
 
+def test_report_counts_waiting_initiatives_and_uses_plain_words(client):
+    """C7 Reports (06/10). Every new proposal waits for approval
+    (`pending_approval`), but the report counted `awaiting_approval`, a
+    status no initiative has, so every report said "Pending initiatives: 0"
+    and listed no decisions. New reports also read as plain words: dates,
+    work status, policies and events, never code names or JSON."""
+    import re
+
+    project_id = "reports-words"
+    created = client.post("/api/plugins/hermes-dockyard/onboard", json={
+        "project_id": project_id,
+        "repo_path": "/srv/reports-words",
+        "mission": "Readable reports",
+        "lead_profile": "octacon",
+    })
+    assert created.status_code == 200, created.text
+    updated = client.patch(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/settings",
+        json={"verification_policy": {"require_tests": True, "max_open_initiatives": 3}},
+    )
+    assert updated.status_code == 200, updated.text
+
+    with TestClient(plugin_api._app) as upstream:
+        work = upstream.post(
+            f"/stewardship/v1/projects/{project_id}/work-items",
+            json={"type": "task", "title": "Write the release note",
+                  "actor_id": "octacon", "actor_kind": "bot"},
+        )
+        assert work.status_code == 200, work.text
+        proposed = upstream.post(
+            f"/stewardship/v1/projects/{project_id}/initiatives",
+            json={"title": "Tidy the release checklist",
+                  "rationale": "Fewer missed steps", "risk": "medium"},
+        )
+        assert proposed.status_code == 200, proposed.text
+    initiative = proposed.json()
+    assert initiative["status"] == "pending_approval"
+
+    generated = client.post(
+        f"/api/plugins/hermes-dockyard/projects/{project_id}/reports",
+        json={"report_type": "full", "include_activity": True},
+    )
+    assert generated.status_code == 200, generated.text
+    content = generated.json()["content"]
+    lines = content.splitlines()
+
+    # The waiting proposal is counted and listed as a decision.
+    assert "- Pending initiatives: 1" in lines
+    assert f"- Decision: {initiative['ref']} Tidy the release checklist (medium risk)" in lines
+
+    # Plain words: a readable date, status words, policies as words, events by name.
+    assert re.fullmatch(r"Generated: \d{1,2} [A-Z][a-z]{2} \d{4}, \d{2}:\d{2} UTC",
+                        next(line for line in lines if line.startswith("Generated: ")))
+    assert "- Verification policy: Max open initiatives: 3; Require tests: yes" in lines
+    assert "- Release policy: Default settings" in lines
+    table = [line for line in lines if line.startswith("| ")]
+    assert any(re.fullmatch(r"\| [^|]+ \| Write the release note \| Backlog \| octacon \|", line)
+               for line in table), table
+    assert any(re.fullmatch(
+        rf"- \d{{1,2}} [A-Z][a-z]{{2}} \d{{4}}, \d{{2}}:\d{{2}} UTC — Approval requested · "
+        rf"{re.escape(initiative['ref'])} · by .+", line) for line in lines)
+    assert not re.search(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", content), "no raw timestamps"
+    assert not re.search(r"\b(initiative|work|stewardship)\.[a-z_.]+", content), "no event code names"
+    assert "{" not in content and "_" not in content.split("## Configuration")[1].split("## Delivery")[0]
+
+
 def test_bot_session_transcripts_are_profile_scoped(client, tmp_path, monkeypatch):
     project_id = "sessions-ui"
     created = client.post("/api/plugins/hermes-dockyard/onboard", json={
