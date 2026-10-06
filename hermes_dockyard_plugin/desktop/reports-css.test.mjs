@@ -56,6 +56,14 @@ test('narrow: the open report comes before the list; wide tables scroll inside t
   assert.match(css, /\.dockyard-root \.dy-rep-doc \{[^}]*max-width: 860px;/, 'a readable line length')
 })
 
+test('Sahil 06/10 picked side by side: no reports table, no side panel and no design-review bar', () => {
+  assert.doesNotMatch(css, /\.dy-rep-reports\b/, 'the table of past reports is gone')
+  assert.doesNotMatch(css, /\.dy-rep-drawer/, 'the side panel the table opened reports in is gone')
+  assert.doesNotMatch(css, /\.dy-rep-close\b|\.dy-rep-none-table\b/, 'and its close button and empty table')
+  assert.doesNotMatch(css, /\.dy-rep-review\b/, 'the design-review bar is gone')
+  assert.match(css, /\.dockyard-root \.dy-rep-side \{ display: grid; grid-template-columns: minmax\(220px, 280px\) minmax\(0, 1fr\);/, 'the list and the open report side by side, as reviewed')
+})
+
 test('the stylesheet is loaded, before the theme sheet so a chosen theme still wins', () => {
   const ours = context.indexOf("useStylesheet('dy-reports-stylesheet', 'dyReportsStylesheet', REPORTS_CSS)")
   assert.ok(ours > 0, 'the Reports stylesheet is mounted')

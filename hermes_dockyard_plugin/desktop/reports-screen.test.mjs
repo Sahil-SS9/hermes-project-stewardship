@@ -9,9 +9,10 @@
 //     the list; Risk turns the activity box off and says why, and the box
 //     comes back as it was; a past report opens from the keyboard; Copy and
 //     Download sit on the page;
-//   - design review (?review=1&reports=table): the reports sit in a table and
-//     a row opens the report in a side panel that Escape closes, with focus
-//     back on the row; the bar switches back to side by side;
+//   - the pick is fixed (Sahil 06/10: side by side): no design-review bar,
+//     and the old review links (?review=1&reports=table) change nothing: the
+//     past reports are a list, the newest is open beside it, and a past
+//     report opens on the page, not in a side panel;
 //   - dark mode recolours the page; at phone width the open report comes
 //     before the list and nothing scrolls sideways.
 // The suite shares one backend, so nothing here hard-codes a count.
@@ -154,30 +155,25 @@ test('Reports: Generate opens the new report first; Risk turns activity off and 
   })
 })
 
-test('Reports design review: the table layout opens a report in a side panel that Escape closes', { timeout: 180000 }, async () => {
+test('Reports: the pick is fixed (no review bar; old review links change nothing)', { timeout: 180000 }, async () => {
   const { projectId, pid } = await seedOnce()
-  const first = (await listed(pid))[0]
+  const [newest, older] = await listed(pid)
   await withPage({ width: 1440, height: 900 }, async (page) => {
+    // The flags the 06/10 review prototype read. Sahil picked "side by side";
+    // the flags are gone. The list of past reports renders in either layout,
+    // so it is the marker to wait for before checking what is absent.
     await openReports(page, projectId, '?review=1&reports=table')
-    await page.locator('[data-reports-review]').waitFor(MARKER)
-    await page.locator('[data-report-layout="table"]').waitFor(MARKER)
-    assert.equal(await page.locator('[data-review-choice="reports:table"]').getAttribute('aria-pressed'), 'true')
-    assert.equal(await page.locator('[data-report-drawer]').count(), 0, 'nothing opens on arrival')
-    assert.deepEqual(await page.locator('[data-report-layout="table"] thead th').evaluateAll((els) => els.map((el) => el.textContent.trim())), ['Report', 'Generated', 'By'])
-    const row = page.locator(`[data-report-row="${first.report_id}"]`)
-    assert.equal((await row.locator('[data-report-history]').innerText()).trim(), reportTypeLabel(first.report_type))
-    await row.locator('[data-report-history]').click()
-    const drawer = page.locator('[data-report-drawer]')
-    await drawer.waitFor(MARKER)
-    assert.equal(await drawer.locator('[role="dialog"]').getAttribute('aria-modal'), 'true')
-    await drawer.locator('[data-report-preview] h3').first().waitFor(MARKER)
-    const shown = await shownReport(drawer)
-    assert.deepEqual(shown.headings, reportSections(first.report_type, first.options?.activity_included !== false))
-    await page.keyboard.press('Escape')
-    await drawer.waitFor({ state: 'detached' })
-    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('data-report-history')), first.report_id, 'focus is back on the row')
-    await page.locator('[data-review-choice="reports:side"]').click()
-    await page.locator('[data-report-layout="side"]').waitFor(MARKER)
+    await page.locator('[data-report-list]').waitFor(MARKER)
+    assert.equal(await page.locator('[data-reports-review]').count(), 0, 'no design-review bar')
+    assert.equal(await page.locator('[data-report-layout="side"]').count(), 1, 'reports=table changes nothing: side by side')
+    assert.equal(await page.locator('[data-report-list] table').count(), 0, 'past reports are a list, not a table')
+    await page.locator(`[data-report-history="${newest.report_id}"][aria-current="true"]`).waitFor(MARKER)
+    await page.locator('[data-report-pane] [data-report-preview] h3').first().waitFor(MARKER)
+    await page.locator(`[data-report-history="${older.report_id}"]`).click()
+    await page.locator(`[data-report-history="${older.report_id}"][aria-current="true"]`).waitFor(MARKER)
+    await page.locator(`[data-report-pane] [data-report-preview="${older.report_id}"]`).waitFor(MARKER)
+    assert.equal(await page.locator('[data-report-drawer], [data-project-reports] [role="dialog"]').count(), 0, 'a past report opens on the page, not in a side panel')
+    assert.deepEqual((await shownReport(page.locator('[data-report-pane]'))).headings, reportSections(older.report_type, older.options?.activity_included !== false))
   })
 })
 

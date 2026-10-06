@@ -3164,33 +3164,6 @@ var REPORTS_CSS = `
 .dockyard-root .dy-rep-state svg { width: 26px; height: 26px; color: var(--dy-text-3); }
 .dockyard-root .dy-rep-state[role="alert"] p { color: var(--dy-danger); font-weight: 650; }
 
-/* Table + side panel: past reports in a table; a row opens the report. */
-.dockyard-root .dy-rep-reports-wrap { overflow-x: auto; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); }
-.dockyard-root .dy-rep-reports { width: 100%; border-collapse: collapse; font-size: 13px; }
-.dockyard-root .dy-rep-reports th { padding: 8px 14px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; font-weight: 800; letter-spacing: .05em; text-align: left; text-transform: uppercase; white-space: nowrap; }
-.dockyard-root .dy-rep-reports td { height: 42px; padding: 0 14px; border-top: 1px solid var(--dy-border); color: var(--dy-text-2); white-space: nowrap; }
-.dockyard-root .dy-rep-reports tbody tr { cursor: pointer; }
-.dockyard-root .dy-rep-reports tbody tr:hover { background: var(--dy-surface-subtle); }
-.dockyard-root .dy-rep-reports tr[aria-current="true"] { background: var(--dy-accent-soft); }
-.dockyard-root .dy-rep-reports button { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0; border: 0; background: transparent; color: var(--dy-text); font: inherit; font-weight: 700; cursor: pointer; }
-.dockyard-root .dy-rep-reports button svg { width: 14px; height: 14px; color: var(--dy-text-3); }
-.dockyard-root .dy-rep-reports button:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; border-radius: 4px; }
-.dockyard-root .dy-rep-none-table { padding: 16px 14px; border: 1px dashed var(--dy-border); border-radius: 10px; }
-.dockyard-root .dy-rep-drawer-layer { place-items: stretch end; padding: 0; }
-.dockyard-root .dy-rep-drawer-panel { display: grid; align-content: start; gap: 12px; width: min(820px, 100%); height: 100%; overflow-y: auto; padding: 16px 24px 28px; border-left: 1px solid var(--dy-border); background: var(--dy-surface); color: var(--dy-text); box-shadow: var(--dy-shadow); }
-.dockyard-root .dy-rep-drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.dockyard-root .dy-rep-drawer-head span { color: var(--dy-text-3); font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
-.dockyard-root .dy-rep-close { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text-2); cursor: pointer; }
-.dockyard-root .dy-rep-close svg { width: 16px; height: 16px; }
-.dockyard-root .dy-rep-close:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
-
-/* Design review bar (?review=1); removed with the losing layout after the pick. */
-.dockyard-root .dy-rep-review { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 12px; border: 1px dashed var(--dy-accent-border); border-radius: 10px; background: var(--dy-accent-soft); color: var(--dy-text); font-size: 12px; }
-.dockyard-root .dy-rep-review [role="group"] { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.dockyard-root .dy-rep-review button { min-height: 32px; padding: 0 12px; border: 1px solid var(--dy-control-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text-2); font: inherit; cursor: pointer; }
-.dockyard-root .dy-rep-review button[aria-pressed="true"] { border-color: var(--dy-action); color: var(--dy-text); font-weight: 700; }
-.dockyard-root .dy-rep-review button:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
-
 @container dockyard (max-width: 640px) {
   .dockyard-root .dy-rep-side { grid-template-columns: minmax(0, 1fr); }
   .dockyard-root .dy-rep-pane { order: -1; }
@@ -3200,8 +3173,6 @@ var REPORTS_CSS = `
   .dockyard-root .dy-rep-actions .dockyard-button { min-height: 40px; }
   .dockyard-root .dy-rep-facts { grid-template-columns: minmax(0, 1fr); }
   .dockyard-root .dy-rep-facts dd { border-top: 0; }
-  .dockyard-root .dy-rep-drawer-layer { place-items: end stretch; }
-  .dockyard-root .dy-rep-drawer-panel { width: 100%; height: auto; max-height: 90%; padding: 14px 16px 22px; border-left: 0; border-top: 1px solid var(--dy-border); border-radius: 14px 14px 0 0; }
 }
 `;
 
@@ -15566,41 +15537,6 @@ function parseReport(markdown) {
   return doc;
 }
 
-// hermes_dockyard_plugin/desktop/src/project/reports-review.js
-var REPORTS_REVIEW_DEFAULTS = { reports: "side" };
-var LAYOUTS = [["side", "Side by side"], ["table", "Table + side panel"]];
-function readReportsReview(search = globalThis.location?.search ?? "") {
-  const params = new URLSearchParams(search);
-  const reports = params.get("reports");
-  return {
-    active: params.get("review") === "1",
-    reports: LAYOUTS.some(([value]) => value === reports) ? reports : REPORTS_REVIEW_DEFAULTS.reports
-  };
-}
-function writeReportsReview(key, value) {
-  const url = new URL(globalThis.location.href);
-  url.searchParams.set(key, value);
-  globalThis.history.replaceState(globalThis.history.state, "", url);
-}
-function ReportsReviewBar({ review, onChange }) {
-  return jsxs("div", { className: "dy-rep-review", "data-reports-review": true, children: [
-    jsx("strong", { children: "Design review" }),
-    jsxs("span", { role: "group", "aria-label": "Reports tab layout", children: [
-      jsx("span", { children: "Reports tab:" }),
-      ...LAYOUTS.map(([value, text2]) => jsx("button", {
-        type: "button",
-        "aria-pressed": review.reports === value,
-        "data-review-choice": `reports:${value}`,
-        onClick: () => {
-          writeReportsReview("reports", value);
-          onChange?.();
-        },
-        children: text2
-      }, value))
-    ] })
-  ] });
-}
-
 // hermes_dockyard_plugin/desktop/src/project/reports.js
 var byline = (report) => [reportWhen(report.generated_at), report.generated_by ? `by ${report.generated_by}` : ""].filter(Boolean).join(" \xB7 ");
 function ReportControls({ type, onType, includeActivity, onActivity, generating, onGenerate, error }) {
@@ -15689,63 +15625,7 @@ function ReportList({ history, openId, onOpen }) {
     }) }, report.report_id)) }) : jsx("p", { className: "dy-rep-none", children: "No reports yet." })
   ] });
 }
-function ReportTable({ history, openId, onOpen }) {
-  if (history.length === 0) {
-    return jsx("p", { className: "dy-rep-none dy-rep-none-table", "data-report-list": true, children: "No reports yet. Pick a type above and press Generate report." });
-  }
-  return jsx("div", { className: "dy-rep-reports-wrap", "data-report-list": true, children: jsxs("table", { className: "dy-rep-reports", children: [
-    jsx("thead", { children: jsxs("tr", { children: [
-      jsx("th", { scope: "col", children: "Report" }),
-      jsx("th", { scope: "col", children: "Generated" }),
-      jsx("th", { scope: "col", children: "By" })
-    ] }) }),
-    jsx("tbody", { children: history.map((report) => jsxs("tr", {
-      "data-report-row": report.report_id,
-      "aria-current": report.report_id === openId ? "true" : void 0,
-      // The whole row opens the report; its button is the keyboard route.
-      onClick: () => onOpen(report.report_id),
-      children: [
-        jsx("td", { children: jsxs("button", { type: "button", "data-report-history": report.report_id, children: [
-          jsx("span", { children: reportTypeLabel(report.report_type) }),
-          jsx(Icon, { name: "chevron" })
-        ] }) }),
-        jsx("td", { children: reportWhen(report.generated_at) }),
-        jsx("td", { children: report.generated_by || "Unknown" })
-      ]
-    }, report.report_id)) })
-  ] }) });
-}
-function ReportDrawer({ onClose, children }) {
-  useDialogFocusManager("[data-report-drawer] .dy-rep-drawer-panel");
-  useEffect(() => {
-    const onKey = (event) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopPropagation();
-      onClose();
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
-  return jsx("section", {
-    className: "dockyard-modal-layer dy-rep-drawer-layer",
-    "data-report-drawer": true,
-    onClick: (event) => {
-      if (event.target === event.currentTarget) onClose();
-    },
-    children: jsxs("aside", { className: "dy-rep-drawer-panel", role: "dialog", "aria-modal": true, "aria-labelledby": "dy-rep-doc-title", children: [
-      jsxs("header", { className: "dy-rep-drawer-head", children: [
-        jsx("span", { children: "Report" }),
-        jsx("button", { type: "button", className: "dy-rep-close", "aria-label": "Close report", "data-report-close": true, onClick: onClose, children: jsx(Icon, { name: "x" }) })
-      ] }),
-      children
-    ] })
-  });
-}
 function ProjectReportsPanel({ project, reports, onRefresh }) {
-  const [, setReviewTick] = useState(0);
-  const review = readReportsReview();
-  const layout = review.reports;
   const [type, setType] = useState("executive");
   const [includeActivity, setIncludeActivity] = useState(true);
   const [history, setHistory] = useState(reports);
@@ -15753,7 +15633,6 @@ function ProjectReportsPanel({ project, reports, onRefresh }) {
   const [report, setReport] = useState(null);
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState(null);
-  const [drawer, setDrawer] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const wanted = useRef(null);
@@ -15761,7 +15640,6 @@ function ProjectReportsPanel({ project, reports, onRefresh }) {
     wanted.current = reportId;
     setOpenId(reportId);
     setOpenError(null);
-    if (layout === "table") setDrawer(true);
     if (scroll) {
       globalThis.requestAnimationFrame?.(() => {
         const pane = document.querySelector("[data-report-pane]");
@@ -15779,8 +15657,8 @@ function ProjectReportsPanel({ project, reports, onRefresh }) {
     if (wanted.current === reportId) setOpening(false);
   };
   useEffect(() => {
-    if (layout === "side" && !openId && history.length > 0) open(history[0].report_id);
-  }, [layout]);
+    if (!openId && history.length > 0) open(history[0].report_id);
+  }, []);
   const generate = async () => {
     setGenerating(true);
     setError(null);
@@ -15795,7 +15673,6 @@ function ProjectReportsPanel({ project, reports, onRefresh }) {
       setOpenError(null);
       setOpening(false);
       setHistory((current) => [made, ...current.filter((item) => item.report_id !== made.report_id)]);
-      if (layout === "table") setDrawer(true);
       onRefresh?.();
     } catch (failure) {
       setError(String(failure?.message ?? failure));
@@ -15821,7 +15698,6 @@ function ProjectReportsPanel({ project, reports, onRefresh }) {
     onDownload: download
   });
   return jsxs("section", { className: "dy-rep", "data-project-reports": true, children: [
-    review.active ? jsx(ReportsReviewBar, { review, onChange: () => setReviewTick((tick) => tick + 1) }) : null,
     jsx(ReportControls, {
       type,
       onType: setType,
@@ -15831,10 +15707,7 @@ function ProjectReportsPanel({ project, reports, onRefresh }) {
       onGenerate: generate,
       error
     }),
-    layout === "table" ? jsxs("div", { className: "dy-rep-tablelayout", "data-report-layout": "table", children: [
-      jsx(ReportTable, { history, openId, onOpen: open }),
-      drawer && openId ? jsx(ReportDrawer, { onClose: () => setDrawer(false), children: body }) : null
-    ] }) : jsxs("div", { className: "dy-rep-side", "data-report-layout": "side", children: [
+    jsxs("div", { className: "dy-rep-side", "data-report-layout": "side", children: [
       jsx(ReportList, { history, openId, onOpen: open }),
       jsx("article", { className: "dy-rep-pane", "data-report-pane": true, children: body })
     ] })

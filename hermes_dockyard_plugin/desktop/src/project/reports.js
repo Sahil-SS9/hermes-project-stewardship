@@ -8,11 +8,9 @@
 // lib/report-vocab.js; the backend writes new reports in plain words
 // (persistence/report_words.py).
 //
-// Two layouts are in design review (?review=1, reports-review.js):
-//   side   past reports on the left, the open report beside them (default)
-//   table  past reports in a table; a report opens in a side panel
-// They share this file's controls, page, words and actions, so they differ
-// only in layout. Once Sahil picks, the losing layout and the bar go.
+// Side by side (Sahil's pick, 06/10, DESIGN-ROUND-C7-R1.md): past reports
+// on the left, the open report beside them, and the newest report open on
+// arrival. At phone width the open report comes first, the list after it.
 import { useEffect } from '../runtime/react.js'
 import { useRef } from '../runtime/react.js'
 import { useState } from '../runtime/react.js'
@@ -23,7 +21,6 @@ import { emitToast } from '../runtime/context.js'
 import { _os } from '../runtime/context.js'
 import { Button } from '../lib/ui.js'
 import { Icon } from '../lib/ui.js'
-import { useDialogFocusManager } from '../lib/ui.js'
 import { reportDownloadFilename } from '../../download.js'
 import { downloadTextFile } from '../../download.js'
 import { REPORT_TYPES } from '../lib/report-vocab.js'
@@ -32,8 +29,6 @@ import { reportHint } from '../lib/report-vocab.js'
 import { reportTypeLabel } from '../lib/report-vocab.js'
 import { reportWhen } from '../lib/report-vocab.js'
 import { takesActivity } from '../lib/report-vocab.js'
-import { readReportsReview } from './reports-review.js'
-import { ReportsReviewBar } from './reports-review.js'
 
 const byline = (report) => [reportWhen(report.generated_at), report.generated_by ? `by ${report.generated_by}` : ''].filter(Boolean).join(' · ')
 
@@ -133,59 +128,7 @@ function ReportList({ history, openId, onOpen }) {
   ]})
 }
 
-function ReportTable({ history, openId, onOpen }) {
-  if (history.length === 0) {
-    return jsx('p', { className: 'dy-rep-none dy-rep-none-table', 'data-report-list': true, children: 'No reports yet. Pick a type above and press Generate report.' })
-  }
-  return jsx('div', { className: 'dy-rep-reports-wrap', 'data-report-list': true, children: jsxs('table', { className: 'dy-rep-reports', children: [
-    jsx('thead', { children: jsxs('tr', { children: [
-      jsx('th', { scope: 'col', children: 'Report' }), jsx('th', { scope: 'col', children: 'Generated' }), jsx('th', { scope: 'col', children: 'By' }),
-    ]}) }),
-    jsx('tbody', { children: history.map((report) => jsxs('tr', {
-      'data-report-row': report.report_id, 'aria-current': report.report_id === openId ? 'true' : undefined,
-      // The whole row opens the report; its button is the keyboard route.
-      onClick: () => onOpen(report.report_id),
-      children: [
-        jsx('td', { children: jsxs('button', { type: 'button', 'data-report-history': report.report_id, children: [
-          jsx('span', { children: reportTypeLabel(report.report_type) }), jsx(Icon, { name: 'chevron' }),
-        ]}) }),
-        jsx('td', { children: reportWhen(report.generated_at) }),
-        jsx('td', { children: report.generated_by || 'Unknown' }),
-      ],
-    }, report.report_id)) }),
-  ]}) })
-}
-
-function ReportDrawer({ onClose, children }) {
-  // Initial focus, Tab kept inside, and focus back to the row on close.
-  useDialogFocusManager('[data-report-drawer] .dy-rep-drawer-panel')
-  useEffect(() => {
-    const onKey = (event) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      event.stopPropagation()
-      onClose()
-    }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [onClose])
-  return jsx('section', {
-    className: 'dockyard-modal-layer dy-rep-drawer-layer', 'data-report-drawer': true,
-    onClick: (event) => { if (event.target === event.currentTarget) onClose() },
-    children: jsxs('aside', { className: 'dy-rep-drawer-panel', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'dy-rep-doc-title', children: [
-      jsxs('header', { className: 'dy-rep-drawer-head', children: [
-        jsx('span', { children: 'Report' }),
-        jsx('button', { type: 'button', className: 'dy-rep-close', 'aria-label': 'Close report', 'data-report-close': true, onClick: onClose, children: jsx(Icon, { name: 'x' }) }),
-      ]}),
-      children,
-    ]}),
-  })
-}
-
 export function ProjectReportsPanel({ project, reports, onRefresh }) {
-  const [, setReviewTick] = useState(0)
-  const review = readReportsReview()
-  const layout = review.reports
   const [type, setType] = useState('executive')
   const [includeActivity, setIncludeActivity] = useState(true)
   const [history, setHistory] = useState(reports)
@@ -193,7 +136,6 @@ export function ProjectReportsPanel({ project, reports, onRefresh }) {
   const [report, setReport] = useState(null)
   const [opening, setOpening] = useState(false)
   const [openError, setOpenError] = useState(null)
-  const [drawer, setDrawer] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState(null)
   // The report asked for last: a slower earlier answer must not replace it.
@@ -203,7 +145,6 @@ export function ProjectReportsPanel({ project, reports, onRefresh }) {
     wanted.current = reportId
     setOpenId(reportId)
     setOpenError(null)
-    if (layout === 'table') setDrawer(true)
     if (scroll) {
       // At phone width the page sits above the list: bring it into view.
       globalThis.requestAnimationFrame?.(() => {
@@ -221,11 +162,11 @@ export function ProjectReportsPanel({ project, reports, onRefresh }) {
     }
     if (wanted.current === reportId) setOpening(false)
   }
-  // Side by side opens the newest report on arrival, so the page is never an
-  // empty frame when reports exist. The table opens nothing until asked.
+  // The newest report opens on arrival, so the page is never an empty frame
+  // when reports exist.
   useEffect(() => {
-    if (layout === 'side' && !openId && history.length > 0) open(history[0].report_id)
-  }, [layout])
+    if (!openId && history.length > 0) open(history[0].report_id)
+  }, [])
 
   const generate = async () => {
     setGenerating(true)
@@ -240,7 +181,6 @@ export function ProjectReportsPanel({ project, reports, onRefresh }) {
       setOpenError(null)
       setOpening(false)
       setHistory((current) => [made, ...current.filter((item) => item.report_id !== made.report_id)])
-      if (layout === 'table') setDrawer(true)
       onRefresh?.()
     } catch (failure) {
       setError(String(failure?.message ?? failure))
@@ -266,19 +206,13 @@ export function ProjectReportsPanel({ project, reports, onRefresh }) {
   })
 
   return jsxs('section', { className: 'dy-rep', 'data-project-reports': true, children: [
-    review.active ? jsx(ReportsReviewBar, { review, onChange: () => setReviewTick((tick) => tick + 1) }) : null,
     jsx(ReportControls, {
       type, onType: setType, includeActivity, onActivity: setIncludeActivity,
       generating, onGenerate: generate, error,
     }),
-    layout === 'table'
-      ? jsxs('div', { className: 'dy-rep-tablelayout', 'data-report-layout': 'table', children: [
-          jsx(ReportTable, { history, openId, onOpen: open }),
-          drawer && openId ? jsx(ReportDrawer, { onClose: () => setDrawer(false), children: body }) : null,
-        ]})
-      : jsxs('div', { className: 'dy-rep-side', 'data-report-layout': 'side', children: [
-          jsx(ReportList, { history, openId, onOpen: open }),
-          jsx('article', { className: 'dy-rep-pane', 'data-report-pane': true, children: body }),
-        ]}),
+    jsxs('div', { className: 'dy-rep-side', 'data-report-layout': 'side', children: [
+      jsx(ReportList, { history, openId, onOpen: open }),
+      jsx('article', { className: 'dy-rep-pane', 'data-report-pane': true, children: body }),
+    ]}),
   ]})
 }

@@ -1,9 +1,9 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 //
-// C7 Reports (06/10): the Reports tab: the Generate controls, the list or
-// table of past reports, the open report as a formatted page, and the side
-// panel the table layout opens it in. Scoped to .dockyard-root and built only
+// C7 Reports (06/10): the Reports tab: the Generate controls, the list of
+// past reports, and the open report beside it as a formatted page (Sahil's
+// pick: side by side). Scoped to .dockyard-root and built only
 // from the shell's colour tokens, so light, dark and auto all work
 // (reports-css.test.mjs checks every token used is defined in both themes).
 export const REPORTS_CSS = `
@@ -63,33 +63,6 @@ export const REPORTS_CSS = `
 .dockyard-root .dy-rep-state svg { width: 26px; height: 26px; color: var(--dy-text-3); }
 .dockyard-root .dy-rep-state[role="alert"] p { color: var(--dy-danger); font-weight: 650; }
 
-/* Table + side panel: past reports in a table; a row opens the report. */
-.dockyard-root .dy-rep-reports-wrap { overflow-x: auto; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); }
-.dockyard-root .dy-rep-reports { width: 100%; border-collapse: collapse; font-size: 13px; }
-.dockyard-root .dy-rep-reports th { padding: 8px 14px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; font-weight: 800; letter-spacing: .05em; text-align: left; text-transform: uppercase; white-space: nowrap; }
-.dockyard-root .dy-rep-reports td { height: 42px; padding: 0 14px; border-top: 1px solid var(--dy-border); color: var(--dy-text-2); white-space: nowrap; }
-.dockyard-root .dy-rep-reports tbody tr { cursor: pointer; }
-.dockyard-root .dy-rep-reports tbody tr:hover { background: var(--dy-surface-subtle); }
-.dockyard-root .dy-rep-reports tr[aria-current="true"] { background: var(--dy-accent-soft); }
-.dockyard-root .dy-rep-reports button { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0; border: 0; background: transparent; color: var(--dy-text); font: inherit; font-weight: 700; cursor: pointer; }
-.dockyard-root .dy-rep-reports button svg { width: 14px; height: 14px; color: var(--dy-text-3); }
-.dockyard-root .dy-rep-reports button:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; border-radius: 4px; }
-.dockyard-root .dy-rep-none-table { padding: 16px 14px; border: 1px dashed var(--dy-border); border-radius: 10px; }
-.dockyard-root .dy-rep-drawer-layer { place-items: stretch end; padding: 0; }
-.dockyard-root .dy-rep-drawer-panel { display: grid; align-content: start; gap: 12px; width: min(820px, 100%); height: 100%; overflow-y: auto; padding: 16px 24px 28px; border-left: 1px solid var(--dy-border); background: var(--dy-surface); color: var(--dy-text); box-shadow: var(--dy-shadow); }
-.dockyard-root .dy-rep-drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.dockyard-root .dy-rep-drawer-head span { color: var(--dy-text-3); font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
-.dockyard-root .dy-rep-close { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text-2); cursor: pointer; }
-.dockyard-root .dy-rep-close svg { width: 16px; height: 16px; }
-.dockyard-root .dy-rep-close:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
-
-/* Design review bar (?review=1); removed with the losing layout after the pick. */
-.dockyard-root .dy-rep-review { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 12px; border: 1px dashed var(--dy-accent-border); border-radius: 10px; background: var(--dy-accent-soft); color: var(--dy-text); font-size: 12px; }
-.dockyard-root .dy-rep-review [role="group"] { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.dockyard-root .dy-rep-review button { min-height: 32px; padding: 0 12px; border: 1px solid var(--dy-control-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text-2); font: inherit; cursor: pointer; }
-.dockyard-root .dy-rep-review button[aria-pressed="true"] { border-color: var(--dy-action); color: var(--dy-text); font-weight: 700; }
-.dockyard-root .dy-rep-review button:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
-
 @container dockyard (max-width: 640px) {
   .dockyard-root .dy-rep-side { grid-template-columns: minmax(0, 1fr); }
   .dockyard-root .dy-rep-pane { order: -1; }
@@ -99,7 +72,5 @@ export const REPORTS_CSS = `
   .dockyard-root .dy-rep-actions .dockyard-button { min-height: 40px; }
   .dockyard-root .dy-rep-facts { grid-template-columns: minmax(0, 1fr); }
   .dockyard-root .dy-rep-facts dd { border-top: 0; }
-  .dockyard-root .dy-rep-drawer-layer { place-items: end stretch; }
-  .dockyard-root .dy-rep-drawer-panel { width: 100%; height: auto; max-height: 90%; padding: 14px 16px 22px; border-left: 0; border-top: 1px solid var(--dy-border); border-radius: 14px 14px 0 0; }
 }
 `
