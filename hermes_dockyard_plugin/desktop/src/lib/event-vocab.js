@@ -87,8 +87,10 @@ function describeHealth(payload) {
   }
   return {
     kind: 'health', icon: 'activity', label: 'Health changed',
-    title: !to ? '' : from ? `${healthWord(from)} → ${healthWord(to)}` : `Now ${healthWord(to)}`,
-    note: Number.isFinite(score) ? `Score ${score}` : '',
+    title: !to ? '' : from ? `${healthWord(from)} → ${healthWord(to)}` : healthWord(to),
+    // An unverified project carries score 0 in the payload; that is not a
+    // measurement, so no score is shown for it (unavailable is not zero).
+    note: Number.isFinite(score) && to && to !== 'unknown' ? `Score ${score}` : '',
     effect: change,
   }
 }

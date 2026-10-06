@@ -180,13 +180,17 @@ export function RecentActivityCard({ view, onViewAll }) {
       jsx('button', { type: 'button', className: 'dy-act-viewall', 'data-activity-view-all': true, onClick: onViewAll, children: 'View all' }),
     ]}),
     jsx('p', { children: 'What happened on this project lately.' }),
-    rows.length > 0 ? jsx('div', { className: 'dockyard-overview-list activity', children: rows.map((row) => jsxs('article', { 'data-activity-row': row.key, children: [
-      jsxs('span', { children: [
-        jsx('strong', { children: row.title ? `${row.label} · ${row.title}` : row.label }),
-        jsx('small', { title: fullTime(row.ts), children: [row.by, timeAgo(row.ts) ?? 'time not recorded'].join(' · ') }),
-      ]}),
-      jsx(Impact, { row }),
-    ]}, row.key)) })
+    rows.length > 0 ? jsx('div', { className: 'dockyard-overview-list activity', children: rows.map((row) => {
+      const words = row.title ? `${row.label} · ${row.title}` : row.label
+      return jsxs('article', { 'data-activity-row': row.key, children: [
+        jsxs('span', { children: [
+          jsx('strong', { title: words, children: words }),
+          jsx('small', { title: fullTime(row.ts), children: [row.by, timeAgo(row.ts) ?? 'time not recorded'].join(' · ') }),
+        ]}),
+        // A small card: no placeholder dash when the event has no impact.
+        row.effect ? jsx(Impact, { row }) : null,
+      ]}, row.key)
+    }) })
       : jsx('p', { className: 'dockyard-meta', children: 'No events recorded yet.' }),
   ]})
 }

@@ -3154,6 +3154,7 @@ var ACTIVITY_CSS = `
 /* The Overview "Recent activity" card with the tab's words. */
 .dockyard-root .dockyard-overview-card[data-overview-activity="words"] .dockyard-overview-list.activity article { grid-template-columns: minmax(0, 1fr) auto; }
 .dockyard-root .dockyard-overview-card[data-overview-activity="words"] .dockyard-status-tag { max-width: 190px; }
+.dockyard-root .dockyard-overview-card[data-overview-activity="words"] .dockyard-overview-list strong { display: -webkit-box; overflow: hidden; white-space: normal; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .dockyard-root .dy-act-viewall { padding: 2px 4px; border: 0; background: none; color: var(--dy-action); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .dockyard-root .dy-act-viewall:hover { text-decoration: underline; }
 
@@ -18182,8 +18183,10 @@ function describeHealth(payload) {
     kind: "health",
     icon: "activity",
     label: "Health changed",
-    title: !to ? "" : from ? `${healthWord(from)} \u2192 ${healthWord(to)}` : `Now ${healthWord(to)}`,
-    note: Number.isFinite(score) ? `Score ${score}` : "",
+    title: !to ? "" : from ? `${healthWord(from)} \u2192 ${healthWord(to)}` : healthWord(to),
+    // An unverified project carries score 0 in the payload; that is not a
+    // measurement, so no score is shown for it (unavailable is not zero).
+    note: Number.isFinite(score) && to && to !== "unknown" ? `Score ${score}` : "",
     effect: change
   };
 }
@@ -18495,13 +18498,17 @@ function RecentActivityCard({ view, onViewAll }) {
       jsx("button", { type: "button", className: "dy-act-viewall", "data-activity-view-all": true, onClick: onViewAll, children: "View all" })
     ] }),
     jsx("p", { children: "What happened on this project lately." }),
-    rows.length > 0 ? jsx("div", { className: "dockyard-overview-list activity", children: rows.map((row) => jsxs("article", { "data-activity-row": row.key, children: [
-      jsxs("span", { children: [
-        jsx("strong", { children: row.title ? `${row.label} \xB7 ${row.title}` : row.label }),
-        jsx("small", { title: fullTime(row.ts), children: [row.by, timeAgo(row.ts) ?? "time not recorded"].join(" \xB7 ") })
-      ] }),
-      jsx(Impact, { row })
-    ] }, row.key)) }) : jsx("p", { className: "dockyard-meta", children: "No events recorded yet." })
+    rows.length > 0 ? jsx("div", { className: "dockyard-overview-list activity", children: rows.map((row) => {
+      const words2 = row.title ? `${row.label} \xB7 ${row.title}` : row.label;
+      return jsxs("article", { "data-activity-row": row.key, children: [
+        jsxs("span", { children: [
+          jsx("strong", { title: words2, children: words2 }),
+          jsx("small", { title: fullTime(row.ts), children: [row.by, timeAgo(row.ts) ?? "time not recorded"].join(" \xB7 ") })
+        ] }),
+        // A small card: no placeholder dash when the event has no impact.
+        row.effect ? jsx(Impact, { row }) : null
+      ] }, row.key);
+    }) }) : jsx("p", { className: "dockyard-meta", children: "No events recorded yet." })
   ] });
 }
 

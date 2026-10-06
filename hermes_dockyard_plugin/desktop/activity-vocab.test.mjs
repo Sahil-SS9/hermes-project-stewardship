@@ -114,8 +114,11 @@ test('health: the same words as the rest of the app, and the direction of the ch
   assert.deepEqual(worse.effect, { label: 'Health worse', tone: 'danger' })
   assert.deepEqual(describeEvent(event('project.health.changed', { payload: { from: 'healthy', to: 'watch' } })).effect, { label: 'Health worse', tone: 'warning' })
   assert.deepEqual(describeEvent(event('project.health.changed', { payload: { from: 'degraded', to: 'healthy' } })).effect, { label: 'Health better', tone: 'success' })
-  const first = describeEvent(event('project.health.changed', { payload: { from: null, to: 'healthy' } }))
-  assert.deepEqual([first.title, first.effect], ['Now Healthy', { label: 'First reading', tone: 'neutral' }])
+  const first = describeEvent(event('project.health.changed', { payload: { from: null, to: 'healthy', score: 88 } }))
+  assert.deepEqual([first.title, first.note, first.effect], ['Healthy', 'Score 88', { label: 'First reading', tone: 'neutral' }])
+  // The first read-only assessment of a new project sends this exact payload.
+  const unverified = describeEvent(event('project.health.changed', { subject: 'none->unknown', payload: { from: null, score: 0.0, snapshot_id: 1, to: 'unknown' } }))
+  assert.deepEqual([unverified.title, unverified.note], ['Not verified', ''], 'no "Score 0" for a project nobody could verify')
   assert.deepEqual(describeEvent(event('project.health.changed', { payload: { from: 'unknown', to: 'healthy' } })).effect, { label: 'Health changed', tone: 'neutral' }, 'no direction is claimed from "Not verified"')
 
   const critical = describeEvent(event('project.critical', { subject: 'snapshot:5', payload: { contradictions: [{}, {}], auto_freeze: true } }))

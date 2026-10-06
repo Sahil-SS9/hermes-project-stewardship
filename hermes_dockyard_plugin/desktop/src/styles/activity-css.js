@@ -69,6 +69,7 @@ export const ACTIVITY_CSS = `
 /* The Overview "Recent activity" card with the tab's words. */
 .dockyard-root .dockyard-overview-card[data-overview-activity="words"] .dockyard-overview-list.activity article { grid-template-columns: minmax(0, 1fr) auto; }
 .dockyard-root .dockyard-overview-card[data-overview-activity="words"] .dockyard-status-tag { max-width: 190px; }
+.dockyard-root .dockyard-overview-card[data-overview-activity="words"] .dockyard-overview-list strong { display: -webkit-box; overflow: hidden; white-space: normal; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .dockyard-root .dy-act-viewall { padding: 2px 4px; border: 0; background: none; color: var(--dy-action); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .dockyard-root .dy-act-viewall:hover { text-decoration: underline; }
 
