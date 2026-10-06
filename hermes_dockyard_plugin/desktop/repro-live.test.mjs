@@ -1480,11 +1480,15 @@ async function testPhase5ManagementJourneys() {
   await runtime.click('[data-tab="project"]', 80);
   await runtime.click('[data-project-view="workflows"]');
   assert(doc.querySelector('[data-executable-workflows]'), 'executable workflow surface is missing');
-  await runtime.setValue('[data-workflow-name]', 'release');
+  // The side form only creates (06/10/2026, WORKFLOWS-R1.md bug 2): typing an
+  // existing name used to post a one-step version that replaced the workflow.
+  await runtime.setValue('[data-workflow-name]', 'verify-release');
   await runtime.setValue('[data-workflow-title]', 'Verify release');
   await runtime.click('[data-action="define-workflow"]', 80);
-  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/workflows/release/versions'), 'workflow version definition did not reach proxy');
+  assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/workflows' && call.body?.name === 'verify-release'), 'workflow definition did not reach proxy');
+  assert(!runtime.calls.some((call) => call.path === '/projects/payments-relaunch/workflows/release/versions'), 'the side form posted a version over an existing workflow');
   await runtime.click('[data-project-view="workflows"]');
+  await runtime.click('[data-workflow-library-item="release"]', 80);
   await runtime.setValue('[data-workflow-run-key="release"]', 'browser-run-1');
   // Explicit version start lives in the toolbar Versions menu; the primary
   // toolbar button starts the latest version only.

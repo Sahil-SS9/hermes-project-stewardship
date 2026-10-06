@@ -14836,6 +14836,18 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     phase_team: n.phase_team ?? null,
     canvas_position: n.canvas_position ?? void 0
   }));
+  const storedById = new Map(nodes.map((n) => [n.node_id ?? n.id, n]));
+  const toDefinitionNodes = (editedNodes) => editedNodes.map(({ node_id, title: nodeTitle, depends_on, human_gate, task_ref, kind, phase_team, canvas_position }) => ({
+    ...storedById.get(node_id) ?? {},
+    id: node_id,
+    title: nodeTitle,
+    depends_on,
+    human_gate,
+    task_ref,
+    kind,
+    phase_team,
+    canvas_position
+  }));
   const loadRuns = async (workflow = current?.name) => {
     if (!workflow) return;
     try {
@@ -14853,7 +14865,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     const visibleRuns = mode === "live" ? runs : [];
     return mountDesktopWorkflowCanvas(canvasRef.current, project.id, current.name, definition, visibleRuns, {
       onEdit: async (editedNodes) => {
-        await api(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/versions`, { method: "POST", body: { nodes: editedNodes.map(({ node_id, title: title2, depends_on, human_gate, task_ref, kind, phase_team, canvas_position }) => ({ id: node_id, title: title2, depends_on, human_gate, task_ref, kind, phase_team, canvas_position })) } });
+        await api(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/versions`, { method: "POST", body: { nodes: toDefinitionNodes(editedNodes) } });
         onRefresh?.();
       },
       // Gate decisions use the same canonical authority as the dashboard: the
@@ -14888,18 +14900,17 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
       return false;
     }
   };
+  const nameTaken = grouped.some((item) => item.name === name.trim());
   const define = () => {
-    if (!name.trim() || !title.trim()) return;
-    const existing = grouped.find((item) => item.name === name.trim());
-    const path = `/projects/${encoded}/workflows${existing ? `/${encodeURIComponent(name.trim())}/versions` : ""}`;
-    mutate(path, { ...existing ? {} : { name: name.trim() }, nodes: [{ id: "step-1", title: title.trim(), depends_on: [], human_gate: false, team: team || null, phase_team: phaseTeams["step-1"] || null }] });
+    if (!name.trim() || !title.trim() || nameTaken) return;
+    mutate(`/projects/${encoded}/workflows`, { name: name.trim(), nodes: [{ id: "step-1", title: title.trim(), depends_on: [], human_gate: false, team: team || null, phase_team: phaseTeams["step-1"] || null }] });
     setSelected(name.trim());
     setTitle("");
   };
   const persistNodes = (nextNodes) => {
     if (!current) return Promise.resolve(false);
     return mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/versions`, {
-      nodes: nextNodes.map(({ node_id, title: nodeTitle, depends_on, human_gate, task_ref, kind, phase_team, canvas_position }) => ({ id: node_id, title: nodeTitle, depends_on, human_gate, task_ref, kind, phase_team, canvas_position }))
+      nodes: toDefinitionNodes(nextNodes)
     });
   };
   const addNode = (gate) => {
@@ -14979,7 +14990,8 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
           jsxs("label", { children: [jsx("span", { children: "Phase title" }), jsx("input", { "data-workflow-title": true, value: title, onChange: (event) => setTitle(event.target.value) })] }),
           jsxs("label", { children: [jsx("span", { children: "Default bot team" }), jsx("input", { "data-workflow-team": true, value: team, placeholder: "team slug", onChange: (event) => setTeam(event.target.value) })] }),
           jsxs("label", { children: [jsx("span", { children: "Run key" }), jsx("input", { "data-workflow-run-key": current?.name ?? name, value: runKey, onChange: (event) => setRunKey(event.target.value), placeholder: "execution key" })] }),
-          jsx(Button, { action: "define-workflow", variant: "primary", disabled: !name.trim() || !title.trim(), onClick: define, children: current ? "Save planning version" : "Create instance" })
+          nameTaken ? jsx("p", { className: "dockyard-meta", role: "status", "data-workflow-name-taken": name.trim(), children: `"${name.trim()}" already exists. Pick a new name; to change "${name.trim()}", edit it on the canvas.` }) : null,
+          jsx(Button, { action: "define-workflow", variant: "primary", disabled: !name.trim() || !title.trim() || nameTaken, onClick: define, children: "Create workflow" })
         ] })
       ] }),
       // ---- Zone 2: toolbar + run readout + canvas (the surface) ----------
