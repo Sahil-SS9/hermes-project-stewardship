@@ -144,12 +144,27 @@ def test_milestone_server_error_branches_are_explicit(client):
     assert client.post(f"{base}/none/detach", json={"ref": "x"}).status_code == 409
 
 
-@pytest.mark.parametrize(("status", "payload"), [
-    (404, {"detail": "missing"}),
-    (422, {"detail": "invalid"}),
-    (500, {"detail": "boom"}),
+@pytest.mark.parametrize(("status", "payload", "expected", "code"), [
+    # The Dockyard API's own envelope (api/middleware.py): the message is the
+    # detail, the code rides in a header, field reasons join the message.
+    (422, {"error": {"code": "validation_error",
+                     "message": "workflow dependencies must reference existing nodes"}},
+     "workflow dependencies must reference existing nodes", "validation_error"),
+    (422, {"error": {"code": "validation_error", "message": "invalid",
+                     "fields": {"name": "too long"}}},
+     "invalid (name: too long)", "validation_error"),
+    (409, {"error": {"code": "idempotency_conflict", "message": "key reused"}},
+     "key reused", "idempotency_conflict"),
+    # FastAPI-style bodies are unwrapped the same way.
+    (404, {"detail": "missing"}, "missing", None),
+    (500, {"detail": "boom"}, "boom", None),
+    (422, {"detail": [{"loc": ["body", "nodes"], "msg": "field required"},
+                      {"loc": ["body", "name"], "msg": "too long"}]},
+     "field required; too long", None),
+    (403, {"detail": {"required_capability": "project_archive"}},
+     {"required_capability": "project_archive"}, None),
 ])
-def test_milestone_proxy_propagates_backend_failures(client, monkeypatch, status, payload):
+def test_milestone_proxy_propagates_backend_failures(client, monkeypatch, status, payload, expected, code):
     class Response:
         status_code = status
         text = str(payload)
@@ -161,7 +176,27 @@ def test_milestone_proxy_propagates_backend_failures(client, monkeypatch, status
     monkeypatch.setattr(plugin_api, "_client", Backend())
     response = client.get("/api/plugins/hermes-dockyard/projects/p/milestones")
     assert response.status_code == status
-    assert response.json()["detail"]["detail"] == payload["detail"]
+    # The reason is the bridge's own detail: the Desktop host prints
+    # "<status>: <detail>", and the old nested object printed as
+    # "[object Object]" (07/10/2026).
+    assert response.json()["detail"] == expected
+    assert response.headers.get("x-dockyard-error-code") == code
+
+
+def test_proxy_reports_a_non_json_failure_as_text(client, monkeypatch):
+    class Response:
+        status_code = 502
+        text = "upstream exploded"
+        def json(self):
+            raise ValueError("not json")
+    class Backend:
+        async def request(self, *_args, **_kwargs):
+            return Response()
+    monkeypatch.setattr(plugin_api, "_client", Backend())
+    response = client.get("/api/plugins/hermes-dockyard/projects/p/milestones")
+    assert response.status_code == 502
+    assert response.json()["detail"] == "upstream exploded"
+    assert response.headers.get("x-dockyard-error-code") == "upstream_error"
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX file modes only")
@@ -265,7 +300,9 @@ def test_existing_onboarding_rejects_conflicting_default_key_reuse(client):
         "project_id": "alpha", "repo_path": "/srv/a",
         "mission": "again", "lead_profile": "octacon"})
     assert r.status_code == 409
-    assert r.json()["detail"]["error"]["code"] == "idempotency_conflict"
+    # The code travels in a header; the detail is the readable message.
+    assert r.headers["x-dockyard-error-code"] == "idempotency_conflict"
+    assert isinstance(r.json()["detail"], str) and r.json()["detail"]
 
 
 def test_rich_dashboard_reads_are_exposed_through_plugin_router(client):

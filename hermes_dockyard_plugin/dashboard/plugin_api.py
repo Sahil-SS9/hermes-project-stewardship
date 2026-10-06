@@ -148,21 +148,53 @@ async def _proxy(method: str, path: str, json_body: dict | None = None,
     )
     logger.debug("Upstream %s %s -> %s", method, path, response.status_code)
     if response.status_code >= 400:
-        try:
-            detail = response.json()
-        except ValueError:
-            # cor-003: upstream non-JSON failures (plain-text 500s) must not
-            # become an opaque JSONDecodeError here.
-            detail = {"error": {"code": "upstream_error",
-                                "message": response.text[:500]}}
+        detail, code = _upstream_error(response)
         logger.error("Upstream error %s on %s %s",
                      response.status_code, method, path)
-        raise HTTPException(status_code=response.status_code, detail=detail)
+        raise HTTPException(
+            status_code=response.status_code, detail=detail,
+            headers={"X-Dockyard-Error-Code": code} if code else None)
     try:
         return response.json()
     except ValueError:
         logger.error("Upstream returned invalid JSON on successful %s %s", method, path)
         raise HTTPException(502, "Dockyard returned an invalid response")
+
+
+def _upstream_error(response) -> tuple[object, str | None]:
+    """A refusal from the Dockyard API as (detail, error code).
+
+    The API answers every error as ``{"error": {"code", "message",
+    "fields"?}}`` (api/middleware.py). Passing that whole body on as this
+    route's detail put the message two levels down, and the Desktop host,
+    which prints ``<status>: <detail>``, showed every refusal as
+    "[object Object]" (07/10/2026, WORKFLOWS-R1.md finding 10). The detail is
+    now the message a person reads; the code travels in the
+    ``X-Dockyard-Error-Code`` header. FastAPI-style ``{"detail": ...}`` bodies
+    are unwrapped the same way; anything else passes through unchanged.
+    """
+    try:
+        body = response.json()
+    except ValueError:
+        # cor-003: upstream non-JSON failures (plain-text 500s) must not
+        # become an opaque JSONDecodeError here.
+        return (response.text[:500] or "Dockyard returned an error"), "upstream_error"
+    if isinstance(body, dict) and isinstance(body.get("error"), dict):
+        error = body["error"]
+        message = str(error.get("message") or "request failed")
+        fields = error.get("fields")
+        if isinstance(fields, dict) and fields:
+            message += " (" + "; ".join(f"{name}: {reason}" for name, reason in fields.items()) + ")"
+        return message, (str(error["code"]) if error.get("code") else None)
+    if isinstance(body, dict) and "detail" in body:
+        detail = body["detail"]
+        if isinstance(detail, list):
+            messages = [str(item["msg"]) for item in detail
+                        if isinstance(item, dict) and item.get("msg")]
+            if messages:
+                return "; ".join(messages), None
+        return detail, None
+    return body, None
 
 
 _PROFILE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
