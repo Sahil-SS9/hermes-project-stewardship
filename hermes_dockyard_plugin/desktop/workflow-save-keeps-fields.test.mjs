@@ -43,13 +43,25 @@ const UNMANAGED = { build: ['body'], test: ['body', 'loop'], fix: ['body', 'when
 const byId = (version) => Object.fromEntries(version.definition.nodes.map((node) => [node.id, node]))
 const nodeIn = (page, name, id) => page.locator(`[data-workflow-canvas="${name}"] g.dy-wf-node[data-node-id="${id}"]`)
 
-async function openWorkflow(page, name) {
+async function openWorkflow(page, name, runsInFlight) {
   await page.goto(BASE)
   await pickProject(page, PROJECT)
   await page.locator('[data-tab="project"]').click()
   await page.locator('[data-project-view="workflows"]').click()
   await page.locator(`[data-workflow-library-item="${name}"]`).click()
   await nodeIn(page, name, 'build').waitFor()
+  // The screen rebuilds the canvas each time a workflow's runs arrive, and
+  // opening one fetches them twice (WORKFLOWS-R1.md finding 13, fixed
+  // separately). Act only once no runs request is pending and the step has
+  // stayed the same element for 300 ms, so these tests measure saving and not
+  // that rebuild. Under load the rebuild raced the drag (gate ee2b720 run 1).
+  const step = `[data-workflow-canvas="${name}"] g.dy-wf-node[data-node-id="build"]`
+  await until(async () => runsInFlight.size === 0 && page.evaluate((selector) => {
+    const element = document.querySelector(selector)
+    const watch = window.__settle ?? (window.__settle = {})
+    if (!element || watch.element !== element) { watch.element = element; watch.since = performance.now(); return false }
+    return performance.now() - watch.since >= 300
+  }, step), 'the canvas never settled after opening the workflow')
 }
 
 async function withRichWorkflow(slug, run) {
@@ -60,7 +72,12 @@ async function withRichWorkflow(slug, run) {
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
     page.setDefaultTimeout(8000)
-    await openWorkflow(page, name)
+    const runsInFlight = new Set()
+    const isRuns = (request) => request.url().includes(`/workflows/${name}/runs`)
+    page.on('request', (request) => { if (isRuns(request)) runsInFlight.add(request) })
+    page.on('requestfinished', (request) => runsInFlight.delete(request))
+    page.on('requestfailed', (request) => runsInFlight.delete(request))
+    await openWorkflow(page, name, runsInFlight)
     await run(page, name)
   } finally { await browser.close() }
 }
