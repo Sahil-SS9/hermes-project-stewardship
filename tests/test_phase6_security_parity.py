@@ -280,18 +280,22 @@ def test_pm0605_every_dashboard_call_resolves_to_backend_route(phase6):
             assert resp.status_code != 500, f"{method.upper()} {path} leaks a raw error"
             payload = resp.json()
             if resp.status_code >= 400:
-                # Truthful failure contract: the backend error envelope
-                # crosses the proxy either normalised ({"error": ...}) or
-                # pass-through ({"detail": {"error": ...}}). A missing
-                # method/path would instead surface as FastAPI's bare
-                # route-miss shape {"detail": "Not Found"} — that exact
-                # shape is the false-empty failure this test refuses.
+                # Truthful failure contract: a backend refusal crosses the
+                # proxy as its readable message (the detail) with the
+                # backend's error code in the X-Dockyard-Error-Code header, or
+                # normalised ({"error": ...}). Until 07/10/2026 the whole
+                # envelope was nested inside the detail, and the Desktop host
+                # printed it as "[object Object]". A missing method/path would
+                # instead surface as FastAPI's bare route-miss shape
+                # {"detail": "Not Found"} with no error code — that exact
+                # shape is the false-empty failure this test refuses (it now
+                # also catches a bridge route that forwards to a missing
+                # backend route, whose message is "Not Found").
                 assert payload != {"detail": "Not Found"}, (
                     f"{method.upper()} {path}: route missing through proxy"
                 )
-                has_error = "error" in payload or (
-                    isinstance(payload.get("detail"), dict) and "error" in payload["detail"]
-                )
+                has_error = "error" in payload or bool(
+                    resp.headers.get("x-dockyard-error-code"))
                 assert has_error, f"{method.upper()} {path}: {resp.status_code} {payload}"
             else:
                 # No false-empty substitution: success payloads are real
