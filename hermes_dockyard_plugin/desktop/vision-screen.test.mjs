@@ -175,6 +175,18 @@ test('Vision: propose with checks, withdraw, mark complete, delete archived mile
       const element = await waitFor(selector)
       await act(async () => { element.click(); await wait(ms) })
     }
+    // The test's own backend reads and writes run inside act. After a click
+    // the screen is still reloading (PlanScreen and DashboardPage), and on a
+    // busy machine that reload finishes while the test waits on its own
+    // fetch: outside act, React warns and the warnings check below fails.
+    // Seen 06/10: the post-merge gate ran into the 02:00 cron burst, and 2 of
+    // 10 runs under CPU load failed this way. The app's own calls keep the
+    // plain `rest` (the plugin gets it above).
+    const check = async (path, init) => {
+      let result
+      await act(async () => { result = await rest(path, init) })
+      return result
+    }
     // React 19 + jsdom: drive a controlled field the way repro-live.test.mjs does.
     const setValue = async (selector, value) => {
       const element = await waitFor(selector)
@@ -192,12 +204,12 @@ test('Vision: propose with checks, withdraw, mark complete, delete archived mile
         await wait(20)
       })
     }
-    const initiatives = async () => (await rest(`/projects/${PROJECT}/initiatives`)).initiatives
+    const initiatives = async () => (await check(`/projects/${PROJECT}/initiatives`)).initiatives
     const byTitle = async (title) => (await initiatives()).find((row) => row.title === title)
     // Refs, goal ids and milestone ids here carry no quote characters.
     const row = (kind, id) => `[data-plan-row="${kind}"][data-plan-id="${String(id)}"]`
     const text = (selector) => ($(selector)?.textContent ?? '').replace(/\s+/g, ' ')
-    const inInbox = async (ref) => (await rest('/inbox')).items.some((item) => item.ref === ref)
+    const inInbox = async (ref) => (await check('/inbox')).items.some((item) => item.ref === ref)
 
     await act(async () => { root.render(route.render()); await wait(80) })
 
@@ -276,7 +288,7 @@ test('Vision: propose with checks, withdraw, mark complete, delete archived mile
     assert.match(text('[data-plan-section="initiative"] .dy-plan-section-note'), /1 of 3 open allowed/)
 
     // 6. Milestone "Beta": no Delete while active; archive, then delete for good.
-    const beta = (await rest(`/projects/${PROJECT}/milestones`)).milestones.find((m) => m.name === 'Beta')
+    const beta = (await check(`/projects/${PROJECT}/milestones`)).milestones.find((m) => m.name === 'Beta')
     await click(`${row('milestone', beta.id)} [data-plan-menu="row-milestone"]`)
     assert.equal($('[data-plan-menu-item="delete"]'), null, 'an active milestone offers no delete')
     await click('[data-plan-menu-item="archive"]')
@@ -288,14 +300,14 @@ test('Vision: propose with checks, withdraw, mark complete, delete archived mile
     await click('[data-destructive-confirm] [data-action="confirm-destructive-action"]', 200)
     await waitGone('[data-destructive-confirm]')
     await waitGone(row('milestone', beta.id))
-    const milestones = (await rest(`/projects/${PROJECT}/milestones?include_archived=true`)).milestones
+    const milestones = (await check(`/projects/${PROJECT}/milestones?include_archived=true`)).milestones
     assert.equal(milestones.some((m) => m.name === 'Beta'), false, 'the milestone is gone')
-    const workRefs = (await rest(`/projects/${PROJECT}/work-items`)).work_items.map((w) => w.title)
+    const workRefs = (await check(`/projects/${PROJECT}/work-items`)).work_items.map((w) => w.title)
     assert.ok(workRefs.includes('Write the beta notes'), 'its work item stays')
-    await rest(`/projects/${PROJECT}/milestones`, { method: 'POST', body: JSON.stringify({ name: 'Beta' }) })
+    await check(`/projects/${PROJECT}/milestones`, { method: 'POST', body: JSON.stringify({ name: 'Beta' }) })
 
     // 7. Goal "Faster checkout": archive, then delete from the row menu; its objective stays free.
-    const goal = (await rest(`/projects/${PROJECT}/goals`)).goals.find((g) => g.title === 'Faster checkout')
+    const goal = (await check(`/projects/${PROJECT}/goals`)).goals.find((g) => g.title === 'Faster checkout')
     await click(`${row('goal', goal.goal_id)} [data-plan-menu="row-goal"]`)
     await click('[data-plan-menu-item="archive"]')
     await click('[data-destructive-confirm] [data-action="confirm-destructive-action"]', 200)
@@ -306,14 +318,14 @@ test('Vision: propose with checks, withdraw, mark complete, delete archived mile
     await click('[data-destructive-confirm] [data-action="confirm-destructive-action"]', 200)
     await waitGone('[data-destructive-confirm]')
     await waitGone(row('goal', goal.goal_id))
-    const goals = (await rest(`/projects/${PROJECT}/goals?include_archived=true`)).goals
+    const goals = (await check(`/projects/${PROJECT}/goals?include_archived=true`)).goals
     assert.equal(goals.length, 0, 'the goal is gone')
-    const objective = (await rest(`/projects/${PROJECT}/objectives`)).objectives.find((o) => o.name === 'Checkout time')
+    const objective = (await check(`/projects/${PROJECT}/objectives`)).objectives.find((o) => o.name === 'Checkout time')
     assert.ok(objective, 'its objective stays')
 
     // 8. The backend still refuses to delete anything active.
-    assert.ok((await rest(`/projects/${PROJECT}/milestones`)).milestones.some((m) => m.name === 'Beta'))
-    await assert.rejects(rest(`/projects/${PROJECT}/milestones/Beta`, { method: 'DELETE' }), (error) => error.status === 409)
+    assert.ok((await check(`/projects/${PROJECT}/milestones`)).milestones.some((m) => m.name === 'Beta'))
+    await assert.rejects(check(`/projects/${PROJECT}/milestones/Beta`, { method: 'DELETE' }), (error) => error.status === 409)
 
     await act(async () => { root.unmount(); await wait(0); dom.window.close() })
   } finally {
