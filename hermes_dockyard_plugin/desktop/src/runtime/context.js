@@ -10,6 +10,7 @@ import { PLAN_CSS } from '../styles/plan-css.js'
 import { SETTINGS_CSS } from '../styles/settings-css.js'
 import { KANBAN_CSS } from '../styles/kanban-css.js'
 import { OVERVIEW_CSS } from '../styles/overview-css.js'
+import { ACTIVITY_CSS } from '../styles/activity-css.js'
 import workflowCanvasCss from '../../workflow-canvas-css.js'
 export let _rest = null
 export let _os = null
@@ -113,6 +114,9 @@ export function useDockyardStyles() {
   // C1 Overview (05/10): the project header strip signed 16/09 and its
   // "Needs attention" drawer (C1-owned, same rule as the blocks above).
   useStylesheet('dy-overview-stylesheet', 'dyOverviewStylesheet', OVERVIEW_CSS)
+  // C5 Activity (06/10): the Activity tab's event list and the Overview
+  // "Recent activity" card's words (C5-owned, same rule as the blocks above).
+  useStylesheet('dy-activity-stylesheet', 'dyActivityStylesheet', ACTIVITY_CSS)
   // Sahil 05/10 (design round d + h): colour themes, backgrounds and fonts.
   // Last, so a chosen theme's colours win over every block above.
   useStylesheet('dy-theme-stylesheet', 'dyThemeStylesheet', THEME_CSS)

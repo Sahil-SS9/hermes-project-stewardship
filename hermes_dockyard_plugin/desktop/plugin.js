@@ -3090,6 +3090,96 @@ var OVERVIEW_CSS = `
 }
 `;
 
+// hermes_dockyard_plugin/desktop/src/styles/activity-css.js
+var ACTIVITY_CSS = `
+.dockyard-root .dy-act { min-width: 0; padding: 17px; }
+.dockyard-root .dy-act-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.dockyard-root .dy-act-head h2 { margin: 0; font-size: 16px; }
+.dockyard-root .dy-act-count { color: var(--dy-text-3); font-size: 12px; white-space: nowrap; }
+.dockyard-root .dy-act-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 12px 0 10px; }
+.dockyard-root .dy-act-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.dockyard-root .dy-act-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--dy-control-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text-2); font: inherit; font-size: 12px; cursor: pointer; }
+.dockyard-root .dy-act-chip span { color: var(--dy-text-3); font-size: 11px; }
+.dockyard-root .dy-act-chip[aria-pressed="true"] { border-color: var(--dy-action); background: var(--dy-accent-soft); color: var(--dy-text); font-weight: 700; }
+.dockyard-root .dy-act-search { width: 240px; max-width: 100%; padding: 6px 10px; border: 1px solid var(--dy-control-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 12px; }
+.dockyard-root .dy-act-chip:focus-visible, .dockyard-root .dy-act-search:focus-visible,
+.dockyard-root .dy-act-open:focus-visible, .dockyard-root .dy-act-viewall:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
+.dockyard-root .dy-act-open { padding: 3px 9px; border: 1px solid var(--dy-control-border); border-radius: 7px; background: var(--dy-surface); color: var(--dy-text-2); font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; }
+.dockyard-root .dy-act-open:hover { border-color: var(--dy-action); color: var(--dy-text); }
+.dockyard-root .dy-act-open:disabled { cursor: progress; opacity: 0.7; }
+.dockyard-root .dy-act-none { color: var(--dy-text-3); }
+.dockyard-root .dy-act-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.dockyard-root .dy-act-empty { padding: 14px 0 4px; color: var(--dy-text-2); font-size: 13px; }
+.dockyard-root .dy-act-empty p { margin: 0 0 6px; }
+.dockyard-root .dy-act-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; color: var(--dy-text-3); font-size: 12px; }
+.dockyard-root .dy-act-error { color: var(--dy-danger); font-weight: 700; }
+
+/* Layout: table (the reference's columns: time, event, details, impact). */
+.dockyard-root .dy-act-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.dockyard-root .dy-act-table thead th { padding: 6px 8px; border-bottom: 1px solid var(--dy-border); color: var(--dy-text-3); font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-align: left; text-transform: uppercase; }
+.dockyard-root .dy-act-table td { padding: 7px 8px; border-bottom: 1px solid var(--dy-border); color: var(--dy-text-2); vertical-align: middle; }
+.dockyard-root .dy-act-table tbody tr[data-activity-row]:hover td { background: var(--dy-surface-subtle); }
+.dockyard-root .dy-act-table .dy-act-day th { padding: 12px 8px 5px; border-bottom: 1px solid var(--dy-border); color: var(--dy-text); font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-align: left; text-transform: uppercase; }
+.dockyard-root .dy-act-table .dy-act-time { width: 56px; color: var(--dy-text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dockyard-root .dy-act-table .dy-act-event > span { display: inline-flex; align-items: center; gap: 7px; color: var(--dy-text); font-weight: 700; white-space: nowrap; }
+.dockyard-root .dy-act-table .dy-act-event svg { width: 14px; height: 14px; flex: 0 0 auto; color: var(--dy-text-3); }
+.dockyard-root .dy-act-table .dy-act-detail { width: 100%; min-width: 0; }
+.dockyard-root .dy-act-table .dy-act-detail > span { display: grid; min-width: 0; }
+.dockyard-root .dy-act-table .dy-act-title { color: var(--dy-text); overflow-wrap: anywhere; }
+.dockyard-root .dy-act-table .dy-act-detail small { color: var(--dy-text-3); font-size: 11px; overflow-wrap: anywhere; }
+.dockyard-root .dy-act-table .dy-act-by { white-space: nowrap; }
+.dockyard-root .dy-act-table .dy-act-go { text-align: right; }
+
+/* Layout: timeline (a dated feed with an icon rail). */
+.dockyard-root .dy-act-timeline, .dockyard-root .dy-act-timeline ol { margin: 0; padding: 0; list-style: none; }
+.dockyard-root .dy-act-tday h3 { margin: 14px 0 6px; color: var(--dy-text); font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.dockyard-root .dy-act-entry { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 0 8px 2px; }
+.dockyard-root .dy-act-entry::before { content: ""; position: absolute; top: 34px; bottom: -8px; left: 15px; border-left: 1px solid var(--dy-border); }
+.dockyard-root .dy-act-entry:last-child::before { display: none; }
+.dockyard-root .dy-act-dot { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--dy-border); border-radius: 50%; background: var(--dy-surface); color: var(--dy-text-3); }
+.dockyard-root .dy-act-dot svg { width: 14px; height: 14px; }
+.dockyard-root .dy-act-dot[data-tone="success"] { background: var(--dy-success-bg); color: var(--dy-success); }
+.dockyard-root .dy-act-dot[data-tone="warning"] { background: var(--dy-warning-bg); color: var(--dy-warning); }
+.dockyard-root .dy-act-dot[data-tone="danger"] { background: var(--dy-danger-bg); color: var(--dy-danger); }
+.dockyard-root .dy-act-dot[data-tone="info"] { background: var(--dy-info-bg); color: var(--dy-info); }
+.dockyard-root .dy-act-body { min-width: 0; }
+.dockyard-root .dy-act-body p { margin: 0; }
+.dockyard-root .dy-act-line1 { display: flex; flex-wrap: wrap; gap: 4px 8px; color: var(--dy-text-2); font-size: 13px; }
+.dockyard-root .dy-act-line1 strong { color: var(--dy-text); }
+.dockyard-root .dy-act-line1 span { overflow-wrap: anywhere; }
+.dockyard-root .dy-act-note { margin-top: 2px; color: var(--dy-text-2); font-size: 12px; overflow-wrap: anywhere; }
+.dockyard-root .dy-act-line2 { margin-top: 2px; color: var(--dy-text-3); font-size: 11px; }
+.dockyard-root .dy-act-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+
+/* The Overview "Recent activity" card with the tab's words. */
+.dockyard-root .dockyard-overview-card[data-overview-activity="words"] .dockyard-overview-list.activity article { grid-template-columns: minmax(0, 1fr) auto; }
+.dockyard-root .dockyard-overview-card[data-overview-activity="words"] .dockyard-status-tag { max-width: 190px; }
+.dockyard-root .dy-act-viewall { padding: 2px 4px; border: 0; background: none; color: var(--dy-action); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.dockyard-root .dy-act-viewall:hover { text-decoration: underline; }
+
+/* Design review only (?review=1): the bar that switches the open choices. */
+.dockyard-root .dy-act-review { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0 0 10px; padding: 8px 12px; border: 1px dashed var(--dy-control-border); border-radius: 8px; background: var(--dy-accent-soft); color: var(--dy-text-2); font-size: 12px; }
+.dockyard-root .dy-act-review strong { font-weight: 800; }
+.dockyard-root .dy-act-review [role="group"] { display: inline-flex; align-items: center; gap: 4px; }
+.dockyard-root .dy-act-review button { padding: 3px 9px; border: 1px solid var(--dy-control-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text-2); font: inherit; cursor: pointer; }
+.dockyard-root .dy-act-review button[aria-pressed="true"] { border-color: var(--dy-action); background: var(--dy-action); color: var(--dy-on-action); }
+
+/* Narrow: each table row becomes a small stacked block. */
+@container dockyard (max-width: 640px) {
+  .dockyard-root .dy-act-search { width: 100%; }
+  .dockyard-root .dy-act-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .dockyard-root .dy-act-table, .dockyard-root .dy-act-table tbody, .dockyard-root .dy-act-table tr, .dockyard-root .dy-act-table th, .dockyard-root .dy-act-table td { display: block; }
+  .dockyard-root .dy-act-table tr[data-activity-row] { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; padding: 8px 0; border-bottom: 1px solid var(--dy-border); }
+  .dockyard-root .dy-act-table tr[data-activity-row] td { padding: 0; border: 0; }
+  .dockyard-root .dy-act-table .dy-act-time { grid-row: 1; width: auto; }
+  .dockyard-root .dy-act-table .dy-act-event { grid-row: 1; }
+  .dockyard-root .dy-act-table .dy-act-detail, .dockyard-root .dy-act-table .dy-act-impact,
+  .dockyard-root .dy-act-table .dy-act-by, .dockyard-root .dy-act-table .dy-act-go { grid-column: 2; text-align: left; }
+  .dockyard-root .dy-act-entry { grid-template-columns: 28px minmax(0, 1fr); }
+  .dockyard-root .dy-act-side { grid-column: 2; flex-direction: row; align-items: center; }
+}
+`;
+
 // hermes_dockyard_plugin/desktop/workflow-canvas-css.js
 var workflow_canvas_css_default = `
 /* ---- Workflow canvas: card + status token set ----------------------------
@@ -3886,6 +3976,7 @@ function useDockyardStyles() {
   useStylesheet("dy-switcher-stylesheet", "dySwitcherStylesheet", SWITCHER_CSS);
   useStylesheet("dy-plan-stylesheet", "dyPlanStylesheet", PLAN_CSS);
   useStylesheet("dy-overview-stylesheet", "dyOverviewStylesheet", OVERVIEW_CSS);
+  useStylesheet("dy-activity-stylesheet", "dyActivityStylesheet", ACTIVITY_CSS);
   useStylesheet("dy-theme-stylesheet", "dyThemeStylesheet", THEME_CSS);
 }
 
@@ -6059,8 +6150,8 @@ function initials2(value) {
   return words2.slice(0, 2).map((word) => word.charAt(0).toUpperCase()).join("") || "?";
 }
 function readableLabel(value, fallback = "All") {
-  const text = String(value || fallback).replace(/[_-]+/g, " ").trim();
-  return text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : fallback;
+  const text2 = String(value || fallback).replace(/[_-]+/g, " ").trim();
+  return text2 ? `${text2.charAt(0).toUpperCase()}${text2.slice(1)}` : fallback;
 }
 function validationSummary(contract) {
   if (!contract || typeof contract !== "object") return "No validation contract supplied";
@@ -7271,12 +7362,12 @@ function ApprovalDetail({ item, onResolved, onBack }) {
 }
 
 // hermes_dockyard_plugin/desktop/src/views/bulk-import.js
-function normaliseBulkImportText(text, mode) {
-  let csvText = text;
+function normaliseBulkImportText(text2, mode) {
+  let csvText = text2;
   if (mode === "json") {
     let rowsJson;
     try {
-      rowsJson = JSON.parse(text);
+      rowsJson = JSON.parse(text2);
       if (!Array.isArray(rowsJson)) throw new Error("JSON must be an array");
       if (rowsJson.some((row) => row?.initiative_ref)) throw new Error("initiative_ref is not supported by bulk import; link the item after import");
       const supported = /* @__PURE__ */ new Set(["row_key", "type", "title", "parent", "parent_key", "labels", "estimate_days", "due"]);
@@ -9141,13 +9232,13 @@ function BacklogView({ view, onRefresh, preset }) {
   const parseImport = (advance) => {
     setImportError(null);
     setImportValid(false);
-    const text = importText.trim();
-    if (!text) {
+    const text2 = importText.trim();
+    if (!text2) {
       setImportError("Paste CSV lines or a JSON array first.");
       setImportRows(null);
       return;
     }
-    const normalised = normaliseBulkImportText(text, importMode);
+    const normalised = normaliseBulkImportText(text2, importMode);
     if (normalised.error) {
       setImportError(normalised.error);
       setImportRows(null);
@@ -9599,7 +9690,7 @@ var rectOf = (item) => ({
 });
 var overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 var inflate = (r, by) => ({ x: r.x - by, y: r.y - by, width: r.width + by * 2, height: r.height + by * 2 });
-var labelSize = (text) => ({ width: String(text).length * LABEL_CHAR_W + LABEL_PAD_X, height: LABEL_H });
+var labelSize = (text2) => ({ width: String(text2).length * LABEL_CHAR_W + LABEL_PAD_X, height: LABEL_H });
 var anchors = (from, to) => {
   const fcx = from.x + from.width / 2;
   const fcy = from.y + from.height / 2;
@@ -9632,8 +9723,8 @@ var layoutConnectors = (objects, connectors, labelFor = (m) => m, world = { widt
     const offset = (index - (siblings.length - 1) / 2) * PARALLEL_GAP;
     const a = anchors(rectOf(byId.get(edge.source)), rectOf(byId.get(edge.target)));
     const line = a.axis === "h" ? { x1: a.x1, y1: a.y1 + offset, x2: a.x2, y2: a.y2 + offset } : { x1: a.x1 + offset, y1: a.y1, x2: a.x2 + offset, y2: a.y2 };
-    const text = labelFor(edge.meaning);
-    const size = labelSize(text);
+    const text2 = labelFor(edge.meaning);
+    const size = labelSize(text2);
     const dx = line.x2 - line.x1;
     const dy = line.y2 - line.y1;
     const length = Math.hypot(dx, dy) || 1;
@@ -9661,7 +9752,7 @@ var layoutConnectors = (objects, connectors, labelFor = (m) => m, world = { widt
       source: edge.source,
       target: edge.target,
       ...line,
-      label: text,
+      label: text2,
       labelBox: pick.box,
       anchor: { x: pick.ax, y: pick.ay },
       // A label pushed away from its line gets a short leader so it is still
@@ -9700,9 +9791,9 @@ var MAX_LIST_LEVELS = 5;
 var MARK_ORDER = ["bold", "italic", "underline", "strike", "fontSize"];
 var RICH_TEXT_LIMITS = Object.freeze({ chars: 2e4, nodes: 3e3, bytes: 64 * 1024 });
 var ZWSP = /\u200B/g;
-var plainToDoc = (text) => ({
+var plainToDoc = (text2) => ({
   type: "doc",
-  content: String(text ?? "").split("\n").map((line) => line ? { type: "paragraph", content: [{ type: "text", text: line }] } : { type: "paragraph" })
+  content: String(text2 ?? "").split("\n").map((line) => line ? { type: "paragraph", content: [{ type: "text", text: line }] } : { type: "paragraph" })
 });
 var alignOf = (el) => {
   const raw = String(el.style?.textAlign || el.getAttribute?.("align") || "").toLowerCase();
@@ -9725,8 +9816,8 @@ var markList = (marks) => MARK_ORDER.filter((m) => marks[m]).map((m) => m === "f
 var sameMarks = (a = [], b = []) => JSON.stringify(a) === JSON.stringify(b);
 var BLOCK_TAGS = /* @__PURE__ */ new Set(["P", "DIV", "H1", "H2", "H3", "H4", "H5", "H6", "UL", "OL", "LI", "BLOCKQUOTE", "PRE", "TABLE", "THEAD", "TBODY", "TR", "TD", "TH", "SECTION", "ARTICLE", "HEADER", "FOOTER", "FIGURE", "DL", "DT", "DD"]);
 var SKIP_TAGS = /* @__PURE__ */ new Set(["SCRIPT", "STYLE", "TEMPLATE", "NOSCRIPT", "IFRAME", "OBJECT", "EMBED", "IMG", "SVG", "VIDEO", "AUDIO", "CANVAS", "HEAD", "TITLE", "META", "LINK", "BUTTON", "INPUT", "SELECT", "TEXTAREA"]);
-function pushText(inline, text, marks) {
-  const clean = text.replace(ZWSP, "").replace(/[\r\n\t\u00A0]+/g, " ");
+function pushText(inline, text2, marks) {
+  const clean = text2.replace(ZWSP, "").replace(/[\r\n\t\u00A0]+/g, " ");
   if (!clean) return;
   const m = markList(marks);
   const last = inline[inline.length - 1];
@@ -9990,15 +10081,15 @@ function normaliseDom(host2, { afterDelete = false } = {}) {
     changed = true;
   };
   const walker = document.createTreeWalker(host2, 4);
-  for (let text = walker.nextNode(); text; text = walker.nextNode()) {
-    const value = text.nodeValue || "";
+  for (let text2 = walker.nextNode(); text2; text2 = walker.nextNode()) {
+    const value = text2.nodeValue || "";
     if (!value.includes("\u200B") || value.replace(ZWSP, "") === "") continue;
     if (keep) {
       for (const i of [0, 2]) {
-        if (keep[i] === text) keep[i + 1] -= (value.slice(0, keep[i + 1]).match(ZWSP) || []).length;
+        if (keep[i] === text2) keep[i + 1] -= (value.slice(0, keep[i + 1]).match(ZWSP) || []).length;
       }
     }
-    text.nodeValue = value.replace(ZWSP, "");
+    text2.nodeValue = value.replace(ZWSP, "");
     changed = true;
   }
   for (const el of [...host2.querySelectorAll("b, i, strike, del")]) {
@@ -10150,12 +10241,12 @@ function selectedTexts(host2) {
   if (sc.nodeType === 3 && so > 0 && so < sc.nodeValue.length) first = sc.splitText(so);
   const out = [];
   const walker = document.createTreeWalker(host2, 4);
-  for (let text = walker.nextNode(); text; text = walker.nextNode()) {
-    if (!text.nodeValue || !range.intersectsNode(text)) continue;
-    if (text === sc && !first && so >= text.nodeValue.length) continue;
-    if (text === ec && eo === 0 && text !== first) continue;
-    if (first && text === sc) continue;
-    out.push(text);
+  for (let text2 = walker.nextNode(); text2; text2 = walker.nextNode()) {
+    if (!text2.nodeValue || !range.intersectsNode(text2)) continue;
+    if (text2 === sc && !first && so >= text2.nodeValue.length) continue;
+    if (text2 === ec && eo === 0 && text2 !== first) continue;
+    if (first && text2 === sc) continue;
+    out.push(text2);
   }
   return out;
 }
@@ -10221,7 +10312,7 @@ function setBlockStyle(host2, style) {
 function clearFormatting(host2) {
   const texts = selectedTexts(host2);
   const blocks = blocksIn(host2);
-  for (const text of texts) liftOut(host2, text, isMark);
+  for (const text2 of texts) liftOut(host2, text2, isMark);
   for (const block of blocks) {
     block.style.removeProperty("text-align");
     if (!block.getAttribute("style")) block.removeAttribute("style");
@@ -10288,12 +10379,12 @@ function applySize(host2, size) {
     return;
   }
   const texts = selectedTexts(host2);
-  for (const text of texts) {
-    liftOut(host2, text, (el) => el.hasAttribute("data-size"));
+  for (const text2 of texts) {
+    liftOut(host2, text2, (el) => el.hasAttribute("data-size"));
     if (size !== "normal") {
       const span = sizeSpan(size);
-      text.before(span);
-      span.appendChild(text);
+      text2.before(span);
+      span.appendChild(text2);
     }
   }
   reselect(texts);
@@ -11344,8 +11435,8 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     }
   };
   saveRef.current = save2;
-  const addObject = (objectKind, text) => {
-    const body = String(text ?? "").trim();
+  const addObject = (objectKind, text2) => {
+    const body = String(text2 ?? "").trim();
     if (!body || readOnly) return null;
     const before = snapshot(objects, connectors);
     const position = canvasPlaced(objects);
@@ -11408,8 +11499,8 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   };
   const applyDrawer = () => {
     if (!selected || readOnly) return;
-    const text = drawerText.trim();
-    if (!text) return;
+    const text2 = drawerText.trim();
+    if (!text2) return;
     if (richProblem) {
       setNotice({ tone: "danger", text: richProblem });
       return;
@@ -11432,7 +11523,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     };
     if (typeof selected.content?.url === "string" && !Array.isArray(selected.content?.links)) fields.url = "";
     const before = snapshot(objects, connectors);
-    setObjects((current) => current.map((item) => item.id === selected.id ? { ...item, kind: drawerKind, content: { ...item.content ?? {}, ...fields, text } } : item));
+    setObjects((current) => current.map((item) => item.id === selected.id ? { ...item, kind: drawerKind, content: { ...item.content ?? {}, ...fields, text: text2 } } : item));
     setHistory((current) => [...current.slice(-49), before]);
     setFuture([]);
     setDirty(true);
@@ -11832,11 +11923,11 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     if (boardRef.current === at) setBusy(false);
   };
   const sendChat = async () => {
-    const text = chatDraft.trim();
-    if (!text || chatBusy) return;
-    setChatLog((current) => [...current, { role: "me", text }]);
+    const text2 = chatDraft.trim();
+    if (!text2 || chatBusy) return;
+    setChatLog((current) => [...current, { role: "me", text: text2 }]);
     setChatDraft("");
-    await curate(text);
+    await curate(text2);
   };
   const stopChat = () => {
     chatToken.current += 1;
@@ -13349,10 +13440,10 @@ var prefersReducedMotion = () => {
     return false;
   }
 };
-function elu(tag, cls, text) {
+function elu(tag, cls, text2) {
   const el = document.createElement(tag);
   if (cls) el.className = cls;
-  if (text !== void 0) el.textContent = text;
+  if (text2 !== void 0) el.textContent = text2;
   return el;
 }
 function sEl(tag, attrs) {
@@ -13502,14 +13593,14 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   feedHead.setAttribute("aria-expanded", "true");
   feed.append(feedHead, feedBody);
   const feedMsgs = [];
-  const feedLog = (text) => {
+  const feedLog = (text2) => {
     const item = elu("div", "dy-wf-feed-item");
     const t = elu("span", "dy-wf-feed-time");
     t.textContent = (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    const b = elu("span", "", " " + text);
+    const b = elu("span", "", " " + text2);
     item.append(t, b);
     feedBody.prepend(item);
-    feedMsgs.unshift({ ts: Date.now(), text, el: item });
+    feedMsgs.unshift({ ts: Date.now(), text: text2, el: item });
     while (feedMsgs.length > 6) {
       const old = feedMsgs.pop();
       if (old) old.el.remove();
@@ -14259,10 +14350,10 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
         const approve = elu("button", "dy-btn primary", "Approve");
         const reject = elu("button", "dy-btn", "Reject");
         let inFlight = false;
-        const setDecisionState = (state, text) => {
+        const setDecisionState = (state, text2) => {
           if (!decisionState) return;
           decisionState.setAttribute("data-decision-state", state);
-          decisionState.textContent = text;
+          decisionState.textContent = text2;
         };
         const runAction = async (act, okLabel, pendingLabel, failPrefix, okState, pendingState) => {
           if (inFlight) return;
@@ -15511,8 +15602,8 @@ var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oc
 function shortDate(iso, today) {
   const [year, month, day] = String(iso ?? "").slice(0, 10).split("-").map(Number);
   if (!year || !month || !day) return String(iso ?? "");
-  const text = `${day} ${MONTHS[month - 1]}`;
-  return today && String(today).slice(0, 4) === String(year) ? text : `${text} ${year}`;
+  const text2 = `${day} ${MONTHS[month - 1]}`;
+  return today && String(today).slice(0, 4) === String(year) ? text2 : `${text2} ${year}`;
 }
 function objectivesOfInitiative(roadmapProject, initiativeRef) {
   const initiative = (roadmapProject?.initiatives ?? []).find((candidate) => candidate.ref === initiativeRef);
@@ -15677,7 +15768,7 @@ function CardBody({ id, item, facts, moves, moving, today, onMove, onOpenItem, o
   }) }, card.ref);
   const section2 = (key, title, body) => jsxs("section", { className: "dy-kb-section", "data-card-section": key, children: [jsx("h5", { children: title }), body] }, key);
   const row = (label, value, extra = {}, key = label) => jsxs("div", { className: "dy-kb-row", ...extra, children: [jsx("dt", { children: label }), jsx("dd", { children: value })] }, key);
-  const goto = (label, onClick, text) => jsx("button", { type: "button", className: "dy-kb-goto", "aria-label": `${label}: ${text}`, onClick, children: text });
+  const goto = (label, onClick, text2) => jsx("button", { type: "button", className: "dy-kb-goto", "aria-label": `${label}: ${text2}`, onClick, children: text2 });
   const planning = [];
   if (facts.initiative) planning.push(row("Initiative", goto("Initiative", () => onNavigate(`plan:initiative:${facts.initiative.ref}`), facts.initiative.title || facts.initiative.ref)));
   facts.milestones.forEach((milestone, index) => planning.push(row("Milestone", goto("Milestone", () => onNavigate(`plan:milestone:${milestone.id}`), milestone.due ? `${milestone.name} \xB7 due ${shortDate(milestone.due, today)}` : milestone.name), {}, `milestone:${index}`)));
@@ -15796,9 +15887,9 @@ function ViewsPanel({
   const trimmed = newName.trim();
   const newProblem = !trimmed ? "Give the view a name." : names.includes(trimmed) ? `A view called "${trimmed}" already exists.` : null;
   const renameProblem = (from) => {
-    const text = renameText.trim();
-    if (!text) return "Give the view a name.";
-    if (text !== from && names.includes(text)) return `A view called "${text}" already exists.`;
+    const text2 = renameText.trim();
+    if (!text2) return "Give the view a name.";
+    if (text2 !== from && names.includes(text2)) return `A view called "${text2}" already exists.`;
     return null;
   };
   const newForm = newOpen ? jsxs("form", {
@@ -16145,7 +16236,7 @@ function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenItem, onN
     ] })
   ] });
   const { filters } = working;
-  const segmented = (label, key, value, choices, onPick) => jsx("div", { className: "dy-kb-segmented", role: "group", "aria-label": label, children: choices.map(([choice, text]) => jsx("button", { type: "button", [`data-kanban-${key}`]: choice, "aria-pressed": value === choice, onClick: () => onPick(choice), children: text }, choice)) });
+  const segmented = (label, key, value, choices, onPick) => jsx("div", { className: "dy-kb-segmented", role: "group", "aria-label": label, children: choices.map(([choice, text2]) => jsx("button", { type: "button", [`data-kanban-${key}`]: choice, "aria-pressed": value === choice, onClick: () => onPick(choice), children: text2 }, choice)) });
   const toolbar = jsxs("div", { className: "dy-kb-toolbar", "data-kanban-toolbar": true, children: [
     jsxs("label", { className: "dy-kb-control dy-kb-search", children: [
       jsx(Icon, { name: "search" }),
@@ -16572,7 +16663,7 @@ function planActions(projectId) {
     unlinkMilestone: (ref, milestoneId) => api(`/projects/${p}/initiatives/${enc(ref)}/milestones/${Number(milestoneId)}`, { method: "DELETE", quiet, body: {} }),
     linkObjective: (ref, objectiveId, relationship) => api(`/projects/${p}/objectives/${Number(objectiveId)}/initiatives`, { method: "POST", quiet, body: { initiative_ref: ref, relationship } }),
     unlinkObjective: (ref, objectiveId) => api(`/projects/${p}/objectives/${Number(objectiveId)}/initiatives/${enc(ref)}`, { method: "DELETE", quiet, body: {} }),
-    saveMission: (text) => api(`/projects/${p}/settings`, { method: "PATCH", quiet, body: { mission: text.trim() } }),
+    saveMission: (text2) => api(`/projects/${p}/settings`, { method: "PATCH", quiet, body: { mission: text2.trim() } }),
     archiveMission: () => api(`/projects/${p}/mission/archive`, { method: "POST", quiet, body: {} }),
     removeMission: () => api(`/projects/${p}/mission`, { method: "DELETE", quiet, body: {} }),
     freeze: () => api(`/projects/${p}/freeze`, { method: "POST", quiet, body: {} })
@@ -17225,10 +17316,10 @@ function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
         item.delivery.blocked > 0 ? jsxs("span", { className: "blocked", children: [jsx("strong", { children: number(item.delivery.blocked) }), "Blocked"] }, "blocked") : null
       ] }) }, "delivery"),
       jsx("p", { className: "dy-plan-note", "data-plan-no-delete": true, children: WITHDRAWABLE_STATUSES.includes(item.status) ? "Initiatives are not deleted: each keeps its approval record. Not needed any more? Withdraw it before approval." : "Initiatives are not deleted: each keeps its approval record." }, "nodelete"),
-      jsx(Section2, { title: "Stages", children: jsx("ol", { className: "dy-plan-loop", "data-plan-loop": item.ref, children: LOOP.map(([key, label, text], index) => jsxs("li", {
+      jsx(Section2, { title: "Stages", children: jsx("ol", { className: "dy-plan-loop", "data-plan-loop": item.ref, children: LOOP.map(([key, label, text2], index) => jsxs("li", {
         className: index < stage ? "done" : index === stage ? stopped ? "stopped" : "current" : "",
         "aria-current": index === stage ? "step" : void 0,
-        children: [jsx("strong", { children: label }), index === stage ? jsx("small", { children: stopped ?? text(item) }) : null]
+        children: [jsx("strong", { children: label }), index === stage ? jsx("small", { children: stopped ?? text2(item) }) : null]
       }, key)) }) }, "loop")
     ];
     footer = [
@@ -18009,6 +18100,448 @@ function ProjectHeaderStrip({ project, view, onRefresh, onOpenRoadmap, onOpenIte
   ] });
 }
 
+// hermes_dockyard_plugin/desktop/src/lib/event-vocab.js
+var CHECK = "stewardship.cycle.started";
+var HEALTH_ORDER = ["critical", "degraded", "watch", "healthy"];
+var HEALTH_WORD = Object.freeze({ healthy: "Healthy", watch: "Watch", degraded: "Degraded", critical: "Critical", unknown: "Not verified" });
+var TRIGGER_WORD = Object.freeze({
+  manual: "Run on request",
+  gateway: "Run from a chat command",
+  webhook: "Run by a webhook",
+  internal: "Run by Dockyard",
+  schedule: "Run on schedule",
+  scheduled: "Run on schedule"
+});
+var EVENT_FILTERS = Object.freeze([["all", "All events"], ["initiatives", "Initiatives"], ["work", "Work"], ["health", "Health and checks"]]);
+var INITIATIVE = Object.freeze({
+  "initiative.proposed": { label: "Initiative proposed", icon: "sparkles", effect: ["New proposal", "info"], note: "risk" },
+  "initiative.approval_required": { label: "Approval requested", icon: "hand", effect: ["Waiting for a decision", "warning"], note: "risk" },
+  "initiative.approved": { label: "Initiative approved", icon: "circle-check", effect: ["Work can start", "success"] },
+  "initiative.rejected": { label: "Initiative rejected", icon: "x", effect: ["Will not go ahead", "neutral"], note: "reason" },
+  "initiative.changes_requested": { label: "Changes requested", icon: "undo-2", effect: ["Back with the proposer", "warning"], note: "feedback" },
+  "initiative.withdrawn": { label: "Initiative withdrawn", icon: "archive", effect: ["Closed by the proposer", "neutral"], note: "reason" },
+  "initiative.started": { label: "Initiative started", icon: "flag", effect: ["In progress", "info"] },
+  "initiative.completed": { label: "Initiative completed", icon: "circle-check", effect: ["Complete", "success"] },
+  "initiative.regressed": { label: "Initiative regressed", icon: "triangle-alert", effect: ["Outcome went backwards", "danger"] }
+});
+var KNOWN_EVENT_TYPES = Object.freeze([
+  ...Object.keys(INITIATIVE),
+  "project.health.changed",
+  "project.critical",
+  "stewardship.verification.failed",
+  "stewardship.reasoning.failed",
+  CHECK,
+  "cycle.mutations_blocked",
+  "work.assigned",
+  "work.unassigned"
+]);
+var text = (value) => typeof value === "string" ? value.trim() : "";
+var sentence = (value) => {
+  const words2 = String(value ?? "").replace(/[._]+/g, " ").replace(/\s+/g, " ").trim();
+  return words2 ? words2[0].toUpperCase() + words2.slice(1) : "";
+};
+var plural5 = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+var effect = (label, tone) => ({ label, tone });
+var healthWord = (state) => HEALTH_WORD[state] ?? sentence(state);
+var contradictions = (payload) => Array.isArray(payload.contradictions) ? payload.contradictions : [];
+var firstDetail = (list) => text(list.find((entry) => text(entry?.detail))?.detail);
+function describeInitiative(type, spec, ref, payload, ctx) {
+  const initiative = ref ? (ctx.initiatives ?? []).find((entry) => entry?.ref === ref) : null;
+  const name = text(payload.title) || text(initiative?.title);
+  let note = "";
+  if (spec.note === "risk") note = text(payload.risk) ? `${sentence(payload.risk)} risk` : "";
+  else if (spec.note) note = text(payload[spec.note]);
+  const pending = initiative?.status === "pending_approval";
+  return {
+    kind: "initiatives",
+    icon: spec.icon,
+    ref: ref || null,
+    label: type === "initiative.approval_required" && payload.resubmitted === true ? "Resubmitted for approval" : spec.label,
+    title: ref ? name ? `${ref} \xB7 ${name}` : ref : name,
+    note,
+    effect: effect(...spec.effect),
+    // Still waiting: decide it where the fingerprint is shown. Otherwise open
+    // it in Vision. No button for an initiative the project no longer lists.
+    target: initiative ? pending ? { kind: "deep_link", link: `s6:initiative/${ref}` } : { kind: "plan", entry: `plan:initiative:${ref}` } : null,
+    openLabel: initiative ? pending ? "Open in Approval inbox" : "Open in Vision" : null
+  };
+}
+function describeHealth(payload) {
+  const from = text(payload.from);
+  const to = text(payload.to);
+  const score = payload.score === null || payload.score === void 0 || payload.score === "" ? NaN : Number(payload.score);
+  let change = effect("Health changed", "neutral");
+  if (to && !from) change = effect("First reading", "neutral");
+  else if (to) {
+    const before = HEALTH_ORDER.indexOf(from);
+    const after = HEALTH_ORDER.indexOf(to);
+    if (before >= 0 && after >= 0 && after < before) change = effect("Health worse", to === "critical" ? "danger" : "warning");
+    else if (before >= 0 && after >= 0 && after > before) change = effect("Health better", "success");
+  }
+  return {
+    kind: "health",
+    icon: "activity",
+    label: "Health changed",
+    title: !to ? "" : from ? `${healthWord(from)} \u2192 ${healthWord(to)}` : `Now ${healthWord(to)}`,
+    note: Number.isFinite(score) ? `Score ${score}` : "",
+    effect: change
+  };
+}
+function describeWork(type, ref, payload, ctx) {
+  const item = ref ? (ctx.workItems ?? []).find((entry) => entry?.ref === ref) : null;
+  const name = text(payload.title) || text(item?.title);
+  const assigned = type === "work.assigned";
+  return {
+    kind: "work",
+    icon: "user",
+    ref: ref || null,
+    label: assigned ? "Work assigned" : "Work unassigned",
+    title: ref ? name ? `${ref} \xB7 ${name}` : ref : name,
+    note: assigned && text(payload.to) ? `Assigned to ${text(payload.to)}` : "",
+    // Unassigned: the app's own words ("no bot will pick it up", Sahil 04/10).
+    // Assigned: the owner may be a person, so only say it has one.
+    effect: assigned ? effect("Has an owner", "success") : effect("No bot will pick it up", "warning"),
+    target: item ? { kind: "work", ref } : null,
+    openLabel: item ? "Open work item" : null
+  };
+}
+function describeType(type, subject, payload, ctx) {
+  if (INITIATIVE[type]) return describeInitiative(type, INITIATIVE[type], subject, payload, ctx);
+  if (type === "project.health.changed") return describeHealth(payload);
+  if (type === "work.assigned" || type === "work.unassigned") return describeWork(type, subject, payload, ctx);
+  if (type === "project.critical") {
+    const list = contradictions(payload);
+    return {
+      kind: "health",
+      icon: "triangle-alert",
+      label: "Project critical",
+      title: "Health is critical",
+      note: [list.length > 0 ? plural5(list.length, "contradiction") : "", payload.auto_freeze === true ? "Changes are frozen automatically" : ""].filter(Boolean).join(" \xB7 "),
+      effect: effect("Critical", "danger")
+    };
+  }
+  if (type === "stewardship.verification.failed") {
+    const list = contradictions(payload);
+    return {
+      kind: "health",
+      icon: "shield-alert",
+      label: "Verification failed",
+      title: list.length > 0 ? `${plural5(list.length, "contradiction")} found` : "The evidence did not check out",
+      note: firstDetail(list),
+      effect: effect("Evidence disagrees", "warning")
+    };
+  }
+  if (type === "stewardship.reasoning.failed") {
+    return {
+      kind: "health",
+      icon: "triangle-alert",
+      label: "Proposal step failed",
+      title: "The proposal step stopped with an error",
+      note: text(payload.error).slice(0, 160),
+      effect: effect("No proposals made", "warning")
+    };
+  }
+  if (type === CHECK) {
+    const trigger = text(payload.trigger_type);
+    return {
+      kind: "health",
+      icon: "rotate-cw",
+      label: "Stewardship check",
+      title: TRIGGER_WORD[trigger] ?? (trigger ? `Run: ${sentence(trigger).toLowerCase()}` : "Run"),
+      note: "",
+      effect: null
+    };
+  }
+  if (type === "cycle.mutations_blocked") {
+    return { kind: "health", icon: "shield-alert", label: "Changes blocked", title: text(payload.reason), note: "", effect: effect("Nothing was changed", "neutral") };
+  }
+  return { kind: "other", icon: "history", label: sentence(type) || "Project event", title: subject, note: "", effect: null };
+}
+function describeEvent(event, ctx = {}) {
+  const type = String(event?.event_type ?? event?.type ?? "");
+  const raw = event?.payload;
+  const payload = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const subject = event?.subject === null || event?.subject === void 0 ? "" : String(event.subject);
+  const actor = text(payload.actor) || (text(event?.emitted_by) && event.emitted_by !== "system" ? text(event.emitted_by) : "");
+  const at = Date.parse(event?.ts ?? "");
+  const row = {
+    ref: null,
+    target: null,
+    openLabel: null,
+    note: "",
+    ...describeType(type, subject, payload, ctx),
+    key: `event:${event?.id ?? `${type}:${event?.ts ?? ""}`}`,
+    id: event?.id ?? null,
+    type,
+    ts: event?.ts ?? null,
+    at: Number.isNaN(at) ? null : at,
+    by: actor || "System",
+    count: 1
+  };
+  row.tone = row.effect?.tone ?? "neutral";
+  return row;
+}
+var formatter = (options, timeZone) => new Intl.DateTimeFormat(options.locale ?? "en-GB", { ...options, locale: void 0, timeZone });
+var clock = (at, timeZone) => formatter({ hour: "2-digit", minute: "2-digit" }, timeZone).format(at);
+var dayKey = (at, timeZone) => formatter({ locale: "en-CA", year: "numeric", month: "2-digit", day: "2-digit" }, timeZone).format(at);
+function activityRows(events, ctx = {}, { timeZone } = {}) {
+  const rows = [];
+  for (const entry of events ?? []) {
+    const row = describeEvent(entry, ctx);
+    row.time = row.at === null ? "\u2014" : clock(row.at, timeZone);
+    row.day = row.at === null ? "unknown" : dayKey(row.at, timeZone);
+    const last = rows[rows.length - 1];
+    if (row.type === CHECK && last?.type === CHECK && last.day === row.day && row.day !== "unknown") {
+      last.count += 1;
+      last.oldestTime = row.time;
+      continue;
+    }
+    rows.push(row);
+  }
+  for (const row of rows) {
+    if (row.type !== CHECK || row.count < 2) continue;
+    row.note = `Latest: ${row.title.charAt(0).toLowerCase()}${row.title.slice(1)}`;
+    row.title = `Ran ${row.count} times, ${row.oldestTime} to ${row.time}`;
+  }
+  return rows;
+}
+function groupByDay(rows, { now = /* @__PURE__ */ new Date(), timeZone } = {}) {
+  const today = dayKey(now.getTime(), timeZone);
+  const yesterday = dayKey(now.getTime() - 864e5, timeZone);
+  const groups = /* @__PURE__ */ new Map();
+  for (const row of rows ?? []) {
+    const key = row.day ?? (row.at === null ? "unknown" : dayKey(row.at, timeZone));
+    if (!groups.has(key)) {
+      let label = "Unknown time";
+      if (key === today) label = "Today";
+      else if (key === yesterday) label = "Yesterday";
+      else if (key !== "unknown") {
+        const sameYear = key.slice(0, 4) === today.slice(0, 4);
+        label = formatter({ weekday: "short", day: "numeric", month: "short", ...sameYear ? {} : { year: "numeric" } }, timeZone).format(row.at).replace(/,/g, "");
+      }
+      groups.set(key, { key, label, rows: [] });
+    }
+    groups.get(key).rows.push(row);
+  }
+  const list = [...groups.values()];
+  return [...list.filter((group) => group.key !== "unknown"), ...list.filter((group) => group.key === "unknown")];
+}
+function matchesFilter(row, { kind = "all", query = "" } = {}) {
+  if (kind !== "all" && row.kind !== kind) return false;
+  const wanted = String(query ?? "").trim().toLowerCase();
+  if (!wanted) return true;
+  return [row.label, row.title, row.note, row.by, row.effect?.label, row.ref].some((value) => String(value ?? "").toLowerCase().includes(wanted));
+}
+
+// hermes_dockyard_plugin/desktop/src/project/activity.js
+var STEPS = [50, 200, 500];
+var fullTime = (ts) => {
+  const at = Date.parse(ts ?? "");
+  return Number.isNaN(at) ? "Time not recorded" : new Intl.DateTimeFormat("en-GB", { dateStyle: "full", timeStyle: "short" }).format(at);
+};
+var plural6 = (count, word) => `${number(count)} ${word}${count === 1 ? "" : "s"}`;
+function Impact({ row }) {
+  return row.effect ? jsx(StatusTag, { tone: row.tone, label: row.effect.label }) : jsx("span", { className: "dy-act-none", children: "\u2014" });
+}
+function OpenButton({ row, onOpenItem }) {
+  if (!row.target) return null;
+  return jsx("button", {
+    type: "button",
+    className: "dy-act-open",
+    "data-activity-open": row.key,
+    onClick: () => onOpenItem?.(row),
+    children: row.openLabel
+  });
+}
+function When({ row }) {
+  return jsx("time", { dateTime: row.ts ?? void 0, title: fullTime(row.ts), children: row.time });
+}
+function TableLayout({ groups, onOpenItem }) {
+  return jsxs("table", { className: "dy-act-table", "data-activity-table": true, children: [
+    jsx("thead", { children: jsxs("tr", { children: [
+      jsx("th", { scope: "col", className: "dy-act-time", children: "Time" }),
+      jsx("th", { scope: "col", children: "Event" }),
+      jsx("th", { scope: "col", children: "Details" }),
+      jsx("th", { scope: "col", children: "Impact" }),
+      jsx("th", { scope: "col", children: "By" }),
+      jsx("th", { scope: "col", children: jsx("span", { className: "dy-act-sr", children: "Open" }) })
+    ] }) }),
+    ...groups.map((group) => jsxs("tbody", { "data-activity-day": group.label, children: [
+      jsx("tr", { className: "dy-act-day", children: jsx("th", { scope: "rowgroup", colSpan: 6, children: group.label }) }),
+      ...group.rows.map((row) => jsxs("tr", { "data-activity-row": row.key, "data-event-type": row.type, "data-tone": row.tone, children: [
+        jsx("td", { className: "dy-act-time", children: jsx(When, { row }) }),
+        jsx("td", { className: "dy-act-event", children: jsxs("span", { children: [jsx(Icon, { name: row.icon }), row.label] }) }),
+        jsx("td", { className: "dy-act-detail", children: jsxs("span", { children: [
+          jsx("span", { className: "dy-act-title", children: row.title || "\u2014" }),
+          row.note ? jsx("small", { children: row.note }) : null
+        ] }) }),
+        jsx("td", { className: "dy-act-impact", children: jsx(Impact, { row }) }),
+        jsx("td", { className: "dy-act-by", children: row.by }),
+        jsx("td", { className: "dy-act-go", children: jsx(OpenButton, { row, onOpenItem }) })
+      ] }, row.key))
+    ] }, group.key))
+  ] });
+}
+function TimelineLayout({ groups, onOpenItem }) {
+  return jsx("ol", { className: "dy-act-timeline", "data-activity-timeline": true, children: groups.map((group) => jsxs("li", { className: "dy-act-tday", "data-activity-day": group.label, children: [
+    jsx("h3", { children: group.label }),
+    jsx("ol", { children: group.rows.map((row) => jsxs("li", { className: "dy-act-entry", "data-activity-row": row.key, "data-event-type": row.type, "data-tone": row.tone, children: [
+      jsx("span", { className: "dy-act-dot", "data-tone": row.tone, children: jsx(Icon, { name: row.icon }) }),
+      jsxs("div", { className: "dy-act-body", children: [
+        jsxs("p", { className: "dy-act-line1", children: [jsx("strong", { children: row.label }), row.title ? jsx("span", { children: row.title }) : null] }),
+        row.note ? jsx("p", { className: "dy-act-note", children: row.note }) : null,
+        jsxs("p", { className: "dy-act-line2", children: [row.by, " \xB7 ", jsx(When, { row })] })
+      ] }),
+      jsxs("div", { className: "dy-act-side", children: [jsx(Impact, { row }), jsx(OpenButton, { row, onOpenItem })] })
+    ] }, row.key)) })
+  ] }, group.key)) });
+}
+function ProjectActivityPanel({ project, view, layout = "table", onOpenItem }) {
+  const [older, setOlder] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [kind, setKind] = useState("all");
+  const [query, setQuery] = useState("");
+  useEffect(() => {
+    setOlder(null);
+    setError("");
+  }, [view.events, project.id]);
+  const events = older?.events ?? view.events ?? [];
+  const limit = older?.limit ?? STEPS[0];
+  const rows = useMemo(
+    () => activityRows(events, { initiatives: view.initiatives, workItems: view.workItems }),
+    [events, view.initiatives, view.workItems]
+  );
+  const shown = rows.filter((row) => matchesFilter(row, { kind, query }));
+  const groups = groupByDay(shown);
+  const eventCount = (list) => list.reduce((sum, row) => sum + row.count, 0);
+  const next = STEPS.find((step) => step > limit);
+  const full = events.length >= limit;
+  const filtered = kind !== "all" || query.trim() !== "";
+  const showOlder = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const encoded = encodeURIComponent(project.id);
+      const data = await api(`/projects/${encoded}/events?limit=${next}`, { quiet: true });
+      setOlder({ limit: next, events: data?.events ?? [] });
+    } catch {
+      setError("Could not load older events. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  const total = eventCount(rows);
+  let footnote = `All ${plural6(total, "event")} recorded for this project.`;
+  if (full && next) footnote = `The latest ${plural6(total, "event")}.`;
+  else if (full) footnote = `The latest ${plural6(total, "event")}, the most the app can read.`;
+  return jsxs("section", { className: "dockyard-feature-card dy-act", "data-activity": project.id, "data-activity-layout": layout, children: [
+    jsxs("header", { className: "dy-act-head", children: [
+      jsx("h2", { children: "Project activity" }),
+      jsx("span", { className: "dy-act-count", "data-activity-count": true, children: filtered ? `${number(eventCount(shown))} of ${plural6(total, "event")}` : plural6(total, "event") })
+    ] }),
+    rows.length === 0 ? jsxs("div", { className: "dy-act-empty", "data-activity-empty": "none", children: [
+      jsx("p", { children: jsx("strong", { children: "No events recorded yet." }) }),
+      jsx("p", { children: "Events appear here when someone proposes, approves or rejects an initiative, assigns work, or when a stewardship check runs." })
+    ] }) : jsxs("div", { className: "dy-act-tools", children: [
+      jsx("div", { className: "dy-act-chips", role: "group", "aria-label": "Show", children: EVENT_FILTERS.map(([key, label]) => {
+        const count = key === "all" ? total : eventCount(rows.filter((row) => row.kind === key));
+        return jsxs("button", {
+          type: "button",
+          className: "dy-act-chip",
+          "aria-pressed": kind === key,
+          "data-activity-filter": key,
+          onClick: () => setKind(key),
+          children: [label, jsx("span", { children: number(count) })]
+        }, key);
+      }) }),
+      jsx("input", {
+        type: "search",
+        className: "dy-act-search",
+        "data-activity-search": true,
+        "aria-label": "Search activity",
+        placeholder: "Search events, people or refs",
+        value: query,
+        onChange: (event) => setQuery(event.target.value)
+      })
+    ] }),
+    rows.length > 0 && shown.length === 0 ? jsxs("div", { className: "dy-act-empty", "data-activity-empty": "filtered", children: [
+      jsx("p", { children: "No events match these filters." }),
+      jsx("button", { type: "button", className: "dy-act-open", "data-activity-clear": true, onClick: () => {
+        setKind("all");
+        setQuery("");
+      }, children: "Clear filters" })
+    ] }) : null,
+    shown.length > 0 ? layout === "timeline" ? jsx(TimelineLayout, { groups, onOpenItem }) : jsx(TableLayout, { groups, onOpenItem }) : null,
+    rows.length > 0 ? jsxs("footer", { className: "dy-act-foot", children: [
+      jsx("span", { children: footnote }),
+      full && next ? jsx("button", {
+        type: "button",
+        className: "dy-act-open",
+        "data-activity-older": next,
+        disabled: loading,
+        onClick: showOlder,
+        children: loading ? "Loading\u2026" : "Show older events"
+      }) : null,
+      error ? jsx("span", { className: "dy-act-error", role: "alert", children: error }) : null
+    ] }) : null
+  ] });
+}
+function RecentActivityCard({ view, onViewAll }) {
+  const rows = activityRows(view.events ?? [], { initiatives: view.initiatives, workItems: view.workItems }).slice(0, 4);
+  return jsxs("section", { className: "dockyard-feature-card dockyard-overview-card", "data-overview-activity": "words", children: [
+    jsxs("header", { children: [
+      jsx("h2", { children: "Recent activity" }),
+      jsx("button", { type: "button", className: "dy-act-viewall", "data-activity-view-all": true, onClick: onViewAll, children: "View all" })
+    ] }),
+    jsx("p", { children: "What happened on this project lately." }),
+    rows.length > 0 ? jsx("div", { className: "dockyard-overview-list activity", children: rows.map((row) => jsxs("article", { "data-activity-row": row.key, children: [
+      jsxs("span", { children: [
+        jsx("strong", { children: row.title ? `${row.label} \xB7 ${row.title}` : row.label }),
+        jsx("small", { title: fullTime(row.ts), children: [row.by, timeAgo(row.ts) ?? "time not recorded"].join(" \xB7 ") })
+      ] }),
+      jsx(Impact, { row })
+    ] }, row.key)) }) : jsx("p", { className: "dockyard-meta", children: "No events recorded yet." })
+  ] });
+}
+
+// hermes_dockyard_plugin/desktop/src/project/activity-review.js
+var ACTIVITY_REVIEW_DEFAULTS = { layout: "table", card: "words" };
+function readActivityReview(search = globalThis.location?.search ?? "") {
+  const params = new URLSearchParams(search);
+  const pick = (key, allowed) => allowed.includes(params.get(key)) ? params.get(key) : ACTIVITY_REVIEW_DEFAULTS[key];
+  return {
+    active: params.get("review") === "1",
+    layout: pick("layout", ["table", "timeline"]),
+    card: pick("card", ["words", "today"])
+  };
+}
+function writeActivityReview(key, value) {
+  const url = new URL(globalThis.location.href);
+  url.searchParams.set(key, value);
+  globalThis.history.replaceState(globalThis.history.state, "", url);
+}
+function ActivityReviewBar({ review, onChange }) {
+  const group = (key, label, options) => jsxs("span", { role: "group", "aria-label": label, children: [
+    jsx("span", { children: `${label}:` }),
+    ...options.map(([value, text2]) => jsx("button", {
+      type: "button",
+      "aria-pressed": review[key] === value,
+      "data-review-choice": `${key}:${value}`,
+      onClick: () => {
+        writeActivityReview(key, value);
+        onChange?.();
+      },
+      children: text2
+    }, value))
+  ] }, key);
+  return jsxs("div", { className: "dy-act-review", "data-activity-review": true, children: [
+    jsx("strong", { children: "Design review" }),
+    group("layout", "Activity tab", [["table", "Table"], ["timeline", "Timeline"]]),
+    group("card", "Overview's Recent activity card", [["words", "Same words + View all"], ["today", "As today"]])
+  ] });
+}
+
 // hermes_dockyard_plugin/desktop/src/project/dashboard.js
 var planView = (entry) => parsePlanFocus(entry) || ["objectives", "initiative", "vision"].includes(entry) ? "plan" : entry;
 function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap, onOpenLink }) {
@@ -18016,6 +18549,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   const [planFocus, setPlanFocus] = useState(() => parsePlanFocus(initialView));
   const [canvasDirty, setCanvasDirty] = useState(false);
   const [pendingView, setPendingView] = useState(null);
+  const [, setReviewTick] = useState(0);
   const changeView = (key) => {
     if (key === projectView) return;
     if (projectView === "planning" && canvasDirty) {
@@ -18079,6 +18613,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   }
   if (!project) return jsx(EmptyState, { title: "No project selected", description: "Connect a project before opening the project dashboard.", icon: "project" });
   const [healthTone, healthLabel] = healthDetails(project.health);
+  const review = readActivityReview();
   const views = [
     ["overview", "Overview"],
     ["plan", "Vision"],
@@ -18129,10 +18664,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   } else if (projectView === "content") {
     panel = jsx(ProjectContentPanel, { project, content: view.content ?? [], onRefresh }, project.id);
   } else if (projectView === "activity") {
-    panel = jsxs("section", { className: "dockyard-feature-card", children: [
-      jsx("h2", { children: "Project activity" }),
-      (view.events ?? []).length > 0 ? jsx("div", { className: "dockyard-activity-list", children: view.events.map((event, index) => jsx("p", { children: JSON.stringify(event) }, String(event.id ?? index))) }) : jsx("p", { className: "dockyard-meta", children: "No attributed project events have been recorded yet." })
-    ] });
+    panel = jsx(ProjectActivityPanel, { project, view, layout: review.layout, onOpenItem: openAttentionItem }, project.id);
   } else if (projectView === "settings") {
     panel = jsx(ProjectSettingsPanel, { project, settings: view.settings ?? {}, onRefresh, onDirty: onProjectDirty }, `${project.id}:${view.settings?.updated_at || "initial"}`);
   } else if (projectView === "reports") {
@@ -18180,7 +18712,9 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
             children: visibleInitiatives.map((initiative) => jsx(InitiativeRevisionRow, { initiative, onResubmitted: onRefresh }, initiative.ref))
           }) : jsx("p", { className: "dockyard-meta", children: "No initiatives are attached." })
         ] }),
-        jsxs("section", { className: "dockyard-feature-card dockyard-overview-card", "data-overview-activity": true, children: [
+        // C5 design review: the card with the Activity tab's words and View
+        // all (Kensei's recommendation), or exactly as today.
+        review.card === "today" ? jsxs("section", { className: "dockyard-feature-card dockyard-overview-card", "data-overview-activity": true, children: [
           jsxs("header", { children: [jsx("h2", { children: "Recent activity" }), jsx("span", { children: number(view.events?.length ?? 0) })] }),
           jsx("p", { children: "Attributed events from this project." }),
           visibleEvents.length > 0 ? jsx("div", {
@@ -18189,12 +18723,13 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
               jsxs("span", { children: [jsx("strong", { children: event.title || event.event_type || event.type || "Project event" }), jsx("small", { children: event.actor_id || event.actor || formatWhen(event.created_at) || "Attributed event" })] })
             ] }, String(event.id ?? index)))
           }) : jsx("p", { className: "dockyard-meta", children: "No attributed project events recorded yet." })
-        ] })
+        ] }) : jsx(RecentActivityCard, { view, onViewAll: () => changeView("activity") })
       ] }),
       jsx(FirstAssessmentCard, { projectId: project.id })
     ] });
   }
   return jsxs("div", { "data-project-dashboard": project.id, children: [
+    review.active ? jsx(ActivityReviewBar, { review, onChange: () => setReviewTick((tick) => tick + 1) }) : null,
     // C1 (signed 16/09): the header strip replaces the old page head, in full
     // on every tab (Sahil 06/10: "full strip + keep all"), so the tab bar never
     // moves. The project comes from the global switcher only (Sahil 04/10), so
@@ -19366,7 +19901,7 @@ var LINK_KIND = {
   }
 };
 var words = (value) => String(value ?? "").replace(/_/g, " ");
-var chip = (text, tone = "") => jsx("span", { className: `dy-rm-chip${tone ? ` ${tone}` : ""}`, children: text });
+var chip = (text2, tone = "") => jsx("span", { className: `dy-rm-chip${tone ? ` ${tone}` : ""}`, children: text2 });
 function treeKeydown(event) {
   const rows = [...event.currentTarget.querySelectorAll("[data-rm-row]")];
   const row = document.activeElement?.closest?.("[data-rm-row]");
@@ -19528,17 +20063,17 @@ function contractFacts(entry, goalTitle) {
   if (!entry || entry.loading) return [["Goal contract", "Loading\u2026"]];
   if (entry.error) return [["Goal contract", `Unavailable: ${entry.error}`]];
   const contract = entry.contract;
-  const text = (value) => value === null || value === void 0 || String(value).trim() === "" ? "\u2014" : String(value);
+  const text2 = (value) => value === null || value === void 0 || String(value).trim() === "" ? "\u2014" : String(value);
   const outcome = String(contract.outcome ?? "").trim();
   const copied = outcome !== "" && outcome === String(goalTitle ?? "").trim();
   return [
-    ["Outcome", copied ? jsxs(Fragment, { children: [contract.outcome, jsx("small", { className: "dy-rm-copied", children: "Copied from the goal title" })] }) : text(contract.outcome)],
+    ["Outcome", copied ? jsxs(Fragment, { children: [contract.outcome, jsx("small", { className: "dy-rm-copied", children: "Copied from the goal title" })] }) : text2(contract.outcome)],
     ["Contract status", CONTRACT_STATUS[contract.status] ?? words(contract.status)],
-    ...contract.status === "paused" ? [["Paused because", text(contract.paused_reason)]] : [],
-    ["Verification", text(contract.verification)],
-    ["Constraints", text(contract.constraints)],
-    ["Boundaries", text(contract.boundaries)],
-    ["Stop when", text(contract.stop_when)],
+    ...contract.status === "paused" ? [["Paused because", text2(contract.paused_reason)]] : [],
+    ["Verification", text2(contract.verification)],
+    ["Constraints", text2(contract.constraints)],
+    ["Boundaries", text2(contract.boundaries)],
+    ["Stop when", text2(contract.stop_when)],
     ...contract.max_turns !== null && contract.max_turns !== void 0 ? [["Turn limit", number(contract.max_turns)]] : []
   ];
 }
@@ -20603,12 +21138,12 @@ function openDockyard() {
   host?.navigate?.("/dockyard");
 }
 function surfacePopup(item) {
-  const text = String(item?.body ?? "").trim();
+  const text2 = String(item?.body ?? "").trim();
   host.notify({
     id: `dockyard-notification-${item?.id}`,
     kind: "info",
     title: item?.title ?? "Fleet notification",
-    message: text || "Open Dockyard to review it.",
+    message: text2 || "Open Dockyard to review it.",
     action: { label: "Open Dockyard", onClick: openDockyard }
   });
 }
