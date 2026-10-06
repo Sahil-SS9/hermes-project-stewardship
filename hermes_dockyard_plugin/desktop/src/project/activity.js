@@ -1,10 +1,11 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 //
-// C5 Activity (06/10): a project's recorded events as real rows instead of
-// raw JSON (HANDOFF-BATCH-C: the "Recent outcomes" reference, with time,
-// event, details and impact). The words, colours and links come from
-// lib/event-vocab.js, so this tab and the Overview card never disagree.
+// C5 Activity (06/10): a project's recorded events as a dated timeline
+// instead of raw JSON (HANDOFF-BATCH-C: the "Recent outcomes" reference, with
+// time, event, details and impact). Sahil picked the timeline over a table on
+// 06/10. The words, colours and links come from lib/event-vocab.js, so this
+// tab and the Overview card never disagree.
 // "Impact" is what the event means for the project, from a fixed list per
 // event type (an approval means work can start). The backend records no
 // measured impact, so the screen never guesses one.
@@ -51,34 +52,8 @@ function When({ row }) {
   return jsx('time', { dateTime: row.ts ?? undefined, title: fullTime(row.ts), children: row.time })
 }
 
-function TableLayout({ groups, onOpenItem }) {
-  return jsxs('table', { className: 'dy-act-table', 'data-activity-table': true, children: [
-    jsx('thead', { children: jsxs('tr', { children: [
-      jsx('th', { scope: 'col', className: 'dy-act-time', children: 'Time' }),
-      jsx('th', { scope: 'col', children: 'Event' }),
-      jsx('th', { scope: 'col', children: 'Details' }),
-      jsx('th', { scope: 'col', children: 'Impact' }),
-      jsx('th', { scope: 'col', children: 'By' }),
-      jsx('th', { scope: 'col', children: jsx('span', { className: 'dy-act-sr', children: 'Open' }) }),
-    ]}) }),
-    ...groups.map((group) => jsxs('tbody', { 'data-activity-day': group.label, children: [
-      jsx('tr', { className: 'dy-act-day', children: jsx('th', { scope: 'rowgroup', colSpan: 6, children: group.label }) }),
-      ...group.rows.map((row) => jsxs('tr', { 'data-activity-row': row.key, 'data-event-type': row.type, 'data-tone': row.tone, children: [
-        jsx('td', { className: 'dy-act-time', children: jsx(When, { row }) }),
-        jsx('td', { className: 'dy-act-event', children: jsxs('span', { children: [jsx(Icon, { name: row.icon }), row.label] }) }),
-        jsx('td', { className: 'dy-act-detail', children: jsxs('span', { children: [
-          jsx('span', { className: 'dy-act-title', children: row.title || '—' }),
-          row.note ? jsx('small', { children: row.note }) : null,
-        ]}) }),
-        jsx('td', { className: 'dy-act-impact', children: jsx(Impact, { row }) }),
-        jsx('td', { className: 'dy-act-by', children: row.by }),
-        jsx('td', { className: 'dy-act-go', children: jsx(OpenButton, { row, onOpenItem }) }),
-      ]}, row.key)),
-    ]}, group.key)),
-  ]})
-}
-
-function TimelineLayout({ groups, onOpenItem }) {
+// A dated feed with an icon rail: one heading per day, newest first.
+function Timeline({ groups, onOpenItem }) {
   return jsx('ol', { className: 'dy-act-timeline', 'data-activity-timeline': true, children: groups.map((group) =>
     jsxs('li', { className: 'dy-act-tday', 'data-activity-day': group.label, children: [
       jsx('h3', { children: group.label }),
@@ -94,7 +69,7 @@ function TimelineLayout({ groups, onOpenItem }) {
     ]}, group.key)) })
 }
 
-export function ProjectActivityPanel({ project, view, layout = 'table', onOpenItem }) {
+export function ProjectActivityPanel({ project, view, onOpenItem }) {
   // `older` holds a longer read the person asked for; a project reload
   // (after any action) brings fresh latest events and drops it.
   const [older, setOlder] = useState(null)
@@ -131,7 +106,7 @@ export function ProjectActivityPanel({ project, view, layout = 'table', onOpenIt
   if (full && next) footnote = `The latest ${plural(total, 'event')}.`
   else if (full) footnote = `The latest ${plural(total, 'event')}, the most the app can read.`
 
-  return jsxs('section', { className: 'dockyard-feature-card dy-act', 'data-activity': project.id, 'data-activity-layout': layout, children: [
+  return jsxs('section', { className: 'dockyard-feature-card dy-act', 'data-activity': project.id, children: [
     jsxs('header', { className: 'dy-act-head', children: [
       jsx('h2', { children: 'Project activity' }),
       jsx('span', { className: 'dy-act-count', 'data-activity-count': true, children: filtered ? `${number(eventCount(shown))} of ${plural(total, 'event')}` : plural(total, 'event') }),
@@ -158,7 +133,7 @@ export function ProjectActivityPanel({ project, view, layout = 'table', onOpenIt
       jsx('p', { children: 'No events match these filters.' }),
       jsx('button', { type: 'button', className: 'dy-act-open', 'data-activity-clear': true, onClick: () => { setKind('all'); setQuery('') }, children: 'Clear filters' }),
     ]}) : null,
-    shown.length > 0 ? (layout === 'timeline' ? jsx(TimelineLayout, { groups, onOpenItem }) : jsx(TableLayout, { groups, onOpenItem })) : null,
+    shown.length > 0 ? jsx(Timeline, { groups, onOpenItem }) : null,
     rows.length > 0 ? jsxs('footer', { className: 'dy-act-foot', children: [
       jsx('span', { children: footnote }),
       full && next ? jsx('button', {

@@ -48,6 +48,13 @@ test('every rule is scoped to .dockyard-root, and breakpoints are container quer
   assert.match(activity, /@container dockyard \(max-width: 640px\)/, 'narrow-container rules exist')
 })
 
+test('Sahil 06/10 picked the timeline: no table and no design-review bar', () => {
+  assert.doesNotMatch(activity, /\.dy-act-table\b/, 'the table layout is gone')
+  assert.doesNotMatch(activity, /\.dy-act-review\b/, 'the design-review bar is gone')
+  assert.match(activity, /@container dockyard \(max-width: 640px\) \{[\s\S]*?\.dockyard-root \.dy-act-entry \{ grid-template-columns: 28px minmax\(0, 1fr\); \}/, 'narrow: the entry drops to two columns')
+  assert.match(activity, /@container dockyard \(max-width: 640px\) \{[\s\S]*?\.dockyard-root \.dy-act-side \{ grid-column: 2;/, 'narrow: impact and Open move under the text')
+})
+
 test('the timeline dot keys background and icon colour to each tone token; pills reuse the app tag', () => {
   for (const tone of ['success', 'warning', 'danger', 'info']) {
     assert.match(activity, new RegExp(`\\.dy-act-dot\\[data-tone="${tone}"\\] \\{ background: var\\(--dy-${tone}-bg\\); color: var\\(--dy-${tone}\\); \\}`), `${tone} dot`)

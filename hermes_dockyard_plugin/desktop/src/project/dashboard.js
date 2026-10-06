@@ -20,7 +20,6 @@ import { Fragment } from '../runtime/react.js'
 import { StatusTag } from '../lib/ui.js'
 import { WorkBar } from '../views/dashboard.js'
 import { InitiativeRevisionRow } from '../views/dashboard.js'
-import { formatWhen } from '../lib/ui.js'
 import { FirstAssessmentCard } from '../views/dashboard.js'
 import { WorkItemDetail } from '../work-item/detail.js'
 import { KanbanScreen } from '../kanban/board.js'
@@ -29,8 +28,6 @@ import { parsePlanFocus } from './plan/plan-screen.js'
 import { ProjectHeaderStrip } from './header-strip.js'
 import { ProjectActivityPanel } from './activity.js'
 import { RecentActivityCard } from './activity.js'
-import { readActivityReview } from './activity-review.js'
-import { ActivityReviewBar } from './activity-review.js'
 
 // Design round f: the old Objectives and Initiatives tabs (and the milestone
 // panel) are one Vision tab (Sahil 05/10 named it; the whiteboards keep
@@ -44,9 +41,6 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
   // QA M-7: leaving the Planning view with unsaved board edits asks first.
   const [canvasDirty, setCanvasDirty] = useState(false)
   const [pendingView, setPendingView] = useState(null)
-  // C5 design review (?review=1): the bar rewrites the page address, and this
-  // counter re-renders the screen so the new choice shows at once.
-  const [, setReviewTick] = useState(0)
   const changeView = (key) => {
     if (key === projectView) return
     if (projectView === 'planning' && canvasDirty) { setPendingView(key); return }
@@ -106,7 +100,6 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
   }
   if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Connect a project before opening the project dashboard.', icon: 'project' })
   const [healthTone, healthLabel] = healthDetails(project.health)
-  const review = readActivityReview()
   const views = [
     ['overview', 'Overview'], ['plan', 'Vision'], ['board', 'Kanban'], ['planning', 'Planning'], ['workflows', 'Workflows'], ['content', 'Content'], ['activity', 'Activity'], ['reports', 'Reports'], ['settings', 'Settings'],
   ]
@@ -146,7 +139,7 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
   } else if (projectView === 'activity') {
     // C5 Activity (06/10): real rows instead of raw JSON. Open goes to the
     // same places as the header strip's "Needs attention" drawer.
-    panel = jsx(ProjectActivityPanel, { project, view, layout: review.layout, onOpenItem: openAttentionItem }, project.id)
+    panel = jsx(ProjectActivityPanel, { project, view, onOpenItem: openAttentionItem }, project.id)
   } else if (projectView === 'settings') {
     panel = jsx(ProjectSettingsPanel, { project, settings: view.settings ?? {}, onRefresh, onDirty: onProjectDirty }, `${project.id}:${view.settings?.updated_at || 'initial'}`)
   } else if (projectView === 'reports') {
@@ -158,9 +151,6 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
     const visibleInitiatives = [...(view.initiatives ?? [])]
       .sort((left, right) => Number(right.priority ?? 0) - Number(left.priority ?? 0))
       .slice(0, 3)
-    const visibleEvents = [...(view.events ?? [])]
-      .sort((left, right) => String(right.created_at || '').localeCompare(String(left.created_at || '')))
-      .slice(0, 4)
     panel = jsxs(Fragment, { children: [
       jsxs('div', { className: 'dockyard-project-grid', 'data-project-visual': true, children: [
         jsxs('section', { className: 'dockyard-feature-card dockyard-project-hero', children: [
@@ -200,24 +190,13 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
           })
             : jsx('p', { className: 'dockyard-meta', children: 'No initiatives are attached.' }),
         ]}),
-        // C5 design review: the card with the Activity tab's words and View
-        // all (Kensei's recommendation), or exactly as today.
-        review.card === 'today' ? jsxs('section', { className: 'dockyard-feature-card dockyard-overview-card', 'data-overview-activity': true, children: [
-          jsxs('header', { children: [jsx('h2', { children: 'Recent activity' }), jsx('span', { children: number(view.events?.length ?? 0) })] }),
-          jsx('p', { children: 'Attributed events from this project.' }),
-          visibleEvents.length > 0 ? jsx('div', { className: 'dockyard-overview-list activity', children:
-            visibleEvents.map((event, index) => jsxs('article', { children: [
-              jsxs('span', { children: [jsx('strong', { children: event.title || event.event_type || event.type || 'Project event' }), jsx('small', { children: event.actor_id || event.actor || formatWhen(event.created_at) || 'Attributed event' })] }),
-            ]}, String(event.id ?? index))),
-          })
-            : jsx('p', { className: 'dockyard-meta', children: 'No attributed project events recorded yet.' }),
-        ]}) : jsx(RecentActivityCard, { view, onViewAll: () => changeView('activity') }),
+        // C5 (Sahil 06/10): the Activity tab's words, the latest four, and View all.
+        jsx(RecentActivityCard, { view, onViewAll: () => changeView('activity') }),
       ]}),
       jsx(FirstAssessmentCard, { projectId: project.id }),
     ]})
   }
   return jsxs('div', { 'data-project-dashboard': project.id, children: [
-    review.active ? jsx(ActivityReviewBar, { review, onChange: () => setReviewTick((tick) => tick + 1) }) : null,
     // C1 (signed 16/09): the header strip replaces the old page head, in full
     // on every tab (Sahil 06/10: "full strip + keep all"), so the tab bar never
     // moves. The project comes from the global switcher only (Sahil 04/10), so

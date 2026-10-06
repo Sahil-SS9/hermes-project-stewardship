@@ -3108,29 +3108,12 @@ var ACTIVITY_CSS = `
 .dockyard-root .dy-act-open:hover { border-color: var(--dy-action); color: var(--dy-text); }
 .dockyard-root .dy-act-open:disabled { cursor: progress; opacity: 0.7; }
 .dockyard-root .dy-act-none { color: var(--dy-text-3); }
-.dockyard-root .dy-act-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .dockyard-root .dy-act-empty { padding: 14px 0 4px; color: var(--dy-text-2); font-size: 13px; }
 .dockyard-root .dy-act-empty p { margin: 0 0 6px; }
 .dockyard-root .dy-act-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; color: var(--dy-text-3); font-size: 12px; }
 .dockyard-root .dy-act-error { color: var(--dy-danger); font-weight: 700; }
 
-/* Layout: table (the reference's columns: time, event, details, impact). */
-.dockyard-root .dy-act-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.dockyard-root .dy-act-table thead th { padding: 6px 8px; border-bottom: 1px solid var(--dy-border); color: var(--dy-text-3); font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-align: left; text-transform: uppercase; }
-.dockyard-root .dy-act-table td { padding: 7px 8px; border-bottom: 1px solid var(--dy-border); color: var(--dy-text-2); vertical-align: middle; }
-.dockyard-root .dy-act-table tbody tr[data-activity-row]:hover td { background: var(--dy-surface-subtle); }
-.dockyard-root .dy-act-table .dy-act-day th { padding: 12px 8px 5px; border-bottom: 1px solid var(--dy-border); color: var(--dy-text); font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-align: left; text-transform: uppercase; }
-.dockyard-root .dy-act-table .dy-act-time { width: 56px; color: var(--dy-text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.dockyard-root .dy-act-table .dy-act-event > span { display: inline-flex; align-items: center; gap: 7px; color: var(--dy-text); font-weight: 700; white-space: nowrap; }
-.dockyard-root .dy-act-table .dy-act-event svg { width: 14px; height: 14px; flex: 0 0 auto; color: var(--dy-text-3); }
-.dockyard-root .dy-act-table .dy-act-detail { width: 100%; min-width: 0; }
-.dockyard-root .dy-act-table .dy-act-detail > span { display: grid; min-width: 0; }
-.dockyard-root .dy-act-table .dy-act-title { color: var(--dy-text); overflow-wrap: anywhere; }
-.dockyard-root .dy-act-table .dy-act-detail small { color: var(--dy-text-3); font-size: 11px; overflow-wrap: anywhere; }
-.dockyard-root .dy-act-table .dy-act-by { white-space: nowrap; }
-.dockyard-root .dy-act-table .dy-act-go { text-align: right; }
-
-/* Layout: timeline (a dated feed with an icon rail). */
+/* The timeline: a dated feed with an icon rail. */
 .dockyard-root .dy-act-timeline, .dockyard-root .dy-act-timeline ol { margin: 0; padding: 0; list-style: none; }
 .dockyard-root .dy-act-tday h3 { margin: 14px 0 6px; color: var(--dy-text); font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
 .dockyard-root .dy-act-entry { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 0 8px 2px; }
@@ -3158,24 +3141,9 @@ var ACTIVITY_CSS = `
 .dockyard-root .dy-act-viewall { padding: 2px 4px; border: 0; background: none; color: var(--dy-action); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .dockyard-root .dy-act-viewall:hover { text-decoration: underline; }
 
-/* Design review only (?review=1): the bar that switches the open choices. */
-.dockyard-root .dy-act-review { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0 0 10px; padding: 8px 12px; border: 1px dashed var(--dy-control-border); border-radius: 8px; background: var(--dy-accent-soft); color: var(--dy-text-2); font-size: 12px; }
-.dockyard-root .dy-act-review strong { font-weight: 800; }
-.dockyard-root .dy-act-review [role="group"] { display: inline-flex; align-items: center; gap: 4px; }
-.dockyard-root .dy-act-review button { padding: 3px 9px; border: 1px solid var(--dy-control-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text-2); font: inherit; cursor: pointer; }
-.dockyard-root .dy-act-review button[aria-pressed="true"] { border-color: var(--dy-action); background: var(--dy-action); color: var(--dy-on-action); }
-
-/* Narrow: each table row becomes a small stacked block. */
+/* Narrow: the search fills the row; the impact and Open move under the text. */
 @container dockyard (max-width: 640px) {
   .dockyard-root .dy-act-search { width: 100%; }
-  .dockyard-root .dy-act-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  .dockyard-root .dy-act-table, .dockyard-root .dy-act-table tbody, .dockyard-root .dy-act-table tr, .dockyard-root .dy-act-table th, .dockyard-root .dy-act-table td { display: block; }
-  .dockyard-root .dy-act-table tr[data-activity-row] { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; padding: 8px 0; border-bottom: 1px solid var(--dy-border); }
-  .dockyard-root .dy-act-table tr[data-activity-row] td { padding: 0; border: 0; }
-  .dockyard-root .dy-act-table .dy-act-time { grid-row: 1; width: auto; }
-  .dockyard-root .dy-act-table .dy-act-event { grid-row: 1; }
-  .dockyard-root .dy-act-table .dy-act-detail, .dockyard-root .dy-act-table .dy-act-impact,
-  .dockyard-root .dy-act-table .dy-act-by, .dockyard-root .dy-act-table .dy-act-go { grid-column: 2; text-align: left; }
   .dockyard-root .dy-act-entry { grid-template-columns: 28px minmax(0, 1fr); }
   .dockyard-root .dy-act-side { grid-column: 2; flex-direction: row; align-items: center; }
 }
@@ -18359,33 +18327,7 @@ function OpenButton({ row, onOpenItem }) {
 function When({ row }) {
   return jsx("time", { dateTime: row.ts ?? void 0, title: fullTime(row.ts), children: row.time });
 }
-function TableLayout({ groups, onOpenItem }) {
-  return jsxs("table", { className: "dy-act-table", "data-activity-table": true, children: [
-    jsx("thead", { children: jsxs("tr", { children: [
-      jsx("th", { scope: "col", className: "dy-act-time", children: "Time" }),
-      jsx("th", { scope: "col", children: "Event" }),
-      jsx("th", { scope: "col", children: "Details" }),
-      jsx("th", { scope: "col", children: "Impact" }),
-      jsx("th", { scope: "col", children: "By" }),
-      jsx("th", { scope: "col", children: jsx("span", { className: "dy-act-sr", children: "Open" }) })
-    ] }) }),
-    ...groups.map((group) => jsxs("tbody", { "data-activity-day": group.label, children: [
-      jsx("tr", { className: "dy-act-day", children: jsx("th", { scope: "rowgroup", colSpan: 6, children: group.label }) }),
-      ...group.rows.map((row) => jsxs("tr", { "data-activity-row": row.key, "data-event-type": row.type, "data-tone": row.tone, children: [
-        jsx("td", { className: "dy-act-time", children: jsx(When, { row }) }),
-        jsx("td", { className: "dy-act-event", children: jsxs("span", { children: [jsx(Icon, { name: row.icon }), row.label] }) }),
-        jsx("td", { className: "dy-act-detail", children: jsxs("span", { children: [
-          jsx("span", { className: "dy-act-title", children: row.title || "\u2014" }),
-          row.note ? jsx("small", { children: row.note }) : null
-        ] }) }),
-        jsx("td", { className: "dy-act-impact", children: jsx(Impact, { row }) }),
-        jsx("td", { className: "dy-act-by", children: row.by }),
-        jsx("td", { className: "dy-act-go", children: jsx(OpenButton, { row, onOpenItem }) })
-      ] }, row.key))
-    ] }, group.key))
-  ] });
-}
-function TimelineLayout({ groups, onOpenItem }) {
+function Timeline({ groups, onOpenItem }) {
   return jsx("ol", { className: "dy-act-timeline", "data-activity-timeline": true, children: groups.map((group) => jsxs("li", { className: "dy-act-tday", "data-activity-day": group.label, children: [
     jsx("h3", { children: group.label }),
     jsx("ol", { children: group.rows.map((row) => jsxs("li", { className: "dy-act-entry", "data-activity-row": row.key, "data-event-type": row.type, "data-tone": row.tone, children: [
@@ -18399,7 +18341,7 @@ function TimelineLayout({ groups, onOpenItem }) {
     ] }, row.key)) })
   ] }, group.key)) });
 }
-function ProjectActivityPanel({ project, view, layout = "table", onOpenItem }) {
+function ProjectActivityPanel({ project, view, onOpenItem }) {
   const [older, setOlder] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -18438,7 +18380,7 @@ function ProjectActivityPanel({ project, view, layout = "table", onOpenItem }) {
   let footnote = `All ${plural6(total, "event")} recorded for this project.`;
   if (full && next) footnote = `The latest ${plural6(total, "event")}.`;
   else if (full) footnote = `The latest ${plural6(total, "event")}, the most the app can read.`;
-  return jsxs("section", { className: "dockyard-feature-card dy-act", "data-activity": project.id, "data-activity-layout": layout, children: [
+  return jsxs("section", { className: "dockyard-feature-card dy-act", "data-activity": project.id, children: [
     jsxs("header", { className: "dy-act-head", children: [
       jsx("h2", { children: "Project activity" }),
       jsx("span", { className: "dy-act-count", "data-activity-count": true, children: filtered ? `${number(eventCount(shown))} of ${plural6(total, "event")}` : plural6(total, "event") })
@@ -18475,7 +18417,7 @@ function ProjectActivityPanel({ project, view, layout = "table", onOpenItem }) {
         setQuery("");
       }, children: "Clear filters" })
     ] }) : null,
-    shown.length > 0 ? layout === "timeline" ? jsx(TimelineLayout, { groups, onOpenItem }) : jsx(TableLayout, { groups, onOpenItem }) : null,
+    shown.length > 0 ? jsx(Timeline, { groups, onOpenItem }) : null,
     rows.length > 0 ? jsxs("footer", { className: "dy-act-foot", children: [
       jsx("span", { children: footnote }),
       full && next ? jsx("button", {
@@ -18512,43 +18454,6 @@ function RecentActivityCard({ view, onViewAll }) {
   ] });
 }
 
-// hermes_dockyard_plugin/desktop/src/project/activity-review.js
-var ACTIVITY_REVIEW_DEFAULTS = { layout: "table", card: "words" };
-function readActivityReview(search = globalThis.location?.search ?? "") {
-  const params = new URLSearchParams(search);
-  const pick = (key, allowed) => allowed.includes(params.get(key)) ? params.get(key) : ACTIVITY_REVIEW_DEFAULTS[key];
-  return {
-    active: params.get("review") === "1",
-    layout: pick("layout", ["table", "timeline"]),
-    card: pick("card", ["words", "today"])
-  };
-}
-function writeActivityReview(key, value) {
-  const url = new URL(globalThis.location.href);
-  url.searchParams.set(key, value);
-  globalThis.history.replaceState(globalThis.history.state, "", url);
-}
-function ActivityReviewBar({ review, onChange }) {
-  const group = (key, label, options) => jsxs("span", { role: "group", "aria-label": label, children: [
-    jsx("span", { children: `${label}:` }),
-    ...options.map(([value, text2]) => jsx("button", {
-      type: "button",
-      "aria-pressed": review[key] === value,
-      "data-review-choice": `${key}:${value}`,
-      onClick: () => {
-        writeActivityReview(key, value);
-        onChange?.();
-      },
-      children: text2
-    }, value))
-  ] }, key);
-  return jsxs("div", { className: "dy-act-review", "data-activity-review": true, children: [
-    jsx("strong", { children: "Design review" }),
-    group("layout", "Activity tab", [["table", "Table"], ["timeline", "Timeline"]]),
-    group("card", "Overview's Recent activity card", [["words", "Same words + View all"], ["today", "As today"]])
-  ] });
-}
-
 // hermes_dockyard_plugin/desktop/src/project/dashboard.js
 var planView = (entry) => parsePlanFocus(entry) || ["objectives", "initiative", "vision"].includes(entry) ? "plan" : entry;
 function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap, onOpenLink }) {
@@ -18556,7 +18461,6 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   const [planFocus, setPlanFocus] = useState(() => parsePlanFocus(initialView));
   const [canvasDirty, setCanvasDirty] = useState(false);
   const [pendingView, setPendingView] = useState(null);
-  const [, setReviewTick] = useState(0);
   const changeView = (key) => {
     if (key === projectView) return;
     if (projectView === "planning" && canvasDirty) {
@@ -18620,7 +18524,6 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   }
   if (!project) return jsx(EmptyState, { title: "No project selected", description: "Connect a project before opening the project dashboard.", icon: "project" });
   const [healthTone, healthLabel] = healthDetails(project.health);
-  const review = readActivityReview();
   const views = [
     ["overview", "Overview"],
     ["plan", "Vision"],
@@ -18671,7 +18574,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   } else if (projectView === "content") {
     panel = jsx(ProjectContentPanel, { project, content: view.content ?? [], onRefresh }, project.id);
   } else if (projectView === "activity") {
-    panel = jsx(ProjectActivityPanel, { project, view, layout: review.layout, onOpenItem: openAttentionItem }, project.id);
+    panel = jsx(ProjectActivityPanel, { project, view, onOpenItem: openAttentionItem }, project.id);
   } else if (projectView === "settings") {
     panel = jsx(ProjectSettingsPanel, { project, settings: view.settings ?? {}, onRefresh, onDirty: onProjectDirty }, `${project.id}:${view.settings?.updated_at || "initial"}`);
   } else if (projectView === "reports") {
@@ -18679,7 +18582,6 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   } else {
     const visibleWork = [...view.workItems ?? []].sort((left, right) => String(left.status || "").localeCompare(String(right.status || ""))).slice(0, 5);
     const visibleInitiatives = [...view.initiatives ?? []].sort((left, right) => Number(right.priority ?? 0) - Number(left.priority ?? 0)).slice(0, 3);
-    const visibleEvents = [...view.events ?? []].sort((left, right) => String(right.created_at || "").localeCompare(String(left.created_at || ""))).slice(0, 4);
     panel = jsxs(Fragment, { children: [
       jsxs("div", { className: "dockyard-project-grid", "data-project-visual": true, children: [
         jsxs("section", { className: "dockyard-feature-card dockyard-project-hero", children: [
@@ -18719,24 +18621,13 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
             children: visibleInitiatives.map((initiative) => jsx(InitiativeRevisionRow, { initiative, onResubmitted: onRefresh }, initiative.ref))
           }) : jsx("p", { className: "dockyard-meta", children: "No initiatives are attached." })
         ] }),
-        // C5 design review: the card with the Activity tab's words and View
-        // all (Kensei's recommendation), or exactly as today.
-        review.card === "today" ? jsxs("section", { className: "dockyard-feature-card dockyard-overview-card", "data-overview-activity": true, children: [
-          jsxs("header", { children: [jsx("h2", { children: "Recent activity" }), jsx("span", { children: number(view.events?.length ?? 0) })] }),
-          jsx("p", { children: "Attributed events from this project." }),
-          visibleEvents.length > 0 ? jsx("div", {
-            className: "dockyard-overview-list activity",
-            children: visibleEvents.map((event, index) => jsxs("article", { children: [
-              jsxs("span", { children: [jsx("strong", { children: event.title || event.event_type || event.type || "Project event" }), jsx("small", { children: event.actor_id || event.actor || formatWhen(event.created_at) || "Attributed event" })] })
-            ] }, String(event.id ?? index)))
-          }) : jsx("p", { className: "dockyard-meta", children: "No attributed project events recorded yet." })
-        ] }) : jsx(RecentActivityCard, { view, onViewAll: () => changeView("activity") })
+        // C5 (Sahil 06/10): the Activity tab's words, the latest four, and View all.
+        jsx(RecentActivityCard, { view, onViewAll: () => changeView("activity") })
       ] }),
       jsx(FirstAssessmentCard, { projectId: project.id })
     ] });
   }
   return jsxs("div", { "data-project-dashboard": project.id, children: [
-    review.active ? jsx(ActivityReviewBar, { review, onChange: () => setReviewTick((tick) => tick + 1) }) : null,
     // C1 (signed 16/09): the header strip replaces the old page head, in full
     // on every tab (Sahil 06/10: "full strip + keep all"), so the tab bar never
     // moves. The project comes from the global switcher only (Sahil 04/10), so

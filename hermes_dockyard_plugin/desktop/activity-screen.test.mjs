@@ -2,8 +2,9 @@
 // (disposable data), no mocks. Real events are made first with the app's own
 // actions (test-support/activity-seed.mjs: propose, approve, reject, request
 // changes, withdraw, assign and unassign work). Then:
-//   - the Activity tab lists them as rows (time, event, details, impact, by),
-//     never as JSON, in the order and words the pure model gives
+//   - the Activity tab lists them as a dated timeline (Sahil's pick 06/10:
+//     timeline, not table): event, details, by, time, impact and the tone of
+//     each entry, never JSON, in the order and words the pure model gives
 //     (activity-vocab.test.mjs pins the model's rules);
 //   - Open goes to the exact place: a waiting initiative to the Approval
 //     inbox, a decided one to Vision, a work item to its drawer;
@@ -11,9 +12,10 @@
 //     can be cleared, and the chips work from the keyboard;
 //   - the Overview "Recent activity" card uses the same words and View all
 //     opens the tab;
-//   - the review link (?review=1) switches to the timeline and back to
-//     today's card; dark mode changes the impact pill colours; at phone width
-//     the rows stack and nothing scrolls sideways.
+//   - the pick is fixed: no design-review bar, and the old review flags
+//     (?review=1&layout=table&card=today) change nothing; dark mode changes
+//     the impact pill and dot colours; at phone width the impact and Open sit
+//     under the text and nothing scrolls sideways.
 // The suite shares one backend, so nothing here hard-codes a count.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -21,7 +23,7 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { pickProject, rememberedProject, restoreRememberedProject } from './test-support/project-scope.mjs'
 import { seedActivity } from './test-support/activity-seed.mjs'
-import { activityRows, matchesFilter } from './src/lib/event-vocab.js'
+import { activityRows, groupByDay, matchesFilter } from './src/lib/event-vocab.js'
 
 const require = createRequire(fileURLToPath(new URL('../dashboard/package.json', import.meta.url)))
 const { chromium } = require('playwright')
@@ -98,17 +100,19 @@ async function openActivity(page, projectId, query = '') {
 }
 const shownKeys = (page) => page.locator('[data-activity-row]').evaluateAll((els) => els.map((el) => el.getAttribute('data-activity-row')))
 
-test('Activity: real events as rows in the model\'s order and words, never JSON', { timeout: 180000 }, async () => {
+test('Activity: real events as a timeline in the model\'s order and words, never JSON', { timeout: 180000 }, async () => {
   const { projectId, refs } = await seedOnce()
   const rows = await expectedRows(projectId)
   await withPage({ width: 1440, height: 900 }, async (page) => {
     await openActivity(page, projectId)
     const panel = page.locator(`[data-activity="${projectId}"]`)
-    assert.equal(await panel.getAttribute('data-activity-layout'), 'table', 'the table is the default layout')
+    await panel.locator('[data-activity-timeline]').waitFor()
+    assert.equal(await panel.locator('table').count(), 0, 'the timeline is the only layout (Sahil 06/10): no table')
     const text = await panel.innerText()
     assert.doesNotMatch(text, /[{}]|"event_type"|\binitiative\.[a-z_]+\b|\bwork\.(un)?assigned\b/, 'no JSON and no code names on screen')
-    assert.deepEqual(await panel.locator('thead th').evaluateAll((els) => els.map((el) => el.textContent.trim())), ['Time', 'Event', 'Details', 'Impact', 'By', 'Open'])
     assert.deepEqual(await shownKeys(page), rows.map((row) => row.key), 'every row, newest first, as the model orders them')
+    assert.deepEqual(await panel.locator('[data-activity-day]').evaluateAll((els) => els.map((el) => el.getAttribute('data-activity-day'))),
+      groupByDay(rows, { timeZone: TZ }).map((group) => group.label), 'one heading per day, in order')
 
     const checks = [
       ['initiative.approved', refs.approved, 'Initiative approved', 'Work can start'],
@@ -119,21 +123,21 @@ test('Activity: real events as rows in the model\'s order and words, never JSON'
       ['work.assigned', refs.work, 'Work assigned', 'Has an owner'],
       ['work.unassigned', refs.work, 'Work unassigned', 'No bot will pick it up'],
     ]
+    const words = (locator) => locator.evaluate((el) => el.innerText.replace(/\s+/g, ' ').trim())
     for (const [type, ref, label, impact] of checks) {
       const want = rowFor(rows, type, ref)
       assert.ok(want, `the backend recorded ${type} for ${ref}`)
-      const row = panel.locator(`tr[data-activity-row="${want.key}"]`)
-      const cells = await row.locator('td').evaluateAll((els) => els.map((el) => el.innerText.replace(/\s+/g, ' ').trim()))
-      assert.equal(cells[0], want.time, `${type}: time`)
-      assert.equal(cells[1], label, `${type}: event`)
-      assert.ok(cells[2].startsWith(want.title) && cells[2].includes(want.title), `${type}: details "${cells[2]}"`)
-      if (want.note) assert.ok(cells[2].includes(want.note), `${type}: the note "${want.note}" is shown`)
-      assert.equal(cells[3], impact, `${type}: impact`)
-      assert.equal(cells[4], want.by, `${type}: by`)
-      assert.equal(await row.getAttribute('data-tone'), want.tone, `${type}: tone`)
+      const entry = panel.locator(`li[data-activity-row="${want.key}"]`)
+      assert.equal(await words(entry.locator('.dy-act-line1 strong')), label, `${type}: event`)
+      assert.equal(await words(entry.locator('.dy-act-line1 > span')), want.title, `${type}: details`)
+      if (want.note) assert.equal(await words(entry.locator('.dy-act-note')), want.note, `${type}: the note is shown`)
+      assert.equal(await words(entry.locator('.dy-act-line2')), `${want.by} · ${want.time}`, `${type}: by and time`)
+      assert.equal(await words(entry.locator('.dy-act-side .dockyard-status-tag')), impact, `${type}: impact`)
+      assert.equal(await entry.getAttribute('data-tone'), want.tone, `${type}: tone`)
+      assert.equal(await entry.locator('.dy-act-dot').getAttribute('data-tone'), want.tone, `${type}: the icon dot carries the tone`)
     }
-    assert.match(await panel.locator(`tr[data-activity-row="${rowFor(rows, 'initiative.rejected', refs.rejected).key}"] td`).nth(2).innerText(), /Too costly this quarter/, 'the reject reason is shown')
-    assert.match(await panel.locator(`tr[data-activity-row="${rowFor(rows, 'initiative.changes_requested', refs.changes).key}"] td`).nth(2).innerText(), /Show the cost first/, 'the reviewer feedback is shown')
+    assert.match(await words(panel.locator(`li[data-activity-row="${rowFor(rows, 'initiative.rejected', refs.rejected).key}"] .dy-act-note`)), /Too costly this quarter/, 'the reject reason is shown')
+    assert.match(await words(panel.locator(`li[data-activity-row="${rowFor(rows, 'initiative.changes_requested', refs.changes).key}"] .dy-act-note`)), /Show the cost first/, 'the reviewer feedback is shown')
   })
 })
 
@@ -214,35 +218,47 @@ test('Activity: the Overview card uses the same words and View all opens the tab
   })
 })
 
-test('Activity: review link switches layout and card; dark mode recolours the pills; phone width stacks', { timeout: 180000 }, async () => {
+test('Activity: the pick is fixed (no review bar, old flags change nothing); dark mode recolours; phone width stacks', { timeout: 180000 }, async () => {
   const { projectId, refs } = await seedOnce()
   const rows = await expectedRows(projectId)
   await withPage({ width: 1280, height: 900 }, async (page) => {
-    await openActivity(page, projectId, '?review=1&layout=timeline&card=today')
-    await page.locator('[data-activity-review]').waitFor()
-    assert.equal(await page.locator(`[data-activity="${projectId}"]`).getAttribute('data-activity-layout'), 'timeline')
+    // The flags the 06/10 review prototype read. Sahil picked "timeline +
+    // same words and View all"; the flags are gone.
+    await openActivity(page, projectId, '?review=1&layout=table&card=today')
     await page.locator('[data-activity-timeline]').waitFor()
-    assert.deepEqual(await shownKeys(page), rows.map((row) => row.key), 'the timeline lists the same rows')
-    await page.locator('[data-review-choice="layout:table"]').click()
-    await page.locator('[data-activity-table]').waitFor()
+    assert.equal(await page.locator('[data-activity-review]').count(), 0, 'no design-review bar')
+    assert.equal(await page.locator(`[data-activity="${projectId}"] table`).count(), 0, 'layout=table changes nothing')
+    assert.deepEqual(await shownKeys(page), rows.map((row) => row.key), 'the timeline lists every row')
     await page.locator('[data-project-view="overview"]').click()
-    await page.locator('[data-overview-activity="true"]').waitFor()
-    await page.locator('[data-review-choice="card:words"]').click()
     await page.locator('[data-overview-activity="words"]').waitFor()
+    assert.equal(await page.locator('[data-overview-activity]').count(), 1, 'card=today changes nothing: one activity card, with the words')
+    assert.doesNotMatch(await page.locator('[data-overview-activity]').innerText(), /Attributed event/, 'today\'s card is gone')
 
     await page.locator('[data-project-view="activity"]').click()
-    const pill = page.locator(`tr[data-activity-row="${rowFor(rows, 'initiative.approved', refs.approved).key}"] .dockyard-status-tag`)
-    const colours = () => pill.evaluate((el) => { const style = getComputedStyle(el); return { bg: style.backgroundColor, color: style.color } })
+    const entry = `li[data-activity-row="${rowFor(rows, 'initiative.approved', refs.approved).key}"]`
+    await page.locator(entry).waitFor()
+    const colours = () => page.evaluate((selector) => {
+      const read = (el) => { const style = getComputedStyle(el); return { bg: style.backgroundColor, color: style.color } }
+      const root = document.querySelector(selector)
+      return { pill: read(root.querySelector('.dockyard-status-tag')), dot: read(root.querySelector('.dy-act-dot')) }
+    }, entry)
     const light = await colours()
     await page.evaluate(() => document.querySelector('.dockyard-root').setAttribute('data-theme', 'dark'))
-    await page.waitForFunction((before) => getComputedStyle(document.querySelector('tr[data-tone="success"] .dockyard-status-tag')).backgroundColor !== before, light.bg)
+    await page.waitForFunction(({ selector, before }) => getComputedStyle(document.querySelector(`${selector} .dockyard-status-tag`)).backgroundColor !== before, { selector: entry, before: light.pill.bg })
     const dark = await colours()
-    assert.notEqual(dark.bg, light.bg, 'dark mode changes the pill background')
-    assert.notEqual(dark.color, light.color, 'dark mode changes the pill text')
+    assert.notEqual(dark.pill.bg, light.pill.bg, 'dark mode changes the pill background')
+    assert.notEqual(dark.pill.color, light.pill.color, 'dark mode changes the pill text')
+    assert.notEqual(dark.dot.bg, light.dot.bg, 'dark mode changes the icon dot')
   })
   await withPage({ width: 390, height: 844 }, async (page) => {
     await openActivity(page, projectId)
+    await page.locator('[data-activity-timeline]').waitFor()
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false, 'no sideways scroll')
-    assert.equal(await page.locator('tr[data-activity-row]').first().evaluate((el) => getComputedStyle(el).display), 'grid', 'rows stack at phone width')
+    const shape = await page.locator('li[data-activity-row]').first().evaluate((el) => {
+      const body = el.querySelector('.dy-act-body').getBoundingClientRect()
+      const side = el.querySelector('.dy-act-side').getBoundingClientRect()
+      return { columns: getComputedStyle(el).gridTemplateColumns.split(' ').length, sideUnderText: side.top >= body.bottom - 1, sideLinedUp: Math.abs(side.left - body.left) <= 1 }
+    })
+    assert.deepEqual(shape, { columns: 2, sideUnderText: true, sideLinedUp: true }, 'at phone width the impact and Open sit under the text')
   })
 })
