@@ -838,7 +838,10 @@ var DOCKYARD_CSS = `
   background: var(--dy-surface);
 }
 .dockyard-root .dockyard-feature-card h2 { margin: 9px 0 0; color: var(--dy-text); font-size: 20px; letter-spacing: -0.02em; }
-.dockyard-root .dockyard-feature-card p { margin: 8px 0 0; color: var(--dy-text-2); font-size: 13px; }
+/* Not inside the workflow canvas: its step panel styles its own text (this
+   rule turned the panel's save error grey on the dark panel, 2.67:1;
+   07/10/2026). :where() keeps the rule's specificity as it was. */
+.dockyard-root .dockyard-feature-card p:where(:not(.dy-wf-scope p)) { margin: 8px 0 0; color: var(--dy-text-2); font-size: 13px; }
 .dockyard-root .dockyard-project-hero { background: linear-gradient(145deg, var(--dy-accent-soft), var(--dy-surface)); border-color: var(--dy-accent-border); }
 .dockyard-root .dockyard-project-hero .dockyard-work-visual { margin-top: 20px; }
 .dockyard-root .dockyard-project-overview-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(260px, .8fr); gap: 14px; margin-top: 14px; }
@@ -2452,25 +2455,12 @@ var WORKFLOW_DESIGN_CSS = `
    the canvas is zoomed out, where the canvas hides the card's second line. */
 .dockyard-root .dy-wfd-on .dy-wf-scope .dy-wf-svg[data-lod="map"] .dy-wf-sub[data-wf-card-note] { opacity: 1; }
 .dockyard-root .dy-wfd-chip { display: inline-flex; align-items: center; min-height: 26px; padding: 0 10px; border: 1px solid var(--dy-border); border-radius: 999px; color: var(--dy-text-2); font-size: 12px; white-space: nowrap; }
-.dockyard-root .dy-wfd-draft-name { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dy-text-2); }
-.dockyard-root .dy-wfd-draft-name input { width: 170px; min-height: 30px; padding: 4px 8px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); }
-.dockyard-root .dy-wfd-draft-name input[aria-invalid="true"] { border-color: var(--dy-danger); }
 .dockyard-root .dy-wfd-draft-label { font-size: 12px; font-weight: 600; color: var(--dy-warning); }
-.dockyard-root .dy-wfd-canvas-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
-.dockyard-root .dy-wfd-canvas-row.with-ai { grid-template-columns: minmax(0, 1fr) 320px; }
 .dockyard-root .dy-wfd-canvas-wrap { position: relative; min-width: 0; }
-/* With the AI builder open the canvas narrows (~700px at 1440 wide), where the
-   playback bar runs into the minimap; the minimap gives way. */
-.dockyard-root .dy-wfd-canvas-row.with-ai .dy-wf-scope .dy-wf-minimap { display: none; }
 .dockyard-root .dy-wfd-on .dockyard-wf3-stage .dockyard-workflow-graph .dy-wf, .dockyard-root .dy-wfd-on .dy-wfd-canvas-wrap > .dy-wf { border-radius: 10px; }
 .dockyard-root .dy-wfd-on .dy-wf-scope .dy-wf-passport { max-height: calc(100% - 74px); }
 .dockyard-root .dy-wfd-draft-banner { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 15; max-width: calc(100% - 300px); margin: 0; padding: 5px 12px; border: 1px solid var(--dy-warning); border-radius: 999px; background: var(--dy-warning-bg); color: var(--dy-text); font-size: 12px; text-align: center; }
-/* The start card over an empty, unsaved canvas (option B). */
-.dockyard-root .dy-wfd-start { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 16; width: min(560px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow-y: auto; box-sizing: border-box; padding: 18px; border: 1px solid var(--dy-border); border-radius: 12px; background: var(--dy-surface); color: var(--dy-text); box-shadow: 0 18px 50px rgba(0, 0, 0, .35); }
-.dockyard-root .dy-wfd-start.hint { width: min(360px, calc(100% - 32px)); font-size: 13px; text-align: center; }
-.dockyard-root .dy-wfd-start h3 { margin: 0 0 12px; font-size: 16px; }
-.dockyard-root .dy-wfd-start-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-/* The four ways in (dialog and start card). */
+/* The four ways in (the New workflow dialog). */
 .dockyard-root .dy-wfd-ways { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .dockyard-root .dy-wfd-ways button { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface-subtle); color: var(--dy-text); text-align: left; cursor: pointer; font: inherit; }
 .dockyard-root .dy-wfd-ways button:hover { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
@@ -2509,9 +2499,16 @@ var WORKFLOW_DESIGN_CSS = `
 .dockyard-root .dy-wfd-fieldset { display: grid; gap: 8px; margin: 0 0 12px; padding: 12px; border: 1px solid var(--dy-border); border-radius: 8px; }
 .dockyard-root .dy-wfd-fieldset legend { padding: 0 4px; font-size: 13px; font-weight: 650; }
 .dockyard-root .dy-wfd-radio { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-/* The AI builder beside the canvas (option B). */
-.dockyard-root .dy-wfd-ai { display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; min-width: 0; max-height: var(--dy-wfd-canvas-h, 70vh); padding: 12px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); }
-.dockyard-root .dy-wfd-ai-head { display: flex; align-items: center; justify-content: space-between; }
+/* The AI chat (Sahil's pick, 07/10/2026): a sidebar at the window's right
+   edge, outside the canvas. Unpinned it floats over the page; pinned, the
+   page narrows to make room (the class on the plugin's root), so it covers
+   nothing. Below dialogs (100), above the page. */
+.dockyard-root .dy-wfd-ai { position: fixed; top: 0; right: 0; bottom: 0; z-index: 95; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; width: min(360px, 100vw); padding: 14px; border-left: 1px solid var(--dy-border); background: var(--dy-surface); color: var(--dy-text); box-shadow: -16px 0 40px rgba(0, 0, 0, .22); }
+.dockyard-root .dy-wfd-ai[data-pinned="true"] { box-shadow: none; }
+.dockyard-root.dy-wfd-ai-docked { box-sizing: border-box; padding-right: 360px; }
+.dockyard-root .dy-wfd-ai-head { display: flex; align-items: flex-start; gap: 6px; }
+.dockyard-root .dy-wfd-ai-head > div { flex: 1 1 auto; min-width: 0; }
+.dockyard-root .dy-wfd-ai-head h2 { margin: 0; font-size: 16px; }
 .dockyard-root .dy-wfd-ai-thread { display: grid; gap: 10px; flex: 1 1 auto; min-height: 120px; overflow-y: auto; align-content: start; }
 .dockyard-root .dy-wfd-ai-user { justify-self: end; max-width: 85%; margin: 0; padding: 7px 10px; border-radius: 10px 10px 2px 10px; background: var(--dy-action); color: var(--dy-on-action); font-size: 13px; }
 .dockyard-root .dy-wfd-ai-reply { display: grid; gap: 6px; padding: 9px 10px; border: 1px solid var(--dy-border); border-radius: 10px 10px 10px 2px; background: var(--dy-surface-subtle); font-size: 13px; }
@@ -2519,21 +2516,15 @@ var WORKFLOW_DESIGN_CSS = `
 .dockyard-root .dy-wfd-ai-reply p { margin: 0; }
 .dockyard-root .dy-wfd-ai-reply details { font-size: 12px; color: var(--dy-text-2); }
 .dockyard-root .dy-wfd-ai-compose { display: flex; gap: 6px; align-items: flex-end; }
-.dockyard-root .dy-wfd-ai-compose textarea { resize: vertical; }
+.dockyard-root .dy-wfd-ai-compose textarea { flex: 1 1 auto; min-width: 0; resize: vertical; }
+.dockyard-root .dy-wfd-ai-unsaved { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--dy-warning); border-radius: 8px; background: var(--dy-warning-bg); color: var(--dy-text); font-size: 12px; }
+.dockyard-root .dy-wfd-ai-unsaved > span { flex: 1 1 auto; font-weight: 600; }
 /* The repeat settings popover (frames). */
 .dockyard-root .dy-wfd-repeat { position: fixed; z-index: 110; display: grid; gap: 8px; box-sizing: border-box; padding: 14px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); color: var(--dy-text); box-shadow: 0 18px 44px rgba(0, 0, 0, .3); font-size: 13px; }
 .dockyard-root .dy-wfd-repeat h3 { margin: 0; font-size: 14px; }
 .dockyard-root .dy-wfd-repeat label { display: grid; gap: 4px; font-size: 12px; color: var(--dy-text-2); }
 .dockyard-root .dy-wfd-repeat p { margin: 0; }
 .dockyard-root .dy-wfd-repeat-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-/* The design review bar: fixed, so it does not change any measurement. */
-.dockyard-root .dy-wfd-review { position: fixed; left: 12px; bottom: 12px; z-index: 80; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 7px 10px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); color: var(--dy-text); box-shadow: 0 10px 30px rgba(0, 0, 0, .25); font-size: 12px; }
-.dockyard-root .dy-wfd-review-group { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.dockyard-root .dy-wfd-review-label { color: var(--dy-text-2); margin-right: 2px; }
-.dockyard-root .dy-wfd-review button { min-height: 26px; padding: 2px 9px; border: 1px solid var(--dy-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; cursor: pointer; }
-.dockyard-root .dy-wfd-review button[aria-pressed="true"] { border-color: var(--dy-action); background: var(--dy-action); color: var(--dy-on-action); }
-.dockyard-root .dy-wfd-review-key { color: var(--dy-text-2); }
-.dockyard-root .dy-wfd-review-key .dy-wfd-preview-tag { margin-left: 0; }
 /* The step panel's plain-words sections, inside the dark canvas panel. */
 .dy-wf-scope .dy-wfx { display: grid; gap: 10px; }
 .dy-wf-scope .dy-wfx-section { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid var(--dy-wf-glass-line); }
@@ -2549,21 +2540,19 @@ var WORKFLOW_DESIGN_CSS = `
 .dy-wf-scope .dy-wfx-error { margin: 0; color: var(--dy-wf-status-blocked-text); font-size: 12px; font-weight: 600; }
 .dy-wf-scope .dy-wfd-preview-tag { display: inline-flex; margin-left: 6px; padding: 0 6px; border: 1px solid rgba(240, 192, 74, .7); border-radius: 999px; background: rgba(227, 179, 65, .14); color: #f0c04a; font-size: 9.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; line-height: 15px; }
 /* The page colours every <p> in a card or dialog as secondary text
-   (.dockyard-feature-card p, .dockyard-modal p), which turned errors grey, the
-   AI's message bubble grey on blue, and the step panel's help text dark on
-   the dark panel. These keep their own colour and spacing. */
+   (.dockyard-feature-card p, .dockyard-modal p), which turned errors grey and
+   the AI's message bubble grey on blue. These keep their own colour and
+   spacing. (The canvas is left out of the page rule itself.) */
 .dockyard-root .dy-wfd-on p.dy-wfd-error { margin: 4px 0 0; color: var(--dy-danger); font-size: 12px; }
 .dockyard-root .dy-wfd-on p.dy-wfd-ai-user { margin: 0; color: var(--dy-on-action); }
 .dockyard-root .dy-wfd-on .dy-wfd-ai-reply p, .dockyard-root .dy-wfd-on .dy-wfd-import-ok p, .dockyard-root .dy-wfd-on .dy-wfd-repeat p { margin: 0; color: var(--dy-text); }
 .dockyard-root .dy-wfd-on p.dy-wfd-ai-note { margin: 0; }
+.dockyard-root .dy-wfd-on p.dy-wfd-ai-sub { margin: 2px 0 0; color: var(--dy-text-2); font-size: 12px; overflow-wrap: anywhere; }
 .dockyard-root .dy-wfd-on p.dy-wfd-draft-banner { margin: 0; color: var(--dy-text); font-size: 12px; }
-.dockyard-root .dy-wfd-on .dy-wf-scope p.dy-wfx-help { margin: 0; color: var(--dy-wf-card-dim); font-size: 11.5px; }
-.dockyard-root .dy-wfd-on .dy-wf-scope p.dy-wfx-error { margin: 0; color: var(--dy-wf-status-blocked-text); font-size: 12px; }
-@media (max-width: 1100px) {
-  .dockyard-root .dy-wfd-canvas-row.with-ai { grid-template-columns: minmax(0, 1fr) 280px; }
+@media (max-width: 900px) {
+  .dockyard-root.dy-wfd-ai-docked { padding-right: 0; }
 }
 @media (max-width: 760px) {
-  .dockyard-root .dy-wfd-canvas-row.with-ai { grid-template-columns: minmax(0, 1fr); }
   .dockyard-root .dy-wfd-ways { grid-template-columns: minmax(0, 1fr); }
   .dockyard-root .dy-wfd-draft-banner { max-width: calc(100% - 24px); }
 }
@@ -2571,7 +2560,6 @@ var WORKFLOW_DESIGN_CSS = `
   /* Phones: the library becomes one scrolling row, so the canvas comes up. */
   .dockyard-root .dy-wfd-on .dockyard-wf3-lib-list { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
   .dockyard-root .dy-wfd-on .dockyard-wf3-lib-list button { flex: 0 0 auto; }
-  .dockyard-root .dy-wfd-review { left: 6px; right: 6px; bottom: 6px; gap: 6px; }
 }
 `;
 
@@ -3555,6 +3543,13 @@ var workflow_canvas_css_default = `
 .dy-wf-scope .dy-wf-delete-confirm p { flex: 1 0 100%; margin: 0; color: var(--dy-wf-card-text); font-size: 12.5px; line-height: 1.45; }
 .dy-wf-scope .dy-wf-pp-error { margin: 0; color: #ff9d97; font-size: 12.5px; line-height: 1.45; }
 .dy-wf-scope .dy-wf-delete-confirm[hidden], .dy-wf-scope .dy-wf-pp-error[hidden] { display: none; }
+/* Steps open on double-click: the note shown on hover, and the words a
+   screen reader hears. A double-click must not select the label text. */
+.dy-wf-scope .dy-wf-svg { -webkit-user-select: none; user-select: none; }
+.dy-wf-scope .dy-wf-open-hint { position: absolute; z-index: 16; pointer-events: none; padding: 4px 9px; border: 1px solid var(--dy-wf-glass-line); border-radius: 6px; background: #0b1220; color: #f4f7fb; font: 600 12px/1.35 system-ui, sans-serif; white-space: nowrap; transform: translate(-50%, calc(-100% - 6px)); box-shadow: 0 4px 14px rgba(0, 0, 0, .35); }
+.dy-wf-scope .dy-wf-open-hint.below { transform: translate(-50%, 6px); }
+.dy-wf-scope .dy-wf-open-hint[hidden] { display: none; }
+.dy-wf-scope .dy-wf-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .dy-wf-scope .dy-wf-passport > :last-child { margin-bottom: 16px; }
 .dy-wf-scope .dy-wf-empty { fill: var(--dy-wf-card-dim); font: 13px system-ui, sans-serif; }
 /* Lane bands (v6 composition): axis labels, never controls. The "exception"
@@ -11051,7 +11046,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   const zoomRef = useRef(1);
   const panRef = useRef({ x: 0, y: 0 });
   const encoded = encodeURIComponent(project.id);
-  const revision2 = Number(canvas?.revision ?? 0);
+  const revision = Number(canvas?.revision ?? 0);
   const selected = objects.find((item) => item.id === selectedId) ?? null;
   useEffect(() => {
     let live = true;
@@ -11558,7 +11553,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     try {
       const rows = persistableObjects();
       const edges = persistableConnectors(rows);
-      const saved = await api(canvasRoute, { method: "PUT", body: { expected_revision: revision2, objects: rows, connectors: edges } });
+      const saved = await api(canvasRoute, { method: "PUT", body: { expected_revision: revision, objects: rows, connectors: edges } });
       if (boardRef.current !== at) return false;
       dirtyRef.current = false;
       setCanvas(saved);
@@ -11713,7 +11708,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     const at = boardRef.current;
     setBusy(true);
     try {
-      const saved = await api(`${canvasRoute}/objects/${encodeURIComponent(selected.id)}?expected_revision=${revision2}`, { method: "DELETE" });
+      const saved = await api(`${canvasRoute}/objects/${encodeURIComponent(selected.id)}?expected_revision=${revision}`, { method: "DELETE" });
       if (boardRef.current !== at) return;
       setCanvas(saved);
       setObjects(saved.objects ?? []);
@@ -12417,7 +12412,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   return jsxs("section", {
     className: "dockyard-feature-card dy-pc-scope",
     "data-planning-canvas": project.id,
-    "data-canvas-revision": String(revision2),
+    "data-canvas-revision": String(revision),
     "data-canvas-dirty": dirty ? "true" : "false",
     "data-canvas-theme": effectiveTheme,
     "data-canvas-theme-source": theme ? "board" : "app",
@@ -12513,7 +12508,7 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
         jsxs("div", { children: [
           jsx("span", { className: "dockyard-card-label", children: "PLANNING CANVAS" }),
           jsx("h2", { children: "Evidence to plan" }),
-          jsx("p", { children: `${number(objects.length)} object(s), ${number(connectors.length)} connector(s), revision ${number(revision2)}${dirty ? " \xB7 unsaved edits" : " \xB7 saved"}${readOnly ? ` \xB7 ${CANVAS_BOARD_STATUS_LABELS[boardStatus]} (read-only)` : ""}. The steward only proposes; nothing is applied automatically.` }),
+          jsx("p", { children: `${number(objects.length)} object(s), ${number(connectors.length)} connector(s), revision ${number(revision)}${dirty ? " \xB7 unsaved edits" : " \xB7 saved"}${readOnly ? ` \xB7 ${CANVAS_BOARD_STATUS_LABELS[boardStatus]} (read-only)` : ""}. The steward only proposes; nothing is applied automatically.` }),
           content.length ? jsx("p", { className: "dockyard-meta", children: `${number(content.length)} project content item(s) available to reference.` }) : null
         ] })
       ] }),
@@ -13731,6 +13726,7 @@ function buildLayout(nodes, opts) {
     height: PAD * 2 + Math.max(1, lanes.length) * laneH - (LANE_PAD - PAD > 0 ? 0 : 0) - PAD + PAD
   };
 }
+var canvasSeq = 0;
 function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pollMs = 8e3) {
   host2.replaceChildren();
   host2.className = "dy-wf dy-wf-scope";
@@ -13746,6 +13742,17 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   minimap.appendChild(miniViewport);
   const passport = elu("div", "dy-wf-passport dy-wf-glass");
   passport.setAttribute("aria-live", "polite");
+  canvasSeq += 1;
+  const help = elu(
+    "p",
+    "dy-wf-sr-only",
+    "Double-click a step, or press Enter, to open its details. The arrow keys move between steps."
+  );
+  help.id = `wf-help-${canvasSeq}`;
+  const openHint = elu("div", "dy-wf-open-hint", "Double-click to open details");
+  openHint.setAttribute("role", "tooltip");
+  openHint.setAttribute("data-wf-open-hint", "");
+  openHint.hidden = true;
   const zoomBar = elu("div", "dy-wf-zoombar dy-wf-glass");
   zoomBar.setAttribute("role", "group");
   zoomBar.setAttribute("aria-label", "Zoom controls");
@@ -13838,7 +13845,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     host2.classList.toggle("dy-wf-still", on);
   });
   playbackBar.append(playbackButton, playbackSlider, playbackLabel, motionButton);
-  wrap.append(svg, feed, minimap, passport, zoomBar, listView, playbackBar);
+  wrap.append(svg, feed, minimap, passport, zoomBar, listView, playbackBar, openHint, help);
   playbackBar.style.overflowX = "auto";
   host2.appendChild(wrap);
   let panX = 0;
@@ -14221,7 +14228,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     g.setAttribute("data-node-id", n.node_id);
     g.setAttribute("aria-label", `${visuals.label}: ${n.title} (${n.status ?? "pending"})`);
     g.dataset.wfEditable = String(editable);
-    g.setAttribute("aria-describedby", `wf-help-${n.node_id}`);
+    g.setAttribute("aria-describedby", help.id);
     const shape = sEl("rect", {
       width: NODE_W,
       height: NODE_H,
@@ -14336,11 +14343,21 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       }
     });
     g.addEventListener("pointerenter", dash);
+    g.addEventListener("pointerenter", () => scheduleHint(n.node_id, g));
     g.addEventListener("pointerleave", () => {
       if (!g.classList.contains("dy-wf-selected")) undash();
+      hideHint();
     });
-    const open = () => openPassport(n, g);
-    g.addEventListener("click", open);
+    g.addEventListener("pointerdown", hideHint);
+    const open = () => {
+      hideHint();
+      openPassport(n, g);
+    };
+    g.addEventListener("click", () => selectStep(n, g));
+    g.addEventListener("dblclick", (ev) => {
+      ev.preventDefault();
+      open();
+    });
     g.addEventListener("keydown", (e) => {
       const ev = e;
       if (ev.key === "Enter") {
@@ -14608,6 +14625,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     if (selectedEl) selectedEl.classList.add("dy-wf-selected");
     selectedId = n.node_id;
     handlers.onSelect?.(n.node_id);
+    handlers.onOpen?.(n.node_id);
     highlightRoute(n.node_id);
     passport.replaceChildren();
     const status = n.status ?? "pending";
@@ -14898,6 +14916,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   let lastY = 0;
   svg.addEventListener("pointerdown", (e) => {
     if (e.target?.closest?.(".dy-wf-node")) return;
+    hideHint();
     dragging = true;
     host2.classList.add("dy-wf-panning");
     lastX = e.clientX;
@@ -14953,6 +14972,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   let wheelSettle = null;
   svg.addEventListener("wheel", (e) => {
     e.preventDefault();
+    hideHint();
     const ev = e;
     const rect = svg.getBoundingClientRect();
     const { sx, sy } = screenScale();
@@ -14972,6 +14992,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     updateMinimap();
   }, { passive: false });
   const closePassport = () => {
+    const wasOpen = passport.childElementCount > 0;
     passport.replaceChildren();
     if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
     selectedEl = null;
@@ -14979,7 +15000,43 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       selectedId = null;
       handlers.onSelect?.(null);
     }
+    if (wasOpen) handlers.onOpen?.(null);
     clearRoute();
+  };
+  const selectStep = (n, g) => {
+    if (selectedId === n.node_id) return;
+    if (passport.childElementCount > 0) closePassport();
+    if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
+    selectedEl = g;
+    g.classList.add("dy-wf-selected");
+    selectedId = n.node_id;
+    handlers.onSelect?.(n.node_id);
+    highlightRoute(n.node_id);
+  };
+  let hintTimer = null;
+  const hideHint = () => {
+    if (hintTimer) {
+      clearTimeout(hintTimer);
+      hintTimer = null;
+    }
+    openHint.hidden = true;
+  };
+  const scheduleHint = (nodeId, g) => {
+    hideHint();
+    const busy = () => Boolean(dragSession || connectFrom || dragging);
+    if (busy() || selectedId === nodeId && passport.childElementCount > 0) return;
+    hintTimer = setTimeout(() => {
+      hintTimer = null;
+      const el2 = g.isConnected ? g : nodeEl(nodeId);
+      if (!el2 || busy() || el2 !== g && !el2.matches(":hover")) return;
+      const box = wrap.getBoundingClientRect();
+      const r = el2.getBoundingClientRect();
+      const below = r.top - box.top < 34;
+      openHint.classList.toggle("below", below);
+      openHint.style.left = `${Math.round(r.left - box.left + r.width / 2)}px`;
+      openHint.style.top = `${Math.round((below ? r.bottom : r.top) - box.top)}px`;
+      openHint.hidden = false;
+    }, 450);
   };
   const onKeyDown = (e) => {
     if (e.key === "Escape") closePassport();
@@ -15159,6 +15216,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     if (timer) clearInterval(timer);
     if (flowTimer) clearInterval(flowTimer);
     clearInterval(clockTimer);
+    hideHint();
     document.removeEventListener("keydown", onKeyDown);
     document.removeEventListener("visibilitychange", onVisibility);
     canvasWindow.removeEventListener("resize", onResize);
@@ -15230,79 +15288,17 @@ function mountDesktopWorkflowCanvas(host2, projectId, workflowName, definition, 
     onEdit: handlers.onEdit,
     editNodes: handlers.editNodes,
     onSelect: handlers.onSelect,
+    onOpen: handlers.onOpen,
     fetchTimeline: handlers.fetchTimeline,
-    // Workflows design round: optional layout hooks (unset = today's canvas).
+    // The Workflows screen's hooks: card notes, loop frames, and the step
+    // panel's plain-words sections.
     design: handlers.design
   }, handlers.pollMs ?? 6e4);
-}
-
-// hermes_dockyard_plugin/desktop/src/project/workflow-design/review.js
-var WF_DESIGNS = Object.freeze([
-  { value: "today", label: "Today" },
-  { value: "a", label: "A \xB7 Start dialog" },
-  { value: "b", label: "B \xB7 Build on the canvas" }
-]);
-var WF_LOOPS = Object.freeze([
-  { value: "panel", label: "In the step panel" },
-  { value: "frame", label: "Frame around the steps" }
-]);
-var DEFAULT_LOOPS = Object.freeze({ today: "panel", a: "panel", b: "frame" });
-function readWorkflowReview(search = globalThis.location?.search ?? "") {
-  const params = new URLSearchParams(search);
-  const active = params.get("review") === "1";
-  const asked = params.get("wf");
-  const design = active ? WF_DESIGNS.some((d) => d.value === asked) ? asked : "a" : "today";
-  const loopsAsked = params.get("wfloops");
-  const loops = WF_LOOPS.some((l) => l.value === loopsAsked) ? loopsAsked : DEFAULT_LOOPS[design];
-  return { active, design, loops };
-}
-function writeWorkflowReview(review) {
-  const url = new URL(globalThis.location.href);
-  url.searchParams.set("wf", review.design);
-  url.searchParams.set("wfloops", review.loops);
-  globalThis.history.replaceState(globalThis.history.state, "", url);
-}
-function nextReview(review, change) {
-  if (change.design && change.design !== review.design) return { ...review, design: change.design, loops: DEFAULT_LOOPS[change.design] };
-  return { ...review, ...change };
-}
-function ChoiceGroup({ label, choices, value, group, onPick }) {
-  return jsxs("span", { className: "dy-wfd-review-group", role: "group", "aria-label": label, children: [
-    jsx("span", { className: "dy-wfd-review-label", children: label }),
-    ...choices.map((choice) => jsx("button", {
-      type: "button",
-      "aria-pressed": value === choice.value,
-      "data-review-choice": `${group}:${choice.value}`,
-      onClick: () => onPick(choice.value),
-      children: choice.label
-    }, choice.value))
-  ] });
-}
-function WorkflowReviewBar({ review, onChange, collapsed, onCollapse }) {
-  if (collapsed) {
-    return jsx("div", { className: "dy-wfd-review collapsed", "data-wf-review": true, children: jsx("button", { type: "button", "data-action": "wf-review-expand", onClick: () => onCollapse(false), children: "Design review" }) });
-  }
-  return jsxs("div", { className: "dy-wfd-review", "data-wf-review": true, role: "region", "aria-label": "Design review", children: [
-    jsx("strong", { children: "Design review" }),
-    jsx(ChoiceGroup, { label: "Option", group: "wf", choices: WF_DESIGNS, value: review.design, onPick: (design) => onChange({ design }) }),
-    review.design === "today" ? null : jsx(ChoiceGroup, { label: "Loops", group: "wfloops", choices: WF_LOOPS, value: review.loops, onPick: (loops) => onChange({ loops }) }),
-    review.design === "today" ? null : jsxs("span", { className: "dy-wfd-review-key", children: [
-      jsx("span", { className: "dy-wfd-preview-tag", children: "Preview" }),
-      " = not saved: kept until you reload"
-    ] }),
-    jsx("button", { type: "button", className: "dy-wfd-review-hide", "data-action": "wf-review-collapse", "aria-label": "Hide the design review bar", onClick: () => onCollapse(true), children: "\xD7" })
-  ] });
 }
 
 // hermes_dockyard_plugin/desktop/src/project/workflow-design/standins.js
 var stepSettings = /* @__PURE__ */ new Map();
 var workflowSettings = /* @__PURE__ */ new Map();
-var listeners = /* @__PURE__ */ new Set();
-var revision = 0;
-var notify = () => {
-  revision += 1;
-  for (const listener of listeners) listener(revision);
-};
 var EMPTY_STEP = Object.freeze({ check: Object.freeze({ by: "none", doneWhen: "" }), askFirst: false, limits: Object.freeze({ turns: "", minutes: "", skills: "" }) });
 var EMPTY_WORKFLOW = Object.freeze({ trigger: Object.freeze({ kind: "manual", schedule: "weekdays", time: "09:00", event: "task-done" }), improve: Object.freeze({ on: false, afterRuns: 5, reviewer: "" }) });
 var stepKey = (project, workflow, nodeId) => `${project}\0${workflow}\0${nodeId}`;
@@ -15311,29 +15307,12 @@ function readStepSettings(project, workflow, nodeId) {
 }
 function writeStepSettings(project, workflow, nodeId, value) {
   stepSettings.set(stepKey(project, workflow, nodeId), value);
-  notify();
 }
 function readWorkflowSettings(project, workflow) {
   return workflowSettings.get(`${project}\0${workflow}`) ?? EMPTY_WORKFLOW;
 }
 function writeWorkflowSettings(project, workflow, value) {
   workflowSettings.set(`${project}\0${workflow}`, value);
-  notify();
-}
-function renameStandins(project, from, to) {
-  for (const [key, value] of [...stepSettings]) {
-    const [p, w, node] = key.split("\0");
-    if (p === project && w === from) {
-      stepSettings.delete(key);
-      stepSettings.set(stepKey(project, to, node), value);
-    }
-  }
-  const flow = workflowSettings.get(`${project}\0${from}`);
-  if (flow) {
-    workflowSettings.delete(`${project}\0${from}`);
-    workflowSettings.set(`${project}\0${to}`, flow);
-  }
-  notify();
 }
 var CHECK_WORDS = Object.freeze({ none: "No check", judge: "AI judge", person: "You sign off", step: "A check step" });
 var task = (id, title, dependsOn, extra = {}) => ({ id, title, depends_on: dependsOn, human_gate: false, kind: "task", ...extra });
@@ -15555,60 +15534,9 @@ var labelled = (text2, control) => {
   return label;
 };
 var roundsWords = (n) => `Up to ${n} round${n === 1 ? "" : "s"}, then asks you`;
-function checkControls(current) {
-  const by = el("select", "dy-wfx-select");
-  by.setAttribute("data-wfx-check", "");
-  for (const [value, words2] of Object.entries(CHECK_WORDS)) {
-    const option = el("option", "", words2);
-    option.value = value;
-    by.appendChild(option);
-  }
-  by.value = current.check.by;
-  const doneWhen = el("input", "dy-wfx-input");
-  doneWhen.setAttribute("data-wfx-done-when", "");
-  doneWhen.placeholder = "e.g. every test passes";
-  doneWhen.value = current.check.doneWhen;
-  const doneRow = labelled("Done when", doneWhen);
-  const sync = () => {
-    doneRow.hidden = by.value !== "judge";
-  };
-  by.addEventListener("change", sync);
-  sync();
-  return { by, doneWhen, nodes: [labelled("Checked by", by), doneRow] };
-}
-function roundsControl(initial) {
-  const rounds = el("input", "dy-wfx-input dy-wfx-rounds");
-  rounds.type = "number";
-  rounds.min = "1";
-  rounds.max = "10";
-  rounds.step = "1";
-  rounds.value = String(initial);
-  rounds.setAttribute("data-wfx-rounds", "");
-  const error = el("p", "dy-wfx-error");
-  error.hidden = true;
-  error.id = `wfx-rounds-error-${Math.random().toString(36).slice(2, 8)}`;
-  rounds.setAttribute("aria-describedby", error.id);
-  const read = () => {
-    const n = Number(rounds.value);
-    const ok = Number.isInteger(n) && n >= 1 && n <= 10;
-    error.hidden = ok;
-    error.textContent = ok ? "" : "Rounds must be a whole number from 1 to 10.";
-    rounds.setAttribute("aria-invalid", String(!ok));
-    if (!ok) throw new Error("Rounds must be a whole number from 1 to 10.");
-    return n;
-  };
-  rounds.addEventListener("input", () => {
-    try {
-      read();
-    } catch {
-    }
-  });
-  return { rounds, error, read };
-}
-function panelExtras({ node, stored, members, loops, settingsKey, onEditFrame }) {
+function panelExtras({ node, stored, members, settingsKey, onEditFrame }) {
   const current = readStepSettings(...settingsKey(node.node_id));
   const root = el("div", "dy-wfx");
-  root.setAttribute("data-wfx-panel", loops);
   if (node.human_gate) {
     const who2 = section("Who does it");
     who2.appendChild(el("p", "dy-wfx-help", "You. The workflow waits here until you approve or send it back."));
@@ -15639,50 +15567,29 @@ function panelExtras({ node, stored, members, loops, settingsKey, onEditFrame })
   root.append(who, what);
   const repeats = Boolean(stored?.loop ?? node.loop);
   const roundsNow = Number((stored?.loop ?? node.loop)?.max_iterations ?? 3);
-  let check = null;
   let repeatBox = null;
-  let roundsField = null;
-  if (loops === "panel") {
-    const checked = section("How it's checked", { preview: true, help: "When a round fails the check, the next round is told why." });
-    check = checkControls(current);
-    checked.append(...check.nodes);
-    const repeat = section("Repeat");
+  const repeat = section("Repeat");
+  if (repeats) {
+    repeat.appendChild(el("p", "dy-wfx-help", `${roundsWords(roundsNow)}. The repeat settings are on this step's frame on the canvas.`));
+    const open = el("button", "dy-btn", "Edit the repeat");
+    open.type = "button";
+    open.setAttribute("data-wfx-edit-frame", node.node_id);
+    open.addEventListener("click", () => onEditFrame?.(node.node_id, open.getBoundingClientRect()));
+    repeat.appendChild(open);
+  } else if (!(node.depends_on ?? []).length) {
+    const why = el("p", "dy-wfx-help", "This step comes first, so it can't repeat: each round waits on a step before it.");
+    why.setAttribute("data-wfx-no-repeat", "");
+    repeat.appendChild(why);
+  } else {
     repeatBox = el("input");
     repeatBox.type = "checkbox";
-    repeatBox.checked = repeats;
+    repeatBox.checked = false;
     repeatBox.setAttribute("data-wfx-repeat", "");
     const repeatLabel = el("label", "dy-wfx-check");
-    repeatLabel.append(repeatBox, el("span", "", "Try again if a round gets stuck"));
-    roundsField = roundsControl(roundsNow);
-    const roundsRow = labelled("At most this many rounds, then it asks you", roundsField.rounds);
-    const sync = () => {
-      roundsRow.hidden = !repeatBox.checked;
-      roundsField.error.hidden = roundsField.error.hidden || !repeatBox.checked;
-    };
-    repeatBox.addEventListener("change", sync);
-    sync();
-    repeat.append(repeatLabel, roundsRow, roundsField.error);
-    root.append(checked, repeat);
-  } else {
-    const repeat = section("Repeat");
-    if (repeats) {
-      repeat.appendChild(el("p", "dy-wfx-help", `${roundsWords(roundsNow)}. The repeat settings are on this step's frame on the canvas.`));
-      const open = el("button", "dy-btn", "Edit the repeat");
-      open.type = "button";
-      open.setAttribute("data-wfx-edit-frame", node.node_id);
-      open.addEventListener("click", () => onEditFrame?.(node.node_id, open.getBoundingClientRect()));
-      repeat.appendChild(open);
-    } else {
-      repeatBox = el("input");
-      repeatBox.type = "checkbox";
-      repeatBox.checked = false;
-      repeatBox.setAttribute("data-wfx-repeat", "");
-      const repeatLabel = el("label", "dy-wfx-check");
-      repeatLabel.append(repeatBox, el("span", "", "Try again if a round gets stuck (up to 3 rounds; change it on the frame)"));
-      repeat.appendChild(repeatLabel);
-    }
-    root.appendChild(repeat);
+    repeatLabel.append(repeatBox, el("span", "", "Try again if a round gets stuck (up to 3 rounds; change it on the frame)"));
+    repeat.appendChild(repeatLabel);
   }
+  root.appendChild(repeat);
   const ask = section("Ask me first", { preview: true });
   const askBox = el("input");
   askBox.type = "checkbox";
@@ -15711,21 +15618,18 @@ function panelExtras({ node, stored, members, loops, settingsKey, onEditFrame })
   limits.append(pair, labelled("Tools (skills)", skills));
   root.append(ask, limits);
   const apply = (next) => {
-    let loop;
-    if (loops === "panel") loop = repeatBox.checked ? { max_iterations: roundsField.read(), until: { status: "done" } } : null;
-    else if (repeatBox) loop = repeatBox.checked ? { max_iterations: 3, until: { status: "done" } } : null;
     writeStepSettings(...settingsKey(node.node_id), {
-      check: check ? { by: check.by.value, doneWhen: check.doneWhen.value.trim() } : current.check,
+      check: current.check,
       askFirst: askBox.checked,
       limits: { turns: turns.value, minutes: minutes.value, skills: skills.value.trim() }
     });
     const patch = { body: body.value.trim() || null };
-    if (loop !== void 0) patch.loop = loop;
+    if (repeatBox) patch.loop = repeatBox.checked ? { max_iterations: 3, until: { status: "done" } } : null;
     return { ...next, phase_team: pick.value || null, design_patch: patch };
   };
   return { el: root, apply };
 }
-function canvasDesignHooks({ loops, draft, members, storedNode, settingsKey, onEditFrame }) {
+function canvasDesignHooks({ draft, members, storedNode, settingsKey, onEditFrame }) {
   const shortName = (id) => {
     const t = storedNode(id)?.title ?? id;
     if (t.length <= 10) return t;
@@ -15735,14 +15639,14 @@ function canvasDesignHooks({ loops, draft, members, storedNode, settingsKey, onE
   return {
     labels: { heading: "This step", title: "Step name", deps: "Comes after (step IDs)", team: "", save: draft ? "Apply to draft" : "Save version" },
     compactFacts: true,
-    panelExtras: (node) => panelExtras({ node, stored: storedNode(node.node_id), members: team(), loops, settingsKey, onEditFrame }),
+    panelExtras: (node) => panelExtras({ node, stored: storedNode(node.node_id), members: team(), settingsKey, onEditFrame }),
     cardNote: (node) => {
-      if (node.loop) return loops === "panel" ? `\u21BB Repeats \xB7 up to ${node.loop.max_iterations}` : "\u21BB Repeats";
+      if (node.loop) return "\u21BB Repeats";
       if (node.when) return `If ${shortName(node.when.node)} ${node.when.status === "blocked" ? "gets stuck" : "is done"}`;
       if (node.human_gate) return "Sign-off";
       return null;
     },
-    frames: loops === "frame" ? (nodes) => nodes.filter((n) => n.loop).map((n) => {
+    frames: (nodes) => nodes.filter((n) => n.loop).map((n) => {
       const check = readStepSettings(...settingsKey(n.node_id)).check;
       return {
         id: n.node_id,
@@ -15751,7 +15655,7 @@ function canvasDesignHooks({ loops, draft, members, storedNode, settingsKey, onE
         sublabel: check.by !== "none" ? `Checked by: ${CHECK_WORDS[check.by]} (preview)` : null,
         onOpen: (rect) => onEditFrame?.(n.node_id, rect)
       };
-    }) : void 0
+    })
   };
 }
 
@@ -16037,7 +15941,7 @@ function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }
     setBusy(true);
     setServerError(null);
     try {
-      await onCreate({ name: clean, nodes, checks: way === "ai" ? aiDraft.checks : null });
+      await onCreate({ name: clean, nodes, checks: way === "ai" ? aiDraft.checks : null, conversation: way === "ai" ? { describe: describe.trim(), plan: aiDraft } : null });
     } catch (failure) {
       setServerError(`Couldn't create it: ${String(failure?.message ?? failure).replace(/^\d{3}:\s*/, "")}`);
       setBusy(false);
@@ -16137,71 +16041,72 @@ function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }
   ] }) });
 }
 
-// hermes_dockyard_plugin/desktop/src/project/workflow-design/canvas-start.js
-function CanvasStartCard({ templates, onUse, onAi, onCancel }) {
-  const [view, setView] = useState("ways");
-  const [template, setTemplate] = useState(null);
-  const [text2, setText] = useState("");
-  const [imported, setImported] = useState(null);
-  const check = (value) => setImported(readImport(value));
-  const ways = WAYS.map((w) => w.way === "ai" ? { ...w, title: "Build with AI", text: "Describe it in the panel; the AI explains and draws the steps here." } : w);
-  const pick = (way) => {
-    if (way === "blank") onUse({ name: "", nodes: [{ id: "step-1", title: "Step 1", depends_on: [], human_gate: false, kind: "task" }], source: "blank" });
-    else if (way === "ai") onAi();
-    else setView(way);
-  };
-  return jsxs("div", { className: "dy-wfd-start", role: "region", "aria-label": "Start your workflow", "data-wfd-canvas-start": view, children: [
-    jsx("h3", { children: view === "ways" ? "Start your workflow" : view === "template" ? "Use a template" : "Import" }),
-    view === "ways" ? jsx("div", { className: "dy-wfd-ways", children: ways.map((w) => jsxs("button", { type: "button", "data-wfd-way": w.way, onClick: () => pick(w.way), children: [
-      jsxs("strong", { children: [w.title, w.way === "ai" ? jsx(PreviewTag, { children: "Practice AI" }) : null] }),
-      jsx("span", { children: w.text })
-    ] }, w.way)) }) : null,
-    view === "template" ? jsx(TemplateList, { templates, value: template?.name, onPick: setTemplate }) : null,
-    view === "import" ? jsxs("div", { className: "dy-wfd-way-body", children: [
-      jsxs("label", { className: "dy-wfd-field", children: [
-        jsx("span", { children: "Paste the workflow" }),
-        jsx("textarea", { rows: 4, value: text2, "data-wfd-import-text": true, placeholder: "A Dockyard export (JSON). Other formats go through the AI.", onChange: (e) => {
-          setText(e.target.value);
-          setImported(null);
-        } })
-      ] }),
-      jsxs("div", { className: "dy-wfd-row", children: [
-        jsxs("label", { className: "dy-wfd-file", children: [jsx("span", { children: "or choose a file" }), jsx("input", { type: "file", accept: ".json,.yaml,.yml,.txt", "data-wfd-import-file": true, onChange: async (e) => {
-          const value = await readFileText(e.target.files?.[0]);
-          setText(value);
-          check(value);
-        } })] }),
-        jsx(Button, { small: true, action: "wfd-import-check", onClick: () => check(text2), children: "Check it" })
-      ] }),
-      jsx(ImportResult, { result: imported })
-    ] }) : null,
-    jsxs("div", { className: "dy-wfd-start-actions", children: [
-      view === "ways" ? jsx(Button, { small: true, action: "wfd-draft-discard", onClick: onCancel, children: "Cancel" }) : jsx(Button, { small: true, action: "wfd-start-back", onClick: () => {
-        setView("ways");
-        setImported(null);
-      }, children: "\u2190 All ways in" }),
-      view === "template" ? jsx(Button, { small: true, variant: "primary", action: "wfd-use-template", disabled: !template, onClick: () => onUse({ name: template.name, nodes: template.definition?.nodes ?? [], source: "template" }), children: "Put it on the canvas" }) : null,
-      view === "import" ? jsx(Button, { small: true, variant: "primary", action: "wfd-use-import", disabled: !imported || imported.kind === "invalid", onClick: () => onUse({ name: imported.name, nodes: imported.nodes, source: imported.kind === "dockyard" ? "import" : "ai-import", notCarried: imported.notCarried, format: imported.format }), children: "Put it on the canvas" }) : null
-    ] })
-  ] });
-}
-
 // hermes_dockyard_plugin/desktop/src/project/workflow-design/ai-panel.js
 var entryId = 0;
-var nextId = () => {
+var aiEntry = (fields) => {
   entryId += 1;
-  return `wfd-ai-${entryId}`;
+  return { id: `wfd-ai-${entryId}`, did: [], before: null, ...fields };
 };
-function AiSidePanel({ members, nodes, workflowTitle, seed, onApply, onClose }) {
-  const [thread, setThread] = useState(() => seed ? [{ id: nextId(), role: "ai", reply: seed.reply, did: seed.did ?? [], before: null }] : []);
+function createdConversation(workflowName, { describe, plan }) {
+  return [
+    aiEntry({ role: "user", text: describe }),
+    aiEntry({ role: "ai", plan, did: plan.did ?? [] }),
+    aiEntry({ role: "ai", reply: [`Created "${workflowName}". Ask me for changes here: you see them on the canvas, and nothing is saved until you press Save version.`] })
+  ];
+}
+var settleConversation = (thread, how) => thread.map((entry) => entry.before && !entry.undone && !entry.settled ? { ...entry, settled: how } : entry);
+var pinnedNow = false;
+var readAiPinned = () => pinnedNow;
+function writeAiPinned(pinned) {
+  pinnedNow = Boolean(pinned);
+}
+var TOGGLE = '[data-action="wfd-ask-ai"]';
+var focusToggle = () => {
+  window.setTimeout(() => document.querySelector(TOGGLE)?.focus(), 0);
+};
+function AiSidebar({ members, nodes, workflowTitle, thread, onThread, pinned, onPin, onApply, onClose, unsaved = false, saveError = null, onSave, onDiscard }) {
   const [text2, setText] = useState("");
   const [error, setError] = useState(null);
+  const panelRef = useRef(null);
   const listRef = useRef(null);
+  const inputRef = useRef(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
   useEffect(() => {
     const list = listRef.current;
     const last = list?.lastElementChild;
     if (list && last) list.scrollTop = Math.max(0, last.offsetTop - list.offsetTop - 8);
   }, [thread.length]);
+  useEffect(() => {
+    const root = panelRef.current?.closest(".dockyard-root");
+    if (!root) return void 0;
+    root.classList.toggle("dy-wfd-ai-docked", pinned);
+    return () => root.classList.remove("dy-wfd-ai-docked");
+  }, [pinned]);
+  useEffect(() => {
+    if (pinned) return void 0;
+    const onDown = (event) => {
+      const target = event.target;
+      if (panelRef.current?.contains(target) || target?.closest?.(`${TOGGLE}, .dockyard-modal-layer, .dy-wfd-repeat`)) return;
+      closeRef.current();
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [pinned]);
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key !== "Escape" || !panelRef.current?.contains(document.activeElement)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      closeRef.current();
+      focusToggle();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, []);
   const empty = !nodes.length;
   const send = (message = text2) => {
     const clean = message.trim();
@@ -16211,30 +16116,42 @@ function AiSidePanel({ members, nodes, workflowTitle, seed, onApply, onClose }) 
     }
     setError(null);
     setText("");
-    const user = { id: nextId(), role: "user", text: clean };
+    const user = aiEntry({ role: "user", text: clean });
     if (empty) {
       const draft = practiceDraft(clean, members);
-      onApply(draft.nodes, { name: draft.name, checks: draft.checks });
-      setThread((t) => [...t, user, { id: nextId(), role: "ai", plan: draft, did: draft.did, before: nodes }]);
+      if (draft.error) {
+        onThread((t) => [...t, user, aiEntry({ role: "ai", reply: [draft.error] })]);
+        return;
+      }
+      onApply(draft.nodes, { checks: draft.checks });
+      onThread((t) => [...t, user, aiEntry({ role: "ai", plan: draft, did: draft.did, before: nodes })]);
       return;
     }
     const result = practiceRevise(nodes, clean, members);
     if (!result.unknown) onApply(result.nodes, {});
-    setThread((t) => [...t, user, { id: nextId(), role: "ai", reply: result.reply, did: result.did, before: result.unknown ? null : nodes }]);
+    onThread((t) => [...t, user, aiEntry({ role: "ai", reply: result.reply, did: result.did, before: result.unknown ? null : nodes })]);
   };
   const answer = (entry, id, value) => {
     const plan = answerQuestion({ ...entry.plan, nodes }, id, value);
     onApply(plan.nodes, {});
-    setThread((t) => t.map((e) => e.id === entry.id ? { ...e, plan } : e));
+    onThread((t) => t.map((e) => e.id === entry.id ? { ...e, plan } : e));
   };
   const undo = (entry) => {
     onApply(entry.before, {});
-    setThread((t) => t.map((e) => e.id === entry.id ? { ...e, undone: true } : e));
+    onThread((t) => t.map((e) => e.id === entry.id ? { ...e, undone: true } : e));
   };
-  return jsxs("aside", { className: "dy-wfd-ai", "aria-label": "AI builder", "data-wfd-ai-panel": empty ? "new" : "edit", children: [
-    jsxs("div", { className: "dy-wfd-ai-head", children: [
-      jsx("strong", { children: "AI builder" }),
-      jsx(Button, { small: true, action: "wfd-ai-close", ariaLabel: "Close the AI builder", onClick: onClose, children: "\xD7" })
+  const settledWords = { saved: "Saved.", discarded: "Discarded." };
+  return jsxs("aside", { ref: panelRef, id: "wfd-ai-sidebar", className: "dy-wfd-ai", "aria-labelledby": "wfd-ai-title", "data-wfd-ai-sidebar": true, "data-pinned": pinned ? "true" : "false", children: [
+    jsxs("header", { className: "dy-wfd-ai-head", children: [
+      jsxs("div", { children: [
+        jsx("h2", { id: "wfd-ai-title", children: "Ask AI" }),
+        jsx("p", { className: "dy-wfd-ai-sub", children: workflowTitle })
+      ] }),
+      jsx(Button, { small: true, action: "wfd-ai-pin", variant: pinned ? "primary" : "", data: { "aria-pressed": pinned ? "true" : "false", title: pinned ? "Let it float over the page again" : "Keep it open beside the page" }, onClick: () => onPin(!pinned), children: pinned ? "Unpin" : "Pin" }),
+      jsx(Button, { small: true, action: "wfd-ai-close", ariaLabel: "Close the AI chat", onClick: () => {
+        closeRef.current();
+        focusToggle();
+      }, children: "\xD7" })
     ] }),
     jsx(PracticeAiNote, {}),
     jsxs("div", { className: "dy-wfd-ai-thread", ref: listRef, "aria-live": "polite", children: [
@@ -16243,13 +16160,22 @@ function AiSidePanel({ members, nodes, workflowTitle, seed, onApply, onClose }) 
         entry.plan ? jsx(AiPlan, { draft: entry.plan, onAnswer: (id, value) => answer(entry, id, value) }) : null,
         ...(entry.reply ?? []).map((line) => jsx("p", { children: line }, line)),
         entry.did?.length ? jsxs("details", { children: [jsx("summary", { children: "What I changed" }), jsx("ul", { children: entry.did.map((d) => jsx("li", { children: d }, d)) })] }) : null,
-        entry.before && !entry.undone ? jsx(Button, { small: true, action: "wfd-ai-undo", onClick: () => undo(entry), children: "Undo this change" }) : null,
-        entry.undone ? jsx("p", { className: "dockyard-meta", children: "Undone." }) : null
+        entry.before && !entry.undone && !entry.settled ? jsx(Button, { small: true, action: "wfd-ai-undo", onClick: () => undo(entry), children: "Undo this change" }) : null,
+        entry.undone ? jsx("p", { className: "dockyard-meta", children: "Undone." }) : null,
+        entry.settled && !entry.undone ? jsx("p", { className: "dockyard-meta", "data-wfd-ai-settled": entry.settled, children: settledWords[entry.settled] }) : null
       ] }, entry.id))
     ] }),
     empty && !thread.length ? jsx("div", { className: "dy-wfd-chips", role: "group", "aria-label": "Examples", children: AI_EXAMPLES.map((example) => jsx("button", { type: "button", "data-wfd-ai-example": example, onClick: () => send(example), children: example }, example)) }) : null,
+    // The AI's changes can be kept or dropped from here too: floating, the
+    // sidebar covers the right end of the toolbar.
+    unsaved ? jsxs("div", { className: "dy-wfd-ai-unsaved", role: "group", "aria-label": "Unsaved changes", "data-wfd-ai-unsaved": true, children: [
+      jsx("span", { children: "Unsaved changes on the canvas" }),
+      jsx(Button, { small: true, variant: "primary", action: "wfd-ai-save", onClick: onSave, children: "Save version" }),
+      jsx(Button, { small: true, action: "wfd-ai-discard", onClick: onDiscard, children: "Discard" }),
+      saveError ? jsx("p", { className: "dy-wfd-error", role: "alert", children: saveError }) : null
+    ] }) : null,
     jsxs("div", { className: "dy-wfd-ai-compose", children: [
-      jsx("textarea", { rows: 2, value: text2, "data-wfd-ai-input": true, "aria-label": "Message to the AI builder", "aria-invalid": error ? "true" : "false", placeholder: empty ? "e.g. Fix a bug until the tests pass" : "e.g. repeat up to 3 times", onChange: (e) => setText(e.target.value), onKeyDown: (e) => {
+      jsx("textarea", { ref: inputRef, rows: 2, value: text2, "data-wfd-ai-input": true, "aria-label": "Message to the AI", "aria-invalid": error ? "true" : "false", placeholder: empty ? "e.g. Fix a bug until the tests pass" : "e.g. repeat up to 3 times", onChange: (e) => setText(e.target.value), onKeyDown: (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
           send();
@@ -16258,19 +16184,15 @@ function AiSidePanel({ members, nodes, workflowTitle, seed, onApply, onClose }) 
       jsx(Button, { small: true, variant: "primary", action: "wfd-ai-send", onClick: () => send(), children: "Send" })
     ] }),
     error ? jsx("p", { className: "dy-wfd-error", role: "alert", children: error }) : null,
-    jsx("p", { className: "dockyard-meta", children: "Nothing is saved until you press Save." })
+    jsx("p", { className: "dockyard-meta", children: "Nothing is saved until you press Save version." })
   ] });
 }
 
 // hermes_dockyard_plugin/desktop/src/project/workflows.js
 var NO_RUNS = [];
+var NO_THREAD = [];
 var failureText = (failure) => String(failure?.message ?? failure ?? "unknown error").replace(/^\d{3}:\s*/, "");
 function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary }) {
-  const [name, setName] = useState("release");
-  const [title, setTitle] = useState("Draft release plan");
-  const [team, setTeam] = useState("");
-  const [runKey, setRunKey] = useState("");
-  const [phaseTeams, setPhaseTeams] = useState({});
   const canvasRef = useRef(null);
   const [selected, setSelected] = useState(workflows?.[0]?.name ?? "");
   const [runsFor, setRunsFor] = useState({ workflow: null, runs: NO_RUNS });
@@ -16279,9 +16201,6 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
   const [validation, setValidation] = useState(null);
   const [layoutPendingVersion, setLayoutPendingVersion] = useState(null);
   const [libCollapsed, setLibCollapsed] = useState(false);
-  const [review, setReview] = useState(() => readWorkflowReview());
-  const [reviewHidden, setReviewHidden] = useState(false);
-  const designOn = review.design !== "today";
   const [members, setMembers] = useState([]);
   const membersRef = useRef([]);
   membersRef.current = members;
@@ -16296,7 +16215,8 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     return next;
   };
   const [aiOpen, setAiOpen] = useState(false);
-  const [aiSeed, setAiSeed] = useState(null);
+  const [aiPinned, setAiPinned] = useState(() => readAiPinned());
+  const [aiThreads, setAiThreads] = useState({});
   const [repeatAt, setRepeatAt] = useState(null);
   const [draftError, setDraftError] = useState(null);
   const encoded = encodeURIComponent(project.id);
@@ -16385,13 +16305,9 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
   const actionsRef = useRef(null);
   actionsRef.current = { savePlan, loadRuns, planNodes: currentCanvasNodes };
   const canvasReady = Boolean(current) && (mode === "definition" || runsReady);
-  const standinWorkflow = () => {
-    const d = draftRef.current;
-    return d ? d.base?.name ?? `draft:${d.key}` : planRef.current.name;
-  };
+  const standinWorkflow = () => draftRef.current?.base.name ?? planRef.current.name;
   const storedNodeOf = (id) => (draftRef.current ? draftRef.current.nodes : planRef.current.nodes).find((n) => (n.id ?? n.node_id) === id) ?? null;
   const hooksFor = (isDraft) => canvasDesignHooks({
-    loops: review.loops,
     draft: isDraft,
     members: () => membersRef.current,
     storedNode: storedNodeOf,
@@ -16401,38 +16317,35 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
   const fitCanvasHeight = () => {
     const host2 = canvasRef.current;
     if (!host2) return;
-    if (!designOn || globalThis.innerWidth <= 640) {
+    if (window.innerWidth <= 640) {
       host2.style.height = "";
       return;
     }
-    const top = host2.getBoundingClientRect().top + globalThis.scrollY;
-    const height = Math.max(360, Math.round(globalThis.innerHeight - top - 12));
-    host2.style.height = `${height}px`;
-    host2.closest(".dy-wfd-canvas-row")?.style.setProperty("--dy-wfd-canvas-h", `${height}px`);
+    const top = host2.getBoundingClientRect().top + window.scrollY;
+    host2.style.height = `${Math.max(360, Math.round(window.innerHeight - top - 12))}px`;
   };
   useEffect(() => {
-    if (!designOn) return void 0;
     const onResize = () => fitCanvasHeight();
-    globalThis.addEventListener("resize", onResize);
-    return () => globalThis.removeEventListener("resize", onResize);
-  }, [designOn]);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const growForPanel = () => {
     const host2 = canvasRef.current;
-    if (!host2 || !designOn || globalThis.innerWidth <= 640) return;
+    if (!host2 || window.innerWidth <= 640) return;
     const stage = host2.closest(".dockyard-wf3-stage");
     const toolbar = stage?.querySelector(".dockyard-wf3-toolbar");
-    const want = Math.min(820, Math.round(globalThis.innerHeight - (toolbar?.getBoundingClientRect().height ?? 0) - 24));
+    const want = Math.min(820, Math.round(window.innerHeight - (toolbar?.getBoundingClientRect().height ?? 0) - 24));
     if (host2.getBoundingClientRect().height >= want - 4) return;
     host2.style.height = `${want}px`;
-    host2.closest(".dy-wfd-canvas-row")?.style.setProperty("--dy-wfd-canvas-h", `${want}px`);
     stage?.scrollIntoView({ block: "start" });
   };
   const onSelectStep = (nodeId) => {
     selectedNodeRef.current = nodeId;
-    if (nodeId && designOn) growForPanel();
+  };
+  const onOpenStep = (nodeId) => {
+    if (nodeId) growForPanel();
   };
   useEffect(() => {
-    if (!designOn) return void 0;
     let live = true;
     api(`/projects/${encoded}/team`).then((result) => {
       if (live) setMembers((result?.members ?? []).filter((m) => m.state === "active").map((m) => m.profile_slug));
@@ -16445,20 +16358,20 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     return () => {
       live = false;
     };
-  }, [designOn, encoded, workflows?.length]);
-  const designKey = designOn ? `${review.design}:${review.loops}` : "today";
+  }, [encoded, workflows?.length]);
   const draftKey2 = draft?.key ?? null;
   useEffect(() => {
     if (!canvasRef.current || !draftKey2) return void 0;
     fitCanvasHeight();
-    const handle = mountDesktopWorkflowCanvas(canvasRef.current, project.id, draftRef.current?.base?.name ?? "new-workflow", () => ({ nodes: draftRef.current?.nodes ?? [] }), () => NO_RUNS, {
-      // A draft changes in memory only; Save in the toolbar saves it.
+    const handle = mountDesktopWorkflowCanvas(canvasRef.current, project.id, draftRef.current.base.name, () => ({ nodes: draftRef.current?.nodes ?? [] }), () => NO_RUNS, {
+      // A draft changes in memory only; Save version in the toolbar saves it.
       onEdit: (editedNodes) => {
         updateDraft((d) => d ? { ...d, nodes: mergeEdits(editedNodes, d.nodes) } : d);
         canvasHandle.current?.refresh();
       },
       editNodes: () => canvasNodesOf(draftRef.current?.nodes ?? []),
-      onSelect: (nodeId) => onSelectStep(nodeId),
+      onSelect: onSelectStep,
+      onOpen: onOpenStep,
       design: hooksFor(true)
     });
     canvasHandle.current = handle;
@@ -16467,7 +16380,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
       selectedNodeRef.current = null;
       handle();
     };
-  }, [project.id, draftKey2, designKey]);
+  }, [project.id, draftKey2]);
   useEffect(() => {
     if (!canvasRef.current || !current || !canvasReady || draftKey2) return void 0;
     fitCanvasHeight();
@@ -16475,7 +16388,8 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     const handle = mountDesktopWorkflowCanvas(canvasRef.current, project.id, workflowName, () => viewRef.current.definition, () => viewRef.current.runs, {
       onEdit: (editedNodes) => actionsRef.current.savePlan(editedNodes),
       editNodes: () => actionsRef.current.planNodes(),
-      onSelect: (nodeId) => designOn ? onSelectStep(nodeId) : selectedNodeRef.current = nodeId,
+      onSelect: onSelectStep,
+      onOpen: onOpenStep,
       // Gate decisions use the same canonical authority as the dashboard: the
       // reviewed decision fingerprint is submitted with the action, so a stale
       // review can never approve something else. Retry re-queues via the
@@ -16494,8 +16408,8 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
         await api(`/projects/${encoded}/work-items/${encodeURIComponent(ref)}/transition`, { method: "POST", body: { status: "backlog" } });
         await actionsRef.current.loadRuns(workflowName);
       },
-      fetchTimeline: async (pid, wname, runKey2) => api(`/projects/${encodeURIComponent(pid)}/workflows/${encodeURIComponent(wname)}/runs/${encodeURIComponent(runKey2)}/timeline`),
-      design: designOn ? hooksFor(false) : void 0
+      fetchTimeline: async (pid, wname, runKey) => api(`/projects/${encodeURIComponent(pid)}/workflows/${encodeURIComponent(wname)}/runs/${encodeURIComponent(runKey)}/timeline`),
+      design: hooksFor(false)
     });
     canvasHandle.current = handle;
     return () => {
@@ -16503,7 +16417,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
       selectedNodeRef.current = null;
       handle();
     };
-  }, [project.id, current?.name, canvasReady, draftKey2, designKey]);
+  }, [project.id, current?.name, canvasReady, draftKey2]);
   useEffect(() => {
     canvasHandle.current?.refresh();
   }, [runs, mode, latestVersion?.version]);
@@ -16517,13 +16431,6 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
       setError(String(failure?.message ?? failure));
       return false;
     }
-  };
-  const nameTaken = grouped.some((item) => item.name === name.trim());
-  const define = () => {
-    if (!name.trim() || !title.trim() || nameTaken) return;
-    mutate(`/projects/${encoded}/workflows`, { name: name.trim(), nodes: [{ id: "step-1", title: title.trim(), depends_on: [], human_gate: false, team: team || null, phase_team: phaseTeams["step-1"] || null }] });
-    setSelected(name.trim());
-    setTitle("");
   };
   const persistNodes = async (nextNodes) => {
     if (draftRef.current) {
@@ -16586,59 +16493,43 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
   const attentionCount = latest ? (latest.nodes ?? []).filter(needsAttention).length : 0;
   const startVersion = async (version) => {
     if (!current || !version) return;
-    await mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/start`, { version: version.version, run_key: runKey || `${current.name}-${Date.now()}` });
+    await mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/start`, { version: version.version, run_key: `${current.name}-${Date.now()}` });
     await loadRuns(current.name);
   };
   const takenNames = grouped.map((item) => item.name);
   const keepChecks = (workflowName, checks) => {
     for (const [id, check] of Object.entries(checks ?? {})) writeStepSettings(project.id, workflowName, id, { ...EMPTY_STEP, check });
   };
-  const closeDraft = () => {
+  const threadOf = (workflowName) => aiThreads[workflowName] ?? NO_THREAD;
+  const changeThread = (workflowName, change) => setAiThreads((all) => ({ ...all, [workflowName]: change(all[workflowName] ?? NO_THREAD) }));
+  const closeDraft = (how) => {
+    const d = draftRef.current;
     updateDraft(null);
-    setAiOpen(false);
-    setAiSeed(null);
     setDraftError(null);
     setRepeatAt(null);
+    if (d && how) changeThread(d.base.name, (thread) => settleConversation(thread, how));
   };
   const startNew = () => {
     setValidation(null);
-    if (review.design === "a") {
-      setDialog("new");
-      return;
-    }
-    closeDraft();
-    updateDraft({ key: `new-${Date.now()}`, name: "", base: null, nodes: [] });
+    setDialog("new");
   };
-  const createFromDialog = async ({ name: newName, nodes: newNodes, checks }) => {
+  const createFromDialog = async ({ name: newName, nodes: newNodes, checks, conversation }) => {
     await api(`/projects/${encoded}/workflows`, { method: "POST", body: { name: newName, nodes: newNodes }, quiet: true });
     keepChecks(newName, checks);
+    if (conversation) {
+      setAiThreads((all) => ({ ...all, [newName]: createdConversation(newName, conversation) }));
+      setAiOpen(true);
+    }
     setDialog(null);
     setSelected(newName);
     onRefresh?.();
   };
-  const useStart = ({ name: startName, nodes: startNodes, source, notCarried, format }) => {
-    updateDraft((d) => ({ ...d, name: d.name || (startName ? uniqueDraftName(startName) : ""), nodes: startNodes.map((n) => ({ ...n })) }));
-    canvasHandle.current?.refresh();
-    if (source === "ai-import") {
-      setAiSeed({ reply: [`I drafted ${startNodes.length} steps from ${format}.`, `I could not carry over: ${notCarried.join("; ")}.`, "Check the steps on the canvas, then ask me for changes."], did: [`Added ${startNodes.length} steps`] });
-      setAiOpen(true);
-    }
-  };
-  const uniqueDraftName = (base) => {
-    let candidate = base;
-    let index = 2;
-    while (takenNames.includes(candidate)) {
-      candidate = `${base}-${index}`;
-      index += 1;
-    }
-    return candidate;
-  };
   const aiApply = (nextNodes, meta = {}) => {
     if (!draftRef.current) {
       if (!current) return;
-      updateDraft({ key: `edit-${Date.now()}`, name: current.name, base: { name: current.name, version: latestVersion?.version ?? 0 }, nodes: nextNodes });
+      updateDraft({ key: `edit-${Date.now()}`, base: { name: current.name, version: latestVersion?.version ?? 0 }, nodes: nextNodes });
     } else {
-      updateDraft((d) => ({ ...d, nodes: nextNodes, name: d.name || (meta.name ? uniqueDraftName(meta.name) : "") }));
+      updateDraft((d) => ({ ...d, nodes: nextNodes }));
     }
     keepChecks(standinWorkflow(), meta.checks);
     canvasHandle.current?.refresh();
@@ -16652,29 +16543,16 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
       return;
     }
     try {
-      if (d.base) {
-        await api(`/projects/${encoded}/workflows/${encodeURIComponent(d.base.name)}/versions`, { method: "POST", body: { nodes: d.nodes }, quiet: true });
-        closeDraft();
-        onRefresh?.();
-        return;
-      }
-      const clean = d.name.trim();
-      if (!clean) {
-        setDraftError("Give the workflow a name.");
-        return;
-      }
-      if (takenNames.includes(clean)) {
-        setDraftError(`"${clean}" already exists. Pick another name.`);
-        return;
-      }
-      await api(`/projects/${encoded}/workflows`, { method: "POST", body: { name: clean, nodes: d.nodes }, quiet: true });
-      renameStandins(project.id, `draft:${d.key}`, clean);
-      closeDraft();
-      setSelected(clean);
+      await api(`/projects/${encoded}/workflows/${encodeURIComponent(d.base.name)}/versions`, { method: "POST", body: { nodes: d.nodes }, quiet: true });
+      closeDraft("saved");
       onRefresh?.();
     } catch (failure) {
       setDraftError(`Couldn't save: ${failureText(failure)}`);
     }
+  };
+  const pinAi = (pinned) => {
+    writeAiPinned(pinned);
+    setAiPinned(pinned);
   };
   const saveRepeat = async (nodeId, loop, check) => {
     const key = [project.id, standinWorkflow(), nodeId];
@@ -16686,84 +16564,65 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     }
     await savePlan(edited);
   };
-  const changeReview = (change) => {
-    const next = nextReview(review, change);
-    writeWorkflowReview(next);
-    closeDraft();
-    setDialog(null);
-    setReview(next);
-  };
   const repeatNode = repeatAt ? storedNodeOf(repeatAt.nodeId) : null;
   const liveCounts = latest ? (latest.nodes ?? []).reduce((acc, node) => {
     const key = node.status ?? "pending";
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {}) : null;
-  return jsxs("section", { className: designOn ? "dockyard-feature-card dockyard-workflows-v6 dy-wfd-on" : "dockyard-feature-card dockyard-workflows-v6", "data-workflows-prototype": project.id, "data-executable-workflows": project.id, "data-wf-design": designOn ? review.design : void 0, "data-wf-loops": designOn ? review.loops : void 0, children: [
-    designOn ? null : jsxs("div", { className: "dockyard-wf-entry", "data-workflow-library-entry": true, children: [
-      jsx(Button, { action: "open-workflow-library", variant: "primary", onClick: onOpenLibrary, children: "Open workflow library" }),
-      jsx("span", { children: "The library holds every workflow: global (available to all projects) and this project's dedicated ones." })
-    ] }),
-    designOn ? null : jsxs("header", { className: "dockyard-section-head", children: [jsxs("div", { children: [jsx("h2", { children: "Workflows" }), jsx("p", { children: "Planning is saved as a version; execution is shown only from canonical runs." })] }), jsx(StatusTag, { tone: latest?.status === "running" ? "info" : "neutral", label: latest ? `Live: ${latest.status}` : `${number(grouped.length)} instances` })] }),
-    // Design round: one compact row (the two blocks above took ~150px and
-    // pushed the canvas below the window).
-    designOn ? jsxs("header", { className: "dy-wfd-head", "data-wfd-head": true, children: [
+  const askAi = (key) => jsx(Button, { small: true, action: "wfd-ask-ai", variant: aiOpen ? "primary" : "", data: { "aria-expanded": aiOpen ? "true" : "false", "aria-controls": "wfd-ai-sidebar" }, disabled: !current, onClick: () => setAiOpen((v) => !v), children: "Ask AI" }, key);
+  return jsxs("section", { className: "dockyard-feature-card dockyard-workflows-v6 dy-wfd-on", "data-workflows-prototype": project.id, "data-executable-workflows": project.id, children: [
+    // One compact row (the old two header blocks took ~150px and pushed the
+    // canvas below the window).
+    jsxs("header", { className: "dy-wfd-head", "data-wfd-head": true, children: [
       jsx("h2", { children: "Workflows" }),
       jsx(StatusTag, { tone: latest?.status === "running" ? "info" : "neutral", label: latest ? `Live: ${latest.status}` : `${number(grouped.length)} ${plural2(grouped.length, "workflow")}` }),
       !latest && current && !draft ? jsx("span", { className: "dy-wfd-chip", "data-workflow-no-run": true, children: `${current.name}: no runs yet` }) : null,
       jsx("span", { className: "dy-wfd-grow" }),
       jsx(Button, { small: true, action: "open-workflow-library", onClick: onOpenLibrary, children: "Open library" }),
       jsx(Button, { small: true, variant: "primary", action: "wfd-new-workflow", disabled: Boolean(draft), onClick: startNew, children: "New workflow" })
-    ] }) : null,
+    ] }),
     error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: error }) : null,
     jsxs("div", { className: libCollapsed ? "dockyard-wf3 lib-collapsed" : "dockyard-wf3", "data-wf-library-collapsed": libCollapsed ? "true" : "false", children: [
-      // ---- Zone 1: workflow library + create/define editor ---------------
+      // ---- Zone 1: the workflow library ------------------------------------
       jsxs("aside", { className: "dockyard-wf3-lib", "data-workflow-library": project.id, "aria-hidden": libCollapsed ? "true" : void 0, inert: libCollapsed ? true : void 0, children: [
         jsxs("div", { className: "dockyard-wf3-lib-head", children: [jsx("strong", { children: "Library" }), jsx("span", { children: number(grouped.length) })] }),
-        designOn && draft && !draft.base ? jsx("div", { className: "dockyard-wf3-lib-list", children: jsxs("button", { type: "button", className: "active", "data-wfd-draft-item": true, "aria-current": "true", children: [jsx("strong", { children: draft.name || "New workflow" }), jsx("small", { children: "not saved" })] }) }) : null,
         grouped.length ? jsx("div", { className: "dockyard-wf3-lib-list", children: grouped.map((item) => jsxs("button", {
           type: "button",
-          className: item.name === current?.name && !(designOn && draft && !draft.base) ? "active" : "",
+          className: item.name === current?.name ? "active" : "",
           "data-workflow-library-item": item.name,
           "data-action": "select-workflow",
-          // Design round: an unsaved draft is never thrown away by a click.
-          disabled: designOn && Boolean(draft),
-          title: designOn && draft ? "Save or discard the open draft first." : void 0,
+          // The AI's unsaved changes are never thrown away by a click.
+          disabled: Boolean(draft),
+          title: draft ? "Save or discard the AI\u2019s changes first." : void 0,
           onClick: () => setSelected(item.name),
           children: [
             jsx("strong", { children: item.name }),
             jsx("small", { children: `v${item.versions[item.versions.length - 1].version}${item.archived_at ? " \xB7 archived" : ""}` })
           ]
-        }, item.name)) }) : jsx("p", { className: "dockyard-meta", children: designOn ? "No workflows yet. Press New workflow." : "No workflow instances yet." }),
-        designOn ? null : jsxs("div", { className: "dockyard-inline-editor", children: [
-          jsxs("label", { children: [jsx("span", { children: "Template / instance" }), jsx("input", { "data-workflow-name": true, value: name, onChange: (event) => setName(event.target.value) })] }),
-          jsxs("label", { children: [jsx("span", { children: "Phase title" }), jsx("input", { "data-workflow-title": true, value: title, onChange: (event) => setTitle(event.target.value) })] }),
-          jsxs("label", { children: [jsx("span", { children: "Default bot team" }), jsx("input", { "data-workflow-team": true, value: team, placeholder: "team slug", onChange: (event) => setTeam(event.target.value) })] }),
-          jsxs("label", { children: [jsx("span", { children: "Run key" }), jsx("input", { "data-workflow-run-key": current?.name ?? name, value: runKey, onChange: (event) => setRunKey(event.target.value), placeholder: "execution key" })] }),
-          nameTaken ? jsx("p", { className: "dockyard-meta", role: "status", "data-workflow-name-taken": name.trim(), children: `"${name.trim()}" already exists. Pick a new name; to change "${name.trim()}", edit it on the canvas.` }) : null,
-          jsx(Button, { action: "define-workflow", variant: "primary", disabled: !name.trim() || !title.trim() || nameTaken, onClick: define, children: "Create workflow" })
-        ] })
+        }, item.name)) }) : jsx("p", { className: "dockyard-meta", children: "No workflows yet. Press New workflow." })
       ] }),
       // ---- Zone 2: toolbar + run readout + canvas (the surface) ----------
       // There is no third column: run lifecycle lives in the toolbar, the
-      // canonical run state is a one-line readout above the canvas, and step
-      // details open in the canvas's own floating panel.
+      // canonical run state is a one-line readout above the canvas, step
+      // details open in the canvas's own floating panel, and the AI chat is
+      // a sidebar beside the page.
       jsxs("div", { className: "dockyard-wf3-stage", children: [
-        jsxs("div", { className: "dockyard-wf3-toolbar", role: "toolbar", "aria-label": "Workflow canvas tools", children: designOn && draft ? [
-          // Design round: an unsaved draft has its own controls; the run
-          // controls come back once it is saved.
+        jsxs("div", { className: "dockyard-wf3-toolbar", role: "toolbar", "aria-label": "Workflow canvas tools", children: draft ? [
+          // The AI's unsaved changes have their own controls; the run
+          // controls come back once they are saved or discarded.
           jsx("button", { type: "button", className: "dockyard-wf3-libtoggle", "data-action": "wf-toggle-library", "aria-expanded": libCollapsed ? "false" : "true", "aria-label": libCollapsed ? "Show workflow library" : "Hide workflow library", title: libCollapsed ? "Show library" : "Hide library", onClick: () => setLibCollapsed((v) => !v), children: libCollapsed ? "\xBB" : "\xAB" }, "lib"),
-          draft.base ? jsx("span", { className: "dy-wfd-draft-label", "data-wfd-draft-label": true, children: `Unsaved changes to ${draft.base.name}` }, "label") : jsxs("label", { className: "dy-wfd-draft-name", children: [jsx("span", { children: "Name" }), jsx("input", { value: draft.name, "data-wfd-draft-name": true, placeholder: "e.g. fix-a-bug", "aria-invalid": draftError && !draft.name.trim() ? "true" : "false", onChange: (event) => updateDraft((d) => ({ ...d, name: event.target.value })) })] }, "name"),
+          jsx("span", { className: "dy-wfd-draft-label", "data-wfd-draft-label": true, children: `Unsaved changes to ${draft.base.name}` }, "label"),
           jsx("span", { className: "dockyard-wf3-sep", "aria-hidden": true }, "sep1"),
           jsx(Button, { small: true, action: "wf-add-step", onClick: () => addNode(false), children: "\uFF0B Step" }, "step"),
           jsx(Button, { small: true, action: "wf-add-gate", onClick: () => addNode(true), children: "\uFF0B Gate" }, "gate"),
           jsx(Button, { small: true, action: "wf-auto-layout", disabled: !draft.nodes.length, onClick: autoLayout, children: "Auto layout" }, "layout"),
           jsx(Button, { small: true, action: "wf-validate", disabled: !draft.nodes.length, onClick: validateGraph, children: "Validate" }, "validate"),
           jsx(Button, { small: true, action: "wfd-settings", onClick: () => setDialog("settings"), children: "Settings" }, "settings"),
-          review.design === "b" ? jsx(Button, { small: true, action: "wfd-ask-ai", variant: aiOpen ? "primary" : "", data: { "aria-pressed": aiOpen }, onClick: () => setAiOpen((v) => !v), children: "Ask AI" }, "ai") : null,
+          askAi("ai"),
           jsx("span", { className: "dockyard-wf3-sep", "aria-hidden": true }, "sep2"),
-          jsx(Button, { small: true, variant: "primary", action: "wfd-draft-save", onClick: saveDraft, children: draft.base ? "Save version" : "Save workflow" }, "save"),
-          jsx(Button, { small: true, action: "wfd-draft-discard", onClick: closeDraft, children: "Discard" }, "discard")
+          jsx(Button, { small: true, variant: "primary", action: "wfd-draft-save", onClick: saveDraft, children: "Save version" }, "save"),
+          jsx(Button, { small: true, action: "wfd-draft-discard", onClick: () => closeDraft("discarded"), children: "Discard" }, "discard")
         ] : [
           jsx("button", { type: "button", className: "dockyard-wf3-libtoggle", "data-action": "wf-toggle-library", "aria-expanded": libCollapsed ? "false" : "true", "aria-label": libCollapsed ? "Show workflow library" : "Hide workflow library", title: libCollapsed ? "Show library" : "Hide library", onClick: () => setLibCollapsed((v) => !v), children: libCollapsed ? "\xBB" : "\xAB" }),
           jsx("span", { className: "dockyard-wf3-sep", "aria-hidden": true }),
@@ -16790,14 +16649,14 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
           ] }) : null,
           current ? current.archived_at ? jsx(Button, { small: true, action: "restore-workflow", onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/restore`), children: "Restore" }) : jsx(Button, { small: true, action: "archive-workflow", variant: "danger", onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/archive`), children: "Archive" }) : null,
           jsx(Button, { small: true, action: "inspect-workflow", disabled: !current, onClick: () => loadRuns(current.name), children: "Refresh" }),
-          designOn ? jsx(Button, { small: true, action: "wfd-settings", disabled: !current, onClick: () => setDialog("settings"), children: "Settings" }) : null,
-          designOn && review.design === "b" ? jsx(Button, { small: true, action: "wfd-ask-ai", variant: aiOpen ? "primary" : "", data: { "aria-pressed": aiOpen }, disabled: !current, onClick: () => setAiOpen((v) => !v), children: "Ask AI" }) : null
+          jsx(Button, { small: true, action: "wfd-settings", disabled: !current, onClick: () => setDialog("settings"), children: "Settings" }),
+          askAi()
         ] }),
-        designOn && draftError ? jsx("p", { className: "dy-wfd-error", role: "alert", "data-wfd-draft-error": true, children: draftError }) : null,
+        draftError ? jsx("p", { className: "dy-wfd-error", role: "alert", "data-wfd-draft-error": true, children: draftError }) : null,
         validation ? jsx("p", { className: "dockyard-wf3-validation", role: "status", "data-wf-validate-result": validation.ok ? "ok" : "issues", children: validation.text }) : null,
         layoutPendingVersion !== null ? jsx("p", { role: "status", "data-wf-layout-saving": true, children: "Saving layout version before the graph can be edited\u2026" }) : null,
         // Run readout: the latest canonical run only. Nothing here is inferred.
-        latest && !(designOn && draft) ? jsxs("div", { className: "dockyard-wf3-run", "data-workflow-live-run": latest.run_key, children: [
+        latest && !draft ? jsxs("div", { className: "dockyard-wf3-run", "data-workflow-live-run": latest.run_key, children: [
           jsx(StatusTag, { tone: latest.status === "completed" ? "success" : latest.status === "failed" ? "danger" : "info", label: latest.status }),
           jsx("span", { className: "dockyard-wf3-runkey", children: `${latest.run_key} \xB7 v${latest.version}` }),
           liveCounts ? jsx("span", { className: "dockyard-wf3-counts", children: ["done", "working", "blocked", "pending"].filter((k) => liveCounts[k]).map((k) => `${liveCounts[k]} ${k}`).join(" \xB7 ") }) : null,
@@ -16805,25 +16664,34 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
             jsx("summary", { children: attentionCount ? `Steps \xB7 ${attentionCount} need attention` : "Steps" }),
             jsx("ul", { "data-wf-live-map": latest.run_key, children: (latest.nodes ?? []).map((node) => jsx("li", { "data-wf-live-node": node.node_id, "data-wf-needs-attention": needsAttention(node) ? "true" : void 0, children: `${node.title} \u2014 ${node.status ?? "pending"}${node.assignee ? ` \xB7 ${node.assignee}` : ""}${needsAttention(node) ? " \xB7 needs attention" : ""}` }, node.node_id)) })
           ] })
-        ] }) : designOn ? null : jsx("p", { className: "dockyard-wf3-run dockyard-meta", "data-workflow-no-run": true, children: "No canonical run recorded. Start a run to see truthful state." }),
-        // The two canvases carry different keys. Same-type elements in the
-        // same place were reused across a switch to or from Today, and the old
-        // canvas's teardown (host.replaceChildren) then emptied the new layout:
-        // a blank canvas, then a crash (07/10/2026, found walking the review link).
-        !designOn ? current ? jsx("div", { ref: canvasRef, className: "dockyard-workflow-graph", "data-workflow-canvas": current.name, role: "img", "aria-label": "Workflow planning graph", "aria-busy": layoutPendingVersion !== null || !canvasReady, style: layoutPendingVersion !== null ? { pointerEvents: "none" } : void 0 }, "canvas-today") : jsx("p", { className: "dockyard-meta", children: "No workflow selected." }) : current || draft ? jsxs("div", { className: aiOpen ? "dy-wfd-canvas-row with-ai" : "dy-wfd-canvas-row", children: [
-          jsxs("div", { className: "dy-wfd-canvas-wrap", children: [
-            jsx("div", { ref: canvasRef, className: "dockyard-workflow-graph", "data-workflow-canvas": draft ? draft.base?.name ?? "new" : current.name, "data-wfd-draft": draft ? draft.base ? "edit" : "new" : void 0, role: "img", "aria-label": "Workflow planning graph", "aria-busy": !draft && (layoutPendingVersion !== null || !canvasReady), style: !draft && layoutPendingVersion !== null ? { pointerEvents: "none" } : void 0 }),
-            draft && !draft.base && !draft.nodes.length ? aiOpen ? jsx("div", { className: "dy-wfd-start hint", role: "status", "data-wfd-canvas-start": "ai", children: "Describe the workflow in the AI builder. The steps appear here as it works." }) : jsx(CanvasStartCard, { templates, onUse: useStart, onAi: () => setAiOpen(true), onCancel: closeDraft }) : null,
-            draft?.base ? jsx("p", { className: "dy-wfd-draft-banner", role: "status", "data-wfd-draft-banner": true, children: "The AI\u2019s changes are on the canvas but not saved. Save version keeps them; Discard drops them." }) : null
-          ] }),
-          aiOpen ? jsx(AiSidePanel, { members, nodes: draft ? draft.nodes : planRef.current.nodes, workflowTitle: draft?.base?.name ?? current?.name ?? "this workflow", seed: aiSeed, onApply: aiApply, onClose: () => setAiOpen(false) }, draft && !draft.base ? draft.key : current?.name ?? "none") : null
-        ] }, "canvas-design") : jsx("p", { className: "dockyard-meta", children: "No workflow selected." })
+        ] }) : null,
+        // The canvas, with the AI's draft banner over it. Nothing shares its
+        // row: the AI chat is a sidebar beside the page, not a column here.
+        current || draft ? jsxs("div", { className: "dy-wfd-canvas-wrap", children: [
+          jsx("div", { ref: canvasRef, className: "dockyard-workflow-graph", "data-workflow-canvas": draft ? draft.base.name : current.name, "data-wfd-draft": draft ? "edit" : void 0, role: "img", "aria-label": "Workflow planning graph", "aria-busy": !draft && (layoutPendingVersion !== null || !canvasReady), style: !draft && layoutPendingVersion !== null ? { pointerEvents: "none" } : void 0 }),
+          draft ? jsx("p", { className: "dy-wfd-draft-banner", role: "status", "data-wfd-draft-banner": true, children: "The AI\u2019s changes are on the canvas but not saved. Save version keeps them; Discard drops them." }) : null
+        ] }, "canvas") : jsx("p", { className: "dockyard-meta", children: "No workflow selected." })
       ] })
     ] }),
-    designOn && dialog === "new" ? jsx(NewWorkflowDialog, { takenNames, templates, members, onCreate: createFromDialog, onClose: () => setDialog(null) }) : null,
-    designOn && dialog === "settings" ? jsx(WorkflowSettingsDialog, { project: project.id, workflow: standinWorkflow(), title: draft ? draft.name || "New workflow" : current?.name ?? "", members, onClose: () => setDialog(null) }) : null,
-    designOn && repeatNode ? jsx(RepeatPopover, { node: repeatNode, anchor: repeatAt.rect, check: readStepSettings(project.id, standinWorkflow(), repeatAt.nodeId).check, draft: Boolean(draft), onSave: ({ rounds, check }) => saveRepeat(repeatAt.nodeId, { max_iterations: rounds, until: { status: "done" } }, check), onStop: () => saveRepeat(repeatAt.nodeId, null, null), onClose: () => setRepeatAt(null) }, repeatAt.nodeId) : null,
-    review.active ? jsx(WorkflowReviewBar, { review, onChange: changeReview, collapsed: reviewHidden, onCollapse: setReviewHidden }) : null
+    dialog === "new" ? jsx(NewWorkflowDialog, { takenNames, templates, members, onCreate: createFromDialog, onClose: () => setDialog(null) }) : null,
+    dialog === "settings" ? jsx(WorkflowSettingsDialog, { project: project.id, workflow: standinWorkflow(), title: current?.name ?? "", members, onClose: () => setDialog(null) }) : null,
+    repeatNode ? jsx(RepeatPopover, { node: repeatNode, anchor: repeatAt.rect, check: readStepSettings(project.id, standinWorkflow(), repeatAt.nodeId).check, draft: Boolean(draft), onSave: ({ rounds, check }) => saveRepeat(repeatAt.nodeId, { max_iterations: rounds, until: { status: "done" } }, check), onStop: () => saveRepeat(repeatAt.nodeId, null, null), onClose: () => setRepeatAt(null) }, repeatAt.nodeId) : null,
+    // The AI chat: a sidebar at the window's edge, outside the canvas.
+    aiOpen && current ? jsx(AiSidebar, {
+      members,
+      nodes: draft ? draft.nodes : planRef.current.nodes,
+      workflowTitle: current.name,
+      thread: threadOf(current.name),
+      onThread: (change) => changeThread(current.name, change),
+      pinned: aiPinned,
+      onPin: pinAi,
+      onApply: aiApply,
+      onClose: () => setAiOpen(false),
+      unsaved: Boolean(draft),
+      saveError: draftError,
+      onSave: saveDraft,
+      onDiscard: () => closeDraft("discarded")
+    }, current.name) : null
   ] });
 }
 

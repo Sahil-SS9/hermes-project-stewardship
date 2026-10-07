@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium } from './browser-harness.mjs';
+import { createBlankWorkflow, openStep } from './test-support/workflow-create.mjs';
 
 const BASE = process.env.STEWARD_DESKTOP_URL;
 
@@ -16,12 +17,8 @@ async function projectWorkflows(page) {
   await page.locator('[data-executable-workflows="payments-relaunch"]').waitFor();
 }
 
-async function createWorkflow(page, name) {
-  await page.locator('[data-workflow-name]').fill(name);
-  await page.locator('[data-workflow-title]').fill('Build release');
-  await page.locator('[data-action="define-workflow"]').click();
-  await page.locator(`[data-workflow-library-item="${name}"]`).waitFor();
-}
+// New workflow -> Start blank (the old side form went with the builder, 07/10/2026).
+const createWorkflow = (page, name) => createBlankWorkflow(page, name, 'Build release');
 
 test('W0-P2: after auto-layout node editor saves a new version without detaching', async () => {
   assert.ok(BASE, 'Run via run-browser-suite.mjs');
@@ -35,17 +32,17 @@ test('W0-P2: after auto-layout node editor saves a new version without detaching
     await page.locator('[data-action="wf-add-gate"]').click();
     await page.locator(`[data-workflow-canvas="${name}"] [data-node-id="gate-2"]`).waitFor();
     await page.locator('[data-action="wf-validate"]').click();
-    await page.locator('[data-workflow-run-key]').fill(name + '-run');
+    // Each run names itself (<workflow>-<time>); the old Run key box went with the side form.
     await page.locator('[data-action="start-workflow"]').last().click();
-    await page.locator(`[data-workflow-live-run="${name}-run"]`).waitFor();
+    await page.locator(`[data-workflow-live-run^="${name}-"]`).waitFor();
     await page.locator('[data-action="archive-workflow"]').click();
     await page.locator('[data-action="restore-workflow"]').waitFor();
     await page.locator('[data-action="restore-workflow"]').click();
     await page.locator('[data-action="archive-workflow"]').waitFor();
     await page.locator('[data-action="wf-auto-layout"]').click();
-    await page.locator(`[data-workflow-canvas="${name}"] [data-node-id="step-1"]`).click();
-    await page.getByLabel('Node title').fill('Edited via canvas');
-    await page.getByRole('button', { name: 'Save graph version' }).click();
+    await openStep(page, name, 'step-1');
+    await page.getByLabel('Step name').fill('Edited via canvas');
+    await page.getByRole('button', { name: 'Save version', exact: true }).click();
     // Definition versions live in a collapsed <details>; attached is the
     // correct DOM state, then expand before asserting the persisted title.
     await page.locator(`[data-workflow-definition-version]`).last().waitFor({ state: 'attached' });

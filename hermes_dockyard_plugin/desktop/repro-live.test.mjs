@@ -1480,20 +1480,27 @@ async function testPhase5ManagementJourneys() {
   await runtime.click('[data-tab="project"]', 80);
   await runtime.click('[data-project-view="workflows"]');
   assert(doc.querySelector('[data-executable-workflows]'), 'executable workflow surface is missing');
-  // The side form only creates (06/10/2026, WORKFLOWS-R1.md bug 2): typing an
-  // existing name used to post a one-step version that replaced the workflow.
-  await runtime.setValue('[data-workflow-name]', 'verify-release');
-  await runtime.setValue('[data-workflow-title]', 'Verify release');
-  await runtime.click('[data-action="define-workflow"]', 80);
-  assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/workflows' && call.body?.name === 'verify-release'), 'workflow definition did not reach proxy');
-  assert(!runtime.calls.some((call) => call.path === '/projects/payments-relaunch/workflows/release/versions'), 'the side form posted a version over an existing workflow');
+  // Creating is the New workflow dialog since the builder (07/10/2026). It only
+  // creates (WORKFLOWS-R1.md bug 2): a taken name used to post a one-step
+  // version that replaced the workflow; the dialog refuses it instead.
+  await runtime.click('[data-action="wfd-new-workflow"]', 80);
+  await runtime.click('[data-wfd-way="blank"]', 40);
+  await runtime.setValue('[data-wfd-name]', 'release');
+  await runtime.click('[data-action="wfd-create"]', 80);
+  assert(/already exists/.test(doc.querySelector('[data-wfd-name-error]')?.textContent ?? ''), 'a taken name is refused in the dialog');
+  await runtime.setValue('[data-wfd-name]', 'verify-release');
+  await runtime.setValue('[data-wfd-first-step]', 'Verify release');
+  await runtime.click('[data-action="wfd-create"]', 80);
+  assert(runtime.calls.some((call) => call.method === 'POST' && call.path === '/projects/payments-relaunch/workflows' && call.body?.name === 'verify-release' && call.body?.nodes?.[0]?.title === 'Verify release'), 'workflow definition did not reach proxy');
+  assert(!runtime.calls.some((call) => call.path === '/projects/payments-relaunch/workflows/release/versions'), 'New workflow posted a version over an existing workflow');
   await runtime.click('[data-project-view="workflows"]');
   await runtime.click('[data-workflow-library-item="release"]', 80);
-  await runtime.setValue('[data-workflow-run-key="release"]', 'browser-run-1');
   // Explicit version start lives in the toolbar Versions menu; the primary
-  // toolbar button starts the latest version only.
+  // toolbar button starts the latest version only. Each run names itself
+  // (<workflow>-<time>); the old Run key box went with the side form.
   await runtime.click('[data-workflow-definition-version="1"] [data-action="start-workflow-version"]', 80);
-  assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/workflows/release/start' && call.body.version === 1 && call.body.run_key === 'browser-run-1'), 'explicit workflow version start did not reach proxy');
+  const started = runtime.calls.find((call) => call.path === '/projects/payments-relaunch/workflows/release/start' && call.body.version === 1);
+  assert(started && /^release-\d+$/.test(started.body.run_key), 'explicit workflow version start did not reach proxy with its own run key');
   await runtime.click('[data-project-view="workflows"]');
   await runtime.click('[data-action="inspect-workflow"]', 80);
   // Phase 5 canvas port: the stored definition is inspectable through the
@@ -1505,8 +1512,8 @@ async function testPhase5ManagementJourneys() {
   const realCanvasMounted = Boolean(canvasHost && (canvasHost.matches('.dy-wf-scope') || canvasHost.querySelector('.dy-wf-scope, svg[data-lod]')));
   assert(rt.canvasMounts.some((mount) => mount.projectId === 'payments-relaunch' && mount.workflowName === 'release') || realCanvasMounted, 'stored workflow definition did not reach the canvas mount');
   assert(doc.querySelector('[data-workflow-definition-version="1"]'), 'stored workflow definition is not inspectable');
-  const liveRun = doc.querySelector('[data-workflow-live-run="browser-run-1"]');
-  assert(liveRun && /browser-run-1/.test(liveRun.textContent), 'workflow run history did not render the real run_key contract');
+  const liveRun = doc.querySelector(`[data-workflow-live-run="${started.body.run_key}"]`);
+  assert(liveRun && liveRun.textContent.includes(started.body.run_key), 'workflow run history did not render the real run_key contract');
   assert(/v1/.test(liveRun.textContent), 'workflow run history did not render the executed version');
   await runtime.click('[data-action="archive-workflow"]', 80);
   assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/workflows/release/archive'), 'workflow archive did not reach proxy');

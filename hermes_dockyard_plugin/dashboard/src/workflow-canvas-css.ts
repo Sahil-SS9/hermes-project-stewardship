@@ -233,6 +233,13 @@ export const WORKFLOW_CANVAS_CSS = `
 .dy-wf-scope .dy-wf-delete-confirm p { flex: 1 0 100%; margin: 0; color: var(--dy-wf-card-text); font-size: 12.5px; line-height: 1.45; }
 .dy-wf-scope .dy-wf-pp-error { margin: 0; color: #ff9d97; font-size: 12.5px; line-height: 1.45; }
 .dy-wf-scope .dy-wf-delete-confirm[hidden], .dy-wf-scope .dy-wf-pp-error[hidden] { display: none; }
+/* Steps open on double-click: the note shown on hover, and the words a
+   screen reader hears. A double-click must not select the label text. */
+.dy-wf-scope .dy-wf-svg { -webkit-user-select: none; user-select: none; }
+.dy-wf-scope .dy-wf-open-hint { position: absolute; z-index: 16; pointer-events: none; padding: 4px 9px; border: 1px solid var(--dy-wf-glass-line); border-radius: 6px; background: #0b1220; color: #f4f7fb; font: 600 12px/1.35 system-ui, sans-serif; white-space: nowrap; transform: translate(-50%, calc(-100% - 6px)); box-shadow: 0 4px 14px rgba(0, 0, 0, .35); }
+.dy-wf-scope .dy-wf-open-hint.below { transform: translate(-50%, 6px); }
+.dy-wf-scope .dy-wf-open-hint[hidden] { display: none; }
+.dy-wf-scope .dy-wf-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .dy-wf-scope .dy-wf-passport > :last-child { margin-bottom: 16px; }
 .dy-wf-scope .dy-wf-empty { fill: var(--dy-wf-card-dim); font: 13px system-ui, sans-serif; }
 /* Lane bands (v6 composition): axis labels, never controls. The "exception"

@@ -9,14 +9,15 @@ import {pickProject} from './test-support/project-scope.mjs';
 // drives; nothing here invents workflow state.
 
 test('W3 library: create global workflow, filter by scope, archive and restore', async()=>fixtureBrowser(async(page)=>{
- // Option A: Project > Workflows keeps a library entry point that lands on
- // the top Workflows tab, and the top tab opens the library directly.
+ // Option A: Project > Workflows keeps a library entry point (Open library in
+ // the screen's header since 07/10/2026) that lands on the top Workflows tab,
+ // and the top tab opens the library directly.
  // Sahil 05/10: the app opens on All projects; pick the project first.
  await pickProject(page,'payments-relaunch');
  await page.locator('[data-tab="project"]').click();
  await page.locator('[data-project-view="workflows"]').click();
- await page.locator('[data-workflow-library-entry] [data-action="open-workflow-library"]').waitFor();
- await page.locator('[data-workflow-library-entry] [data-action="open-workflow-library"]').click();
+ await page.locator('[data-wfd-head] [data-action="open-workflow-library"]').waitFor();
+ await page.locator('[data-wfd-head] [data-action="open-workflow-library"]').click();
  await page.locator('[data-workflow-library-screen]').waitFor();
  assert.equal(await page.locator('[data-tab="workflows"]').getAttribute('aria-selected'),'true');
  await page.locator('[data-tab="dashboard"]').click();

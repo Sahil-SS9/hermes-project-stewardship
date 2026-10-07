@@ -1,10 +1,11 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 //
-// Workflows design round (07/10/2026), option A "Start dialog": one New
-// workflow button opens this dialog with the four ways in. The AI is one of
-// them: describe, read its plan, answer its questions, then Create workflow.
-// Nothing is saved until Create workflow.
+// Workflows (Sahil's pick, 07/10/2026): one New workflow button opens this
+// dialog with the four ways in. The AI is one of them: describe, read its
+// plan, answer its questions, then Create workflow; the conversation then
+// carries on in the AI sidebar beside the canvas. Nothing is saved until
+// Create workflow.
 import { useState } from '../../runtime/react.js'
 import { useEffect } from '../../runtime/react.js'
 import { jsxs } from '../../runtime/react.js'
@@ -93,7 +94,7 @@ export function NewWorkflowDialog({ takenNames, templates, members, onCreate, on
     if (!clean || !nodes) return
     setBusy(true); setServerError(null)
     try {
-      await onCreate({ name: clean, nodes, checks: way === 'ai' ? aiDraft.checks : null })
+      await onCreate({ name: clean, nodes, checks: way === 'ai' ? aiDraft.checks : null, conversation: way === 'ai' ? { describe: describe.trim(), plan: aiDraft } : null })
     } catch (failure) {
       setServerError(`Couldn't create it: ${String(failure?.message ?? failure).replace(/^\d{3}:\s*/, '')}`)
       setBusy(false)

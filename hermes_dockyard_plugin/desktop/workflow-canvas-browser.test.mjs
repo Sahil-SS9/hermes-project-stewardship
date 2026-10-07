@@ -113,7 +113,8 @@ test('browser canvas interactions persist positions, edges, validation feedback,
     await page.locator('[data-node-id=\"c\"]').click();
     assert.ok(await page.locator('.dy-wf-route-dim').count() >= 1, 'selection dims unrelated nodes');
     assert.ok(await page.locator('.dy-wf-route-edge').count() >= 1, 'selection highlights the connected route');
-    await b.click();
+    // One click selects a step; a double-click opens its editor (07/10/2026).
+    await b.dblclick();
     await page.getByLabel('Node title').fill('Build and ship'); await page.getByLabel('Dependencies').fill('a'); await page.getByLabel('Phase team override').fill('release-bots'); await page.getByRole('button', { name: 'Save graph version' }).click()
     await page.getByRole('button', { name: 'Saved ✓' }).waitFor()
     const saved = await page.evaluate(() => globalThis.__edits.at(-1))

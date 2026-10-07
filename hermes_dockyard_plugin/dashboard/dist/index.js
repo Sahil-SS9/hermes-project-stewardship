@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // src/api.ts
+  // dashboard/src/api.ts
   var BASE = "/api/plugins/hermes-dockyard";
   function createApi(sdk) {
     const get = (path) => sdk.fetchJSON(`${BASE}${path}`);
@@ -146,7 +146,7 @@
     return sdk;
   }
 
-  // src/objective-evidence.ts
+  // dashboard/src/objective-evidence.ts
   async function renderObjectiveEvidence(root, api, project) {
     const text = (tag, value) => {
       const node = document.createElement(tag);
@@ -231,7 +231,7 @@
     }
   }
 
-  // src/components/live-detail.ts
+  // dashboard/src/components/live-detail.ts
   function buildActivityThread(items, opts = {}) {
     const max = opts.max ?? 8;
     const wrap = document.createElement("div");
@@ -313,7 +313,7 @@
     return wrap;
   }
 
-  // src/workflow-canvas.ts
+  // dashboard/src/workflow-canvas.ts
   function validateConnection(nodes, from, to) {
     if (!from || !to) return "Both source and target are required";
     if (from === to) return "A node cannot depend on itself";
@@ -570,6 +570,7 @@
       height: PAD * 2 + Math.max(1, lanes.length) * laneH - (LANE_PAD - PAD > 0 ? 0 : 0) - PAD + PAD
     };
   }
+  var canvasSeq = 0;
   function mountWorkflowCanvas(host, projectId, runName, fetchRuns, handlers, pollMs = 8e3) {
     host.replaceChildren();
     host.className = "dy-wf dy-wf-scope";
@@ -585,6 +586,17 @@
     minimap.appendChild(miniViewport);
     const passport = elu("div", "dy-wf-passport dy-wf-glass");
     passport.setAttribute("aria-live", "polite");
+    canvasSeq += 1;
+    const help = elu(
+      "p",
+      "dy-wf-sr-only",
+      "Double-click a step, or press Enter, to open its details. The arrow keys move between steps."
+    );
+    help.id = `wf-help-${canvasSeq}`;
+    const openHint = elu("div", "dy-wf-open-hint", "Double-click to open details");
+    openHint.setAttribute("role", "tooltip");
+    openHint.setAttribute("data-wf-open-hint", "");
+    openHint.hidden = true;
     const zoomBar = elu("div", "dy-wf-zoombar dy-wf-glass");
     zoomBar.setAttribute("role", "group");
     zoomBar.setAttribute("aria-label", "Zoom controls");
@@ -677,7 +689,7 @@
       host.classList.toggle("dy-wf-still", on);
     });
     playbackBar.append(playbackButton, playbackSlider, playbackLabel, motionButton);
-    wrap.append(svg, feed, minimap, passport, zoomBar, listView, playbackBar);
+    wrap.append(svg, feed, minimap, passport, zoomBar, listView, playbackBar, openHint, help);
     playbackBar.style.overflowX = "auto";
     host.appendChild(wrap);
     let panX = 0;
@@ -1060,7 +1072,7 @@
       g.setAttribute("data-node-id", n.node_id);
       g.setAttribute("aria-label", `${visuals.label}: ${n.title} (${n.status ?? "pending"})`);
       g.dataset.wfEditable = String(editable);
-      g.setAttribute("aria-describedby", `wf-help-${n.node_id}`);
+      g.setAttribute("aria-describedby", help.id);
       const shape = sEl("rect", {
         width: NODE_W,
         height: NODE_H,
@@ -1175,11 +1187,21 @@
         }
       });
       g.addEventListener("pointerenter", dash);
+      g.addEventListener("pointerenter", () => scheduleHint(n.node_id, g));
       g.addEventListener("pointerleave", () => {
         if (!g.classList.contains("dy-wf-selected")) undash();
+        hideHint();
       });
-      const open = () => openPassport(n, g);
-      g.addEventListener("click", open);
+      g.addEventListener("pointerdown", hideHint);
+      const open = () => {
+        hideHint();
+        openPassport(n, g);
+      };
+      g.addEventListener("click", () => selectStep(n, g));
+      g.addEventListener("dblclick", (ev) => {
+        ev.preventDefault();
+        open();
+      });
       g.addEventListener("keydown", (e) => {
         const ev = e;
         if (ev.key === "Enter") {
@@ -1447,6 +1469,7 @@
       if (selectedEl) selectedEl.classList.add("dy-wf-selected");
       selectedId = n.node_id;
       handlers.onSelect?.(n.node_id);
+      handlers.onOpen?.(n.node_id);
       highlightRoute(n.node_id);
       passport.replaceChildren();
       const status = n.status ?? "pending";
@@ -1737,6 +1760,7 @@
     let lastY = 0;
     svg.addEventListener("pointerdown", (e) => {
       if (e.target?.closest?.(".dy-wf-node")) return;
+      hideHint();
       dragging = true;
       host.classList.add("dy-wf-panning");
       lastX = e.clientX;
@@ -1792,6 +1816,7 @@
     let wheelSettle = null;
     svg.addEventListener("wheel", (e) => {
       e.preventDefault();
+      hideHint();
       const ev = e;
       const rect = svg.getBoundingClientRect();
       const { sx, sy } = screenScale();
@@ -1811,6 +1836,7 @@
       updateMinimap();
     }, { passive: false });
     const closePassport = () => {
+      const wasOpen = passport.childElementCount > 0;
       passport.replaceChildren();
       if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
       selectedEl = null;
@@ -1818,7 +1844,43 @@
         selectedId = null;
         handlers.onSelect?.(null);
       }
+      if (wasOpen) handlers.onOpen?.(null);
       clearRoute();
+    };
+    const selectStep = (n, g) => {
+      if (selectedId === n.node_id) return;
+      if (passport.childElementCount > 0) closePassport();
+      if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
+      selectedEl = g;
+      g.classList.add("dy-wf-selected");
+      selectedId = n.node_id;
+      handlers.onSelect?.(n.node_id);
+      highlightRoute(n.node_id);
+    };
+    let hintTimer = null;
+    const hideHint = () => {
+      if (hintTimer) {
+        clearTimeout(hintTimer);
+        hintTimer = null;
+      }
+      openHint.hidden = true;
+    };
+    const scheduleHint = (nodeId, g) => {
+      hideHint();
+      const busy = () => Boolean(dragSession || connectFrom || dragging);
+      if (busy() || selectedId === nodeId && passport.childElementCount > 0) return;
+      hintTimer = setTimeout(() => {
+        hintTimer = null;
+        const el = g.isConnected ? g : nodeEl(nodeId);
+        if (!el || busy() || el !== g && !el.matches(":hover")) return;
+        const box = wrap.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+        const below = r.top - box.top < 34;
+        openHint.classList.toggle("below", below);
+        openHint.style.left = `${Math.round(r.left - box.left + r.width / 2)}px`;
+        openHint.style.top = `${Math.round((below ? r.bottom : r.top) - box.top)}px`;
+        openHint.hidden = false;
+      }, 450);
     };
     const onKeyDown = (e) => {
       if (e.key === "Escape") closePassport();
@@ -1998,6 +2060,7 @@
       if (timer) clearInterval(timer);
       if (flowTimer) clearInterval(flowTimer);
       clearInterval(clockTimer);
+      hideHint();
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("visibilitychange", onVisibility);
       canvasWindow.removeEventListener("resize", onResize);
@@ -2014,7 +2077,7 @@
     } });
   }
 
-  // src/app.ts
+  // dashboard/src/app.ts
   function applyFleetDeepLink({ link, s, tabs, go }) {
     const sep = link.indexOf(":");
     if (sep <= 0) return;
@@ -3594,7 +3657,7 @@
     return el;
   }
 
-  // src/index.ts
+  // dashboard/src/index.ts
   function whenReady() {
     if (document.readyState !== "loading") return Promise.resolve();
     return new Promise(

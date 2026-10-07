@@ -116,12 +116,13 @@ test('workflow tab renders canvas with nodes and edges, then opens gate passport
   assert.ok(nodes.length >= 3, `expected >=3 nodes, got ${nodes.length}`);
   const edges = dom.window.document.querySelectorAll('.dy-wf-edge');
   assert.ok(edges.length >= 2, `expected >=2 edges, got ${edges.length}`);
-  // Click the gate node -> passport with Approve/Reject.
+  // Double-click the gate node -> passport with Approve/Reject (one click
+  // only selects it; steps open on double-click since 07/10/2026).
   const gate = [...nodes].find((n) => (n.getAttribute('class') || '').split(/\s+/).includes('pending'));
   assert.ok(gate, 'gate node should be present');
-  gate.dispatchEvent(new dom.window.Event('click'));
+  gate.dispatchEvent(new dom.window.Event('dblclick'));
   const passport = dom.window.document.querySelector('.dy-wf-passport');
-  assert.ok(passport, 'passport should open on gate click');
+  assert.ok(passport, 'passport should open on gate double-click');
   assert.ok(passport.querySelector('button'), 'passport should have action buttons');
   // LOD attribute present (v3 mechanic)
   const lod = dom.window.document.querySelector('svg.dy-wf-svg');
@@ -142,7 +143,7 @@ test('workflow tab renders canvas with nodes and edges, then opens gate passport
   const taskNode = [...dom.window.document.querySelectorAll('.dy-wf-node')].find((n) =>
     (n.getAttribute('class') || '').split(/\s+/).includes('done'));
   assert.ok(taskNode, 'done task node should be present');
-  taskNode.dispatchEvent(new dom.window.Event('click'));
+  taskNode.dispatchEvent(new dom.window.Event('dblclick'));
   await new Promise((r) => setTimeout(r, 80));
   const taskPassport = dom.window.document.querySelector('.dy-wf-passport');
   const expandHead = taskPassport.querySelector('.dy-wf-expand-head');

@@ -38,7 +38,8 @@ test('Desktop canvas edit callback receives a canonical graph payload', async ()
     const host = document.querySelector('#host'); let payload
     const dispose = mountDesktopWorkflowCanvas(host, 'p1', 'release', { nodes: [{ id: 'a', title: 'Plan', depends_on: [], human_gate: false }, { id: 'b', title: 'Ship', depends_on: ['a'], human_gate: false }] }, [], { onEdit: (nodes) => { payload = nodes } })
     await new Promise((resolve) => setTimeout(resolve, 25))
-    host.querySelector('[data-node-id="b"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }))
+    // One click selects a step; a double-click opens its editor (07/10/2026).
+    host.querySelector('[data-node-id="b"]').dispatchEvent(new dom.window.Event('dblclick', { bubbles: true }))
     host.querySelector('[aria-label="Node title"]').value = 'Ship it'
     host.querySelector('[aria-label="Dependencies"]').value = ''
     host.querySelector('[aria-label="Phase team override"]').value = 'release-bots'

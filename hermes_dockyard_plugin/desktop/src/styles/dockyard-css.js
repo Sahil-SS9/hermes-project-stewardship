@@ -701,7 +701,10 @@ export const DOCKYARD_CSS = `
   background: var(--dy-surface);
 }
 .dockyard-root .dockyard-feature-card h2 { margin: 9px 0 0; color: var(--dy-text); font-size: 20px; letter-spacing: -0.02em; }
-.dockyard-root .dockyard-feature-card p { margin: 8px 0 0; color: var(--dy-text-2); font-size: 13px; }
+/* Not inside the workflow canvas: its step panel styles its own text (this
+   rule turned the panel's save error grey on the dark panel, 2.67:1;
+   07/10/2026). :where() keeps the rule's specificity as it was. */
+.dockyard-root .dockyard-feature-card p:where(:not(.dy-wf-scope p)) { margin: 8px 0 0; color: var(--dy-text-2); font-size: 13px; }
 .dockyard-root .dockyard-project-hero { background: linear-gradient(145deg, var(--dy-accent-soft), var(--dy-surface)); border-color: var(--dy-accent-border); }
 .dockyard-root .dockyard-project-hero .dockyard-work-visual { margin-top: 20px; }
 .dockyard-root .dockyard-project-overview-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(260px, .8fr); gap: 14px; margin-top: 14px; }

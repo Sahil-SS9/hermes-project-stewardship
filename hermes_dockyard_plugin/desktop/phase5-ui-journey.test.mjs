@@ -113,7 +113,7 @@ test('Phase 5 rendered UI journey: bind team, start run, live status, revision a
     await page.getByText('pending', { exact: false }).first().waitFor({ timeout: 10000 })
     const bodyText = await page.locator('body').innerText()
     assert.match(bodyText, /UI e2e build/, 'canvas/live panel shows the workflow nodes')
-    assert.match(bodyText, /No canonical run recorded|pending|Live:/, 'live status section renders')
+    assert.match(bodyText, /no runs yet|pending|Live:/, 'live status section renders')
 
     // --- 6. Advance canonical tasks through their real lifecycle and
     // watch the UI run status derive from canonical states (advance → refresh).

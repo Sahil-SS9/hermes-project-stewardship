@@ -170,11 +170,10 @@ test('Workflows v6: three zones render with every preserved hook', { timeout: 12
     }))
     assert.ok(Math.abs(widths.frame - widths.lib - widths.stage) <= 2, `canvas stage takes all width beside the library (${JSON.stringify(widths)})`)
 
-    // The define form still exists in the library zone (create/version save).
-    assert.ok(await page.$('[data-workflow-name]'), 'workflow name input preserved')
-    assert.ok(await page.$('[data-workflow-title]'), 'phase title input preserved')
-    assert.ok(await page.$('[data-workflow-run-key]'), 'run key input preserved')
-    assert.ok(await page.$('[data-action="define-workflow"]'), 'define action preserved')
+    // Creating moved from the old side form to the New workflow dialog (Sahil's
+    // pick, 07/10/2026); the side form and its Run key box went with it.
+    assert.ok(await page.$('[data-wfd-head] [data-action="wfd-new-workflow"]'), 'New workflow is in the header')
+    assert.equal(await page.$('[data-workflow-name], [data-workflow-run-key], [data-action="define-workflow"]'), null, 'the old side form is gone')
 
     // Lane bands are drawn on the surface (team assignments drive them here).
     const lanes = await page.$$eval('[data-workflow-canvas] .dy-wf-lane', (els) => els.map((e) => e.dataset.lane))

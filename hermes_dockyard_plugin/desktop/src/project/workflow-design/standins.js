@@ -1,35 +1,21 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 //
-// Workflows design round (07/10/2026): stand-ins for what the engine cannot
-// store or do yet (WORKFLOWS-SPEC-R1.md E2-E7). Everything here lives in this
+// Workflows builder (07/10/2026): stand-ins for what the engine cannot store
+// or do yet (WORKFLOWS-SPEC-R1.md E2-E7). Everything here lives in this
 // module's memory, lasts until the page reloads and never reaches the backend.
 // Screens tag every control that writes here "Preview".
 
 const stepSettings = new Map()
 const workflowSettings = new Map()
-const listeners = new Set()
-let revision = 0
-const notify = () => { revision += 1; for (const listener of listeners) listener(revision) }
-export function subscribeStandins(listener) { listeners.add(listener); return () => listeners.delete(listener) }
 
 export const EMPTY_STEP = Object.freeze({ check: Object.freeze({ by: 'none', doneWhen: '' }), askFirst: false, limits: Object.freeze({ turns: '', minutes: '', skills: '' }) })
 export const EMPTY_WORKFLOW = Object.freeze({ trigger: Object.freeze({ kind: 'manual', schedule: 'weekdays', time: '09:00', event: 'task-done' }), improve: Object.freeze({ on: false, afterRuns: 5, reviewer: '' }) })
 const stepKey = (project, workflow, nodeId) => `${project}\u0000${workflow}\u0000${nodeId}`
 export function readStepSettings(project, workflow, nodeId) { return stepSettings.get(stepKey(project, workflow, nodeId)) ?? EMPTY_STEP }
-export function writeStepSettings(project, workflow, nodeId, value) { stepSettings.set(stepKey(project, workflow, nodeId), value); notify() }
+export function writeStepSettings(project, workflow, nodeId, value) { stepSettings.set(stepKey(project, workflow, nodeId), value) }
 export function readWorkflowSettings(project, workflow) { return workflowSettings.get(`${project}\u0000${workflow}`) ?? EMPTY_WORKFLOW }
-export function writeWorkflowSettings(project, workflow, value) { workflowSettings.set(`${project}\u0000${workflow}`, value); notify() }
-// A draft saved under its real name keeps the preview settings made on it.
-export function renameStandins(project, from, to) {
-  for (const [key, value] of [...stepSettings]) {
-    const [p, w, node] = key.split('\u0000')
-    if (p === project && w === from) { stepSettings.delete(key); stepSettings.set(stepKey(project, to, node), value) }
-  }
-  const flow = workflowSettings.get(`${project}\u0000${from}`)
-  if (flow) { workflowSettings.delete(`${project}\u0000${from}`); workflowSettings.set(`${project}\u0000${to}`, flow) }
-  notify()
-}
+export function writeWorkflowSettings(project, workflow, value) { workflowSettings.set(`${project}\u0000${workflow}`, value) }
 
 export const CHECK_WORDS = Object.freeze({ none: 'No check', judge: 'AI judge', person: 'You sign off', step: 'A check step' })
 

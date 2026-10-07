@@ -55,17 +55,16 @@ test('W5 live map attributes come from the canonical run projection', async () =
     .replace(/from '\.\.\/\.\.\/workflow-canvas-mount\.js'/g, `from 'file://${path.join(dir, 'mount-stub.js').replace(/\\\\/g, '/')}'`)
     // The shared planning wording has no imports of its own, so the real file loads as is.
     .replace(/from '\.\.\/lib\/plan-vocab\.js'/g, `from 'file://${path.join(HERE, 'src', 'lib', 'plan-vocab.js').replace(/\\\\/g, '/')}'`)
-    // Workflows design round (07/10/2026): the review-only modules render nothing without
-    // ?review=1, so they are stubbed and this test still reads today's markup.
+    // The builder's modules (dialog, AI sidebar, step-panel hooks) render
+    // nothing until opened, so they are stubbed; this test reads the run readout.
     .replace(/from '\.\/workflow-design\/[a-z-]+\.js'/g, `from 'file://${path.join(dir, 'design-stub.js').replace(/\\\\/g, '/')}'`);
   fs.writeFileSync(path.join(dir, 'design-stub.js'), [
-    "export function readWorkflowReview(){ return { active: false, design: 'today', loops: 'panel' } }",
-    'export function writeWorkflowReview(){}', 'export function nextReview(r){ return r }',
-    'export function WorkflowReviewBar(){ return null }', 'export function canvasDesignHooks(){ return {} }',
-    'export function NewWorkflowDialog(){ return null }', 'export function CanvasStartCard(){ return null }',
-    'export function AiSidePanel(){ return null }', 'export function WorkflowSettingsDialog(){ return null }',
+    'export function canvasDesignHooks(){ return {} }', 'export function NewWorkflowDialog(){ return null }',
+    'export function AiSidebar(){ return null }', 'export function createdConversation(){ return [] }',
+    'export function settleConversation(t){ return t }', 'export function readAiPinned(){ return false }',
+    'export function writeAiPinned(){}', 'export function WorkflowSettingsDialog(){ return null }',
     'export function RepeatPopover(){ return null }', 'export function readStepSettings(){ return {} }',
-    'export function writeStepSettings(){}', 'export function renameStandins(){}', 'export const EMPTY_STEP = {}',
+    'export function writeStepSettings(){}', 'export const EMPTY_STEP = {}',
   ].join('\n'));
   const { __setRuns__ } = await import('file://' + path.join(dir, 'context-stub.js').replace(/\\\\/g, '/'));
   const runs = [{ run_key: 'r1', version: 1, status: 'running', nodes: [

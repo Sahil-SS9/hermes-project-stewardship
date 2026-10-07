@@ -132,8 +132,8 @@ test('Workflows: opening a workflow asks for its runs once and draws the canvas 
 test('Workflows: Refresh and saving keep the open step panel and the zoom', { timeout: 90000 }, async () => {
   await withWorkflow('keep', LINEAR, {}, async (page, name, ctx) => {
     const problems = []
-    await nodeIn(page, name, 'test').click()
-    await until(() => panelOpen(page, name), 'clicking a step did not open its panel')
+    await nodeIn(page, name, 'test').dblclick()
+    await until(() => panelOpen(page, name), 'double-clicking a step did not open its panel')
     await zoomIn(page, name, 2)
     const zoomed = await zoomOf(page, name)
     assert.ok(zoomed > 1.2, `zoom-in did not zoom (scale ${zoomed})`)
@@ -145,12 +145,12 @@ test('Workflows: Refresh and saving keep the open step panel and the zoom', { ti
     if (await zoomOf(page, name) !== zoomed) problems.push(`Refresh reset the zoom from ${zoomed} to ${await zoomOf(page, name)}`)
     // Saving from the panel: re-open the panel and zoom in again if Refresh lost them, so the save
     // is measured on its own.
-    if (!await panelOpen(page, name)) await nodeIn(page, name, 'test').click()
+    if (!await panelOpen(page, name)) await nodeIn(page, name, 'test').dblclick()
     if ((await zoomOf(page, name)) < 1.2) await zoomIn(page, name, 2)
     const zoomBeforeSave = await zoomOf(page, name)
     const before = (await versionsOf(name)).length
-    await page.getByLabel('Node title').fill('Test it well')
-    await page.getByRole('button', { name: 'Save graph version' }).click()
+    await page.getByLabel('Step name').fill('Test it well')
+    await page.getByRole('button', { name: 'Save version', exact: true }).click()
     await until(async () => (await versionsOf(name)).length > before, 'the step editor did not save')
     await page.waitForTimeout(1000)
     if (!await panelOpen(page, name)) problems.push('saving closed the step panel')
@@ -187,7 +187,7 @@ test('Workflows: + Step while a run is on screen shows the new step', { timeout:
 test('Workflows: a step can be deleted from its panel or with the Delete key, and the steps around it stay linked', { timeout: 90000 }, async () => {
   const nodes = [...LINEAR, { id: 'docs', title: 'Write the docs', depends_on: ['test'] }]
   await withWorkflow('delete', nodes, {}, async (page, name) => {
-    await nodeIn(page, name, 'test').click()
+    await nodeIn(page, name, 'test').dblclick()
     const remove = page.locator(`${canvas(name)} [data-wf-delete-step]`)
     assert.equal(await remove.count(), 1, 'the step panel has no way to delete a step')
     let before = (await versionsOf(name)).length
@@ -220,7 +220,7 @@ test('Workflows: a step that another step\'s condition points to is not deleted,
     { id: 'fix', title: 'Fix failures', depends_on: ['test'], when: { node: 'test', status: 'blocked' } },
   ]
   await withWorkflow('delete-guard', nodes, {}, async (page, name) => {
-    await nodeIn(page, name, 'test').click()
+    await nodeIn(page, name, 'test').dblclick()
     const remove = page.locator(`${canvas(name)} [data-wf-delete-step]`)
     assert.equal(await remove.count(), 1, 'the step panel has no way to delete a step')
     const before = (await versionsOf(name)).length
@@ -264,8 +264,10 @@ test('Workflows: Auto layout clears saved positions and places every step again'
 
 test('Workflows: + Step follows the selected step, or the last step when none is selected', { timeout: 90000 }, async () => {
   await withWorkflow('follow', LINEAR, {}, async (page, name) => {
+    // One click selects the step without opening it (07/10/2026); + Step follows it.
     await nodeIn(page, name, 'build').click()
-    await until(() => panelOpen(page, name), 'clicking a step did not open its panel')
+    await until(async () => /dy-wf-selected/.test(await nodeIn(page, name, 'build').getAttribute('class')), 'clicking a step did not select it')
+    assert.equal(await panelOpen(page, name), false, 'one click opened the step panel')
     let before = (await versionsOf(name)).length
     await page.locator('[data-action="wf-add-step"]').click()
     await until(async () => (await versionsOf(name)).length > before, '+ Step did not save')
@@ -308,10 +310,10 @@ test('Workflows: Fit brings every step into view after zooming in', { timeout: 9
 
 test('Workflows: a failed save says why in the step panel', { timeout: 90000 }, async () => {
   await withWorkflow('error', LINEAR, {}, async (page, name) => {
-    await nodeIn(page, name, 'test').click()
-    await page.getByLabel('Dependencies').fill('build, no-such-step')
+    await nodeIn(page, name, 'test').dblclick()
+    await page.getByLabel('Comes after (step IDs)').fill('build, no-such-step')
     const before = (await versionsOf(name)).length
-    await page.getByRole('button', { name: 'Save graph version' }).click()
+    await page.getByRole('button', { name: 'Save version', exact: true }).click()
     await until(async () => /fail|couldn/i.test(await panel(page, name).innerText()), 'the save never reported a result')
     const text = (await panel(page, name).innerText()).replace(/\s+/g, ' ')
     const elsewhere = /reference existing nodes/i.test(await page.locator('body').innerText())

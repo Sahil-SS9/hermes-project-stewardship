@@ -120,9 +120,13 @@ export interface CanvasHandlers {
   // (07/10/2026, WORKFLOWS-R1.md finding 14). Absent: edits start from what
   // is shown.
   editNodes?: () => CanvasNode[];
-  // Told which step is selected (null when none), so the host's toolbar can
-  // act on it (e.g. a new step follows the selected one).
+  // Told which step is selected (one click, a double-click or Enter; null
+  // when none), so the host's toolbar can act on it (e.g. a new step follows
+  // the selected one).
   onSelect?: (nodeId: string | null) => void;
+  // Told when a step's details panel opens (double-click or Enter) or closes
+  // (null), so the host can make room for it.
+  onOpen?: (nodeId: string | null) => void;
   // Read-only canonical event history. If absent (e.g. definition-only
   // frames), playback stays disabled rather than inventing events.
   fetchTimeline?: (projectId: string, workflowName: string, runKey: string) => Promise<{ events?: Array<Record<string, unknown>> }>;
@@ -463,6 +467,9 @@ export function buildLayout(nodes: CanvasNode[], opts?: { laneOf?: (n: CanvasNod
 // screen re-mounted the canvas on every data change).
 export type CanvasHandle = (() => void) & { refresh: () => void };
 
+// Numbers each mounted canvas, so its screen-reader help has a unique id.
+let canvasSeq = 0;
+
 export function mountWorkflowCanvas(
   host: HTMLElement,
   projectId: string,
@@ -496,6 +503,20 @@ export function mountWorkflowCanvas(
 
   const passport = elu<HTMLDivElement>('div', 'dy-wf-passport dy-wf-glass');
   passport.setAttribute('aria-live', 'polite');
+
+  // One click selects a step and a drag moves it; a double-click (or Enter)
+  // opens its details. The panel used to open on every click, and so at the
+  // end of every drag (Sahil, 07/10/2026). A small note on hover says so;
+  // screen readers get the same words through each step's aria-describedby
+  // (which used to name an element that did not exist).
+  canvasSeq += 1;
+  const help = elu<HTMLParagraphElement>('p', 'dy-wf-sr-only',
+    'Double-click a step, or press Enter, to open its details. The arrow keys move between steps.');
+  help.id = `wf-help-${canvasSeq}`;
+  const openHint = elu<HTMLDivElement>('div', 'dy-wf-open-hint', 'Double-click to open details');
+  openHint.setAttribute('role', 'tooltip');
+  openHint.setAttribute('data-wf-open-hint', '');
+  openHint.hidden = true;
 
   // P8.2: explicit zoom controls (in / out / fit / reset) — no pointer-wheel
   // dependence. Keyboard operable (real buttons) with data-wf-action hooks.
@@ -605,7 +626,7 @@ export function mountWorkflowCanvas(
     host.classList.toggle('dy-wf-still', on);
   });
   playbackBar.append(playbackButton, playbackSlider, playbackLabel, motionButton);
-  wrap.append(svg, feed, minimap, passport, zoomBar, listView, playbackBar);
+  wrap.append(svg, feed, minimap, passport, zoomBar, listView, playbackBar, openHint, help);
   // Keep the canvas frame itself scroll-free on mobile: the control row owns
   // its horizontal overflow and remains fully reachable by touch/keyboard.
   playbackBar.style.overflowX = 'auto';
@@ -1081,7 +1102,7 @@ export function mountWorkflowCanvas(
     g.setAttribute('aria-label', `${visuals.label}: ${n.title} (${n.status ?? 'pending'})`);
     // The editable flag states whether a persistence seam is actually wired.
     g.dataset.wfEditable = String(editable);
-    g.setAttribute('aria-describedby', `wf-help-${n.node_id}`);
+    g.setAttribute('aria-describedby', help.id);
 
     // The card. One element, identical geometry for every node.
     const shape = sEl('rect', {
@@ -1210,11 +1231,23 @@ export function mountWorkflowCanvas(
       }
     });
     g.addEventListener('pointerenter', dash); // intent preview [archify]
+    g.addEventListener('pointerenter', () => scheduleHint(n.node_id, g));
     g.addEventListener('pointerleave', () => {
       if (!g.classList.contains('dy-wf-selected')) undash();
+      hideHint();
     });
-    const open = () => openPassport(n, g);
-    g.addEventListener('click', open);
+    // Pressing a step (a click, or the start of a drag) hides the note at once.
+    g.addEventListener('pointerdown', hideHint);
+    const open = () => {
+      hideHint();
+      openPassport(n, g);
+    };
+    // One click selects (a drag ends with one too); a double-click opens.
+    g.addEventListener('click', () => selectStep(n, g));
+    g.addEventListener('dblclick', (ev) => {
+      ev.preventDefault();
+      open();
+    });
     g.addEventListener('keydown', (e) => {
       const ev = e as KeyboardEvent;
       if (ev.key === 'Enter') {
@@ -1505,6 +1538,7 @@ export function mountWorkflowCanvas(
     if (selectedEl) selectedEl.classList.add('dy-wf-selected');
     selectedId = n.node_id;
     handlers.onSelect?.(n.node_id);
+    handlers.onOpen?.(n.node_id);
     highlightRoute(n.node_id);
     passport.replaceChildren();
     const status = n.status ?? 'pending';
@@ -1819,6 +1853,7 @@ export function mountWorkflowCanvas(
     // click event still retargets to the node on release (capturing on the svg
     // swallowed node clicks entirely — real-browser verified).
     if ((e.target as Element)?.closest?.('.dy-wf-node')) return;
+    hideHint();
     dragging = true;
     host.classList.add('dy-wf-panning');
     lastX = (e as PointerEvent).clientX;
@@ -1885,6 +1920,7 @@ export function mountWorkflowCanvas(
   let wheelSettle: ReturnType<typeof setTimeout> | null = null;
   svg.addEventListener('wheel', (e) => {
     e.preventDefault();
+    hideHint();
     const ev = e as WheelEvent;
     const rect = svg.getBoundingClientRect();
     const { sx, sy } = screenScale();
@@ -1905,6 +1941,7 @@ export function mountWorkflowCanvas(
   }, { passive: false });
 
   const closePassport = () => {
+    const wasOpen = passport.childElementCount > 0;
     passport.replaceChildren();
     if (selectedEl) selectedEl.classList.remove('dy-wf-selected');
     selectedEl = null;
@@ -1912,7 +1949,51 @@ export function mountWorkflowCanvas(
       selectedId = null;
       handlers.onSelect?.(null);
     }
+    if (wasOpen) handlers.onOpen?.(null);
     clearRoute();
+  };
+  // One click: select the step (its highlight and route) without opening
+  // it. The panel belongs to one step, so selecting another step closes it;
+  // clicking or dragging the open step keeps it.
+  const selectStep = (n: CanvasNode, g: SVGGElement) => {
+    if (selectedId === n.node_id) return;
+    if (passport.childElementCount > 0) closePassport();
+    if (selectedEl) selectedEl.classList.remove('dy-wf-selected');
+    selectedEl = g;
+    g.classList.add('dy-wf-selected');
+    selectedId = n.node_id;
+    handlers.onSelect?.(n.node_id);
+    highlightRoute(n.node_id);
+  };
+  // The hover note waits a moment (a pointer crossing the canvas must not
+  // flash notes), sits above the step (below it at the top edge), and never
+  // shows during a drag, a link or a pan, or over the step that is open.
+  let hintTimer: ReturnType<typeof setTimeout> | null = null;
+  const hideHint = () => {
+    if (hintTimer) {
+      clearTimeout(hintTimer);
+      hintTimer = null;
+    }
+    openHint.hidden = true;
+  };
+  const scheduleHint = (nodeId: string, g: SVGGElement) => {
+    hideHint();
+    const busy = () => Boolean(dragSession || connectFrom || dragging);
+    if (busy() || (selectedId === nodeId && passport.childElementCount > 0)) return;
+    hintTimer = setTimeout(() => {
+      hintTimer = null;
+      // New data redraws the steps; the pointer may now be over the
+      // redrawn copy of this step, which never saw a pointerenter.
+      const el = g.isConnected ? g : nodeEl(nodeId);
+      if (!el || busy() || (el !== g && !el.matches(':hover'))) return;
+      const box = wrap.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      const below = r.top - box.top < 34;
+      openHint.classList.toggle('below', below);
+      openHint.style.left = `${Math.round(r.left - box.left + r.width / 2)}px`;
+      openHint.style.top = `${Math.round((below ? r.bottom : r.top) - box.top)}px`;
+      openHint.hidden = false;
+    }, 450);
   };
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') closePassport();
@@ -2119,6 +2200,7 @@ export function mountWorkflowCanvas(
     if (timer) clearInterval(timer);
     if (flowTimer) clearInterval(flowTimer);
     clearInterval(clockTimer);
+    hideHint();
     document.removeEventListener('keydown', onKeyDown);
     document.removeEventListener('visibilitychange', onVisibility);
     canvasWindow.removeEventListener('resize', onResize);
