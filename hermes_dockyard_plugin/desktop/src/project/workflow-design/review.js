@@ -68,7 +68,7 @@ export function WorkflowReviewBar({ review, onChange, collapsed, onCollapse }) {
     review.design === 'today' ? null : jsx(ChoiceGroup, { label: 'Loops', group: 'wfloops', choices: WF_LOOPS, value: review.loops, onPick: (loops) => onChange({ loops }) }),
     review.design === 'today' ? null : jsxs('span', { className: 'dy-wfd-review-key', children: [
       jsx('span', { className: 'dy-wfd-preview-tag', children: 'Preview' }),
-      ' = not saved yet: kept in this page until you reload',
+      ' = not saved: kept until you reload',
     ] }),
     jsx('button', { type: 'button', className: 'dy-wfd-review-hide', 'data-action': 'wf-review-collapse', 'aria-label': 'Hide the design review bar', onClick: () => onCollapse(true), children: '×' }),
   ] })

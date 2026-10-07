@@ -23,6 +23,9 @@ export const WORKFLOW_DESIGN_CSS = `
 .dockyard-root .dy-wfd-canvas-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
 .dockyard-root .dy-wfd-canvas-row.with-ai { grid-template-columns: minmax(0, 1fr) 320px; }
 .dockyard-root .dy-wfd-canvas-wrap { position: relative; min-width: 0; }
+/* With the AI builder open the canvas narrows (~700px at 1440 wide), where the
+   playback bar runs into the minimap; the minimap gives way. */
+.dockyard-root .dy-wfd-canvas-row.with-ai .dy-wf-scope .dy-wf-minimap { display: none; }
 .dockyard-root .dy-wfd-on .dockyard-wf3-stage .dockyard-workflow-graph .dy-wf, .dockyard-root .dy-wfd-on .dy-wfd-canvas-wrap > .dy-wf { border-radius: 10px; }
 .dockyard-root .dy-wfd-on .dy-wf-scope .dy-wf-passport { max-height: calc(100% - 74px); }
 .dockyard-root .dy-wfd-draft-banner { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 15; max-width: calc(100% - 300px); margin: 0; padding: 5px 12px; border: 1px solid var(--dy-warning); border-radius: 999px; background: var(--dy-warning-bg); color: var(--dy-text); font-size: 12px; text-align: center; }
@@ -109,6 +112,17 @@ export const WORKFLOW_DESIGN_CSS = `
 .dy-wf-scope .dy-wfx-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .dy-wf-scope .dy-wfx-error { margin: 0; color: var(--dy-wf-status-blocked-text); font-size: 12px; font-weight: 600; }
 .dy-wf-scope .dy-wfd-preview-tag { display: inline-flex; margin-left: 6px; padding: 0 6px; border: 1px solid rgba(240, 192, 74, .7); border-radius: 999px; background: rgba(227, 179, 65, .14); color: #f0c04a; font-size: 9.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; line-height: 15px; }
+/* The page colours every <p> in a card or dialog as secondary text
+   (.dockyard-feature-card p, .dockyard-modal p), which turned errors grey, the
+   AI's message bubble grey on blue, and the step panel's help text dark on
+   the dark panel. These keep their own colour and spacing. */
+.dockyard-root .dy-wfd-on p.dy-wfd-error { margin: 4px 0 0; color: var(--dy-danger); font-size: 12px; }
+.dockyard-root .dy-wfd-on p.dy-wfd-ai-user { margin: 0; color: var(--dy-on-action); }
+.dockyard-root .dy-wfd-on .dy-wfd-ai-reply p, .dockyard-root .dy-wfd-on .dy-wfd-import-ok p, .dockyard-root .dy-wfd-on .dy-wfd-repeat p { margin: 0; color: var(--dy-text); }
+.dockyard-root .dy-wfd-on p.dy-wfd-ai-note { margin: 0; }
+.dockyard-root .dy-wfd-on p.dy-wfd-draft-banner { margin: 0; color: var(--dy-text); font-size: 12px; }
+.dockyard-root .dy-wfd-on .dy-wf-scope p.dy-wfx-help { margin: 0; color: var(--dy-wf-card-dim); font-size: 11.5px; }
+.dockyard-root .dy-wfd-on .dy-wf-scope p.dy-wfx-error { margin: 0; color: var(--dy-wf-status-blocked-text); font-size: 12px; }
 @media (max-width: 1100px) {
   .dockyard-root .dy-wfd-canvas-row.with-ai { grid-template-columns: minmax(0, 1fr) 280px; }
 }

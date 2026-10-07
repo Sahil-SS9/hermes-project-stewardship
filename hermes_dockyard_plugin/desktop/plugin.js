@@ -2459,6 +2459,9 @@ var WORKFLOW_DESIGN_CSS = `
 .dockyard-root .dy-wfd-canvas-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
 .dockyard-root .dy-wfd-canvas-row.with-ai { grid-template-columns: minmax(0, 1fr) 320px; }
 .dockyard-root .dy-wfd-canvas-wrap { position: relative; min-width: 0; }
+/* With the AI builder open the canvas narrows (~700px at 1440 wide), where the
+   playback bar runs into the minimap; the minimap gives way. */
+.dockyard-root .dy-wfd-canvas-row.with-ai .dy-wf-scope .dy-wf-minimap { display: none; }
 .dockyard-root .dy-wfd-on .dockyard-wf3-stage .dockyard-workflow-graph .dy-wf, .dockyard-root .dy-wfd-on .dy-wfd-canvas-wrap > .dy-wf { border-radius: 10px; }
 .dockyard-root .dy-wfd-on .dy-wf-scope .dy-wf-passport { max-height: calc(100% - 74px); }
 .dockyard-root .dy-wfd-draft-banner { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 15; max-width: calc(100% - 300px); margin: 0; padding: 5px 12px; border: 1px solid var(--dy-warning); border-radius: 999px; background: var(--dy-warning-bg); color: var(--dy-text); font-size: 12px; text-align: center; }
@@ -2545,6 +2548,17 @@ var WORKFLOW_DESIGN_CSS = `
 .dy-wf-scope .dy-wfx-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .dy-wf-scope .dy-wfx-error { margin: 0; color: var(--dy-wf-status-blocked-text); font-size: 12px; font-weight: 600; }
 .dy-wf-scope .dy-wfd-preview-tag { display: inline-flex; margin-left: 6px; padding: 0 6px; border: 1px solid rgba(240, 192, 74, .7); border-radius: 999px; background: rgba(227, 179, 65, .14); color: #f0c04a; font-size: 9.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; line-height: 15px; }
+/* The page colours every <p> in a card or dialog as secondary text
+   (.dockyard-feature-card p, .dockyard-modal p), which turned errors grey, the
+   AI's message bubble grey on blue, and the step panel's help text dark on
+   the dark panel. These keep their own colour and spacing. */
+.dockyard-root .dy-wfd-on p.dy-wfd-error { margin: 4px 0 0; color: var(--dy-danger); font-size: 12px; }
+.dockyard-root .dy-wfd-on p.dy-wfd-ai-user { margin: 0; color: var(--dy-on-action); }
+.dockyard-root .dy-wfd-on .dy-wfd-ai-reply p, .dockyard-root .dy-wfd-on .dy-wfd-import-ok p, .dockyard-root .dy-wfd-on .dy-wfd-repeat p { margin: 0; color: var(--dy-text); }
+.dockyard-root .dy-wfd-on p.dy-wfd-ai-note { margin: 0; }
+.dockyard-root .dy-wfd-on p.dy-wfd-draft-banner { margin: 0; color: var(--dy-text); font-size: 12px; }
+.dockyard-root .dy-wfd-on .dy-wf-scope p.dy-wfx-help { margin: 0; color: var(--dy-wf-card-dim); font-size: 11.5px; }
+.dockyard-root .dy-wfd-on .dy-wf-scope p.dy-wfx-error { margin: 0; color: var(--dy-wf-status-blocked-text); font-size: 12px; }
 @media (max-width: 1100px) {
   .dockyard-root .dy-wfd-canvas-row.with-ai { grid-template-columns: minmax(0, 1fr) 280px; }
 }
@@ -3548,6 +3562,17 @@ var workflow_canvas_css_default = `
 .dy-wf-scope .dy-wf-lane { fill: rgba(140, 170, 220, .035); stroke: rgba(140, 180, 255, .09); stroke-width: 1; }
 .dy-wf-scope .dy-wf-lane.exception { fill: rgba(255, 123, 114, .05); }
 .dy-wf-scope .dy-wf-lane-label { fill: #6f86a8; font: 600 7px system-ui, sans-serif; letter-spacing: .9px; text-transform: uppercase; pointer-events: none; }
+/* Workflows design round (07/10/2026): plain-words card notes and the frame
+   drawn around steps that repeat. Only drawn when a design hook asks. */
+.dy-wf-scope .dy-wf-svg .dy-wf-node .dy-wf-sub[data-wf-card-note] { fill: #b9d3ff; text-transform: none; letter-spacing: 0; font-size: 11px; }
+.dy-wf-scope .dy-wf-frame-box { fill: rgba(106, 183, 255, .06); stroke: #6ab7ff; stroke-width: 1.4; stroke-dasharray: 6 4; pointer-events: none; }
+.dy-wf-scope .dy-wf-frame-tab { cursor: pointer; }
+.dy-wf-scope .dy-wf-frame-tab:focus { outline: none; }
+.dy-wf-scope .dy-wf-frame-tabbg { fill: #12305a; stroke: #6ab7ff; stroke-width: 1; }
+.dy-wf-scope .dy-wf-frame-tab:hover .dy-wf-frame-tabbg { fill: #1b4580; }
+.dy-wf-scope .dy-wf-frame-tab:focus-visible .dy-wf-frame-tabbg { stroke: #ffffff; stroke-width: 2.5; }
+.dy-wf-scope .dy-wf-frame-label { fill: #e6f1ff; font: 600 11px system-ui, sans-serif; pointer-events: none; }
+.dy-wf-scope .dy-wf-frame-sub { fill: #9fc6ff; font: 500 10.5px system-ui, sans-serif; pointer-events: none; }
 
 /* Phone width: stacked layout; floating surfaces reflow so none overlaps
    another and none is cut off. */
@@ -14588,7 +14613,8 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     const status = n.status ?? "pending";
     const head = elu("div", "dy-wf-pp-head");
     const meta = elu("div", "dy-wf-pp-meta");
-    meta.append(elu("span", "dy-wf-passport-kind", PURPOSE_VISUALS[nodePurpose(n)].label), elu("span", `badge ${status}`, status));
+    const quietFacts = Boolean(handlers.design?.compactFacts) && (!lastRun || lastRun.status === "definition");
+    meta.append(elu("span", "dy-wf-passport-kind", handlers.design?.cardNote?.(n) ?? PURPOSE_VISUALS[nodePurpose(n)].label), elu("span", `badge ${status}`, status));
     const close = elu("button", "dy-wf-passport-close", "\xD7");
     close.type = "button";
     close.setAttribute("aria-label", "Close step details");
@@ -14609,7 +14635,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     if (n.assignee) fact("Assignee", n.assignee);
     if (n.evidence_refs.length) fact("Evidence", n.evidence_refs.join(", "));
     if (n.task_ref) fact("Work item", n.task_ref);
-    passport.appendChild(facts);
+    if (!quietFacts) passport.appendChild(facts);
     const nodeEvents = (lastRun?.timeline ?? []).filter((event) => event.node_id === n.node_id);
     if (nodeEvents.length) {
       passport.appendChild(elu("h4", "", "Status history"));
@@ -14860,7 +14886,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
         sec.append(head2, body);
         passport.appendChild(sec);
       }
-    } else {
+    } else if (!quietFacts) {
       passport.appendChild(elu("p", "dy-wf-pp-note", "No canonical work bound to this step yet."));
     }
     appendEditor();
@@ -15262,7 +15288,7 @@ function WorkflowReviewBar({ review, onChange, collapsed, onCollapse }) {
     review.design === "today" ? null : jsx(ChoiceGroup, { label: "Loops", group: "wfloops", choices: WF_LOOPS, value: review.loops, onPick: (loops) => onChange({ loops }) }),
     review.design === "today" ? null : jsxs("span", { className: "dy-wfd-review-key", children: [
       jsx("span", { className: "dy-wfd-preview-tag", children: "Preview" }),
-      " = not saved yet: kept in this page until you reload"
+      " = not saved: kept until you reload"
     ] }),
     jsx("button", { type: "button", className: "dy-wfd-review-hide", "data-action": "wf-review-collapse", "aria-label": "Hide the design review bar", onClick: () => onCollapse(true), children: "\xD7" })
   ] });
@@ -15708,11 +15734,12 @@ function canvasDesignHooks({ loops, draft, members, storedNode, settingsKey, onE
   const team = () => (typeof members === "function" ? members() : members) ?? [];
   return {
     labels: { heading: "This step", title: "Step name", deps: "Comes after (step IDs)", team: "", save: draft ? "Apply to draft" : "Save version" },
+    compactFacts: true,
     panelExtras: (node) => panelExtras({ node, stored: storedNode(node.node_id), members: team(), loops, settingsKey, onEditFrame }),
     cardNote: (node) => {
       if (node.loop) return loops === "panel" ? `\u21BB Repeats \xB7 up to ${node.loop.max_iterations}` : "\u21BB Repeats";
       if (node.when) return `If ${shortName(node.when.node)} ${node.when.status === "blocked" ? "gets stuck" : "is done"}`;
-      if (node.human_gate) return "Your sign-off";
+      if (node.human_gate) return "Sign-off";
       return null;
     },
     frames: loops === "frame" ? (nodes) => nodes.filter((n) => n.loop).map((n) => {
@@ -16172,7 +16199,8 @@ function AiSidePanel({ members, nodes, workflowTitle, seed, onApply, onClose }) 
   const listRef = useRef(null);
   useEffect(() => {
     const list = listRef.current;
-    if (list) list.scrollTop = list.scrollHeight;
+    const last = list?.lastElementChild;
+    if (list && last) list.scrollTop = Math.max(0, last.offsetTop - list.offsetTop - 8);
   }, [thread.length]);
   const empty = !nodes.length;
   const send = (message = text2) => {
@@ -16388,6 +16416,21 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     globalThis.addEventListener("resize", onResize);
     return () => globalThis.removeEventListener("resize", onResize);
   }, [designOn]);
+  const growForPanel = () => {
+    const host2 = canvasRef.current;
+    if (!host2 || !designOn || globalThis.innerWidth <= 640) return;
+    const stage = host2.closest(".dockyard-wf3-stage");
+    const toolbar = stage?.querySelector(".dockyard-wf3-toolbar");
+    const want = Math.min(820, Math.round(globalThis.innerHeight - (toolbar?.getBoundingClientRect().height ?? 0) - 24));
+    if (host2.getBoundingClientRect().height >= want - 4) return;
+    host2.style.height = `${want}px`;
+    host2.closest(".dy-wfd-canvas-row")?.style.setProperty("--dy-wfd-canvas-h", `${want}px`);
+    stage?.scrollIntoView({ block: "start" });
+  };
+  const onSelectStep = (nodeId) => {
+    selectedNodeRef.current = nodeId;
+    if (nodeId && designOn) growForPanel();
+  };
   useEffect(() => {
     if (!designOn) return void 0;
     let live = true;
@@ -16415,9 +16458,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
         canvasHandle.current?.refresh();
       },
       editNodes: () => canvasNodesOf(draftRef.current?.nodes ?? []),
-      onSelect: (nodeId) => {
-        selectedNodeRef.current = nodeId;
-      },
+      onSelect: (nodeId) => onSelectStep(nodeId),
       design: hooksFor(true)
     });
     canvasHandle.current = handle;
@@ -16434,9 +16475,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     const handle = mountDesktopWorkflowCanvas(canvasRef.current, project.id, workflowName, () => viewRef.current.definition, () => viewRef.current.runs, {
       onEdit: (editedNodes) => actionsRef.current.savePlan(editedNodes),
       editNodes: () => actionsRef.current.planNodes(),
-      onSelect: (nodeId) => {
-        selectedNodeRef.current = nodeId;
-      },
+      onSelect: (nodeId) => designOn ? onSelectStep(nodeId) : selectedNodeRef.current = nodeId,
       // Gate decisions use the same canonical authority as the dashboard: the
       // reviewed decision fingerprint is submitted with the action, so a stale
       // review can never approve something else. Retry re-queues via the
@@ -16773,13 +16812,13 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
             draft && !draft.base && !draft.nodes.length ? aiOpen ? jsx("div", { className: "dy-wfd-start hint", role: "status", "data-wfd-canvas-start": "ai", children: "Describe the workflow in the AI builder. The steps appear here as it works." }) : jsx(CanvasStartCard, { templates, onUse: useStart, onAi: () => setAiOpen(true), onCancel: closeDraft }) : null,
             draft?.base ? jsx("p", { className: "dy-wfd-draft-banner", role: "status", "data-wfd-draft-banner": true, children: "The AI\u2019s changes are on the canvas but not saved. Save version keeps them; Discard drops them." }) : null
           ] }),
-          aiOpen ? jsx(AiSidePanel, { key: draft && !draft.base ? draft.key : current?.name ?? "none", members, nodes: draft ? draft.nodes : planRef.current.nodes, workflowTitle: draft?.base?.name ?? current?.name ?? "this workflow", seed: aiSeed, onApply: aiApply, onClose: () => setAiOpen(false) }) : null
+          aiOpen ? jsx(AiSidePanel, { members, nodes: draft ? draft.nodes : planRef.current.nodes, workflowTitle: draft?.base?.name ?? current?.name ?? "this workflow", seed: aiSeed, onApply: aiApply, onClose: () => setAiOpen(false) }, draft && !draft.base ? draft.key : current?.name ?? "none") : null
         ] }) : jsx("p", { className: "dockyard-meta", children: "No workflow selected." })
       ] })
     ] }),
     designOn && dialog === "new" ? jsx(NewWorkflowDialog, { takenNames, templates, members, onCreate: createFromDialog, onClose: () => setDialog(null) }) : null,
     designOn && dialog === "settings" ? jsx(WorkflowSettingsDialog, { project: project.id, workflow: standinWorkflow(), title: draft ? draft.name || "New workflow" : current?.name ?? "", members, onClose: () => setDialog(null) }) : null,
-    designOn && repeatNode ? jsx(RepeatPopover, { key: repeatAt.nodeId, node: repeatNode, anchor: repeatAt.rect, check: readStepSettings(project.id, standinWorkflow(), repeatAt.nodeId).check, draft: Boolean(draft), onSave: ({ rounds, check }) => saveRepeat(repeatAt.nodeId, { max_iterations: rounds, until: { status: "done" } }, check), onStop: () => saveRepeat(repeatAt.nodeId, null, null), onClose: () => setRepeatAt(null) }) : null,
+    designOn && repeatNode ? jsx(RepeatPopover, { node: repeatNode, anchor: repeatAt.rect, check: readStepSettings(project.id, standinWorkflow(), repeatAt.nodeId).check, draft: Boolean(draft), onSave: ({ rounds, check }) => saveRepeat(repeatAt.nodeId, { max_iterations: rounds, until: { status: "done" } }, check), onStop: () => saveRepeat(repeatAt.nodeId, null, null), onClose: () => setRepeatAt(null) }, repeatAt.nodeId) : null,
     review.active ? jsx(WorkflowReviewBar, { review, onChange: changeReview, collapsed: reviewHidden, onCollapse: setReviewHidden }) : null
   ] });
 }

@@ -149,6 +149,8 @@ export interface CanvasDesignHooks {
   panelExtras?: (node: CanvasNode) => { el: HTMLElement; apply?: (node: CanvasNode) => CanvasNode } | null;
   // A short line on the card in place of the purpose word (null keeps it).
   cardNote?: (node: CanvasNode) => string | null;
+  // Skip the step panel's facts list in the plan view (no run to report on).
+  compactFacts?: boolean;
   frames?: (nodes: CanvasNode[]) => CanvasFrame[];
 }
 
@@ -1509,7 +1511,10 @@ export function mountWorkflowCanvas(
     // Header: kind + status on one line, title below, close top-right.
     const head = elu<HTMLDivElement>('div', 'dy-wf-pp-head');
     const meta = elu<HTMLDivElement>('div', 'dy-wf-pp-meta');
-    meta.append(elu('span', 'dy-wf-passport-kind', PURPOSE_VISUALS[nodePurpose(n)].label), elu('span', `badge ${status}`, status));
+    // Design hook: the plan view (no run) has nothing to report but the step's
+    // links, which the edit section shows, so its facts list is skipped.
+    const quietFacts = Boolean(handlers.design?.compactFacts) && (!lastRun || lastRun.status === 'definition');
+    meta.append(elu('span', 'dy-wf-passport-kind', handlers.design?.cardNote?.(n) ?? PURPOSE_VISUALS[nodePurpose(n)].label), elu('span', `badge ${status}`, status));
     const close = elu<HTMLButtonElement>('button', 'dy-wf-passport-close', '×');
     close.type = 'button';
     close.setAttribute('aria-label', 'Close step details');
@@ -1532,7 +1537,7 @@ export function mountWorkflowCanvas(
     if (n.assignee) fact('Assignee', n.assignee);
     if (n.evidence_refs.length) fact('Evidence', n.evidence_refs.join(', '));
     if (n.task_ref) fact('Work item', n.task_ref);
-    passport.appendChild(facts);
+    if (!quietFacts) passport.appendChild(facts);
     const nodeEvents = (lastRun?.timeline ?? []).filter((event) => event.node_id === n.node_id);
     if (nodeEvents.length) {
       passport.appendChild(elu('h4', '', 'Status history'));
@@ -1789,7 +1794,7 @@ export function mountWorkflowCanvas(
         sec.append(head, body);
         passport.appendChild(sec);
       }
-    } else {
+    } else if (!quietFacts) {
       passport.appendChild(elu('p', 'dy-wf-pp-note', 'No canonical work bound to this step yet.'));
     }
     appendEditor();

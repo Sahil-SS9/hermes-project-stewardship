@@ -129,8 +129,11 @@ test('Design review A: at 1440x900 the canvas and every step are on the first sc
     assert.ok(a.canvasTop < today.canvasTop - 100, `canvas moved up (${today.canvasTop} -> ${a.canvasTop})`)
     assert.ok(a.toolbar < 60, `toolbar is one row (${a.toolbar}px)`)
     assert.equal(await noteOf(page, name, 'fix'), '↻ Repeats · up to 5')
-    assert.equal(await noteOf(page, name, 'review'), 'Your sign-off')
+    assert.equal(await noteOf(page, name, 'review'), 'Sign-off')
     assert.equal(await noteOf(page, name, 'stuck'), 'If fix gets stuck')
+    // Notes are plain words in sentence case (the canvas stylesheet is generated: a stale copy
+    // left them upper-case and dim).
+    assert.equal(await nodeIn(page, name, 'fix').locator('.dy-wf-sub').evaluate((t) => getComputedStyle(t).textTransform), 'none')
     assert.equal(await page.locator(`${canvas(name)} [data-wf-frame]`).count(), 0, 'no frames when loops are in the panel')
   }, { open: name })
 })
@@ -348,6 +351,7 @@ test('Design review B: a frame opens its repeat settings; rounds save as a versi
   await withPage('review=1&wf=b', async (page) => {
     const first = byId(await latest(name))
     assert.equal(await noteOf(page, name, 'fix'), '↻ Repeats')
+    assert.notEqual(await page.locator(`${canvas(name)} .dy-wf-frame-box`).evaluate((r) => getComputedStyle(r).strokeDasharray), 'none', 'the frame is drawn dashed')
     await page.locator(`${canvas(name)} [data-wf-frame-open="fix"]`).click()
     await page.locator('[data-wfd-repeat="fix"]').waitFor()
     await page.locator('[data-wfd-repeat-rounds]').fill('0')

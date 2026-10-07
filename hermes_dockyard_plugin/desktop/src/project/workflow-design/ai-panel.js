@@ -26,7 +26,13 @@ export function AiSidePanel({ members, nodes, workflowTitle, seed, onApply, onCl
   const [text, setText] = useState('')
   const [error, setError] = useState(null)
   const listRef = useRef(null)
-  useEffect(() => { const list = listRef.current; if (list) list.scrollTop = list.scrollHeight }, [thread.length])
+  // Show the start of the newest reply, so the plan is read before its
+  // questions (scrolling to the bottom landed on the questions).
+  useEffect(() => {
+    const list = listRef.current
+    const last = list?.lastElementChild
+    if (list && last) list.scrollTop = Math.max(0, last.offsetTop - list.offsetTop - 8)
+  }, [thread.length])
   const empty = !nodes.length
   const send = (message = text) => {
     const clean = message.trim()

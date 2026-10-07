@@ -212,6 +212,25 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
     globalThis.addEventListener('resize', onResize)
     return () => globalThis.removeEventListener('resize', onResize)
   }, [designOn])
+  // Opening a step gives its panel room: the canvas grows to the window and
+  // the page scrolls so the toolbar sits at the top. The canvas keeps its zoom
+  // and position (the engine only adds room on a resize). At 1440x900 the
+  // first-screen canvas left the panel ~330px, hiding the new sections.
+  const growForPanel = () => {
+    const host = canvasRef.current
+    if (!host || !designOn || globalThis.innerWidth <= 640) return
+    const stage = host.closest('.dockyard-wf3-stage')
+    const toolbar = stage?.querySelector('.dockyard-wf3-toolbar')
+    const want = Math.min(820, Math.round(globalThis.innerHeight - (toolbar?.getBoundingClientRect().height ?? 0) - 24))
+    if (host.getBoundingClientRect().height >= want - 4) return
+    host.style.height = `${want}px`
+    host.closest('.dy-wfd-canvas-row')?.style.setProperty('--dy-wfd-canvas-h', `${want}px`)
+    stage?.scrollIntoView({ block: 'start' })
+  }
+  const onSelectStep = (nodeId) => {
+    selectedNodeRef.current = nodeId
+    if (nodeId && designOn) growForPanel()
+  }
   useEffect(() => {
     if (!designOn) return undefined
     let live = true
@@ -228,7 +247,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
       // A draft changes in memory only; Save in the toolbar saves it.
       onEdit: (editedNodes) => { updateDraft((d) => (d ? { ...d, nodes: mergeEdits(editedNodes, d.nodes) } : d)); canvasHandle.current?.refresh() },
       editNodes: () => canvasNodesOf(draftRef.current?.nodes ?? []),
-      onSelect: (nodeId) => { selectedNodeRef.current = nodeId },
+      onSelect: (nodeId) => onSelectStep(nodeId),
       design: hooksFor(true),
     })
     canvasHandle.current = handle
@@ -245,7 +264,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
     const handle = mountDesktopWorkflowCanvas(canvasRef.current, project.id, workflowName, () => viewRef.current.definition, () => viewRef.current.runs, {
       onEdit: (editedNodes) => actionsRef.current.savePlan(editedNodes),
       editNodes: () => actionsRef.current.planNodes(),
-      onSelect: (nodeId) => { selectedNodeRef.current = nodeId },
+      onSelect: (nodeId) => (designOn ? onSelectStep(nodeId) : (selectedNodeRef.current = nodeId)),
       // Gate decisions use the same canonical authority as the dashboard: the
       // reviewed decision fingerprint is submitted with the action, so a stale
       // review can never approve something else. Retry re-queues via the
@@ -561,13 +580,13 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
                 : jsx(CanvasStartCard, { templates, onUse: useStart, onAi: () => setAiOpen(true), onCancel: closeDraft })) : null,
               draft?.base ? jsx('p', { className: 'dy-wfd-draft-banner', role: 'status', 'data-wfd-draft-banner': true, children: 'The AI’s changes are on the canvas but not saved. Save version keeps them; Discard drops them.' }) : null,
             ] }),
-            aiOpen ? jsx(AiSidePanel, { key: draft && !draft.base ? draft.key : (current?.name ?? 'none'), members, nodes: draft ? draft.nodes : planRef.current.nodes, workflowTitle: draft?.base?.name ?? current?.name ?? 'this workflow', seed: aiSeed, onApply: aiApply, onClose: () => setAiOpen(false) }) : null,
+            aiOpen ? jsx(AiSidePanel, { members, nodes: draft ? draft.nodes : planRef.current.nodes, workflowTitle: draft?.base?.name ?? current?.name ?? 'this workflow', seed: aiSeed, onApply: aiApply, onClose: () => setAiOpen(false) }, draft && !draft.base ? draft.key : (current?.name ?? 'none')) : null,
           ] }) : jsx('p', { className: 'dockyard-meta', children: 'No workflow selected.' }),
       ]}),
     ]}),
     designOn && dialog === 'new' ? jsx(NewWorkflowDialog, { takenNames, templates, members, onCreate: createFromDialog, onClose: () => setDialog(null) }) : null,
     designOn && dialog === 'settings' ? jsx(WorkflowSettingsDialog, { project: project.id, workflow: standinWorkflow(), title: draft ? (draft.name || 'New workflow') : (current?.name ?? ''), members, onClose: () => setDialog(null) }) : null,
-    designOn && repeatNode ? jsx(RepeatPopover, { key: repeatAt.nodeId, node: repeatNode, anchor: repeatAt.rect, check: readStepSettings(project.id, standinWorkflow(), repeatAt.nodeId).check, draft: Boolean(draft), onSave: ({ rounds, check }) => saveRepeat(repeatAt.nodeId, { max_iterations: rounds, until: { status: 'done' } }, check), onStop: () => saveRepeat(repeatAt.nodeId, null, null), onClose: () => setRepeatAt(null) }) : null,
+    designOn && repeatNode ? jsx(RepeatPopover, { node: repeatNode, anchor: repeatAt.rect, check: readStepSettings(project.id, standinWorkflow(), repeatAt.nodeId).check, draft: Boolean(draft), onSave: ({ rounds, check }) => saveRepeat(repeatAt.nodeId, { max_iterations: rounds, until: { status: 'done' } }, check), onStop: () => saveRepeat(repeatAt.nodeId, null, null), onClose: () => setRepeatAt(null) }, repeatAt.nodeId) : null,
     review.active ? jsx(WorkflowReviewBar, { review, onChange: changeReview, collapsed: reviewHidden, onCollapse: setReviewHidden }) : null,
   ]})
 }

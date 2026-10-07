@@ -242,7 +242,7 @@ export const WORKFLOW_CANVAS_CSS = `
 .dy-wf-scope .dy-wf-lane-label { fill: #6f86a8; font: 600 7px system-ui, sans-serif; letter-spacing: .9px; text-transform: uppercase; pointer-events: none; }
 /* Workflows design round (07/10/2026): plain-words card notes and the frame
    drawn around steps that repeat. Only drawn when a design hook asks. */
-.dy-wf-scope .dy-wf-sub[data-wf-card-note] { fill: #b9d3ff; text-transform: none; letter-spacing: 0; font-size: 11px; }
+.dy-wf-scope .dy-wf-svg .dy-wf-node .dy-wf-sub[data-wf-card-note] { fill: #b9d3ff; text-transform: none; letter-spacing: 0; font-size: 11px; }
 .dy-wf-scope .dy-wf-frame-box { fill: rgba(106, 183, 255, .06); stroke: #6ab7ff; stroke-width: 1.4; stroke-dasharray: 6 4; pointer-events: none; }
 .dy-wf-scope .dy-wf-frame-tab { cursor: pointer; }
 .dy-wf-scope .dy-wf-frame-tab:focus { outline: none; }

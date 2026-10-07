@@ -177,11 +177,14 @@ export function canvasDesignHooks({ loops, draft, members, storedNode, settingsK
   const team = () => (typeof members === 'function' ? members() : members) ?? []
   return {
     labels: { heading: 'This step', title: 'Step name', deps: 'Comes after (step IDs)', team: '', save: draft ? 'Apply to draft' : 'Save version' },
+    compactFacts: true,
     panelExtras: (node) => panelExtras({ node, stored: storedNode(node.node_id), members: team(), loops, settingsKey, onEditFrame }),
     cardNote: (node) => {
       if (node.loop) return loops === 'panel' ? `↻ Repeats · up to ${node.loop.max_iterations}` : '↻ Repeats'
       if (node.when) return `If ${shortName(node.when.node)} ${node.when.status === 'blocked' ? 'gets stuck' : 'is done'}`
-      if (node.human_gate) return 'Your sign-off'
+      // "Sign-off", not "Your sign-off": the gate's status ("awaiting
+      // decision") is the longest on the card and they share the line.
+      if (node.human_gate) return 'Sign-off'
       return null
     },
     frames: loops === 'frame' ? (nodes) => nodes.filter((n) => n.loop).map((n) => {
