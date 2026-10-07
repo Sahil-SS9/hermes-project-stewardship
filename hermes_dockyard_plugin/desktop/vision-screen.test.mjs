@@ -284,7 +284,14 @@ test('Vision: propose with checks, withdraw, mark complete, delete archived mile
     await waitGone('[data-plan-dialog]')
     assert.equal((await byTitle('Running change')).status, 'completed')
     await waitFor(`${row('initiative', running.ref)} .dy-plan-row-status`)
-    assert.match(text(`${row('initiative', running.ref)} .dy-plan-row-status`), /Complete/)
+    // The screen reloads after the dialog closes. On a busy machine the row
+    // can still show the old status for a moment, so wait for the new one; a
+    // single read failed once at load average ~30 (07/10/2026).
+    const runningStatus = `${row('initiative', running.ref)} .dy-plan-row-status`
+    for (const start = Date.now(); !/Complete/.test(text(runningStatus)) && Date.now() - start < 8000;) {
+      await act(async () => { await wait(50) })
+    }
+    assert.match(text(runningStatus), /Complete/)
     assert.match(text('[data-plan-section="initiative"] .dy-plan-section-note'), /1 of 3 open allowed/)
 
     // 6. Milestone "Beta": no Delete while active; archive, then delete for good.
