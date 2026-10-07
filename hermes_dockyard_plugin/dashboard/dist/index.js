@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // src/api.ts
+  // dashboard/src/api.ts
   var BASE = "/api/plugins/hermes-dockyard";
   function createApi(sdk) {
     const get = (path) => sdk.fetchJSON(`${BASE}${path}`);
@@ -146,7 +146,7 @@
     return sdk;
   }
 
-  // src/objective-evidence.ts
+  // dashboard/src/objective-evidence.ts
   async function renderObjectiveEvidence(root, api, project) {
     const text = (tag, value) => {
       const node = document.createElement(tag);
@@ -231,7 +231,7 @@
     }
   }
 
-  // src/components/live-detail.ts
+  // dashboard/src/components/live-detail.ts
   function buildActivityThread(items, opts = {}) {
     const max = opts.max ?? 8;
     const wrap = document.createElement("div");
@@ -313,7 +313,7 @@
     return wrap;
   }
 
-  // src/workflow-canvas.ts
+  // dashboard/src/workflow-canvas.ts
   function validateConnection(nodes, from, to) {
     if (!from || !to) return "Both source and target are required";
     if (from === to) return "A node cannot depend on itself";
@@ -570,6 +570,7 @@
       height: PAD * 2 + Math.max(1, lanes.length) * laneH - (LANE_PAD - PAD > 0 ? 0 : 0) - PAD + PAD
     };
   }
+  var canvasSeq = 0;
   function mountWorkflowCanvas(host, projectId, runName, fetchRuns, handlers, pollMs = 8e3) {
     host.replaceChildren();
     host.className = "dy-wf dy-wf-scope";
@@ -585,6 +586,17 @@
     minimap.appendChild(miniViewport);
     const passport = elu("div", "dy-wf-passport dy-wf-glass");
     passport.setAttribute("aria-live", "polite");
+    canvasSeq += 1;
+    const help = elu(
+      "p",
+      "dy-wf-sr-only",
+      "Double-click a step, or press Enter, to open its details. The arrow keys move between steps."
+    );
+    help.id = `wf-help-${canvasSeq}`;
+    const openHint = elu("div", "dy-wf-open-hint", "Double-click to open details");
+    openHint.setAttribute("role", "tooltip");
+    openHint.setAttribute("data-wf-open-hint", "");
+    openHint.hidden = true;
     const zoomBar = elu("div", "dy-wf-zoombar dy-wf-glass");
     zoomBar.setAttribute("role", "group");
     zoomBar.setAttribute("aria-label", "Zoom controls");
@@ -677,7 +689,7 @@
       host.classList.toggle("dy-wf-still", on);
     });
     playbackBar.append(playbackButton, playbackSlider, playbackLabel, motionButton);
-    wrap.append(svg, feed, minimap, passport, zoomBar, listView, playbackBar);
+    wrap.append(svg, feed, minimap, passport, zoomBar, listView, playbackBar, openHint, help);
     playbackBar.style.overflowX = "auto";
     host.appendChild(wrap);
     let panX = 0;
@@ -689,6 +701,33 @@
     let originY = 0;
     let currentNodes = [];
     let nodePositions = {};
+    const FRAME_PAD = 14;
+    const FRAME_TAB_H = 20;
+    let frameEls = [];
+    const placeFrames = () => {
+      for (const f of frameEls) {
+        const ps = f.ids.map((id) => nodePositions[id]).filter((p) => Boolean(p));
+        if (!ps.length) continue;
+        const x = Math.min(...ps.map((p) => p.x)) - FRAME_PAD;
+        const y = Math.min(...ps.map((p) => p.y)) - FRAME_PAD - FRAME_TAB_H;
+        const w = Math.max(...ps.map((p) => p.x + NODE_W)) + FRAME_PAD - x;
+        const h = Math.max(...ps.map((p) => p.y + NODE_H)) + FRAME_PAD + (f.sub ? 18 : 0) - y;
+        f.box.setAttribute("x", String(x));
+        f.box.setAttribute("y", String(y));
+        f.box.setAttribute("width", String(w));
+        f.box.setAttribute("height", String(h));
+        const tabW = Math.min(w - 12, (f.text.textContent ?? "").length * 6.3 + 20);
+        f.tabBg.setAttribute("x", String(x + 6));
+        f.tabBg.setAttribute("y", String(y + 5));
+        f.tabBg.setAttribute("width", String(tabW));
+        f.text.setAttribute("x", String(x + 16));
+        f.text.setAttribute("y", String(y + 19));
+        if (f.sub) {
+          f.sub.setAttribute("x", String(x + 14));
+          f.sub.setAttribute("y", String(y + h - 8));
+        }
+      }
+    };
     const pendingPositions = /* @__PURE__ */ new Map();
     let layoutW = 0;
     let layoutH = 0;
@@ -724,6 +763,7 @@
     const writeNodePosition = (nodeId, g, x, y) => {
       nodePositions[nodeId] = { x, y, depth: nodePositions[nodeId]?.depth ?? 0 };
       g.setAttribute("transform", `translate(${x} ${y})`);
+      if (frameEls.length) placeFrames();
     };
     const startDrag = (nodeId, g, e, depth) => {
       if (connectFrom) return;
@@ -1032,7 +1072,7 @@
       g.setAttribute("data-node-id", n.node_id);
       g.setAttribute("aria-label", `${visuals.label}: ${n.title} (${n.status ?? "pending"})`);
       g.dataset.wfEditable = String(editable);
-      g.setAttribute("aria-describedby", `wf-help-${n.node_id}`);
+      g.setAttribute("aria-describedby", help.id);
       const shape = sEl("rect", {
         width: NODE_W,
         height: NODE_H,
@@ -1052,7 +1092,9 @@
       const label2 = sEl("text", { x: 30, y: 26, class: "dy-wf-label" });
       label2.textContent = n.title.length > 22 ? n.title.slice(0, 21) + "\u2026" : n.title;
       const sub = sEl("text", { x: 14, y: 46, class: "dy-wf-sub" });
-      sub.textContent = visuals.label;
+      const note = handlers.design?.cardNote?.(n) ?? null;
+      sub.textContent = note ? note.length > 24 ? note.slice(0, 23) + "\u2026" : note : visuals.label;
+      if (note) sub.dataset.wfCardNote = "true";
       const statusText = sEl("text", {
         x: NODE_W - 14,
         y: 46,
@@ -1145,11 +1187,21 @@
         }
       });
       g.addEventListener("pointerenter", dash);
+      g.addEventListener("pointerenter", () => scheduleHint(n.node_id, g));
       g.addEventListener("pointerleave", () => {
         if (!g.classList.contains("dy-wf-selected")) undash();
+        hideHint();
       });
-      const open = () => openPassport(n, g);
-      g.addEventListener("click", open);
+      g.addEventListener("pointerdown", hideHint);
+      const open = () => {
+        hideHint();
+        openPassport(n, g);
+      };
+      g.addEventListener("click", () => selectStep(n, g));
+      g.addEventListener("dblclick", (ev) => {
+        ev.preventDefault();
+        open();
+      });
       g.addEventListener("keydown", (e) => {
         const ev = e;
         if (ev.key === "Enter") {
@@ -1187,6 +1239,7 @@
       viewport.replaceChildren();
       viewport.appendChild(defs);
       if (!run || run.nodes.length === 0) {
+        frameEls = [];
         const t = sEl("text", { x: 20, y: 40, class: "dy-wf-empty" });
         t.textContent = "No workflow runs yet.";
         viewport.appendChild(t);
@@ -1234,6 +1287,46 @@
         lbl.textContent = lane.label;
         viewport.append(band, lbl);
       }
+      frameEls = [];
+      for (const frame of handlers.design?.frames?.(currentNodes) ?? []) {
+        const ids2 = frame.nodeIds.filter((id) => positions[id]);
+        if (!ids2.length) continue;
+        const g = sEl("g", { class: "dy-wf-frame" });
+        g.dataset.wfFrame = frame.id;
+        const box = sEl("rect", { class: "dy-wf-frame-box", rx: 16 });
+        const tab = sEl("g", { class: "dy-wf-frame-tab" });
+        tab.setAttribute("role", "button");
+        tab.setAttribute("tabindex", "0");
+        tab.setAttribute("aria-label", `${frame.label}${frame.sublabel ? `. ${frame.sublabel}` : ""}. Open repeat settings`);
+        tab.dataset.wfFrameOpen = frame.id;
+        const tabBg = sEl("rect", { class: "dy-wf-frame-tabbg", rx: 9, height: FRAME_TAB_H });
+        const text = sEl("text", { class: "dy-wf-frame-label" });
+        text.textContent = frame.label;
+        tab.append(tabBg, text);
+        g.append(box, tab);
+        let sub = null;
+        if (frame.sublabel) {
+          sub = sEl("text", { class: "dy-wf-frame-sub" });
+          sub.textContent = frame.sublabel;
+          g.appendChild(sub);
+        }
+        const open = (e) => {
+          e.stopPropagation();
+          frame.onOpen?.(tab.getBoundingClientRect());
+        };
+        tab.addEventListener("pointerdown", (e) => e.stopPropagation());
+        tab.addEventListener("click", open);
+        tab.addEventListener("keydown", (e) => {
+          const key = e.key;
+          if (key === "Enter" || key === " ") {
+            e.preventDefault();
+            open(e);
+          }
+        });
+        viewport.appendChild(g);
+        frameEls.push({ ids: ids2, box, tabBg, text, sub });
+      }
+      placeFrames();
       const depMeaning = EDGE_MEANINGS[DEFAULT_EDGE_MEANING];
       for (const n of currentNodes) {
         const from = positions[n.node_id];
@@ -1376,12 +1469,14 @@
       if (selectedEl) selectedEl.classList.add("dy-wf-selected");
       selectedId = n.node_id;
       handlers.onSelect?.(n.node_id);
+      handlers.onOpen?.(n.node_id);
       highlightRoute(n.node_id);
       passport.replaceChildren();
       const status = n.status ?? "pending";
       const head = elu("div", "dy-wf-pp-head");
       const meta = elu("div", "dy-wf-pp-meta");
-      meta.append(elu("span", "dy-wf-passport-kind", PURPOSE_VISUALS[nodePurpose(n)].label), elu("span", `badge ${status}`, status));
+      const quietFacts = Boolean(handlers.design?.compactFacts) && (!lastRun || lastRun.status === "definition");
+      meta.append(elu("span", "dy-wf-passport-kind", handlers.design?.cardNote?.(n) ?? PURPOSE_VISUALS[nodePurpose(n)].label), elu("span", `badge ${status}`, status));
       const close = elu("button", "dy-wf-passport-close", "\xD7");
       close.type = "button";
       close.setAttribute("aria-label", "Close step details");
@@ -1402,7 +1497,7 @@
       if (n.assignee) fact("Assignee", n.assignee);
       if (n.evidence_refs.length) fact("Evidence", n.evidence_refs.join(", "));
       if (n.task_ref) fact("Work item", n.task_ref);
-      passport.appendChild(facts);
+      if (!quietFacts) passport.appendChild(facts);
       const nodeEvents = (lastRun?.timeline ?? []).filter((event) => event.node_id === n.node_id);
       if (nodeEvents.length) {
         passport.appendChild(elu("h4", "", "Status history"));
@@ -1413,7 +1508,8 @@
       const appendEditor = () => {
         if (!handlers.onEdit) return;
         const edit = elu("div", "dy-wf-edit");
-        edit.appendChild(elu("h4", "", "Edit step"));
+        const words = handlers.design?.labels ?? {};
+        edit.appendChild(elu("h4", "", words.heading ?? "Edit step"));
         const planned = editBase().find((item) => item.node_id === n.node_id);
         if (!planned) {
           edit.appendChild(elu("p", "dy-wf-pp-note", "This step is not in the latest version of the workflow, so it cannot be edited here."));
@@ -1434,19 +1530,22 @@
         };
         const title = elu("input", "dy-wf-edit-title");
         title.value = planned.title;
-        title.setAttribute("aria-label", "Node title");
+        title.setAttribute("aria-label", words.title ?? "Node title");
         const deps = elu("input", "dy-wf-edit-deps");
         deps.value = planned.depends_on.join(", ");
         deps.placeholder = "e.g. build, tests";
-        deps.setAttribute("aria-label", "Dependencies");
+        deps.setAttribute("aria-label", words.deps ?? "Dependencies");
         const team = elu("input", "dy-wf-edit-team");
         team.value = planned.phase_team ?? "";
         team.placeholder = "phase team override";
-        team.setAttribute("aria-label", "Phase team override");
-        field("Title", title);
-        field("Depends on (step IDs)", deps);
-        field("Phase team", team);
-        const save = elu("button", "dy-btn primary", "Save graph version");
+        team.setAttribute("aria-label", words.team ?? "Phase team override");
+        field(words.title ?? "Title", title);
+        field(words.deps ?? "Depends on (step IDs)", deps);
+        if (words.team !== "") field(words.team ?? "Phase team", team);
+        const extra = handlers.design?.panelExtras?.(planned) ?? null;
+        if (extra) edit.appendChild(extra.el);
+        const saveWord = words.save ?? "Save graph version";
+        const save = elu("button", "dy-btn primary", saveWord);
         save.type = "button";
         save.addEventListener("click", async () => {
           const ids = new Set(deps.value.split(",").map((v) => v.trim()).filter(Boolean));
@@ -1455,7 +1554,11 @@
           save.textContent = "Saving\u2026";
           say(null);
           try {
-            await runEdit((base) => base.some((item) => item.node_id === n.node_id) ? base.map((item) => item.node_id === n.node_id ? { ...item, title: title.value.trim() || item.title, depends_on: [...ids], phase_team: team.value.trim() || null } : item) : NOT_IN_PLAN);
+            await runEdit((base) => base.some((item) => item.node_id === n.node_id) ? base.map((item) => {
+              if (item.node_id !== n.node_id) return item;
+              const next = { ...item, title: title.value.trim() || item.title, depends_on: [...ids], phase_team: words.team === "" ? item.phase_team : team.value.trim() || null };
+              return extra?.apply ? extra.apply(next) : next;
+            }) : NOT_IN_PLAN);
             save.textContent = "Saved \u2713";
           } catch (error) {
             save.disabled = false;
@@ -1645,7 +1748,7 @@
           sec.append(head2, body);
           passport.appendChild(sec);
         }
-      } else {
+      } else if (!quietFacts) {
         passport.appendChild(elu("p", "dy-wf-pp-note", "No canonical work bound to this step yet."));
       }
       appendEditor();
@@ -1657,6 +1760,7 @@
     let lastY = 0;
     svg.addEventListener("pointerdown", (e) => {
       if (e.target?.closest?.(".dy-wf-node")) return;
+      hideHint();
       dragging = true;
       host.classList.add("dy-wf-panning");
       lastX = e.clientX;
@@ -1712,6 +1816,7 @@
     let wheelSettle = null;
     svg.addEventListener("wheel", (e) => {
       e.preventDefault();
+      hideHint();
       const ev = e;
       const rect = svg.getBoundingClientRect();
       const { sx, sy } = screenScale();
@@ -1731,6 +1836,7 @@
       updateMinimap();
     }, { passive: false });
     const closePassport = () => {
+      const wasOpen = passport.childElementCount > 0;
       passport.replaceChildren();
       if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
       selectedEl = null;
@@ -1738,7 +1844,43 @@
         selectedId = null;
         handlers.onSelect?.(null);
       }
+      if (wasOpen) handlers.onOpen?.(null);
       clearRoute();
+    };
+    const selectStep = (n, g) => {
+      if (selectedId === n.node_id) return;
+      if (passport.childElementCount > 0) closePassport();
+      if (selectedEl) selectedEl.classList.remove("dy-wf-selected");
+      selectedEl = g;
+      g.classList.add("dy-wf-selected");
+      selectedId = n.node_id;
+      handlers.onSelect?.(n.node_id);
+      highlightRoute(n.node_id);
+    };
+    let hintTimer = null;
+    const hideHint = () => {
+      if (hintTimer) {
+        clearTimeout(hintTimer);
+        hintTimer = null;
+      }
+      openHint.hidden = true;
+    };
+    const scheduleHint = (nodeId, g) => {
+      hideHint();
+      const busy = () => Boolean(dragSession || connectFrom || dragging);
+      if (busy() || selectedId === nodeId && passport.childElementCount > 0) return;
+      hintTimer = setTimeout(() => {
+        hintTimer = null;
+        const el = g.isConnected ? g : nodeEl(nodeId);
+        if (!el || busy() || el !== g && !el.matches(":hover")) return;
+        const box = wrap.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+        const below = r.top - box.top < 34;
+        openHint.classList.toggle("below", below);
+        openHint.style.left = `${Math.round(r.left - box.left + r.width / 2)}px`;
+        openHint.style.top = `${Math.round((below ? r.bottom : r.top) - box.top)}px`;
+        openHint.hidden = false;
+      }, 450);
     };
     const onKeyDown = (e) => {
       if (e.key === "Escape") closePassport();
@@ -1918,6 +2060,7 @@
       if (timer) clearInterval(timer);
       if (flowTimer) clearInterval(flowTimer);
       clearInterval(clockTimer);
+      hideHint();
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("visibilitychange", onVisibility);
       canvasWindow.removeEventListener("resize", onResize);
@@ -1934,7 +2077,7 @@
     } });
   }
 
-  // src/app.ts
+  // dashboard/src/app.ts
   function applyFleetDeepLink({ link, s, tabs, go }) {
     const sep = link.indexOf(":");
     if (sep <= 0) return;
@@ -3514,7 +3657,7 @@
     return el;
   }
 
-  // src/index.ts
+  // dashboard/src/index.ts
   function whenReady() {
     if (document.readyState !== "loading") return Promise.resolve();
     return new Promise(

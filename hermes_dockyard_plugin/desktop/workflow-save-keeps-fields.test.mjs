@@ -118,9 +118,10 @@ const SAVE_PATHS = [
     applied: (nodes) => nodes.ship.depends_on.includes('build') },
   { label: 'the step editor', slug: 'edit',
     act: async (page, name) => {
-      await nodeIn(page, name, 'fix').click()
-      await page.getByLabel('Node title').fill('Fix what failed')
-      await page.getByRole('button', { name: 'Save graph version' }).click()
+      // One click selects a step; a double-click opens it (07/10/2026).
+      await nodeIn(page, name, 'fix').dblclick()
+      await page.getByLabel('Step name').fill('Fix what failed')
+      await page.getByRole('button', { name: 'Save version', exact: true }).click()
     },
     applied: (nodes) => nodes.fix.title === 'Fix what failed' },
   { label: 'the Auto layout button', slug: 'layout',
@@ -149,30 +150,30 @@ for (const path of SAVE_PATHS) {
   })
 }
 
-test('Workflows: the side form never overwrites an existing workflow, and a new name still creates one', { timeout: 90000 }, async () => {
+// WORKFLOWS-R1.md bug 2 (06/10/2026): creating with a taken name posted a one-step version over
+// the existing workflow. The side form went with the builder (07/10/2026); the New workflow
+// dialog must hold the same line.
+test('Workflows: New workflow never overwrites an existing workflow, and a new name still creates one', { timeout: 90000 }, async () => {
   await withRichWorkflow('form', async (page, name) => {
     const versionPosts = []
     page.on('request', (request) => {
       if (request.method() === 'POST' && request.url().endsWith(`/workflows/${name}/versions`)) versionPosts.push(request.url())
     })
     const before = (await versionsOf(name)).length
-    await page.locator('[data-workflow-name]').fill(name)
-    await page.locator('[data-workflow-title]').fill('Another phase')
-    const button = page.locator('[data-action="define-workflow"]')
-    // Before the fix this button read "Save planning version" here and posted
-    // a one-step version over the workflow: click it whenever it is enabled.
-    if (await button.isEnabled()) await button.click()
+    await page.locator('[data-action="wfd-new-workflow"]').click()
+    await page.locator('[data-wfd-way="blank"]').click()
+    await page.locator('[data-wfd-name]').fill(name)
+    await page.locator('[data-wfd-first-step]').fill('Another phase')
+    await page.locator('[data-action="wfd-create"]').click()
     await page.waitForTimeout(1500)
     const after = await versionsOf(name)
-    assert.equal(after.at(-1).definition.nodes.length, RICH.length, `the side form replaced the workflow's ${RICH.length} steps with ${after.at(-1).definition.nodes.length}`)
-    assert.deepEqual(versionPosts, [], 'the side form posted a version over an existing workflow')
-    assert.equal(after.length, before, 'the side form saved a version over an existing workflow')
-    assert.equal(await button.isDisabled(), true, 'an existing name can still be submitted')
-    assert.match(await page.locator('[data-workflow-name-taken]').innerText(), /already exists/)
+    assert.equal(after.at(-1).definition.nodes.length, RICH.length, `New workflow replaced the workflow's ${RICH.length} steps with ${after.at(-1).definition.nodes.length}`)
+    assert.deepEqual(versionPosts, [], 'New workflow posted a version over an existing workflow')
+    assert.equal(after.length, before, 'New workflow saved a version over an existing workflow')
+    assert.match(await page.locator('[data-wfd-name-error]').innerText(), /already exists/)
     const fresh = `${name}-new`
-    await page.locator('[data-workflow-name]').fill(fresh)
-    assert.equal((await button.innerText()).trim(), 'Create workflow')
-    await button.click()
+    await page.locator('[data-wfd-name]').fill(fresh)
+    await page.locator('[data-action="wfd-create"]').click()
     await until(async () => (await versionsOf(fresh)).length === 1, 'a new name did not create a workflow')
     assert.equal((await versionsOf(fresh))[0].definition.nodes[0].title, 'Another phase')
   })

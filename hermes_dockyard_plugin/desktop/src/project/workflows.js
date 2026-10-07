@@ -11,13 +11,25 @@ import { jsx } from '../runtime/react.js'
 import { StatusTag } from '../lib/ui.js'
 import { number } from '../lib/ui.js'
 import { Button } from '../lib/ui.js'
+import { plural } from '../lib/ui.js'
+// The builder (Sahil's pick, 07/10/2026): the New workflow dialog, loops shown
+// as a frame, and the AI chat in a sidebar beside the page.
+import { canvasDesignHooks } from './workflow-design/step-settings.js'
+import { NewWorkflowDialog } from './workflow-design/start-dialog.js'
+import { AiSidebar } from './workflow-design/ai-panel.js'
+import { createdConversation } from './workflow-design/ai-panel.js'
+import { settleConversation } from './workflow-design/ai-panel.js'
+import { readAiPinned } from './workflow-design/ai-panel.js'
+import { writeAiPinned } from './workflow-design/ai-panel.js'
+import { WorkflowSettingsDialog } from './workflow-design/shared.js'
+import { RepeatPopover } from './workflow-design/shared.js'
+import { readStepSettings } from './workflow-design/standins.js'
+import { writeStepSettings } from './workflow-design/standins.js'
+import { EMPTY_STEP } from './workflow-design/standins.js'
 const NO_RUNS = []
+const NO_THREAD = []
+const failureText = (failure) => String(failure?.message ?? failure ?? 'unknown error').replace(/^\d{3}:\s*/, '')
 export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary }) {
-  const [name, setName] = useState('release')
-  const [title, setTitle] = useState('Draft release plan')
-  const [team, setTeam] = useState('')
-  const [runKey, setRunKey] = useState('')
-  const [phaseTeams, setPhaseTeams] = useState({})
   const canvasRef = useRef(null)
   const [selected, setSelected] = useState(workflows?.[0]?.name ?? '')
   // Runs belong to one workflow. Keyed by name so a newly opened workflow
@@ -32,6 +44,30 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   const [validation, setValidation] = useState(null)
   const [layoutPendingVersion, setLayoutPendingVersion] = useState(null)
   const [libCollapsed, setLibCollapsed] = useState(false)
+  // ---- the builder: dialog, AI sidebar, AI drafts --------------------------
+  const [members, setMembers] = useState([])
+  const membersRef = useRef([])
+  membersRef.current = members
+  const [templates, setTemplates] = useState(null)
+  const [dialog, setDialog] = useState(null)
+  // The AI's unsaved changes to the open workflow: { key, base: { name,
+  // version }, nodes }. Every change goes through updateDraft so the canvas
+  // reads the same value React has.
+  const [draft, setDraft] = useState(null)
+  const draftRef = useRef(null)
+  const updateDraft = (change) => {
+    const next = typeof change === 'function' ? change(draftRef.current) : change
+    draftRef.current = next
+    setDraft(next)
+    return next
+  }
+  // The AI sidebar: open or not, pinned or floating (remembered), and one
+  // conversation per workflow, kept here so closing the sidebar keeps it.
+  const [aiOpen, setAiOpen] = useState(false)
+  const [aiPinned, setAiPinned] = useState(() => readAiPinned())
+  const [aiThreads, setAiThreads] = useState({})
+  const [repeatAt, setRepeatAt] = useState(null)
+  const [draftError, setDraftError] = useState(null)
   const encoded = encodeURIComponent(project.id)
   const grouped = Object.values((workflows ?? []).reduce((all, row) => {
     const item = all[row.name] ?? { name: row.name, versions: [], archived_at: row.archived_at }
@@ -68,7 +104,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   const canvasHandle = useRef(null)
   // The saved plan's steps in the canvas's own vocabulary, so toolbar actions
   // persist through the exact mapping the canvas edits use.
-  const currentCanvasNodes = () => planRef.current.nodes.map((n) => ({
+  const canvasNodesOf = (list) => list.map((n) => ({
     node_id: n.node_id ?? n.id,
     title: n.title ?? n.name ?? n.id,
     depends_on: n.depends_on ?? [],
@@ -82,18 +118,23 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
     when: n.when ?? null,
     loop: n.loop ?? null,
   }))
+  const currentCanvasNodes = () => canvasNodesOf(planRef.current.nodes)
   // Every save path (canvas edits and the toolbar) goes through here. The
   // canvas only manages the fields below; everything else on a stored step
   // (its loop, its condition, its instructions, anything added later) is
   // carried over from the saved plan. Rebuilding steps from a fixed field
   // list wiped them on every edit (06/10/2026, WORKFLOWS-R1.md bug 1).
-  const toDefinitionNodes = (editedNodes) => {
-    const storedById = new Map(planRef.current.nodes.map((n) => [n.node_id ?? n.id, n]))
-    return editedNodes.map(({ node_id, title: nodeTitle, depends_on, human_gate, task_ref, kind, phase_team, canvas_position }) => ({
+  // The step panel may also send `design_patch` (its instructions and loop);
+  // only the fields it names change.
+  const mergeEdits = (editedNodes, storedList) => {
+    const storedById = new Map(storedList.map((n) => [n.node_id ?? n.id, n]))
+    return editedNodes.map(({ node_id, title: nodeTitle, depends_on, human_gate, task_ref, kind, phase_team, canvas_position, design_patch }) => ({
       ...(storedById.get(node_id) ?? {}),
       id: node_id, title: nodeTitle, depends_on, human_gate, task_ref, kind, phase_team, canvas_position,
+      ...(design_patch ?? {}),
     }))
   }
+  const toDefinitionNodes = (editedNodes) => mergeEdits(editedNodes, planRef.current.nodes)
   // One save path for the canvas and the toolbar. The response is the new
   // version, so the plan is current before the list re-fetch lands. Errors
   // are shown where the edit was made (the step panel, or the line above the
@@ -131,13 +172,84 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   const actionsRef = useRef(null)
   actionsRef.current = { savePlan, loadRuns, planNodes: currentCanvasNodes }
   const canvasReady = Boolean(current) && (mode === 'definition' || runsReady)
+  // ---- the builder: canvas hooks, size and AI drafts -----------------------
+  // The preview settings of a step live under its workflow's name.
+  const standinWorkflow = () => draftRef.current?.base.name ?? planRef.current.name
+  const storedNodeOf = (id) => (draftRef.current ? draftRef.current.nodes : planRef.current.nodes).find((n) => (n.id ?? n.node_id) === id) ?? null
+  const hooksFor = (isDraft) => canvasDesignHooks({
+    draft: isDraft,
+    members: () => membersRef.current,
+    storedNode: storedNodeOf,
+    settingsKey: (id) => [project.id, standinWorkflow(), id],
+    onEditFrame: (nodeId, rect) => setRepeatAt({ nodeId, rect }),
+  })
+  // The canvas fills the rest of the first screen, so opening Workflows shows
+  // the steps without scrolling (WORKFLOWS-R1.md: at 1440x900 the old canvas
+  // started below the window). Phones keep the stacked layout.
+  const fitCanvasHeight = () => {
+    const host = canvasRef.current
+    if (!host) return
+    if (window.innerWidth <= 640) { host.style.height = ''; return }
+    const top = host.getBoundingClientRect().top + window.scrollY
+    host.style.height = `${Math.max(360, Math.round(window.innerHeight - top - 12))}px`
+  }
   useEffect(() => {
-    if (!canvasRef.current || !current || !canvasReady) return undefined
+    const onResize = () => fitCanvasHeight()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  // Opening a step gives its panel room: the canvas grows to the window and
+  // the page scrolls so the toolbar sits at the top. The canvas keeps its zoom
+  // and position (the engine only adds room on a resize). At 1440x900 the
+  // first-screen canvas left the panel ~330px, hiding the new sections.
+  const growForPanel = () => {
+    const host = canvasRef.current
+    if (!host || window.innerWidth <= 640) return
+    const stage = host.closest('.dockyard-wf3-stage')
+    const toolbar = stage?.querySelector('.dockyard-wf3-toolbar')
+    const want = Math.min(820, Math.round(window.innerHeight - (toolbar?.getBoundingClientRect().height ?? 0) - 24))
+    if (host.getBoundingClientRect().height >= want - 4) return
+    host.style.height = `${want}px`
+    stage?.scrollIntoView({ block: 'start' })
+  }
+  // One click selects a step (a new step follows it); a double-click or
+  // Enter opens its panel, which gets room.
+  const onSelectStep = (nodeId) => { selectedNodeRef.current = nodeId }
+  const onOpenStep = (nodeId) => { if (nodeId) growForPanel() }
+  useEffect(() => {
+    let live = true
+    api(`/projects/${encoded}/team`).then((result) => { if (live) setMembers((result?.members ?? []).filter((m) => m.state === 'active').map((m) => m.profile_slug)) }).catch(() => undefined)
+    api('/workflow-library?scope=global').then((result) => { if (live) setTemplates(result?.workflows ?? []) }).catch(() => { if (live) setTemplates([]) })
+    return () => { live = false }
+  }, [encoded, workflows?.length])
+  const draftKey = draft?.key ?? null
+  useEffect(() => {
+    if (!canvasRef.current || !draftKey) return undefined
+    fitCanvasHeight()
+    const handle = mountDesktopWorkflowCanvas(canvasRef.current, project.id, draftRef.current.base.name, () => ({ nodes: draftRef.current?.nodes ?? [] }), () => NO_RUNS, {
+      // A draft changes in memory only; Save version in the toolbar saves it.
+      onEdit: (editedNodes) => { updateDraft((d) => (d ? { ...d, nodes: mergeEdits(editedNodes, d.nodes) } : d)); canvasHandle.current?.refresh() },
+      editNodes: () => canvasNodesOf(draftRef.current?.nodes ?? []),
+      onSelect: onSelectStep,
+      onOpen: onOpenStep,
+      design: hooksFor(true),
+    })
+    canvasHandle.current = handle
+    return () => {
+      if (canvasHandle.current === handle) canvasHandle.current = null
+      selectedNodeRef.current = null
+      handle()
+    }
+  }, [project.id, draftKey])
+  useEffect(() => {
+    if (!canvasRef.current || !current || !canvasReady || draftKey) return undefined
+    fitCanvasHeight()
     const workflowName = current.name
     const handle = mountDesktopWorkflowCanvas(canvasRef.current, project.id, workflowName, () => viewRef.current.definition, () => viewRef.current.runs, {
       onEdit: (editedNodes) => actionsRef.current.savePlan(editedNodes),
       editNodes: () => actionsRef.current.planNodes(),
-      onSelect: (nodeId) => { selectedNodeRef.current = nodeId },
+      onSelect: onSelectStep,
+      onOpen: onOpenStep,
       // Gate decisions use the same canonical authority as the dashboard: the
       // reviewed decision fingerprint is submitted with the action, so a stale
       // review can never approve something else. Retry re-queues via the
@@ -157,6 +269,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
         await actionsRef.current.loadRuns(workflowName)
       },
       fetchTimeline: async (pid, wname, runKey) => api(`/projects/${encodeURIComponent(pid)}/workflows/${encodeURIComponent(wname)}/runs/${encodeURIComponent(runKey)}/timeline`),
+      design: hooksFor(false),
     })
     canvasHandle.current = handle
     return () => {
@@ -164,7 +277,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
       selectedNodeRef.current = null
       handle()
     }
-  }, [project.id, current?.name, canvasReady])
+  }, [project.id, current?.name, canvasReady, draftKey])
   // New data reaches the mounted canvas without rebuilding it, so the open
   // step panel, the selection and the zoom survive Refresh and saves
   // (finding 13).
@@ -174,26 +287,24 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
     try { await api(path, { method: 'POST', body }); onRefresh?.(); return true }
     catch (failure) { setError(String(failure?.message ?? failure)); return false }
   }
-  // The side form only creates. A name that already exists used to post a
-  // one-step version that replaced the whole workflow (06/10/2026,
-  // WORKFLOWS-R1.md bug 2); now the form says so and saves nothing.
-  const nameTaken = grouped.some((item) => item.name === name.trim())
-  const define = () => {
-    if (!name.trim() || !title.trim() || nameTaken) return
-    mutate(`/projects/${encoded}/workflows`, { name: name.trim(), nodes: [{ id: 'step-1', title: title.trim(), depends_on: [], human_gate: false, team: team || null, phase_team: phaseTeams['step-1'] || null }] })
-    setSelected(name.trim()); setTitle('')
-  }
-  // Toolbar actions persist through the SAME save path the canvas uses.
+  // Toolbar actions persist through the SAME save path the canvas uses. With
+  // the AI's changes unsaved, they change that draft in memory instead.
   const persistNodes = async (nextNodes) => {
+    if (draftRef.current) {
+      updateDraft((d) => ({ ...d, nodes: mergeEdits(nextNodes, d.nodes) }))
+      canvasHandle.current?.refresh()
+      return true
+    }
     if (!current) return false
     setError(null)
     try { await savePlan(nextNodes); return true }
     catch (failure) { setError(String(failure?.message ?? failure)); return false }
   }
+  const planNodesNow = () => (draftRef.current ? canvasNodesOf(draftRef.current.nodes) : currentCanvasNodes())
   // A new step follows the selected step, or the last step when none is
   // selected; it used to be added with no link at all (finding 8).
   const addNode = (gate) => {
-    const nodesNow = currentCanvasNodes()
+    const nodesNow = planNodesNow()
     const existingIds = new Set(nodesNow.map((n) => n.node_id))
     let index = nodesNow.length + 1
     while (existingIds.has(gate ? `gate-${index}` : `step-${index}`)) index += 1
@@ -208,12 +319,13 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   // again. It used to save the positions unchanged, so dragged steps stayed
   // where they were (finding 6).
   const autoLayout = async () => {
+    if (draftRef.current) { persistNodes(planNodesNow().map((n) => ({ ...n, canvas_position: undefined }))); return }
     if (!current || layoutPendingVersion !== null) return
     setLayoutPendingVersion(current.versions.length)
     if (!await persistNodes(currentCanvasNodes().map((n) => ({ ...n, canvas_position: undefined })))) setLayoutPendingVersion(null)
   }
   const validateGraph = () => {
-    const nodesNow = currentCanvasNodes()
+    const nodesNow = planNodesNow()
     const issues = []
     for (const n of nodesNow) {
       for (const dep of n.depends_on) {
@@ -232,24 +344,94 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   // the two states the run projection actually reports.
   const needsAttention = (node) => node.status === 'blocked' || (node.status === 'pending' && node.human_gate)
   const attentionCount = latest ? (latest.nodes ?? []).filter(needsAttention).length : 0
+  // Each run gets its own key (the old side form's "Run key" box was jargon,
+  // WORKFLOWS-R1.md item 12, and went with the form).
   const startVersion = async (version) => {
     if (!current || !version) return
-    await mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/start`, { version: version.version, run_key: runKey || `${current.name}-${Date.now()}` })
+    await mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/start`, { version: version.version, run_key: `${current.name}-${Date.now()}` })
     await loadRuns(current.name)
   }
+  // ---- the builder's actions ---------------------------------------------
+  const takenNames = grouped.map((item) => item.name)
+  const keepChecks = (workflowName, checks) => {
+    for (const [id, check] of Object.entries(checks ?? {})) writeStepSettings(project.id, workflowName, id, { ...EMPTY_STEP, check })
+  }
+  const threadOf = (workflowName) => aiThreads[workflowName] ?? NO_THREAD
+  const changeThread = (workflowName, change) => setAiThreads((all) => ({ ...all, [workflowName]: change(all[workflowName] ?? NO_THREAD) }))
+  // Save version or Discard ends the AI's draft; the sidebar stays open and
+  // its conversation says which happened.
+  const closeDraft = (how) => {
+    const d = draftRef.current
+    updateDraft(null); setDraftError(null); setRepeatAt(null)
+    if (d && how) changeThread(d.base.name, (thread) => settleConversation(thread, how))
+  }
+  const startNew = () => { setValidation(null); setDialog('new') }
+  // The dialog's Create workflow. A workflow described to the AI opens with
+  // the sidebar carrying that conversation, so the iterating goes on.
+  const createFromDialog = async ({ name: newName, nodes: newNodes, checks, conversation }) => {
+    await api(`/projects/${encoded}/workflows`, { method: 'POST', body: { name: newName, nodes: newNodes }, quiet: true })
+    keepChecks(newName, checks)
+    if (conversation) {
+      setAiThreads((all) => ({ ...all, [newName]: createdConversation(newName, conversation) }))
+      setAiOpen(true)
+    }
+    setDialog(null); setSelected(newName); onRefresh?.()
+  }
+  // The AI's changes. The first one makes a draft of the open workflow;
+  // nothing is saved until Save version.
+  const aiApply = (nextNodes, meta = {}) => {
+    if (!draftRef.current) {
+      if (!current) return
+      updateDraft({ key: `edit-${Date.now()}`, base: { name: current.name, version: latestVersion?.version ?? 0 }, nodes: nextNodes })
+    } else {
+      updateDraft((d) => ({ ...d, nodes: nextNodes }))
+    }
+    keepChecks(standinWorkflow(), meta.checks)
+    canvasHandle.current?.refresh()
+  }
+  const saveDraft = async () => {
+    const d = draftRef.current
+    if (!d) return
+    setDraftError(null)
+    if (!d.nodes.length) { setDraftError('Add at least one step first.'); return }
+    try {
+      await api(`/projects/${encoded}/workflows/${encodeURIComponent(d.base.name)}/versions`, { method: 'POST', body: { nodes: d.nodes }, quiet: true })
+      closeDraft('saved'); onRefresh?.()
+    } catch (failure) {
+      setDraftError(`Couldn't save: ${failureText(failure)}`)
+    }
+  }
+  const pinAi = (pinned) => { writeAiPinned(pinned); setAiPinned(pinned) }
+  // The repeat popover (a frame's settings). Rounds are real; the check is a
+  // preview kept in memory.
+  const saveRepeat = async (nodeId, loop, check) => {
+    const key = [project.id, standinWorkflow(), nodeId]
+    if (check) writeStepSettings(...key, { ...readStepSettings(...key), check })
+    const edited = planNodesNow().map((n) => (n.node_id === nodeId ? { ...n, design_patch: { loop } } : n))
+    if (draftRef.current) { persistNodes(edited); return }
+    await savePlan(edited)
+  }
+  const repeatNode = repeatAt ? storedNodeOf(repeatAt.nodeId) : null
   const liveCounts = latest ? (latest.nodes ?? []).reduce((acc, node) => { const key = node.status ?? 'pending'; acc[key] = (acc[key] ?? 0) + 1; return acc }, {}) : null
+  // Ask AI opens or closes the AI sidebar; the chat is never inside the canvas.
+  const askAi = (key) => jsx(Button, { small: true, action: 'wfd-ask-ai', variant: aiOpen ? 'primary' : '', data: { 'aria-expanded': aiOpen ? 'true' : 'false', 'aria-controls': 'wfd-ai-sidebar' }, disabled: !current, onClick: () => setAiOpen((v) => !v), children: 'Ask AI' }, key)
   // W5 live map: read only from the canonical run projection. A node needs
   // attention when it is blocked or waiting on a human decision — the two
   // states the run projection actually reports; nothing is inferred beyond it.
-  return jsxs('section', { className: 'dockyard-feature-card dockyard-workflows-v6', 'data-workflows-prototype': project.id, 'data-executable-workflows': project.id, children: [
-    jsxs('div', { className: 'dockyard-wf-entry', 'data-workflow-library-entry': true, children: [
-      jsx(Button, { action: 'open-workflow-library', variant: 'primary', onClick: onOpenLibrary, children: 'Open workflow library' }),
-      jsx('span', { children: 'The library holds every workflow: global (available to all projects) and this project\'s dedicated ones.' }),
-    ]}),
-    jsxs('header', { className: 'dockyard-section-head', children: [jsxs('div', { children: [jsx('h2', { children: 'Workflows' }), jsx('p', { children: 'Planning is saved as a version; execution is shown only from canonical runs.' })] }), jsx(StatusTag, { tone: latest?.status === 'running' ? 'info' : 'neutral', label: latest ? `Live: ${latest.status}` : `${number(grouped.length)} instances` })] }),
+  return jsxs('section', { className: 'dockyard-feature-card dockyard-workflows-v6 dy-wfd-on', 'data-workflows-prototype': project.id, 'data-executable-workflows': project.id, children: [
+    // One compact row (the old two header blocks took ~150px and pushed the
+    // canvas below the window).
+    jsxs('header', { className: 'dy-wfd-head', 'data-wfd-head': true, children: [
+      jsx('h2', { children: 'Workflows' }),
+      jsx(StatusTag, { tone: latest?.status === 'running' ? 'info' : 'neutral', label: latest ? `Live: ${latest.status}` : `${number(grouped.length)} ${plural(grouped.length, 'workflow')}` }),
+      !latest && current && !draft ? jsx('span', { className: 'dy-wfd-chip', 'data-workflow-no-run': true, children: `${current.name}: no runs yet` }) : null,
+      jsx('span', { className: 'dy-wfd-grow' }),
+      jsx(Button, { small: true, action: 'open-workflow-library', onClick: onOpenLibrary, children: 'Open library' }),
+      jsx(Button, { small: true, variant: 'primary', action: 'wfd-new-workflow', disabled: Boolean(draft), onClick: startNew, children: 'New workflow' }),
+    ] }),
     error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
     jsxs('div', { className: libCollapsed ? 'dockyard-wf3 lib-collapsed' : 'dockyard-wf3', 'data-wf-library-collapsed': libCollapsed ? 'true' : 'false', children: [
-      // ---- Zone 1: workflow library + create/define editor ---------------
+      // ---- Zone 1: the workflow library ------------------------------------
       jsxs('aside', { className: 'dockyard-wf3-lib', 'data-workflow-library': project.id, 'aria-hidden': libCollapsed ? 'true' : undefined, inert: libCollapsed ? true : undefined, children: [
         jsxs('div', { className: 'dockyard-wf3-lib-head', children: [jsx('strong', { children: 'Library' }), jsx('span', { children: number(grouped.length) })] }),
         grouped.length ? jsx('div', { className: 'dockyard-wf3-lib-list', children: grouped.map((item) => jsxs('button', {
@@ -257,27 +439,38 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
           className: item.name === current?.name ? 'active' : '',
           'data-workflow-library-item': item.name,
           'data-action': 'select-workflow',
+          // The AI's unsaved changes are never thrown away by a click.
+          disabled: Boolean(draft),
+          title: draft ? 'Save or discard the AI’s changes first.' : undefined,
           onClick: () => setSelected(item.name),
           children: [
             jsx('strong', { children: item.name }),
             jsx('small', { children: `v${item.versions[item.versions.length - 1].version}${item.archived_at ? ' · archived' : ''}` }),
           ],
-        }, item.name)) }) : jsx('p', { className: 'dockyard-meta', children: 'No workflow instances yet.' }),
-        jsxs('div', { className: 'dockyard-inline-editor', children: [
-          jsxs('label', { children: [jsx('span', { children: 'Template / instance' }), jsx('input', { 'data-workflow-name': true, value: name, onChange: (event) => setName(event.target.value) })] }),
-          jsxs('label', { children: [jsx('span', { children: 'Phase title' }), jsx('input', { 'data-workflow-title': true, value: title, onChange: (event) => setTitle(event.target.value) })] }),
-          jsxs('label', { children: [jsx('span', { children: 'Default bot team' }), jsx('input', { 'data-workflow-team': true, value: team, placeholder: 'team slug', onChange: (event) => setTeam(event.target.value) })] }),
-          jsxs('label', { children: [jsx('span', { children: 'Run key' }), jsx('input', { 'data-workflow-run-key': current?.name ?? name, value: runKey, onChange: (event) => setRunKey(event.target.value), placeholder: 'execution key' })] }),
-          nameTaken ? jsx('p', { className: 'dockyard-meta', role: 'status', 'data-workflow-name-taken': name.trim(), children: `"${name.trim()}" already exists. Pick a new name; to change "${name.trim()}", edit it on the canvas.` }) : null,
-          jsx(Button, { action: 'define-workflow', variant: 'primary', disabled: !name.trim() || !title.trim() || nameTaken, onClick: define, children: 'Create workflow' }),
-        ] }),
+        }, item.name)) }) : jsx('p', { className: 'dockyard-meta', children: 'No workflows yet. Press New workflow.' }),
       ]}),
       // ---- Zone 2: toolbar + run readout + canvas (the surface) ----------
       // There is no third column: run lifecycle lives in the toolbar, the
-      // canonical run state is a one-line readout above the canvas, and step
-      // details open in the canvas's own floating panel.
+      // canonical run state is a one-line readout above the canvas, step
+      // details open in the canvas's own floating panel, and the AI chat is
+      // a sidebar beside the page.
       jsxs('div', { className: 'dockyard-wf3-stage', children: [
-        jsxs('div', { className: 'dockyard-wf3-toolbar', role: 'toolbar', 'aria-label': 'Workflow canvas tools', children: [
+        jsxs('div', { className: 'dockyard-wf3-toolbar', role: 'toolbar', 'aria-label': 'Workflow canvas tools', children: draft ? [
+          // The AI's unsaved changes have their own controls; the run
+          // controls come back once they are saved or discarded.
+          jsx('button', { type: 'button', className: 'dockyard-wf3-libtoggle', 'data-action': 'wf-toggle-library', 'aria-expanded': libCollapsed ? 'false' : 'true', 'aria-label': libCollapsed ? 'Show workflow library' : 'Hide workflow library', title: libCollapsed ? 'Show library' : 'Hide library', onClick: () => setLibCollapsed((v) => !v), children: libCollapsed ? '»' : '«' }, 'lib'),
+          jsx('span', { className: 'dy-wfd-draft-label', 'data-wfd-draft-label': true, children: `Unsaved changes to ${draft.base.name}` }, 'label'),
+          jsx('span', { className: 'dockyard-wf3-sep', 'aria-hidden': true }, 'sep1'),
+          jsx(Button, { small: true, action: 'wf-add-step', onClick: () => addNode(false), children: '＋ Step' }, 'step'),
+          jsx(Button, { small: true, action: 'wf-add-gate', onClick: () => addNode(true), children: '＋ Gate' }, 'gate'),
+          jsx(Button, { small: true, action: 'wf-auto-layout', disabled: !draft.nodes.length, onClick: autoLayout, children: 'Auto layout' }, 'layout'),
+          jsx(Button, { small: true, action: 'wf-validate', disabled: !draft.nodes.length, onClick: validateGraph, children: 'Validate' }, 'validate'),
+          jsx(Button, { small: true, action: 'wfd-settings', onClick: () => setDialog('settings'), children: 'Settings' }, 'settings'),
+          askAi('ai'),
+          jsx('span', { className: 'dockyard-wf3-sep', 'aria-hidden': true }, 'sep2'),
+          jsx(Button, { small: true, variant: 'primary', action: 'wfd-draft-save', onClick: saveDraft, children: 'Save version' }, 'save'),
+          jsx(Button, { small: true, action: 'wfd-draft-discard', onClick: () => closeDraft('discarded'), children: 'Discard' }, 'discard'),
+        ] : [
           jsx('button', { type: 'button', className: 'dockyard-wf3-libtoggle', 'data-action': 'wf-toggle-library', 'aria-expanded': libCollapsed ? 'false' : 'true', 'aria-label': libCollapsed ? 'Show workflow library' : 'Hide workflow library', title: libCollapsed ? 'Show library' : 'Hide library', onClick: () => setLibCollapsed((v) => !v), children: libCollapsed ? '»' : '«' }),
           jsx('span', { className: 'dockyard-wf3-sep', 'aria-hidden': true }),
           jsx(Button, { small: true, action: 'wf-view-definition', variant: mode === 'definition' ? 'primary' : '', onClick: () => setMode('definition'), children: 'Definition' }),
@@ -305,11 +498,14 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
             ? jsx(Button, { small: true, action: 'restore-workflow', onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/restore`), children: 'Restore' })
             : jsx(Button, { small: true, action: 'archive-workflow', variant: 'danger', onClick: () => mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/archive`), children: 'Archive' })) : null,
           jsx(Button, { small: true, action: 'inspect-workflow', disabled: !current, onClick: () => loadRuns(current.name), children: 'Refresh' }),
+          jsx(Button, { small: true, action: 'wfd-settings', disabled: !current, onClick: () => setDialog('settings'), children: 'Settings' }),
+          askAi(),
         ]}),
+        draftError ? jsx('p', { className: 'dy-wfd-error', role: 'alert', 'data-wfd-draft-error': true, children: draftError }) : null,
         validation ? jsx('p', { className: 'dockyard-wf3-validation', role: 'status', 'data-wf-validate-result': validation.ok ? 'ok' : 'issues', children: validation.text }) : null,
         layoutPendingVersion !== null ? jsx('p', { role: 'status', 'data-wf-layout-saving': true, children: 'Saving layout version before the graph can be edited…' }) : null,
         // Run readout: the latest canonical run only. Nothing here is inferred.
-        latest ? jsxs('div', { className: 'dockyard-wf3-run', 'data-workflow-live-run': latest.run_key, children: [
+        latest && !draft ? jsxs('div', { className: 'dockyard-wf3-run', 'data-workflow-live-run': latest.run_key, children: [
           jsx(StatusTag, { tone: latest.status === 'completed' ? 'success' : latest.status === 'failed' ? 'danger' : 'info', label: latest.status }),
           jsx('span', { className: 'dockyard-wf3-runkey', children: `${latest.run_key} · v${latest.version}` }),
           liveCounts ? jsx('span', { className: 'dockyard-wf3-counts', children: ['done', 'working', 'blocked', 'pending'].filter((k) => liveCounts[k]).map((k) => `${liveCounts[k]} ${k}`).join(' · ') }) : null,
@@ -317,9 +513,33 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
             jsx('summary', { children: attentionCount ? `Steps · ${attentionCount} need attention` : 'Steps' }),
             jsx('ul', { 'data-wf-live-map': latest.run_key, children: (latest.nodes ?? []).map((node) => jsx('li', { 'data-wf-live-node': node.node_id, 'data-wf-needs-attention': needsAttention(node) ? 'true' : undefined, children: `${node.title} — ${node.status ?? 'pending'}${node.assignee ? ` · ${node.assignee}` : ''}${needsAttention(node) ? ' · needs attention' : ''}` }, node.node_id)) }),
           ] }),
-        ] }) : jsx('p', { className: 'dockyard-wf3-run dockyard-meta', 'data-workflow-no-run': true, children: 'No canonical run recorded. Start a run to see truthful state.' }),
-        current ? jsx('div', { ref: canvasRef, className: 'dockyard-workflow-graph', 'data-workflow-canvas': current.name, role: 'img', 'aria-label': 'Workflow planning graph', 'aria-busy': layoutPendingVersion !== null || !canvasReady, style: layoutPendingVersion !== null ? { pointerEvents: 'none' } : undefined }) : jsx('p', { className: 'dockyard-meta', children: 'No workflow selected.' }),
+        ] }) : null,
+        // The canvas, with the AI's draft banner over it. Nothing shares its
+        // row: the AI chat is a sidebar beside the page, not a column here.
+        (current || draft) ? jsxs('div', { className: 'dy-wfd-canvas-wrap', children: [
+          jsx('div', { ref: canvasRef, className: 'dockyard-workflow-graph', 'data-workflow-canvas': draft ? draft.base.name : current.name, 'data-wfd-draft': draft ? 'edit' : undefined, role: 'img', 'aria-label': 'Workflow planning graph', 'aria-busy': !draft && (layoutPendingVersion !== null || !canvasReady), style: !draft && layoutPendingVersion !== null ? { pointerEvents: 'none' } : undefined }),
+          draft ? jsx('p', { className: 'dy-wfd-draft-banner', role: 'status', 'data-wfd-draft-banner': true, children: 'The AI’s changes are on the canvas but not saved. Save version keeps them; Discard drops them.' }) : null,
+        ] }, 'canvas') : jsx('p', { className: 'dockyard-meta', children: 'No workflow selected.' }),
       ]}),
     ]}),
+    dialog === 'new' ? jsx(NewWorkflowDialog, { takenNames, templates, members, onCreate: createFromDialog, onClose: () => setDialog(null) }) : null,
+    dialog === 'settings' ? jsx(WorkflowSettingsDialog, { project: project.id, workflow: standinWorkflow(), title: current?.name ?? '', members, onClose: () => setDialog(null) }) : null,
+    repeatNode ? jsx(RepeatPopover, { node: repeatNode, anchor: repeatAt.rect, check: readStepSettings(project.id, standinWorkflow(), repeatAt.nodeId).check, draft: Boolean(draft), onSave: ({ rounds, check }) => saveRepeat(repeatAt.nodeId, { max_iterations: rounds, until: { status: 'done' } }, check), onStop: () => saveRepeat(repeatAt.nodeId, null, null), onClose: () => setRepeatAt(null) }, repeatAt.nodeId) : null,
+    // The AI chat: a sidebar at the window's edge, outside the canvas.
+    aiOpen && current ? jsx(AiSidebar, {
+      members,
+      nodes: draft ? draft.nodes : planRef.current.nodes,
+      workflowTitle: current.name,
+      thread: threadOf(current.name),
+      onThread: (change) => changeThread(current.name, change),
+      pinned: aiPinned,
+      onPin: pinAi,
+      onApply: aiApply,
+      onClose: () => setAiOpen(false),
+      unsaved: Boolean(draft),
+      saveError: draftError,
+      onSave: saveDraft,
+      onDiscard: () => closeDraft('discarded'),
+    }, current.name) : null,
   ]})
 }

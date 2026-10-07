@@ -54,7 +54,18 @@ test('W5 live map attributes come from the canonical run projection', async () =
     .replace(/from '\.\.\/lib\/ui\.js'/g, `from 'file://${path.join(dir, 'ui-stub.js').replace(/\\\\/g, '/')}'`)
     .replace(/from '\.\.\/\.\.\/workflow-canvas-mount\.js'/g, `from 'file://${path.join(dir, 'mount-stub.js').replace(/\\\\/g, '/')}'`)
     // The shared planning wording has no imports of its own, so the real file loads as is.
-    .replace(/from '\.\.\/lib\/plan-vocab\.js'/g, `from 'file://${path.join(HERE, 'src', 'lib', 'plan-vocab.js').replace(/\\\\/g, '/')}'`);
+    .replace(/from '\.\.\/lib\/plan-vocab\.js'/g, `from 'file://${path.join(HERE, 'src', 'lib', 'plan-vocab.js').replace(/\\\\/g, '/')}'`)
+    // The builder's modules (dialog, AI sidebar, step-panel hooks) render
+    // nothing until opened, so they are stubbed; this test reads the run readout.
+    .replace(/from '\.\/workflow-design\/[a-z-]+\.js'/g, `from 'file://${path.join(dir, 'design-stub.js').replace(/\\\\/g, '/')}'`);
+  fs.writeFileSync(path.join(dir, 'design-stub.js'), [
+    'export function canvasDesignHooks(){ return {} }', 'export function NewWorkflowDialog(){ return null }',
+    'export function AiSidebar(){ return null }', 'export function createdConversation(){ return [] }',
+    'export function settleConversation(t){ return t }', 'export function readAiPinned(){ return false }',
+    'export function writeAiPinned(){}', 'export function WorkflowSettingsDialog(){ return null }',
+    'export function RepeatPopover(){ return null }', 'export function readStepSettings(){ return {} }',
+    'export function writeStepSettings(){}', 'export const EMPTY_STEP = {}',
+  ].join('\n'));
   const { __setRuns__ } = await import('file://' + path.join(dir, 'context-stub.js').replace(/\\\\/g, '/'));
   const runs = [{ run_key: 'r1', version: 1, status: 'running', nodes: [
     { node_id: 'a', title: 'Assemble', depends_on: [], human_gate: false, kind: 'task', status: 'done', task_ref: null, evidence_refs: [] },
@@ -64,6 +75,7 @@ test('W5 live map attributes come from the canonical run projection', async () =
   fs.writeFileSync(path.join(dir, 'ui-stub.js'), [
     "export function StatusTag(){ return { t: 'span', props: { children: '' } } }",
     "export function number(v){ return String(v ?? 0) }",
+    "export function plural(v, one, many = `${one}s`){ return Number(v) === 1 ? one : many }",
     "export function Button(props){ return { t: 'button', props } }",
   ].join('\n'));
   const moduleUrl = 'data:text/javascript;base64,' + Buffer.from(source).toString('base64');

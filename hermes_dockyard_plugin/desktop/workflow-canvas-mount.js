@@ -66,7 +66,11 @@ export function mountDesktopWorkflowCanvas(host, projectId, workflowName, defini
     onEdit: handlers.onEdit,
     editNodes: handlers.editNodes,
     onSelect: handlers.onSelect,
+    onOpen: handlers.onOpen,
     fetchTimeline: handlers.fetchTimeline,
+    // The Workflows screen's hooks: card notes, loop frames, and the step
+    // panel's plain-words sections.
+    design: handlers.design,
   }, handlers.pollMs ?? 60000)
 }
 

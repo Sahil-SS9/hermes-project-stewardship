@@ -190,8 +190,9 @@ test('passport shows last-confirmed update and decision state', async () => {
   try {
     await settle();
     const host = dom.window.document.getElementById('host');
+    // Steps open on double-click (07/10/2026); one click only selects.
     host.querySelector('.dy-wf-node').dispatchEvent(
-      new dom.window.MouseEvent('click', { bubbles: true }));
+      new dom.window.MouseEvent('dblclick', { bubbles: true }));
     const passport = host.querySelector('.dy-wf-passport');
     assert.match(passport.textContent, /Last confirmed update/i,
       'passport shows the run last-confirmed update');
@@ -219,8 +220,9 @@ test('after a failed approve the passport reports decision state failed, retryab
   try {
     await settle();
     const host = dom.window.document.getElementById('host');
+    // Steps open on double-click (07/10/2026); one click only selects.
     host.querySelector('.dy-wf-node').dispatchEvent(
-      new dom.window.MouseEvent('click', { bubbles: true }));
+      new dom.window.MouseEvent('dblclick', { bubbles: true }));
     const approve = [...host.querySelectorAll('.dy-wf-passport button')]
       .find((b) => b.textContent === 'Approve');
     approve.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
@@ -255,7 +257,8 @@ test('blocked node passport exposes supported retry and labels pause/cancel unsu
     const blocked = [...host.querySelectorAll('.dy-wf-node')]
       .find((n) => n.getAttribute('class').includes('blocked'));
     assert.ok(blocked, 'blocked node present');
-    blocked.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+    // Steps open on double-click (07/10/2026); one click only selects.
+    blocked.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true }));
     const passport = host.querySelector('.dy-wf-passport');
     const retry = [...passport.querySelectorAll('button')]
       .find((b) => /re-?queue|retry/i.test(b.textContent));
@@ -359,9 +362,10 @@ test('escape handler is removed after dispose (no listener leak)', async () => {
   try {
     await settle();
     const host = dom.window.document.getElementById('host');
+    // Steps open on double-click (07/10/2026); one click only selects.
     host.querySelector('.dy-wf-node').dispatchEvent(
-      new dom.window.MouseEvent('click', { bubbles: true }));
-    assert.ok(host.querySelector('.dy-wf-passport'), 'passport open');
+      new dom.window.MouseEvent('dblclick', { bubbles: true }));
+    assert.ok(host.querySelector('.dy-wf-passport .dy-wf-pp-head'), 'passport open (with content, not just the empty panel)');
     dispose();
     // After dispose, Escape must not throw or resurrect anything.
     dom.window.document.dispatchEvent(new dom.window.KeyboardEvent('keydown', {

@@ -136,7 +136,8 @@ test('frame re-renders when payload changes but node_id/status are unchanged', a
     assert.ok(node, 'node renders');
     assert.match(node.textContent, /human-2/, 'changed assignee must reach the canvas');
     const passport = dom.window.document.querySelector('.dy-wf-passport');
-    node.dispatchEvent(new dom.window.Event('click'));
+    // Steps open on double-click (07/10/2026); one click only selects.
+    node.dispatchEvent(new dom.window.Event('dblclick'));
     assert.ok(passport, 'passport opens');
     assert.match(dom.window.document.querySelector('.dy-wf-passport').textContent, /ev-9/, 'changed evidence must be visible');
   } finally {
@@ -198,7 +199,8 @@ test('approve failure shows failure, never a success claim; duplicate click fire
   try {
     await new Promise((r) => setTimeout(r, 100));
     const node = dom.window.document.querySelector('.dy-wf-node');
-    node.dispatchEvent(new dom.window.Event('click'));
+    // Steps open on double-click (07/10/2026); one click only selects.
+    node.dispatchEvent(new dom.window.Event('dblclick'));
     const passport = dom.window.document.querySelector('.dy-wf-passport');
     const approve = [...passport.querySelectorAll('button')].find((b) => b.textContent === 'Approve');
     assert.ok(approve, 'gate passport has Approve');

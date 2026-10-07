@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium } from './browser-harness.mjs';
+import { createBlankWorkflow } from './test-support/workflow-create.mjs';
 
 const BASE = process.env.STEWARD_DESKTOP_URL;
 
@@ -16,12 +17,8 @@ async function projectWorkflows(page) {
   await page.locator('[data-executable-workflows="payments-relaunch"]').waitFor();
 }
 
-async function createWorkflow(page, name) {
-  await page.locator('[data-workflow-name]').fill(name);
-  await page.locator('[data-workflow-title]').fill('Build release');
-  await page.locator('[data-action="define-workflow"]').click();
-  await page.locator(`[data-workflow-library-item="${name}"]`).waitFor();
-}
+// New workflow -> Start blank (the old side form went with the builder, 07/10/2026).
+const createWorkflow = (page, name) => createBlankWorkflow(page, name, 'Build release');
 
 test('W0-P1: 403 on archive shows intelligible permission error and keeps action retryable', async () => {
   assert.ok(BASE, 'Run via run-browser-suite.mjs');

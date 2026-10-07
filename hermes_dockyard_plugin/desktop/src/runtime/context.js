@@ -5,6 +5,7 @@ import { DOCKYARD_CSS } from '../styles/dockyard-css.js'
 import { THEME_CSS } from '../styles/themes.js'
 import { SWITCHER_CSS } from '../styles/switcher-css.js'
 import { WORKFLOW_LIBRARY_CSS } from '../styles/workflow-css.js'
+import { WORKFLOW_DESIGN_CSS } from '../styles/workflow-design-css.js'
 import { ROADMAP_CSS } from '../styles/roadmap-css.js'
 import { PLAN_CSS } from '../styles/plan-css.js'
 import { SETTINGS_CSS } from '../styles/settings-css.js'
@@ -91,6 +92,9 @@ export function useDockyardStyles() {
   // W3/W4: workflow library + enablement styles (W-owned; appended here so
   // dockyard-css.js does not grow, per the Batch W shared-file table).
   useStylesheet('dy-wf-library-stylesheet', 'dyWfLibraryStylesheet', WORKFLOW_LIBRARY_CSS)
+  // Workflows design round (07/10/2026), review only: scoped to .dy-wfd-* and
+  // .dy-wfx-* classes, which only the ?review=1 options render.
+  useStylesheet('dy-wf-design-stylesheet', 'dyWfDesignStylesheet', WORKFLOW_DESIGN_CSS)
   // R2 Phase C: Roadmap styles (R2-owned; appended here so dockyard-css.js
   // does not grow, same rule as the workflow library block above).
   useStylesheet('dy-roadmap-stylesheet', 'dyRoadmapStylesheet', ROADMAP_CSS)
