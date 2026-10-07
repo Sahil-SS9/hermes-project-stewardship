@@ -569,7 +569,11 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
             jsx('ul', { 'data-wf-live-map': latest.run_key, children: (latest.nodes ?? []).map((node) => jsx('li', { 'data-wf-live-node': node.node_id, 'data-wf-needs-attention': needsAttention(node) ? 'true' : undefined, children: `${node.title} — ${node.status ?? 'pending'}${node.assignee ? ` · ${node.assignee}` : ''}${needsAttention(node) ? ' · needs attention' : ''}` }, node.node_id)) }),
           ] }),
         ] }) : designOn ? null : jsx('p', { className: 'dockyard-wf3-run dockyard-meta', 'data-workflow-no-run': true, children: 'No canonical run recorded. Start a run to see truthful state.' }),
-        !designOn ? (current ? jsx('div', { ref: canvasRef, className: 'dockyard-workflow-graph', 'data-workflow-canvas': current.name, role: 'img', 'aria-label': 'Workflow planning graph', 'aria-busy': layoutPendingVersion !== null || !canvasReady, style: layoutPendingVersion !== null ? { pointerEvents: 'none' } : undefined }) : jsx('p', { className: 'dockyard-meta', children: 'No workflow selected.' }))
+        // The two canvases carry different keys. Same-type elements in the
+        // same place were reused across a switch to or from Today, and the old
+        // canvas's teardown (host.replaceChildren) then emptied the new layout:
+        // a blank canvas, then a crash (07/10/2026, found walking the review link).
+        !designOn ? (current ? jsx('div', { ref: canvasRef, className: 'dockyard-workflow-graph', 'data-workflow-canvas': current.name, role: 'img', 'aria-label': 'Workflow planning graph', 'aria-busy': layoutPendingVersion !== null || !canvasReady, style: layoutPendingVersion !== null ? { pointerEvents: 'none' } : undefined }, 'canvas-today') : jsx('p', { className: 'dockyard-meta', children: 'No workflow selected.' }))
           // Design round: the canvas, the start card over an empty draft, and
           // (option B) the AI builder beside it.
           : (current || draft) ? jsxs('div', { className: aiOpen ? 'dy-wfd-canvas-row with-ai' : 'dy-wfd-canvas-row', children: [
@@ -581,7 +585,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
               draft?.base ? jsx('p', { className: 'dy-wfd-draft-banner', role: 'status', 'data-wfd-draft-banner': true, children: 'The AI’s changes are on the canvas but not saved. Save version keeps them; Discard drops them.' }) : null,
             ] }),
             aiOpen ? jsx(AiSidePanel, { members, nodes: draft ? draft.nodes : planRef.current.nodes, workflowTitle: draft?.base?.name ?? current?.name ?? 'this workflow', seed: aiSeed, onApply: aiApply, onClose: () => setAiOpen(false) }, draft && !draft.base ? draft.key : (current?.name ?? 'none')) : null,
-          ] }) : jsx('p', { className: 'dockyard-meta', children: 'No workflow selected.' }),
+          ] }, 'canvas-design') : jsx('p', { className: 'dockyard-meta', children: 'No workflow selected.' }),
       ]}),
     ]}),
     designOn && dialog === 'new' ? jsx(NewWorkflowDialog, { takenNames, templates, members, onCreate: createFromDialog, onClose: () => setDialog(null) }) : null,

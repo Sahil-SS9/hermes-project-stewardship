@@ -444,3 +444,21 @@ test('Design review bar: switching options and loops changes the URL only, never
     assert.deepEqual(await storage(page), [], 'no browser storage')
   })
 })
+
+// Found 07/10/2026 walking the review link: Today's canvas and the options' canvas row sat in
+// the same place as the same kind of element, so switching to or from Today reused the box. The
+// old canvas's teardown (host.replaceChildren) then emptied the new layout: a blank canvas, and
+// on the next switch a crash that took the review bar with it. A to B never reused it.
+test('Design review bar: every switch between Today, A and B keeps the open workflow drawn', { timeout: 90000 }, async () => {
+  const name = await full('redraw')
+  await withPage('review=1', async (page) => {
+    for (const choice of ['today', 'a', 'today', 'b', 'a', 'b', 'today', 'a']) {
+      await page.locator(`[data-review-choice="wf:${choice}"]`).click()
+      await until(async () => new URL(page.url()).searchParams.get('wf') === choice, `URL says ${choice}`)
+      await until(async () => (await page.locator(canvas(name)).count()) === 1, `after ${choice}: the canvas is on the page, once`)
+      await until(async () => nodesIn(page, name).first().isVisible(), `after ${choice}: its steps are drawn`)
+      assert.equal(await nodesIn(page, name).count(), 5, `after ${choice}: all five steps`)
+      assert.equal(await page.locator('[data-wf-review]').count(), 1, `after ${choice}: the review bar is still there`)
+    }
+  }, { open: name })
+})
