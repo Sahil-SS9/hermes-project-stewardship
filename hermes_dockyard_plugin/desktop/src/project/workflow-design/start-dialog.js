@@ -1,16 +1,18 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 //
-// Workflows (Sahil's pick, 07/10/2026): one New workflow button opens this
-// dialog with the four ways in. The AI is one of them: describe, read its
-// plan, answer its questions, then Create workflow; the conversation then
-// carries on in the AI sidebar beside the canvas. Nothing is saved until
-// Create workflow.
+// Workflows (Sahil's pick, 07/10/2026): New workflow opens this dialog, from
+// the builder and from the Workflows tab alike. It asks first where the
+// workflow lives (Sahil 08/10/2026): this project, or global (every project
+// can use it, once turned on there). Then come the four ways in. The AI is
+// one of them: describe, read its plan, answer its questions, then Create
+// workflow; the conversation then carries on in the AI sidebar beside the
+// canvas. Nothing is saved until Create workflow.
 //
 // Use a template offers the 30 built-in templates (builtin-templates.json,
-// HPS-Audit WORKFLOW-TEMPLATES-RESEARCH.md) in five groups, then the ones
-// saved in the library. A built-in names no bot: it asks who does the work
-// and who checks it, and warns when one bot would check its own work.
+// HPS-Audit WORKFLOW-TEMPLATES-RESEARCH.md) on five tabs, then a Saved tab
+// for the ones in the library. A built-in names no bot: it asks who does the
+// work and who checks it, and warns when one bot would check its own work.
 import { useState } from '../../runtime/react.js'
 import { useEffect } from '../../runtime/react.js'
 import { jsxs } from '../../runtime/react.js'
@@ -34,6 +36,12 @@ export const WAYS = Object.freeze([
   { way: 'template', title: 'Use a template', text: 'Start from one of 30 built-in templates, or one saved in your library.' },
   { way: 'import', title: 'Import', text: 'Paste a workflow, or choose a file.' },
   { way: 'ai', title: 'Describe it to the AI', text: 'Say what you want. The AI explains its plan and drafts the steps.' },
+])
+// Where a new workflow lives. A global one is kept in the library (the
+// Workflows tab); each project turns it on before it runs there.
+export const SCOPES = Object.freeze([
+  { scope: 'project', title: 'This project', text: 'Only this project uses it. It opens on the canvas, ready to build.' },
+  { scope: 'global', title: 'Global', text: 'Every project can use it, once turned on there. It is kept on the Workflows tab.' },
 ])
 export const AI_EXAMPLES = Object.freeze(['Fix a bug until the tests pass', 'Prepare a weekly release', 'Research a topic and write a summary'])
 
@@ -87,8 +95,21 @@ function TemplateDetail({ pick, members, whoWorks, whoChecks, onWorks, onChecks 
   ] })
 }
 
-export function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }) {
-  const [way, setWay] = useState('choose')
+function ScopeLine({ scope, project, disabled, onChange }) {
+  return jsxs('div', { className: 'dy-wfd-scope-line', 'data-wfd-scope-chosen': scope, children: [
+    jsx('span', { children: 'Saving to' }),
+    jsx('strong', { children: scope === 'global' ? 'Global: every project can use it' : `This project: ${project?.name ?? project?.id ?? ''}` }),
+    jsx(Button, { small: true, action: 'wfd-scope-change', disabled, onClick: onChange, children: 'Change' }),
+  ] })
+}
+
+// project: { id, name } or null (no project picked: only Global is open).
+// taken: the names in use, { project: [...], global: [...] }; a list still
+// loading is null, and Create waits for it (the library would add a version
+// to a global name that exists, so the dialog must know them).
+export function NewWorkflowDialog({ project, taken, templates, members, onCreate, onClose }) {
+  const [scope, setScope] = useState(null)
+  const [way, setWay] = useState('scope')
   const [name, setName] = useState('')
   const [first, setFirst] = useState('Step 1')
   // The picked template: { source: 'builtin' | 'library', item }.
@@ -115,6 +136,8 @@ export function NewWorkflowDialog({ takenNames, templates, members, onCreate, on
     return () => window.removeEventListener('keydown', onKey)
   }, [busy, onClose])
   const go = (next) => { setWay(next); setServerError(null); setNameError(null); setWayError(null) }
+  const takenNames = (scope && taken?.[scope]) || []
+  const pickScope = (next) => { setScope(next); go('choose') }
   const checkName = () => {
     const clean = name.trim()
     const problem = !clean ? 'Give the workflow a name.' : takenNames.includes(clean) ? `"${clean}" already exists. Pick another name.` : null
@@ -136,6 +159,7 @@ export function NewWorkflowDialog({ takenNames, templates, members, onCreate, on
         : way === 'ai' && !aiDraft ? 'Press Draft it first.' : null
     setWayError(missing)
     if (missing) return
+    if (!taken?.[scope]) { setWayError('Still checking which names are in use. Try again in a moment.'); return }
     if (way === 'blank' && !first.trim()) setStepError('Name the first step.')
     else setStepError(null)
     const clean = checkName()
@@ -143,7 +167,7 @@ export function NewWorkflowDialog({ takenNames, templates, members, onCreate, on
     if (!clean || !nodes) return
     setBusy(true); setServerError(null)
     try {
-      await onCreate({ name: clean, nodes, checks: way === 'ai' ? aiDraft.checks : null, conversation: way === 'ai' ? { describe: describe.trim(), plan: aiDraft } : null })
+      await onCreate({ scope, name: clean, nodes, checks: way === 'ai' ? aiDraft.checks : null, conversation: way === 'ai' ? { describe: describe.trim(), plan: aiDraft } : null })
     } catch (failure) {
       setServerError(`Couldn't create it: ${String(failure?.message ?? failure).replace(/^\d{3}:\s*/, '')}`)
       setBusy(false)
@@ -161,6 +185,13 @@ export function NewWorkflowDialog({ takenNames, templates, members, onCreate, on
     setAiError(null); setAiDraft(result); setName(uniqueName(result.name, takenNames))
   }
   const body = () => {
+    if (way === 'scope') return jsx('div', { className: 'dy-wfd-ways dy-wfd-scopes', role: 'group', 'aria-label': 'Where it lives', children: SCOPES.map((s) => {
+      const off = s.scope === 'project' && !project
+      return jsxs('button', { type: 'button', 'data-wfd-scope': s.scope, disabled: off, onClick: () => pickScope(s.scope), children: [
+        jsxs('strong', { children: [s.title, s.scope === 'project' && project ? jsx('span', { className: 'dy-wfd-scope-name', children: project.name ?? project.id }) : null] }),
+        jsx('span', { children: off ? 'Pick a project in the switcher first.' : s.text }),
+      ] }, s.scope)
+    }) })
     if (way === 'choose') return jsx('div', { className: 'dy-wfd-ways', children: WAYS.map((w) => jsxs('button', { type: 'button', 'data-wfd-way': w.way, onClick: () => go(w.way), children: [
       jsxs('strong', { children: [w.title, w.way === 'ai' ? jsx(PreviewTag, { children: 'Practice AI' }) : null] }),
       jsx('span', { children: w.text }),
@@ -207,20 +238,22 @@ export function NewWorkflowDialog({ takenNames, templates, members, onCreate, on
       aiDraft ? jsx(NameField, { value: name, onChange: setName, error: nameError }) : null,
     ] })
   }
-  const heading = way === 'choose' ? 'How do you want to start?' : WAYS.find((w) => w.way === way).title
+  const heading = way === 'scope' ? 'Where should it live?' : way === 'choose' ? 'How do you want to start?' : WAYS.find((w) => w.way === way).title
+  const atStart = way === 'scope' || way === 'choose'
   return jsx('section', { className: 'dockyard-modal-layer', 'data-wfd-new-dialog': way, onClick: (event) => { if (event.target === event.currentTarget && !busy) onClose() }, children:
     jsxs('div', { className: 'dockyard-modal dy-wfd-modal dy-wfd-new', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'wfd-new-title', children: [
       jsxs('div', { className: 'dockyard-modal-head', children: [
         jsxs('div', { children: [jsx('h2', { id: 'wfd-new-title', children: 'New workflow' }), jsx('p', { children: heading })] }),
         jsx(Button, { small: true, action: 'wfd-new-close', ariaLabel: 'Close', disabled: busy, onClick: onClose, children: '×' }),
       ] }),
+      way === 'scope' ? null : jsx(ScopeLine, { scope, project, disabled: busy, onChange: () => go('scope') }),
       body(),
       serverError ? jsx('p', { className: 'dy-wfd-error', role: 'alert', 'data-wfd-create-error': true, children: serverError }) : null,
       wayError ? jsx('p', { className: 'dy-wfd-error', role: 'alert', 'data-wfd-way-error': true, children: wayError }) : null,
-      way === 'choose' ? null : jsx('p', { className: 'dockyard-meta', children: 'Nothing is saved until you press Create workflow.' }),
+      atStart ? null : jsx('p', { className: 'dockyard-meta', children: 'Nothing is saved until you press Create workflow.' }),
       jsxs('div', { className: 'dockyard-modal-actions', children: [
-        way === 'choose' ? jsx(Button, { action: 'wfd-new-cancel', onClick: onClose, children: 'Cancel' }) : jsx(Button, { action: 'wfd-new-back', disabled: busy, onClick: () => go('choose'), children: '← All ways in' }),
-        way === 'choose' ? null : jsx(Button, { action: 'wfd-create', variant: 'primary', disabled: busy, onClick: create, children: busy ? 'Creating…' : 'Create workflow' }),
+        atStart ? jsx(Button, { action: 'wfd-new-cancel', onClick: onClose, children: 'Cancel' }) : jsx(Button, { action: 'wfd-new-back', disabled: busy, onClick: () => go('choose'), children: '← All ways in' }),
+        atStart ? null : jsx(Button, { action: 'wfd-create', variant: 'primary', disabled: busy, onClick: create, children: busy ? 'Creating…' : 'Create workflow' }),
       ] }),
     ] }) })
 }

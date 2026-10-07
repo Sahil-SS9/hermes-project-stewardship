@@ -13,20 +13,26 @@ import { LoadingState } from '../lib/ui.js'
 import { PageHead } from '../lib/ui.js'
 import { StatusTag } from '../lib/ui.js'
 import { number } from '../lib/ui.js'
+import { NewWorkflowDialog } from '../project/workflow-design/start-dialog.js'
 
 // W3: the top-level Workflows tab is the library. Every workflow the owner can
 // edit lives here — global (available to every project) or dedicated to one
 // project. No workflow data is invented: empty, loading and error states read
 // only from the real /workflow-library contract.
-export function WorkflowLibraryView({ projectId, onOpenBuilder }) {
+//
+// New workflow opens the builder's dialog (Sahil 08/10/2026: not a name and
+// first-step form): where it lives first, then the four ways in. A global
+// one stays here, marked as just made; a project one opens on the canvas.
+export function WorkflowLibraryView({ projectId, projectLabel = null, highlight = null, onOpenBuilder }) {
   const [scope, setScope] = useState('all')
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState(null)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [name, setName] = useState('')
-  const [title, setTitle] = useState('')
-  const [creating, setCreating] = useState(false)
+  // The New workflow dialog and what it needs: the names in use, the saved
+  // templates and the project's bots. null = closed.
+  const [dialog, setDialog] = useState(null)
+  const [justMade, setJustMade] = useState(highlight)
   const [enablement, setEnablement] = useState({})
   const [refusals, setRefusals] = useState({})
   const load = async () => {
@@ -48,16 +54,41 @@ export function WorkflowLibraryView({ projectId, onOpenBuilder }) {
   useEffect(() => { void load() }, [scope, projectId])
   const filtered = (rows ?? []).filter((row) =>
     !search.trim() || row.name.toLowerCase().includes(search.trim().toLowerCase()))
-  const create = async () => {
-    if (!name.trim() || !title.trim()) return
-    setBusy(true); setError(null)
+  useEffect(() => {
+    if (justMade && rows) document.querySelector('[data-library-just-created="true"]')?.scrollIntoView({ block: 'nearest' })
+  }, [justMade, rows])
+  const openNew = async () => {
+    setError(null)
+    setDialog({ taken: null, templates: null, members: [] })
     try {
-      await api('/workflow-library', { method: 'POST', body: { scope: 'global', name: name.trim(), nodes: [{ id: 'step-1', title: title.trim(), depends_on: [] }] } })
-      setName(''); setTitle(''); setCreating(false)
-      await load()
-      emitToast('success', 'Workflow library updated.')
-    } catch (failure) { setError(String(failure?.message ?? failure)) }
-    finally { setBusy(false) }
+      const [all, team] = await Promise.all([
+        api('/workflow-library?include_archived=true'),
+        projectId ? api(`/projects/${encodeURIComponent(projectId)}/team`).catch(() => null) : null,
+      ])
+      const every = all?.workflows ?? []
+      const names = (keep) => every.filter(keep).map((row) => row.name)
+      setDialog((open) => open && {
+        taken: { global: names((row) => row.scope === 'global'), project: projectId ? names((row) => row.scope === 'project' && row.owner_project_id === projectId) : [] },
+        templates: every.filter((row) => row.scope === 'global' && !row.archived_at),
+        members: (team?.members ?? []).filter((m) => m.state === 'active').map((m) => m.profile_slug),
+      })
+    } catch (failure) {
+      setDialog(null)
+      setError(`Couldn't open New workflow: ${String(failure?.message ?? failure)}`)
+    }
+  }
+  const createNew = async ({ scope: where, name, nodes, checks, conversation }) => {
+    if (where === 'global') {
+      await api('/workflow-library', { method: 'POST', body: { scope: 'global', name, nodes }, quiet: true })
+      setDialog(null); setJustMade(name); setSearch('')
+      if (scope === 'project') setScope('all')
+      else await load()
+      emitToast('success', `${name} is saved for every project.`)
+      return
+    }
+    await api(`/projects/${encodeURIComponent(projectId)}/workflows`, { method: 'POST', body: { name, nodes }, quiet: true })
+    setDialog(null)
+    onOpenBuilder?.({ scope: 'project', name, owner_project_id: projectId }, { created: true, conversation, checks })
   }
   const act = async (path) => {
     setBusy(true); setError(null)
@@ -108,22 +139,21 @@ export function WorkflowLibraryView({ projectId, onOpenBuilder }) {
         jsx(Button, { small: true, action: 'library-scope-project', variant: scope === 'project' ? 'primary' : '', onClick: () => setScope('project'), children: 'Project' }),
       ]}),
       jsx('input', { 'data-library-search': true, 'aria-label': 'Search workflows', placeholder: 'Search workflows', value: search, onChange: (event) => setSearch(event.target.value) }),
-      jsx(Button, { action: 'library-create', variant: 'primary', disabled: busy, onClick: () => setCreating((open) => !open), children: creating ? 'Close' : 'New workflow' }),
+      jsx(Button, { action: 'library-create', variant: 'primary', disabled: busy || Boolean(dialog), onClick: openNew, children: 'New workflow' }),
     ]}),
-    creating ? jsxs('div', { className: 'dockyard-wf-library-create', 'data-library-create-form': true, children: [
-      jsxs('label', { children: [jsx('span', { children: 'Workflow name' }), jsx('input', { 'data-library-name': true, value: name, onChange: (event) => setName(event.target.value) })] }),
-      jsxs('label', { children: [jsx('span', { children: 'First step title' }), jsx('input', { 'data-library-title': true, value: title, onChange: (event) => setTitle(event.target.value) })] }),
-      jsx(Button, { action: 'library-create-confirm', variant: 'primary', disabled: busy || !name.trim() || !title.trim(), onClick: create, children: 'Create global workflow' }),
-    ]}) : null,
+    dialog ? jsx(NewWorkflowDialog, { project: projectId ? { id: projectId, name: projectLabel ?? projectId } : null, taken: dialog.taken, templates: dialog.templates, members: dialog.members, onCreate: createNew, onClose: () => setDialog(null) }) : null,
     rows === null && !error
       ? jsx(LoadingState, {})
       : rows === null && error
         ? jsx(ErrorState, { error, onRetry: load })
         : filtered.length === 0
           ? jsx(EmptyState, { title: 'No workflows yet', description: 'Create a workflow and project teams can adopt it for autonomous work.', icon: 'project' })
-          : jsxs('div', { className: 'dockyard-wf-library-grid', 'data-library-rows': true, children: filtered.map((row) => jsxs('article', { className: 'dockyard-feature-card', 'data-library-row': row.name, 'data-library-scope': row.scope, children: [
+          : jsxs('div', { className: 'dockyard-wf-library-grid', 'data-library-rows': true, children: filtered.map((row) => {
+            const made = row.scope === 'global' && row.name === justMade
+            return jsxs('article', { className: `dockyard-feature-card${made ? ' dy-wf-just-made' : ''}`, 'data-library-row': row.name, 'data-library-scope': row.scope, 'data-library-just-created': made ? 'true' : undefined, children: [
               jsxs('header', { children: [
                 jsx('h3', { children: row.name }),
+                made ? jsx(StatusTag, { tone: 'success', label: 'Just made' }) : null,
                 jsx(StatusTag, { tone: row.scope === 'global' ? 'info' : 'neutral', label: row.scope === 'global' ? 'Global' : 'Project' }),
               ]}),
               jsx('p', { className: 'dockyard-meta', children: row.owner_project_id ? `Dedicated to ${row.owner_project_id} · v${row.version}` : `Available to every project · v${row.version}` }),
@@ -149,6 +179,7 @@ export function WorkflowLibraryView({ projectId, onOpenBuilder }) {
               refusals[`${row.scope}:${row.name}`]
                 ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', 'data-wf-run-refused': `${row.scope}:${row.name}`, children: refusals[`${row.scope}:${row.name}`] })
                 : null,
-            ]}, `${row.scope}:${row.name}:${row.owner_project_id ?? ''}`)) }),
+            ]}, `${row.scope}:${row.name}:${row.owner_project_id ?? ''}`)
+          }) }),
   ]})
 }

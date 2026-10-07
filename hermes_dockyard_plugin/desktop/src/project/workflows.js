@@ -29,9 +29,13 @@ import { EMPTY_STEP } from './workflow-design/standins.js'
 const NO_RUNS = []
 const NO_THREAD = []
 const failureText = (failure) => String(failure?.message ?? failure ?? 'unknown error').replace(/^\d{3}:\s*/, '')
-export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary }) {
+// openWorkflow: { project, name, conversation?, checks? } from the Workflows
+// tab (Open builder, or a project workflow just made there). It opens that
+// workflow; a conversation with the AI carries on in the sidebar.
+export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary, openWorkflow = null, onOpenWorkflowDone }) {
   const canvasRef = useRef(null)
-  const [selected, setSelected] = useState(workflows?.[0]?.name ?? '')
+  const opening = openWorkflow?.project === project.id && openWorkflow.name ? openWorkflow : null
+  const [selected, setSelected] = useState(opening?.name ?? workflows?.[0]?.name ?? '')
   // Runs belong to one workflow. Keyed by name so a newly opened workflow
   // never shows the previous workflow's run while its own runs load.
   const [runsFor, setRunsFor] = useState({ workflow: null, runs: NO_RUNS })
@@ -49,6 +53,9 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   const membersRef = useRef([])
   membersRef.current = members
   const [templates, setTemplates] = useState(null)
+  // Every global name, archived ones too: a global workflow made here must
+  // not reuse one (the library would add a version to it). null = loading.
+  const [globalNames, setGlobalNames] = useState(null)
   const [dialog, setDialog] = useState(null)
   // The AI's unsaved changes to the open workflow: { key, base: { name,
   // version }, nodes }. Every change goes through updateDraft so the canvas
@@ -63,9 +70,9 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   }
   // The AI sidebar: open or not, pinned or floating (remembered), and one
   // conversation per workflow, kept here so closing the sidebar keeps it.
-  const [aiOpen, setAiOpen] = useState(false)
+  const [aiOpen, setAiOpen] = useState(Boolean(opening?.conversation))
   const [aiPinned, setAiPinned] = useState(() => readAiPinned())
-  const [aiThreads, setAiThreads] = useState({})
+  const [aiThreads, setAiThreads] = useState(() => (opening?.conversation ? { [opening.name]: createdConversation(opening.name, opening.conversation) } : {}))
   const [repeatAt, setRepeatAt] = useState(null)
   const [draftError, setDraftError] = useState(null)
   const encoded = encodeURIComponent(project.id)
@@ -219,7 +226,11 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   useEffect(() => {
     let live = true
     api(`/projects/${encoded}/team`).then((result) => { if (live) setMembers((result?.members ?? []).filter((m) => m.state === 'active').map((m) => m.profile_slug)) }).catch(() => undefined)
-    api('/workflow-library?scope=global').then((result) => { if (live) setTemplates(result?.workflows ?? []) }).catch(() => { if (live) setTemplates([]) })
+    api('/workflow-library?scope=global&include_archived=true').then((result) => {
+      if (!live) return
+      const rows = result?.workflows ?? []
+      setTemplates(rows.filter((row) => !row.archived_at)); setGlobalNames(rows.map((row) => row.name))
+    }).catch(() => { if (live) { setTemplates([]); setGlobalNames(null) } })
     return () => { live = false }
   }, [encoded, workflows?.length])
   const draftKey = draft?.key ?? null
@@ -366,9 +377,24 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
     if (d && how) changeThread(d.base.name, (thread) => settleConversation(thread, how))
   }
   const startNew = () => { setValidation(null); setDialog('new') }
+  // A workflow opened from the Workflows tab: its AI checks (a preview kept
+  // in memory) come along once, then the request is done.
+  useEffect(() => {
+    if (!openWorkflow) return
+    if (opening?.checks) keepChecks(opening.name, opening.checks)
+    onOpenWorkflowDone?.()
+  }, [])
   // The dialog's Create workflow. A workflow described to the AI opens with
   // the sidebar carrying that conversation, so the iterating goes on.
-  const createFromDialog = async ({ name: newName, nodes: newNodes, checks, conversation }) => {
+  const createFromDialog = async ({ scope, name: newName, nodes: newNodes, checks, conversation }) => {
+    if (scope === 'global') {
+      // A global workflow lives in the library, not in this project: the
+      // Workflows tab shows it, marked as just made.
+      await api('/workflow-library', { method: 'POST', body: { scope: 'global', name: newName, nodes: newNodes }, quiet: true })
+      setDialog(null)
+      onOpenLibrary?.({ highlight: newName })
+      return
+    }
     await api(`/projects/${encoded}/workflows`, { method: 'POST', body: { name: newName, nodes: newNodes }, quiet: true })
     keepChecks(newName, checks)
     if (conversation) {
@@ -426,7 +452,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
       jsx(StatusTag, { tone: latest?.status === 'running' ? 'info' : 'neutral', label: latest ? `Live: ${latest.status}` : `${number(grouped.length)} ${plural(grouped.length, 'workflow')}` }),
       !latest && current && !draft ? jsx('span', { className: 'dy-wfd-chip', 'data-workflow-no-run': true, children: `${current.name}: no runs yet` }) : null,
       jsx('span', { className: 'dy-wfd-grow' }),
-      jsx(Button, { small: true, action: 'open-workflow-library', onClick: onOpenLibrary, children: 'Open library' }),
+      jsx(Button, { small: true, action: 'open-workflow-library', onClick: () => onOpenLibrary?.(), children: 'Open library' }),
       jsx(Button, { small: true, variant: 'primary', action: 'wfd-new-workflow', disabled: Boolean(draft), onClick: startNew, children: 'New workflow' }),
     ] }),
     error ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: error }) : null,
@@ -522,7 +548,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
         ] }, 'canvas') : jsx('p', { className: 'dockyard-meta', children: 'No workflow selected.' }),
       ]}),
     ]}),
-    dialog === 'new' ? jsx(NewWorkflowDialog, { takenNames, templates, members, onCreate: createFromDialog, onClose: () => setDialog(null) }) : null,
+    dialog === 'new' ? jsx(NewWorkflowDialog, { project: { id: project.id, name: project.name || project.id }, taken: { project: takenNames, global: globalNames }, templates, members, onCreate: createFromDialog, onClose: () => setDialog(null) }) : null,
     dialog === 'settings' ? jsx(WorkflowSettingsDialog, { project: project.id, workflow: standinWorkflow(), title: current?.name ?? '', members, onClose: () => setDialog(null) }) : null,
     repeatNode ? jsx(RepeatPopover, { node: repeatNode, anchor: repeatAt.rect, check: readStepSettings(project.id, standinWorkflow(), repeatAt.nodeId).check, draft: Boolean(draft), onSave: ({ rounds, check }) => saveRepeat(repeatAt.nodeId, { max_iterations: rounds, until: { status: 'done' } }, check), onStop: () => saveRepeat(repeatAt.nodeId, null, null), onClose: () => setRepeatAt(null) }, repeatAt.nodeId) : null,
     // The AI chat: a sidebar at the window's edge, outside the canvas.

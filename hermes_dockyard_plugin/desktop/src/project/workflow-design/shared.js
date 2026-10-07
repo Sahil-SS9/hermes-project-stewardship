@@ -56,50 +56,83 @@ export function StepsPreview({ nodes, roleOf = null }) {
 // in the library. A pick is { source: 'builtin' | 'library', item }.
 const stepCount = (n) => `${n} step${n === 1 ? '' : 's'}`
 const matches = (words, ...fields) => !words || fields.some((f) => String(f ?? '').toLowerCase().includes(words))
+// The templates sit on tabs, one group at a time (Sahil 08/10/2026: tabs, not
+// one long list whose heading changed as it scrolled). Each tab shows its
+// count. Typing searches every tab at once: the tabs then count the matches
+// and none is open; picking a tab ends the search. The panel keeps one height,
+// so the dialog does not jump from tab to tab.
 export function TemplatePicker({ builtins, groups, saved, value, onPick }) {
+  const tabs = [
+    ...groups.map((group) => ({ id: group.id, label: group.tab ?? group.title, title: group.title, items: builtins.filter((t) => t.group === group.id) })),
+    { id: 'library', label: 'Saved', title: 'Saved in your library' },
+  ]
   const [filter, setFilter] = useState('')
+  const [open, setOpen] = useState(() => (value ? (value.source === 'library' ? 'library' : value.item.group) : tabs[0].id))
   const words = filter.trim().toLowerCase()
+  const builtinHit = (t) => matches(words, t.title, t.summary, t.based_on, t.name)
+  const savedHit = (t) => matches(words, t.name)
+  const countOf = (tab) => (tab.id === 'library' ? (saved === null ? null : (saved ?? []).filter(savedHit).length) : tab.items.filter(builtinHit).length)
+  const labelOf = (groupId) => tabs.find((tab) => tab.id === groupId)?.label ?? ''
   const isPicked = (source, name) => value?.source === source && value.item.name === name
-  const sections = groups.map((group) => ({ group, items: builtins.filter((t) => t.group === group.id && matches(words, t.title, t.summary, t.based_on, t.name)) }))
-  const savedItems = (saved ?? []).filter((t) => matches(words, t.name))
-  const shown = sections.filter((s) => !words || s.items.length)
-  const nothing = words && !shown.length && !savedItems.length
+  const current = words ? null : (tabs.find((tab) => tab.id === open) ?? tabs[0])
+  const choose = (id) => { setFilter(''); setOpen(id) }
+  // Arrow keys, Home and End move between tabs (and open them).
+  const onTabKey = (event) => {
+    const buttons = [...event.currentTarget.querySelectorAll('[role="tab"]')]
+    const at = Math.max(0, buttons.indexOf(document.activeElement))
+    const next = { ArrowRight: (at + 1) % tabs.length, ArrowLeft: (at - 1 + tabs.length) % tabs.length, Home: 0, End: tabs.length - 1 }[event.key]
+    if (next === undefined) return
+    event.preventDefault()
+    choose(tabs[next].id)
+    buttons[next]?.focus()
+  }
+  const item = (source, t, withGroup) => {
+    const nodes = source === 'builtin' ? t.nodes : t.definition?.nodes ?? []
+    const where = withGroup ? `${source === 'builtin' ? labelOf(t.group) : 'Saved'} · ` : ''
+    return jsxs('button', {
+      type: 'button', role: 'radio', 'aria-checked': isPicked(source, t.name), [source === 'builtin' ? 'data-wfd-builtin' : 'data-wfd-template']: t.name,
+      className: `dy-wfd-tpl-item${isPicked(source, t.name) ? ' active' : ''}`, onClick: () => onPick({ source, item: t }),
+      children: [
+        jsxs('span', { className: 'dy-wfd-template-head', children: [jsx('strong', { children: source === 'builtin' ? t.title : t.name }), jsx('small', { children: `${where}${stepCount(nodes.length)}` })] }),
+        jsx('span', { className: 'dy-wfd-tpl-summary', children: source === 'builtin' ? t.summary : runOrder(nodes).map((n) => n.title).join(' → ') }),
+      ],
+    }, `${source}:${t.name}`)
+  }
+  let items = []
+  let note = null
+  if (words) {
+    items = [...builtins.filter(builtinHit).map((t) => item('builtin', t, true)), ...(saved ?? []).filter(savedHit).map((t) => item('library', t, true))]
+    if (!items.length) note = jsx('span', { className: 'dockyard-meta', role: 'status', children: `No templates match "${filter.trim()}".` })
+  } else if (current.id === 'library') {
+    if (saved === null) note = jsx('span', { className: 'dockyard-meta', role: 'status', children: 'Loading saved templates…' })
+    else if (!saved.length) note = jsx('span', { className: 'dockyard-meta', 'data-wfd-no-templates': true, children: 'None saved yet. In the library, save a workflow for every project to make it a template.' })
+    else items = saved.map((t) => item('library', t, false))
+  } else {
+    items = current.items.map((t) => item('builtin', t, false))
+  }
   return jsxs('div', { className: 'dy-wfd-tpl', children: [
     jsxs('label', { className: 'dy-wfd-field', children: [
       jsx('span', { children: 'Find a template' }),
-      jsx('input', { type: 'search', value: filter, 'data-wfd-template-filter': true, placeholder: 'e.g. bug, release, research', onChange: (e) => setFilter(e.target.value) }),
+      jsx('input', { type: 'search', value: filter, 'data-wfd-template-filter': true, placeholder: 'Search all templates, e.g. bug, release, research', onChange: (e) => setFilter(e.target.value) }),
     ] }),
-    jsxs('div', { className: 'dy-wfd-tpl-groups', role: 'radiogroup', 'aria-label': 'Templates', children: [
-      ...shown.map(({ group, items }) => jsxs('section', { className: 'dy-wfd-tpl-group', 'data-wfd-template-group': group.id, children: [
-        jsx('h4', { children: group.title }),
-        ...items.map((t) => jsxs('button', {
-          type: 'button', role: 'radio', 'aria-checked': isPicked('builtin', t.name), 'data-wfd-builtin': t.name,
-          className: `dy-wfd-tpl-item${isPicked('builtin', t.name) ? ' active' : ''}`, onClick: () => onPick({ source: 'builtin', item: t }),
-          children: [
-            jsxs('span', { className: 'dy-wfd-template-head', children: [jsx('strong', { children: t.title }), jsx('small', { children: stepCount(t.nodes.length) })] }),
-            jsx('span', { className: 'dy-wfd-tpl-summary', children: t.summary }),
-          ],
-        }, t.name)),
-      ] }, group.id)),
-      !words || savedItems.length ? jsxs('section', { className: 'dy-wfd-tpl-group', 'data-wfd-template-group': 'library', children: [
-        jsx('h4', { children: 'Saved in your library' }),
-        saved === null ? jsx('span', { className: 'dockyard-meta', role: 'status', children: 'Loading saved templates…' })
-          : !saved.length ? jsx('span', { className: 'dockyard-meta', 'data-wfd-no-templates': true, children: 'None saved yet. In the library, save a workflow for every project to make it a template.' })
-            : null,
-        ...savedItems.map((t) => {
-          const nodes = t.definition?.nodes ?? []
-          return jsxs('button', {
-            type: 'button', role: 'radio', 'aria-checked': isPicked('library', t.name), 'data-wfd-template': t.name,
-            className: `dy-wfd-tpl-item${isPicked('library', t.name) ? ' active' : ''}`, onClick: () => onPick({ source: 'library', item: t }),
-            children: [
-              jsxs('span', { className: 'dy-wfd-template-head', children: [jsx('strong', { children: t.name }), jsx('small', { children: stepCount(nodes.length) })] }),
-              jsx('span', { className: 'dy-wfd-tpl-summary', children: runOrder(nodes).map((n) => n.title).join(' → ') }),
-            ],
-          }, t.name)
-        }),
-      ] }, 'library') : null,
-      nothing ? jsx('span', { className: 'dockyard-meta', role: 'status', children: `No templates match "${filter.trim()}".` }) : null,
-    ] }),
+    jsx('div', { className: 'dy-wfd-tpl-tabs', role: 'tablist', 'aria-label': 'Template groups', onKeyDown: onTabKey, children: tabs.map((tab, index) => {
+      const selected = current?.id === tab.id
+      const count = countOf(tab)
+      return jsxs('button', {
+        type: 'button', role: 'tab', id: `wfd-tpl-tab-${tab.id}`, title: tab.title, 'data-wfd-template-tab': tab.id,
+        'aria-selected': selected ? 'true' : 'false', 'aria-controls': 'wfd-tpl-panel', tabIndex: selected || (!current && index === 0) ? 0 : -1,
+        className: `dy-wfd-tpl-tab${selected ? ' active' : ''}`, onClick: () => choose(tab.id),
+        children: [jsx('span', { children: tab.label }), jsx('span', { className: 'dy-wfd-tpl-count', children: count === null ? '…' : String(count) })],
+      }, tab.id)
+    }) }),
+    jsxs('div', {
+      id: 'wfd-tpl-panel', className: 'dy-wfd-tpl-panel', 'data-wfd-template-panel': current ? current.id : 'matches',
+      role: current ? 'tabpanel' : 'region', 'aria-labelledby': current ? `wfd-tpl-tab-${current.id}` : undefined, 'aria-label': current ? undefined : `Templates matching ${filter.trim()}`,
+      children: [
+        items.length ? jsx('div', { className: 'dy-wfd-tpl-list', role: 'radiogroup', 'aria-label': current ? current.title : 'Matching templates', children: items }) : null,
+        note,
+      ],
+    }),
   ] })
 }
 

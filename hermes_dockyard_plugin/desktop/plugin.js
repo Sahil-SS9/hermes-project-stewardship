@@ -2477,9 +2477,25 @@ var WORKFLOW_DESIGN_CSS = `
 /* Use a template: the built-in groups, then the saved ones; a filter; the
    picked one's steps, sources and the two questions (who works, who checks). */
 .dockyard-root .dy-wfd-tpl { display: grid; gap: 8px; }
-.dockyard-root .dy-wfd-tpl-groups { display: grid; gap: 12px; max-height: min(38vh, 330px); overflow-y: auto; padding-right: 4px; }
-.dockyard-root .dy-wfd-tpl-group { display: grid; gap: 6px; }
-.dockyard-root .dy-wfd-tpl-group h4 { position: sticky; top: 0; z-index: 1; margin: 0; padding: 2px 0; background: var(--dy-surface); color: var(--dy-text-2); font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+.dockyard-root .dy-wfd-tpl-tabs { display: flex; gap: 2px; overflow-x: auto; border-bottom: 1px solid var(--dy-border); scrollbar-width: none; }
+.dockyard-root .dy-wfd-tpl-tab { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; margin-bottom: -1px; padding: 7px 10px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--dy-text-2); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.dockyard-root .dy-wfd-tpl-tab:hover { color: var(--dy-text); }
+.dockyard-root .dy-wfd-tpl-tab.active { border-bottom-color: var(--dy-action); color: var(--dy-text); }
+.dockyard-root .dy-wfd-tpl-tab:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: -2px; border-radius: 6px 6px 0 0; }
+.dockyard-root .dy-wfd-tpl-count { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; line-height: 18px; text-align: center; }
+.dockyard-root .dy-wfd-tpl-tab.active .dy-wfd-tpl-count { background: var(--dy-accent-soft); color: var(--dy-text); }
+/* The panel keeps one height on every tab, so the dialog does not jump. It takes the room the dialog has
+   left (the dialog is at most 100vh - 40px, about 390px of it around the panel), up to 440px: enough for
+   the largest built-in tab (7 templates) with no scrolling. A small window scrolls the panel, not the dialog. */
+.dockyard-root .dy-wfd-tpl-panel { display: grid; align-content: start; height: clamp(200px, calc(100vh - 430px), 440px); overflow-y: auto; padding: 2px 4px 2px 0; }
+.dockyard-root .dy-wfd-tpl-list { display: grid; gap: 6px; }
+.dockyard-root .dy-wfd-scopes button:disabled { border-style: dashed; background: var(--dy-surface); cursor: not-allowed; }
+.dockyard-root .dy-wfd-scopes button:disabled:hover { border-color: var(--dy-border); }
+.dockyard-root .dy-wfd-ways .dy-wfd-scope-name { margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--dy-accent-soft); color: var(--dy-text); font-size: 12px; font-weight: 600; }
+.dockyard-root .dy-wfd-scope-line { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 6px 6px 6px 10px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); font-size: 12px; }
+.dockyard-root .dy-wfd-scope-line > span { color: var(--dy-text-2); }
+.dockyard-root .dy-wfd-scope-line > strong { flex: 1; min-width: 0; color: var(--dy-text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dockyard-root .dockyard-feature-card.dy-wf-just-made { border-color: var(--dy-action); box-shadow: 0 0 0 1px var(--dy-action); }
 .dockyard-root .dy-wfd-tpl-item { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); text-align: left; cursor: pointer; font: inherit; }
 .dockyard-root .dy-wfd-tpl-item:hover { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
 .dockyard-root .dy-wfd-tpl-item:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
@@ -15752,55 +15768,94 @@ function StepsPreview({ nodes, roleOf = null }) {
 var stepCount = (n) => `${n} step${n === 1 ? "" : "s"}`;
 var matches = (words2, ...fields) => !words2 || fields.some((f) => String(f ?? "").toLowerCase().includes(words2));
 function TemplatePicker({ builtins, groups, saved, value, onPick }) {
+  const tabs = [
+    ...groups.map((group) => ({ id: group.id, label: group.tab ?? group.title, title: group.title, items: builtins.filter((t) => t.group === group.id) })),
+    { id: "library", label: "Saved", title: "Saved in your library" }
+  ];
   const [filter, setFilter] = useState("");
+  const [open, setOpen] = useState(() => value ? value.source === "library" ? "library" : value.item.group : tabs[0].id);
   const words2 = filter.trim().toLowerCase();
+  const builtinHit = (t) => matches(words2, t.title, t.summary, t.based_on, t.name);
+  const savedHit = (t) => matches(words2, t.name);
+  const countOf = (tab) => tab.id === "library" ? saved === null ? null : (saved ?? []).filter(savedHit).length : tab.items.filter(builtinHit).length;
+  const labelOf = (groupId) => tabs.find((tab) => tab.id === groupId)?.label ?? "";
   const isPicked = (source, name) => value?.source === source && value.item.name === name;
-  const sections = groups.map((group) => ({ group, items: builtins.filter((t) => t.group === group.id && matches(words2, t.title, t.summary, t.based_on, t.name)) }));
-  const savedItems = (saved ?? []).filter((t) => matches(words2, t.name));
-  const shown = sections.filter((s) => !words2 || s.items.length);
-  const nothing = words2 && !shown.length && !savedItems.length;
+  const current = words2 ? null : tabs.find((tab) => tab.id === open) ?? tabs[0];
+  const choose = (id) => {
+    setFilter("");
+    setOpen(id);
+  };
+  const onTabKey = (event) => {
+    const buttons = [...event.currentTarget.querySelectorAll('[role="tab"]')];
+    const at = Math.max(0, buttons.indexOf(document.activeElement));
+    const next = { ArrowRight: (at + 1) % tabs.length, ArrowLeft: (at - 1 + tabs.length) % tabs.length, Home: 0, End: tabs.length - 1 }[event.key];
+    if (next === void 0) return;
+    event.preventDefault();
+    choose(tabs[next].id);
+    buttons[next]?.focus();
+  };
+  const item = (source, t, withGroup) => {
+    const nodes = source === "builtin" ? t.nodes : t.definition?.nodes ?? [];
+    const where = withGroup ? `${source === "builtin" ? labelOf(t.group) : "Saved"} \xB7 ` : "";
+    return jsxs("button", {
+      type: "button",
+      role: "radio",
+      "aria-checked": isPicked(source, t.name),
+      [source === "builtin" ? "data-wfd-builtin" : "data-wfd-template"]: t.name,
+      className: `dy-wfd-tpl-item${isPicked(source, t.name) ? " active" : ""}`,
+      onClick: () => onPick({ source, item: t }),
+      children: [
+        jsxs("span", { className: "dy-wfd-template-head", children: [jsx("strong", { children: source === "builtin" ? t.title : t.name }), jsx("small", { children: `${where}${stepCount(nodes.length)}` })] }),
+        jsx("span", { className: "dy-wfd-tpl-summary", children: source === "builtin" ? t.summary : runOrder(nodes).map((n) => n.title).join(" \u2192 ") })
+      ]
+    }, `${source}:${t.name}`);
+  };
+  let items = [];
+  let note = null;
+  if (words2) {
+    items = [...builtins.filter(builtinHit).map((t) => item("builtin", t, true)), ...(saved ?? []).filter(savedHit).map((t) => item("library", t, true))];
+    if (!items.length) note = jsx("span", { className: "dockyard-meta", role: "status", children: `No templates match "${filter.trim()}".` });
+  } else if (current.id === "library") {
+    if (saved === null) note = jsx("span", { className: "dockyard-meta", role: "status", children: "Loading saved templates\u2026" });
+    else if (!saved.length) note = jsx("span", { className: "dockyard-meta", "data-wfd-no-templates": true, children: "None saved yet. In the library, save a workflow for every project to make it a template." });
+    else items = saved.map((t) => item("library", t, false));
+  } else {
+    items = current.items.map((t) => item("builtin", t, false));
+  }
   return jsxs("div", { className: "dy-wfd-tpl", children: [
     jsxs("label", { className: "dy-wfd-field", children: [
       jsx("span", { children: "Find a template" }),
-      jsx("input", { type: "search", value: filter, "data-wfd-template-filter": true, placeholder: "e.g. bug, release, research", onChange: (e) => setFilter(e.target.value) })
+      jsx("input", { type: "search", value: filter, "data-wfd-template-filter": true, placeholder: "Search all templates, e.g. bug, release, research", onChange: (e) => setFilter(e.target.value) })
     ] }),
-    jsxs("div", { className: "dy-wfd-tpl-groups", role: "radiogroup", "aria-label": "Templates", children: [
-      ...shown.map(({ group, items }) => jsxs("section", { className: "dy-wfd-tpl-group", "data-wfd-template-group": group.id, children: [
-        jsx("h4", { children: group.title }),
-        ...items.map((t) => jsxs("button", {
-          type: "button",
-          role: "radio",
-          "aria-checked": isPicked("builtin", t.name),
-          "data-wfd-builtin": t.name,
-          className: `dy-wfd-tpl-item${isPicked("builtin", t.name) ? " active" : ""}`,
-          onClick: () => onPick({ source: "builtin", item: t }),
-          children: [
-            jsxs("span", { className: "dy-wfd-template-head", children: [jsx("strong", { children: t.title }), jsx("small", { children: stepCount(t.nodes.length) })] }),
-            jsx("span", { className: "dy-wfd-tpl-summary", children: t.summary })
-          ]
-        }, t.name))
-      ] }, group.id)),
-      !words2 || savedItems.length ? jsxs("section", { className: "dy-wfd-tpl-group", "data-wfd-template-group": "library", children: [
-        jsx("h4", { children: "Saved in your library" }),
-        saved === null ? jsx("span", { className: "dockyard-meta", role: "status", children: "Loading saved templates\u2026" }) : !saved.length ? jsx("span", { className: "dockyard-meta", "data-wfd-no-templates": true, children: "None saved yet. In the library, save a workflow for every project to make it a template." }) : null,
-        ...savedItems.map((t) => {
-          const nodes = t.definition?.nodes ?? [];
-          return jsxs("button", {
-            type: "button",
-            role: "radio",
-            "aria-checked": isPicked("library", t.name),
-            "data-wfd-template": t.name,
-            className: `dy-wfd-tpl-item${isPicked("library", t.name) ? " active" : ""}`,
-            onClick: () => onPick({ source: "library", item: t }),
-            children: [
-              jsxs("span", { className: "dy-wfd-template-head", children: [jsx("strong", { children: t.name }), jsx("small", { children: stepCount(nodes.length) })] }),
-              jsx("span", { className: "dy-wfd-tpl-summary", children: runOrder(nodes).map((n) => n.title).join(" \u2192 ") })
-            ]
-          }, t.name);
-        })
-      ] }, "library") : null,
-      nothing ? jsx("span", { className: "dockyard-meta", role: "status", children: `No templates match "${filter.trim()}".` }) : null
-    ] })
+    jsx("div", { className: "dy-wfd-tpl-tabs", role: "tablist", "aria-label": "Template groups", onKeyDown: onTabKey, children: tabs.map((tab, index) => {
+      const selected = current?.id === tab.id;
+      const count = countOf(tab);
+      return jsxs("button", {
+        type: "button",
+        role: "tab",
+        id: `wfd-tpl-tab-${tab.id}`,
+        title: tab.title,
+        "data-wfd-template-tab": tab.id,
+        "aria-selected": selected ? "true" : "false",
+        "aria-controls": "wfd-tpl-panel",
+        tabIndex: selected || !current && index === 0 ? 0 : -1,
+        className: `dy-wfd-tpl-tab${selected ? " active" : ""}`,
+        onClick: () => choose(tab.id),
+        children: [jsx("span", { children: tab.label }), jsx("span", { className: "dy-wfd-tpl-count", children: count === null ? "\u2026" : String(count) })]
+      }, tab.id);
+    }) }),
+    jsxs("div", {
+      id: "wfd-tpl-panel",
+      className: "dy-wfd-tpl-panel",
+      "data-wfd-template-panel": current ? current.id : "matches",
+      role: current ? "tabpanel" : "region",
+      "aria-labelledby": current ? `wfd-tpl-tab-${current.id}` : void 0,
+      "aria-label": current ? void 0 : `Templates matching ${filter.trim()}`,
+      children: [
+        items.length ? jsx("div", { className: "dy-wfd-tpl-list", role: "radiogroup", "aria-label": current ? current.title : "Matching templates", children: items }) : null,
+        note
+      ]
+    })
   ] });
 }
 function ImportResult({ result }) {
@@ -15960,23 +16015,28 @@ var builtin_templates_default = {
   groups: [
     {
       id: "loops",
-      title: "Loops"
+      title: "Loops",
+      tab: "Loops"
     },
     {
       id: "build-and-fix",
-      title: "Build and fix"
+      title: "Build and fix",
+      tab: "Build & fix"
     },
     {
       id: "check-quality",
-      title: "Check quality"
+      title: "Check quality",
+      tab: "Quality"
     },
     {
       id: "look-after",
-      title: "Look after the project"
+      title: "Look after the project",
+      tab: "Look after"
     },
     {
       id: "research-writing",
-      title: "Research and writing"
+      title: "Research and writing",
+      tab: "Research"
     }
   ],
   templates: [
@@ -17910,6 +17970,10 @@ var WAYS = Object.freeze([
   { way: "import", title: "Import", text: "Paste a workflow, or choose a file." },
   { way: "ai", title: "Describe it to the AI", text: "Say what you want. The AI explains its plan and drafts the steps." }
 ]);
+var SCOPES = Object.freeze([
+  { scope: "project", title: "This project", text: "Only this project uses it. It opens on the canvas, ready to build." },
+  { scope: "global", title: "Global", text: "Every project can use it, once turned on there. It is kept on the Workflows tab." }
+]);
 var AI_EXAMPLES = Object.freeze(["Fix a bug until the tests pass", "Prepare a weekly release", "Research a topic and write a summary"]);
 function NameField({ value, onChange, error }) {
   return jsxs("label", { className: "dy-wfd-field", children: [
@@ -17960,8 +18024,16 @@ function TemplateDetail({ pick, members, whoWorks, whoChecks, onWorks, onChecks 
     same ? jsx("span", { className: "dy-wfd-warning", role: "status", "data-wfd-same-bot": true, children: `${whoWorks} checks its own work here. A different checker catches more, so pick another bot if you can.` }) : null
   ] });
 }
-function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }) {
-  const [way, setWay] = useState("choose");
+function ScopeLine({ scope, project, disabled, onChange }) {
+  return jsxs("div", { className: "dy-wfd-scope-line", "data-wfd-scope-chosen": scope, children: [
+    jsx("span", { children: "Saving to" }),
+    jsx("strong", { children: scope === "global" ? "Global: every project can use it" : `This project: ${project?.name ?? project?.id ?? ""}` }),
+    jsx(Button, { small: true, action: "wfd-scope-change", disabled, onClick: onChange, children: "Change" })
+  ] });
+}
+function NewWorkflowDialog({ project, taken, templates, members, onCreate, onClose }) {
+  const [scope, setScope] = useState(null);
+  const [way, setWay] = useState("scope");
   const [name, setName] = useState("");
   const [first, setFirst] = useState("Step 1");
   const [template, setTemplate] = useState(null);
@@ -17992,6 +18064,11 @@ function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }
     setNameError(null);
     setWayError(null);
   };
+  const takenNames = scope && taken?.[scope] || [];
+  const pickScope = (next) => {
+    setScope(next);
+    go("choose");
+  };
   const checkName = () => {
     const clean = name.trim();
     const problem = !clean ? "Give the workflow a name." : takenNames.includes(clean) ? `"${clean}" already exists. Pick another name.` : null;
@@ -18009,6 +18086,10 @@ function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }
     const missing = way === "template" && !template ? "Pick a template first." : way === "import" && !(imported && imported.kind !== "invalid") ? imported ? "This text cannot be imported. Fix it, or describe it to the AI instead." : "Press Check it first." : way === "ai" && !aiDraft ? "Press Draft it first." : null;
     setWayError(missing);
     if (missing) return;
+    if (!taken?.[scope]) {
+      setWayError("Still checking which names are in use. Try again in a moment.");
+      return;
+    }
     if (way === "blank" && !first.trim()) setStepError("Name the first step.");
     else setStepError(null);
     const clean = checkName();
@@ -18017,7 +18098,7 @@ function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }
     setBusy(true);
     setServerError(null);
     try {
-      await onCreate({ name: clean, nodes, checks: way === "ai" ? aiDraft.checks : null, conversation: way === "ai" ? { describe: describe.trim(), plan: aiDraft } : null });
+      await onCreate({ scope, name: clean, nodes, checks: way === "ai" ? aiDraft.checks : null, conversation: way === "ai" ? { describe: describe.trim(), plan: aiDraft } : null });
     } catch (failure) {
       setServerError(`Couldn't create it: ${String(failure?.message ?? failure).replace(/^\d{3}:\s*/, "")}`);
       setBusy(false);
@@ -18047,6 +18128,13 @@ function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }
     setName(uniqueName(result.name, takenNames));
   };
   const body = () => {
+    if (way === "scope") return jsx("div", { className: "dy-wfd-ways dy-wfd-scopes", role: "group", "aria-label": "Where it lives", children: SCOPES.map((s) => {
+      const off = s.scope === "project" && !project;
+      return jsxs("button", { type: "button", "data-wfd-scope": s.scope, disabled: off, onClick: () => pickScope(s.scope), children: [
+        jsxs("strong", { children: [s.title, s.scope === "project" && project ? jsx("span", { className: "dy-wfd-scope-name", children: project.name ?? project.id }) : null] }),
+        jsx("span", { children: off ? "Pick a project in the switcher first." : s.text })
+      ] }, s.scope);
+    }) });
     if (way === "choose") return jsx("div", { className: "dy-wfd-ways", children: WAYS.map((w) => jsxs("button", { type: "button", "data-wfd-way": w.way, onClick: () => go(w.way), children: [
       jsxs("strong", { children: [w.title, w.way === "ai" ? jsx(PreviewTag, { children: "Practice AI" }) : null] }),
       jsx("span", { children: w.text })
@@ -18101,7 +18189,8 @@ function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }
       aiDraft ? jsx(NameField, { value: name, onChange: setName, error: nameError }) : null
     ] });
   };
-  const heading = way === "choose" ? "How do you want to start?" : WAYS.find((w) => w.way === way).title;
+  const heading = way === "scope" ? "Where should it live?" : way === "choose" ? "How do you want to start?" : WAYS.find((w) => w.way === way).title;
+  const atStart = way === "scope" || way === "choose";
   return jsx("section", { className: "dockyard-modal-layer", "data-wfd-new-dialog": way, onClick: (event) => {
     if (event.target === event.currentTarget && !busy) onClose();
   }, children: jsxs("div", { className: "dockyard-modal dy-wfd-modal dy-wfd-new", role: "dialog", "aria-modal": true, "aria-labelledby": "wfd-new-title", children: [
@@ -18109,13 +18198,14 @@ function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }
       jsxs("div", { children: [jsx("h2", { id: "wfd-new-title", children: "New workflow" }), jsx("p", { children: heading })] }),
       jsx(Button, { small: true, action: "wfd-new-close", ariaLabel: "Close", disabled: busy, onClick: onClose, children: "\xD7" })
     ] }),
+    way === "scope" ? null : jsx(ScopeLine, { scope, project, disabled: busy, onChange: () => go("scope") }),
     body(),
     serverError ? jsx("p", { className: "dy-wfd-error", role: "alert", "data-wfd-create-error": true, children: serverError }) : null,
     wayError ? jsx("p", { className: "dy-wfd-error", role: "alert", "data-wfd-way-error": true, children: wayError }) : null,
-    way === "choose" ? null : jsx("p", { className: "dockyard-meta", children: "Nothing is saved until you press Create workflow." }),
+    atStart ? null : jsx("p", { className: "dockyard-meta", children: "Nothing is saved until you press Create workflow." }),
     jsxs("div", { className: "dockyard-modal-actions", children: [
-      way === "choose" ? jsx(Button, { action: "wfd-new-cancel", onClick: onClose, children: "Cancel" }) : jsx(Button, { action: "wfd-new-back", disabled: busy, onClick: () => go("choose"), children: "\u2190 All ways in" }),
-      way === "choose" ? null : jsx(Button, { action: "wfd-create", variant: "primary", disabled: busy, onClick: create, children: busy ? "Creating\u2026" : "Create workflow" })
+      atStart ? jsx(Button, { action: "wfd-new-cancel", onClick: onClose, children: "Cancel" }) : jsx(Button, { action: "wfd-new-back", disabled: busy, onClick: () => go("choose"), children: "\u2190 All ways in" }),
+      atStart ? null : jsx(Button, { action: "wfd-create", variant: "primary", disabled: busy, onClick: create, children: busy ? "Creating\u2026" : "Create workflow" })
     ] })
   ] }) });
 }
@@ -18311,9 +18401,10 @@ function AiSidebar({ members, nodes, workflowTitle, thread, onThread, pinned, on
 var NO_RUNS = [];
 var NO_THREAD = [];
 var failureText = (failure) => String(failure?.message ?? failure ?? "unknown error").replace(/^\d{3}:\s*/, "");
-function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary }) {
+function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary, openWorkflow = null, onOpenWorkflowDone }) {
   const canvasRef = useRef(null);
-  const [selected, setSelected] = useState(workflows?.[0]?.name ?? "");
+  const opening = openWorkflow?.project === project.id && openWorkflow.name ? openWorkflow : null;
+  const [selected, setSelected] = useState(opening?.name ?? workflows?.[0]?.name ?? "");
   const [runsFor, setRunsFor] = useState({ workflow: null, runs: NO_RUNS });
   const [error, setError] = useState(null);
   const [mode, setMode] = useState("live");
@@ -18324,6 +18415,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
   const membersRef = useRef([]);
   membersRef.current = members;
   const [templates, setTemplates] = useState(null);
+  const [globalNames, setGlobalNames] = useState(null);
   const [dialog, setDialog] = useState(null);
   const [draft, setDraft] = useState(null);
   const draftRef = useRef(null);
@@ -18333,9 +18425,9 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     setDraft(next);
     return next;
   };
-  const [aiOpen, setAiOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(Boolean(opening?.conversation));
   const [aiPinned, setAiPinned] = useState(() => readAiPinned());
-  const [aiThreads, setAiThreads] = useState({});
+  const [aiThreads, setAiThreads] = useState(() => opening?.conversation ? { [opening.name]: createdConversation(opening.name, opening.conversation) } : {});
   const [repeatAt, setRepeatAt] = useState(null);
   const [draftError, setDraftError] = useState(null);
   const encoded = encodeURIComponent(project.id);
@@ -18469,10 +18561,16 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     api(`/projects/${encoded}/team`).then((result) => {
       if (live) setMembers((result?.members ?? []).filter((m) => m.state === "active").map((m) => m.profile_slug));
     }).catch(() => void 0);
-    api("/workflow-library?scope=global").then((result) => {
-      if (live) setTemplates(result?.workflows ?? []);
+    api("/workflow-library?scope=global&include_archived=true").then((result) => {
+      if (!live) return;
+      const rows = result?.workflows ?? [];
+      setTemplates(rows.filter((row) => !row.archived_at));
+      setGlobalNames(rows.map((row) => row.name));
     }).catch(() => {
-      if (live) setTemplates([]);
+      if (live) {
+        setTemplates([]);
+        setGlobalNames(null);
+      }
     });
     return () => {
       live = false;
@@ -18632,7 +18730,18 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     setValidation(null);
     setDialog("new");
   };
-  const createFromDialog = async ({ name: newName, nodes: newNodes, checks, conversation }) => {
+  useEffect(() => {
+    if (!openWorkflow) return;
+    if (opening?.checks) keepChecks(opening.name, opening.checks);
+    onOpenWorkflowDone?.();
+  }, []);
+  const createFromDialog = async ({ scope, name: newName, nodes: newNodes, checks, conversation }) => {
+    if (scope === "global") {
+      await api("/workflow-library", { method: "POST", body: { scope: "global", name: newName, nodes: newNodes }, quiet: true });
+      setDialog(null);
+      onOpenLibrary?.({ highlight: newName });
+      return;
+    }
     await api(`/projects/${encoded}/workflows`, { method: "POST", body: { name: newName, nodes: newNodes }, quiet: true });
     keepChecks(newName, checks);
     if (conversation) {
@@ -18698,7 +18807,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
       jsx(StatusTag, { tone: latest?.status === "running" ? "info" : "neutral", label: latest ? `Live: ${latest.status}` : `${number(grouped.length)} ${plural2(grouped.length, "workflow")}` }),
       !latest && current && !draft ? jsx("span", { className: "dy-wfd-chip", "data-workflow-no-run": true, children: `${current.name}: no runs yet` }) : null,
       jsx("span", { className: "dy-wfd-grow" }),
-      jsx(Button, { small: true, action: "open-workflow-library", onClick: onOpenLibrary, children: "Open library" }),
+      jsx(Button, { small: true, action: "open-workflow-library", onClick: () => onOpenLibrary?.(), children: "Open library" }),
       jsx(Button, { small: true, variant: "primary", action: "wfd-new-workflow", disabled: Boolean(draft), onClick: startNew, children: "New workflow" })
     ] }),
     error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: error }) : null,
@@ -18792,7 +18901,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
         ] }, "canvas") : jsx("p", { className: "dockyard-meta", children: "No workflow selected." })
       ] })
     ] }),
-    dialog === "new" ? jsx(NewWorkflowDialog, { takenNames, templates, members, onCreate: createFromDialog, onClose: () => setDialog(null) }) : null,
+    dialog === "new" ? jsx(NewWorkflowDialog, { project: { id: project.id, name: project.name || project.id }, taken: { project: takenNames, global: globalNames }, templates, members, onCreate: createFromDialog, onClose: () => setDialog(null) }) : null,
     dialog === "settings" ? jsx(WorkflowSettingsDialog, { project: project.id, workflow: standinWorkflow(), title: current?.name ?? "", members, onClose: () => setDialog(null) }) : null,
     repeatNode ? jsx(RepeatPopover, { node: repeatNode, anchor: repeatAt.rect, check: readStepSettings(project.id, standinWorkflow(), repeatAt.nodeId).check, draft: Boolean(draft), onSave: ({ rounds, check }) => saveRepeat(repeatAt.nodeId, { max_iterations: rounds, until: { status: "done" } }, check), onStop: () => saveRepeat(repeatAt.nodeId, null, null), onClose: () => setRepeatAt(null) }, repeatAt.nodeId) : null,
     // The AI chat: a sidebar at the window's edge, outside the canvas.
@@ -22456,7 +22565,7 @@ function RecentActivityCard({ view, onViewAll }) {
 
 // hermes_dockyard_plugin/desktop/src/project/dashboard.js
 var planView = (entry) => parsePlanFocus(entry) || ["objectives", "initiative", "vision"].includes(entry) ? "plan" : entry;
-function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap, onOpenLink }) {
+function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap, onOpenLink, openWorkflow, onOpenWorkflowDone }) {
   const [projectView, setProjectView] = useState(planView(initialView) || "overview");
   const [planFocus, setPlanFocus] = useState(() => parsePlanFocus(initialView));
   const [canvasDirty, setCanvasDirty] = useState(false);
@@ -22570,7 +22679,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   } else if (projectView === "planning") {
     panel = jsx(PlanningCanvasPanel, { project, canvas: view.canvas, content: view.content ?? [], onRefresh, onDirty: onCanvasDirty }, project.id);
   } else if (projectView === "workflows") {
-    panel = jsx(ExecutableWorkflowsPanel, { project, workflows: view.workflows ?? [], onRefresh, onOpenLibrary }, project.id);
+    panel = jsx(ExecutableWorkflowsPanel, { project, workflows: view.workflows ?? [], onRefresh, onOpenLibrary, openWorkflow, onOpenWorkflowDone }, project.id);
   } else if (projectView === "content") {
     panel = jsx(ProjectContentPanel, { project, content: view.content ?? [], onRefresh }, project.id);
   } else if (projectView === "activity") {
@@ -23135,15 +23244,14 @@ function InboxView({ view, onRefresh, focusRef = null, onOpenProject }) {
 }
 
 // hermes_dockyard_plugin/desktop/src/views/workflow-library.js
-function WorkflowLibraryView({ projectId, onOpenBuilder }) {
+function WorkflowLibraryView({ projectId, projectLabel = null, highlight = null, onOpenBuilder }) {
   const [scope, setScope] = useState("all");
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [name, setName] = useState("");
-  const [title, setTitle] = useState("");
-  const [creating, setCreating] = useState(false);
+  const [dialog, setDialog] = useState(null);
+  const [justMade, setJustMade] = useState(highlight);
   const [enablement, setEnablement] = useState({});
   const [refusals, setRefusals] = useState({});
   const load = async () => {
@@ -23166,22 +23274,43 @@ function WorkflowLibraryView({ projectId, onOpenBuilder }) {
     void load();
   }, [scope, projectId]);
   const filtered = (rows ?? []).filter((row) => !search.trim() || row.name.toLowerCase().includes(search.trim().toLowerCase()));
-  const create = async () => {
-    if (!name.trim() || !title.trim()) return;
-    setBusy(true);
+  useEffect(() => {
+    if (justMade && rows) document.querySelector('[data-library-just-created="true"]')?.scrollIntoView({ block: "nearest" });
+  }, [justMade, rows]);
+  const openNew = async () => {
     setError(null);
+    setDialog({ taken: null, templates: null, members: [] });
     try {
-      await api("/workflow-library", { method: "POST", body: { scope: "global", name: name.trim(), nodes: [{ id: "step-1", title: title.trim(), depends_on: [] }] } });
-      setName("");
-      setTitle("");
-      setCreating(false);
-      await load();
-      emitToast("success", "Workflow library updated.");
+      const [all, team] = await Promise.all([
+        api("/workflow-library?include_archived=true"),
+        projectId ? api(`/projects/${encodeURIComponent(projectId)}/team`).catch(() => null) : null
+      ]);
+      const every = all?.workflows ?? [];
+      const names = (keep) => every.filter(keep).map((row) => row.name);
+      setDialog((open) => open && {
+        taken: { global: names((row) => row.scope === "global"), project: projectId ? names((row) => row.scope === "project" && row.owner_project_id === projectId) : [] },
+        templates: every.filter((row) => row.scope === "global" && !row.archived_at),
+        members: (team?.members ?? []).filter((m) => m.state === "active").map((m) => m.profile_slug)
+      });
     } catch (failure) {
-      setError(String(failure?.message ?? failure));
-    } finally {
-      setBusy(false);
+      setDialog(null);
+      setError(`Couldn't open New workflow: ${String(failure?.message ?? failure)}`);
     }
+  };
+  const createNew = async ({ scope: where, name, nodes, checks, conversation }) => {
+    if (where === "global") {
+      await api("/workflow-library", { method: "POST", body: { scope: "global", name, nodes }, quiet: true });
+      setDialog(null);
+      setJustMade(name);
+      setSearch("");
+      if (scope === "project") setScope("all");
+      else await load();
+      emitToast("success", `${name} is saved for every project.`);
+      return;
+    }
+    await api(`/projects/${encodeURIComponent(projectId)}/workflows`, { method: "POST", body: { name, nodes }, quiet: true });
+    setDialog(null);
+    onOpenBuilder?.({ scope: "project", name, owner_project_id: projectId }, { created: true, conversation, checks });
   };
   const act = async (path) => {
     setBusy(true);
@@ -23251,36 +23380,36 @@ function WorkflowLibraryView({ projectId, onOpenBuilder }) {
         jsx(Button, { small: true, action: "library-scope-project", variant: scope === "project" ? "primary" : "", onClick: () => setScope("project"), children: "Project" })
       ] }),
       jsx("input", { "data-library-search": true, "aria-label": "Search workflows", placeholder: "Search workflows", value: search, onChange: (event) => setSearch(event.target.value) }),
-      jsx(Button, { action: "library-create", variant: "primary", disabled: busy, onClick: () => setCreating((open) => !open), children: creating ? "Close" : "New workflow" })
+      jsx(Button, { action: "library-create", variant: "primary", disabled: busy || Boolean(dialog), onClick: openNew, children: "New workflow" })
     ] }),
-    creating ? jsxs("div", { className: "dockyard-wf-library-create", "data-library-create-form": true, children: [
-      jsxs("label", { children: [jsx("span", { children: "Workflow name" }), jsx("input", { "data-library-name": true, value: name, onChange: (event) => setName(event.target.value) })] }),
-      jsxs("label", { children: [jsx("span", { children: "First step title" }), jsx("input", { "data-library-title": true, value: title, onChange: (event) => setTitle(event.target.value) })] }),
-      jsx(Button, { action: "library-create-confirm", variant: "primary", disabled: busy || !name.trim() || !title.trim(), onClick: create, children: "Create global workflow" })
-    ] }) : null,
-    rows === null && !error ? jsx(LoadingState, {}) : rows === null && error ? jsx(ErrorState, { error, onRetry: load }) : filtered.length === 0 ? jsx(EmptyState, { title: "No workflows yet", description: "Create a workflow and project teams can adopt it for autonomous work.", icon: "project" }) : jsxs("div", { className: "dockyard-wf-library-grid", "data-library-rows": true, children: filtered.map((row) => jsxs("article", { className: "dockyard-feature-card", "data-library-row": row.name, "data-library-scope": row.scope, children: [
-      jsxs("header", { children: [
-        jsx("h3", { children: row.name }),
-        jsx(StatusTag, { tone: row.scope === "global" ? "info" : "neutral", label: row.scope === "global" ? "Global" : "Project" })
-      ] }),
-      jsx("p", { className: "dockyard-meta", children: row.owner_project_id ? `Dedicated to ${row.owner_project_id} \xB7 v${row.version}` : `Available to every project \xB7 v${row.version}` }),
-      jsx("p", { className: "dockyard-meta", children: `${number(row.definition?.nodes?.length ?? 0)} nodes` }),
-      row.archived_at ? jsx(Button, { small: true, action: "library-restore", disabled: busy, onClick: () => act(`/workflow-library/${row.scope}/${encodeURIComponent(row.name)}/restore${row.owner_project_id ? `?owner_project_id=${encodeURIComponent(row.owner_project_id)}` : ""}`), children: "Restore" }) : jsxs("div", { className: "dockyard-form-actions", children: [
-        jsx(Button, { small: true, action: "library-open", disabled: busy, onClick: () => onOpenBuilder?.(row), children: "Open builder" }),
-        jsx(Button, { small: true, action: "library-archive", disabled: busy, onClick: () => act(`/workflow-library/${row.scope}/${encodeURIComponent(row.name)}/archive${row.owner_project_id ? `?owner_project_id=${encodeURIComponent(row.owner_project_id)}` : ""}`), children: "Archive" }),
-        jsx(Button, { small: true, action: "library-delete", variant: "danger", disabled: busy, onClick: () => remove(row.scope, row.name, row.owner_project_id), children: "Delete" })
-      ] }),
-      !projectId || row.scope === "project" && row.owner_project_id !== projectId ? jsx("p", { className: "dockyard-meta", "data-wf-enablement-na": `${row.scope}:${row.name}`, children: projectId ? `Only ${row.owner_project_id} can run this workflow.` : "Select a project to turn workflows on or off." }) : jsxs("div", { className: "dockyard-wf-enablement", children: [
-        jsxs("label", { className: "dockyard-switch", children: [
-          jsx("input", { type: "checkbox", role: "switch", "data-wf-enablement": `${row.scope}:${row.name}`, "aria-label": `Turn ${row.name} on for ${projectId}`, checked: Boolean(enablement[`${row.scope}:${row.name}`] ?? row.scope === "project"), "aria-checked": String(Boolean(enablement[`${row.scope}:${row.name}`] ?? row.scope === "project")), disabled: busy, onChange: () => toggle(row.scope, row.name) }),
-          jsx("span", { className: "dockyard-switch-track", "aria-hidden": true }),
-          jsx("span", { className: "dockyard-switch-thumb", "aria-hidden": true })
+    dialog ? jsx(NewWorkflowDialog, { project: projectId ? { id: projectId, name: projectLabel ?? projectId } : null, taken: dialog.taken, templates: dialog.templates, members: dialog.members, onCreate: createNew, onClose: () => setDialog(null) }) : null,
+    rows === null && !error ? jsx(LoadingState, {}) : rows === null && error ? jsx(ErrorState, { error, onRetry: load }) : filtered.length === 0 ? jsx(EmptyState, { title: "No workflows yet", description: "Create a workflow and project teams can adopt it for autonomous work.", icon: "project" }) : jsxs("div", { className: "dockyard-wf-library-grid", "data-library-rows": true, children: filtered.map((row) => {
+      const made = row.scope === "global" && row.name === justMade;
+      return jsxs("article", { className: `dockyard-feature-card${made ? " dy-wf-just-made" : ""}`, "data-library-row": row.name, "data-library-scope": row.scope, "data-library-just-created": made ? "true" : void 0, children: [
+        jsxs("header", { children: [
+          jsx("h3", { children: row.name }),
+          made ? jsx(StatusTag, { tone: "success", label: "Just made" }) : null,
+          jsx(StatusTag, { tone: row.scope === "global" ? "info" : "neutral", label: row.scope === "global" ? "Global" : "Project" })
         ] }),
-        jsx("span", { className: "dockyard-wf-enablement-label", children: row.scope === "global" ? `On for ${projectId} (off by default)` : `On for ${projectId}` }),
-        jsx(Button, { small: true, action: "library-run", data: { "data-wf-run-start": `${row.scope}:${row.name}` }, disabled: busy, onClick: () => start(row.scope, row.name), children: "Start run" })
-      ] }),
-      refusals[`${row.scope}:${row.name}`] ? jsx("p", { className: "dockyard-inline-error", role: "alert", "data-wf-run-refused": `${row.scope}:${row.name}`, children: refusals[`${row.scope}:${row.name}`] }) : null
-    ] }, `${row.scope}:${row.name}:${row.owner_project_id ?? ""}`)) })
+        jsx("p", { className: "dockyard-meta", children: row.owner_project_id ? `Dedicated to ${row.owner_project_id} \xB7 v${row.version}` : `Available to every project \xB7 v${row.version}` }),
+        jsx("p", { className: "dockyard-meta", children: `${number(row.definition?.nodes?.length ?? 0)} nodes` }),
+        row.archived_at ? jsx(Button, { small: true, action: "library-restore", disabled: busy, onClick: () => act(`/workflow-library/${row.scope}/${encodeURIComponent(row.name)}/restore${row.owner_project_id ? `?owner_project_id=${encodeURIComponent(row.owner_project_id)}` : ""}`), children: "Restore" }) : jsxs("div", { className: "dockyard-form-actions", children: [
+          jsx(Button, { small: true, action: "library-open", disabled: busy, onClick: () => onOpenBuilder?.(row), children: "Open builder" }),
+          jsx(Button, { small: true, action: "library-archive", disabled: busy, onClick: () => act(`/workflow-library/${row.scope}/${encodeURIComponent(row.name)}/archive${row.owner_project_id ? `?owner_project_id=${encodeURIComponent(row.owner_project_id)}` : ""}`), children: "Archive" }),
+          jsx(Button, { small: true, action: "library-delete", variant: "danger", disabled: busy, onClick: () => remove(row.scope, row.name, row.owner_project_id), children: "Delete" })
+        ] }),
+        !projectId || row.scope === "project" && row.owner_project_id !== projectId ? jsx("p", { className: "dockyard-meta", "data-wf-enablement-na": `${row.scope}:${row.name}`, children: projectId ? `Only ${row.owner_project_id} can run this workflow.` : "Select a project to turn workflows on or off." }) : jsxs("div", { className: "dockyard-wf-enablement", children: [
+          jsxs("label", { className: "dockyard-switch", children: [
+            jsx("input", { type: "checkbox", role: "switch", "data-wf-enablement": `${row.scope}:${row.name}`, "aria-label": `Turn ${row.name} on for ${projectId}`, checked: Boolean(enablement[`${row.scope}:${row.name}`] ?? row.scope === "project"), "aria-checked": String(Boolean(enablement[`${row.scope}:${row.name}`] ?? row.scope === "project")), disabled: busy, onChange: () => toggle(row.scope, row.name) }),
+            jsx("span", { className: "dockyard-switch-track", "aria-hidden": true }),
+            jsx("span", { className: "dockyard-switch-thumb", "aria-hidden": true })
+          ] }),
+          jsx("span", { className: "dockyard-wf-enablement-label", children: row.scope === "global" ? `On for ${projectId} (off by default)` : `On for ${projectId}` }),
+          jsx(Button, { small: true, action: "library-run", data: { "data-wf-run-start": `${row.scope}:${row.name}` }, disabled: busy, onClick: () => start(row.scope, row.name), children: "Start run" })
+        ] }),
+        refusals[`${row.scope}:${row.name}`] ? jsx("p", { className: "dockyard-inline-error", role: "alert", "data-wf-run-refused": `${row.scope}:${row.name}`, children: refusals[`${row.scope}:${row.name}`] }) : null
+      ] }, `${row.scope}:${row.name}:${row.owner_project_id ?? ""}`);
+    }) })
   ] });
 }
 
@@ -24642,6 +24771,8 @@ function DashboardPage({ inboxCss = "" } = {}) {
   const [counts, setCounts] = useState({ approvals: null, notifications: null });
   const [loadScope, setLoadScope] = useState(null);
   const [pendingWorkRef, setPendingWorkRef] = useState(null);
+  const [pendingWorkflow, setPendingWorkflow] = useState(null);
+  const [libraryHighlight, setLibraryHighlight] = useState(null);
   const loadSerial = useRef(0);
   const [dirtyProject, setDirtyProject] = useState(null);
   const [pendingProject, setPendingProject] = useState(null);
@@ -24762,7 +24893,11 @@ function DashboardPage({ inboxCss = "" } = {}) {
   const pendingTabOpts = useRef({});
   const goTab = (next, opts = {}) => {
     if (opts.project) setSelectedProject(opts.project);
-    if (next === "project") setProjectEntryView(opts.entryView ?? "overview");
+    if (next === "project") {
+      setProjectEntryView(opts.entryView ?? "overview");
+      setPendingWorkflow(opts.workflow ?? null);
+    }
+    if (next === "workflows") setLibraryHighlight(opts.highlight ?? null);
     if (next === "roadmap" && opts.roadmapScope) setSelectedProject(opts.roadmapScope === "all" ? ALL_PROJECTS : opts.roadmapScope);
     if (next === "roadmap") showRoadmap(opts.roadmapScope ?? selectedProject);
     if (next === "dashboard") setDashboardHomeVersion((value) => value + 1);
@@ -24917,7 +25052,9 @@ function DashboardPage({ inboxCss = "" } = {}) {
       onSelectProject: selectProject,
       onProjectDirty: markDirty(payload.project?.id ?? null),
       onRefresh: refresh,
-      onOpenLibrary: () => requestTab("workflows"),
+      onOpenLibrary: (opts) => requestTab("workflows", { highlight: opts?.highlight }),
+      openWorkflow: pendingWorkflow,
+      onOpenWorkflowDone: () => setPendingWorkflow(null),
       onOpenRoadmap: () => requestTab("roadmap", { roadmapScope: payload.project?.id }),
       // C1: the header strip's attention drawer opens approvals in the inbox.
       onOpenLink: openDeepLink,
@@ -24940,9 +25077,13 @@ function DashboardPage({ inboxCss = "" } = {}) {
   } else if (tab === "workflows") {
     content = jsx(WorkflowLibraryView, {
       projectId: isAll ? null : selectedProject,
-      onOpenBuilder: (row) => {
+      projectLabel: isAll ? null : scopeLabel,
+      highlight: libraryHighlight,
+      onOpenBuilder: (row, extra = {}) => {
         const owner = row?.owner_project_id;
-        requestTab("project", { entryView: "workflows", project: owner && owner !== selectedProject ? owner : void 0 });
+        if (extra.created) refresh();
+        const workflow = row?.scope === "project" ? { project: owner ?? selectedProject, name: row.name, conversation: extra.conversation ?? null, checks: extra.checks ?? null } : void 0;
+        requestTab("project", { entryView: "workflows", project: owner && owner !== selectedProject ? owner : void 0, workflow });
       }
     }, `workflow-library:${isAll ? "all" : selectedProject ?? "none"}`);
   } else if (tab === "roadmap") {

@@ -4,23 +4,28 @@
   "groups": [
     {
       "id": "loops",
-      "title": "Loops"
+      "title": "Loops",
+      "tab": "Loops"
     },
     {
       "id": "build-and-fix",
-      "title": "Build and fix"
+      "title": "Build and fix",
+      "tab": "Build & fix"
     },
     {
       "id": "check-quality",
-      "title": "Check quality"
+      "title": "Check quality",
+      "tab": "Quality"
     },
     {
       "id": "look-after",
-      "title": "Look after the project"
+      "title": "Look after the project",
+      "tab": "Look after"
     },
     {
       "id": "research-writing",
-      "title": "Research and writing"
+      "title": "Research and writing",
+      "tab": "Research"
     }
   ],
   "templates": [

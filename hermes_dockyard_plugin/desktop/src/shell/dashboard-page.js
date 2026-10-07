@@ -119,6 +119,11 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   // P6.4 (review R3): a deep link can pre-select an exact work item; the
   // project dashboard opens its drawer on arrival.
   const [pendingWorkRef, setPendingWorkRef] = useState(null)
+  // The Workflows tab hands the builder a workflow to open ({ project, name,
+  // conversation?, checks? }), and the builder hands the tab a global
+  // workflow it just made, to mark in the list.
+  const [pendingWorkflow, setPendingWorkflow] = useState(null)
+  const [libraryHighlight, setLibraryHighlight] = useState(null)
   const loadSerial = useRef(0)
   const [dirtyProject, setDirtyProject] = useState(null)
   const [pendingProject, setPendingProject] = useState(null)
@@ -263,7 +268,8 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   const pendingTabOpts = useRef({})
   const goTab = (next, opts = {}) => {
     if (opts.project) setSelectedProject(opts.project)
-    if (next === 'project') setProjectEntryView(opts.entryView ?? 'overview')
+    if (next === 'project') { setProjectEntryView(opts.entryView ?? 'overview'); setPendingWorkflow(opts.workflow ?? null) }
+    if (next === 'workflows') setLibraryHighlight(opts.highlight ?? null)
     // The Roadmap follows the switcher; "View in Roadmap" moves the switcher too.
     if (next === 'roadmap' && opts.roadmapScope) setSelectedProject(opts.roadmapScope === 'all' ? ALL_PROJECTS : opts.roadmapScope)
     if (next === 'roadmap') showRoadmap(opts.roadmapScope ?? selectedProject)
@@ -416,7 +422,9 @@ export function DashboardPage({ inboxCss = '' } = {}) {
       onSelectProject: selectProject,
       onProjectDirty: markDirty(payload.project?.id ?? null),
       onRefresh: refresh,
-      onOpenLibrary: () => requestTab('workflows'),
+      onOpenLibrary: (opts) => requestTab('workflows', { highlight: opts?.highlight }),
+      openWorkflow: pendingWorkflow,
+      onOpenWorkflowDone: () => setPendingWorkflow(null),
       onOpenRoadmap: () => requestTab('roadmap', { roadmapScope: payload.project?.id }),
       // C1: the header strip's attention drawer opens approvals in the inbox.
       onOpenLink: openDeepLink,
@@ -441,10 +449,16 @@ export function DashboardPage({ inboxCss = '' } = {}) {
     // project selected in the global picker, never an implicit first project.
     content = jsx(WorkflowLibraryView, {
       projectId: isAll ? null : selectedProject,
-      onOpenBuilder: (row) => {
+      projectLabel: isAll ? null : scopeLabel,
+      highlight: libraryHighlight,
+      onOpenBuilder: (row, extra = {}) => {
         // Quan M1: guarded like every other tab switch (no silent loss of edits).
+        // A project row opens that workflow (it used to open the first one);
+        // one just made there brings its AI conversation along.
         const owner = row?.owner_project_id
-        requestTab('project', { entryView: 'workflows', project: owner && owner !== selectedProject ? owner : undefined })
+        if (extra.created) refresh()
+        const workflow = row?.scope === 'project' ? { project: owner ?? selectedProject, name: row.name, conversation: extra.conversation ?? null, checks: extra.checks ?? null } : undefined
+        requestTab('project', { entryView: 'workflows', project: owner && owner !== selectedProject ? owner : undefined, workflow })
       },
     }, `workflow-library:${isAll ? 'all' : selectedProject ?? 'none'}`)
   } else if (tab === 'roadmap') {

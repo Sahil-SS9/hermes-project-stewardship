@@ -38,9 +38,25 @@ export const WORKFLOW_DESIGN_CSS = `
 /* Use a template: the built-in groups, then the saved ones; a filter; the
    picked one's steps, sources and the two questions (who works, who checks). */
 .dockyard-root .dy-wfd-tpl { display: grid; gap: 8px; }
-.dockyard-root .dy-wfd-tpl-groups { display: grid; gap: 12px; max-height: min(38vh, 330px); overflow-y: auto; padding-right: 4px; }
-.dockyard-root .dy-wfd-tpl-group { display: grid; gap: 6px; }
-.dockyard-root .dy-wfd-tpl-group h4 { position: sticky; top: 0; z-index: 1; margin: 0; padding: 2px 0; background: var(--dy-surface); color: var(--dy-text-2); font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+.dockyard-root .dy-wfd-tpl-tabs { display: flex; gap: 2px; overflow-x: auto; border-bottom: 1px solid var(--dy-border); scrollbar-width: none; }
+.dockyard-root .dy-wfd-tpl-tab { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; margin-bottom: -1px; padding: 7px 10px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--dy-text-2); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.dockyard-root .dy-wfd-tpl-tab:hover { color: var(--dy-text); }
+.dockyard-root .dy-wfd-tpl-tab.active { border-bottom-color: var(--dy-action); color: var(--dy-text); }
+.dockyard-root .dy-wfd-tpl-tab:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: -2px; border-radius: 6px 6px 0 0; }
+.dockyard-root .dy-wfd-tpl-count { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; line-height: 18px; text-align: center; }
+.dockyard-root .dy-wfd-tpl-tab.active .dy-wfd-tpl-count { background: var(--dy-accent-soft); color: var(--dy-text); }
+/* The panel keeps one height on every tab, so the dialog does not jump. It takes the room the dialog has
+   left (the dialog is at most 100vh - 40px, about 390px of it around the panel), up to 440px: enough for
+   the largest built-in tab (7 templates) with no scrolling. A small window scrolls the panel, not the dialog. */
+.dockyard-root .dy-wfd-tpl-panel { display: grid; align-content: start; height: clamp(200px, calc(100vh - 430px), 440px); overflow-y: auto; padding: 2px 4px 2px 0; }
+.dockyard-root .dy-wfd-tpl-list { display: grid; gap: 6px; }
+.dockyard-root .dy-wfd-scopes button:disabled { border-style: dashed; background: var(--dy-surface); cursor: not-allowed; }
+.dockyard-root .dy-wfd-scopes button:disabled:hover { border-color: var(--dy-border); }
+.dockyard-root .dy-wfd-ways .dy-wfd-scope-name { margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--dy-accent-soft); color: var(--dy-text); font-size: 12px; font-weight: 600; }
+.dockyard-root .dy-wfd-scope-line { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 6px 6px 6px 10px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); font-size: 12px; }
+.dockyard-root .dy-wfd-scope-line > span { color: var(--dy-text-2); }
+.dockyard-root .dy-wfd-scope-line > strong { flex: 1; min-width: 0; color: var(--dy-text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dockyard-root .dockyard-feature-card.dy-wf-just-made { border-color: var(--dy-action); box-shadow: 0 0 0 1px var(--dy-action); }
 .dockyard-root .dy-wfd-tpl-item { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); text-align: left; cursor: pointer; font: inherit; }
 .dockyard-root .dy-wfd-tpl-item:hover { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
 .dockyard-root .dy-wfd-tpl-item:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
