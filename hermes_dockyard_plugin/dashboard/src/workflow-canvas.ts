@@ -126,6 +126,30 @@ export interface CanvasHandlers {
   // Read-only canonical event history. If absent (e.g. definition-only
   // frames), playback stays disabled rather than inventing events.
   fetchTimeline?: (projectId: string, workflowName: string, runKey: string) => Promise<{ events?: Array<Record<string, unknown>> }>;
+  // Workflows design round (07/10/2026): optional hooks the Desktop review
+  // build uses to try layouts. Unset, the canvas draws exactly as before.
+  design?: CanvasDesignHooks;
+}
+
+// A frame drawn around steps that repeat together. `onOpen` gets the screen
+// rectangle of the frame's label so the host can anchor its settings there.
+export interface CanvasFrame {
+  id: string;
+  nodeIds: string[];
+  label: string;
+  sublabel?: string | null;
+  onOpen?: (anchor: DOMRect) => void;
+}
+
+export interface CanvasDesignHooks {
+  // Words for the step panel's edit section (default: today's words).
+  labels?: { heading?: string; title?: string; deps?: string; team?: string; save?: string };
+  // Extra fields under the edit section. `apply` runs on the step being saved,
+  // so the extra fields save with the same Save button and the same queue.
+  panelExtras?: (node: CanvasNode) => { el: HTMLElement; apply?: (node: CanvasNode) => CanvasNode } | null;
+  // A short line on the card in place of the purpose word (null keeps it).
+  cardNote?: (node: CanvasNode) => string | null;
+  frames?: (nodes: CanvasNode[]) => CanvasFrame[];
 }
 
 const NODE_W = 208;
@@ -598,6 +622,28 @@ export function mountWorkflowCanvas(
   let originY = 0;
   let currentNodes: CanvasNode[] = [];
   let nodePositions: Record<string, CanvasPosition> = {};
+  // Frames around repeating steps (design hook). Re-placed from nodePositions
+  // whenever a step moves, so a frame follows a dragged step.
+  const FRAME_PAD = 14;
+  const FRAME_TAB_H = 20;
+  let frameEls: Array<{ ids: string[]; box: SVGRectElement; tabBg: SVGRectElement; text: SVGTextElement; sub: SVGTextElement | null }> = [];
+  const placeFrames = () => {
+    for (const f of frameEls) {
+      const ps = f.ids.map((id) => nodePositions[id]).filter((p): p is CanvasPosition => Boolean(p));
+      if (!ps.length) continue;
+      const x = Math.min(...ps.map((p) => p.x)) - FRAME_PAD;
+      const y = Math.min(...ps.map((p) => p.y)) - FRAME_PAD - FRAME_TAB_H;
+      const w = Math.max(...ps.map((p) => p.x + NODE_W)) + FRAME_PAD - x;
+      const h = Math.max(...ps.map((p) => p.y + NODE_H)) + FRAME_PAD + (f.sub ? 18 : 0) - y;
+      f.box.setAttribute('x', String(x)); f.box.setAttribute('y', String(y));
+      f.box.setAttribute('width', String(w)); f.box.setAttribute('height', String(h));
+      const tabW = Math.min(w - 12, (f.text.textContent ?? '').length * 6.3 + 20);
+      f.tabBg.setAttribute('x', String(x + 6)); f.tabBg.setAttribute('y', String(y + 5));
+      f.tabBg.setAttribute('width', String(tabW));
+      f.text.setAttribute('x', String(x + 16)); f.text.setAttribute('y', String(y + 19));
+      if (f.sub) { f.sub.setAttribute('x', String(x + 14)); f.sub.setAttribute('y', String(y + h - 8)); }
+    }
+  };
   // Drops whose save has not come back yet: drawn where they were dropped
   // until the saved frame carries the same position (or the save fails).
   const pendingPositions = new Map<string, { x: number; y: number }>();
@@ -664,6 +710,7 @@ export function mountWorkflowCanvas(
   const writeNodePosition = (nodeId: string, g: SVGGElement, x: number, y: number) => {
     nodePositions[nodeId] = { x, y, depth: nodePositions[nodeId]?.depth ?? 0 };
     g.setAttribute('transform', `translate(${x} ${y})`);
+    if (frameEls.length) placeFrames();
   };
 
   const startDrag = (nodeId: string, g: SVGGElement, e: PointerEvent, depth: number) => {
@@ -1051,7 +1098,9 @@ export function mountWorkflowCanvas(
     const label = sEl('text', { x: 30, y: 26, class: 'dy-wf-label' }) as SVGTextElement;
     label.textContent = n.title.length > 22 ? n.title.slice(0, 21) + '…' : n.title;
     const sub = sEl('text', { x: 14, y: 46, class: 'dy-wf-sub' }) as SVGTextElement;
-    sub.textContent = visuals.label;
+    const note = handlers.design?.cardNote?.(n) ?? null;
+    sub.textContent = note ? (note.length > 24 ? note.slice(0, 23) + '…' : note) : visuals.label;
+    if (note) sub.dataset.wfCardNote = 'true';
     const statusText = sEl('text', {
       x: NODE_W - 14, y: 46, 'text-anchor': 'end',
       class: `dy-wf-statustext ${status}`,
@@ -1200,6 +1249,7 @@ export function mountWorkflowCanvas(
     viewport.replaceChildren();
     viewport.appendChild(defs);
     if (!run || run.nodes.length === 0) {
+      frameEls = [];
       const t = sEl('text', { x: 20, y: 40, class: 'dy-wf-empty' }) as SVGTextElement;
       t.textContent = 'No workflow runs yet.';
       viewport.appendChild(t);
@@ -1260,6 +1310,44 @@ export function mountWorkflowCanvas(
       lbl.textContent = lane.label;
       viewport.append(band, lbl);
     }
+
+    // Frames around steps that repeat together (design hook): over the lanes,
+    // under the edges and steps. Only the label is clickable, so panning and
+    // dragging work through the frame.
+    frameEls = [];
+    for (const frame of handlers.design?.frames?.(currentNodes) ?? []) {
+      const ids = frame.nodeIds.filter((id) => positions[id]);
+      if (!ids.length) continue;
+      const g = sEl('g', { class: 'dy-wf-frame' }) as SVGGElement;
+      g.dataset.wfFrame = frame.id;
+      const box = sEl('rect', { class: 'dy-wf-frame-box', rx: 16 }) as SVGRectElement;
+      const tab = sEl('g', { class: 'dy-wf-frame-tab' }) as SVGGElement;
+      tab.setAttribute('role', 'button');
+      tab.setAttribute('tabindex', '0');
+      tab.setAttribute('aria-label', `${frame.label}${frame.sublabel ? `. ${frame.sublabel}` : ''}. Open repeat settings`);
+      tab.dataset.wfFrameOpen = frame.id;
+      const tabBg = sEl('rect', { class: 'dy-wf-frame-tabbg', rx: 9, height: FRAME_TAB_H }) as SVGRectElement;
+      const text = sEl('text', { class: 'dy-wf-frame-label' }) as SVGTextElement;
+      text.textContent = frame.label;
+      tab.append(tabBg, text);
+      g.append(box, tab);
+      let sub: SVGTextElement | null = null;
+      if (frame.sublabel) {
+        sub = sEl('text', { class: 'dy-wf-frame-sub' }) as SVGTextElement;
+        sub.textContent = frame.sublabel;
+        g.appendChild(sub);
+      }
+      const open = (e: Event) => { e.stopPropagation(); frame.onOpen?.(tab.getBoundingClientRect()); };
+      tab.addEventListener('pointerdown', (e) => e.stopPropagation());
+      tab.addEventListener('click', open);
+      tab.addEventListener('keydown', (e) => {
+        const key = (e as KeyboardEvent).key;
+        if (key === 'Enter' || key === ' ') { e.preventDefault(); open(e); }
+      });
+      viewport.appendChild(g);
+      frameEls.push({ ids, box, tabBg, text, sub });
+    }
+    placeFrames();
 
     // edges first (under nodes). Every dependency edge carries the default
     // workflow meaning; its colour and arrowhead come from the meaning table.
@@ -1456,7 +1544,8 @@ export function mountWorkflowCanvas(
     const appendEditor = () => {
       if (!handlers.onEdit) return;
       const edit = elu<HTMLDivElement>('div', 'dy-wf-edit');
-      edit.appendChild(elu('h4', '', 'Edit step'));
+      const words = handlers.design?.labels ?? {};
+      edit.appendChild(elu('h4', '', words.heading ?? 'Edit step'));
       // Edit the saved plan's copy of the step: a run on screen may show an
       // older title or links (finding 14).
       const planned = editBase().find((item) => item.node_id === n.node_id);
@@ -1476,17 +1565,26 @@ export function mountWorkflowCanvas(
         f.append(elu('span', '', label), input);
         edit.appendChild(f);
       };
-      const title = elu<HTMLInputElement>('input', 'dy-wf-edit-title'); title.value = planned.title; title.setAttribute('aria-label', 'Node title');
-      const deps = elu<HTMLInputElement>('input', 'dy-wf-edit-deps'); deps.value = planned.depends_on.join(', '); deps.placeholder = 'e.g. build, tests'; deps.setAttribute('aria-label', 'Dependencies');
-      const team = elu<HTMLInputElement>('input', 'dy-wf-edit-team'); team.value = planned.phase_team ?? ''; team.placeholder = 'phase team override'; team.setAttribute('aria-label', 'Phase team override');
-      field('Title', title); field('Depends on (step IDs)', deps); field('Phase team', team);
-      const save = elu<HTMLButtonElement>('button', 'dy-btn primary', 'Save graph version'); save.type = 'button';
+      const title = elu<HTMLInputElement>('input', 'dy-wf-edit-title'); title.value = planned.title; title.setAttribute('aria-label', words.title ?? 'Node title');
+      const deps = elu<HTMLInputElement>('input', 'dy-wf-edit-deps'); deps.value = planned.depends_on.join(', '); deps.placeholder = 'e.g. build, tests'; deps.setAttribute('aria-label', words.deps ?? 'Dependencies');
+      const team = elu<HTMLInputElement>('input', 'dy-wf-edit-team'); team.value = planned.phase_team ?? ''; team.placeholder = 'phase team override'; team.setAttribute('aria-label', words.team ?? 'Phase team override');
+      field(words.title ?? 'Title', title); field(words.deps ?? 'Depends on (step IDs)', deps);
+      // A design build may replace the team box with its own "Who does it".
+      if (words.team !== '') field(words.team ?? 'Phase team', team);
+      const extra = handlers.design?.panelExtras?.(planned) ?? null;
+      if (extra) edit.appendChild(extra.el);
+      const saveWord = words.save ?? 'Save graph version';
+      const save = elu<HTMLButtonElement>('button', 'dy-btn primary', saveWord); save.type = 'button';
       save.addEventListener('click', async () => {
         const ids = new Set(deps.value.split(',').map((v) => v.trim()).filter(Boolean)); ids.delete(n.node_id);
         save.disabled = true; save.textContent = 'Saving…'; say(null);
         try {
           await runEdit((base) => (base.some((item) => item.node_id === n.node_id)
-            ? base.map((item) => (item.node_id === n.node_id ? { ...item, title: title.value.trim() || item.title, depends_on: [...ids], phase_team: team.value.trim() || null } : item))
+            ? base.map((item) => {
+              if (item.node_id !== n.node_id) return item;
+              const next = { ...item, title: title.value.trim() || item.title, depends_on: [...ids], phase_team: words.team === '' ? item.phase_team : (team.value.trim() || null) };
+              return extra?.apply ? extra.apply(next) : next;
+            })
             : NOT_IN_PLAN));
           save.textContent = 'Saved ✓';
         } catch (error) {

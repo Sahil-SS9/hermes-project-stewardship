@@ -67,6 +67,8 @@ export function mountDesktopWorkflowCanvas(host, projectId, workflowName, defini
     editNodes: handlers.editNodes,
     onSelect: handlers.onSelect,
     fetchTimeline: handlers.fetchTimeline,
+    // Workflows design round: optional layout hooks (unset = today's canvas).
+    design: handlers.design,
   }, handlers.pollMs ?? 60000)
 }
 

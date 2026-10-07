@@ -240,6 +240,17 @@ export const WORKFLOW_CANVAS_CSS = `
 .dy-wf-scope .dy-wf-lane { fill: rgba(140, 170, 220, .035); stroke: rgba(140, 180, 255, .09); stroke-width: 1; }
 .dy-wf-scope .dy-wf-lane.exception { fill: rgba(255, 123, 114, .05); }
 .dy-wf-scope .dy-wf-lane-label { fill: #6f86a8; font: 600 7px system-ui, sans-serif; letter-spacing: .9px; text-transform: uppercase; pointer-events: none; }
+/* Workflows design round (07/10/2026): plain-words card notes and the frame
+   drawn around steps that repeat. Only drawn when a design hook asks. */
+.dy-wf-scope .dy-wf-sub[data-wf-card-note] { fill: #b9d3ff; text-transform: none; letter-spacing: 0; font-size: 11px; }
+.dy-wf-scope .dy-wf-frame-box { fill: rgba(106, 183, 255, .06); stroke: #6ab7ff; stroke-width: 1.4; stroke-dasharray: 6 4; pointer-events: none; }
+.dy-wf-scope .dy-wf-frame-tab { cursor: pointer; }
+.dy-wf-scope .dy-wf-frame-tab:focus { outline: none; }
+.dy-wf-scope .dy-wf-frame-tabbg { fill: #12305a; stroke: #6ab7ff; stroke-width: 1; }
+.dy-wf-scope .dy-wf-frame-tab:hover .dy-wf-frame-tabbg { fill: #1b4580; }
+.dy-wf-scope .dy-wf-frame-tab:focus-visible .dy-wf-frame-tabbg { stroke: #ffffff; stroke-width: 2.5; }
+.dy-wf-scope .dy-wf-frame-label { fill: #e6f1ff; font: 600 11px system-ui, sans-serif; pointer-events: none; }
+.dy-wf-scope .dy-wf-frame-sub { fill: #9fc6ff; font: 500 10.5px system-ui, sans-serif; pointer-events: none; }
 
 /* Phone width: stacked layout; floating surfaces reflow so none overlaps
    another and none is cut off. */
