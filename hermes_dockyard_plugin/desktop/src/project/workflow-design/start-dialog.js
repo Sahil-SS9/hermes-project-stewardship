@@ -6,6 +6,11 @@
 // plan, answer its questions, then Create workflow; the conversation then
 // carries on in the AI sidebar beside the canvas. Nothing is saved until
 // Create workflow.
+//
+// Use a template offers the 30 built-in templates (builtin-templates.json,
+// HPS-Audit WORKFLOW-TEMPLATES-RESEARCH.md) in five groups, then the ones
+// saved in the library. A built-in names no bot: it asks who does the work
+// and who checks it, and warns when one bot would check its own work.
 import { useState } from '../../runtime/react.js'
 import { useEffect } from '../../runtime/react.js'
 import { jsxs } from '../../runtime/react.js'
@@ -16,7 +21,9 @@ import { practiceDraft } from './standins.js'
 import { answerQuestion } from './standins.js'
 import { readImport } from './standins.js'
 import { uniqueName } from './standins.js'
-import { TemplateList } from './shared.js'
+import { TemplatePicker } from './shared.js'
+import { StepsPreview } from './shared.js'
+import BUILTINS from './builtin-templates.json'
 import { ImportResult } from './shared.js'
 import { AiPlan } from './shared.js'
 import { PracticeAiNote } from './shared.js'
@@ -24,7 +31,7 @@ import { PreviewTag } from './shared.js'
 
 export const WAYS = Object.freeze([
   { way: 'blank', title: 'Start blank', text: 'An empty workflow with one step.' },
-  { way: 'template', title: 'Use a template', text: 'Start from a workflow saved for every project.' },
+  { way: 'template', title: 'Use a template', text: 'Start from one of 30 built-in templates, or one saved in your library.' },
   { way: 'import', title: 'Import', text: 'Paste a workflow, or choose a file.' },
   { way: 'ai', title: 'Describe it to the AI', text: 'Say what you want. The AI explains its plan and drafts the steps.' },
 ])
@@ -44,11 +51,53 @@ export async function readFileText(file) {
   return new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result ?? '')); r.onerror = reject; r.readAsText(file) })
 }
 
+// A built-in template's steps with the bots picked on use: the checker takes
+// its check steps, the worker takes the other steps; sign-offs stay yours.
+export function builtinNodes(template, whoWorks, whoChecks) {
+  const checks = new Set(template.check_steps ?? [])
+  return template.nodes.map((n) => {
+    if (n.kind === 'gate' || n.human_gate) return { ...n }
+    const who = checks.has(n.id) ? whoChecks : whoWorks
+    return who ? { ...n, phase_team: who } : { ...n }
+  })
+}
+
+function TemplateDetail({ pick, members, whoWorks, whoChecks, onWorks, onChecks }) {
+  const t = pick.item
+  if (pick.source === 'library') return jsxs('div', { className: 'dy-wfd-tpl-detail', 'data-wfd-template-detail': t.name, children: [
+    jsx('strong', { children: t.name }),
+    jsx(StepsPreview, { nodes: t.definition?.nodes ?? [] }),
+  ] })
+  const checks = new Set(t.check_steps)
+  const roleOf = (n) => (checks.has(n.id) ? 'checker' : 'worker')
+  const choose = (label, value, onChange, attr) => jsxs('label', { children: [
+    jsx('span', { children: label }),
+    jsx('select', { value, [attr]: true, onChange: (e) => onChange(e.target.value), children: [jsx('option', { value: '', children: 'Decide later' }, ''), ...members.map((m) => jsx('option', { value: m, children: m }, m))] }),
+  ] })
+  const same = Boolean(whoWorks) && whoWorks === whoChecks && checks.size > 0
+  return jsxs('div', { className: 'dy-wfd-tpl-detail', 'data-wfd-template-detail': t.name, children: [
+    jsxs('div', { className: 'dy-wfd-tpl-detail-head', children: [jsx('strong', { children: t.title }), jsx('span', { children: t.summary })] }),
+    jsx(StepsPreview, { nodes: t.nodes, roleOf }),
+    jsx('span', { className: 'dy-wfd-based-on', 'data-wfd-based-on': true, children: `Based on ${t.based_on}.` }),
+    jsxs('div', { className: 'dy-wfd-row', children: [
+      choose('Who does the work?', whoWorks, onWorks, 'data-wfd-who-works'),
+      checks.size ? choose('Who checks it?', whoChecks, onChecks, 'data-wfd-who-checks') : null,
+    ] }),
+    same ? jsx('span', { className: 'dy-wfd-warning', role: 'status', 'data-wfd-same-bot': true, children: `${whoWorks} checks its own work here. A different checker catches more, so pick another bot if you can.` }) : null,
+  ] })
+}
+
 export function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }) {
   const [way, setWay] = useState('choose')
   const [name, setName] = useState('')
   const [first, setFirst] = useState('Step 1')
+  // The picked template: { source: 'builtin' | 'library', item }.
   const [template, setTemplate] = useState(null)
+  const [whoWorks, setWhoWorks] = useState('')
+  const [whoChecks, setWhoChecks] = useState('')
+  // Picking a template folds the list away, so its steps, the two questions,
+  // the name and Create fit the window; "All templates" brings the list back.
+  const [browsing, setBrowsing] = useState(true)
   const [importText, setImportText] = useState('')
   const [imported, setImported] = useState(null)
   const [describe, setDescribe] = useState('')
@@ -74,7 +123,7 @@ export function NewWorkflowDialog({ takenNames, templates, members, onCreate, on
   }
   const nodesNow = () => {
     if (way === 'blank') return first.trim() ? [{ id: 'step-1', title: first.trim(), depends_on: [], human_gate: false, kind: 'task' }] : null
-    if (way === 'template') return template?.definition?.nodes ?? null
+    if (way === 'template') return !template ? null : template.source === 'library' ? template.item.definition?.nodes ?? null : builtinNodes(template.item, whoWorks, whoChecks)
     if (way === 'import') return imported && imported.kind !== 'invalid' ? imported.nodes : null
     if (way === 'ai') return aiDraft?.nodes ?? null
     return null
@@ -100,7 +149,7 @@ export function NewWorkflowDialog({ takenNames, templates, members, onCreate, on
       setBusy(false)
     }
   }
-  const pickTemplate = (t) => { setTemplate(t); setName(uniqueName(t.name, takenNames)); setNameError(null) }
+  const pickTemplate = (pick) => { setTemplate(pick); setName(uniqueName(pick.item.name, takenNames)); setNameError(null); setWayError(null); setBrowsing(false) }
   const check = (text) => {
     const result = readImport(text)
     setImported(result)
@@ -124,10 +173,13 @@ export function NewWorkflowDialog({ takenNames, templates, members, onCreate, on
         stepError ? jsx('span', { className: 'dy-wfd-error', 'data-wfd-step-error': true, children: stepError }) : null,
       ] }),
     ] })
-    if (way === 'template') return jsxs('div', { className: 'dy-wfd-way-body', children: [
-      jsx(TemplateList, { templates, value: template?.name, onPick: pickTemplate }),
-      template ? jsx(NameField, { value: name, onChange: setName, error: nameError }) : null,
-    ] })
+    if (way === 'template') return template && !browsing
+      ? jsxs('div', { className: 'dy-wfd-way-body', children: [
+        jsx('div', { children: jsx(Button, { small: true, action: 'wfd-template-change', onClick: () => setBrowsing(true), children: '← All templates' }) }),
+        jsx(TemplateDetail, { pick: template, members, whoWorks, whoChecks, onWorks: setWhoWorks, onChecks: setWhoChecks }),
+        jsx(NameField, { value: name, onChange: setName, error: nameError }),
+      ] }, 'picked')
+      : jsx('div', { className: 'dy-wfd-way-body', children: jsx(TemplatePicker, { builtins: BUILTINS.templates, groups: BUILTINS.groups, saved: templates, value: template, onPick: pickTemplate }) }, 'browse')
     if (way === 'import') return jsxs('div', { className: 'dy-wfd-way-body', children: [
       jsxs('label', { className: 'dy-wfd-field', children: [
         jsx('span', { children: 'Paste the workflow' }),

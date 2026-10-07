@@ -183,6 +183,38 @@ export function practiceRevise(nodes, message, members = []) {
   return { nodes, reply: ["This practice AI only knows a few requests. Try: 'repeat up to 3 times', 'add a sign-off at the end', 'remove the sign-off', 'give the work to reviewer', 'add a step to tell the team'."], did: [], unknown: true }
 }
 
+// ---- talking first (Sahil, 07/10/2026: suggest, then Apply) ---------------
+// A question is answered from the steps on the canvas; it never changes them.
+const QUESTION = /^(what|why|how|which|who|when|where|does|do|is|are|explain|describe|tell me about|walk me through|summari[sz]e)\b/i
+export const isQuestion = (text) => /\?\s*$/.test(String(text ?? '').trim()) || QUESTION.test(String(text ?? '').trim())
+export function practiceExplain(nodes, title) {
+  if (!nodes.length) return { reply: ['It has no steps yet. Say what it should do and I will suggest some.'], steps: null, after: [] }
+  const gates = nodes.filter((n) => n.human_gate).length
+  return {
+    reply: [`"${title}" has ${nodes.length} step${nodes.length === 1 ? '' : 's'}, in the order they run:`],
+    steps: nodes,
+    after: [
+      gates ? `You sign off ${gates === 1 ? 'once' : `${gates} times`}.` : 'Nothing waits for your sign-off.',
+      'Ask for a change and I will suggest it here first. Nothing changes until you press Apply.',
+    ],
+  }
+}
+
+// Whether two sets of steps are the same plan. Positions on the canvas do not
+// count: dragging a step does not make a suggestion out of date.
+const planKey = (n) => JSON.stringify([
+  n.id ?? n.node_id, n.title ?? '', [...(n.depends_on ?? [])], Boolean(n.human_gate), n.kind ?? (n.human_gate ? 'gate' : 'task'),
+  n.body ?? null, n.phase_team ?? null,
+  n.loop ? [n.loop.max_iterations, n.loop.until?.status ?? 'done'] : null,
+  n.when ? [n.when.node, n.when.status] : null,
+])
+export const sameSteps = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((n, i) => planKey(n) === planKey(b[i]))
+// Applying a suggestion keeps where each step sits on the canvas now.
+export function withCurrentPositions(next, current) {
+  const at = new Map(current.map((n) => [n.id ?? n.node_id, n.canvas_position]))
+  return next.map((n) => (at.has(n.id) && at.get(n.id) ? { ...n, canvas_position: at.get(n.id) } : n))
+}
+
 // ---- import ---------------------------------------------------------------
 export const IMPORT_MAX_BYTES = 262144
 const isDockyardNode = (n) => n && typeof n === 'object' && typeof n.id === 'string' && typeof n.title === 'string'

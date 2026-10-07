@@ -35,11 +35,24 @@ export const WORKFLOW_DESIGN_CSS = `
 .dockyard-root .dy-wfd-row { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
 .dockyard-root .dy-wfd-row > label { display: grid; gap: 4px; flex: 1 1 150px; font-size: 12px; color: var(--dy-text-2); }
 .dockyard-root .dy-wfd-file { display: grid; gap: 4px; font-size: 12px; color: var(--dy-text-2); }
-.dockyard-root .dy-wfd-templates { display: grid; gap: 8px; max-height: 260px; overflow-y: auto; }
-.dockyard-root .dy-wfd-templates button { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); text-align: left; cursor: pointer; font: inherit; }
-.dockyard-root .dy-wfd-templates button.active { border-color: var(--dy-action); background: var(--dy-accent-soft); }
+/* Use a template: the built-in groups, then the saved ones; a filter; the
+   picked one's steps, sources and the two questions (who works, who checks). */
+.dockyard-root .dy-wfd-tpl { display: grid; gap: 8px; }
+.dockyard-root .dy-wfd-tpl-groups { display: grid; gap: 12px; max-height: min(38vh, 330px); overflow-y: auto; padding-right: 4px; }
+.dockyard-root .dy-wfd-tpl-group { display: grid; gap: 6px; }
+.dockyard-root .dy-wfd-tpl-group h4 { position: sticky; top: 0; z-index: 1; margin: 0; padding: 2px 0; background: var(--dy-surface); color: var(--dy-text-2); font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+.dockyard-root .dy-wfd-tpl-item { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); text-align: left; cursor: pointer; font: inherit; }
+.dockyard-root .dy-wfd-tpl-item:hover { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
+.dockyard-root .dy-wfd-tpl-item:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
+.dockyard-root .dy-wfd-tpl-item.active { border-color: var(--dy-action); background: var(--dy-accent-soft); }
+.dockyard-root .dy-wfd-tpl-item strong { font-size: 13px; }
 .dockyard-root .dy-wfd-template-head { display: flex; justify-content: space-between; gap: 8px; }
-.dockyard-root .dy-wfd-template-head small, .dockyard-root .dy-wfd-template-line { color: var(--dy-text-2); font-size: 12px; }
+.dockyard-root .dy-wfd-template-head small, .dockyard-root .dy-wfd-tpl-summary { color: var(--dy-text-2); font-size: 12px; line-height: 1.4; }
+.dockyard-root .dy-wfd-tpl-detail { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); font-size: 13px; }
+.dockyard-root .dy-wfd-tpl-detail-head { display: grid; gap: 2px; }
+.dockyard-root .dy-wfd-tpl-detail-head span, .dockyard-root .dy-wfd-based-on { color: var(--dy-text-2); font-size: 12px; }
+.dockyard-root .dy-wfd-tpl-detail .dy-wfd-row > label select { box-sizing: border-box; width: 100%; min-height: 34px; padding: 6px 9px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 13px; }
+.dockyard-root .dy-wfd-warning { padding: 6px 10px; border: 1px solid var(--dy-warning); border-radius: 8px; background: var(--dy-warning-bg); color: var(--dy-text); font-size: 12px; }
 .dockyard-root .dy-wfd-import-ok { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); font-size: 13px; }
 .dockyard-root .dy-wfd-import-ok p, .dockyard-root .dy-wfd-ai-plan p { margin: 0; }
 .dockyard-root .dy-wfd-steps { display: grid; gap: 4px; margin: 0; padding-left: 20px; font-size: 13px; }
@@ -57,6 +70,8 @@ export const WORKFLOW_DESIGN_CSS = `
 .dockyard-root .dy-wfd-modal { width: min(640px, 100%); }
 .dockyard-root .dy-wfd-modal .dockyard-modal-head { margin-bottom: 12px; }
 .dockyard-root .dy-wfd-modal .dockyard-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+/* A long New workflow dialog scrolls inside; its buttons stay in view. */
+.dockyard-root .dy-wfd-new .dockyard-modal-actions { position: sticky; bottom: -22px; z-index: 2; margin: 14px -22px -22px; padding: 12px 22px 22px; border-top: 1px solid var(--dy-border); background: var(--dy-surface); }
 .dockyard-root .dy-wfd-fieldset { display: grid; gap: 8px; margin: 0 0 12px; padding: 12px; border: 1px solid var(--dy-border); border-radius: 8px; }
 .dockyard-root .dy-wfd-fieldset legend { padding: 0 4px; font-size: 13px; font-weight: 650; }
 .dockyard-root .dy-wfd-radio { display: flex; align-items: center; gap: 8px; font-size: 13px; }
@@ -80,6 +95,16 @@ export const WORKFLOW_DESIGN_CSS = `
 .dockyard-root .dy-wfd-ai-compose textarea { flex: 1 1 auto; min-width: 0; resize: vertical; }
 .dockyard-root .dy-wfd-ai-unsaved { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--dy-warning); border-radius: 8px; background: var(--dy-warning-bg); color: var(--dy-text); font-size: 12px; }
 .dockyard-root .dy-wfd-ai-unsaved > span { flex: 1 1 auto; font-weight: 600; }
+/* A suggestion in the AI chat (Sahil, 07/10/2026: suggest, then Apply). The
+   live one has the action colour down its edge; the rest are quiet. */
+.dockyard-root .dy-wfd-ai-suggestion { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid var(--dy-accent-border); border-left: 3px solid var(--dy-action); border-radius: 8px; background: var(--dy-surface); }
+.dockyard-root .dy-wfd-ai-suggestion h4 { margin: 0; color: var(--dy-text-2); font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+.dockyard-root .dy-wfd-ai-changes { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.45; }
+.dockyard-root .dy-wfd-ai-suggestion details { color: var(--dy-text-2); font-size: 12px; }
+.dockyard-root .dy-wfd-ai-suggestion-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.dockyard-root .dy-wfd-ai-suggestion:not(.is-pending) { border-color: var(--dy-border); border-left-color: var(--dy-border); }
+.dockyard-root .dy-wfd-ai-suggestion.is-applied { border-left-color: var(--dy-action); }
+.dockyard-root .dy-wfd-ai-suggestion.is-replaced .dy-wfd-ai-changes, .dockyard-root .dy-wfd-ai-suggestion.is-stale .dy-wfd-ai-changes { color: var(--dy-text-2); }
 /* The repeat settings popover (frames). */
 .dockyard-root .dy-wfd-repeat { position: fixed; z-index: 110; display: grid; gap: 8px; box-sizing: border-box; padding: 14px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); color: var(--dy-text); box-shadow: 0 18px 44px rgba(0, 0, 0, .3); font-size: 13px; }
 .dockyard-root .dy-wfd-repeat h3 { margin: 0; font-size: 14px; }

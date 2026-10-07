@@ -32,37 +32,75 @@ export function runOrder(nodes) {
   return out
 }
 
-export function stepNotes(node, nodes) {
+// `roleOf` (optional) names who a step goes to before any bot is picked: a
+// built-in template's steps say "the worker" or "the checker".
+export function stepNotes(node, nodes, roleOf = null) {
   const notes = []
   if (node.human_gate) notes.push('your sign-off')
   if (node.loop) notes.push(`repeats, up to ${node.loop.max_iterations} rounds`)
   if (node.when) notes.push(`only if "${nodes.find((n) => (n.id ?? n.node_id) === node.when.node)?.title ?? node.when.node}" ${node.when.status === 'blocked' ? 'gets stuck' : 'is done'}`)
   if (node.phase_team) notes.push(`done by ${node.phase_team}`)
+  else if (roleOf && !node.human_gate && roleOf(node)) notes.push(`the ${roleOf(node)}`)
   return notes
 }
 
-export function StepsPreview({ nodes }) {
+export function StepsPreview({ nodes, roleOf = null }) {
   const ordered = runOrder(nodes)
   return jsx('ol', { className: 'dy-wfd-steps', 'data-wfd-steps': ordered.length, children: ordered.map((node) => jsxs('li', { children: [
     jsx('strong', { children: node.title }),
-    ...stepNotes(node, nodes).map((note) => jsx('span', { className: 'dy-wfd-step-note', children: note }, note)),
+    ...stepNotes(node, nodes, roleOf).map((note) => jsx('span', { className: 'dy-wfd-step-note', children: note }, note)),
   ] }, node.id ?? node.node_id)) })
 }
 
-export function TemplateList({ templates, value, onPick }) {
-  if (templates === null) return jsx('p', { className: 'dockyard-meta', role: 'status', children: 'Loading templates…' })
-  if (!templates.length) return jsx('p', { className: 'dockyard-meta', 'data-wfd-no-templates': true, children: 'No templates yet. In the library, save a workflow for every project to make it a template.' })
-  return jsx('div', { className: 'dy-wfd-templates', role: 'radiogroup', 'aria-label': 'Templates', children: templates.map((t) => {
-    const nodes = t.definition?.nodes ?? []
-    return jsxs('button', {
-      type: 'button', role: 'radio', 'aria-checked': value === t.name, 'data-wfd-template': t.name,
-      className: value === t.name ? 'active' : '', onClick: () => onPick(t),
-      children: [
-        jsxs('span', { className: 'dy-wfd-template-head', children: [jsx('strong', { children: t.name }), jsx('small', { children: `${nodes.length} step${nodes.length === 1 ? '' : 's'}` })] }),
-        jsx('span', { className: 'dy-wfd-template-line', children: runOrder(nodes).map((n) => n.title).join(' → ') }),
-      ],
-    }, t.name)
-  }) })
+// Use a template: the built-in templates in their groups, then the ones saved
+// in the library. A pick is { source: 'builtin' | 'library', item }.
+const stepCount = (n) => `${n} step${n === 1 ? '' : 's'}`
+const matches = (words, ...fields) => !words || fields.some((f) => String(f ?? '').toLowerCase().includes(words))
+export function TemplatePicker({ builtins, groups, saved, value, onPick }) {
+  const [filter, setFilter] = useState('')
+  const words = filter.trim().toLowerCase()
+  const isPicked = (source, name) => value?.source === source && value.item.name === name
+  const sections = groups.map((group) => ({ group, items: builtins.filter((t) => t.group === group.id && matches(words, t.title, t.summary, t.based_on, t.name)) }))
+  const savedItems = (saved ?? []).filter((t) => matches(words, t.name))
+  const shown = sections.filter((s) => !words || s.items.length)
+  const nothing = words && !shown.length && !savedItems.length
+  return jsxs('div', { className: 'dy-wfd-tpl', children: [
+    jsxs('label', { className: 'dy-wfd-field', children: [
+      jsx('span', { children: 'Find a template' }),
+      jsx('input', { type: 'search', value: filter, 'data-wfd-template-filter': true, placeholder: 'e.g. bug, release, research', onChange: (e) => setFilter(e.target.value) }),
+    ] }),
+    jsxs('div', { className: 'dy-wfd-tpl-groups', role: 'radiogroup', 'aria-label': 'Templates', children: [
+      ...shown.map(({ group, items }) => jsxs('section', { className: 'dy-wfd-tpl-group', 'data-wfd-template-group': group.id, children: [
+        jsx('h4', { children: group.title }),
+        ...items.map((t) => jsxs('button', {
+          type: 'button', role: 'radio', 'aria-checked': isPicked('builtin', t.name), 'data-wfd-builtin': t.name,
+          className: `dy-wfd-tpl-item${isPicked('builtin', t.name) ? ' active' : ''}`, onClick: () => onPick({ source: 'builtin', item: t }),
+          children: [
+            jsxs('span', { className: 'dy-wfd-template-head', children: [jsx('strong', { children: t.title }), jsx('small', { children: stepCount(t.nodes.length) })] }),
+            jsx('span', { className: 'dy-wfd-tpl-summary', children: t.summary }),
+          ],
+        }, t.name)),
+      ] }, group.id)),
+      !words || savedItems.length ? jsxs('section', { className: 'dy-wfd-tpl-group', 'data-wfd-template-group': 'library', children: [
+        jsx('h4', { children: 'Saved in your library' }),
+        saved === null ? jsx('span', { className: 'dockyard-meta', role: 'status', children: 'Loading saved templates…' })
+          : !saved.length ? jsx('span', { className: 'dockyard-meta', 'data-wfd-no-templates': true, children: 'None saved yet. In the library, save a workflow for every project to make it a template.' })
+            : null,
+        ...savedItems.map((t) => {
+          const nodes = t.definition?.nodes ?? []
+          return jsxs('button', {
+            type: 'button', role: 'radio', 'aria-checked': isPicked('library', t.name), 'data-wfd-template': t.name,
+            className: `dy-wfd-tpl-item${isPicked('library', t.name) ? ' active' : ''}`, onClick: () => onPick({ source: 'library', item: t }),
+            children: [
+              jsxs('span', { className: 'dy-wfd-template-head', children: [jsx('strong', { children: t.name }), jsx('small', { children: stepCount(nodes.length) })] }),
+              jsx('span', { className: 'dy-wfd-tpl-summary', children: runOrder(nodes).map((n) => n.title).join(' → ') }),
+            ],
+          }, t.name)
+        }),
+      ] }, 'library') : null,
+      nothing ? jsx('span', { className: 'dockyard-meta', role: 'status', children: `No templates match "${filter.trim()}".` }) : null,
+    ] }),
+  ] })
 }
 
 export function ImportResult({ result }) {
@@ -82,7 +120,9 @@ export function ImportResult({ result }) {
 }
 
 // The AI's answer: its plan in words, the steps and its questions.
-export function AiPlan({ draft, onAnswer }) {
+// `readOnly`: a plan that is no longer a live suggestion (applied, replaced,
+// or the one a workflow was created from) shows its answers but changes nothing.
+export function AiPlan({ draft, onAnswer, readOnly = false }) {
   return jsxs('div', { className: 'dy-wfd-ai-plan', 'data-wfd-ai-plan': draft.name, children: [
     jsx('h4', { children: "Here's my plan" }),
     jsx('ol', { className: 'dy-wfd-ai-explain', children: draft.explain.map((line) => jsx('li', { children: line }, line)) }),
@@ -91,7 +131,7 @@ export function AiPlan({ draft, onAnswer }) {
     draft.questions.length ? jsx('h4', { children: 'Questions for you' }) : null,
     ...draft.questions.map((q) => jsxs('div', { className: 'dy-wfd-question', role: 'group', 'aria-label': q.text, 'data-wfd-question': q.id, children: [
       jsx('span', { children: q.text }),
-      jsx('span', { className: 'dy-wfd-chips', children: q.options.map((o) => jsx('button', { type: 'button', 'aria-pressed': q.current === o.value, 'data-wfd-answer': `${q.id}:${o.value}`, onClick: () => onAnswer(q.id, o.value), children: o.label }, String(o.value))) }),
+      jsx('span', { className: 'dy-wfd-chips', children: q.options.map((o) => jsx('button', { type: 'button', 'aria-pressed': q.current === o.value, 'data-wfd-answer': `${q.id}:${o.value}`, disabled: readOnly, onClick: () => onAnswer(q.id, o.value), children: o.label }, String(o.value))) }),
     ] }, q.id)),
   ] })
 }
