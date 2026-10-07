@@ -103,62 +103,65 @@ function bootWorkflow() {
 
 test('workflow tab renders canvas with nodes and edges, then opens gate passport', async () => {
   const { dom } = bootWorkflow();
-  await new Promise((r) => setTimeout(r, 80)); // initApp mounts synchronously via dev fallback
-  // Switch to Workflow tab.
-  const tabs = [...dom.window.document.querySelectorAll('button[data-tab]')];
-  const wfTab = tabs.find((t) => t.dataset.tab === 'workflow');
-  assert.ok(wfTab, 'Workflow tab should exist');
-  wfTab.click();
-  await new Promise((r) => setTimeout(r, 200)); // allow async load + mount + poll
-  const svg = dom.window.document.querySelector('svg.dy-wf-svg');
-  assert.ok(svg, 'canvas svg should render');
-  const nodes = dom.window.document.querySelectorAll('.dy-wf-node');
-  assert.ok(nodes.length >= 3, `expected >=3 nodes, got ${nodes.length}`);
-  const edges = dom.window.document.querySelectorAll('.dy-wf-edge');
-  assert.ok(edges.length >= 2, `expected >=2 edges, got ${edges.length}`);
-  // Double-click the gate node -> passport with Approve/Reject (one click
-  // only selects it; steps open on double-click since 07/10/2026).
-  const gate = [...nodes].find((n) => (n.getAttribute('class') || '').split(/\s+/).includes('pending'));
-  assert.ok(gate, 'gate node should be present');
-  gate.dispatchEvent(new dom.window.Event('dblclick'));
-  const passport = dom.window.document.querySelector('.dy-wf-passport');
-  assert.ok(passport, 'passport should open on gate double-click');
-  assert.ok(passport.querySelector('button'), 'passport should have action buttons');
-  // LOD attribute present (v3 mechanic)
-  const lod = dom.window.document.querySelector('svg.dy-wf-svg');
-  assert.ok(['map', 'read', 'full'].includes(lod.getAttribute('data-lod')), 'data-lod should be set');
-  // arrow markers exist (agenttrail edge vocabulary)
-  assert.ok(lod.querySelector('marker'), 'arrow markers should exist');
-  // Gate click = selection: unmistakable highlight class lands on the clicked node
-  assert.ok(gate.getAttribute('class').includes('dy-wf-selected'), 'clicked gate node should carry selected class');
-  // Activity strip exists (collapsible, top-left of canvas)
-  const feedStrip = dom.window.document.querySelector('.dy-wf-feed');
-  assert.ok(feedStrip, 'activity strip should exist');
-  assert.ok(feedStrip.querySelector('.dy-wf-feed-head'), 'activity strip header should exist');
-  // Per-node timers: clocks exist ONLY on working nodes (was: number on every node)
-  const timerOnWorking = dom.window.document.querySelectorAll('.dy-wf-node.working .dy-wf-timer').length;
-  const timerOnDone = dom.window.document.querySelectorAll('.dy-wf-node.done .dy-wf-timer').length;
-  assert.ok(timerOnDone === 0, `no clock on done nodes, got ${timerOnDone}`);
-  // Expand live detail on the done TASK node (W-1 has task_ref + fixture detail)
-  const taskNode = [...dom.window.document.querySelectorAll('.dy-wf-node')].find((n) =>
-    (n.getAttribute('class') || '').split(/\s+/).includes('done'));
-  assert.ok(taskNode, 'done task node should be present');
-  taskNode.dispatchEvent(new dom.window.Event('dblclick'));
-  await new Promise((r) => setTimeout(r, 80));
-  const taskPassport = dom.window.document.querySelector('.dy-wf-passport');
-  const expandHead = taskPassport.querySelector('.dy-wf-expand-head');
-  assert.ok(expandHead, 'expansion toggle should exist');
-  expandHead.click();
-  await new Promise((r) => setTimeout(r, 150)); // lazy fetch
-  const body = taskPassport.querySelector('.dy-wf-expand-body');
-  assert.ok(body.querySelector('.dy-activity-item'), 'activity thread should render');
-  assert.ok(body.querySelectorAll('.dy-taskitem').length >= 2, 'sub-task list should render');
-  // Clean up the canvas poll timer so the test process can exit.
-  const host = dom.window.document.querySelector('.dy-wf-host');
-  if (host && typeof host.dyDispose === 'function') host.dyDispose();
-  // jsdom keeps the event loop alive while windows are open; closing them
-  // lets node:test exit promptly instead of idling to the file timeout.
-  await new Promise((r) => setTimeout(r, 50));
-  dom.window.close();
+  try {
+    await new Promise((r) => setTimeout(r, 80)); // initApp mounts synchronously via dev fallback
+    // Switch to Workflow tab.
+    const tabs = [...dom.window.document.querySelectorAll('button[data-tab]')];
+    const wfTab = tabs.find((t) => t.dataset.tab === 'workflow');
+    assert.ok(wfTab, 'Workflow tab should exist');
+    wfTab.click();
+    await new Promise((r) => setTimeout(r, 200)); // allow async load + mount + poll
+    const svg = dom.window.document.querySelector('svg.dy-wf-svg');
+    assert.ok(svg, 'canvas svg should render');
+    const nodes = dom.window.document.querySelectorAll('.dy-wf-node');
+    assert.ok(nodes.length >= 3, `expected >=3 nodes, got ${nodes.length}`);
+    const edges = dom.window.document.querySelectorAll('.dy-wf-edge');
+    assert.ok(edges.length >= 2, `expected >=2 edges, got ${edges.length}`);
+    // Double-click the gate node -> passport with Approve/Reject (one click
+    // only selects it; steps open on double-click since 07/10/2026).
+    const gate = [...nodes].find((n) => (n.getAttribute('class') || '').split(/\s+/).includes('pending'));
+    assert.ok(gate, 'gate node should be present');
+    gate.dispatchEvent(new dom.window.Event('dblclick'));
+    const passport = dom.window.document.querySelector('.dy-wf-passport');
+    assert.ok(passport, 'passport should open on gate double-click');
+    assert.ok(passport.querySelector('button'), 'passport should have action buttons');
+    // LOD attribute present (v3 mechanic)
+    const lod = dom.window.document.querySelector('svg.dy-wf-svg');
+    assert.ok(['map', 'read', 'full'].includes(lod.getAttribute('data-lod')), 'data-lod should be set');
+    // arrow markers exist (agenttrail edge vocabulary)
+    assert.ok(lod.querySelector('marker'), 'arrow markers should exist');
+    // Gate click = selection: unmistakable highlight class lands on the clicked node
+    assert.ok(gate.getAttribute('class').includes('dy-wf-selected'), 'clicked gate node should carry selected class');
+    // Activity strip exists (collapsible, top-left of canvas)
+    const feedStrip = dom.window.document.querySelector('.dy-wf-feed');
+    assert.ok(feedStrip, 'activity strip should exist');
+    assert.ok(feedStrip.querySelector('.dy-wf-feed-head'), 'activity strip header should exist');
+    // Per-node timers: clocks exist ONLY on working nodes (was: number on every node)
+    const timerOnWorking = dom.window.document.querySelectorAll('.dy-wf-node.working .dy-wf-timer').length;
+    const timerOnDone = dom.window.document.querySelectorAll('.dy-wf-node.done .dy-wf-timer').length;
+    assert.ok(timerOnDone === 0, `no clock on done nodes, got ${timerOnDone}`);
+    // Expand live detail on the done TASK node (W-1 has task_ref + fixture detail)
+    const taskNode = [...dom.window.document.querySelectorAll('.dy-wf-node')].find((n) =>
+      (n.getAttribute('class') || '').split(/\s+/).includes('done'));
+    assert.ok(taskNode, 'done task node should be present');
+    taskNode.dispatchEvent(new dom.window.Event('dblclick'));
+    await new Promise((r) => setTimeout(r, 80));
+    const taskPassport = dom.window.document.querySelector('.dy-wf-passport');
+    const expandHead = taskPassport.querySelector('.dy-wf-expand-head');
+    assert.ok(expandHead, 'expansion toggle should exist');
+    expandHead.click();
+    await new Promise((r) => setTimeout(r, 150)); // lazy fetch
+    const body = taskPassport.querySelector('.dy-wf-expand-body');
+    assert.ok(body.querySelector('.dy-activity-item'), 'activity thread should render');
+    assert.ok(body.querySelectorAll('.dy-taskitem').length >= 2, 'sub-task list should render');
+  } finally {
+    // Clean up even when an assertion fails: the canvas poll timer and an
+    // open jsdom window keep the test process alive until the runner's file
+    // timeout, so one failed assertion used to hang the whole suite.
+    const host = dom.window.document.querySelector('.dy-wf-host');
+    if (host && typeof host.dyDispose === 'function') host.dyDispose();
+    await new Promise((r) => setTimeout(r, 50));
+    dom.window.close();
+  }
 });
 
