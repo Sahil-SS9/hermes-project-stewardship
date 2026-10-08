@@ -61,6 +61,9 @@ export const dropStatusOf = (stageKey) => STAGE_BY_KEY[stageKey]?.statuses[0] ??
 // them with each item. Until it does, this measured table is the source; a move
 // the host refuses anyway is reported as an error, never as a success.
 const TASK_MOVES = Object.freeze({ backlog: ['active', 'done'], active: ['review', 'blocked', 'done'], review: ['done'], blocked: ['active', 'done'], done: [] })
+// Moving a blocked item "active" unblocks it: the board refuses backlog->running for a
+// blocked card ("blocked: unblock before transitioning to running"), so the retry button on a
+// workflow step uses this same path (08/10/2026, WORKFLOWS-R1.md engine round, bug 12).
 const EPIC_MOVES = Object.freeze({ backlog: ['active'], active: [], review: [], blocked: [], done: [] })
 
 // { targets: [{ key, label, status }], reason } for one card. `openBlockers` is
