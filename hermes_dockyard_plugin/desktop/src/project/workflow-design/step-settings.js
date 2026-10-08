@@ -3,10 +3,11 @@
 //
 // Workflows (Sahil's pick, 07/10/2026: loops shown as a frame): the canvas
 // hooks. The step panel says, in plain words: Who does it, What to do,
-// Repeat, Ask me first, Limits. Real fields (who, what, repeat) save with the
-// panel's own Save button through the screen's one save path; the rest are
-// stand-ins kept in memory and tagged "Preview". A step that repeats is drawn
-// inside a frame on the canvas, and its repeat settings live on that frame.
+// Repeat, Ask me first, Limits. Real fields (who, what, repeat, ask me first)
+// save with the panel's own Save button through the screen's one save path;
+// Limits is a stand-in kept in memory and tagged "Preview". A step that
+// repeats is drawn inside a frame on the canvas, and its repeat settings live
+// on that frame.
 import { readStepSettings } from './standins.js'
 import { writeStepSettings } from './standins.js'
 import { CHECK_WORDS } from './standins.js'
@@ -84,8 +85,10 @@ function panelExtras({ node, stored, members, settingsKey, onEditFrame }) {
   }
   root.appendChild(repeat)
 
-  const ask = section('Ask me first', { preview: true })
-  const askBox = el('input'); askBox.type = 'checkbox'; askBox.checked = current.askFirst; askBox.setAttribute('data-wfx-ask-first', '')
+  // Saved with the workflow (08/10/2026): when its turn comes the step waits
+  // for you instead of going to its bot.
+  const ask = section('Ask me first', { help: 'When its turn comes, it waits for you: move it to Doing to start it.' })
+  const askBox = el('input'); askBox.type = 'checkbox'; askBox.checked = Boolean(stored?.ask_first ?? node.ask_first); askBox.setAttribute('data-wfx-ask-first', '')
   const askLabel = el('label', 'dy-wfx-check'); askLabel.append(askBox, el('span', '', 'Ask me before this step starts'))
   ask.appendChild(askLabel)
 
@@ -100,10 +103,9 @@ function panelExtras({ node, stored, members, settingsKey, onEditFrame }) {
   const apply = (next) => {
     writeStepSettings(...settingsKey(node.node_id), {
       check: current.check,
-      askFirst: askBox.checked,
       limits: { turns: turns.value, minutes: minutes.value, skills: skills.value.trim() },
     })
-    const patch = { body: body.value.trim() || null }
+    const patch = { body: body.value.trim() || null, ask_first: askBox.checked }
     if (repeatBox) patch.loop = repeatBox.checked ? { max_iterations: 3, until: { status: 'done' } } : null
     return { ...next, phase_team: pick.value || null, design_patch: patch }
   }
@@ -134,6 +136,7 @@ export function canvasDesignHooks({ draft, members, storedNode, settingsKey, onE
       // "Sign-off", not "Your sign-off": the gate's status ("awaiting
       // decision") is the longest on the card and they share the line.
       if (node.human_gate) return 'Sign-off'
+      if (node.ask_first) return 'Asks you first'
       return null
     },
     frames: (nodes) => nodes.filter((n) => n.loop).map((n) => {

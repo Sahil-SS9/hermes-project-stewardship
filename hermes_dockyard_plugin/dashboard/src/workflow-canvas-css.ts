@@ -109,6 +109,8 @@ export const WORKFLOW_CANVAS_CSS = `
 .dy-wf-scope .dy-wf-node.blocked .dy-wf-shape { stroke: var(--dy-wf-status-blocked); filter: drop-shadow(0 0 7px color-mix(in srgb, var(--dy-wf-status-blocked) 45%, transparent)); }
 .dy-wf-scope .dy-wf-node.pending .dy-wf-shape { stroke: var(--dy-wf-status-pending); stroke-dasharray: 5 4; }
 .dy-wf-scope .dy-wf-node.awaiting .dy-wf-shape { stroke: var(--dy-wf-status-working); stroke-dasharray: 5 4; animation: dyWfAwait 2.6s ease-in-out infinite; }
+/* A step this run did not need (its branch was not taken). */
+.dy-wf-scope .dy-wf-node.skipped { opacity: 0.5; }
 @keyframes dyWfBreath {
   0%, 100% { stroke-width: 1.5; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--dy-wf-status-working) 35%, transparent)); }
   50% { stroke-width: 2.4; filter: drop-shadow(0 0 14px color-mix(in srgb, var(--dy-wf-status-working) 70%, transparent)); }
