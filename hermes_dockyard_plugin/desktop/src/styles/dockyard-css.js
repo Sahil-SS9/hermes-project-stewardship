@@ -1474,6 +1474,9 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-wf3-steps ul { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 260px; margin: 0; padding: 10px 12px 10px 28px; display: grid; gap: 4px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); box-shadow: 0 16px 40px rgba(0,0,0,.28); }
 .dockyard-root .dockyard-wf3-steps li { color: var(--dy-text-2); font-size: 12px; }
 .dockyard-root .dockyard-wf3-steps li[data-wf-needs-attention="true"] { color: var(--dy-warning); }
+.dockyard-root .dockyard-wf3-timer { color: var(--dy-text-3); }
+.dockyard-root .dockyard-wf3-timer[data-wf-timer="off"] { color: var(--dy-warning); }
+.dockyard-root .dockyard-wf3-movenote { flex-basis: 100%; margin: 0; color: var(--dy-text-2); }
 @media (max-width: 1250px) {
   .dockyard-root .dockyard-wf3 { grid-template-columns: 220px minmax(0, 1fr); }
   .dockyard-root .dockyard-wf3.lib-collapsed { grid-template-columns: 0 minmax(0, 1fr); }

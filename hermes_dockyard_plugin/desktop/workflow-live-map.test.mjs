@@ -43,9 +43,16 @@ test('W5 live map attributes come from the canonical run projection', async () =
     export function useStylesheet(){}
   `;
   fs.writeFileSync(path.join(dir, 'context-stub.js'), contextStub);
+  // The run's words (stepWord, needsPerson...) are the REAL ones: the canvas
+  // adapter is compiled with the repo's own esbuild; only drawing is stubbed.
+  const { execFileSync } = await import('node:child_process');
+  const realMount = path.join(dir, 'mount-real.mjs');
+  execFileSync(path.join(HERE, '..', 'dashboard', 'node_modules', '.bin', 'esbuild'), [
+    path.join(HERE, 'workflow-canvas-mount.js'), '--bundle', '--format=esm', `--outfile=${realMount}`,
+  ]);
   const mountStub = `
+    export * from 'file://${realMount.replace(/\\/g, '/')}'
     export function mountDesktopWorkflowCanvas(){ return () => {} }
-    export function validateConnection(nodes, from, to){ return null }
   `;
   fs.writeFileSync(path.join(dir, 'mount-stub.js'), mountStub);
   const source = fs.readFileSync(path.join(HERE, 'src', 'project', 'workflows.js'), 'utf8')
@@ -69,7 +76,7 @@ test('W5 live map attributes come from the canonical run projection', async () =
   const { __setRuns__ } = await import('file://' + path.join(dir, 'context-stub.js').replace(/\\\\/g, '/'));
   const runs = [{ run_key: 'r1', version: 1, status: 'running', nodes: [
     { node_id: 'a', title: 'Assemble', depends_on: [], human_gate: false, kind: 'task', status: 'done', task_ref: null, evidence_refs: [] },
-    { node_id: 'g', title: 'Approve', depends_on: ['a'], human_gate: true, kind: 'gate', status: 'pending', task_ref: null, evidence_refs: [] },
+    { node_id: 'g', title: 'Approve', depends_on: ['a'], human_gate: true, kind: 'gate', status: 'backlog', task_ref: 'INIT-1', evidence_refs: [] },
   ] }];
   __setRuns__(runs);
   fs.writeFileSync(path.join(dir, 'ui-stub.js'), [
@@ -104,5 +111,8 @@ test('W5 live map attributes come from the canonical run projection', async () =
   assert.equal(assemble['data-wf-needs-attention'], undefined);
   assert.equal(approve['data-wf-needs-attention'], 'true');
   assert.match(String(approve.children), /needs attention/);
+  // Dockyard's words reach the readout as the canvas's words.
+  assert.match(String(approve.children), /Approve — awaiting decision/);
+  assert.match(String(assemble.children), /Assemble — done/);
   await rm(dir, { recursive: true, force: true });
 });

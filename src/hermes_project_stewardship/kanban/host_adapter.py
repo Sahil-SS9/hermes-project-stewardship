@@ -547,6 +547,33 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
         except Exception as exc:
             raise self._mapped_error(exc) from None
 
+    def work_block_reason(self, project_id: str, item_id: str) -> str | None:
+        """Why the item was last blocked, from the host's own event history.
+
+        Advisory text only (a workflow passes it to the next round); a host
+        without an event history, or a failed read, gives None.
+        """
+        reader: Any = getattr(self.host, "get_task_events", None)
+        if not callable(reader):
+            return None
+        try:
+            events = list(reader(item_id, board=self.project_board(project_id)) or [])
+        except Exception:
+            return None
+        for event in reversed(events):
+            if str(event.get("kind")) != "blocked":
+                continue
+            payload = event.get("payload")
+            if isinstance(payload, str):
+                try:
+                    payload = json.loads(payload)
+                except ValueError:
+                    payload = None
+            reason = payload.get("reason") if isinstance(payload, Mapping) else None
+            text = str(reason).strip() if reason else ""
+            return text or None
+        return None
+
     def list_work_links(
         self,
         project_id: str,

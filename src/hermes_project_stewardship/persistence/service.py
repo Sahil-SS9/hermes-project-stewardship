@@ -467,10 +467,19 @@ class StewardshipService:
         return self._resolve_features(row)
 
     def _resolve_features(self, r: sqlite3.Row) -> Dict[str, bool]:
-        stored = self.store._uj(r["features_json"], {}) if r["features_json"] else {}
+        return self.features_from_json(r["features_json"])
+
+    @classmethod
+    def features_from_json(cls, raw: Any) -> Dict[str, bool]:
+        """A project's feature switches from its stored ``features_json``.
+
+        Needs no service instance, so a read-only caller (the workflow timer)
+        resolves features exactly as the service does without building one.
+        """
+        stored = Store._uj(raw, {}) if raw else {}
         return {
-            name: bool(stored.get(name, name not in self.DEFAULT_OFF_FEATURES))
-            for name in self.TOGGLABLE_FEATURES
+            name: bool(stored.get(name, name not in cls.DEFAULT_OFF_FEATURES))
+            for name in cls.TOGGLABLE_FEATURES
         }
 
     def features(self, project_id: str) -> Dict[str, bool]:

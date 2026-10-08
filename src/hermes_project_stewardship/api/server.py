@@ -2984,14 +2984,25 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(404 if "not found" in str(exc) else 422, str(exc)) from None
 
+    @router.get("/workflows/timer")
+    def workflow_timer():
+        """Whether runs move on by themselves: the timer's last pass and problems."""
+        return workflows.tick_status()
+
     @router.post("/projects/{project_id}/workflows/{name}/runs/{run_key}/advance")
     def advance_workflow_run(project_id: str, name: str, run_key: str):
-        """Materialise conditional branches / progress bounded loops."""
+        """Move a run on now (Move on now); works while the project is paused."""
         svc.require_feature(project_id, "workflow_canvas")
         try:
             return workflows.advance(project_id, name, run_key)
+        except KanbanAdapterError as exc:
+            _raise_work_error(exc)
         except ValueError as exc:
-            raise HTTPException(404 if "not found" in str(exc) else 422, str(exc)) from None
+            message = str(exc)
+            code = (404 if "not found" in message
+                    else 409 if any(word in message for word in ("archived", "disabled"))
+                    else 422)
+            raise HTTPException(code, message) from None
 
     @router.post("/projects/{project_id}/workflows/{name}/runs/{run_key}/proposals")
     def propose_workflow_revision(

@@ -150,7 +150,9 @@ test('list view: equivalent table with dependencies, gates and statuses', async 
     const gateRow = rows.find((r) => r.dataset.wfListRow === 'g');
     assert.match(gateRow.textContent, /Approve gate/);
     assert.match(gateRow.textContent, /gate/i, 'gate kind is visible in list');
-    assert.match(gateRow.textContent, /pending/, 'status is visible in list');
+    // The list says what the card says (08/10/2026): a gate waiting on a
+    // person reads "awaiting decision" in both places.
+    assert.match(gateRow.textContent, /awaiting decision/, 'status is visible in list');
     assert.match(gateRow.textContent, /ingest/i,
       'dependency is visible in list (by node title)');
     const blockedRow = rows.find((r) => r.dataset.wfListRow === 'c');

@@ -6,6 +6,10 @@ import { api } from '../runtime/context.js'
 import { useEffect } from '../runtime/react.js'
 import { mountDesktopWorkflowCanvas } from '../../workflow-canvas-mount.js'
 import { validateConnection } from '../../workflow-canvas-mount.js'
+import { toCanvasRun } from '../../workflow-canvas-mount.js'
+import { stepWord } from '../../workflow-canvas-mount.js'
+import { needsPerson } from '../../workflow-canvas-mount.js'
+import { statusToken } from '../../workflow-canvas-mount.js'
 import { jsxs } from '../runtime/react.js'
 import { jsx } from '../runtime/react.js'
 import { StatusTag } from '../lib/ui.js'
@@ -29,6 +33,20 @@ import { EMPTY_STEP } from './workflow-design/standins.js'
 const NO_RUNS = []
 const NO_THREAD = []
 const failureText = (failure) => String(failure?.message ?? failure ?? 'unknown error').replace(/^\d{3}:\s*/, '')
+// A run's status in plain words (the engine says pending, escalated or
+// complete; the readout used to look for "completed" and "failed").
+const RUN_WORDS = { pending: ['Running', 'info'], escalated: ['Needs a person', 'danger'], complete: ['Finished', 'success'] }
+const runWord = (status) => RUN_WORDS[status] ?? [String(status ?? 'unknown'), 'neutral']
+// Step counts in the canvas's own words.
+const COUNT_WORDS = [['done', 'done'], ['working', 'working'], ['blocked', 'blocked'], ['pending', 'pending'], ['skipped', 'not needed']]
+// Whether runs move on by themselves: the timer's last pass (08/10/2026).
+const timerWords = (timer) => {
+  if (!timer) return null
+  if (!timer.moving) return 'Runs move on when you press Move on now (the timer is off).'
+  const at = new Date(timer.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const failed = timer.failed?.length ?? 0
+  return `Runs move on by themselves (checked ${at})${failed ? ` · ${failed} run${failed === 1 ? '' : 's'} could not move on` : ''}`
+}
 // openWorkflow: { project, name, conversation?, checks? } from the Workflows
 // tab (Open builder, or a project workflow just made there). It opens that
 // workflow; a conversation with the AI carries on in the sidebar.
@@ -75,6 +93,9 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   const [aiThreads, setAiThreads] = useState(() => (opening?.conversation ? { [opening.name]: createdConversation(opening.name, opening.conversation) } : {}))
   const [repeatAt, setRepeatAt] = useState(null)
   const [draftError, setDraftError] = useState(null)
+  // The timer's last pass, and what Move on now just did.
+  const [timer, setTimer] = useState(null)
+  const [moveNote, setMoveNote] = useState(null)
   const encoded = encodeURIComponent(project.id)
   const grouped = Object.values((workflows ?? []).reduce((all, row) => {
     const item = all[row.name] ?? { name: row.name, versions: [], archived_at: row.archived_at }
@@ -161,8 +182,12 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
     onRefresh?.()
     return saved
   }
+  const loadTimer = async () => {
+    try { setTimer(await api('/workflows/timer', { suppressErrorToast: true })) } catch { setTimer(null) }
+  }
   const loadRuns = async (workflow = current?.name) => {
     if (!workflow) return
+    loadTimer()
     try {
       const result = await api(`/projects/${encoded}/workflows/${encodeURIComponent(workflow)}/runs`)
       setRunsFor({ workflow, runs: result.runs ?? NO_RUNS })
@@ -173,7 +198,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   }
   // One runs request per opened workflow (opening used to ask twice: once
   // from the library click and once from this effect).
-  useEffect(() => { loadRuns() }, [current?.name, workflows?.length])
+  useEffect(() => { setMoveNote(null); loadRuns() }, [current?.name, workflows?.length])
   // The canvas mounts once per open workflow, after that workflow's runs have
   // loaded (the live view needs them), and is never rebuilt for new data.
   const actionsRef = useRef(null)
@@ -275,8 +300,10 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
         await api(`/initiatives/${encodeURIComponent(ref)}/reject`, { method: 'POST', body: { expected_fingerprint: decision.fingerprint, reason: 'Rejected from workflow gate review' } })
         await actionsRef.current.loadRuns(workflowName)
       },
+      // Retry gives a stuck step back to its bot: Doing unblocks it. To do
+      // was refused by the board for a stuck card (08/10/2026, bug 12).
       onRetry: async (ref) => {
-        await api(`/projects/${encoded}/work-items/${encodeURIComponent(ref)}/transition`, { method: 'POST', body: { status: 'backlog' } })
+        await api(`/projects/${encoded}/work-items/${encodeURIComponent(ref)}/transition`, { method: 'POST', body: { status: 'in_progress' } })
         await actionsRef.current.loadRuns(workflowName)
       },
       fetchTimeline: async (pid, wname, runKey) => api(`/projects/${encodeURIComponent(pid)}/workflows/${encodeURIComponent(wname)}/runs/${encodeURIComponent(runKey)}/timeline`),
@@ -351,10 +378,29 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
   }
   const statusFor = (run, node) => run?.nodes?.find((item) => item.node_id === (node.id || node.node_id))?.status ?? 'pending'
   const latest = runs[0]
-  // A node needs attention when it is blocked or a human gate is waiting —
-  // the two states the run projection actually reports.
-  const needsAttention = (node) => node.status === 'blocked' || (node.status === 'pending' && node.human_gate)
-  const attentionCount = latest ? (latest.nodes ?? []).filter(needsAttention).length : 0
+  // The latest run in the canvas's vocabulary, so the readout, the counts and
+  // the canvas use one set of words. A step needs attention when it waits on
+  // a person: stuck, given up, or a sign-off or "Ask me first" step whose
+  // turn has come.
+  const latestView = latest ? toCanvasRun(latest) : null
+  const needsAttention = (node) => needsPerson(node, latestView)
+  const attentionCount = latestView ? latestView.nodes.filter(needsAttention).length : 0
+  // Move on now: decide what the run can decide and hand over the steps whose
+  // turn has come, without waiting for the timer (works while paused too).
+  const moveOn = async () => {
+    if (!current || !latest) return
+    setError(null)
+    setMoveNote(null)
+    try {
+      const moved = await api(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/runs/${encodeURIComponent(latest.run_key)}/advance`, { method: 'POST', body: {}, suppressErrorToast: true })
+      const changes = moved?.changes ?? []
+      setMoveNote(changes.length ? `Moved on: ${changes.join('; ')}.` : 'Nothing to move on: each step is waiting for its turn, its bot or you.')
+    } catch (failure) {
+      setMoveNote(null)
+      setError(failureText(failure))
+    }
+    await loadRuns(current.name)
+  }
   // Each run gets its own key (the old side form's "Run key" box was jargon,
   // WORKFLOWS-R1.md item 12, and went with the form).
   const startVersion = async (version) => {
@@ -438,7 +484,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
     await savePlan(edited)
   }
   const repeatNode = repeatAt ? storedNodeOf(repeatAt.nodeId) : null
-  const liveCounts = latest ? (latest.nodes ?? []).reduce((acc, node) => { const key = node.status ?? 'pending'; acc[key] = (acc[key] ?? 0) + 1; return acc }, {}) : null
+  const liveCounts = latestView ? latestView.nodes.reduce((acc, node) => { const key = node.state === 'skipped' ? 'skipped' : statusToken(node.status); acc[key] = (acc[key] ?? 0) + 1; return acc }, {}) : null
   // Ask AI opens or closes the AI sidebar; the chat is never inside the canvas.
   const askAi = (key) => jsx(Button, { small: true, action: 'wfd-ask-ai', variant: aiOpen ? 'primary' : '', data: { 'aria-expanded': aiOpen ? 'true' : 'false', 'aria-controls': 'wfd-ai-sidebar' }, disabled: !current, onClick: () => setAiOpen((v) => !v), children: 'Ask AI' }, key)
   // W5 live map: read only from the canonical run projection. A node needs
@@ -449,7 +495,7 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
     // canvas below the window).
     jsxs('header', { className: 'dy-wfd-head', 'data-wfd-head': true, children: [
       jsx('h2', { children: 'Workflows' }),
-      jsx(StatusTag, { tone: latest?.status === 'running' ? 'info' : 'neutral', label: latest ? `Live: ${latest.status}` : `${number(grouped.length)} ${plural(grouped.length, 'workflow')}` }),
+      jsx(StatusTag, { tone: latest ? runWord(latest.status)[1] : 'neutral', label: latest ? `Live: ${runWord(latest.status)[0]}` : `${number(grouped.length)} ${plural(grouped.length, 'workflow')}` }),
       !latest && current && !draft ? jsx('span', { className: 'dy-wfd-chip', 'data-workflow-no-run': true, children: `${current.name}: no runs yet` }) : null,
       jsx('span', { className: 'dy-wfd-grow' }),
       jsx(Button, { small: true, action: 'open-workflow-library', onClick: () => onOpenLibrary?.(), children: 'Open library' }),
@@ -532,13 +578,16 @@ export function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpen
         layoutPendingVersion !== null ? jsx('p', { role: 'status', 'data-wf-layout-saving': true, children: 'Saving layout version before the graph can be edited…' }) : null,
         // Run readout: the latest canonical run only. Nothing here is inferred.
         latest && !draft ? jsxs('div', { className: 'dockyard-wf3-run', 'data-workflow-live-run': latest.run_key, children: [
-          jsx(StatusTag, { tone: latest.status === 'completed' ? 'success' : latest.status === 'failed' ? 'danger' : 'info', label: latest.status }),
+          jsx(StatusTag, { tone: runWord(latest.status)[1], label: runWord(latest.status)[0] }),
           jsx('span', { className: 'dockyard-wf3-runkey', children: `${latest.run_key} · v${latest.version}` }),
-          liveCounts ? jsx('span', { className: 'dockyard-wf3-counts', children: ['done', 'working', 'blocked', 'pending'].filter((k) => liveCounts[k]).map((k) => `${liveCounts[k]} ${k}`).join(' · ') }) : null,
+          liveCounts ? jsx('span', { className: 'dockyard-wf3-counts', children: COUNT_WORDS.filter(([k]) => liveCounts[k]).map(([k, word]) => `${liveCounts[k]} ${word}`).join(' · ') }) : null,
           jsxs('details', { className: 'dockyard-wf3-steps', children: [
             jsx('summary', { children: attentionCount ? `Steps · ${attentionCount} need attention` : 'Steps' }),
-            jsx('ul', { 'data-wf-live-map': latest.run_key, children: (latest.nodes ?? []).map((node) => jsx('li', { 'data-wf-live-node': node.node_id, 'data-wf-needs-attention': needsAttention(node) ? 'true' : undefined, children: `${node.title} — ${node.status ?? 'pending'}${node.assignee ? ` · ${node.assignee}` : ''}${needsAttention(node) ? ' · needs attention' : ''}` }, node.node_id)) }),
+            jsx('ul', { 'data-wf-live-map': latest.run_key, children: latestView.nodes.map((node) => jsx('li', { 'data-wf-live-node': node.node_id, 'data-wf-needs-attention': needsAttention(node) ? 'true' : undefined, children: `${node.title} — ${stepWord(node, latestView)}${node.assignee ? ` · ${node.assignee}` : ''}${needsAttention(node) ? ' · needs attention' : ''}` }, node.node_id)) }),
           ] }),
+          latest.status !== 'complete' ? jsx(Button, { small: true, action: 'wf-move-on', onClick: moveOn, children: 'Move on now' }) : null,
+          timer ? jsx('span', { className: 'dockyard-wf3-timer', 'data-wf-timer': timer.moving ? 'on' : 'off', children: timerWords(timer) }) : null,
+          moveNote ? jsx('p', { className: 'dockyard-wf3-movenote', role: 'status', 'data-wf-move-note': true, children: moveNote }) : null,
         ] }) : null,
         // The canvas, with the AI's draft banner over it. Nothing shares its
         // row: the AI chat is a sidebar beside the page, not a column here.

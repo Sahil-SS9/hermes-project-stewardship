@@ -291,13 +291,16 @@ def test_conditional_branches_validate_take_and_skip(store, enabled):
         f"{BASE}/projects/{enabled}/workflows/rollout/runs/run-1/advance")
     assert r.status_code == 200, r.text
     advanced = r.json()
-    assert advanced["node_states"]["rollout"] == "skipped"
+    # A stuck step may still finish, so "when it is done" waits rather than
+    # being skipped (08/10/2026, WORKFLOWS-R1.md engine round, bug 4).
+    assert advanced["node_states"]["rollout"] == "waiting"
     assert advanced["node_states"]["rollback"] == "taken"
     work = _by_id(adapter.list_work(enabled))
     rollback_ref = advanced["tasks"]["rollback"]
     assert work[rollback_ref]["status"] == "backlog"
-    # Dependency gate: rollback waits on build via a native link.
-    assert {"parent_id": build_ref, "child_id": rollback_ref} in [
+    # An "if stuck" step is never linked behind the stuck step: the board
+    # would never start it, because that step is not done (bug 7).
+    assert {"parent_id": build_ref, "child_id": rollback_ref} not in [
         {"parent_id": link[1], "child_id": link[2]}
         for link in sorted(adapter._canonical_links)
     ]
@@ -317,6 +320,16 @@ def test_conditional_branches_validate_take_and_skip(store, enabled):
         f"{BASE}/projects/{enabled}/workflows/rollout/runs/run-2/advance").json()
     assert taken["node_states"]["rollout"] == "taken"
     assert taken["node_states"]["rollback"] == "skipped"
+
+
+def test_workflow_timer_route_says_whether_runs_move_on_by_themselves(store, enabled):
+    _adapter, client, _dy, workflows = _env(store)
+    before = client.get(f"{BASE}/workflows/timer")
+    assert before.status_code == 200, before.text
+    assert before.json()["at"] is None and before.json()["moving"] is False
+    workflows.tick(interface="timer")
+    after = client.get(f"{BASE}/workflows/timer").json()
+    assert after["by"] == "timer" and after["moving"] is True
 
 
 def test_loops_bounded_iterations_exit_and_escalation(store, enabled):
@@ -353,7 +366,7 @@ def test_loops_bounded_iterations_exit_and_escalation(store, enabled):
     second = adv["tasks"]["retry"]
     assert second != first
     work = _by_id(adapter.list_work(enabled))
-    assert work[second]["title"] == "Retry (iteration 2)"
+    assert work[second]["title"] == "Retry (round 2 of 3)"   # the run view's words
     assert adv["node_states"]["retry"] == "repeating"
 
     adapter.transition_work(enabled, "task", second, "blocked")

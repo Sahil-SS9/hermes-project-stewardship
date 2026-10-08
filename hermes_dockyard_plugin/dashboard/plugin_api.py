@@ -1918,6 +1918,11 @@ async def set_workflow_binding(project_id: str, name: str, body: dict) -> dict:
     )
 
 
+@plugin_api.get("/workflows/timer")
+async def workflow_timer() -> dict:
+    return await _proxy("GET", "/stewardship/v1/workflows/timer")
+
+
 @plugin_api.post("/projects/{project_id}/workflows/{name}/runs/{run_key}/advance")
 async def advance_workflow_run(project_id: str, name: str, run_key: str) -> dict:
     return await _proxy(
@@ -1960,14 +1965,6 @@ async def restore_workflow(project_id: str, name: str) -> dict:
         f"/stewardship/v1/projects/{quote(project_id, safe='')}/workflows/{quote(name, safe='')}/restore",
         {},
     )
-
-
-@plugin_api.get("/projects/{project_id}/workflows/{name}/runs")
-async def workflow_runs(project_id: str, name: str) -> dict:
-    pid = quote(project_id, safe="")
-    wf = quote(name, safe="")
-    return await _proxy(
-        "GET", f"/stewardship/v1/projects/{pid}/workflows/{wf}/runs")
 
 
 @plugin_api.post("/notifications/{notification_id}/ack")

@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // dashboard/src/api.ts
+  // src/api.ts
   var BASE = "/api/plugins/hermes-dockyard";
   function createApi(sdk) {
     const get = (path) => sdk.fetchJSON(`${BASE}${path}`);
@@ -146,7 +146,7 @@
     return sdk;
   }
 
-  // dashboard/src/objective-evidence.ts
+  // src/objective-evidence.ts
   async function renderObjectiveEvidence(root, api, project) {
     const text = (tag, value) => {
       const node = document.createElement(tag);
@@ -231,7 +231,7 @@
     }
   }
 
-  // dashboard/src/components/live-detail.ts
+  // src/components/live-detail.ts
   function buildActivityThread(items, opts = {}) {
     const max = opts.max ?? 8;
     const wrap = document.createElement("div");
@@ -313,7 +313,7 @@
     return wrap;
   }
 
-  // dashboard/src/workflow-canvas.ts
+  // src/workflow-canvas.ts
   function validateConnection(nodes, from, to) {
     if (!from || !to) return "Both source and target are required";
     if (from === to) return "A node cannot depend on itself";
@@ -354,8 +354,20 @@
   var LOD_FULL = 1.4;
   var ZOOM_IN = 1.1;
   var ZOOM_OUT = 0.9;
+  var TOKEN_OF = {
+    done: "done",
+    archived: "done",
+    working: "working",
+    in_progress: "working",
+    in_review: "working",
+    ready: "working",
+    scheduled: "working",
+    running: "working",
+    review: "working",
+    blocked: "blocked"
+  };
   function statusToken(status) {
-    return status === "done" || status === "working" || status === "blocked" ? status : "pending";
+    return (status ? TOKEN_OF[status] : void 0) ?? "pending";
   }
   var STATUS_TOKENS = {
     done: "--dy-wf-status-done",
@@ -377,6 +389,31 @@
   }
   function isAwaitingDecision(n) {
     return nodePurpose(n) === "gate" && statusToken(n.status) === "pending";
+  }
+  function turnHasCome(n, run) {
+    if (!run) return false;
+    const byId = new Map(run.nodes.map((m) => [m.node_id, m]));
+    return n.depends_on.every((dep) => {
+      if (n.when?.status === "blocked" && n.when.node === dep) return true;
+      const before = byId.get(dep);
+      return Boolean(before) && (before.state === "skipped" || statusToken(before.status) === "done");
+    });
+  }
+  function stepWord(n, run) {
+    if (n.state === "skipped") return "not needed";
+    if (n.state === "escalated") {
+      const rounds = Number(n.iteration ?? 1);
+      return `stuck after ${rounds} round${rounds === 1 ? "" : "s"}`;
+    }
+    if (n.state === "waiting" && !n.task_ref) return "waiting";
+    if (isAwaitingDecision(n)) return "awaiting decision";
+    const token = statusToken(n.status);
+    if (token === "pending" && n.ask_first && n.task_ref && turnHasCome(n, run)) return "needs your OK";
+    if (n.loop && token !== "done" && Number(n.iteration ?? 1) > 1) {
+      return `round ${n.iteration} of ${n.loop.max_iterations}`;
+    }
+    if (token === "working" && (n.status === "in_review" || n.status === "review")) return "in review";
+    return token;
   }
   var CARD_RADIUS = 12;
   var EDGE_MEANINGS = {
@@ -1042,8 +1079,8 @@
         );
         const status = elu(
           `span`,
-          `dy-wf-list-status ${n.status ?? "pending"}`,
-          n.status ?? "pending"
+          `dy-wf-list-status ${statusToken(n.status)}`,
+          stepWord(n, run)
         );
         const open = () => openPassport(n, null);
         const activate = elu("button", "dy-wf-list-open", "Open");
@@ -1058,9 +1095,11 @@
       const purpose = nodePurpose(n);
       const status = statusToken(n.status);
       const visuals = PURPOSE_VISUALS[purpose];
-      const awaiting = isAwaitingDecision(n);
+      const word = stepWord(n, run);
+      const awaiting = isAwaitingDecision(n) || word === "needs your OK";
+      const skipped = n.state === "skipped";
       const g = sEl("g", {
-        class: `dy-wf-node ${purpose} ${status}${awaiting ? " awaiting" : ""}`,
+        class: `dy-wf-node ${purpose} ${status}${awaiting ? " awaiting" : ""}${skipped ? " skipped" : ""}`,
         transform: `translate(${p.x} ${p.y})`
       });
       g.dataset.wfPurpose = purpose;
@@ -1070,7 +1109,7 @@
       g.setAttribute("tabindex", "0");
       g.setAttribute("role", "button");
       g.setAttribute("data-node-id", n.node_id);
-      g.setAttribute("aria-label", `${visuals.label}: ${n.title} (${n.status ?? "pending"})`);
+      g.setAttribute("aria-label", `${visuals.label}: ${n.title} (${word})`);
       g.dataset.wfEditable = String(editable);
       g.setAttribute("aria-describedby", help.id);
       const shape = sEl("rect", {
@@ -1101,9 +1140,9 @@
         "text-anchor": "end",
         class: `dy-wf-statustext ${status}`
       });
-      statusText.textContent = awaiting ? "awaiting decision" : n.status ?? "pending";
+      statusText.textContent = word;
       g.append(shape, sheen, dot, label2, sub, statusText);
-      if (n.status === "working") {
+      if (status === "working") {
         const timer2 = sEl("text", {
           x: 14,
           y: 62,
@@ -1615,12 +1654,13 @@
         passport.appendChild(edit);
       };
       if (n.task_ref) {
-        const decisionState = n.kind === "gate" && n.status !== "done" && n.status !== "blocked" ? elu("span", "dy-wf-decision-state", "Awaiting decision") : null;
+        const gateOpen = n.kind === "gate" && statusToken(n.status) !== "done" && statusToken(n.status) !== "blocked";
+        const decisionState = gateOpen ? elu("span", "dy-wf-decision-state", "Awaiting decision") : null;
         if (decisionState) {
           decisionState.setAttribute("data-decision-state", "awaiting_decision");
           passport.appendChild(decisionState);
         }
-        if (n.kind === "gate" && n.status !== "done" && n.status !== "blocked") {
+        if (gateOpen) {
           const row = elu("div", "dy-wf-actions");
           const approve = elu("button", "dy-btn primary", "Approve");
           const reject = elu("button", "dy-btn", "Reject");
@@ -1664,16 +1704,17 @@
           row.append(approve, reject);
           passport.appendChild(row);
         }
-        if (n.kind !== "gate" && (n.status === "blocked" || n.status === "working") && handlers.onRetry) {
+        const recoveryToken = statusToken(n.status);
+        if (n.kind !== "gate" && (recoveryToken === "blocked" || recoveryToken === "working") && handlers.onRetry) {
           const recovery = elu("div", "dy-wf-recovery");
-          if (n.status === "blocked") {
+          if (recoveryToken === "blocked") {
             const retry = elu("button", "dy-btn", "Re-queue (retry)");
             retry.type = "button";
             retry.setAttribute("aria-label", `Re-queue ${n.title} through the canonical transition`);
-            retry.addEventListener("click", () => {
+            retry.addEventListener("click", async () => {
               retry.disabled = true;
               try {
-                handlers.onRetry(n.task_ref);
+                await handlers.onRetry(n.task_ref);
                 retry.textContent = "Re-queued \u2713";
               } catch {
                 retry.textContent = "Re-queue failed \u2014 retry";
@@ -1905,13 +1946,13 @@
         if (dot && dot.classList.contains("dy-wf-flowdot")) edgeMap.set(key, { path: p, dot });
       });
       const doneIds = new Set(
-        currentNodes.filter((n) => n.status === "done").map((n) => n.node_id)
+        currentNodes.filter((n) => statusToken(n.status) === "done").map((n) => n.node_id)
       );
       viewport.querySelectorAll("path.dy-wf-edge").forEach((p) => {
         const to = currentNodes.find((n) => n.node_id === p.dataset.to);
         const fromDone = doneIds.has(p.dataset.from ?? "");
         const meaning = EDGE_MEANINGS[p.dataset.meaning ?? DEFAULT_EDGE_MEANING];
-        const active = !!to && to.status !== "pending" && fromDone;
+        const active = !!to && statusToken(to.status) !== "pending" && fromDone;
         p.classList.toggle("active", active);
         if (meaning) {
           p.setAttribute("marker-end", `url(#${active ? meaning.activeMarker : meaning.marker})`);
@@ -1954,7 +1995,7 @@
     const tickTimers = () => {
       viewport.querySelectorAll("text.dy-wf-timer").forEach((t) => {
         const node = currentNodes.find((n) => n.node_id === t.dataset.for);
-        if (!node || node.status !== "working") return;
+        if (!node || statusToken(node.status) !== "working") return;
         t.textContent = `Workflow: ${elapsedLabel(currentStartedAt)}`;
       });
     };
@@ -2077,7 +2118,7 @@
     } });
   }
 
-  // dashboard/src/app.ts
+  // src/app.ts
   function applyFleetDeepLink({ link, s, tabs, go }) {
     const sep = link.indexOf(":");
     if (sep <= 0) return;
@@ -3657,7 +3698,7 @@
     return el;
   }
 
-  // dashboard/src/index.ts
+  // src/index.ts
   function whenReady() {
     if (document.readyState !== "loading") return Promise.resolve();
     return new Promise(

@@ -334,14 +334,15 @@ test('Builder: the AI way explains, asks and saves only on Create; the AI sideba
   })
 })
 
-test('Builder: the step panel saves who, what and repeat as a version; untouched fields stay; preview fields stay in memory', { timeout: 90000 }, async () => {
+test('Builder: the step panel saves who, what, repeat and Ask me first as a version; untouched fields stay; preview fields stay in memory', { timeout: 90000 }, async () => {
   const name = await full('panel')
   await withPage('', async (page) => {
     const first = byId(await latest(name))
     await nodeIn(page, name, 'fix').dblclick()
     await panelTitle(page, name).waitFor()
     const heads = await page.locator('.dy-wfx-section h5').evaluateAll((els) => els.map((e) => e.textContent))
-    assert.deepEqual(heads, ['Who does it', 'What to do', 'Repeat', 'Ask me firstPreview', 'LimitsPreview'])
+    // Ask me first is saved with the workflow (08/10/2026); only Limits is still a preview.
+    assert.deepEqual(heads, ['Who does it', 'What to do', 'Repeat', 'Ask me first', 'LimitsPreview'])
     assert.equal(await page.locator('[data-wfx-who]').inputValue(), 'worker')
     assert.equal(await page.locator('[data-wfx-body]').inputValue(), 'Make the new test pass.')
     assert.match(await page.locator('.dy-wfx-section').nth(2).textContent(), /Up to 5 rounds, then asks you\. The repeat settings are on this step's frame/)
@@ -358,6 +359,7 @@ test('Builder: the step panel saves who, what and repeat as a version; untouched
     assert.deepEqual(saved.fix.loop, first.fix.loop, 'the repeat is untouched')
     assert.equal(saved.fix.phase_team, 'reviewer')
     assert.equal(saved.fix.body, 'Make every test pass.')
+    assert.equal(saved.fix.ask_first, true, 'Ask me first is saved with the step')
     for (const key of ['title', 'depends_on', 'when', 'human_gate', 'kind']) assert.deepEqual(saved.fix[key], first.fix[key], `fix.${key} untouched`)
     for (const id of ['reproduce', 'review', 'stuck', 'merge']) assert.deepEqual(saved[id], first[id], `${id} untouched`)
     // The first step cannot repeat (the engine gates each round on a step before it), and
@@ -377,9 +379,58 @@ test('Builder: the step panel saves who, what and repeat as a version; untouched
     await page.locator(`${canvas(name)} [data-wf-frame="merge"]`).waitFor()
     await page.locator(`${canvas(name)} .dy-wf-passport-close`).click()
     await nodeIn(page, name, 'fix').dblclick()
-    assert.ok(await page.locator('[data-wfx-ask-first]').isChecked(), 'preview field kept in memory')
+    assert.ok(await page.locator('[data-wfx-ask-first]').isChecked(), 'Ask me first comes back from the saved step')
     assert.equal(await page.locator('[data-wfx-turns]').inputValue(), '30')
     assert.deepEqual(await storage(page), [], 'no browser storage')
+  }, { open: name })
+})
+
+// Runs move on by themselves (08/10/2026, WORKFLOWS-R1.md engine round). The browser suite has
+// no timer, so Move on now stands in for it; the bots are played through the work-item API (the
+// same canonical transitions a bot's card makes).
+test('Builder: a run hands each step to its bot; Move on now moves it on and the readout says round k of N, stuck after N rounds and Needs a person; Retry gives a stuck step back', { timeout: 120000 }, async () => {
+  const name = unique('run')
+  await api(`/projects/${PROJECT}/workflows`, 'POST', { name, nodes: [
+    { id: 'reproduce', title: 'Reproduce', depends_on: [], phase_team: 'worker' },
+    { id: 'fix', title: 'Fix', depends_on: ['reproduce'], phase_team: 'worker', loop: { max_iterations: 2, until: { status: 'done' } } },
+    { id: 'tell', title: 'Tell me', depends_on: ['fix'], phase_team: 'worker', when: { node: 'fix', status: 'blocked' } },
+    { id: 'review', title: 'Review', depends_on: ['fix'], human_gate: true, kind: 'gate' },
+  ] })
+  const wf = encodeURIComponent(name)
+  await api(`/projects/${PROJECT}/workflows/${wf}/start`, 'POST', { version: 1, run_key: `${name}-r1` })
+  const nodeNow = async (id) => (await api(`/projects/${PROJECT}/workflows/${wf}/runs`)).runs[0].nodes.find((n) => n.node_id === id)
+  const move = async (id, status) => api(`/projects/${PROJECT}/work-items/${encodeURIComponent((await nodeNow(id)).task_ref)}/transition`, 'POST', { status })
+  // Starting hands the first step to its bot straight away.
+  assert.equal((await nodeNow('reproduce')).status, 'in_progress')
+  await move('reproduce', 'done')
+  await withPage('', async (page) => {
+    const readout = page.locator('[data-workflow-live-run]')
+    const stepText = async (title) => (await page.locator('[data-wf-live-node]').filter({ hasText: `${title} —` }).textContent()).split(' · ')[0]
+    const moveOn = async (said) => {
+      await page.locator('[data-action="wf-move-on"]').click()
+      await until(async () => said.test(await page.locator('[data-wf-move-note]').textContent().catch(() => '')), `Move on now says ${said}`)
+    }
+    await readout.waitFor()
+    assert.match(await readout.textContent(), /Running/)
+    assert.match(await page.locator('[data-wf-timer]').textContent(), /the timer is off/)
+    await moveOn(/Fix: handed to worker/)
+    await until(async () => (await stepText('Fix')) === 'Fix — working', 'Fix is with its bot')
+    // A stuck round gets a new round at once.
+    await move('fix', 'blocked')
+    await moveOn(/round 1 got stuck, so round 2 of 2 started/)
+    await until(async () => (await stepText('Fix')) === 'Fix — round 2 of 2', 'the readout says round 2 of 2')
+    assert.equal(await stepText('Tell me'), 'Tell me — waiting')
+    // Stuck in the last round: the loop gives up, the if-stuck step starts, the run needs a person.
+    await move('fix', 'blocked')
+    await moveOn(/still stuck after 2 rounds/)
+    await until(async () => (await stepText('Fix')) === 'Fix — stuck after 2 rounds', 'the readout says stuck after 2 rounds')
+    assert.equal(await stepText('Tell me'), 'Tell me — working')
+    assert.match(await readout.textContent(), /Needs a person/)
+    assert.match(await page.locator('[data-wf-live-node]').filter({ hasText: 'Fix —' }).textContent(), /needs attention/)
+    // Retry gives the stuck round back to its bot (it used to move it to To do, which the board refuses).
+    await nodeIn(page, name, 'fix').dblclick()
+    await page.locator(`${canvas(name)} .dy-wf-passport button`).filter({ hasText: /re-?queue/i }).click()
+    await until(async () => (await nodeNow('fix')).status === 'in_progress', 'Retry puts the round back with its bot')
   }, { open: name })
 })
 

@@ -1611,6 +1611,9 @@ var DOCKYARD_CSS = `
 .dockyard-root .dockyard-wf3-steps ul { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 260px; margin: 0; padding: 10px 12px 10px 28px; display: grid; gap: 4px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); box-shadow: 0 16px 40px rgba(0,0,0,.28); }
 .dockyard-root .dockyard-wf3-steps li { color: var(--dy-text-2); font-size: 12px; }
 .dockyard-root .dockyard-wf3-steps li[data-wf-needs-attention="true"] { color: var(--dy-warning); }
+.dockyard-root .dockyard-wf3-timer { color: var(--dy-text-3); }
+.dockyard-root .dockyard-wf3-timer[data-wf-timer="off"] { color: var(--dy-warning); }
+.dockyard-root .dockyard-wf3-movenote { flex-basis: 100%; margin: 0; color: var(--dy-text-2); }
 @media (max-width: 1250px) {
   .dockyard-root .dockyard-wf3 { grid-template-columns: 220px minmax(0, 1fr); }
   .dockyard-root .dockyard-wf3.lib-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
@@ -3457,6 +3460,8 @@ var workflow_canvas_css_default = `
 .dy-wf-scope .dy-wf-node.blocked .dy-wf-shape { stroke: var(--dy-wf-status-blocked); filter: drop-shadow(0 0 7px color-mix(in srgb, var(--dy-wf-status-blocked) 45%, transparent)); }
 .dy-wf-scope .dy-wf-node.pending .dy-wf-shape { stroke: var(--dy-wf-status-pending); stroke-dasharray: 5 4; }
 .dy-wf-scope .dy-wf-node.awaiting .dy-wf-shape { stroke: var(--dy-wf-status-working); stroke-dasharray: 5 4; animation: dyWfAwait 2.6s ease-in-out infinite; }
+/* A step this run did not need (its branch was not taken). */
+.dy-wf-scope .dy-wf-node.skipped { opacity: 0.5; }
 @keyframes dyWfBreath {
   0%, 100% { stroke-width: 1.5; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--dy-wf-status-working) 35%, transparent)); }
   50% { stroke-width: 2.4; filter: drop-shadow(0 0 14px color-mix(in srgb, var(--dy-wf-status-working) 70%, transparent)); }
@@ -13548,8 +13553,20 @@ var LANE_PAD = 30;
 var LOD_FULL = 1.4;
 var ZOOM_IN = 1.1;
 var ZOOM_OUT = 0.9;
+var TOKEN_OF = {
+  done: "done",
+  archived: "done",
+  working: "working",
+  in_progress: "working",
+  in_review: "working",
+  ready: "working",
+  scheduled: "working",
+  running: "working",
+  review: "working",
+  blocked: "blocked"
+};
 function statusToken(status) {
-  return status === "done" || status === "working" || status === "blocked" ? status : "pending";
+  return (status ? TOKEN_OF[status] : void 0) ?? "pending";
 }
 var STATUS_TOKENS = {
   done: "--dy-wf-status-done",
@@ -13571,6 +13588,38 @@ function nodePurpose(n) {
 }
 function isAwaitingDecision(n) {
   return nodePurpose(n) === "gate" && statusToken(n.status) === "pending";
+}
+function turnHasCome(n, run) {
+  if (!run) return false;
+  const byId = new Map(run.nodes.map((m) => [m.node_id, m]));
+  return n.depends_on.every((dep) => {
+    if (n.when?.status === "blocked" && n.when.node === dep) return true;
+    const before = byId.get(dep);
+    return Boolean(before) && (before.state === "skipped" || statusToken(before.status) === "done");
+  });
+}
+function stepWord(n, run) {
+  if (n.state === "skipped") return "not needed";
+  if (n.state === "escalated") {
+    const rounds = Number(n.iteration ?? 1);
+    return `stuck after ${rounds} round${rounds === 1 ? "" : "s"}`;
+  }
+  if (n.state === "waiting" && !n.task_ref) return "waiting";
+  if (isAwaitingDecision(n)) return "awaiting decision";
+  const token = statusToken(n.status);
+  if (token === "pending" && n.ask_first && n.task_ref && turnHasCome(n, run)) return "needs your OK";
+  if (n.loop && token !== "done" && Number(n.iteration ?? 1) > 1) {
+    return `round ${n.iteration} of ${n.loop.max_iterations}`;
+  }
+  if (token === "working" && (n.status === "in_review" || n.status === "review")) return "in review";
+  return token;
+}
+function needsPerson(n, run) {
+  if (n.state === "skipped") return false;
+  const token = statusToken(n.status);
+  if (n.state === "escalated" || token === "blocked") return true;
+  if (!n.task_ref || token !== "pending") return false;
+  return (nodePurpose(n) === "gate" || Boolean(n.ask_first)) && turnHasCome(n, run);
 }
 var CARD_RADIUS = 12;
 var EDGE_MEANINGS = {
@@ -14236,8 +14285,8 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       );
       const status = elu(
         `span`,
-        `dy-wf-list-status ${n.status ?? "pending"}`,
-        n.status ?? "pending"
+        `dy-wf-list-status ${statusToken(n.status)}`,
+        stepWord(n, run)
       );
       const open = () => openPassport(n, null);
       const activate = elu("button", "dy-wf-list-open", "Open");
@@ -14252,9 +14301,11 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     const purpose = nodePurpose(n);
     const status = statusToken(n.status);
     const visuals = PURPOSE_VISUALS[purpose];
-    const awaiting = isAwaitingDecision(n);
+    const word = stepWord(n, run);
+    const awaiting = isAwaitingDecision(n) || word === "needs your OK";
+    const skipped = n.state === "skipped";
     const g = sEl("g", {
-      class: `dy-wf-node ${purpose} ${status}${awaiting ? " awaiting" : ""}`,
+      class: `dy-wf-node ${purpose} ${status}${awaiting ? " awaiting" : ""}${skipped ? " skipped" : ""}`,
       transform: `translate(${p.x} ${p.y})`
     });
     g.dataset.wfPurpose = purpose;
@@ -14264,7 +14315,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     g.setAttribute("tabindex", "0");
     g.setAttribute("role", "button");
     g.setAttribute("data-node-id", n.node_id);
-    g.setAttribute("aria-label", `${visuals.label}: ${n.title} (${n.status ?? "pending"})`);
+    g.setAttribute("aria-label", `${visuals.label}: ${n.title} (${word})`);
     g.dataset.wfEditable = String(editable);
     g.setAttribute("aria-describedby", help.id);
     const shape = sEl("rect", {
@@ -14295,9 +14346,9 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       "text-anchor": "end",
       class: `dy-wf-statustext ${status}`
     });
-    statusText2.textContent = awaiting ? "awaiting decision" : n.status ?? "pending";
+    statusText2.textContent = word;
     g.append(shape, sheen, dot, label, sub, statusText2);
-    if (n.status === "working") {
+    if (status === "working") {
       const timer2 = sEl("text", {
         x: 14,
         y: 62,
@@ -14809,12 +14860,13 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       passport.appendChild(edit);
     };
     if (n.task_ref) {
-      const decisionState = n.kind === "gate" && n.status !== "done" && n.status !== "blocked" ? elu("span", "dy-wf-decision-state", "Awaiting decision") : null;
+      const gateOpen = n.kind === "gate" && statusToken(n.status) !== "done" && statusToken(n.status) !== "blocked";
+      const decisionState = gateOpen ? elu("span", "dy-wf-decision-state", "Awaiting decision") : null;
       if (decisionState) {
         decisionState.setAttribute("data-decision-state", "awaiting_decision");
         passport.appendChild(decisionState);
       }
-      if (n.kind === "gate" && n.status !== "done" && n.status !== "blocked") {
+      if (gateOpen) {
         const row = elu("div", "dy-wf-actions");
         const approve = elu("button", "dy-btn primary", "Approve");
         const reject = elu("button", "dy-btn", "Reject");
@@ -14858,16 +14910,17 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
         row.append(approve, reject);
         passport.appendChild(row);
       }
-      if (n.kind !== "gate" && (n.status === "blocked" || n.status === "working") && handlers.onRetry) {
+      const recoveryToken = statusToken(n.status);
+      if (n.kind !== "gate" && (recoveryToken === "blocked" || recoveryToken === "working") && handlers.onRetry) {
         const recovery = elu("div", "dy-wf-recovery");
-        if (n.status === "blocked") {
+        if (recoveryToken === "blocked") {
           const retry = elu("button", "dy-btn", "Re-queue (retry)");
           retry.type = "button";
           retry.setAttribute("aria-label", `Re-queue ${n.title} through the canonical transition`);
-          retry.addEventListener("click", () => {
+          retry.addEventListener("click", async () => {
             retry.disabled = true;
             try {
-              handlers.onRetry(n.task_ref);
+              await handlers.onRetry(n.task_ref);
               retry.textContent = "Re-queued \u2713";
             } catch {
               retry.textContent = "Re-queue failed \u2014 retry";
@@ -15099,13 +15152,13 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       if (dot && dot.classList.contains("dy-wf-flowdot")) edgeMap.set(key, { path: p, dot });
     });
     const doneIds = new Set(
-      currentNodes.filter((n) => n.status === "done").map((n) => n.node_id)
+      currentNodes.filter((n) => statusToken(n.status) === "done").map((n) => n.node_id)
     );
     viewport.querySelectorAll("path.dy-wf-edge").forEach((p) => {
       const to = currentNodes.find((n) => n.node_id === p.dataset.to);
       const fromDone = doneIds.has(p.dataset.from ?? "");
       const meaning = EDGE_MEANINGS[p.dataset.meaning ?? DEFAULT_EDGE_MEANING];
-      const active = !!to && to.status !== "pending" && fromDone;
+      const active = !!to && statusToken(to.status) !== "pending" && fromDone;
       p.classList.toggle("active", active);
       if (meaning) {
         p.setAttribute("marker-end", `url(#${active ? meaning.activeMarker : meaning.marker})`);
@@ -15148,7 +15201,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
   const tickTimers = () => {
     viewport.querySelectorAll("text.dy-wf-timer").forEach((t) => {
       const node = currentNodes.find((n) => n.node_id === t.dataset.for);
-      if (!node || node.status !== "working") return;
+      if (!node || statusToken(node.status) !== "working") return;
       t.textContent = `Workflow: ${elapsedLabel(currentStartedAt)}`;
     });
   };
@@ -15293,7 +15346,13 @@ var toCanvasNode = (node) => ({
   // silhouette, so two of the four node purposes could never appear on the
   // Desktop surface. Data only — this adapter still invents no graph state.
   when: node.when ?? null,
-  loop: node.loop ?? null
+  loop: node.loop ?? null,
+  // Run-only facts (round number, the engine's word for the step, "Ask me
+  // first"). Dropping them left the canvas unable to say "round 2 of 3",
+  // "not needed" or "stuck after 3 rounds" (08/10/2026).
+  iteration: node.iteration ?? null,
+  state: node.state ?? null,
+  ask_first: Boolean(node.ask_first)
 });
 var toCanvasRun = (run) => ({
   run_key: run.run_key,
@@ -15337,7 +15396,7 @@ function mountDesktopWorkflowCanvas(host2, projectId, workflowName, definition, 
 // hermes_dockyard_plugin/desktop/src/project/workflow-design/standins.js
 var stepSettings = /* @__PURE__ */ new Map();
 var workflowSettings = /* @__PURE__ */ new Map();
-var EMPTY_STEP = Object.freeze({ check: Object.freeze({ by: "none", doneWhen: "" }), askFirst: false, limits: Object.freeze({ turns: "", minutes: "", skills: "" }) });
+var EMPTY_STEP = Object.freeze({ check: Object.freeze({ by: "none", doneWhen: "" }), limits: Object.freeze({ turns: "", minutes: "", skills: "" }) });
 var EMPTY_WORKFLOW = Object.freeze({ trigger: Object.freeze({ kind: "manual", schedule: "weekdays", time: "09:00", event: "task-done" }), improve: Object.freeze({ on: false, afterRuns: 5, reviewer: "" }) });
 var stepKey = (project, workflow, nodeId) => `${project}\0${workflow}\0${nodeId}`;
 function readStepSettings(project, workflow, nodeId) {
@@ -15527,7 +15586,8 @@ var planKey = (n) => JSON.stringify([
   n.body ?? null,
   n.phase_team ?? null,
   n.loop ? [n.loop.max_iterations, n.loop.until?.status ?? "done"] : null,
-  n.when ? [n.when.node, n.when.status] : null
+  n.when ? [n.when.node, n.when.status] : null,
+  Boolean(n.ask_first)
 ]);
 var sameSteps = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((n, i) => planKey(n) === planKey(b[i]));
 function withCurrentPositions(next, current) {
@@ -15658,10 +15718,10 @@ function panelExtras({ node, stored, members, settingsKey, onEditFrame }) {
     repeat.appendChild(repeatLabel);
   }
   root.appendChild(repeat);
-  const ask = section("Ask me first", { preview: true });
+  const ask = section("Ask me first", { help: "When its turn comes, it waits for you: move it to Doing to start it." });
   const askBox = el("input");
   askBox.type = "checkbox";
-  askBox.checked = current.askFirst;
+  askBox.checked = Boolean(stored?.ask_first ?? node.ask_first);
   askBox.setAttribute("data-wfx-ask-first", "");
   const askLabel = el("label", "dy-wfx-check");
   askLabel.append(askBox, el("span", "", "Ask me before this step starts"));
@@ -15688,10 +15748,9 @@ function panelExtras({ node, stored, members, settingsKey, onEditFrame }) {
   const apply = (next) => {
     writeStepSettings(...settingsKey(node.node_id), {
       check: current.check,
-      askFirst: askBox.checked,
       limits: { turns: turns.value, minutes: minutes.value, skills: skills.value.trim() }
     });
-    const patch = { body: body.value.trim() || null };
+    const patch = { body: body.value.trim() || null, ask_first: askBox.checked };
     if (repeatBox) patch.loop = repeatBox.checked ? { max_iterations: 3, until: { status: "done" } } : null;
     return { ...next, phase_team: pick.value || null, design_patch: patch };
   };
@@ -15712,6 +15771,7 @@ function canvasDesignHooks({ draft, members, storedNode, settingsKey, onEditFram
       if (node.loop) return "\u21BB Repeats";
       if (node.when) return `If ${shortName(node.when.node)} ${node.when.status === "blocked" ? "gets stuck" : "is done"}`;
       if (node.human_gate) return "Sign-off";
+      if (node.ask_first) return "Asks you first";
       return null;
     },
     frames: (nodes) => nodes.filter((n) => n.loop).map((n) => {
@@ -18398,6 +18458,16 @@ function AiSidebar({ members, nodes, workflowTitle, thread, onThread, pinned, on
 var NO_RUNS = [];
 var NO_THREAD = [];
 var failureText = (failure) => String(failure?.message ?? failure ?? "unknown error").replace(/^\d{3}:\s*/, "");
+var RUN_WORDS = { pending: ["Running", "info"], escalated: ["Needs a person", "danger"], complete: ["Finished", "success"] };
+var runWord = (status) => RUN_WORDS[status] ?? [String(status ?? "unknown"), "neutral"];
+var COUNT_WORDS = [["done", "done"], ["working", "working"], ["blocked", "blocked"], ["pending", "pending"], ["skipped", "not needed"]];
+var timerWords = (timer) => {
+  if (!timer) return null;
+  if (!timer.moving) return "Runs move on when you press Move on now (the timer is off).";
+  const at = new Date(timer.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const failed = timer.failed?.length ?? 0;
+  return `Runs move on by themselves (checked ${at})${failed ? ` \xB7 ${failed} run${failed === 1 ? "" : "s"} could not move on` : ""}`;
+};
 function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary, openWorkflow = null, onOpenWorkflowDone }) {
   const canvasRef = useRef(null);
   const opening = openWorkflow?.project === project.id && openWorkflow.name ? openWorkflow : null;
@@ -18427,6 +18497,8 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
   const [aiThreads, setAiThreads] = useState(() => opening?.conversation ? { [opening.name]: createdConversation(opening.name, opening.conversation) } : {});
   const [repeatAt, setRepeatAt] = useState(null);
   const [draftError, setDraftError] = useState(null);
+  const [timer, setTimer] = useState(null);
+  const [moveNote, setMoveNote] = useState(null);
   const encoded = encodeURIComponent(project.id);
   const grouped = Object.values((workflows ?? []).reduce((all, row) => {
     const item = all[row.name] ?? { name: row.name, versions: [], archived_at: row.archived_at };
@@ -18497,8 +18569,16 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     onRefresh?.();
     return saved;
   };
+  const loadTimer = async () => {
+    try {
+      setTimer(await api("/workflows/timer", { suppressErrorToast: true }));
+    } catch {
+      setTimer(null);
+    }
+  };
   const loadRuns = async (workflow = current?.name) => {
     if (!workflow) return;
+    loadTimer();
     try {
       const result = await api(`/projects/${encoded}/workflows/${encodeURIComponent(workflow)}/runs`);
       setRunsFor({ workflow, runs: result.runs ?? NO_RUNS });
@@ -18508,6 +18588,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     }
   };
   useEffect(() => {
+    setMoveNote(null);
     loadRuns();
   }, [current?.name, workflows?.length]);
   const actionsRef = useRef(null);
@@ -18618,8 +18699,10 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
         await api(`/initiatives/${encodeURIComponent(ref)}/reject`, { method: "POST", body: { expected_fingerprint: decision.fingerprint, reason: "Rejected from workflow gate review" } });
         await actionsRef.current.loadRuns(workflowName);
       },
+      // Retry gives a stuck step back to its bot: Doing unblocks it. To do
+      // was refused by the board for a stuck card (08/10/2026, bug 12).
       onRetry: async (ref) => {
-        await api(`/projects/${encoded}/work-items/${encodeURIComponent(ref)}/transition`, { method: "POST", body: { status: "backlog" } });
+        await api(`/projects/${encoded}/work-items/${encodeURIComponent(ref)}/transition`, { method: "POST", body: { status: "in_progress" } });
         await actionsRef.current.loadRuns(workflowName);
       },
       fetchTimeline: async (pid, wname, runKey) => api(`/projects/${encodeURIComponent(pid)}/workflows/${encodeURIComponent(wname)}/runs/${encodeURIComponent(runKey)}/timeline`),
@@ -18703,8 +18786,23 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
   };
   const statusFor = (run, node) => run?.nodes?.find((item) => item.node_id === (node.id || node.node_id))?.status ?? "pending";
   const latest = runs[0];
-  const needsAttention = (node) => node.status === "blocked" || node.status === "pending" && node.human_gate;
-  const attentionCount = latest ? (latest.nodes ?? []).filter(needsAttention).length : 0;
+  const latestView = latest ? toCanvasRun(latest) : null;
+  const needsAttention = (node) => needsPerson(node, latestView);
+  const attentionCount = latestView ? latestView.nodes.filter(needsAttention).length : 0;
+  const moveOn = async () => {
+    if (!current || !latest) return;
+    setError(null);
+    setMoveNote(null);
+    try {
+      const moved = await api(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/runs/${encodeURIComponent(latest.run_key)}/advance`, { method: "POST", body: {}, suppressErrorToast: true });
+      const changes = moved?.changes ?? [];
+      setMoveNote(changes.length ? `Moved on: ${changes.join("; ")}.` : "Nothing to move on: each step is waiting for its turn, its bot or you.");
+    } catch (failure) {
+      setMoveNote(null);
+      setError(failureText(failure));
+    }
+    await loadRuns(current.name);
+  };
   const startVersion = async (version) => {
     if (!current || !version) return;
     await mutate(`/projects/${encoded}/workflows/${encodeURIComponent(current.name)}/start`, { version: version.version, run_key: `${current.name}-${Date.now()}` });
@@ -18790,8 +18888,8 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     await savePlan(edited);
   };
   const repeatNode = repeatAt ? storedNodeOf(repeatAt.nodeId) : null;
-  const liveCounts = latest ? (latest.nodes ?? []).reduce((acc, node) => {
-    const key = node.status ?? "pending";
+  const liveCounts = latestView ? latestView.nodes.reduce((acc, node) => {
+    const key = node.state === "skipped" ? "skipped" : statusToken(node.status);
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {}) : null;
@@ -18801,7 +18899,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     // canvas below the window).
     jsxs("header", { className: "dy-wfd-head", "data-wfd-head": true, children: [
       jsx("h2", { children: "Workflows" }),
-      jsx(StatusTag, { tone: latest?.status === "running" ? "info" : "neutral", label: latest ? `Live: ${latest.status}` : `${number(grouped.length)} ${plural2(grouped.length, "workflow")}` }),
+      jsx(StatusTag, { tone: latest ? runWord(latest.status)[1] : "neutral", label: latest ? `Live: ${runWord(latest.status)[0]}` : `${number(grouped.length)} ${plural2(grouped.length, "workflow")}` }),
       !latest && current && !draft ? jsx("span", { className: "dy-wfd-chip", "data-workflow-no-run": true, children: `${current.name}: no runs yet` }) : null,
       jsx("span", { className: "dy-wfd-grow" }),
       jsx(Button, { small: true, action: "open-workflow-library", onClick: () => onOpenLibrary?.(), children: "Open library" }),
@@ -18882,13 +18980,16 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
         layoutPendingVersion !== null ? jsx("p", { role: "status", "data-wf-layout-saving": true, children: "Saving layout version before the graph can be edited\u2026" }) : null,
         // Run readout: the latest canonical run only. Nothing here is inferred.
         latest && !draft ? jsxs("div", { className: "dockyard-wf3-run", "data-workflow-live-run": latest.run_key, children: [
-          jsx(StatusTag, { tone: latest.status === "completed" ? "success" : latest.status === "failed" ? "danger" : "info", label: latest.status }),
+          jsx(StatusTag, { tone: runWord(latest.status)[1], label: runWord(latest.status)[0] }),
           jsx("span", { className: "dockyard-wf3-runkey", children: `${latest.run_key} \xB7 v${latest.version}` }),
-          liveCounts ? jsx("span", { className: "dockyard-wf3-counts", children: ["done", "working", "blocked", "pending"].filter((k) => liveCounts[k]).map((k) => `${liveCounts[k]} ${k}`).join(" \xB7 ") }) : null,
+          liveCounts ? jsx("span", { className: "dockyard-wf3-counts", children: COUNT_WORDS.filter(([k]) => liveCounts[k]).map(([k, word]) => `${liveCounts[k]} ${word}`).join(" \xB7 ") }) : null,
           jsxs("details", { className: "dockyard-wf3-steps", children: [
             jsx("summary", { children: attentionCount ? `Steps \xB7 ${attentionCount} need attention` : "Steps" }),
-            jsx("ul", { "data-wf-live-map": latest.run_key, children: (latest.nodes ?? []).map((node) => jsx("li", { "data-wf-live-node": node.node_id, "data-wf-needs-attention": needsAttention(node) ? "true" : void 0, children: `${node.title} \u2014 ${node.status ?? "pending"}${node.assignee ? ` \xB7 ${node.assignee}` : ""}${needsAttention(node) ? " \xB7 needs attention" : ""}` }, node.node_id)) })
-          ] })
+            jsx("ul", { "data-wf-live-map": latest.run_key, children: latestView.nodes.map((node) => jsx("li", { "data-wf-live-node": node.node_id, "data-wf-needs-attention": needsAttention(node) ? "true" : void 0, children: `${node.title} \u2014 ${stepWord(node, latestView)}${node.assignee ? ` \xB7 ${node.assignee}` : ""}${needsAttention(node) ? " \xB7 needs attention" : ""}` }, node.node_id)) })
+          ] }),
+          latest.status !== "complete" ? jsx(Button, { small: true, action: "wf-move-on", onClick: moveOn, children: "Move on now" }) : null,
+          timer ? jsx("span", { className: "dockyard-wf3-timer", "data-wf-timer": timer.moving ? "on" : "off", children: timerWords(timer) }) : null,
+          moveNote ? jsx("p", { className: "dockyard-wf3-movenote", role: "status", "data-wf-move-note": true, children: moveNote }) : null
         ] }) : null,
         // The canvas, with the AI's draft banner over it. Nothing shares its
         // row: the AI chat is a sidebar beside the page, not a column here.

@@ -104,6 +104,18 @@ _CANONICAL_STATUS = {
 _UNSET = object()
 
 
+def dockyard_status(status: Any) -> str | None:
+    """Dockyard's word for a card's status, whichever word the host reported.
+
+    Host reads may carry the host's own words (Hermes: triage, todo, ready,
+    running, review); words that are already Dockyard's pass through.
+    """
+    if status is None:
+        return None
+    word = str(status)
+    return _CANONICAL_STATUS.get(word, word)
+
+
 class CanonicalWorkPartialError(RuntimeError):
     """Canonical work exists, but Dockyard metadata is incomplete."""
 

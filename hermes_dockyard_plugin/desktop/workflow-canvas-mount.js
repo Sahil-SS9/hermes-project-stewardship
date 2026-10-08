@@ -1,10 +1,14 @@
 // Shared Desktop seam for the production Dashboard canvas.
 // Keep this adapter data-only: Desktop does not invent or persist graph state.
 import { mountWorkflowCanvas, validateConnection } from '../dashboard/src/workflow-canvas.ts'
+import { stepWord, needsPerson, statusToken } from '../dashboard/src/workflow-canvas.ts'
 // Re-export the canonical connection validator so plugin.js toolbar actions
 // (Validate) answer with the SAME cycle/self-dependency rules the canvas
 // enforces on a drag — one implementation, not a second copy in the plugin.
 export { validateConnection }
+// The run's words (round k of N, not needed, stuck after N rounds...) come
+// from the canvas too, so the run readout and the canvas never disagree.
+export { stepWord, needsPerson, statusToken }
 
 const toCanvasNode = (node) => ({
   node_id: node.node_id ?? node.id,
@@ -28,6 +32,12 @@ const toCanvasNode = (node) => ({
   // Desktop surface. Data only — this adapter still invents no graph state.
   when: node.when ?? null,
   loop: node.loop ?? null,
+  // Run-only facts (round number, the engine's word for the step, "Ask me
+  // first"). Dropping them left the canvas unable to say "round 2 of 3",
+  // "not needed" or "stuck after 3 rounds" (08/10/2026).
+  iteration: node.iteration ?? null,
+  state: node.state ?? null,
+  ask_first: Boolean(node.ask_first),
 })
 
 const toCanvasRun = (run) => ({

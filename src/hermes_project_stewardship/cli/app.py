@@ -95,6 +95,16 @@ def build_parser() -> argparse.ArgumentParser:
              "because the CLI process binds no host of its own",
     )
 
+    flows = sub.add_parser("workflows", help="workflow runs")
+    fsub = flows.add_subparsers(dest="action", required=True)
+    ft = fsub.add_parser(
+        "tick", help="move every running workflow run on once (the timer runs this)")
+    ft.add_argument(
+        "--hermes-home", default=None,
+        help="Hermes home of the Kanban host the runs live on; required "
+             "because the CLI process binds no host of its own",
+    )
+
     content = sub.add_parser("content", help="managed project content (PM-0602)")
     csub = content.add_subparsers(dest="action", required=True)
     cr = csub.add_parser("remove", help="remove a managed file (destructive)")
@@ -215,6 +225,48 @@ def main(argv: Optional[List[str]] = None) -> int:
         store.close()
 
 
+def _vanilla_adapter(hermes_home: str):
+    """The pinned vanilla Kanban host behind the adapter contract.
+
+    Raises ImportError when the vanilla runtime is absent (fail closed).
+    """
+    from ..kanban.host_adapter import ProjectKanbanHostAdapter
+    from ..kanban.vanilla_host import ProjectKanbanHost
+
+    raw_host = ProjectKanbanHost(hermes_home=hermes_home)
+    raw_host._modules()  # force the lazy vanilla imports; fail closed if absent
+    return ProjectKanbanHostAdapter(raw_host)
+
+
+def _workflow_host(hermes_home: Optional[str]):
+    """The host the timer moves runs on, or a refusal before any write."""
+    if not hermes_home:
+        return None, ("moving workflow runs needs a connected Hermes Kanban host "
+                      "runtime: pass --hermes-home <path>")
+    try:
+        return _vanilla_adapter(hermes_home), None
+    except ImportError as exc:
+        return None, f"vanilla Hermes runtime is not importable ({exc}); no run was moved"
+
+
+def _workflows_tick(args, store: Store) -> int:
+    """One timer pass: print what moved (and new failures); silent otherwise."""
+    host, refusal = _workflow_host(getattr(args, "hermes_home", None))
+    if host is None:
+        print(friendly_error(refusal or "workflow host unavailable"), file=sys.stderr)
+        return EXIT_ERROR
+    from ..persistence.workflow_service import WorkflowService
+
+    summary = WorkflowService(store, host).tick(interface="timer")
+    for run in summary["runs"]:
+        for change in run["changes"]:
+            print(f"{run['project_id']} / {run['name']} / {run['run_key']}: {change}")
+    for failure in summary["new_failures"]:
+        print(f"{failure['project_id']} / {failure['name']} / {failure['run_key']}: "
+              f"could not move on ({failure['error']})")
+    return EXIT_OK
+
+
 def _transfer_host(hermes_home: Optional[str]):
     """Build the host-bound transfer retry surface, or refuse truthfully.
 
@@ -231,13 +283,8 @@ def _transfer_host(hermes_home: Optional[str]):
             "pass --hermes-home <path>, or resume the operation from the "
             "Desktop backend, which binds the host process"
         )
-    from ..kanban.host_adapter import ProjectKanbanHostAdapter
-    from ..kanban.vanilla_host import ProjectKanbanHost
-
-    raw_host = ProjectKanbanHost(hermes_home=hermes_home)
     try:
-        raw_host._modules()  # force the lazy vanilla imports; fail closed if absent
-        host = ProjectKanbanHostAdapter(raw_host)
+        host = _vanilla_adapter(hermes_home)
     except ImportError as exc:
         return None, (
             f"vanilla Hermes runtime is not importable ({exc}); "
@@ -252,6 +299,8 @@ def _transfer_host(hermes_home: Optional[str]):
 
 def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) -> int:
     g = args.group
+    if g == "workflows":
+        return _workflows_tick(args, store)
     if g == "export":
         manifest = export_store(store, args.output)
         print(json.dumps(manifest, sort_keys=True))

@@ -35,6 +35,13 @@ export interface CanvasNode {
   // these are its documented `when`/`loop` node modifiers, not new kinds.)
   when?: { node: string; status: string } | null;
   loop?: { max_iterations: number; until: { status: string } } | null;
+  // Run-only facts from the run projection: the round a repeating step is
+  // on, and the engine's word for a step it decides about (waiting, taken,
+  // skipped, repeating, escalated, done).
+  iteration?: number | null;
+  state?: string | null;
+  // "Ask me first": a person starts this step, even when its turn has come.
+  ask_first?: boolean;
 }
 
 export interface CanvasRun {
@@ -184,10 +191,18 @@ export type CanvasNodePurpose = 'task' | 'gate' | 'branch' | 'loop';
 export const STATUS_ORDER = ['done', 'working', 'blocked', 'pending'] as const;
 export type CanvasNodeStatusToken = (typeof STATUS_ORDER)[number];
 
-// Canonical statuses are the only ones the canvas colours; anything else is
-// shown as pending (the raw word is still what the node prints).
+// The canvas colours four states. Runs report Dockyard's words (backlog,
+// in_progress, in_review, blocked, done); history saved before 08/10/2026
+// may carry the host's own (triage, todo, ready, running, review, archived).
+// Every word maps to one of the four; anything unknown is pending.
+const TOKEN_OF: Record<string, CanvasNodeStatusToken> = {
+  done: 'done', archived: 'done',
+  working: 'working', in_progress: 'working', in_review: 'working',
+  ready: 'working', scheduled: 'working', running: 'working', review: 'working',
+  blocked: 'blocked',
+};
 export function statusToken(status: string | null | undefined): CanvasNodeStatusToken {
-  return status === 'done' || status === 'working' || status === 'blocked' ? status : 'pending';
+  return (status ? TOKEN_OF[status] : undefined) ?? 'pending';
 }
 
 export const STATUS_TOKENS: Record<CanvasNodeStatusToken, string> = {
@@ -222,6 +237,47 @@ export function nodePurpose(n: CanvasNode): CanvasNodePurpose {
 // run projection states directly (human_gate + pending), never inferred.
 export function isAwaitingDecision(n: CanvasNode): boolean {
   return nodePurpose(n) === 'gate' && statusToken(n.status) === 'pending';
+}
+
+// Every step before this one has finished or was not needed. An "if stuck"
+// step does not wait for the step it is about: that step is stuck.
+export function turnHasCome(n: CanvasNode, run?: CanvasRun | null): boolean {
+  if (!run) return false;
+  const byId = new Map(run.nodes.map((m) => [m.node_id, m] as const));
+  return n.depends_on.every((dep) => {
+    if (n.when?.status === 'blocked' && n.when.node === dep) return true;
+    const before = byId.get(dep);
+    return Boolean(before) && (before!.state === 'skipped' || statusToken(before!.status) === 'done');
+  });
+}
+
+// The plain words a step shows while a workflow runs (Sahil, 08/10/2026):
+// round k of N, not needed, waiting, stuck after N rounds, needs your OK.
+export function stepWord(n: CanvasNode, run?: CanvasRun | null): string {
+  if (n.state === 'skipped') return 'not needed';
+  if (n.state === 'escalated') {
+    const rounds = Number(n.iteration ?? 1);
+    return `stuck after ${rounds} round${rounds === 1 ? '' : 's'}`;
+  }
+  if (n.state === 'waiting' && !n.task_ref) return 'waiting';
+  if (isAwaitingDecision(n)) return 'awaiting decision';
+  const token = statusToken(n.status);
+  if (token === 'pending' && n.ask_first && n.task_ref && turnHasCome(n, run)) return 'needs your OK';
+  if (n.loop && token !== 'done' && Number(n.iteration ?? 1) > 1) {
+    return `round ${n.iteration} of ${n.loop.max_iterations}`;
+  }
+  if (token === 'working' && (n.status === 'in_review' || n.status === 'review')) return 'in review';
+  return token;
+}
+
+// The step is waiting on a person: stuck, given up, or a sign-off or "Ask
+// me first" step whose turn has come.
+export function needsPerson(n: CanvasNode, run?: CanvasRun | null): boolean {
+  if (n.state === 'skipped') return false;
+  const token = statusToken(n.status);
+  if (n.state === 'escalated' || token === 'blocked') return true;
+  if (!n.task_ref || token !== 'pending') return false;
+  return (nodePurpose(n) === 'gate' || Boolean(n.ask_first)) && turnHasCome(n, run);
 }
 
 export const CARD_RADIUS = 12;
@@ -1062,8 +1118,8 @@ export function mountWorkflowCanvas(
         n.depends_on.length
           ? `depends on: ${n.depends_on.map((d) => titleOf.get(d) ?? d).join(', ')}`
           : 'no dependencies');
-      const status = elu<HTMLSpanElement>(`span`, `dy-wf-list-status ${n.status ?? 'pending'}`,
-        n.status ?? 'pending');
+      const status = elu<HTMLSpanElement>(`span`, `dy-wf-list-status ${statusToken(n.status)}`,
+        stepWord(n, run));
       const open = () => openPassport(n, null);
       const activate = elu<HTMLButtonElement>('button', 'dy-wf-list-open', 'Open');
       activate.type = 'button';
@@ -1087,9 +1143,11 @@ export function mountWorkflowCanvas(
     const purpose = nodePurpose(n);
     const status = statusToken(n.status);
     const visuals = PURPOSE_VISUALS[purpose];
-    const awaiting = isAwaitingDecision(n);
+    const word = stepWord(n, run);
+    const awaiting = isAwaitingDecision(n) || word === 'needs your OK';
+    const skipped = n.state === 'skipped';
     const g = sEl('g', {
-      class: `dy-wf-node ${purpose} ${status}${awaiting ? ' awaiting' : ''}`,
+      class: `dy-wf-node ${purpose} ${status}${awaiting ? ' awaiting' : ''}${skipped ? ' skipped' : ''}`,
       transform: `translate(${p.x} ${p.y})`,
     }) as SVGGElement;
     g.dataset.wfPurpose = purpose;
@@ -1099,7 +1157,7 @@ export function mountWorkflowCanvas(
     g.setAttribute('tabindex', '0');
     g.setAttribute('role', 'button');
     g.setAttribute('data-node-id', n.node_id);
-    g.setAttribute('aria-label', `${visuals.label}: ${n.title} (${n.status ?? 'pending'})`);
+    g.setAttribute('aria-label', `${visuals.label}: ${n.title} (${word})`);
     // The editable flag states whether a persistence seam is actually wired.
     g.dataset.wfEditable = String(editable);
     g.setAttribute('aria-describedby', help.id);
@@ -1128,12 +1186,12 @@ export function mountWorkflowCanvas(
       x: NODE_W - 14, y: 46, 'text-anchor': 'end',
       class: `dy-wf-statustext ${status}`,
     }) as SVGTextElement;
-    statusText.textContent = awaiting ? 'awaiting decision' : (n.status ?? 'pending');
+    statusText.textContent = word;
     g.append(shape, sheen, dot, label, sub, statusText);
 
     // Workflow elapsed time, not this node's execution duration.
     // A refresh timestamp must never reset the clock; missing start is unavailable.
-    if (n.status === 'working') {
+    if (status === 'working') {
       const timer = sEl('text', {
         x: 14, y: 62, class: 'dy-wf-timer full',
       }) as SVGTextElement;
@@ -1675,14 +1733,15 @@ export function mountWorkflowCanvas(
       // P8.3: explicit decision state. awaiting_decision -> approved/rejected
       // after server confirmation -> failed (retryable). Phase 4 controls
       // carry the authority; this label never overrides them.
-      const decisionState = n.kind === 'gate' && n.status !== 'done' && n.status !== 'blocked'
+      const gateOpen = n.kind === 'gate' && statusToken(n.status) !== 'done' && statusToken(n.status) !== 'blocked';
+      const decisionState = gateOpen
         ? elu<HTMLSpanElement>('span', 'dy-wf-decision-state', 'Awaiting decision')
         : null;
       if (decisionState) {
         decisionState.setAttribute('data-decision-state', 'awaiting_decision');
         passport.appendChild(decisionState);
       }
-      if (n.kind === 'gate' && n.status !== 'done' && n.status !== 'blocked') {
+      if (gateOpen) {
         const row = elu('div', 'dy-wf-actions');
         const approve = elu<HTMLButtonElement>('button', 'dy-btn primary', 'Approve');
         const reject = elu<HTMLButtonElement>('button', 'dy-btn', 'Reject');
@@ -1737,19 +1796,22 @@ export function mountWorkflowCanvas(
         passport.appendChild(row);
       }
       // P8.4: supported retry/recovery reuses the canonical transition
-      // contract (onRetry -> POST transition backlogged). Pause/cancel of a
-      // running worker is NOT supported by the native execution contract —
-      // displayed as a fact, never offered as a control.
-      if (n.kind !== 'gate' && (n.status === 'blocked' || n.status === 'working') && handlers.onRetry) {
+      // contract (onRetry -> POST transition back to its bot). Pause/cancel
+      // of a running worker is NOT supported by the native execution
+      // contract — displayed as a fact, never offered as a control. The
+      // button says "Re-queued" only once the server has agreed: it used to
+      // say so before the request finished, even when the board refused it.
+      const recoveryToken = statusToken(n.status);
+      if (n.kind !== 'gate' && (recoveryToken === 'blocked' || recoveryToken === 'working') && handlers.onRetry) {
         const recovery = elu('div', 'dy-wf-recovery');
-        if (n.status === 'blocked') {
+        if (recoveryToken === 'blocked') {
           const retry = elu<HTMLButtonElement>('button', 'dy-btn', 'Re-queue (retry)');
           retry.type = 'button';
           retry.setAttribute('aria-label', `Re-queue ${n.title} through the canonical transition`);
-          retry.addEventListener('click', () => {
+          retry.addEventListener('click', async () => {
             retry.disabled = true;
             try {
-              handlers.onRetry!(n.task_ref as string);
+              await handlers.onRetry!(n.task_ref as string);
               retry.textContent = 'Re-queued ✓';
             } catch {
               retry.textContent = 'Re-queue failed — retry';
@@ -2024,14 +2086,14 @@ export function mountWorkflowCanvas(
       if (dot && dot.classList.contains('dy-wf-flowdot')) edgeMap.set(key, { path: p, dot });
     });
     const doneIds = new Set(
-      currentNodes.filter((n) => n.status === 'done').map((n) => n.node_id),
+      currentNodes.filter((n) => statusToken(n.status) === 'done').map((n) => n.node_id),
     );
     // active iff target is live and source is done
     viewport.querySelectorAll<SVGPathElement>('path.dy-wf-edge').forEach((p) => {
       const to = currentNodes.find((n) => n.node_id === p.dataset.to);
       const fromDone = doneIds.has(p.dataset.from ?? '');
       const meaning = EDGE_MEANINGS[p.dataset.meaning ?? DEFAULT_EDGE_MEANING];
-      const active = !!to && to.status !== 'pending' && fromDone;
+      const active = !!to && statusToken(to.status) !== 'pending' && fromDone;
       p.classList.toggle('active', active);
       // A live connector switches to its meaning's active colour, so the
       // arrowhead keeps stating the same meaning while it animates.
@@ -2085,7 +2147,7 @@ export function mountWorkflowCanvas(
   const tickTimers = () => {
     viewport.querySelectorAll<SVGTextElement>('text.dy-wf-timer').forEach((t) => {
       const node = currentNodes.find((n) => n.node_id === t.dataset.for);
-      if (!node || node.status !== 'working') return;
+      if (!node || statusToken(node.status) !== 'working') return;
       t.textContent = `Workflow: ${elapsedLabel(currentStartedAt)}`;
     });
   };

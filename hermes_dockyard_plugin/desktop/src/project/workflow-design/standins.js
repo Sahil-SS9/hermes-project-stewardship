@@ -2,14 +2,15 @@
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 //
 // Workflows builder (07/10/2026): stand-ins for what the engine cannot store
-// or do yet (WORKFLOWS-SPEC-R1.md E2-E7). Everything here lives in this
+// or do yet (WORKFLOWS-SPEC-R1.md E2-E5; "Ask me first" is saved with the
+// workflow since 08/10/2026). Everything here lives in this
 // module's memory, lasts until the page reloads and never reaches the backend.
 // Screens tag every control that writes here "Preview".
 
 const stepSettings = new Map()
 const workflowSettings = new Map()
 
-export const EMPTY_STEP = Object.freeze({ check: Object.freeze({ by: 'none', doneWhen: '' }), askFirst: false, limits: Object.freeze({ turns: '', minutes: '', skills: '' }) })
+export const EMPTY_STEP = Object.freeze({ check: Object.freeze({ by: 'none', doneWhen: '' }), limits: Object.freeze({ turns: '', minutes: '', skills: '' }) })
 export const EMPTY_WORKFLOW = Object.freeze({ trigger: Object.freeze({ kind: 'manual', schedule: 'weekdays', time: '09:00', event: 'task-done' }), improve: Object.freeze({ on: false, afterRuns: 5, reviewer: '' }) })
 const stepKey = (project, workflow, nodeId) => `${project}\u0000${workflow}\u0000${nodeId}`
 export function readStepSettings(project, workflow, nodeId) { return stepSettings.get(stepKey(project, workflow, nodeId)) ?? EMPTY_STEP }
@@ -207,6 +208,7 @@ const planKey = (n) => JSON.stringify([
   n.body ?? null, n.phase_team ?? null,
   n.loop ? [n.loop.max_iterations, n.loop.until?.status ?? 'done'] : null,
   n.when ? [n.when.node, n.when.status] : null,
+  Boolean(n.ask_first),
 ])
 export const sameSteps = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((n, i) => planKey(n) === planKey(b[i]))
 // Applying a suggestion keeps where each step sits on the canvas now.
