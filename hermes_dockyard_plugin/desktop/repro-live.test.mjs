@@ -1484,6 +1484,7 @@ async function testPhase5ManagementJourneys() {
   // creates (WORKFLOWS-R1.md bug 2): a taken name used to post a one-step
   // version that replaced the workflow; the dialog refuses it instead.
   await runtime.click('[data-action="wfd-new-workflow"]', 80);
+  await runtime.click('[data-wfd-scope="project"]', 40);
   await runtime.click('[data-wfd-way="blank"]', 40);
   await runtime.setValue('[data-wfd-name]', 'release');
   await runtime.click('[data-action="wfd-create"]', 80);

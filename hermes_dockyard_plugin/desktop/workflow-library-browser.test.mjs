@@ -25,10 +25,13 @@ test('W3 library: create global workflow, filter by scope, archive and restore',
  await page.locator('[data-workflow-library-screen]').waitFor();
  // Empty state before any workflow exists.
  await page.getByRole('heading',{name:'No workflows yet'}).waitFor();
+ // New workflow is the builder's dialog (Sahil 08/10/2026): where it lives first, then a way in.
  await page.locator('[data-action="library-create"]').click();
- await page.locator('[data-library-name]').fill('release-cadence');
- await page.locator('[data-library-title]').fill('Cut release');
- await page.locator('[data-action="library-create-confirm"]').click();
+ await page.locator('[data-wfd-scope="global"]').click();
+ await page.locator('[data-wfd-way="blank"]').click();
+ await page.locator('[data-wfd-name]').fill('release-cadence');
+ await page.locator('[data-wfd-first-step]').fill('Cut release');
+ await page.locator('[data-action="wfd-create"]').click();
  const row=page.locator('[data-library-row="release-cadence"]');
  await row.waitFor();
  assert.equal(await row.getAttribute('data-library-scope'),'global');
@@ -62,9 +65,11 @@ test('W4 toggle drives enablement: off refuses a run, on starts it, and errors s
  await page.locator('[data-tab="workflows"]').click();
  await page.locator('[data-workflow-library-screen]').waitFor();
  await page.locator('[data-action="library-create"]').click();
- await page.locator('[data-library-name]').fill('nightly-audit');
- await page.locator('[data-library-title]').fill('Audit the queue');
- await page.locator('[data-action="library-create-confirm"]').click();
+ await page.locator('[data-wfd-scope="global"]').click();
+ await page.locator('[data-wfd-way="blank"]').click();
+ await page.locator('[data-wfd-name]').fill('nightly-audit');
+ await page.locator('[data-wfd-first-step]').fill('Audit the queue');
+ await page.locator('[data-action="wfd-create"]').click();
  const row=page.locator('[data-library-row="nightly-audit"]');
  await row.waitFor();
  // Off by default (D-W1): the toggle reflects the persisted enablement and a

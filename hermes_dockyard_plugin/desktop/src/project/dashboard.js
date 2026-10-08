@@ -35,7 +35,7 @@ import { RecentActivityCard } from './activity.js'
 // it, and "plan:<kind>:<id>" opens it on one item (the Roadmap's Open).
 const planView = (entry) => (parsePlanFocus(entry) || ['objectives', 'initiative', 'vision'].includes(entry) ? 'plan' : entry)
 
-export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap, onOpenLink }) {
+export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap, onOpenLink, openWorkflow, onOpenWorkflowDone }) {
   const [projectView, setProjectView] = useState(planView(initialView) || 'overview')
   const [planFocus, setPlanFocus] = useState(() => parsePlanFocus(initialView))
   // QA M-7: leaving the Planning view with unsaved board edits asks first.
@@ -133,7 +133,7 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
   } else if (projectView === 'planning') {
     panel = jsx(PlanningCanvasPanel, { project, canvas: view.canvas, content: view.content ?? [], onRefresh, onDirty: onCanvasDirty }, project.id)
   } else if (projectView === 'workflows') {
-    panel = jsx(ExecutableWorkflowsPanel, { project, workflows: view.workflows ?? [], onRefresh, onOpenLibrary }, project.id)
+    panel = jsx(ExecutableWorkflowsPanel, { project, workflows: view.workflows ?? [], onRefresh, onOpenLibrary, openWorkflow, onOpenWorkflowDone }, project.id)
   } else if (projectView === 'content') {
     panel = jsx(ProjectContentPanel, { project, content: view.content ?? [], onRefresh }, project.id)
   } else if (projectView === 'activity') {

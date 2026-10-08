@@ -2421,9 +2421,6 @@ var WORKFLOW_LIBRARY_CSS = `
 .dockyard-wf-library-toolbar { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; flex-wrap: wrap; }
 .dockyard-wf-library-scope { display: flex; gap: 6px; }
 .dockyard-wf-library-toolbar input { flex: 1 1 220px; min-width: 180px; padding: 7px 10px; border: 1px solid var(--dy-border, #87909d); border-radius: 6px; background: var(--dy-surface, #ffffff); color: inherit; }
-.dockyard-wf-library-create { display: flex; align-items: flex-end; gap: 12px; margin: 0 0 16px; padding: 12px; border: 1px solid var(--dy-border, #87909d); border-radius: 8px; flex-wrap: wrap; }
-.dockyard-wf-library-create label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
-.dockyard-wf-library-create input { padding: 7px 10px; border: 1px solid var(--dy-border, #87909d); border-radius: 6px; background: var(--dy-surface, #ffffff); color: inherit; min-width: 200px; }
 .dockyard-wf-library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .dockyard-wf-library-grid article header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .dockyard-wf-library-grid article h3 { margin: 0; font-size: 15px; }
@@ -2474,11 +2471,40 @@ var WORKFLOW_DESIGN_CSS = `
 .dockyard-root .dy-wfd-row { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
 .dockyard-root .dy-wfd-row > label { display: grid; gap: 4px; flex: 1 1 150px; font-size: 12px; color: var(--dy-text-2); }
 .dockyard-root .dy-wfd-file { display: grid; gap: 4px; font-size: 12px; color: var(--dy-text-2); }
-.dockyard-root .dy-wfd-templates { display: grid; gap: 8px; max-height: 260px; overflow-y: auto; }
-.dockyard-root .dy-wfd-templates button { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); text-align: left; cursor: pointer; font: inherit; }
-.dockyard-root .dy-wfd-templates button.active { border-color: var(--dy-action); background: var(--dy-accent-soft); }
+/* Use a template: the built-in groups, then the saved ones; a filter; the
+   picked one's steps, sources and the two questions (who works, who checks). */
+.dockyard-root .dy-wfd-tpl { display: grid; gap: 8px; }
+.dockyard-root .dy-wfd-tpl-tabs { display: flex; gap: 2px; overflow-x: auto; border-bottom: 1px solid var(--dy-border); scrollbar-width: none; }
+.dockyard-root .dy-wfd-tpl-tab { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; margin-bottom: -1px; padding: 7px 10px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--dy-text-2); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.dockyard-root .dy-wfd-tpl-tab:hover { color: var(--dy-text); }
+.dockyard-root .dy-wfd-tpl-tab.active { border-bottom-color: var(--dy-action); color: var(--dy-text); }
+.dockyard-root .dy-wfd-tpl-tab:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: -2px; border-radius: 6px 6px 0 0; }
+.dockyard-root .dy-wfd-tpl-count { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 11px; line-height: 18px; text-align: center; }
+.dockyard-root .dy-wfd-tpl-tab.active .dy-wfd-tpl-count { background: var(--dy-accent-soft); color: var(--dy-text); }
+/* The panel keeps one height on every tab, so the dialog does not jump. It takes the room the dialog has
+   left (the dialog is at most 100vh - 40px, about 390px of it around the panel), up to 440px: enough for
+   the largest built-in tab (7 templates) with no scrolling. A small window scrolls the panel, not the dialog. */
+.dockyard-root .dy-wfd-tpl-panel { display: grid; align-content: start; height: clamp(200px, calc(100vh - 430px), 440px); overflow-y: auto; padding: 2px 4px 2px 0; }
+.dockyard-root .dy-wfd-tpl-list { display: grid; gap: 6px; }
+.dockyard-root .dy-wfd-scopes button:disabled { border-style: dashed; background: var(--dy-surface); cursor: not-allowed; }
+.dockyard-root .dy-wfd-scopes button:disabled:hover { border-color: var(--dy-border); }
+.dockyard-root .dy-wfd-ways .dy-wfd-scope-name { margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--dy-accent-soft); color: var(--dy-text); font-size: 12px; font-weight: 600; }
+.dockyard-root .dy-wfd-scope-line { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 6px 6px 6px 10px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); font-size: 12px; }
+.dockyard-root .dy-wfd-scope-line > span { color: var(--dy-text-2); }
+.dockyard-root .dy-wfd-scope-line > strong { flex: 1; min-width: 0; color: var(--dy-text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dockyard-root .dockyard-feature-card.dy-wf-just-made { border-color: var(--dy-action); box-shadow: 0 0 0 1px var(--dy-action); }
+.dockyard-root .dy-wfd-tpl-item { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface); color: var(--dy-text); text-align: left; cursor: pointer; font: inherit; }
+.dockyard-root .dy-wfd-tpl-item:hover { border-color: var(--dy-accent-border); background: var(--dy-accent-soft); }
+.dockyard-root .dy-wfd-tpl-item:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
+.dockyard-root .dy-wfd-tpl-item.active { border-color: var(--dy-action); background: var(--dy-accent-soft); }
+.dockyard-root .dy-wfd-tpl-item strong { font-size: 13px; }
 .dockyard-root .dy-wfd-template-head { display: flex; justify-content: space-between; gap: 8px; }
-.dockyard-root .dy-wfd-template-head small, .dockyard-root .dy-wfd-template-line { color: var(--dy-text-2); font-size: 12px; }
+.dockyard-root .dy-wfd-template-head small, .dockyard-root .dy-wfd-tpl-summary { color: var(--dy-text-2); font-size: 12px; line-height: 1.4; }
+.dockyard-root .dy-wfd-tpl-detail { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); font-size: 13px; }
+.dockyard-root .dy-wfd-tpl-detail-head { display: grid; gap: 2px; }
+.dockyard-root .dy-wfd-tpl-detail-head span, .dockyard-root .dy-wfd-based-on { color: var(--dy-text-2); font-size: 12px; }
+.dockyard-root .dy-wfd-tpl-detail .dy-wfd-row > label select { box-sizing: border-box; width: 100%; min-height: 34px; padding: 6px 9px; border: 1px solid var(--dy-control-border); border-radius: 6px; background: var(--dy-surface); color: var(--dy-text); font: inherit; font-size: 13px; }
+.dockyard-root .dy-wfd-warning { padding: 6px 10px; border: 1px solid var(--dy-warning); border-radius: 8px; background: var(--dy-warning-bg); color: var(--dy-text); font-size: 12px; }
 .dockyard-root .dy-wfd-import-ok { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); font-size: 13px; }
 .dockyard-root .dy-wfd-import-ok p, .dockyard-root .dy-wfd-ai-plan p { margin: 0; }
 .dockyard-root .dy-wfd-steps { display: grid; gap: 4px; margin: 0; padding-left: 20px; font-size: 13px; }
@@ -2496,6 +2522,8 @@ var WORKFLOW_DESIGN_CSS = `
 .dockyard-root .dy-wfd-modal { width: min(640px, 100%); }
 .dockyard-root .dy-wfd-modal .dockyard-modal-head { margin-bottom: 12px; }
 .dockyard-root .dy-wfd-modal .dockyard-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+/* A long New workflow dialog scrolls inside; its buttons stay in view. */
+.dockyard-root .dy-wfd-new .dockyard-modal-actions { position: sticky; bottom: -22px; z-index: 2; margin: 14px -22px -22px; padding: 12px 22px 22px; border-top: 1px solid var(--dy-border); background: var(--dy-surface); }
 .dockyard-root .dy-wfd-fieldset { display: grid; gap: 8px; margin: 0 0 12px; padding: 12px; border: 1px solid var(--dy-border); border-radius: 8px; }
 .dockyard-root .dy-wfd-fieldset legend { padding: 0 4px; font-size: 13px; font-weight: 650; }
 .dockyard-root .dy-wfd-radio { display: flex; align-items: center; gap: 8px; font-size: 13px; }
@@ -2519,6 +2547,16 @@ var WORKFLOW_DESIGN_CSS = `
 .dockyard-root .dy-wfd-ai-compose textarea { flex: 1 1 auto; min-width: 0; resize: vertical; }
 .dockyard-root .dy-wfd-ai-unsaved { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--dy-warning); border-radius: 8px; background: var(--dy-warning-bg); color: var(--dy-text); font-size: 12px; }
 .dockyard-root .dy-wfd-ai-unsaved > span { flex: 1 1 auto; font-weight: 600; }
+/* A suggestion in the AI chat (Sahil, 07/10/2026: suggest, then Apply). The
+   live one has the action colour down its edge; the rest are quiet. */
+.dockyard-root .dy-wfd-ai-suggestion { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid var(--dy-accent-border); border-left: 3px solid var(--dy-action); border-radius: 8px; background: var(--dy-surface); }
+.dockyard-root .dy-wfd-ai-suggestion h4 { margin: 0; color: var(--dy-text-2); font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+.dockyard-root .dy-wfd-ai-changes { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.45; }
+.dockyard-root .dy-wfd-ai-suggestion details { color: var(--dy-text-2); font-size: 12px; }
+.dockyard-root .dy-wfd-ai-suggestion-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.dockyard-root .dy-wfd-ai-suggestion:not(.is-pending) { border-color: var(--dy-border); border-left-color: var(--dy-border); }
+.dockyard-root .dy-wfd-ai-suggestion.is-applied { border-left-color: var(--dy-action); }
+.dockyard-root .dy-wfd-ai-suggestion.is-replaced .dy-wfd-ai-changes, .dockyard-root .dy-wfd-ai-suggestion.is-stale .dy-wfd-ai-changes { color: var(--dy-text-2); }
 /* The repeat settings popover (frames). */
 .dockyard-root .dy-wfd-repeat { position: fixed; z-index: 110; display: grid; gap: 8px; box-sizing: border-box; padding: 14px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); color: var(--dy-text); box-shadow: 0 18px 44px rgba(0, 0, 0, .3); font-size: 13px; }
 .dockyard-root .dy-wfd-repeat h3 { margin: 0; font-size: 14px; }
@@ -15466,6 +15504,36 @@ function practiceRevise(nodes, message, members = []) {
   }
   return { nodes, reply: ["This practice AI only knows a few requests. Try: 'repeat up to 3 times', 'add a sign-off at the end', 'remove the sign-off', 'give the work to reviewer', 'add a step to tell the team'."], did: [], unknown: true };
 }
+var QUESTION = /^(what|why|how|which|who|when|where|does|do|is|are|explain|describe|tell me about|walk me through|summari[sz]e)\b/i;
+var isQuestion = (text2) => /\?\s*$/.test(String(text2 ?? "").trim()) || QUESTION.test(String(text2 ?? "").trim());
+function practiceExplain(nodes, title) {
+  if (!nodes.length) return { reply: ["It has no steps yet. Say what it should do and I will suggest some."], steps: null, after: [] };
+  const gates = nodes.filter((n) => n.human_gate).length;
+  return {
+    reply: [`"${title}" has ${nodes.length} step${nodes.length === 1 ? "" : "s"}, in the order they run:`],
+    steps: nodes,
+    after: [
+      gates ? `You sign off ${gates === 1 ? "once" : `${gates} times`}.` : "Nothing waits for your sign-off.",
+      "Ask for a change and I will suggest it here first. Nothing changes until you press Apply."
+    ]
+  };
+}
+var planKey = (n) => JSON.stringify([
+  n.id ?? n.node_id,
+  n.title ?? "",
+  [...n.depends_on ?? []],
+  Boolean(n.human_gate),
+  n.kind ?? (n.human_gate ? "gate" : "task"),
+  n.body ?? null,
+  n.phase_team ?? null,
+  n.loop ? [n.loop.max_iterations, n.loop.until?.status ?? "done"] : null,
+  n.when ? [n.when.node, n.when.status] : null
+]);
+var sameSteps = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((n, i) => planKey(n) === planKey(b[i]));
+function withCurrentPositions(next, current) {
+  const at = new Map(current.map((n) => [n.id ?? n.node_id, n.canvas_position]));
+  return next.map((n) => at.has(n.id) && at.get(n.id) ? { ...n, canvas_position: at.get(n.id) } : n);
+}
 var IMPORT_MAX_BYTES = 262144;
 var isDockyardNode = (n) => n && typeof n === "object" && typeof n.id === "string" && typeof n.title === "string";
 function readImport(text2) {
@@ -15678,39 +15746,114 @@ function runOrder(nodes) {
   for (const n of nodes) visit(n.id ?? n.node_id);
   return out;
 }
-function stepNotes(node, nodes) {
+function stepNotes(node, nodes, roleOf = null) {
   const notes = [];
   if (node.human_gate) notes.push("your sign-off");
   if (node.loop) notes.push(`repeats, up to ${node.loop.max_iterations} rounds`);
   if (node.when) notes.push(`only if "${nodes.find((n) => (n.id ?? n.node_id) === node.when.node)?.title ?? node.when.node}" ${node.when.status === "blocked" ? "gets stuck" : "is done"}`);
   if (node.phase_team) notes.push(`done by ${node.phase_team}`);
+  else if (roleOf && !node.human_gate && roleOf(node)) notes.push(`the ${roleOf(node)}`);
   return notes;
 }
-function StepsPreview({ nodes }) {
+function StepsPreview({ nodes, roleOf = null }) {
   const ordered = runOrder(nodes);
   return jsx("ol", { className: "dy-wfd-steps", "data-wfd-steps": ordered.length, children: ordered.map((node) => jsxs("li", { children: [
     jsx("strong", { children: node.title }),
-    ...stepNotes(node, nodes).map((note) => jsx("span", { className: "dy-wfd-step-note", children: note }, note))
+    ...stepNotes(node, nodes, roleOf).map((note) => jsx("span", { className: "dy-wfd-step-note", children: note }, note))
   ] }, node.id ?? node.node_id)) });
 }
-function TemplateList({ templates, value, onPick }) {
-  if (templates === null) return jsx("p", { className: "dockyard-meta", role: "status", children: "Loading templates\u2026" });
-  if (!templates.length) return jsx("p", { className: "dockyard-meta", "data-wfd-no-templates": true, children: "No templates yet. In the library, save a workflow for every project to make it a template." });
-  return jsx("div", { className: "dy-wfd-templates", role: "radiogroup", "aria-label": "Templates", children: templates.map((t) => {
-    const nodes = t.definition?.nodes ?? [];
+var stepCount = (n) => `${n} step${n === 1 ? "" : "s"}`;
+var matches = (words2, ...fields) => !words2 || fields.some((f) => String(f ?? "").toLowerCase().includes(words2));
+function TemplatePicker({ builtins, groups, saved, value, onPick }) {
+  const tabs = [
+    ...groups.map((group) => ({ id: group.id, label: group.tab ?? group.title, title: group.title, items: builtins.filter((t) => t.group === group.id) })),
+    { id: "library", label: "Saved", title: "Saved in your library" }
+  ];
+  const [filter, setFilter] = useState("");
+  const [open, setOpen] = useState(() => value ? value.source === "library" ? "library" : value.item.group : tabs[0].id);
+  const words2 = filter.trim().toLowerCase();
+  const builtinHit = (t) => matches(words2, t.title, t.summary, t.based_on, t.name);
+  const savedHit = (t) => matches(words2, t.name);
+  const countOf = (tab) => tab.id === "library" ? saved === null ? null : (saved ?? []).filter(savedHit).length : tab.items.filter(builtinHit).length;
+  const labelOf = (groupId) => tabs.find((tab) => tab.id === groupId)?.label ?? "";
+  const isPicked = (source, name) => value?.source === source && value.item.name === name;
+  const current = words2 ? null : tabs.find((tab) => tab.id === open) ?? tabs[0];
+  const choose = (id) => {
+    setFilter("");
+    setOpen(id);
+  };
+  const onTabKey = (event) => {
+    const buttons = [...event.currentTarget.querySelectorAll('[role="tab"]')];
+    const at = Math.max(0, buttons.indexOf(document.activeElement));
+    const next = { ArrowRight: (at + 1) % tabs.length, ArrowLeft: (at - 1 + tabs.length) % tabs.length, Home: 0, End: tabs.length - 1 }[event.key];
+    if (next === void 0) return;
+    event.preventDefault();
+    choose(tabs[next].id);
+    buttons[next]?.focus();
+  };
+  const item = (source, t, withGroup) => {
+    const nodes = source === "builtin" ? t.nodes : t.definition?.nodes ?? [];
+    const where = withGroup ? `${source === "builtin" ? labelOf(t.group) : "Saved"} \xB7 ` : "";
     return jsxs("button", {
       type: "button",
       role: "radio",
-      "aria-checked": value === t.name,
-      "data-wfd-template": t.name,
-      className: value === t.name ? "active" : "",
-      onClick: () => onPick(t),
+      "aria-checked": isPicked(source, t.name),
+      [source === "builtin" ? "data-wfd-builtin" : "data-wfd-template"]: t.name,
+      className: `dy-wfd-tpl-item${isPicked(source, t.name) ? " active" : ""}`,
+      onClick: () => onPick({ source, item: t }),
       children: [
-        jsxs("span", { className: "dy-wfd-template-head", children: [jsx("strong", { children: t.name }), jsx("small", { children: `${nodes.length} step${nodes.length === 1 ? "" : "s"}` })] }),
-        jsx("span", { className: "dy-wfd-template-line", children: runOrder(nodes).map((n) => n.title).join(" \u2192 ") })
+        jsxs("span", { className: "dy-wfd-template-head", children: [jsx("strong", { children: source === "builtin" ? t.title : t.name }), jsx("small", { children: `${where}${stepCount(nodes.length)}` })] }),
+        jsx("span", { className: "dy-wfd-tpl-summary", children: source === "builtin" ? t.summary : runOrder(nodes).map((n) => n.title).join(" \u2192 ") })
       ]
-    }, t.name);
-  }) });
+    }, `${source}:${t.name}`);
+  };
+  let items = [];
+  let note = null;
+  if (words2) {
+    items = [...builtins.filter(builtinHit).map((t) => item("builtin", t, true)), ...(saved ?? []).filter(savedHit).map((t) => item("library", t, true))];
+    if (!items.length) note = jsx("span", { className: "dockyard-meta", role: "status", children: `No templates match "${filter.trim()}".` });
+  } else if (current.id === "library") {
+    if (saved === null) note = jsx("span", { className: "dockyard-meta", role: "status", children: "Loading saved templates\u2026" });
+    else if (!saved.length) note = jsx("span", { className: "dockyard-meta", "data-wfd-no-templates": true, children: "None saved yet. In the library, save a workflow for every project to make it a template." });
+    else items = saved.map((t) => item("library", t, false));
+  } else {
+    items = current.items.map((t) => item("builtin", t, false));
+  }
+  return jsxs("div", { className: "dy-wfd-tpl", children: [
+    jsxs("label", { className: "dy-wfd-field", children: [
+      jsx("span", { children: "Find a template" }),
+      jsx("input", { type: "search", value: filter, "data-wfd-template-filter": true, placeholder: "Search all templates, e.g. bug, release, research", onChange: (e) => setFilter(e.target.value) })
+    ] }),
+    jsx("div", { className: "dy-wfd-tpl-tabs", role: "tablist", "aria-label": "Template groups", onKeyDown: onTabKey, children: tabs.map((tab, index) => {
+      const selected = current?.id === tab.id;
+      const count = countOf(tab);
+      return jsxs("button", {
+        type: "button",
+        role: "tab",
+        id: `wfd-tpl-tab-${tab.id}`,
+        title: tab.title,
+        "data-wfd-template-tab": tab.id,
+        "aria-selected": selected ? "true" : "false",
+        "aria-controls": "wfd-tpl-panel",
+        tabIndex: selected || !current && index === 0 ? 0 : -1,
+        className: `dy-wfd-tpl-tab${selected ? " active" : ""}`,
+        onClick: () => choose(tab.id),
+        children: [jsx("span", { children: tab.label }), jsx("span", { className: "dy-wfd-tpl-count", children: count === null ? "\u2026" : String(count) })]
+      }, tab.id);
+    }) }),
+    jsxs("div", {
+      id: "wfd-tpl-panel",
+      className: "dy-wfd-tpl-panel",
+      "data-wfd-template-panel": current ? current.id : "matches",
+      role: current ? "tabpanel" : "region",
+      "aria-labelledby": current ? `wfd-tpl-tab-${current.id}` : void 0,
+      "aria-label": current ? void 0 : `Templates matching ${filter.trim()}`,
+      children: [
+        items.length ? jsx("div", { className: "dy-wfd-tpl-list", role: "radiogroup", "aria-label": current ? current.title : "Matching templates", children: items }) : null,
+        note
+      ]
+    })
+  ] });
 }
 function ImportResult({ result }) {
   if (!result) return null;
@@ -15727,7 +15870,7 @@ function ImportResult({ result }) {
     jsx(StepsPreview, { nodes: result.nodes })
   ] });
 }
-function AiPlan({ draft, onAnswer }) {
+function AiPlan({ draft, onAnswer, readOnly = false }) {
   return jsxs("div", { className: "dy-wfd-ai-plan", "data-wfd-ai-plan": draft.name, children: [
     jsx("h4", { children: "Here's my plan" }),
     jsx("ol", { className: "dy-wfd-ai-explain", children: draft.explain.map((line) => jsx("li", { children: line }, line)) }),
@@ -15736,7 +15879,7 @@ function AiPlan({ draft, onAnswer }) {
     draft.questions.length ? jsx("h4", { children: "Questions for you" }) : null,
     ...draft.questions.map((q) => jsxs("div", { className: "dy-wfd-question", role: "group", "aria-label": q.text, "data-wfd-question": q.id, children: [
       jsx("span", { children: q.text }),
-      jsx("span", { className: "dy-wfd-chips", children: q.options.map((o) => jsx("button", { type: "button", "aria-pressed": q.current === o.value, "data-wfd-answer": `${q.id}:${o.value}`, onClick: () => onAnswer(q.id, o.value), children: o.label }, String(o.value))) })
+      jsx("span", { className: "dy-wfd-chips", children: q.options.map((o) => jsx("button", { type: "button", "aria-pressed": q.current === o.value, "data-wfd-answer": `${q.id}:${o.value}`, disabled: readOnly, onClick: () => onAnswer(q.id, o.value), children: o.label }, String(o.value))) })
     ] }, q.id))
   ] });
 }
@@ -15862,12 +16005,1971 @@ function RepeatPopover({ node, anchor, check: savedCheck, onSave, onStop, onClos
   ] });
 }
 
+// hermes_dockyard_plugin/desktop/src/project/workflow-design/builtin-templates.json
+var builtin_templates_default = {
+  schema: "dockyard.builtin-templates/v1",
+  about: "Built-in workflow templates (07/10/2026). Sources and reasoning: HPS-Audit-2026-09-24/WORKFLOW-TEMPLATES-RESEARCH.md. Steps name no bot: on use, Dockyard asks who does the work (the other steps) and who checks it (check_steps). Every save runs the engine's validator; tests/test_builtin_workflow_templates.py holds these to it.",
+  groups: [
+    {
+      id: "loops",
+      title: "Loops",
+      tab: "Loops"
+    },
+    {
+      id: "build-and-fix",
+      title: "Build and fix",
+      tab: "Build & fix"
+    },
+    {
+      id: "check-quality",
+      title: "Check quality",
+      tab: "Quality"
+    },
+    {
+      id: "look-after",
+      title: "Look after the project",
+      tab: "Look after"
+    },
+    {
+      id: "research-writing",
+      title: "Research and writing",
+      tab: "Research"
+    }
+  ],
+  templates: [
+    {
+      name: "reach-a-goal",
+      title: "Reach a goal",
+      group: "loops",
+      summary: "Works towards a goal one thing per round until your 'done when' test holds.",
+      based_on: "GitHub Next Goal; the Ralph loop",
+      check_steps: [
+        "verify"
+      ],
+      nodes: [
+        {
+          id: "goal",
+          title: "Write the goal and when it's done",
+          depends_on: [],
+          body: "Write the goal in one or two sentences and a 'done when' test anyone can check: a command, a list or a number. Note what is out of bounds."
+        },
+        {
+          id: "approve-goal",
+          title: "Your sign-off on the goal",
+          depends_on: [
+            "goal"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Check the goal and its 'done when' test before any work starts."
+        },
+        {
+          id: "next",
+          title: "Do the next most important thing",
+          depends_on: [
+            "approve-goal"
+          ],
+          body: "Do one thing that moves the goal forward, check it, and note what changed and what to do next. Finish the round as done when the 'done when' test holds; otherwise finish it as stuck with a note on what to do next, and the next round carries on from there.",
+          loop: {
+            max_iterations: 10,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "summary",
+          title: "Summarise what changed",
+          depends_on: [
+            "next"
+          ],
+          body: "List what changed, with the evidence that the 'done when' test holds."
+        },
+        {
+          id: "verify",
+          title: "Check the result against the goal",
+          depends_on: [
+            "summary"
+          ],
+          body: "Run the 'done when' test yourself, without relying on the worker's notes, and list anything that isn't met."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "verify"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "improve-a-number",
+      title: "Improve a number",
+      group: "loops",
+      summary: "Tries one change per round and keeps it only if the number gets better.",
+      based_on: "GitHub Next Autoloop and Daily Perf Improver; karpathy/autoresearch",
+      check_steps: [
+        "verify"
+      ],
+      nodes: [
+        {
+          id: "measure",
+          title: "Set the number and the target",
+          depends_on: [],
+          body: "Write the command that measures the number (speed, bundle size, test time, warnings), run it three times for a steady baseline, and set the target. List the files that may change."
+        },
+        {
+          id: "approve-measure",
+          title: "Your sign-off on the measure",
+          depends_on: [
+            "measure"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Check the measurement is fair and the target is worth it."
+        },
+        {
+          id: "improve",
+          title: "Try one change and measure it",
+          depends_on: [
+            "approve-measure"
+          ],
+          body: "Make one change, measure it the same way, and keep it only if the number improves; otherwise undo it and log what was tried. Finish the round as done when the target is reached; otherwise finish it as stuck with the log of what was tried, and the next round carries on from there.",
+          loop: {
+            max_iterations: 10,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "verify",
+          title: "Check the gain",
+          depends_on: [
+            "improve"
+          ],
+          body: "Measure again from a clean checkout. Confirm the gain, and that nothing else got worse."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "verify"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "migrate-step-by-step",
+      title: "Migrate step by step",
+      group: "loops",
+      summary: "Moves a framework, library or language over one slice at a time, with no regressions.",
+      based_on: "GitHub Next Crane; Airbnb's and Google's LLM migrations",
+      check_steps: [
+        "final-check"
+      ],
+      nodes: [
+        {
+          id: "inventory",
+          title: "Inventory and plan the slices",
+          depends_on: [],
+          body: "List everything that has to move and split it into slices small enough to finish in one round, each with a check that it still works."
+        },
+        {
+          id: "approve-plan",
+          title: "Your sign-off on the plan",
+          depends_on: [
+            "inventory"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Check the slices and their order. More than 10 slices needs a second run."
+        },
+        {
+          id: "migrate",
+          title: "Migrate the next slice",
+          depends_on: [
+            "approve-plan"
+          ],
+          body: "Migrate the next slice on the list and run the full test suite. Never leave a slice half done. Finish the round as done when every slice has moved; otherwise finish it as stuck with a note of the next slice, and the next round carries on from there.",
+          loop: {
+            max_iterations: 10,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "final-check",
+          title: "Final full check",
+          depends_on: [
+            "migrate"
+          ],
+          body: "Run every test and check on the migrated code and compare its behaviour with before. List any regressions."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "final-check"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "work-through-a-checklist",
+      title: "Work through a checklist",
+      group: "loops",
+      summary: "Turns a brief into small checked items and does one per round until all are ticked.",
+      based_on: "the Ralph loop; Superpowers; the feature-list-as-contract pattern",
+      check_steps: [
+        "review"
+      ],
+      nodes: [
+        {
+          id: "checklist",
+          title: "Turn the brief into a checklist",
+          depends_on: [],
+          body: "Break the work into small items, each finished in one round and each with a check that shows it is done. Keep the checklist where every round can read it, and don't change it once agreed."
+        },
+        {
+          id: "approve-list",
+          title: "Your sign-off on the checklist",
+          depends_on: [
+            "checklist"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Check every item is small and has a check."
+        },
+        {
+          id: "next-item",
+          title: "Do the next unticked item",
+          depends_on: [
+            "approve-list"
+          ],
+          body: "Pick the most important unticked item, do only that item, run its check, tick it, and note anything the next round should know. Finish the round as done when every item is ticked; otherwise finish it as stuck with the next item named, and the next round carries on from there.",
+          loop: {
+            max_iterations: 10,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "review",
+          title: "Review against the checklist",
+          depends_on: [
+            "next-item"
+          ],
+          body: "Run every item's check yourself and list anything that isn't really done."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "review"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "try-several-keep-the-best",
+      title: "Try several, keep the best",
+      group: "loops",
+      summary: "Three independent attempts, picked by a check you can run, then the winner is polished.",
+      based_on: "Agentless; AIDE; best-of-N sampling",
+      check_steps: [
+        "pick"
+      ],
+      nodes: [
+        {
+          id: "task",
+          title: "Set the task and the check",
+          depends_on: [],
+          body: "Write the task and the check that will pick the winner: tests, a benchmark or a rule you can measure. The attempts must not see each other."
+        },
+        {
+          id: "attempt-a",
+          title: "Attempt A",
+          depends_on: [
+            "task"
+          ],
+          body: "Solve the task your own way, without looking at the other attempts. Run the check and record the result."
+        },
+        {
+          id: "attempt-b",
+          title: "Attempt B",
+          depends_on: [
+            "task"
+          ],
+          body: "Solve the task without looking at the other attempts, taking a different approach from the most obvious one. Run the check and record the result."
+        },
+        {
+          id: "attempt-c",
+          title: "Attempt C",
+          depends_on: [
+            "task"
+          ],
+          body: "Solve the task without looking at the other attempts, with the simplest approach that could work. Run the check and record the result."
+        },
+        {
+          id: "pick",
+          title: "Compare and pick the best",
+          depends_on: [
+            "attempt-a",
+            "attempt-b",
+            "attempt-c"
+          ],
+          body: "Run the check on all three attempts and pick the best by its result, not by how it reads. Say why, and what the others did better."
+        },
+        {
+          id: "polish",
+          title: "Polish the winner",
+          depends_on: [
+            "pick"
+          ],
+          body: "Improve the winning attempt with what the others did better. Finish the round as done when the check passes; otherwise finish it as stuck with what is left, and the next round carries on from there.",
+          loop: {
+            max_iterations: 3,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "polish"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "find-the-breaking-change",
+      title: "Find the change that broke it",
+      group: "loops",
+      summary: "Halves the range of changes each round until one is left, then fixes or reverts it.",
+      based_on: "git bisect; research on LLM-assisted bisecting",
+      check_steps: [
+        "review"
+      ],
+      nodes: [
+        {
+          id: "check",
+          title: "Write a check that shows the problem",
+          depends_on: [],
+          body: "Write a command or test that fails on the bad version and passes on a known good one. Run it three times on each, so it gives the same answer every time."
+        },
+        {
+          id: "bisect",
+          title: "Test the change halfway between",
+          depends_on: [
+            "check"
+          ],
+          body: "Test the change halfway between the last good and the first bad version, mark it good or bad, and halve the range (git bisect does this). Ten rounds narrow about a thousand changes to one. Finish the round as done when one change is left; otherwise finish it as stuck with the new range, and the next round carries on from there.",
+          loop: {
+            max_iterations: 10,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "explain",
+          title: "Explain the culprit",
+          depends_on: [
+            "bisect"
+          ],
+          body: "Read the change that broke it and explain in plain words what went wrong."
+        },
+        {
+          id: "fix",
+          title: "Fix or revert",
+          depends_on: [
+            "explain"
+          ],
+          body: "Fix the problem, or revert the change if a fix is risky, and show that the check now passes."
+        },
+        {
+          id: "review",
+          title: "Review the fix",
+          depends_on: [
+            "fix"
+          ],
+          body: "Check the fix is right and that the check and the other tests pass."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "review"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "run-experiments",
+      title: "Run experiments",
+      group: "loops",
+      summary: "Runs one experiment per round, keeps what helps, and writes up what worked and what didn't.",
+      based_on: "karpathy/autoresearch; Agent Laboratory; The AI Scientist",
+      check_steps: [
+        "check-write-up"
+      ],
+      nodes: [
+        {
+          id: "plan",
+          title: "Plan the experiments",
+          depends_on: [],
+          body: "Write the question, the measure, the time or budget per experiment, and a short list of experiments to try, cheapest first."
+        },
+        {
+          id: "approve-plan",
+          title: "Your sign-off on the plan",
+          depends_on: [
+            "plan"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Check the measure is fair and the budget is acceptable."
+        },
+        {
+          id: "experiment",
+          title: "Run the next experiment",
+          depends_on: [
+            "approve-plan"
+          ],
+          body: "Run one experiment from the list, record the result in the log, and keep the change only if the measure improves. Finish the round as done when the list is finished or the target is met; otherwise finish it as stuck with the result logged, and the next round carries on from there.",
+          loop: {
+            max_iterations: 10,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "write-up",
+          title: "Write up the results",
+          depends_on: [
+            "experiment"
+          ],
+          body: "Summarise every experiment from the log with its numbers, including the ones that failed, and what to try next."
+        },
+        {
+          id: "check-write-up",
+          title: "Check the write-up against the log",
+          depends_on: [
+            "write-up"
+          ],
+          body: "Check every number and claim in the write-up against the log, and list anything that doesn't match."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "check-write-up"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "plan-then-build",
+      title: "Plan, then build",
+      group: "build-and-fix",
+      summary: "Explores and plans first, then builds with tests after your sign-off.",
+      based_on: "Claude Code's explore, plan, code; GitHub Spec Kit",
+      check_steps: [
+        "review"
+      ],
+      nodes: [
+        {
+          id: "explore",
+          title: "Explore the code",
+          depends_on: [],
+          body: "Read the code involved and list what the change touches. Change nothing yet."
+        },
+        {
+          id: "plan",
+          title: "Write the plan",
+          depends_on: [
+            "explore"
+          ],
+          body: "Write the plan: what changes, in which files, how it will be tested, and what is out of scope."
+        },
+        {
+          id: "approve-plan",
+          title: "Your sign-off on the plan",
+          depends_on: [
+            "plan"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Check the plan before any code is written."
+        },
+        {
+          id: "build",
+          title: "Build it with tests",
+          depends_on: [
+            "approve-plan"
+          ],
+          body: "Build the plan with tests, running the whole test suite each round. Finish the round as done when every test passes; otherwise finish it as stuck with what is failing, and the next round carries on from there.",
+          loop: {
+            max_iterations: 5,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "review",
+          title: "Review the change",
+          depends_on: [
+            "build"
+          ],
+          body: "Review the change against the plan: correctness, tests and anything risky. List what must change."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "review"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        },
+        {
+          id: "merge",
+          title: "Merge",
+          depends_on: [
+            "approve"
+          ],
+          body: "Merge the change once it is signed off."
+        }
+      ]
+    },
+    {
+      name: "test-first-change",
+      title: "Test-first change",
+      group: "build-and-fix",
+      summary: "You sign off the failing tests first; then the smallest change makes them pass.",
+      based_on: "Superpowers' test-driven development; TDFlow; AgentCoder",
+      check_steps: [
+        "tests",
+        "review"
+      ],
+      nodes: [
+        {
+          id: "tests",
+          title: "Write the failing tests",
+          depends_on: [],
+          body: "Write tests that describe the new behaviour. Run them and make sure they fail for the right reason. Change no other code."
+        },
+        {
+          id: "approve-tests",
+          title: "Your sign-off on the tests",
+          depends_on: [
+            "tests"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Check the tests describe what you want; the build is held to them."
+        },
+        {
+          id: "build",
+          title: "Make the tests pass",
+          depends_on: [
+            "approve-tests"
+          ],
+          body: "Write the smallest change that makes the tests pass, without editing the tests. Run the whole suite each round. Finish the round as done when every test passes; otherwise finish it as stuck with what is failing, and the next round carries on from there.",
+          loop: {
+            max_iterations: 5,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "tidy",
+          title: "Tidy up, tests stay green",
+          depends_on: [
+            "build"
+          ],
+          body: "Clean up the new code without changing what it does, running the tests after each step."
+        },
+        {
+          id: "review",
+          title: "Review the change",
+          depends_on: [
+            "tidy"
+          ],
+          body: "Review the change and check the tests were not edited to pass."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "review"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "fix-a-reported-bug",
+      title: "Fix a reported bug",
+      group: "build-and-fix",
+      summary: "Reproduces the bug with a failing test, then fixes it without touching that test.",
+      based_on: "Agentless; SWE-agent; TDFlow",
+      check_steps: [
+        "review"
+      ],
+      nodes: [
+        {
+          id: "reproduce",
+          title: "Reproduce it with a failing test",
+          depends_on: [],
+          body: "Write a test that fails because of the reported bug. Change no other code yet."
+        },
+        {
+          id: "locate",
+          title: "Find where it goes wrong",
+          depends_on: [
+            "reproduce"
+          ],
+          body: "Narrow the cause down to the files and functions involved, and say why they are wrong."
+        },
+        {
+          id: "fix",
+          title: "Fix it",
+          depends_on: [
+            "locate"
+          ],
+          body: "Change the code until the new test passes and every other test still passes. Never edit the new test to make it pass. Finish the round as done when every test passes; otherwise finish it as stuck with what is failing, and the next round carries on from there.",
+          loop: {
+            max_iterations: 5,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "stuck",
+          title: "Tell me what was tried",
+          depends_on: [
+            "fix"
+          ],
+          body: "Say what was tried, what failed and where it stopped.",
+          when: {
+            node: "fix",
+            status: "blocked"
+          }
+        },
+        {
+          id: "review",
+          title: "Review the fix",
+          depends_on: [
+            "fix"
+          ],
+          body: "Check the new test really shows the bug and the fix is right."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "review"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "fix-failing-ci",
+      title: "Fix failing CI",
+      group: "build-and-fix",
+      summary: "Finds the cause of a red build and fixes it until CI is green; tells you if it gets stuck.",
+      based_on: "GitHub Next CI Doctor and PR Fix",
+      check_steps: [
+        "review"
+      ],
+      nodes: [
+        {
+          id: "diagnose",
+          title: "Find the cause",
+          depends_on: [],
+          body: "Read the failing CI run and find the root cause, with the log lines that show it."
+        },
+        {
+          id: "fix",
+          title: "Fix it",
+          depends_on: [
+            "diagnose"
+          ],
+          body: "Fix the cause, not the symptom, and run CI again. Finish the round as done when CI is green; otherwise finish it as stuck with the new failure, and the next round carries on from there.",
+          loop: {
+            max_iterations: 5,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "stuck",
+          title: "Tell me what was tried",
+          depends_on: [
+            "fix"
+          ],
+          body: "Say what was tried, what is still failing and why.",
+          when: {
+            node: "fix",
+            status: "blocked"
+          }
+        },
+        {
+          id: "review",
+          title: "Review the fix",
+          depends_on: [
+            "fix"
+          ],
+          body: "Check the fix deals with the root cause and doesn't just silence the failure: no skipped or deleted tests."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "review"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        },
+        {
+          id: "merge",
+          title: "Merge",
+          depends_on: [
+            "approve"
+          ],
+          body: "Merge the fix once it is signed off."
+        }
+      ]
+    },
+    {
+      name: "upgrade-a-dependency",
+      title: "Upgrade a dependency",
+      group: "build-and-fix",
+      summary: "Reads what changed, bumps the version, then fixes one breakage per round.",
+      based_on: "wshobson's deps-upgrade; Byam; BUMP",
+      check_steps: [
+        "review"
+      ],
+      nodes: [
+        {
+          id: "read",
+          title: "Read what changed",
+          depends_on: [],
+          body: "Read the release notes between the old and new versions and list the breaking changes that touch this project."
+        },
+        {
+          id: "bump",
+          title: "Change the version",
+          depends_on: [
+            "read"
+          ],
+          body: "Update the version and the lock file. Nothing else."
+        },
+        {
+          id: "fix",
+          title: "Fix what broke",
+          depends_on: [
+            "bump"
+          ],
+          body: "Fix one breakage per round using the build output and the release notes, then build and test again. Finish the round as done when the build and the tests pass; otherwise finish it as stuck with what is still broken, and the next round carries on from there.",
+          loop: {
+            max_iterations: 5,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "stuck",
+          title: "Tell me what's left",
+          depends_on: [
+            "fix"
+          ],
+          body: "List what still breaks, what was tried, and whether rolling back is safer.",
+          when: {
+            node: "fix",
+            status: "blocked"
+          }
+        },
+        {
+          id: "review",
+          title: "Review the changes",
+          depends_on: [
+            "fix"
+          ],
+          body: "Check each change against the release notes and look for behaviour that changed without breaking the build."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "review"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "check-a-ui-change",
+      title: "Check a UI change on screen",
+      group: "build-and-fix",
+      summary: "Makes the change, then checks and fixes it on screen until nothing is off.",
+      based_on: "the rendered UI finish gate pattern; Claude Code best practices",
+      check_steps: [
+        "second-look"
+      ],
+      nodes: [
+        {
+          id: "build",
+          title: "Make the change",
+          depends_on: [],
+          body: "Make the UI change and note which screens and states it affects."
+        },
+        {
+          id: "screen-check",
+          title: "Check it on screen and fix",
+          depends_on: [
+            "build"
+          ],
+          body: "Open the screens at phone and desktop sizes, take screenshots, and try the empty, loading and error states and the keyboard. Compare with the design, list the differences and fix them. Finish the round as done when nothing is off; otherwise finish it as stuck with what is left, and the next round carries on from there.",
+          loop: {
+            max_iterations: 5,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "second-look",
+          title: "Second look at the screenshots",
+          depends_on: [
+            "screen-check"
+          ],
+          body: "Look at the final screenshots yourself against the design, in light and dark themes, and list anything off."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "second-look"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "review-with-three-reviewers",
+      title: "Review a change with three reviewers",
+      group: "check-quality",
+      summary: "Correctness, security and conventions reviews side by side, then fixes until the checks pass.",
+      based_on: "Zeroshot; GitHub Next's reviewers; Claude Code writer/reviewer",
+      check_steps: [
+        "correctness",
+        "security",
+        "conventions"
+      ],
+      nodes: [
+        {
+          id: "scope",
+          title: "Describe the change",
+          depends_on: [],
+          body: "Summarise the change under review: what it does, which files, and how it was tested."
+        },
+        {
+          id: "correctness",
+          title: "Review for correctness",
+          depends_on: [
+            "scope"
+          ],
+          body: "Review the change for bugs, missed cases and missing tests. List findings with file and line, most serious first."
+        },
+        {
+          id: "security",
+          title: "Review for security",
+          depends_on: [
+            "scope"
+          ],
+          body: "Review the change for security problems: inputs, secrets, permissions and dependencies. List findings with file and line."
+        },
+        {
+          id: "conventions",
+          title: "Review against conventions",
+          depends_on: [
+            "scope"
+          ],
+          body: "Review the change against the project's conventions and readability. List findings with file and line."
+        },
+        {
+          id: "combine",
+          title: "Combine the findings",
+          depends_on: [
+            "correctness",
+            "security",
+            "conventions"
+          ],
+          body: "Merge the three reviews, drop duplicates, and order the findings by how serious they are."
+        },
+        {
+          id: "fix",
+          title: "Fix the findings",
+          depends_on: [
+            "combine"
+          ],
+          body: "Fix the findings, most serious first, and run the checks. Finish the round as done when every serious finding is fixed and the checks pass; otherwise finish it as stuck with what is left, and the next round carries on from there.",
+          loop: {
+            max_iterations: 3,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "fix"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "raise-test-coverage",
+      title: "Raise test coverage",
+      group: "check-quality",
+      summary: "Adds tests for untested code that matters, keeping only tests that pass reliably and add coverage.",
+      based_on: "Meta's TestGen-LLM; GitHub Next Daily Test Improver",
+      check_steps: [
+        "review"
+      ],
+      nodes: [
+        {
+          id: "find",
+          title: "Find valuable untested code",
+          depends_on: [],
+          body: "Measure coverage and list the untested code that matters most: risky, often changed or often broken."
+        },
+        {
+          id: "write",
+          title: "Write tests",
+          depends_on: [
+            "find"
+          ],
+          body: "Write tests for the next item on the list. Keep a test only if it builds, passes three runs in a row and raises coverage. Finish the round as done when the list is covered; otherwise finish it as stuck with the next item named, and the next round carries on from there.",
+          loop: {
+            max_iterations: 5,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "review",
+          title: "Review the new tests",
+          depends_on: [
+            "write"
+          ],
+          body: "Check each new test asserts real behaviour, not just that code runs, and would fail if the code broke."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "review"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "security-sweep",
+      title: "Security sweep",
+      group: "check-quality",
+      summary: "Scans read-only, ranks the findings, then fixes the urgent ones until a rescan is clean.",
+      based_on: "Looper's security-scan; GitHub Next Daily Malicious Code Scan",
+      check_steps: [
+        "verify"
+      ],
+      nodes: [
+        {
+          id: "scan",
+          title: "Scan for problems",
+          depends_on: [],
+          body: "Scan the project read-only for exposed secrets, personal data and known vulnerabilities. Change nothing."
+        },
+        {
+          id: "rank",
+          title: "Rank the findings",
+          depends_on: [
+            "scan"
+          ],
+          body: "Rank the findings by how serious and how likely they are, and mark which are urgent."
+        },
+        {
+          id: "fix",
+          title: "Fix the urgent ones",
+          depends_on: [
+            "rank"
+          ],
+          body: "Fix the urgent findings, then scan again. Finish the round as done when the rescan finds nothing urgent; otherwise finish it as stuck with what is left, and the next round carries on from there.",
+          loop: {
+            max_iterations: 3,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "verify",
+          title: "Check the fixes",
+          depends_on: [
+            "fix"
+          ],
+          body: "Scan again yourself and check each fix really closes its finding."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "verify"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "explore-the-app",
+      title: "Explore the app like a tester",
+      group: "check-quality",
+      summary: "Three user journeys tried side by side; findings are reproduced, ranked and filed.",
+      based_on: "GitHub Next Daily Adhoc QA; GPTDroid",
+      check_steps: [
+        "triage"
+      ],
+      nodes: [
+        {
+          id: "journeys",
+          title: "List the main journeys",
+          depends_on: [],
+          body: "List the three most important things a user does in the app, and where each starts."
+        },
+        {
+          id: "journey-1",
+          title: "Try journey 1",
+          depends_on: [
+            "journeys"
+          ],
+          body: "Use the app as a new user would for the first journey. Try odd inputs, going back and slow connections. Note anything broken, confusing or slow, with the steps to reproduce it."
+        },
+        {
+          id: "journey-2",
+          title: "Try journey 2",
+          depends_on: [
+            "journeys"
+          ],
+          body: "Use the app as a new user would for the second journey. Try odd inputs, going back and slow connections. Note anything broken, confusing or slow, with the steps to reproduce it."
+        },
+        {
+          id: "journey-3",
+          title: "Try journey 3",
+          depends_on: [
+            "journeys"
+          ],
+          body: "Use the app as a new user would for the third journey. Try odd inputs, going back and slow connections. Note anything broken, confusing or slow, with the steps to reproduce it."
+        },
+        {
+          id: "triage",
+          title: "Reproduce and rank the findings",
+          depends_on: [
+            "journey-1",
+            "journey-2",
+            "journey-3"
+          ],
+          body: "Reproduce each finding. Drop the ones that don't reproduce, merge duplicates, and rank the rest by how much they hurt users."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off on the list",
+          depends_on: [
+            "triage"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Check the ranked list before anything is filed."
+        },
+        {
+          id: "file",
+          title: "File them as tasks",
+          depends_on: [
+            "approve"
+          ],
+          body: "File each finding as a task with the steps to reproduce it, what was expected and what happened."
+        }
+      ]
+    },
+    {
+      name: "red-team-an-ai-feature",
+      title: "Red-team an AI feature",
+      group: "check-quality",
+      summary: "Attacks an AI feature three ways side by side, then fixes its guards until the attacks fail.",
+      based_on: "garak; Red Teaming Language Models with Language Models",
+      check_steps: [
+        "attack-misuse",
+        "attack-leaks",
+        "attack-answers"
+      ],
+      nodes: [
+        {
+          id: "risks",
+          title: "List what could go wrong",
+          depends_on: [],
+          body: "List how this AI feature could be misused or fail: prompt injection, leaking private data, harmful or made-up answers, misuse of its tools."
+        },
+        {
+          id: "attack-misuse",
+          title: "Attack: injection and misuse",
+          depends_on: [
+            "risks"
+          ],
+          body: "Try to make the feature ignore its instructions or misuse its tools. Record every attempt and whether it got through."
+        },
+        {
+          id: "attack-leaks",
+          title: "Attack: data leaks",
+          depends_on: [
+            "risks"
+          ],
+          body: "Try to make the feature reveal private data, secrets or its hidden instructions. Record every attempt and the result."
+        },
+        {
+          id: "attack-answers",
+          title: "Attack: harmful or made-up answers",
+          depends_on: [
+            "risks"
+          ],
+          body: "Try to get harmful, biased or made-up answers. Record every attempt and the result."
+        },
+        {
+          id: "rank",
+          title: "Rank the failures",
+          depends_on: [
+            "attack-misuse",
+            "attack-leaks",
+            "attack-answers"
+          ],
+          body: "List the attacks that got through, most serious first, and keep them all as a test set."
+        },
+        {
+          id: "fix",
+          title: "Fix the guards",
+          depends_on: [
+            "rank"
+          ],
+          body: "Fix the most serious failure, then rerun every attack in the test set. Finish the round as done when none get through; otherwise finish it as stuck with what still gets through, and the next round carries on from there.",
+          loop: {
+            max_iterations: 5,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "fix"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "tune-a-prompt",
+      title: "Tune a prompt against test cases",
+      group: "check-quality",
+      summary: "Changes a prompt one edit per round, keeping an edit only if the score on agreed cases goes up.",
+      based_on: "DSPy; ERGO; evaluation-driven prompt workflows",
+      check_steps: [
+        "unseen"
+      ],
+      nodes: [
+        {
+          id: "cases",
+          title: "Collect the test cases",
+          depends_on: [],
+          body: "Gather 20 or more real examples, including ones it gets wrong today, and write what a good answer must do for each. Set a few aside as unseen examples."
+        },
+        {
+          id: "approve-cases",
+          title: "Your sign-off on the test cases",
+          depends_on: [
+            "cases"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Check the cases and what counts as a pass."
+        },
+        {
+          id: "tune",
+          title: "Change the prompt, one edit per round",
+          depends_on: [
+            "approve-cases"
+          ],
+          body: "Make one change to the prompt, score it on the test cases, and keep it only if the score goes up. Count passes rather than asking an AI to judge. Finish the round as done when it reaches the target; otherwise finish it as stuck with the score log, and the next round carries on from there.",
+          loop: {
+            max_iterations: 5,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "unseen",
+          title: "Check on unseen examples",
+          depends_on: [
+            "tune"
+          ],
+          body: "Score the final prompt on the examples set aside, and compare it with the original prompt."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "unseen"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "docs-follow-code",
+      title: "Docs follow code",
+      group: "look-after",
+      summary: "Fixes the docs, never the code, until the link check and the docs build pass.",
+      based_on: "GitHub Next Daily Documentation Updater and Link Checker; Looper's docs-sync",
+      check_steps: [
+        "review"
+      ],
+      nodes: [
+        {
+          id: "drift",
+          title: "Find where docs and code disagree",
+          depends_on: [],
+          body: "Compare the docs with the code and recent changes, and list every place they disagree."
+        },
+        {
+          id: "fix",
+          title: "Fix the docs",
+          depends_on: [
+            "drift"
+          ],
+          body: "Fix the docs to match the code; never change the code. Run the link check and the docs build. Finish the round as done when both pass and the list is done; otherwise finish it as stuck with what is left, and the next round carries on from there.",
+          loop: {
+            max_iterations: 3,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "review",
+          title: "Check the docs against the code",
+          depends_on: [
+            "fix"
+          ],
+          body: "Spot-check the changed pages against the code and confirm no code changed."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "review"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "write-an-onboarding-guide",
+      title: "Write an onboarding guide",
+      group: "look-after",
+      summary: "Writes a getting-started guide, then follows it from scratch until a fresh setup works.",
+      based_on: "RepoAgent; the codebase Q&A and onboarding pattern",
+      check_steps: [
+        "follow"
+      ],
+      nodes: [
+        {
+          id: "map",
+          title: "Map the project",
+          depends_on: [],
+          body: "List the main parts of the project, how they connect, and how to install, run and test it."
+        },
+        {
+          id: "draft",
+          title: "Write the getting-started guide",
+          depends_on: [
+            "map"
+          ],
+          body: "Write a guide that takes a newcomer from nothing to a working setup and a first small change."
+        },
+        {
+          id: "follow",
+          title: "Follow the guide from scratch",
+          depends_on: [
+            "draft"
+          ],
+          body: "In a clean environment, follow the guide word for word and fix every step that fails or is unclear. Finish the round as done when a fresh setup works from the guide alone; otherwise finish it as stuck with the step that failed, and the next round carries on from there.",
+          loop: {
+            max_iterations: 5,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "follow"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "triage-the-backlog",
+      title: "Triage the issue backlog",
+      group: "look-after",
+      summary: "Labels, links duplicates and asks for missing details in batches of 20, then hands you the decisions.",
+      based_on: "GitHub Next Issue Triage; the classify-then-act pattern",
+      check_steps: [],
+      nodes: [
+        {
+          id: "rules",
+          title: "Write the triage rules",
+          depends_on: [],
+          body: "Write the labels, what counts as a duplicate, what a good report needs, and what always needs a person."
+        },
+        {
+          id: "approve-rules",
+          title: "Your sign-off on the rules",
+          depends_on: [
+            "rules"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Check the rules before any issue is touched."
+        },
+        {
+          id: "triage",
+          title: "Triage the next 20 issues",
+          depends_on: [
+            "approve-rules"
+          ],
+          body: "Take the next 20 untriaged issues: label them, link duplicates, ask for missing details, and flag anything that needs a person's decision. Close or change nothing else. Finish the round as done when none are left; otherwise finish it as stuck with how many remain, and the next round carries on from there.",
+          loop: {
+            max_iterations: 10,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "summary",
+          title: "Summarise for me",
+          depends_on: [
+            "triage"
+          ],
+          body: "Summarise what came in, what looks urgent, and which issues need your decision."
+        },
+        {
+          id: "decide",
+          title: "Your decisions",
+          depends_on: [
+            "summary"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Decide the flagged issues."
+        }
+      ]
+    },
+    {
+      name: "investigate-an-incident",
+      title: "Investigate an incident",
+      group: "look-after",
+      summary: "Tests one likely cause per round until one is confirmed; you sign off the fix.",
+      based_on: "wshobson's incident-response; FixItFlow; the incident-to-eval pattern",
+      check_steps: [
+        "review"
+      ],
+      nodes: [
+        {
+          id: "gather",
+          title: "Gather what happened",
+          depends_on: [],
+          body: "Collect the alerts, logs, recent changes and what users saw, with times."
+        },
+        {
+          id: "causes",
+          title: "List likely causes",
+          depends_on: [
+            "gather"
+          ],
+          body: "List the likely causes, most likely first, each with the evidence for and against it."
+        },
+        {
+          id: "test",
+          title: "Test the next cause",
+          depends_on: [
+            "causes"
+          ],
+          body: "Check one cause against the evidence. Finish the round as done when a cause is confirmed with evidence; otherwise finish it as stuck with what ruled it out, and the next round carries on from there.",
+          loop: {
+            max_iterations: 5,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "stuck",
+          title: "Tell me it's unresolved",
+          depends_on: [
+            "test"
+          ],
+          body: "Say which causes were ruled out, what is still unknown, and what would help.",
+          when: {
+            node: "test",
+            status: "blocked"
+          }
+        },
+        {
+          id: "approve-fix",
+          title: "Your sign-off on the fix",
+          depends_on: [
+            "test"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Check the cause and the proposed fix before anything changes."
+        },
+        {
+          id: "apply",
+          title: "Apply the fix",
+          depends_on: [
+            "approve-fix"
+          ],
+          body: "Apply the agreed fix and confirm the problem has stopped."
+        },
+        {
+          id: "review",
+          title: "Write the incident review",
+          depends_on: [
+            "apply"
+          ],
+          body: "Write what happened, why, what fixed it and what stops it happening again, and add a check or test that would have caught it."
+        }
+      ]
+    },
+    {
+      name: "prepare-a-release",
+      title: "Prepare a release",
+      group: "look-after",
+      summary: "Runs every check, writes release notes for people, and publishes after your sign-off.",
+      based_on: "Keep a Changelog; semantic-release",
+      check_steps: [
+        "check-notes"
+      ],
+      nodes: [
+        {
+          id: "checks",
+          title: "Run every check",
+          depends_on: [],
+          body: "Run the full test suite, the build and any release checks. Stop if anything fails."
+        },
+        {
+          id: "notes",
+          title: "Write the release notes",
+          depends_on: [
+            "checks"
+          ],
+          body: "Group the changes since the last release as Added, Changed, Fixed and Removed, written for the people who use the project. Call out anything that breaks or needs action."
+        },
+        {
+          id: "check-notes",
+          title: "Check the notes against the changes",
+          depends_on: [
+            "notes"
+          ],
+          body: "Check every merged change is in the notes and every note matches a change."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off on the release",
+          depends_on: [
+            "check-notes"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        },
+        {
+          id: "publish",
+          title: "Tag and publish",
+          depends_on: [
+            "approve"
+          ],
+          body: "Tag the version and publish the release with its notes."
+        }
+      ]
+    },
+    {
+      name: "research-report",
+      title: "Research report",
+      group: "research-writing",
+      summary: "You agree the outline; three sections are researched side by side; then a draft is revised.",
+      based_on: "GPT Researcher; Looper's research-synthesis; STORM",
+      check_steps: [
+        "check"
+      ],
+      nodes: [
+        {
+          id: "outline",
+          title: "Plan the outline",
+          depends_on: [],
+          body: "Write the question, who the report is for, and an outline of three sections."
+        },
+        {
+          id: "approve-outline",
+          title: "Your sign-off on the outline",
+          depends_on: [
+            "outline"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Check the question and the three sections."
+        },
+        {
+          id: "section-1",
+          title: "Research section 1",
+          depends_on: [
+            "approve-outline"
+          ],
+          body: "Research the first section of the outline from first-hand sources. Note where every claim comes from."
+        },
+        {
+          id: "section-2",
+          title: "Research section 2",
+          depends_on: [
+            "approve-outline"
+          ],
+          body: "Research the second section of the outline from first-hand sources. Note where every claim comes from."
+        },
+        {
+          id: "section-3",
+          title: "Research section 3",
+          depends_on: [
+            "approve-outline"
+          ],
+          body: "Research the third section of the outline from first-hand sources. Note where every claim comes from."
+        },
+        {
+          id: "revise",
+          title: "Write and revise the report",
+          depends_on: [
+            "section-1",
+            "section-2",
+            "section-3"
+          ],
+          body: "Write the report from the three sections, review it against the question and the outline, and revise it. Finish the round as done when every claim has a source and the question is answered; otherwise finish it as stuck with what is missing, and the next round carries on from there.",
+          loop: {
+            max_iterations: 3,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "check",
+          title: "Check the claims against their sources",
+          depends_on: [
+            "revise"
+          ],
+          body: "Check every claim against its source and list any that the source doesn't support."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "check"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "draft-critique-refine",
+      title: "Draft, critique, refine",
+      group: "research-writing",
+      summary: "A first draft, then critique-and-refine rounds until it meets the brief: posts, docs, emails.",
+      based_on: "Self-Refine; Anthropic's evaluator-optimizer",
+      check_steps: [
+        "check"
+      ],
+      nodes: [
+        {
+          id: "draft",
+          title: "Write the first draft",
+          depends_on: [],
+          body: "Write a first draft from the brief: who it is for, what it must do, and how long it should be."
+        },
+        {
+          id: "refine",
+          title: "Critique and refine",
+          depends_on: [
+            "draft"
+          ],
+          body: "Critique the draft against the brief (clarity, accuracy, length, tone), then rewrite it. Finish the round as done when it meets the brief; otherwise finish it as stuck with what is still weak, and the next round carries on from there.",
+          loop: {
+            max_iterations: 5,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "check",
+          title: "Read it fresh",
+          depends_on: [
+            "refine"
+          ],
+          body: "Read the latest draft against the brief without the earlier versions, and list anything that still falls short."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "check"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "challenge-a-plan",
+      title: "Challenge a plan",
+      group: "research-writing",
+      summary: "Two critics side by side, what could fail and what it costs, then the plan is revised.",
+      based_on: "GitHub Next Adversarial PM; pre-mortems; Anthropic's voting",
+      check_steps: [
+        "failure",
+        "cost"
+      ],
+      nodes: [
+        {
+          id: "write-up",
+          title: "Write up the plan",
+          depends_on: [],
+          body: "Write the plan on one page: the goal, the steps, the cost and the timeline."
+        },
+        {
+          id: "failure",
+          title: "What could fail",
+          depends_on: [
+            "write-up"
+          ],
+          body: "Imagine the plan failed a year from now. List the most likely reasons, most likely first."
+        },
+        {
+          id: "cost",
+          title: "Cost and reversibility",
+          depends_on: [
+            "write-up"
+          ],
+          body: "List what the plan costs in money, time and attention, and how hard each part would be to undo."
+        },
+        {
+          id: "revise",
+          title: "Revise the plan",
+          depends_on: [
+            "failure",
+            "cost"
+          ],
+          body: "Revise the plan to deal with the most serious risks and costs, and say what changed and what was accepted. Finish the round as done when every serious point is dealt with; otherwise finish it as stuck with what is open, and the next round carries on from there.",
+          loop: {
+            max_iterations: 3,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "revise"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "fact-check-a-draft",
+      title: "Fact-check a draft",
+      group: "research-writing",
+      summary: "Lists every claim, checks each against sources without the draft's wording, then corrects it.",
+      based_on: "Chain-of-Verification; Loki",
+      check_steps: [
+        "claims",
+        "verify"
+      ],
+      nodes: [
+        {
+          id: "claims",
+          title: "List the claims to check",
+          depends_on: [],
+          body: "List every factual claim in the draft: names, numbers, dates and quotes."
+        },
+        {
+          id: "verify",
+          title: "Check each claim",
+          depends_on: [
+            "claims"
+          ],
+          body: "Check each claim on its own against original sources, without reading the draft's wording, and note its source or that it failed."
+        },
+        {
+          id: "correct",
+          title: "Correct the draft",
+          depends_on: [
+            "verify"
+          ],
+          body: "Fix or cut every claim that failed, add the sources, and recheck the changed lines. Finish the round as done when every claim checks out; otherwise finish it as stuck with the claims still open, and the next round carries on from there.",
+          loop: {
+            max_iterations: 3,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "correct"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    },
+    {
+      name: "make-a-decision",
+      title: "Make a decision",
+      group: "research-writing",
+      summary: "Makes the case for each option side by side, compares them against what matters, then you decide.",
+      based_on: "MADR decision records; L-MAD; the opponent-processor pattern",
+      check_steps: [
+        "compare"
+      ],
+      nodes: [
+        {
+          id: "frame",
+          title: "Frame the decision",
+          depends_on: [],
+          body: "Write the question, the options and what matters most: cost, risk, time and how easy it is to undo."
+        },
+        {
+          id: "case-a",
+          title: "Make the case for option A",
+          depends_on: [
+            "frame"
+          ],
+          body: "Make the strongest honest case for option A, with evidence, and name its biggest weakness."
+        },
+        {
+          id: "case-b",
+          title: "Make the case for option B",
+          depends_on: [
+            "frame"
+          ],
+          body: "Make the strongest honest case for option B, with evidence, and name its biggest weakness."
+        },
+        {
+          id: "case-c",
+          title: "Make the case for option C",
+          depends_on: [
+            "frame"
+          ],
+          body: "Make the strongest honest case for option C, with evidence, and name its biggest weakness."
+        },
+        {
+          id: "compare",
+          title: "Compare the options",
+          depends_on: [
+            "case-a",
+            "case-b",
+            "case-c"
+          ],
+          body: "Score each option against what matters and give the strongest argument against the leading one. Don't judge by how well a case is written."
+        },
+        {
+          id: "decide",
+          title: "Your decision",
+          depends_on: [
+            "compare"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Choose an option, or send it back with a question."
+        },
+        {
+          id: "record",
+          title: "Write the decision record",
+          depends_on: [
+            "decide"
+          ],
+          body: "Record the decision, the options considered, why, and the consequences, in the project's decision log."
+        }
+      ]
+    },
+    {
+      name: "feedback-to-themes",
+      title: "Turn feedback into themes",
+      group: "research-writing",
+      summary: "Groups feedback into named themes, checks them on a sample, and turns the top ones into tasks.",
+      based_on: "TopicGPT; GitHub Next Discussion Task Miner",
+      check_steps: [
+        "sample-check"
+      ],
+      nodes: [
+        {
+          id: "gather",
+          title: "Gather the feedback",
+          depends_on: [],
+          body: "Collect the feedback (issues, reviews, support messages, survey answers) and note where each piece came from."
+        },
+        {
+          id: "themes",
+          title: "Group it into themes",
+          depends_on: [
+            "gather"
+          ],
+          body: "Name each theme in plain words with a short description and two example quotes. Merge themes that overlap."
+        },
+        {
+          id: "sample-check",
+          title: "Check the themes on a sample",
+          depends_on: [
+            "themes"
+          ],
+          body: "Take 20 pieces of feedback at random and check each fits a theme; fix the themes where they don't. Finish the round as done when they all fit; otherwise finish it as stuck with the ones that don't, and the next round carries on from there.",
+          loop: {
+            max_iterations: 3,
+            until: {
+              status: "done"
+            }
+          }
+        },
+        {
+          id: "tasks",
+          title: "Turn the top themes into tasks",
+          depends_on: [
+            "sample-check"
+          ],
+          body: "Turn the three biggest themes into tasks, each with the evidence behind it."
+        },
+        {
+          id: "approve",
+          title: "Your sign-off",
+          depends_on: [
+            "tasks"
+          ],
+          kind: "gate",
+          human_gate: true,
+          body: "Read what was done and the evidence before saying yes."
+        }
+      ]
+    }
+  ]
+};
+
 // hermes_dockyard_plugin/desktop/src/project/workflow-design/start-dialog.js
 var WAYS = Object.freeze([
   { way: "blank", title: "Start blank", text: "An empty workflow with one step." },
-  { way: "template", title: "Use a template", text: "Start from a workflow saved for every project." },
+  { way: "template", title: "Use a template", text: "Start from one of 30 built-in templates, or one saved in your library." },
   { way: "import", title: "Import", text: "Paste a workflow, or choose a file." },
   { way: "ai", title: "Describe it to the AI", text: "Say what you want. The AI explains its plan and drafts the steps." }
+]);
+var SCOPES = Object.freeze([
+  { scope: "project", title: "This project", text: "Only this project uses it. It opens on the canvas, ready to build." },
+  { scope: "global", title: "Global", text: "Every project can use it, once turned on there. It is kept on the Workflows tab." }
 ]);
 var AI_EXAMPLES = Object.freeze(["Fix a bug until the tests pass", "Prepare a weekly release", "Research a topic and write a summary"]);
 function NameField({ value, onChange, error }) {
@@ -15887,11 +17989,54 @@ async function readFileText(file) {
     r.readAsText(file);
   });
 }
-function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }) {
-  const [way, setWay] = useState("choose");
+function builtinNodes(template, whoWorks, whoChecks) {
+  const checks = new Set(template.check_steps ?? []);
+  return template.nodes.map((n) => {
+    if (n.kind === "gate" || n.human_gate) return { ...n };
+    const who = checks.has(n.id) ? whoChecks : whoWorks;
+    return who ? { ...n, phase_team: who } : { ...n };
+  });
+}
+function TemplateDetail({ pick, members, whoWorks, whoChecks, onWorks, onChecks }) {
+  const t = pick.item;
+  if (pick.source === "library") return jsxs("div", { className: "dy-wfd-tpl-detail", "data-wfd-template-detail": t.name, children: [
+    jsx("strong", { children: t.name }),
+    jsx(StepsPreview, { nodes: t.definition?.nodes ?? [] })
+  ] });
+  const checks = new Set(t.check_steps);
+  const roleOf = (n) => checks.has(n.id) ? "checker" : "worker";
+  const choose = (label, value, onChange, attr) => jsxs("label", { children: [
+    jsx("span", { children: label }),
+    jsx("select", { value, [attr]: true, onChange: (e) => onChange(e.target.value), children: [jsx("option", { value: "", children: "Decide later" }, ""), ...members.map((m) => jsx("option", { value: m, children: m }, m))] })
+  ] });
+  const same = Boolean(whoWorks) && whoWorks === whoChecks && checks.size > 0;
+  return jsxs("div", { className: "dy-wfd-tpl-detail", "data-wfd-template-detail": t.name, children: [
+    jsxs("div", { className: "dy-wfd-tpl-detail-head", children: [jsx("strong", { children: t.title }), jsx("span", { children: t.summary })] }),
+    jsx(StepsPreview, { nodes: t.nodes, roleOf }),
+    jsx("span", { className: "dy-wfd-based-on", "data-wfd-based-on": true, children: `Based on ${t.based_on}.` }),
+    jsxs("div", { className: "dy-wfd-row", children: [
+      choose("Who does the work?", whoWorks, onWorks, "data-wfd-who-works"),
+      checks.size ? choose("Who checks it?", whoChecks, onChecks, "data-wfd-who-checks") : null
+    ] }),
+    same ? jsx("span", { className: "dy-wfd-warning", role: "status", "data-wfd-same-bot": true, children: `${whoWorks} checks its own work here. A different checker catches more, so pick another bot if you can.` }) : null
+  ] });
+}
+function ScopeLine({ scope, project, disabled, onChange }) {
+  return jsxs("div", { className: "dy-wfd-scope-line", "data-wfd-scope-chosen": scope, children: [
+    jsx("span", { children: "Saving to" }),
+    jsx("strong", { children: scope === "global" ? "Global: every project can use it" : `This project: ${project?.name ?? project?.id ?? ""}` }),
+    jsx(Button, { small: true, action: "wfd-scope-change", disabled, onClick: onChange, children: "Change" })
+  ] });
+}
+function NewWorkflowDialog({ project, taken, templates, members, onCreate, onClose }) {
+  const [scope, setScope] = useState(null);
+  const [way, setWay] = useState("scope");
   const [name, setName] = useState("");
   const [first, setFirst] = useState("Step 1");
   const [template, setTemplate] = useState(null);
+  const [whoWorks, setWhoWorks] = useState("");
+  const [whoChecks, setWhoChecks] = useState("");
+  const [browsing, setBrowsing] = useState(true);
   const [importText, setImportText] = useState("");
   const [imported, setImported] = useState(null);
   const [describe, setDescribe] = useState("");
@@ -15916,6 +18061,11 @@ function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }
     setNameError(null);
     setWayError(null);
   };
+  const takenNames = scope && taken?.[scope] || [];
+  const pickScope = (next) => {
+    setScope(next);
+    go("choose");
+  };
   const checkName = () => {
     const clean = name.trim();
     const problem = !clean ? "Give the workflow a name." : takenNames.includes(clean) ? `"${clean}" already exists. Pick another name.` : null;
@@ -15924,7 +18074,7 @@ function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }
   };
   const nodesNow = () => {
     if (way === "blank") return first.trim() ? [{ id: "step-1", title: first.trim(), depends_on: [], human_gate: false, kind: "task" }] : null;
-    if (way === "template") return template?.definition?.nodes ?? null;
+    if (way === "template") return !template ? null : template.source === "library" ? template.item.definition?.nodes ?? null : builtinNodes(template.item, whoWorks, whoChecks);
     if (way === "import") return imported && imported.kind !== "invalid" ? imported.nodes : null;
     if (way === "ai") return aiDraft?.nodes ?? null;
     return null;
@@ -15933,6 +18083,10 @@ function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }
     const missing = way === "template" && !template ? "Pick a template first." : way === "import" && !(imported && imported.kind !== "invalid") ? imported ? "This text cannot be imported. Fix it, or describe it to the AI instead." : "Press Check it first." : way === "ai" && !aiDraft ? "Press Draft it first." : null;
     setWayError(missing);
     if (missing) return;
+    if (!taken?.[scope]) {
+      setWayError("Still checking which names are in use. Try again in a moment.");
+      return;
+    }
     if (way === "blank" && !first.trim()) setStepError("Name the first step.");
     else setStepError(null);
     const clean = checkName();
@@ -15941,16 +18095,18 @@ function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }
     setBusy(true);
     setServerError(null);
     try {
-      await onCreate({ name: clean, nodes, checks: way === "ai" ? aiDraft.checks : null, conversation: way === "ai" ? { describe: describe.trim(), plan: aiDraft } : null });
+      await onCreate({ scope, name: clean, nodes, checks: way === "ai" ? aiDraft.checks : null, conversation: way === "ai" ? { describe: describe.trim(), plan: aiDraft } : null });
     } catch (failure) {
       setServerError(`Couldn't create it: ${String(failure?.message ?? failure).replace(/^\d{3}:\s*/, "")}`);
       setBusy(false);
     }
   };
-  const pickTemplate = (t) => {
-    setTemplate(t);
-    setName(uniqueName(t.name, takenNames));
+  const pickTemplate = (pick) => {
+    setTemplate(pick);
+    setName(uniqueName(pick.item.name, takenNames));
     setNameError(null);
+    setWayError(null);
+    setBrowsing(false);
   };
   const check = (text2) => {
     const result = readImport(text2);
@@ -15969,6 +18125,13 @@ function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }
     setName(uniqueName(result.name, takenNames));
   };
   const body = () => {
+    if (way === "scope") return jsx("div", { className: "dy-wfd-ways dy-wfd-scopes", role: "group", "aria-label": "Where it lives", children: SCOPES.map((s) => {
+      const off = s.scope === "project" && !project;
+      return jsxs("button", { type: "button", "data-wfd-scope": s.scope, disabled: off, onClick: () => pickScope(s.scope), children: [
+        jsxs("strong", { children: [s.title, s.scope === "project" && project ? jsx("span", { className: "dy-wfd-scope-name", children: project.name ?? project.id }) : null] }),
+        jsx("span", { children: off ? "Pick a project in the switcher first." : s.text })
+      ] }, s.scope);
+    }) });
     if (way === "choose") return jsx("div", { className: "dy-wfd-ways", children: WAYS.map((w) => jsxs("button", { type: "button", "data-wfd-way": w.way, onClick: () => go(w.way), children: [
       jsxs("strong", { children: [w.title, w.way === "ai" ? jsx(PreviewTag, { children: "Practice AI" }) : null] }),
       jsx("span", { children: w.text })
@@ -15981,10 +18144,11 @@ function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }
         stepError ? jsx("span", { className: "dy-wfd-error", "data-wfd-step-error": true, children: stepError }) : null
       ] })
     ] });
-    if (way === "template") return jsxs("div", { className: "dy-wfd-way-body", children: [
-      jsx(TemplateList, { templates, value: template?.name, onPick: pickTemplate }),
-      template ? jsx(NameField, { value: name, onChange: setName, error: nameError }) : null
-    ] });
+    if (way === "template") return template && !browsing ? jsxs("div", { className: "dy-wfd-way-body", children: [
+      jsx("div", { children: jsx(Button, { small: true, action: "wfd-template-change", onClick: () => setBrowsing(true), children: "\u2190 All templates" }) }),
+      jsx(TemplateDetail, { pick: template, members, whoWorks, whoChecks, onWorks: setWhoWorks, onChecks: setWhoChecks }),
+      jsx(NameField, { value: name, onChange: setName, error: nameError })
+    ] }, "picked") : jsx("div", { className: "dy-wfd-way-body", children: jsx(TemplatePicker, { builtins: builtin_templates_default.templates, groups: builtin_templates_default.groups, saved: templates, value: template, onPick: pickTemplate }) }, "browse");
     if (way === "import") return jsxs("div", { className: "dy-wfd-way-body", children: [
       jsxs("label", { className: "dy-wfd-field", children: [
         jsx("span", { children: "Paste the workflow" }),
@@ -16022,7 +18186,8 @@ function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }
       aiDraft ? jsx(NameField, { value: name, onChange: setName, error: nameError }) : null
     ] });
   };
-  const heading = way === "choose" ? "How do you want to start?" : WAYS.find((w) => w.way === way).title;
+  const heading = way === "scope" ? "Where should it live?" : way === "choose" ? "How do you want to start?" : WAYS.find((w) => w.way === way).title;
+  const atStart = way === "scope" || way === "choose";
   return jsx("section", { className: "dockyard-modal-layer", "data-wfd-new-dialog": way, onClick: (event) => {
     if (event.target === event.currentTarget && !busy) onClose();
   }, children: jsxs("div", { className: "dockyard-modal dy-wfd-modal dy-wfd-new", role: "dialog", "aria-modal": true, "aria-labelledby": "wfd-new-title", children: [
@@ -16030,13 +18195,14 @@ function NewWorkflowDialog({ takenNames, templates, members, onCreate, onClose }
       jsxs("div", { children: [jsx("h2", { id: "wfd-new-title", children: "New workflow" }), jsx("p", { children: heading })] }),
       jsx(Button, { small: true, action: "wfd-new-close", ariaLabel: "Close", disabled: busy, onClick: onClose, children: "\xD7" })
     ] }),
+    way === "scope" ? null : jsx(ScopeLine, { scope, project, disabled: busy, onChange: () => go("scope") }),
     body(),
     serverError ? jsx("p", { className: "dy-wfd-error", role: "alert", "data-wfd-create-error": true, children: serverError }) : null,
     wayError ? jsx("p", { className: "dy-wfd-error", role: "alert", "data-wfd-way-error": true, children: wayError }) : null,
-    way === "choose" ? null : jsx("p", { className: "dockyard-meta", children: "Nothing is saved until you press Create workflow." }),
+    atStart ? null : jsx("p", { className: "dockyard-meta", children: "Nothing is saved until you press Create workflow." }),
     jsxs("div", { className: "dockyard-modal-actions", children: [
-      way === "choose" ? jsx(Button, { action: "wfd-new-cancel", onClick: onClose, children: "Cancel" }) : jsx(Button, { action: "wfd-new-back", disabled: busy, onClick: () => go("choose"), children: "\u2190 All ways in" }),
-      way === "choose" ? null : jsx(Button, { action: "wfd-create", variant: "primary", disabled: busy, onClick: create, children: busy ? "Creating\u2026" : "Create workflow" })
+      atStart ? jsx(Button, { action: "wfd-new-cancel", onClick: onClose, children: "Cancel" }) : jsx(Button, { action: "wfd-new-back", disabled: busy, onClick: () => go("choose"), children: "\u2190 All ways in" }),
+      atStart ? null : jsx(Button, { action: "wfd-create", variant: "primary", disabled: busy, onClick: create, children: busy ? "Creating\u2026" : "Create workflow" })
     ] })
   ] }) });
 }
@@ -16051,10 +18217,14 @@ function createdConversation(workflowName, { describe, plan }) {
   return [
     aiEntry({ role: "user", text: describe }),
     aiEntry({ role: "ai", plan, did: plan.did ?? [] }),
-    aiEntry({ role: "ai", reply: [`Created "${workflowName}". Ask me for changes here: you see them on the canvas, and nothing is saved until you press Save version.`] })
+    aiEntry({ role: "ai", reply: [`Created "${workflowName}". Ask me about it or for changes here: I suggest each change first, and nothing changes until you press Apply.`] })
   ];
 }
 var settleConversation = (thread, how) => thread.map((entry) => entry.before && !entry.undone && !entry.settled ? { ...entry, settled: how } : entry);
+function shownStatus(suggestion, nodes) {
+  const open = suggestion.status === "pending" || suggestion.status === "parked";
+  return open && !sameSteps(suggestion.base, nodes) ? "stale" : suggestion.status;
+}
 var pinnedNow = false;
 var readAiPinned = () => pinnedNow;
 function writeAiPinned(pinned) {
@@ -16064,6 +18234,29 @@ var TOGGLE = '[data-action="wfd-ask-ai"]';
 var focusToggle = () => {
   window.setTimeout(() => document.querySelector(TOGGLE)?.focus(), 0);
 };
+var STATUS_WORDS = {
+  pending: "Nothing changes on the canvas until you press Apply.",
+  parked: "Not applied.",
+  replaced: "Replaced by the suggestion below, which includes these changes.",
+  stale: "The canvas has changed since this suggestion. Ask again for an up-to-date one.",
+  applied: "Applied to the canvas."
+};
+var SETTLED_WORDS = { saved: "Saved.", discarded: "Discarded." };
+function SuggestionCard({ entry, status, onApply, onNotYet, onUndo }) {
+  const s = entry.suggestion;
+  return jsxs("div", { className: `dy-wfd-ai-suggestion is-${status}`, "data-wfd-ai-suggestion": status, children: [
+    jsx("h4", { children: s.kind === "draft" ? "Suggested steps" : "Suggested change" }),
+    entry.did?.length ? jsx("ul", { className: "dy-wfd-ai-changes", "data-wfd-ai-changes": true, children: entry.did.map((d, i) => jsx("li", { children: d }, `${i}-${d}`)) }) : null,
+    s.kind === "change" ? jsxs("details", { children: [jsx("summary", { children: "All the steps after this change" }), jsx(StepsPreview, { nodes: s.nodes })] }) : null,
+    entry.undone ? jsx("p", { className: "dockyard-meta", children: "Undone." }) : entry.settled ? jsx("p", { className: "dockyard-meta", "data-wfd-ai-settled": entry.settled, children: `${STATUS_WORDS.applied} ${SETTLED_WORDS[entry.settled]}` }) : jsx("p", { className: "dockyard-meta", children: STATUS_WORDS[status] }),
+    status === "pending" ? jsxs("div", { className: "dy-wfd-ai-suggestion-actions", children: [
+      jsx(Button, { small: true, variant: "primary", action: "wfd-ai-apply", onClick: onApply, children: "Apply" }),
+      jsx(Button, { small: true, action: "wfd-ai-not-yet", onClick: onNotYet, children: "Not yet" })
+    ] }) : null,
+    status === "parked" ? jsx("div", { className: "dy-wfd-ai-suggestion-actions", children: jsx(Button, { small: true, action: "wfd-ai-apply", onClick: onApply, children: "Apply after all" }) }) : null,
+    status === "applied" && !entry.undone && !entry.settled ? jsx("div", { className: "dy-wfd-ai-suggestion-actions", children: jsx(Button, { small: true, action: "wfd-ai-undo", onClick: onUndo, children: "Undo this change" }) }) : null
+  ] });
+}
 function AiSidebar({ members, nodes, workflowTitle, thread, onThread, pinned, onPin, onApply, onClose, unsaved = false, saveError = null, onSave, onDiscard }) {
   const [text2, setText] = useState("");
   const [error, setError] = useState(null);
@@ -16108,6 +18301,7 @@ function AiSidebar({ members, nodes, workflowTitle, thread, onThread, pinned, on
     return () => window.removeEventListener("keydown", onKey, true);
   }, []);
   const empty = !nodes.length;
+  const live = [...thread].reverse().find((e) => e.suggestion?.status === "pending" && sameSteps(e.suggestion.base, nodes)) ?? null;
   const send = (message = text2) => {
     const clean = message.trim();
     if (!clean) {
@@ -16117,30 +18311,49 @@ function AiSidebar({ members, nodes, workflowTitle, thread, onThread, pinned, on
     setError(null);
     setText("");
     const user = aiEntry({ role: "user", text: clean });
-    if (empty) {
+    const from = live ? live.suggestion.nodes : nodes;
+    let reply = null;
+    if (!from.length && !isQuestion(clean)) {
       const draft = practiceDraft(clean, members);
-      if (draft.error) {
-        onThread((t) => [...t, user, aiEntry({ role: "ai", reply: [draft.error] })]);
-        return;
+      reply = draft.error ? aiEntry({ role: "ai", reply: [draft.error] }) : aiEntry({ role: "ai", plan: draft, did: draft.did, suggestion: { kind: "draft", nodes: draft.nodes, base: nodes, checks: draft.checks, status: "pending" } });
+    } else {
+      const result = from.length ? practiceRevise(from, clean, members) : { unknown: true };
+      if (!result.unknown) {
+        reply = aiEntry({ role: "ai", reply: result.reply, did: [...live?.did ?? [], ...result.did], suggestion: { kind: "change", nodes: result.nodes, base: nodes, checks: live?.suggestion.checks ?? null, status: "pending" } });
+      } else if (isQuestion(clean)) {
+        const told = practiceExplain(nodes, workflowTitle);
+        reply = aiEntry({ role: "ai", reply: told.reply, steps: told.steps, after: told.after });
+      } else {
+        reply = aiEntry({ role: "ai", reply: result.reply ?? practiceRevise([], clean, members).reply });
       }
-      onApply(draft.nodes, { checks: draft.checks });
-      onThread((t) => [...t, user, aiEntry({ role: "ai", plan: draft, did: draft.did, before: nodes })]);
-      return;
     }
-    const result = practiceRevise(nodes, clean, members);
-    if (!result.unknown) onApply(result.nodes, {});
-    onThread((t) => [...t, user, aiEntry({ role: "ai", reply: result.reply, did: result.did, before: result.unknown ? null : nodes })]);
+    const replaced = reply.suggestion && live ? live.id : null;
+    onThread((t) => [...t.map((e) => e.id === replaced ? { ...e, suggestion: { ...e.suggestion, status: "replaced" } } : e), user, reply]);
   };
   const answer = (entry, id, value) => {
-    const plan = answerQuestion({ ...entry.plan, nodes }, id, value);
-    onApply(plan.nodes, {});
-    onThread((t) => t.map((e) => e.id === entry.id ? { ...e, plan } : e));
+    const plan = answerQuestion({ ...entry.plan, nodes: entry.suggestion.nodes }, id, value);
+    onThread((t) => t.map((e) => e.id === entry.id ? { ...e, plan, suggestion: { ...e.suggestion, nodes: plan.nodes } } : e));
   };
+  const apply = (entry) => {
+    if (shownStatus(entry.suggestion, nodes) === "stale") return;
+    onApply(withCurrentPositions(entry.suggestion.nodes, nodes), { checks: entry.suggestion.checks });
+    onThread((t) => t.map((e) => e.id === entry.id ? { ...e, before: nodes, suggestion: { ...e.suggestion, status: "applied" } } : e));
+  };
+  const notYet = (entry) => onThread((t) => t.map((e) => e.id === entry.id ? { ...e, suggestion: { ...e.suggestion, status: "parked" } } : e));
   const undo = (entry) => {
     onApply(entry.before, {});
     onThread((t) => t.map((e) => e.id === entry.id ? { ...e, undone: true } : e));
   };
-  const settledWords = { saved: "Saved.", discarded: "Discarded." };
+  const renderAi = (entry) => {
+    const status = entry.suggestion ? shownStatus(entry.suggestion, nodes) : null;
+    return jsxs("div", { className: `dy-wfd-ai-reply${entry.undone ? " undone" : ""}`, "data-wfd-ai-reply": true, children: [
+      entry.plan ? jsx(AiPlan, { draft: entry.plan, readOnly: status !== "pending", onAnswer: (id, value) => answer(entry, id, value) }) : null,
+      ...(entry.reply ?? []).map((line, i) => jsx("p", { children: line }, `r${i}`)),
+      entry.steps ? jsx(StepsPreview, { nodes: entry.steps }) : null,
+      ...(entry.after ?? []).map((line, i) => jsx("p", { children: line }, `a${i}`)),
+      entry.suggestion ? jsx(SuggestionCard, { entry, status, onApply: () => apply(entry), onNotYet: () => notYet(entry), onUndo: () => undo(entry) }) : entry.did?.length ? jsxs("details", { children: [jsx("summary", { children: "What I changed" }), jsx("ul", { children: entry.did.map((d, i) => jsx("li", { children: d }, `${i}-${d}`)) })] }) : null
+    ] }, entry.id);
+  };
   return jsxs("aside", { ref: panelRef, id: "wfd-ai-sidebar", className: "dy-wfd-ai", "aria-labelledby": "wfd-ai-title", "data-wfd-ai-sidebar": true, "data-pinned": pinned ? "true" : "false", children: [
     jsxs("header", { className: "dy-wfd-ai-head", children: [
       jsxs("div", { children: [
@@ -16155,15 +18368,8 @@ function AiSidebar({ members, nodes, workflowTitle, thread, onThread, pinned, on
     ] }),
     jsx(PracticeAiNote, {}),
     jsxs("div", { className: "dy-wfd-ai-thread", ref: listRef, "aria-live": "polite", children: [
-      thread.length ? null : jsx("p", { className: "dockyard-meta", children: empty ? "Say what the workflow should do. I explain my plan here and draw the steps on the canvas." : `Ask for a change to "${workflowTitle}". You see it on the canvas before anything is saved.` }),
-      ...thread.map((entry) => entry.role === "user" ? jsx("p", { className: "dy-wfd-ai-user", "data-wfd-ai-user": true, children: entry.text }, entry.id) : jsxs("div", { className: `dy-wfd-ai-reply${entry.undone ? " undone" : ""}`, "data-wfd-ai-reply": true, children: [
-        entry.plan ? jsx(AiPlan, { draft: entry.plan, onAnswer: (id, value) => answer(entry, id, value) }) : null,
-        ...(entry.reply ?? []).map((line) => jsx("p", { children: line }, line)),
-        entry.did?.length ? jsxs("details", { children: [jsx("summary", { children: "What I changed" }), jsx("ul", { children: entry.did.map((d) => jsx("li", { children: d }, d)) })] }) : null,
-        entry.before && !entry.undone && !entry.settled ? jsx(Button, { small: true, action: "wfd-ai-undo", onClick: () => undo(entry), children: "Undo this change" }) : null,
-        entry.undone ? jsx("p", { className: "dockyard-meta", children: "Undone." }) : null,
-        entry.settled && !entry.undone ? jsx("p", { className: "dockyard-meta", "data-wfd-ai-settled": entry.settled, children: settledWords[entry.settled] }) : null
-      ] }, entry.id))
+      thread.length ? null : jsx("p", { className: "dockyard-meta", children: empty ? "Say what the workflow should do. I suggest the steps here first; nothing goes on the canvas until you press Apply." : `Ask about "${workflowTitle}" or ask for a change. I suggest each change here first; nothing changes until you press Apply.` }),
+      ...thread.map((entry) => entry.role === "user" ? jsx("p", { className: "dy-wfd-ai-user", "data-wfd-ai-user": true, children: entry.text }, entry.id) : renderAi(entry))
     ] }),
     empty && !thread.length ? jsx("div", { className: "dy-wfd-chips", role: "group", "aria-label": "Examples", children: AI_EXAMPLES.map((example) => jsx("button", { type: "button", "data-wfd-ai-example": example, onClick: () => send(example), children: example }, example)) }) : null,
     // The AI's changes can be kept or dropped from here too: floating, the
@@ -16175,7 +18381,7 @@ function AiSidebar({ members, nodes, workflowTitle, thread, onThread, pinned, on
       saveError ? jsx("p", { className: "dy-wfd-error", role: "alert", children: saveError }) : null
     ] }) : null,
     jsxs("div", { className: "dy-wfd-ai-compose", children: [
-      jsx("textarea", { ref: inputRef, rows: 2, value: text2, "data-wfd-ai-input": true, "aria-label": "Message to the AI", "aria-invalid": error ? "true" : "false", placeholder: empty ? "e.g. Fix a bug until the tests pass" : "e.g. repeat up to 3 times", onChange: (e) => setText(e.target.value), onKeyDown: (e) => {
+      jsx("textarea", { ref: inputRef, rows: 2, value: text2, "data-wfd-ai-input": true, "aria-label": "Message to the AI", "aria-invalid": error ? "true" : "false", placeholder: empty ? "e.g. Fix a bug until the tests pass" : "e.g. what does this do? or: repeat up to 3 times", onChange: (e) => setText(e.target.value), onKeyDown: (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
           send();
@@ -16184,7 +18390,7 @@ function AiSidebar({ members, nodes, workflowTitle, thread, onThread, pinned, on
       jsx(Button, { small: true, variant: "primary", action: "wfd-ai-send", onClick: () => send(), children: "Send" })
     ] }),
     error ? jsx("p", { className: "dy-wfd-error", role: "alert", children: error }) : null,
-    jsx("p", { className: "dockyard-meta", children: "Nothing is saved until you press Save version." })
+    jsx("p", { className: "dockyard-meta", children: "Nothing changes until you press Apply, and nothing is saved until Save version." })
   ] });
 }
 
@@ -16192,9 +18398,10 @@ function AiSidebar({ members, nodes, workflowTitle, thread, onThread, pinned, on
 var NO_RUNS = [];
 var NO_THREAD = [];
 var failureText = (failure) => String(failure?.message ?? failure ?? "unknown error").replace(/^\d{3}:\s*/, "");
-function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary }) {
+function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary, openWorkflow = null, onOpenWorkflowDone }) {
   const canvasRef = useRef(null);
-  const [selected, setSelected] = useState(workflows?.[0]?.name ?? "");
+  const opening = openWorkflow?.project === project.id && openWorkflow.name ? openWorkflow : null;
+  const [selected, setSelected] = useState(opening?.name ?? workflows?.[0]?.name ?? "");
   const [runsFor, setRunsFor] = useState({ workflow: null, runs: NO_RUNS });
   const [error, setError] = useState(null);
   const [mode, setMode] = useState("live");
@@ -16205,6 +18412,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
   const membersRef = useRef([]);
   membersRef.current = members;
   const [templates, setTemplates] = useState(null);
+  const [globalNames, setGlobalNames] = useState(null);
   const [dialog, setDialog] = useState(null);
   const [draft, setDraft] = useState(null);
   const draftRef = useRef(null);
@@ -16214,9 +18422,9 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     setDraft(next);
     return next;
   };
-  const [aiOpen, setAiOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(Boolean(opening?.conversation));
   const [aiPinned, setAiPinned] = useState(() => readAiPinned());
-  const [aiThreads, setAiThreads] = useState({});
+  const [aiThreads, setAiThreads] = useState(() => opening?.conversation ? { [opening.name]: createdConversation(opening.name, opening.conversation) } : {});
   const [repeatAt, setRepeatAt] = useState(null);
   const [draftError, setDraftError] = useState(null);
   const encoded = encodeURIComponent(project.id);
@@ -16350,10 +18558,16 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     api(`/projects/${encoded}/team`).then((result) => {
       if (live) setMembers((result?.members ?? []).filter((m) => m.state === "active").map((m) => m.profile_slug));
     }).catch(() => void 0);
-    api("/workflow-library?scope=global").then((result) => {
-      if (live) setTemplates(result?.workflows ?? []);
+    api("/workflow-library?scope=global&include_archived=true").then((result) => {
+      if (!live) return;
+      const rows = result?.workflows ?? [];
+      setTemplates(rows.filter((row) => !row.archived_at));
+      setGlobalNames(rows.map((row) => row.name));
     }).catch(() => {
-      if (live) setTemplates([]);
+      if (live) {
+        setTemplates([]);
+        setGlobalNames(null);
+      }
     });
     return () => {
       live = false;
@@ -16513,7 +18727,18 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     setValidation(null);
     setDialog("new");
   };
-  const createFromDialog = async ({ name: newName, nodes: newNodes, checks, conversation }) => {
+  useEffect(() => {
+    if (!openWorkflow) return;
+    if (opening?.checks) keepChecks(opening.name, opening.checks);
+    onOpenWorkflowDone?.();
+  }, []);
+  const createFromDialog = async ({ scope, name: newName, nodes: newNodes, checks, conversation }) => {
+    if (scope === "global") {
+      await api("/workflow-library", { method: "POST", body: { scope: "global", name: newName, nodes: newNodes }, quiet: true });
+      setDialog(null);
+      onOpenLibrary?.({ highlight: newName });
+      return;
+    }
     await api(`/projects/${encoded}/workflows`, { method: "POST", body: { name: newName, nodes: newNodes }, quiet: true });
     keepChecks(newName, checks);
     if (conversation) {
@@ -16579,7 +18804,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
       jsx(StatusTag, { tone: latest?.status === "running" ? "info" : "neutral", label: latest ? `Live: ${latest.status}` : `${number(grouped.length)} ${plural2(grouped.length, "workflow")}` }),
       !latest && current && !draft ? jsx("span", { className: "dy-wfd-chip", "data-workflow-no-run": true, children: `${current.name}: no runs yet` }) : null,
       jsx("span", { className: "dy-wfd-grow" }),
-      jsx(Button, { small: true, action: "open-workflow-library", onClick: onOpenLibrary, children: "Open library" }),
+      jsx(Button, { small: true, action: "open-workflow-library", onClick: () => onOpenLibrary?.(), children: "Open library" }),
       jsx(Button, { small: true, variant: "primary", action: "wfd-new-workflow", disabled: Boolean(draft), onClick: startNew, children: "New workflow" })
     ] }),
     error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: error }) : null,
@@ -16673,7 +18898,7 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
         ] }, "canvas") : jsx("p", { className: "dockyard-meta", children: "No workflow selected." })
       ] })
     ] }),
-    dialog === "new" ? jsx(NewWorkflowDialog, { takenNames, templates, members, onCreate: createFromDialog, onClose: () => setDialog(null) }) : null,
+    dialog === "new" ? jsx(NewWorkflowDialog, { project: { id: project.id, name: project.name || project.id }, taken: { project: takenNames, global: globalNames }, templates, members, onCreate: createFromDialog, onClose: () => setDialog(null) }) : null,
     dialog === "settings" ? jsx(WorkflowSettingsDialog, { project: project.id, workflow: standinWorkflow(), title: current?.name ?? "", members, onClose: () => setDialog(null) }) : null,
     repeatNode ? jsx(RepeatPopover, { node: repeatNode, anchor: repeatAt.rect, check: readStepSettings(project.id, standinWorkflow(), repeatAt.nodeId).check, draft: Boolean(draft), onSave: ({ rounds, check }) => saveRepeat(repeatAt.nodeId, { max_iterations: rounds, until: { status: "done" } }, check), onStop: () => saveRepeat(repeatAt.nodeId, null, null), onClose: () => setRepeatAt(null) }, repeatAt.nodeId) : null,
     // The AI chat: a sidebar at the window's edge, outside the canvas.
@@ -20337,7 +22562,7 @@ function RecentActivityCard({ view, onViewAll }) {
 
 // hermes_dockyard_plugin/desktop/src/project/dashboard.js
 var planView = (entry) => parsePlanFocus(entry) || ["objectives", "initiative", "vision"].includes(entry) ? "plan" : entry;
-function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap, onOpenLink }) {
+function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap, onOpenLink, openWorkflow, onOpenWorkflowDone }) {
   const [projectView, setProjectView] = useState(planView(initialView) || "overview");
   const [planFocus, setPlanFocus] = useState(() => parsePlanFocus(initialView));
   const [canvasDirty, setCanvasDirty] = useState(false);
@@ -20451,7 +22676,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   } else if (projectView === "planning") {
     panel = jsx(PlanningCanvasPanel, { project, canvas: view.canvas, content: view.content ?? [], onRefresh, onDirty: onCanvasDirty }, project.id);
   } else if (projectView === "workflows") {
-    panel = jsx(ExecutableWorkflowsPanel, { project, workflows: view.workflows ?? [], onRefresh, onOpenLibrary }, project.id);
+    panel = jsx(ExecutableWorkflowsPanel, { project, workflows: view.workflows ?? [], onRefresh, onOpenLibrary, openWorkflow, onOpenWorkflowDone }, project.id);
   } else if (projectView === "content") {
     panel = jsx(ProjectContentPanel, { project, content: view.content ?? [], onRefresh }, project.id);
   } else if (projectView === "activity") {
@@ -21016,15 +23241,14 @@ function InboxView({ view, onRefresh, focusRef = null, onOpenProject }) {
 }
 
 // hermes_dockyard_plugin/desktop/src/views/workflow-library.js
-function WorkflowLibraryView({ projectId, onOpenBuilder }) {
+function WorkflowLibraryView({ projectId, projectLabel = null, highlight = null, onOpenBuilder }) {
   const [scope, setScope] = useState("all");
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [name, setName] = useState("");
-  const [title, setTitle] = useState("");
-  const [creating, setCreating] = useState(false);
+  const [dialog, setDialog] = useState(null);
+  const [justMade, setJustMade] = useState(highlight);
   const [enablement, setEnablement] = useState({});
   const [refusals, setRefusals] = useState({});
   const load = async () => {
@@ -21047,22 +23271,43 @@ function WorkflowLibraryView({ projectId, onOpenBuilder }) {
     void load();
   }, [scope, projectId]);
   const filtered = (rows ?? []).filter((row) => !search.trim() || row.name.toLowerCase().includes(search.trim().toLowerCase()));
-  const create = async () => {
-    if (!name.trim() || !title.trim()) return;
-    setBusy(true);
+  useEffect(() => {
+    if (justMade && rows) document.querySelector('[data-library-just-created="true"]')?.scrollIntoView({ block: "nearest" });
+  }, [justMade, rows]);
+  const openNew = async () => {
     setError(null);
+    setDialog({ taken: null, templates: null, members: [] });
     try {
-      await api("/workflow-library", { method: "POST", body: { scope: "global", name: name.trim(), nodes: [{ id: "step-1", title: title.trim(), depends_on: [] }] } });
-      setName("");
-      setTitle("");
-      setCreating(false);
-      await load();
-      emitToast("success", "Workflow library updated.");
+      const [all, team] = await Promise.all([
+        api("/workflow-library?include_archived=true"),
+        projectId ? api(`/projects/${encodeURIComponent(projectId)}/team`).catch(() => null) : null
+      ]);
+      const every = all?.workflows ?? [];
+      const names = (keep) => every.filter(keep).map((row) => row.name);
+      setDialog((open) => open && {
+        taken: { global: names((row) => row.scope === "global"), project: projectId ? names((row) => row.scope === "project" && row.owner_project_id === projectId) : [] },
+        templates: every.filter((row) => row.scope === "global" && !row.archived_at),
+        members: (team?.members ?? []).filter((m) => m.state === "active").map((m) => m.profile_slug)
+      });
     } catch (failure) {
-      setError(String(failure?.message ?? failure));
-    } finally {
-      setBusy(false);
+      setDialog(null);
+      setError(`Couldn't open New workflow: ${String(failure?.message ?? failure)}`);
     }
+  };
+  const createNew = async ({ scope: where, name, nodes, checks, conversation }) => {
+    if (where === "global") {
+      await api("/workflow-library", { method: "POST", body: { scope: "global", name, nodes }, quiet: true });
+      setDialog(null);
+      setJustMade(name);
+      setSearch("");
+      if (scope === "project") setScope("all");
+      else await load();
+      emitToast("success", `${name} is saved for every project.`);
+      return;
+    }
+    await api(`/projects/${encodeURIComponent(projectId)}/workflows`, { method: "POST", body: { name, nodes }, quiet: true });
+    setDialog(null);
+    onOpenBuilder?.({ scope: "project", name, owner_project_id: projectId }, { created: true, conversation, checks });
   };
   const act = async (path) => {
     setBusy(true);
@@ -21132,36 +23377,36 @@ function WorkflowLibraryView({ projectId, onOpenBuilder }) {
         jsx(Button, { small: true, action: "library-scope-project", variant: scope === "project" ? "primary" : "", onClick: () => setScope("project"), children: "Project" })
       ] }),
       jsx("input", { "data-library-search": true, "aria-label": "Search workflows", placeholder: "Search workflows", value: search, onChange: (event) => setSearch(event.target.value) }),
-      jsx(Button, { action: "library-create", variant: "primary", disabled: busy, onClick: () => setCreating((open) => !open), children: creating ? "Close" : "New workflow" })
+      jsx(Button, { action: "library-create", variant: "primary", disabled: busy || Boolean(dialog), onClick: openNew, children: "New workflow" })
     ] }),
-    creating ? jsxs("div", { className: "dockyard-wf-library-create", "data-library-create-form": true, children: [
-      jsxs("label", { children: [jsx("span", { children: "Workflow name" }), jsx("input", { "data-library-name": true, value: name, onChange: (event) => setName(event.target.value) })] }),
-      jsxs("label", { children: [jsx("span", { children: "First step title" }), jsx("input", { "data-library-title": true, value: title, onChange: (event) => setTitle(event.target.value) })] }),
-      jsx(Button, { action: "library-create-confirm", variant: "primary", disabled: busy || !name.trim() || !title.trim(), onClick: create, children: "Create global workflow" })
-    ] }) : null,
-    rows === null && !error ? jsx(LoadingState, {}) : rows === null && error ? jsx(ErrorState, { error, onRetry: load }) : filtered.length === 0 ? jsx(EmptyState, { title: "No workflows yet", description: "Create a workflow and project teams can adopt it for autonomous work.", icon: "project" }) : jsxs("div", { className: "dockyard-wf-library-grid", "data-library-rows": true, children: filtered.map((row) => jsxs("article", { className: "dockyard-feature-card", "data-library-row": row.name, "data-library-scope": row.scope, children: [
-      jsxs("header", { children: [
-        jsx("h3", { children: row.name }),
-        jsx(StatusTag, { tone: row.scope === "global" ? "info" : "neutral", label: row.scope === "global" ? "Global" : "Project" })
-      ] }),
-      jsx("p", { className: "dockyard-meta", children: row.owner_project_id ? `Dedicated to ${row.owner_project_id} \xB7 v${row.version}` : `Available to every project \xB7 v${row.version}` }),
-      jsx("p", { className: "dockyard-meta", children: `${number(row.definition?.nodes?.length ?? 0)} nodes` }),
-      row.archived_at ? jsx(Button, { small: true, action: "library-restore", disabled: busy, onClick: () => act(`/workflow-library/${row.scope}/${encodeURIComponent(row.name)}/restore${row.owner_project_id ? `?owner_project_id=${encodeURIComponent(row.owner_project_id)}` : ""}`), children: "Restore" }) : jsxs("div", { className: "dockyard-form-actions", children: [
-        jsx(Button, { small: true, action: "library-open", disabled: busy, onClick: () => onOpenBuilder?.(row), children: "Open builder" }),
-        jsx(Button, { small: true, action: "library-archive", disabled: busy, onClick: () => act(`/workflow-library/${row.scope}/${encodeURIComponent(row.name)}/archive${row.owner_project_id ? `?owner_project_id=${encodeURIComponent(row.owner_project_id)}` : ""}`), children: "Archive" }),
-        jsx(Button, { small: true, action: "library-delete", variant: "danger", disabled: busy, onClick: () => remove(row.scope, row.name, row.owner_project_id), children: "Delete" })
-      ] }),
-      !projectId || row.scope === "project" && row.owner_project_id !== projectId ? jsx("p", { className: "dockyard-meta", "data-wf-enablement-na": `${row.scope}:${row.name}`, children: projectId ? `Only ${row.owner_project_id} can run this workflow.` : "Select a project to turn workflows on or off." }) : jsxs("div", { className: "dockyard-wf-enablement", children: [
-        jsxs("label", { className: "dockyard-switch", children: [
-          jsx("input", { type: "checkbox", role: "switch", "data-wf-enablement": `${row.scope}:${row.name}`, "aria-label": `Turn ${row.name} on for ${projectId}`, checked: Boolean(enablement[`${row.scope}:${row.name}`] ?? row.scope === "project"), "aria-checked": String(Boolean(enablement[`${row.scope}:${row.name}`] ?? row.scope === "project")), disabled: busy, onChange: () => toggle(row.scope, row.name) }),
-          jsx("span", { className: "dockyard-switch-track", "aria-hidden": true }),
-          jsx("span", { className: "dockyard-switch-thumb", "aria-hidden": true })
+    dialog ? jsx(NewWorkflowDialog, { project: projectId ? { id: projectId, name: projectLabel ?? projectId } : null, taken: dialog.taken, templates: dialog.templates, members: dialog.members, onCreate: createNew, onClose: () => setDialog(null) }) : null,
+    rows === null && !error ? jsx(LoadingState, {}) : rows === null && error ? jsx(ErrorState, { error, onRetry: load }) : filtered.length === 0 ? jsx(EmptyState, { title: "No workflows yet", description: "Create a workflow and project teams can adopt it for autonomous work.", icon: "project" }) : jsxs("div", { className: "dockyard-wf-library-grid", "data-library-rows": true, children: filtered.map((row) => {
+      const made = row.scope === "global" && row.name === justMade;
+      return jsxs("article", { className: `dockyard-feature-card${made ? " dy-wf-just-made" : ""}`, "data-library-row": row.name, "data-library-scope": row.scope, "data-library-just-created": made ? "true" : void 0, children: [
+        jsxs("header", { children: [
+          jsx("h3", { children: row.name }),
+          made ? jsx(StatusTag, { tone: "success", label: "Just made" }) : null,
+          jsx(StatusTag, { tone: row.scope === "global" ? "info" : "neutral", label: row.scope === "global" ? "Global" : "Project" })
         ] }),
-        jsx("span", { className: "dockyard-wf-enablement-label", children: row.scope === "global" ? `On for ${projectId} (off by default)` : `On for ${projectId}` }),
-        jsx(Button, { small: true, action: "library-run", data: { "data-wf-run-start": `${row.scope}:${row.name}` }, disabled: busy, onClick: () => start(row.scope, row.name), children: "Start run" })
-      ] }),
-      refusals[`${row.scope}:${row.name}`] ? jsx("p", { className: "dockyard-inline-error", role: "alert", "data-wf-run-refused": `${row.scope}:${row.name}`, children: refusals[`${row.scope}:${row.name}`] }) : null
-    ] }, `${row.scope}:${row.name}:${row.owner_project_id ?? ""}`)) })
+        jsx("p", { className: "dockyard-meta", children: row.owner_project_id ? `Dedicated to ${row.owner_project_id} \xB7 v${row.version}` : `Available to every project \xB7 v${row.version}` }),
+        jsx("p", { className: "dockyard-meta", children: `${number(row.definition?.nodes?.length ?? 0)} nodes` }),
+        row.archived_at ? jsx(Button, { small: true, action: "library-restore", disabled: busy, onClick: () => act(`/workflow-library/${row.scope}/${encodeURIComponent(row.name)}/restore${row.owner_project_id ? `?owner_project_id=${encodeURIComponent(row.owner_project_id)}` : ""}`), children: "Restore" }) : jsxs("div", { className: "dockyard-form-actions", children: [
+          jsx(Button, { small: true, action: "library-open", disabled: busy, onClick: () => onOpenBuilder?.(row), children: "Open builder" }),
+          jsx(Button, { small: true, action: "library-archive", disabled: busy, onClick: () => act(`/workflow-library/${row.scope}/${encodeURIComponent(row.name)}/archive${row.owner_project_id ? `?owner_project_id=${encodeURIComponent(row.owner_project_id)}` : ""}`), children: "Archive" }),
+          jsx(Button, { small: true, action: "library-delete", variant: "danger", disabled: busy, onClick: () => remove(row.scope, row.name, row.owner_project_id), children: "Delete" })
+        ] }),
+        !projectId || row.scope === "project" && row.owner_project_id !== projectId ? jsx("p", { className: "dockyard-meta", "data-wf-enablement-na": `${row.scope}:${row.name}`, children: projectId ? `Only ${row.owner_project_id} can run this workflow.` : "Select a project to turn workflows on or off." }) : jsxs("div", { className: "dockyard-wf-enablement", children: [
+          jsxs("label", { className: "dockyard-switch", children: [
+            jsx("input", { type: "checkbox", role: "switch", "data-wf-enablement": `${row.scope}:${row.name}`, "aria-label": `Turn ${row.name} on for ${projectId}`, checked: Boolean(enablement[`${row.scope}:${row.name}`] ?? row.scope === "project"), "aria-checked": String(Boolean(enablement[`${row.scope}:${row.name}`] ?? row.scope === "project")), disabled: busy, onChange: () => toggle(row.scope, row.name) }),
+            jsx("span", { className: "dockyard-switch-track", "aria-hidden": true }),
+            jsx("span", { className: "dockyard-switch-thumb", "aria-hidden": true })
+          ] }),
+          jsx("span", { className: "dockyard-wf-enablement-label", children: row.scope === "global" ? `On for ${projectId} (off by default)` : `On for ${projectId}` }),
+          jsx(Button, { small: true, action: "library-run", data: { "data-wf-run-start": `${row.scope}:${row.name}` }, disabled: busy, onClick: () => start(row.scope, row.name), children: "Start run" })
+        ] }),
+        refusals[`${row.scope}:${row.name}`] ? jsx("p", { className: "dockyard-inline-error", role: "alert", "data-wf-run-refused": `${row.scope}:${row.name}`, children: refusals[`${row.scope}:${row.name}`] }) : null
+      ] }, `${row.scope}:${row.name}:${row.owner_project_id ?? ""}`);
+    }) })
   ] });
 }
 
@@ -22113,7 +24358,7 @@ function RoadmapView({ initialScope = "all", onOpen, onRefresh }) {
   }, [selection?.node, refreshTick]);
   const projects = data?.projects ?? [];
   const canWrite = data?.can_write === true;
-  const matches = useMemo(() => {
+  const matches2 = useMemo(() => {
     const query = search.trim().toLowerCase();
     return (project) => {
       if (attentionOnly && !project.attention) return false;
@@ -22173,7 +24418,7 @@ function RoadmapView({ initialScope = "all", onOpen, onRefresh }) {
   const rows = [];
   const add = (node, render) => rows.push({ node, render });
   const base = (node) => ({ node, selected: selection?.node === node, onFocusRow: setFocusNode });
-  const visibleProjects = projects.filter(matches);
+  const visibleProjects = projects.filter(matches2);
   for (const project of visibleProjects) {
     const pid = project.id;
     const projectNode = `project:${pid}`;
@@ -22523,6 +24768,8 @@ function DashboardPage({ inboxCss = "" } = {}) {
   const [counts, setCounts] = useState({ approvals: null, notifications: null });
   const [loadScope, setLoadScope] = useState(null);
   const [pendingWorkRef, setPendingWorkRef] = useState(null);
+  const [pendingWorkflow, setPendingWorkflow] = useState(null);
+  const [libraryHighlight, setLibraryHighlight] = useState(null);
   const loadSerial = useRef(0);
   const [dirtyProject, setDirtyProject] = useState(null);
   const [pendingProject, setPendingProject] = useState(null);
@@ -22643,7 +24890,11 @@ function DashboardPage({ inboxCss = "" } = {}) {
   const pendingTabOpts = useRef({});
   const goTab = (next, opts = {}) => {
     if (opts.project) setSelectedProject(opts.project);
-    if (next === "project") setProjectEntryView(opts.entryView ?? "overview");
+    if (next === "project") {
+      setProjectEntryView(opts.entryView ?? "overview");
+      setPendingWorkflow(opts.workflow ?? null);
+    }
+    if (next === "workflows") setLibraryHighlight(opts.highlight ?? null);
     if (next === "roadmap" && opts.roadmapScope) setSelectedProject(opts.roadmapScope === "all" ? ALL_PROJECTS : opts.roadmapScope);
     if (next === "roadmap") showRoadmap(opts.roadmapScope ?? selectedProject);
     if (next === "dashboard") setDashboardHomeVersion((value) => value + 1);
@@ -22798,7 +25049,9 @@ function DashboardPage({ inboxCss = "" } = {}) {
       onSelectProject: selectProject,
       onProjectDirty: markDirty(payload.project?.id ?? null),
       onRefresh: refresh,
-      onOpenLibrary: () => requestTab("workflows"),
+      onOpenLibrary: (opts) => requestTab("workflows", { highlight: opts?.highlight }),
+      openWorkflow: pendingWorkflow,
+      onOpenWorkflowDone: () => setPendingWorkflow(null),
       onOpenRoadmap: () => requestTab("roadmap", { roadmapScope: payload.project?.id }),
       // C1: the header strip's attention drawer opens approvals in the inbox.
       onOpenLink: openDeepLink,
@@ -22821,9 +25074,13 @@ function DashboardPage({ inboxCss = "" } = {}) {
   } else if (tab === "workflows") {
     content = jsx(WorkflowLibraryView, {
       projectId: isAll ? null : selectedProject,
-      onOpenBuilder: (row) => {
+      projectLabel: isAll ? null : scopeLabel,
+      highlight: libraryHighlight,
+      onOpenBuilder: (row, extra = {}) => {
         const owner = row?.owner_project_id;
-        requestTab("project", { entryView: "workflows", project: owner && owner !== selectedProject ? owner : void 0 });
+        if (extra.created) refresh();
+        const workflow = row?.scope === "project" ? { project: owner ?? selectedProject, name: row.name, conversation: extra.conversation ?? null, checks: extra.checks ?? null } : void 0;
+        requestTab("project", { entryView: "workflows", project: owner && owner !== selectedProject ? owner : void 0, workflow });
       }
     }, `workflow-library:${isAll ? "all" : selectedProject ?? "none"}`);
   } else if (tab === "roadmap") {

@@ -32,37 +32,108 @@ export function runOrder(nodes) {
   return out
 }
 
-export function stepNotes(node, nodes) {
+// `roleOf` (optional) names who a step goes to before any bot is picked: a
+// built-in template's steps say "the worker" or "the checker".
+export function stepNotes(node, nodes, roleOf = null) {
   const notes = []
   if (node.human_gate) notes.push('your sign-off')
   if (node.loop) notes.push(`repeats, up to ${node.loop.max_iterations} rounds`)
   if (node.when) notes.push(`only if "${nodes.find((n) => (n.id ?? n.node_id) === node.when.node)?.title ?? node.when.node}" ${node.when.status === 'blocked' ? 'gets stuck' : 'is done'}`)
   if (node.phase_team) notes.push(`done by ${node.phase_team}`)
+  else if (roleOf && !node.human_gate && roleOf(node)) notes.push(`the ${roleOf(node)}`)
   return notes
 }
 
-export function StepsPreview({ nodes }) {
+export function StepsPreview({ nodes, roleOf = null }) {
   const ordered = runOrder(nodes)
   return jsx('ol', { className: 'dy-wfd-steps', 'data-wfd-steps': ordered.length, children: ordered.map((node) => jsxs('li', { children: [
     jsx('strong', { children: node.title }),
-    ...stepNotes(node, nodes).map((note) => jsx('span', { className: 'dy-wfd-step-note', children: note }, note)),
+    ...stepNotes(node, nodes, roleOf).map((note) => jsx('span', { className: 'dy-wfd-step-note', children: note }, note)),
   ] }, node.id ?? node.node_id)) })
 }
 
-export function TemplateList({ templates, value, onPick }) {
-  if (templates === null) return jsx('p', { className: 'dockyard-meta', role: 'status', children: 'Loading templates…' })
-  if (!templates.length) return jsx('p', { className: 'dockyard-meta', 'data-wfd-no-templates': true, children: 'No templates yet. In the library, save a workflow for every project to make it a template.' })
-  return jsx('div', { className: 'dy-wfd-templates', role: 'radiogroup', 'aria-label': 'Templates', children: templates.map((t) => {
-    const nodes = t.definition?.nodes ?? []
+// Use a template: the built-in templates in their groups, then the ones saved
+// in the library. A pick is { source: 'builtin' | 'library', item }.
+const stepCount = (n) => `${n} step${n === 1 ? '' : 's'}`
+const matches = (words, ...fields) => !words || fields.some((f) => String(f ?? '').toLowerCase().includes(words))
+// The templates sit on tabs, one group at a time (Sahil 08/10/2026: tabs, not
+// one long list whose heading changed as it scrolled). Each tab shows its
+// count. Typing searches every tab at once: the tabs then count the matches
+// and none is open; picking a tab ends the search. The panel keeps one height,
+// so the dialog does not jump from tab to tab.
+export function TemplatePicker({ builtins, groups, saved, value, onPick }) {
+  const tabs = [
+    ...groups.map((group) => ({ id: group.id, label: group.tab ?? group.title, title: group.title, items: builtins.filter((t) => t.group === group.id) })),
+    { id: 'library', label: 'Saved', title: 'Saved in your library' },
+  ]
+  const [filter, setFilter] = useState('')
+  const [open, setOpen] = useState(() => (value ? (value.source === 'library' ? 'library' : value.item.group) : tabs[0].id))
+  const words = filter.trim().toLowerCase()
+  const builtinHit = (t) => matches(words, t.title, t.summary, t.based_on, t.name)
+  const savedHit = (t) => matches(words, t.name)
+  const countOf = (tab) => (tab.id === 'library' ? (saved === null ? null : (saved ?? []).filter(savedHit).length) : tab.items.filter(builtinHit).length)
+  const labelOf = (groupId) => tabs.find((tab) => tab.id === groupId)?.label ?? ''
+  const isPicked = (source, name) => value?.source === source && value.item.name === name
+  const current = words ? null : (tabs.find((tab) => tab.id === open) ?? tabs[0])
+  const choose = (id) => { setFilter(''); setOpen(id) }
+  // Arrow keys, Home and End move between tabs (and open them).
+  const onTabKey = (event) => {
+    const buttons = [...event.currentTarget.querySelectorAll('[role="tab"]')]
+    const at = Math.max(0, buttons.indexOf(document.activeElement))
+    const next = { ArrowRight: (at + 1) % tabs.length, ArrowLeft: (at - 1 + tabs.length) % tabs.length, Home: 0, End: tabs.length - 1 }[event.key]
+    if (next === undefined) return
+    event.preventDefault()
+    choose(tabs[next].id)
+    buttons[next]?.focus()
+  }
+  const item = (source, t, withGroup) => {
+    const nodes = source === 'builtin' ? t.nodes : t.definition?.nodes ?? []
+    const where = withGroup ? `${source === 'builtin' ? labelOf(t.group) : 'Saved'} · ` : ''
     return jsxs('button', {
-      type: 'button', role: 'radio', 'aria-checked': value === t.name, 'data-wfd-template': t.name,
-      className: value === t.name ? 'active' : '', onClick: () => onPick(t),
+      type: 'button', role: 'radio', 'aria-checked': isPicked(source, t.name), [source === 'builtin' ? 'data-wfd-builtin' : 'data-wfd-template']: t.name,
+      className: `dy-wfd-tpl-item${isPicked(source, t.name) ? ' active' : ''}`, onClick: () => onPick({ source, item: t }),
       children: [
-        jsxs('span', { className: 'dy-wfd-template-head', children: [jsx('strong', { children: t.name }), jsx('small', { children: `${nodes.length} step${nodes.length === 1 ? '' : 's'}` })] }),
-        jsx('span', { className: 'dy-wfd-template-line', children: runOrder(nodes).map((n) => n.title).join(' → ') }),
+        jsxs('span', { className: 'dy-wfd-template-head', children: [jsx('strong', { children: source === 'builtin' ? t.title : t.name }), jsx('small', { children: `${where}${stepCount(nodes.length)}` })] }),
+        jsx('span', { className: 'dy-wfd-tpl-summary', children: source === 'builtin' ? t.summary : runOrder(nodes).map((n) => n.title).join(' → ') }),
       ],
-    }, t.name)
-  }) })
+    }, `${source}:${t.name}`)
+  }
+  let items = []
+  let note = null
+  if (words) {
+    items = [...builtins.filter(builtinHit).map((t) => item('builtin', t, true)), ...(saved ?? []).filter(savedHit).map((t) => item('library', t, true))]
+    if (!items.length) note = jsx('span', { className: 'dockyard-meta', role: 'status', children: `No templates match "${filter.trim()}".` })
+  } else if (current.id === 'library') {
+    if (saved === null) note = jsx('span', { className: 'dockyard-meta', role: 'status', children: 'Loading saved templates…' })
+    else if (!saved.length) note = jsx('span', { className: 'dockyard-meta', 'data-wfd-no-templates': true, children: 'None saved yet. In the library, save a workflow for every project to make it a template.' })
+    else items = saved.map((t) => item('library', t, false))
+  } else {
+    items = current.items.map((t) => item('builtin', t, false))
+  }
+  return jsxs('div', { className: 'dy-wfd-tpl', children: [
+    jsxs('label', { className: 'dy-wfd-field', children: [
+      jsx('span', { children: 'Find a template' }),
+      jsx('input', { type: 'search', value: filter, 'data-wfd-template-filter': true, placeholder: 'Search all templates, e.g. bug, release, research', onChange: (e) => setFilter(e.target.value) }),
+    ] }),
+    jsx('div', { className: 'dy-wfd-tpl-tabs', role: 'tablist', 'aria-label': 'Template groups', onKeyDown: onTabKey, children: tabs.map((tab, index) => {
+      const selected = current?.id === tab.id
+      const count = countOf(tab)
+      return jsxs('button', {
+        type: 'button', role: 'tab', id: `wfd-tpl-tab-${tab.id}`, title: tab.title, 'data-wfd-template-tab': tab.id,
+        'aria-selected': selected ? 'true' : 'false', 'aria-controls': 'wfd-tpl-panel', tabIndex: selected || (!current && index === 0) ? 0 : -1,
+        className: `dy-wfd-tpl-tab${selected ? ' active' : ''}`, onClick: () => choose(tab.id),
+        children: [jsx('span', { children: tab.label }), jsx('span', { className: 'dy-wfd-tpl-count', children: count === null ? '…' : String(count) })],
+      }, tab.id)
+    }) }),
+    jsxs('div', {
+      id: 'wfd-tpl-panel', className: 'dy-wfd-tpl-panel', 'data-wfd-template-panel': current ? current.id : 'matches',
+      role: current ? 'tabpanel' : 'region', 'aria-labelledby': current ? `wfd-tpl-tab-${current.id}` : undefined, 'aria-label': current ? undefined : `Templates matching ${filter.trim()}`,
+      children: [
+        items.length ? jsx('div', { className: 'dy-wfd-tpl-list', role: 'radiogroup', 'aria-label': current ? current.title : 'Matching templates', children: items }) : null,
+        note,
+      ],
+    }),
+  ] })
 }
 
 export function ImportResult({ result }) {
@@ -82,7 +153,9 @@ export function ImportResult({ result }) {
 }
 
 // The AI's answer: its plan in words, the steps and its questions.
-export function AiPlan({ draft, onAnswer }) {
+// `readOnly`: a plan that is no longer a live suggestion (applied, replaced,
+// or the one a workflow was created from) shows its answers but changes nothing.
+export function AiPlan({ draft, onAnswer, readOnly = false }) {
   return jsxs('div', { className: 'dy-wfd-ai-plan', 'data-wfd-ai-plan': draft.name, children: [
     jsx('h4', { children: "Here's my plan" }),
     jsx('ol', { className: 'dy-wfd-ai-explain', children: draft.explain.map((line) => jsx('li', { children: line }, line)) }),
@@ -91,7 +164,7 @@ export function AiPlan({ draft, onAnswer }) {
     draft.questions.length ? jsx('h4', { children: 'Questions for you' }) : null,
     ...draft.questions.map((q) => jsxs('div', { className: 'dy-wfd-question', role: 'group', 'aria-label': q.text, 'data-wfd-question': q.id, children: [
       jsx('span', { children: q.text }),
-      jsx('span', { className: 'dy-wfd-chips', children: q.options.map((o) => jsx('button', { type: 'button', 'aria-pressed': q.current === o.value, 'data-wfd-answer': `${q.id}:${o.value}`, onClick: () => onAnswer(q.id, o.value), children: o.label }, String(o.value))) }),
+      jsx('span', { className: 'dy-wfd-chips', children: q.options.map((o) => jsx('button', { type: 'button', 'aria-pressed': q.current === o.value, 'data-wfd-answer': `${q.id}:${o.value}`, disabled: readOnly, onClick: () => onAnswer(q.id, o.value), children: o.label }, String(o.value))) }),
     ] }, q.id)),
   ] })
 }

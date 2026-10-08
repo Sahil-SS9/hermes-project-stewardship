@@ -1,11 +1,18 @@
 // The Workflows builder (Sahil's pick, 07/10/2026, HPS-Audit DESIGN-ROUND-WF-R1.md):
-//   - New workflow opens one dialog with the four ways in (blank, template, import, describe
-//     it to the AI); nothing is saved until Create workflow.
+//   - New workflow opens one dialog. It asks first where the workflow lives (this project, or
+//     global: every project can use it; Sahil 08/10/2026), then offers the four ways in (blank,
+//     template, import, describe it to the AI); nothing is saved until Create workflow. The
+//     Workflows tab's New workflow opens the same dialog.
 //   - A step that repeats is drawn inside a dashed frame; the frame holds its repeat settings.
 //   - The AI chat is a sidebar at the window's edge, outside the canvas: unpinned it floats over
 //     the page and tucks away; pinned it stays and the page narrows, so it covers nothing. It
-//     changes the open workflow as unsaved changes (Save version / Discard), each undoable, and
-//     a workflow described to the AI carries that conversation on into the sidebar.
+//     talks first (Sahil, 07/10/2026: suggest, then Apply): a question is answered and a change
+//     comes as a suggestion card, refined by talking, that touches the canvas only on Apply, as
+//     unsaved changes (Save version / Discard), each undoable. A workflow described to the AI
+//     carries that conversation on into the sidebar.
+//   - Use a template shows 30 built-in templates on five tabs, plus a Saved tab (tabs, not one
+//     long list, Sahil 08/10/2026); a built-in asks who does the work and who checks it
+//     (HPS-Audit WORKFLOW-TEMPLATES-RESEARCH.md).
 //   - One click selects a step and a drag moves it; only a double-click (or Enter) opens its
 //     details, and a note on hover says so.
 // Real disposable backend (run-browser-suite.mjs): every save is read back from the API, and
@@ -14,7 +21,7 @@
 import { after, before, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { chromium } from './browser-harness.mjs'
-import { pickProject, rememberedProject, restoreRememberedProject } from './test-support/project-scope.mjs'
+import { ALL_PROJECTS, pickProject, rememberedProject, restoreRememberedProject } from './test-support/project-scope.mjs'
 import { seedWorkflowDesign } from './test-support/workflow-design-seed.mjs'
 
 const BASE = process.env.STEWARD_DESKTOP_URL
@@ -55,6 +62,15 @@ const panelTitle = (page, name) => page.locator(`${canvas(name)} .dy-wf-passport
 const noteOf = (page, name, id) => nodeIn(page, name, id).locator('.dy-wf-sub').textContent()
 const storage = (page) => page.evaluate(() => [...Object.keys(localStorage), ...Object.keys(sessionStorage)].filter((k) => /wf|review|workflow|ai/i.test(k)))
 const sidebar = (page) => page.locator('[data-wfd-ai-sidebar]')
+// New workflow asks where the workflow lives first, then offers the four ways in.
+async function newWorkflow(page, scope = 'project') {
+  await page.locator('[data-action="wfd-new-workflow"]').click()
+  await page.locator('[data-wfd-new-dialog="scope"]').waitFor()
+  await page.locator(`[data-wfd-scope="${scope}"]`).click()
+  await page.locator('[data-wfd-new-dialog="choose"]').waitFor()
+}
+const tabsOf = (page) => page.locator('[role="tablist"] [data-wfd-template-tab]').evaluateAll((els) => els.map((el) => [el.getAttribute('data-wfd-template-tab'), el.getAttribute('aria-selected')]))
+const builtinsShown = (page) => page.locator('[data-wfd-template-panel] [data-wfd-builtin]').evaluateAll((els) => els.map((e) => e.getAttribute('data-wfd-builtin')))
 
 async function withPage(query, body, { viewport = { width: 1440, height: 900 }, open = null } = {}) {
   assert.ok(BASE && API, 'Run via run-browser-suite.mjs')
@@ -100,7 +116,7 @@ test('Builder: the Workflows screen is the picked design, with no review bar and
       assert.ok(await page.locator('[data-wfd-head]').isVisible(), 'the one-row header')
       assert.ok(await page.locator(`${canvas(name)} [data-wf-frame="fix"]`).isVisible(), 'loops shown as a frame')
       await page.locator('[data-action="wfd-new-workflow"]').click()
-      await page.locator('[data-wfd-new-dialog="choose"]').waitFor()
+      await page.locator('[data-wfd-new-dialog="scope"]').waitFor()
       await page.locator('[data-action="wfd-new-cancel"]').click()
     }, { open: name })
   }
@@ -177,13 +193,25 @@ test('Builder: one click selects a step, a drag moves it, and only a double-clic
   }, { open: name })
 })
 
-test('Builder: the New workflow dialog offers four ways in; Start blank says what is missing and creates one step', { timeout: 90000 }, async () => {
+test('Builder: New workflow first asks where it lives (this project or global), then offers four ways in; Start blank says what is missing and creates one step', { timeout: 90000 }, async () => {
   const taken = await full('taken')
   const name = unique('blank')
   await withPage('', async (page) => {
     const before = (await api(`/projects/${PROJECT}/workflows`)).workflows.length
     await page.locator('[data-action="wfd-new-workflow"]').click()
+    // Step one is where it lives; the four ways in wait until that is picked.
+    await page.locator('[data-wfd-new-dialog="scope"]').waitFor()
+    assert.deepEqual(await page.locator('[data-wfd-scope]').evaluateAll((els) => els.map((e) => e.dataset.wfdScope)), ['project', 'global'])
+    assert.equal(await page.locator('[data-wfd-way]').count(), 0, 'no ways in before the scope is picked')
+    assert.match(await page.locator('[data-wfd-scope="project"]').textContent(), /Only this project/)
+    assert.match(await page.locator('[data-wfd-scope="global"]').textContent(), /Every project/)
+    await page.locator('[data-wfd-scope="project"]').click()
     assert.deepEqual(await page.locator('[data-wfd-new-dialog="choose"] [data-wfd-way]').evaluateAll((els) => els.map((e) => e.dataset.wfdWay)), ['blank', 'template', 'import', 'ai'])
+    assert.match(await page.locator('[data-wfd-scope-chosen="project"]').textContent(), /This project/, 'the dialog says where it will be saved')
+    // Change goes back to step one.
+    await page.locator('[data-action="wfd-scope-change"]').click()
+    await page.locator('[data-wfd-new-dialog="scope"]').waitFor()
+    await page.locator('[data-wfd-scope="project"]').click()
     await page.locator('[data-wfd-way="blank"]').click()
     await page.locator('[data-action="wfd-create"]').click()
     assert.equal(await page.locator('[data-wfd-name-error]').textContent(), 'Give the workflow a name.')
@@ -214,7 +242,7 @@ test('Builder: a template, a Dockyard import and an n8n import each create the w
   const n8n = { name: 'Inbox flow', nodes: [{ name: 'Webhook', type: 'n8n-nodes-base.webhook', parameters: {} }, { name: 'Send Email', type: 'n8n-nodes-base.emailSend', parameters: {} }], connections: { Webhook: { main: [[{ node: 'Send Email', type: 'main', index: 0 }]] } } }
   await withPage('', async (page) => {
     const create = async (way, name, prepare) => {
-      await page.locator('[data-action="wfd-new-workflow"]').click()
+      await newWorkflow(page)
       await page.locator(`[data-wfd-way="${way}"]`).click()
       await prepare()
       await page.locator('[data-wfd-name]').fill(name)
@@ -226,6 +254,7 @@ test('Builder: a template, a Dockyard import and an n8n import each create the w
     const tpl = await create('template', fromTemplate, async () => {
       await page.locator('[data-action="wfd-create"]').click()
       assert.equal(await page.locator('[data-wfd-way-error]').textContent(), 'Pick a template first.')
+      await page.locator('[data-wfd-template-tab="library"]').click()
       await page.locator('[data-wfd-template="fix-until-green"]').click()
       assert.match(await page.locator('[data-wfd-name]').inputValue(), /^fix-until-green/)
     })
@@ -261,7 +290,7 @@ test('Builder: the AI way explains, asks and saves only on Create; the AI sideba
   const name = unique('ai')
   await withPage('', async (page) => {
     const before = (await api(`/projects/${PROJECT}/workflows`)).workflows.length
-    await page.locator('[data-action="wfd-new-workflow"]').click()
+    await newWorkflow(page)
     await page.locator('[data-wfd-way="ai"]').click()
     assert.ok(await page.locator('[data-wfd-practice-ai]').isVisible(), 'the practice AI is labelled')
     await page.locator('[data-action="wfd-ai-draft"]').click()
@@ -289,10 +318,15 @@ test('Builder: the AI way explains, asks and saves only on Create; the AI sideba
     await sidebar(page).waitFor()
     assert.equal(await page.locator('[data-wfd-ai-user]').first().textContent(), 'Fix a bug until the tests pass')
     assert.match(await sidebar(page).textContent(), new RegExp(`Created "${name}"`))
+    // The plan it was created from is settled: its answers can no longer change anything.
+    assert.ok(await sidebar(page).locator('[data-wfd-ai-plan] [data-wfd-answer]').first().isDisabled(), 'the plan it was made from is settled')
     await page.locator('[data-wfd-ai-input]').fill('add a step to tell the team')
     await page.locator('[data-action="wfd-ai-send"]').click()
+    await page.locator('[data-wfd-ai-suggestion="pending"]').waitFor()
+    assert.equal(await nodesIn(page, name).count(), 3, 'a suggestion changes nothing until Apply')
+    await page.locator('[data-wfd-ai-suggestion="pending"] [data-action="wfd-ai-apply"]').click()
     await page.locator('[data-wfd-draft-banner]').waitFor()
-    await until(async () => (await nodesIn(page, name).count()) === 4, 'the follow-up is drawn')
+    await until(async () => (await nodesIn(page, name).count()) === 4, 'Apply draws the follow-up')
     assert.equal((await versionsOf(name)).length, 1, 'the follow-up is not saved by itself')
     await page.locator('[data-action="wfd-ai-save"]').click()
     await until(async () => (await versionsOf(name)).length === 2, 'Save version keeps it')
@@ -405,46 +439,283 @@ test('Builder: a frame opens its repeat settings; rounds save as a version and S
   }, { open: name })
 })
 
-test('Builder: Ask AI changes the open workflow on the canvas; Undo, Discard and Save version each do what they say', { timeout: 90000 }, async () => {
-  const name = await full('ask')
+const say = async (page, text) => {
+  await page.locator('[data-wfd-ai-input]').fill(text)
+  await page.locator('[data-action="wfd-ai-send"]').click()
+}
+const card = (page, status) => page.locator(`[data-wfd-ai-suggestion="${status}"]`)
+
+test('Builder: Ask AI talks first: a question gets an answer and changes nothing; a change comes as a suggestion you can refine, and only Apply puts it on the canvas', { timeout: 90000 }, async () => {
+  const name = await full('talk')
+  await withPage('', async (page) => {
+    await page.locator('[data-action="wfd-ask-ai"]').click()
+    await sidebar(page).waitFor()
+    await say(page, 'what does this workflow do?')
+    const answer = page.locator('[data-wfd-ai-reply]').first()
+    await answer.waitFor()
+    assert.match(await answer.textContent(), /has 5 steps/)
+    assert.equal(await answer.locator('[data-wfd-steps]').getAttribute('data-wfd-steps'), '5')
+    assert.match(await answer.textContent(), /repeats, up to 5 rounds/)
+    assert.equal(await page.locator('[data-wfd-ai-suggestion]').count(), 0, 'a question gets an answer, not a change')
+    // A change is suggested, not made.
+    await say(page, 'add a sign-off at the end')
+    await card(page, 'pending').waitFor()
+    assert.deepEqual(await card(page, 'pending').locator('[data-wfd-ai-changes] li').allTextContents(), ['Added a sign-off at the end'])
+    assert.equal(await nodesIn(page, name).count(), 5, 'the canvas is unchanged')
+    assert.equal(await page.locator('[data-wfd-draft-banner]').count(), 0, 'nothing is unsaved yet')
+    // Talking refines it: the newest suggestion carries both changes, the older one says it was replaced.
+    await say(page, 'repeat up to 3 times')
+    await until(async () => (await card(page, 'replaced').count()) === 1, 'the earlier suggestion is replaced')
+    assert.equal(await card(page, 'pending').count(), 1, 'one live suggestion at a time')
+    assert.deepEqual(await card(page, 'pending').locator('[data-wfd-ai-changes] li').allTextContents(), ['Added a sign-off at the end', 'Set "Fix the code" to at most 3 rounds'])
+    assert.equal(await card(page, 'replaced').locator('[data-action="wfd-ai-apply"]').count(), 0, 'a replaced suggestion cannot be applied')
+    assert.equal(await nodesIn(page, name).count(), 5, 'still unchanged')
+    // A request it does not understand changes nothing and leaves the suggestion as it is.
+    await say(page, 'hello')
+    await until(async () => (await page.locator('[data-wfd-ai-reply]').count()) === 4, 'it answers')
+    assert.equal(await card(page, 'pending').count(), 1)
+    assert.equal((await versionsOf(name)).length, 1)
+    // Apply puts it on the canvas as an unsaved change.
+    await card(page, 'pending').locator('[data-action="wfd-ai-apply"]').click()
+    await page.locator('[data-wfd-draft-banner]').waitFor()
+    await until(async () => (await nodesIn(page, name).count()) === 6, 'Apply draws the change')
+    assert.equal(await card(page, 'applied').count(), 1)
+    assert.equal((await versionsOf(name)).length, 1, 'not saved yet')
+    await page.locator('[data-action="wfd-ai-save"]').click()
+    await until(async () => (await versionsOf(name)).length === 2, 'Save version keeps it')
+    const saved = byId(await latest(name))
+    assert.equal(saved.fix.loop.max_iterations, 3)
+    assert.ok(Object.values(saved).some((n) => n.human_gate && n.title === 'Your sign-off' && n.depends_on.includes('merge')), 'the sign-off is at the end')
+    // The server has the version before the page has handled the reply (it marks the chat after the
+    // POST returns), so wait for the note rather than look once.
+    await until(async () => (await page.locator('[data-wfd-ai-settled="saved"]').count()) === 1, 'the chat says it was saved')
+  }, { open: name })
+})
+
+test('Builder: a suggestion can wait (Not yet) and goes stale when the canvas changes; once applied, Undo, Discard and Save version each do what they say', { timeout: 90000 }, async () => {
+  const name = await full('wait')
   await withPage('', async (page) => {
     const first = byId(await latest(name))
-    const send = async (text) => {
-      await page.locator('[data-wfd-ai-input]').fill(text)
-      await page.locator('[data-action="wfd-ai-send"]').click()
-    }
     await page.locator('[data-action="wfd-ask-ai"]').click()
     await sidebar(page).waitFor()
-    await send('add a sign-off at the end')
-    await page.locator('[data-wfd-draft-banner]').waitFor()
-    await until(async () => (await nodesIn(page, name).count()) === 6, 'the change is drawn')
-    assert.equal((await versionsOf(name)).length, 1, 'not saved yet')
-    assert.ok(await page.locator(`[data-workflow-library-item="${name}"]`).isDisabled(), 'the library waits while the change is unsaved')
-    assert.ok(await page.locator('[data-wfd-ai-unsaved]').isVisible(), 'the sidebar offers Save version and Discard')
-    await page.locator('[data-action="wfd-ai-discard"]').click()
-    await until(async () => (await nodesIn(page, name).count()) === 5, 'Discard drops it')
-    assert.equal(await page.locator('[data-wfd-draft-banner]').count(), 0)
-    assert.equal(await page.locator('[data-wfd-ai-unsaved]').count(), 0)
-    assert.equal(await page.locator('[data-wfd-ai-settled="discarded"]').count(), 1, 'the chat says it was discarded')
-    assert.equal(await page.locator('[data-action="wfd-ai-undo"]').count(), 0, 'nothing left to undo')
-    await send('add a step to tell the team')
-    await until(async () => (await nodesIn(page, name).count()) === 6, 'the change is drawn again')
+    // Pinned, so the toolbar stays in reach beside the chat.
+    await page.locator('[data-action="wfd-ai-pin"]').click()
+    await say(page, 'add a step to tell the team')
+    await card(page, 'pending').locator('[data-action="wfd-ai-not-yet"]').click()
+    await card(page, 'parked').waitFor()
+    assert.equal(await nodesIn(page, name).count(), 5, 'Not yet changes nothing')
+    await card(page, 'parked').locator('[data-action="wfd-ai-apply"]').click()
+    await until(async () => (await nodesIn(page, name).count()) === 6, 'it can still be applied later')
+    assert.ok(await page.locator('[data-workflow-library-item="' + name + '"]').isDisabled(), 'the library waits while the change is unsaved')
     await page.locator('[data-action="wfd-ai-undo"]').click()
     await until(async () => (await nodesIn(page, name).count()) === 5, 'Undo takes it back off the canvas')
-    await send('add a step to tell the team')
-    await until(async () => (await nodesIn(page, name).count()) === 6, 'and again')
-    // The toolbar's Save version works too (the floating sidebar covers it, so close it first).
-    await page.locator('[data-action="wfd-ai-close"]').click()
-    await sidebar(page).waitFor({ state: 'detached' })
+    await page.locator('[data-action="wfd-ai-discard"]').click()
+    await until(async () => (await page.locator('[data-wfd-draft-banner]').count()) === 0, 'Discard ends the unsaved changes')
+    assert.equal(await page.locator('[data-wfd-ai-unsaved]').count(), 0)
+    // A suggestion made before the canvas changed is stale: it says so and cannot be applied.
+    await say(page, 'add a sign-off at the end')
+    await card(page, 'pending').waitFor()
+    await page.locator('[data-action="wf-add-step"]').click()
+    await until(async () => (await versionsOf(name)).length === 2, 'the toolbar edit saves a version')
+    await card(page, 'stale').waitFor()
+    assert.equal(await card(page, 'stale').locator('[data-action="wfd-ai-apply"]').count(), 0, 'a stale suggestion cannot be applied')
+    assert.match(await card(page, 'stale').textContent(), /canvas has changed/)
+    // A fresh one applies and saves from the toolbar.
+    await say(page, 'add a step to tell the team')
+    await card(page, 'pending').locator('[data-action="wfd-ai-apply"]').click()
+    await page.locator('[data-wfd-draft-banner]').waitFor()
     await page.locator('[data-action="wfd-draft-save"]').click()
-    await until(async () => (await versionsOf(name)).length === 2, 'Save version saves it')
+    await until(async () => (await versionsOf(name)).length === 3, 'Save version saves it')
     const saved = byId(await latest(name))
-    assert.equal(Object.values(saved).find((n) => !first[n.id])?.title, 'Tell the team')
+    assert.ok(Object.values(saved).some((n) => n.title === 'Tell the team'), 'the applied step is saved')
     for (const id of Object.keys(first)) assert.deepEqual(saved[id], first[id], `${id} untouched`)
-    await page.locator('[data-action="wfd-ask-ai"]').click()
-    await sidebar(page).waitFor()
-    assert.equal(await page.locator('[data-wfd-ai-settled="saved"]').count(), 1, 'the chat says it was saved')
+    // The server has the version before the page has handled the reply (it marks the chat after the
+    // POST returns), so wait for the note rather than look once.
+    await until(async () => (await page.locator('[data-wfd-ai-settled="saved"]').count()) === 1, 'the chat says it was saved')
+    await page.locator('[data-action="wfd-ai-pin"]').click()
   }, { open: name })
+})
+
+test('Builder: Use a template shows 30 built-in templates on five tabs plus a Saved tab; a built-in asks who works and who checks, warns when one bot does both, and creates exactly its steps', { timeout: 120000 }, async () => {
+  const name = unique('builtin')
+  await withPage('', async (page) => {
+    await newWorkflow(page)
+    await page.locator('[data-wfd-way="template"]').click()
+    // Tabs, not one long list (Sahil 08/10/2026): one group at a time, no group heading
+    // scrolling past, and the dialog keeps its size from tab to tab.
+    assert.deepEqual(await tabsOf(page), [['loops', 'true'], ['build-and-fix', 'false'], ['check-quality', 'false'], ['look-after', 'false'], ['research-writing', 'false'], ['library', 'false']])
+    assert.equal(await page.locator('.dy-wfd-tpl h4').count(), 0, 'no group headings in the list')
+    const dialogHeight = async () => Math.round((await page.locator('.dy-wfd-new').boundingBox()).height)
+    const height = await dialogHeight()
+    const seen = new Set()
+    for (const [id, count] of [['loops', 7], ['build-and-fix', 6], ['check-quality', 6], ['look-after', 5], ['research-writing', 6]]) {
+      const tab = page.locator(`[data-wfd-template-tab="${id}"]`)
+      await tab.click()
+      assert.equal(await tab.getAttribute('aria-selected'), 'true', `${id} is the open tab`)
+      const shown = await builtinsShown(page)
+      assert.equal(shown.length, count, `${id} shows its ${count} templates: ${shown}`)
+      assert.match(await tab.textContent(), new RegExp(`${count}$`), `${id} shows its count`)
+      for (const item of shown) seen.add(item)
+      assert.equal(await dialogHeight(), height, `the dialog keeps its size on ${id}`)
+      assert.ok(await page.locator('[data-wfd-template-panel]').evaluate((el) => el.scrollHeight <= el.clientHeight + 1), `${id} fits without scrolling at 1440x900`)
+    }
+    assert.equal(seen.size, 30, 'the five tabs hold the 30 built-ins between them')
+    // Arrow keys move between tabs.
+    await page.locator('[data-wfd-template-tab="loops"]').click()
+    await page.keyboard.press('ArrowRight')
+    assert.equal(await page.locator('[data-wfd-template-tab="build-and-fix"]').getAttribute('aria-selected'), 'true', 'ArrowRight opens the next tab')
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('data-wfd-template-tab')), 'build-and-fix', 'and moves focus to it')
+    await page.locator('[data-wfd-template-tab="library"]').click()
+    const saved = await page.locator('[data-wfd-template-panel="library"] [data-wfd-template]').evaluateAll((els) => els.map((e) => e.getAttribute('data-wfd-template')))
+    for (const seeded of ['fix-until-green', 'release-check', 'weekly-tidy']) assert.ok(saved.includes(seeded), `saved template ${seeded} is on the Saved tab`)
+    assert.equal(await dialogHeight(), height, 'the dialog keeps its size on the Saved tab')
+    // Typing searches every tab at once (title, summary and source); the tabs count the matches.
+    await page.locator('[data-wfd-template-filter]').fill('bisect')
+    assert.deepEqual(await builtinsShown(page), ['find-the-breaking-change'])
+    assert.equal(await page.locator('[data-wfd-template-tab][aria-selected="true"]').count(), 0, 'no tab is open while searching')
+    assert.match(await page.locator('[data-wfd-template-tab="loops"]').textContent(), /1$/, 'the Loops tab counts its match')
+    assert.match(await page.locator('[data-wfd-template-tab="build-and-fix"]').textContent(), /0$/)
+    // A tab ends the search and opens that tab.
+    await page.locator('[data-wfd-template-tab="build-and-fix"]').click()
+    assert.equal(await page.locator('[data-wfd-template-filter]').inputValue(), '')
+    assert.equal((await builtinsShown(page)).length, 6)
+    await page.locator('[data-wfd-builtin="fix-a-reported-bug"]').click()
+    // Picking folds the tabs away, so the steps, the questions and Create fit the window.
+    assert.equal(await page.locator('[data-wfd-builtin]').count(), 0, 'the list folds away after a pick')
+    assert.equal(await page.locator('[data-wfd-template-tab]').count(), 0, 'and so do the tabs')
+    const create = await page.locator('[data-action="wfd-create"]').boundingBox()
+    assert.ok(create && create.y + create.height <= 900, `Create is in view after a pick: ${JSON.stringify(create)}`)
+    await page.locator('[data-action="wfd-template-change"]').click()
+    assert.equal(await page.locator('[data-wfd-template-tab="build-and-fix"]').getAttribute('aria-selected'), 'true', 'All templates opens the tab of the pick')
+    assert.equal(await page.locator('[data-wfd-builtin="fix-a-reported-bug"]').getAttribute('aria-checked'), 'true', 'with the pick marked')
+    await page.locator('[data-wfd-builtin="fix-a-reported-bug"]').click()
+    const detail = page.locator('[data-wfd-template-detail]')
+    assert.equal(await detail.locator('[data-wfd-steps]').getAttribute('data-wfd-steps'), '6')
+    assert.match(await detail.locator('[data-wfd-based-on]').textContent(), /Agentless/)
+    assert.match(await page.locator('[data-wfd-name]').inputValue(), /^fix-a-reported-bug/)
+    // Two questions; the same bot for both gets a warning, and it goes when they differ.
+    await page.locator('[data-wfd-who-works]').selectOption('worker')
+    await page.locator('[data-wfd-who-checks]').selectOption('worker')
+    assert.match(await page.locator('[data-wfd-same-bot]').textContent(), /checks its own work/)
+    await page.locator('[data-wfd-who-checks]').selectOption('reviewer')
+    assert.equal(await page.locator('[data-wfd-same-bot]').count(), 0)
+    await page.locator('[data-wfd-name]').fill(name)
+    await page.locator('[data-action="wfd-create"]').click()
+    await page.locator('[data-wfd-new-dialog]').waitFor({ state: 'detached' })
+    await nodesIn(page, name).first().waitFor()
+    const made = byId(await latest(name))
+    assert.deepEqual(Object.keys(made), ['reproduce', 'locate', 'fix', 'stuck', 'review', 'approve'])
+    assert.deepEqual(Object.fromEntries(Object.values(made).map((n) => [n.id, n.phase_team ?? null])), { reproduce: 'worker', locate: 'worker', fix: 'worker', stuck: 'worker', review: 'reviewer', approve: null })
+    assert.deepEqual(made.fix.loop, { max_iterations: 5, until: { status: 'done' } })
+    assert.deepEqual(made.stuck.when, { node: 'fix', status: 'blocked' })
+    assert.ok(made.approve.human_gate)
+    assert.match(made.fix.body, /Never edit the new test/)
+    // A template with no check step asks only who does the work.
+    await newWorkflow(page)
+    await page.locator('[data-wfd-way="template"]').click()
+    await page.locator('[data-wfd-template-tab="look-after"]').click()
+    await page.locator('[data-wfd-builtin="triage-the-backlog"]').click()
+    assert.equal(await page.locator('[data-wfd-who-works]').count(), 1)
+    assert.equal(await page.locator('[data-wfd-who-checks]').count(), 0)
+    await page.locator('[data-action="wfd-new-close"]').click()
+  })
+})
+
+test('Builder: a global workflow is saved to the library, not to this project, and the Workflows tab shows it; its name is checked against the global ones', { timeout: 90000 }, async () => {
+  const name = unique('global')
+  await withPage('', async (page) => {
+    const projectBefore = (await api(`/projects/${PROJECT}/workflows`)).workflows.length
+    await newWorkflow(page, 'global')
+    assert.match(await page.locator('[data-wfd-scope-chosen="global"]').textContent(), /Global/)
+    await page.locator('[data-wfd-way="blank"]').click()
+    // The library adds a version to a global name that exists, so the dialog refuses it.
+    await page.locator('[data-wfd-name]').fill('fix-until-green')
+    await page.locator('[data-action="wfd-create"]').click()
+    assert.match(await page.locator('[data-wfd-name-error]').textContent(), /already exists/)
+    await page.locator('[data-wfd-name]').fill(name)
+    await page.locator('[data-wfd-first-step]').fill('Plan the launch')
+    await page.locator('[data-action="wfd-create"]').click()
+    await page.locator('[data-wfd-new-dialog]').waitFor({ state: 'detached' })
+    // It lands on the Workflows tab (the library), marked as just made.
+    const row = page.locator(`[data-library-row="${name}"][data-library-scope="global"]`)
+    await row.waitFor()
+    assert.equal(await page.locator('[data-tab="workflows"]').getAttribute('aria-selected'), 'true')
+    assert.equal(await row.getAttribute('data-library-just-created'), 'true')
+    const globals = (await api('/workflow-library?scope=global')).workflows.filter((w) => w.name === name)
+    assert.deepEqual(globals.map((w) => [w.version, w.definition.nodes.map((n) => n.title)]), [[1, ['Plan the launch']]])
+    assert.equal((await api(`/projects/${PROJECT}/workflows`)).workflows.length, projectBefore, 'nothing was added to the project')
+  })
+})
+
+test('Workflows tab: New workflow opens the same dialog (no name-and-first-step form); a project workflow opens on the canvas, a global one stays in the library, and Open builder opens the workflow clicked', { timeout: 150000 }, async () => {
+  const other = await full('libopen')
+  const fromTemplate = unique('libtpl')
+  const blank = unique('libblank')
+  const described = unique('libai')
+  await withPage('', async (page) => {
+    const toLibrary = async () => {
+      await page.locator('[data-tab="workflows"]').click()
+      await page.locator('[data-workflow-library-screen]').waitFor()
+    }
+    const openNew = async (scope) => {
+      await page.locator('[data-action="library-create"]').click()
+      await page.locator('[data-wfd-new-dialog="scope"]').waitFor()
+      assert.equal(await page.locator('[data-library-name], [data-library-title], [data-library-create-form]').count(), 0, 'the old form is gone')
+      await page.locator(`[data-wfd-scope="${scope}"]`).click()
+    }
+    await toLibrary()
+    // Global, from a template: it stays in the library, marked as just made.
+    await openNew('global')
+    await page.locator('[data-wfd-way="template"]').click()
+    await page.locator('[data-wfd-builtin="reach-a-goal"]').click()
+    await page.locator('[data-wfd-name]').fill(fromTemplate)
+    await page.locator('[data-action="wfd-create"]').click()
+    await page.locator('[data-wfd-new-dialog]').waitFor({ state: 'detached' })
+    const row = page.locator(`[data-library-row="${fromTemplate}"][data-library-scope="global"]`)
+    await row.waitFor()
+    assert.equal(await row.getAttribute('data-library-just-created'), 'true')
+    assert.equal(await page.locator('[data-tab="workflows"]').getAttribute('aria-selected'), 'true', 'a global workflow stays in the library')
+    const tpl = (await api('/workflow-library?scope=global')).workflows.find((w) => w.name === fromTemplate)
+    assert.ok(tpl && tpl.definition.nodes.length > 1, 'saved with the template steps')
+    // Project, blank: it opens on the canvas.
+    await openNew('project')
+    await page.locator('[data-wfd-way="blank"]').click()
+    await page.locator('[data-wfd-name]').fill(blank)
+    await page.locator('[data-wfd-first-step]').fill('Draft the plan')
+    await page.locator('[data-action="wfd-create"]').click()
+    await page.locator('[data-wfd-new-dialog]').waitFor({ state: 'detached' })
+    await nodesIn(page, blank).first().waitFor()
+    assert.equal(await page.locator('[data-workflow-library-item].active').getAttribute('data-workflow-library-item'), blank)
+    assert.deepEqual((await latest(blank)).definition.nodes.map((n) => n.title), ['Draft the plan'])
+    // Project, described to the AI: the sidebar carries the conversation on.
+    await toLibrary()
+    await openNew('project')
+    await page.locator('[data-wfd-way="ai"]').click()
+    await page.locator('[data-wfd-ai-example="Fix a bug until the tests pass"]').click()
+    await page.locator('[data-action="wfd-ai-draft"]').click()
+    await page.locator('[data-wfd-ai-plan]').waitFor()
+    await page.locator('[data-wfd-name]').fill(described)
+    await page.locator('[data-action="wfd-create"]').click()
+    await nodesIn(page, described).first().waitFor()
+    await sidebar(page).waitFor()
+    assert.match(await sidebar(page).textContent(), /Fix a bug until the tests pass/, 'the conversation carried on')
+    // Open builder opens the workflow clicked, not the first one.
+    await toLibrary()
+    await page.locator(`[data-library-row="${other}"] [data-action="library-open"]`).click()
+    await nodesIn(page, other).first().waitFor()
+    assert.equal(await page.locator('[data-workflow-library-item].active').getAttribute('data-workflow-library-item'), other)
+    assert.notEqual(await page.locator('[data-workflow-library-item]').first().getAttribute('data-workflow-library-item'), other, 'not the first in the list, so the click decided it')
+    // With no project picked there is no "this project": only Global is open.
+    await toLibrary()
+    await pickProject(page, ALL_PROJECTS)
+    await page.locator('[data-action="library-create"]').click()
+    await page.locator('[data-wfd-new-dialog="scope"]').waitFor()
+    assert.ok(await page.locator('[data-wfd-scope="project"]').isDisabled(), 'This project is off with no project picked')
+    assert.match(await page.locator('[data-wfd-scope="project"]').textContent(), /Pick a project in the switcher first/)
+    assert.ok(await page.locator('[data-wfd-scope="global"]').isEnabled())
+    await page.locator('[data-action="wfd-new-cancel"]').click()
+    await pickProject(page, PROJECT)
+  })
 })
 
 test('Builder: the AI chat is a sidebar outside the canvas; unpinned it floats and tucks away, pinned it stays and the page makes room', { timeout: 90000 }, async () => {

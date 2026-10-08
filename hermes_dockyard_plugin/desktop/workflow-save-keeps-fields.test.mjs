@@ -161,6 +161,7 @@ test('Workflows: New workflow never overwrites an existing workflow, and a new n
     })
     const before = (await versionsOf(name)).length
     await page.locator('[data-action="wfd-new-workflow"]').click()
+    await page.locator('[data-wfd-scope="project"]').click()
     await page.locator('[data-wfd-way="blank"]').click()
     await page.locator('[data-wfd-name]').fill(name)
     await page.locator('[data-wfd-first-step]').fill('Another phase')
