@@ -2421,9 +2421,6 @@ var WORKFLOW_LIBRARY_CSS = `
 .dockyard-wf-library-toolbar { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; flex-wrap: wrap; }
 .dockyard-wf-library-scope { display: flex; gap: 6px; }
 .dockyard-wf-library-toolbar input { flex: 1 1 220px; min-width: 180px; padding: 7px 10px; border: 1px solid var(--dy-border, #87909d); border-radius: 6px; background: var(--dy-surface, #ffffff); color: inherit; }
-.dockyard-wf-library-create { display: flex; align-items: flex-end; gap: 12px; margin: 0 0 16px; padding: 12px; border: 1px solid var(--dy-border, #87909d); border-radius: 8px; flex-wrap: wrap; }
-.dockyard-wf-library-create label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
-.dockyard-wf-library-create input { padding: 7px 10px; border: 1px solid var(--dy-border, #87909d); border-radius: 6px; background: var(--dy-surface, #ffffff); color: inherit; min-width: 200px; }
 .dockyard-wf-library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .dockyard-wf-library-grid article header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .dockyard-wf-library-grid article h3 { margin: 0; font-size: 15px; }

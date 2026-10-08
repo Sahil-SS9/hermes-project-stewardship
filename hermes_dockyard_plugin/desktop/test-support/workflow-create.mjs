@@ -1,10 +1,11 @@
 // Create a workflow the way a person does since the Workflows builder (Sahil's
-// pick, 07/10/2026): New workflow -> Start blank -> name and first step ->
-// Create workflow. The old side form ("Template / instance", "Phase title",
+// pick, 07/10/2026): New workflow -> This project (asked first since
+// 08/10/2026) -> Start blank -> name and first step -> Create workflow. The old side form ("Template / instance", "Phase title",
 // "Run key") went with that pick; Start blank makes the same one-step
 // workflow it did (id step-1, titled with the first step).
 export async function createBlankWorkflow(page, name, firstStep = 'Step 1') {
   await page.locator('[data-action="wfd-new-workflow"]').click()
+  await page.locator('[data-wfd-scope="project"]').click()
   await page.locator('[data-wfd-way="blank"]').click()
   await page.locator('[data-wfd-name]').fill(name)
   await page.locator('[data-wfd-first-step]').fill(firstStep)
