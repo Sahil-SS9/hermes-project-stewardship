@@ -78,3 +78,21 @@ def test_no_requirement_pins_an_exact_version():
                for s in Requirement(spec).specifier)
     ]
     assert exact == [], f"exact pins stop Hermes admitting the plugin (#5): {exact}"
+
+
+def test_verify_bootstrap_installs_the_host_side_yaml_libraries():
+    """R-GATE (3b). The native tests import a Hermes source tree that is not
+    installed, so the test venv needs the packages that tree imports. The
+    minimum supported Hermes imports `yaml` (pyyaml); newer supported revisions
+    also import `ruamel.yaml` (their hermes_yaml.py), and without it those tests
+    error. `hermes verify` must therefore install both, or the release gate
+    only passes where someone installed them by hand."""
+    recipe = json.loads((ROOT / ".hermes" / "environment.json").read_text(encoding="utf-8"))
+    installed = {
+        token
+        for command in recipe["bootstrap"]
+        if command.startswith("uv pip install ")
+        for token in command.split()[3:]
+        if not token.startswith("-") and token != ".venv/bin/python"
+    }
+    assert {"pyyaml", "ruamel.yaml"} <= installed, installed

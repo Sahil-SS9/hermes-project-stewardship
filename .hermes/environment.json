@@ -4,7 +4,7 @@
   "bootstrap": [
     "uv venv .venv --allow-existing",
     "uv sync --locked --extra dev --extra plugin",
-    "uv pip install --python .venv/bin/python pyyaml"
+    "uv pip install --python .venv/bin/python pyyaml ruamel.yaml"
   ],
   "build": [
     "node hermes_dockyard_plugin/desktop/build.mjs",
