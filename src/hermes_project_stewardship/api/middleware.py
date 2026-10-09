@@ -63,6 +63,38 @@ def desktop_proxy_actor(request: Request) -> Optional[str]:
     return request.headers.get(DESKTOP_PROXY_ACTOR_HEADER, "").strip() or None
 
 
+# Owner decision 03/10/2026 (Q2, Rule 5), 3b wave (R-M1/R-M2): the acting
+# identity is bound per request to what a TRUSTED caller vouches for — the
+# bearer principal, or the Desktop proxy's user. Set by
+# DesktopProxyBindingMiddleware around every request so handlers that cannot
+# take a Request parameter still bind; cleared when the request ends.
+_CURRENT_DESKTOP_ACTOR: ContextVar[Optional[str]] = ContextVar(
+    "stewardship_current_desktop_actor", default=None
+)
+
+
+def acting_actor() -> Optional[str]:
+    """The Desktop proxy's vouched user for THIS request, or None."""
+    return _CURRENT_DESKTOP_ACTOR.get()
+
+
+class DesktopProxyBindingMiddleware(BaseHTTPMiddleware):
+    """Bind the Desktop proxy's vouched user for the duration of the request.
+
+    Same propagation pattern BearerAuthMiddleware uses for the principal:
+    set before call_next, visible to every handler, reset after. Trusted
+    input only: the value comes from desktop_proxy_actor(request), never
+    from anything the client sent in a body or query string.
+    """
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        token = _CURRENT_DESKTOP_ACTOR.set(desktop_proxy_actor(request))
+        try:
+            return await call_next(request)
+        finally:
+            _CURRENT_DESKTOP_ACTOR.reset(token)
+
+
 class BearerAuthMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, token: str, principal: str = "rpc-token") -> None:
         super().__init__(app)

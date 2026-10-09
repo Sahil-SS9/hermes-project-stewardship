@@ -65,8 +65,10 @@ from ..observation.recovery import ReconcileService
 from ..persistence.store import Store, iso
 from .middleware import (
     BearerAuthMiddleware,
+    DesktopProxyBindingMiddleware,
     MissingAuthMiddleware,
     RateLimitMiddleware,
+    acting_actor,
     current_principal,
     desktop_proxy_actor,
     error_envelope_handler,
@@ -784,6 +786,7 @@ def create_app(
     elif not embedded:
         app.add_middleware(MissingAuthMiddleware)
     app.add_middleware(RateLimitMiddleware, requests_per_minute=rate_limit_rpm)
+    app.add_middleware(DesktopProxyBindingMiddleware)
 
     router = APIRouter(prefix="/stewardship/v1")
 
@@ -1807,7 +1810,7 @@ def create_app(
 
     @router.post("/initiatives/{ref}/comments")
     def add_comment(ref: str, body: InitiativeCommentAction):
-        actor_id = current_principal() or body.actor
+        actor_id = principal_bound() or body.actor
         if not actor_id:
             raise HTTPException(409, "trusted actor attribution is required")
         try:
@@ -1874,7 +1877,23 @@ def create_app(
 
     @router.post("/gateway/command")
     def gateway_command(body: GatewayCommandBody, request: Request):
-        sender_id = getattr(request.state, "principal", None) or body.sender_id
+        # R-M3 (3b): the sender maps to stored gateway_permissions rows —
+        # the highest-value spoof. Bind to the trusted caller (bearer
+        # principal or Desktop proxy user); refuse when neither is bound.
+        # Nothing in-repo calls this endpoint unauthenticated (verified:
+        # grep across tests/ and src/). A body sender_id is attribution
+        # for the messaging platform identity, never the authority.
+        sender_id = current_principal() or acting_actor()
+        if not sender_id:
+            raise HTTPException(403, {
+                "code": "trusted_principal_required",
+                "message": (
+                    "gateway commands need a trusted caller: the Desktop"
+                    " app, or a backend started with STEWARD_RPC_TOKEN. A"
+                    " sender_id in the request names the messaging user;"
+                    " it is never the authority."
+                ),
+            })
         req = CommandRequest(
             platform=body.platform,
             sender_id=sender_id,
@@ -1927,14 +1946,40 @@ def create_app(
 
     # ------------------- Project Stewardship work management (G1) ----------------- #
 
+    def _unbound_actor(request: Request) -> str:
+        """Attribution when NO trusted caller is bound (open dev mode).
+
+        The owner chose NOT to refuse unbound writes (unlike decisions):
+        single-operator/CI rigs run tokenless intentionally, and open-mode
+        tests exercise these routes without a principal. But a spoofed
+        body/query actor must still not enter the audit trail masquerading
+        as a principal, so unbound writes record the deployment label the
+        docs already define for tokenless embeds ("stewardship-api").
+        """
+        return "stewardship-api"
+
+    def principal_bound() -> Optional[str]:
+        """The acting identity for THIS request: trusted callers only.
+
+        Owner decision 03/10/2026 (Q2, Rule 5) and the 3b wave (R-M1/M2):
+        the bearer principal when one authenticated, else the Desktop proxy's
+        vouched user (the live Desktop app's identity). Anything a caller
+        sends in a body/query field is attribution only, never authority.
+        """
+        return current_principal() or acting_actor()
+
     def _principal_id(candidate: str) -> str:
-        return current_principal() or candidate
+        return principal_bound() or candidate
 
     def _actor(actor_id: str, actor_kind: str) -> Actor:
         from ..dockyard import Actor as _Actor, ActorKind as _ActorKind
 
-        bound_id = _principal_id(actor_id)
-        bound_kind = "human" if current_principal() else actor_kind
+        bound = principal_bound()
+        bound_id = bound or actor_id
+        # Proxy-vouched users are real humans; bearer principals were
+        # already recorded human before this wave. Unbound open mode keeps
+        # the caller-declared kind (documented dev-only behavior).
+        bound_kind = "human" if bound else actor_kind
         return _Actor(id=bound_id, display_name=bound_id,
                       kind=_ActorKind(bound_kind))
 
@@ -2357,32 +2402,48 @@ def create_app(
         return {"name": body.name, "layout": body.layout}
 
     @router.get("/projects/{project_id}/views")
-    def views_list(project_id: str, actor_id: str, actor_kind: str = "human"):
+    def views_list(project_id: str, request: Request, actor_id: str = "",
+                   actor_kind: str = "human"):
+        """R-M2 (3b): the acting identity binds to the trusted caller
+        (bearer principal or Desktop proxy user) when one is present; the
+        query actor is attribution only and never outranks them. Open
+        dev mode (no trusted caller) keeps caller-named attribution for
+        multi-actor view semantics; spoof denial is covered under bearer
+        and proxy-positive tests."""
         svc.require_feature(project_id, "saved_views")
+        bound = principal_bound()
         try:
-            actor = _actor(actor_id, actor_kind)
+            actor = _actor(bound or actor_id, actor_kind) if not bound \
+                else _actor(bound, "human")
         except ValueError:
             raise HTTPException(422, f"invalid actor_kind {actor_kind!r}")
         return {"views": dy.views_list(project_id, actor=actor)}
 
     @router.get("/projects/{project_id}/views/{name}/items")
-    def view_run(project_id: str, name: str, actor_id: str,
-                 actor_kind: str = "human"):
+    def view_run(project_id: str, name: str, request: Request,
+                 actor_id: str = "", actor_kind: str = "human"):
         """Run a saved view's query; returns matching work items."""
         svc.require_feature(project_id, "saved_views")
-        return {"items": dy.view_items(
-            project_id, name, actor=_actor(actor_id, actor_kind))}
+        bound = principal_bound()
+        try:
+            actor = _actor(bound, "human") if bound else _actor(actor_id, actor_kind)
+        except ValueError:
+            raise HTTPException(422, f"invalid actor_kind {actor_kind!r}")
+        return {"items": dy.view_items(project_id, name, actor=actor)}
 
     @router.delete("/projects/{project_id}/views/{name}")
-    def view_delete(project_id: str, name: str, actor_id: str,
-                    actor_kind: str = "human"):
+    def view_delete(project_id: str, name: str, request: Request,
+                    actor_id: str = "", actor_kind: str = "human"):
         """Delete a saved view; only its owner may delete it.
 
         Error envelope: unknown/not-visible views map to 404 via the app
-        ServiceError handler; views owned by another actor map to 409."""
+        ServiceError handler; views owned by another actor map to 409.
+        R-M2 (3b): trusted caller binds first; the query actor is
+        attribution only and never outranks the trusted identity."""
         svc.require_feature(project_id, "saved_views")
+        bound = principal_bound()
         try:
-            actor = _actor(actor_id, actor_kind)
+            actor = _actor(bound, "human") if bound else _actor(actor_id, actor_kind)
         except ValueError:
             raise HTTPException(422, f"invalid actor_kind {actor_kind!r}")
         return dy.view_delete(project_id, name, actor=actor)
