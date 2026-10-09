@@ -43,6 +43,47 @@ def _profile_db_path() -> Path:
     return home / "plugin-data" / "hermes-dockyard" / "dockyard.db"
 
 
+def _root_db_path() -> Path:
+    """The root profile's database: ``<root>/profiles/<name>`` -> ``<root>``.
+
+    Mirrors Hermes' own ``get_default_hermes_root()`` for the standard and Docker
+    layouts, without importing Hermes (the dashboard loads this module too).
+    """
+    home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes").expanduser().resolve()
+    root = home.parent.parent if home.parent.name == "profiles" else home
+    return root / "plugin-data" / "hermes-dockyard" / "dockyard.db"
+
+
+def locate_shared_db() -> Path | None:
+    """Where a bot finds Dockyard's data (checks round 1, pick 1b).
+
+    Dockyard normally runs in the root profile while its bots run in their own
+    profiles. Order: an explicit path; else this profile's copy if it holds
+    projects; else the root profile's copy if it holds projects; else ``None``.
+    An empty copy never wins, so a stray one cannot hide the real data. Opens
+    nothing for writing and creates nothing.
+    """
+    explicit = os.environ.get("STEWARD_DB_PATH") or os.environ.get("DOCKYARD_PLUGIN_DB")
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    for candidate in dict.fromkeys((_profile_db_path(), _root_db_path())):
+        if _populated(candidate):
+            return candidate
+    return None
+
+
+def bot_db_path() -> Path | None:
+    """The database Dockyard's bot tools should name, or ``None`` for the host default.
+
+    Only a redirect to the root profile's copy is returned. In every other case the
+    caller keeps the usual resolution (``resolve_db_path``) with all its checks.
+    """
+    if os.environ.get("STEWARD_DB_PATH") or os.environ.get("DOCKYARD_PLUGIN_DB"):
+        return None
+    shared = locate_shared_db()
+    return shared if shared is not None and shared != _profile_db_path() else None
+
+
 def _inside_git_checkout(path: Path) -> bool:
     return any((parent / ".git").exists() for parent in path.parents)
 

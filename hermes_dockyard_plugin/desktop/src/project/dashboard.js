@@ -14,6 +14,7 @@ import { number } from '../lib/ui.js'
 import { PlanningCanvasPanel } from '../project/canvas.js'
 import { ExecutableWorkflowsPanel } from '../project/workflows.js'
 import { ProjectContentPanel } from '../project/content.js'
+import { ProjectMemoryPanel } from '../project/memory.js'
 import { ProjectSettingsPanel } from '../project/panels.js'
 import { ProjectReportsPanel } from '../project/reports.js'
 import { Fragment } from '../runtime/react.js'
@@ -101,7 +102,7 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
   if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Connect a project before opening the project dashboard.', icon: 'project' })
   const [healthTone, healthLabel] = healthDetails(project.health)
   const views = [
-    ['overview', 'Overview'], ['plan', 'Vision'], ['board', 'Kanban'], ['planning', 'Planning'], ['workflows', 'Workflows'], ['content', 'Content'], ['activity', 'Activity'], ['reports', 'Reports'], ['settings', 'Settings'],
+    ['overview', 'Overview'], ['plan', 'Vision'], ['board', 'Kanban'], ['planning', 'Planning'], ['workflows', 'Workflows'], ['content', 'Content'], ['memory', 'Memory'], ['activity', 'Activity'], ['reports', 'Reports'], ['settings', 'Settings'],
   ]
   // C1: Open on a "Needs attention" item goes to the exact place to act.
   const openAttentionItem = (item) => {
@@ -136,6 +137,10 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
     panel = jsx(ExecutableWorkflowsPanel, { project, workflows: view.workflows ?? [], onRefresh, onOpenLibrary, openWorkflow, onOpenWorkflowDone }, project.id)
   } else if (projectView === 'content') {
     panel = jsx(ProjectContentPanel, { project, content: view.content ?? [], onRefresh }, project.id)
+  } else if (projectView === 'memory') {
+    // Checks round 1 (Sahil 08/10, pick 1b): what this project's bots are
+    // told when they work on it. Loads its own data.
+    panel = jsx(ProjectMemoryPanel, { project }, project.id)
   } else if (projectView === 'activity') {
     // C5 Activity (06/10): real rows instead of raw JSON. Open goes to the
     // same places as the header strip's "Needs attention" drawer.

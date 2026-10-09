@@ -7,9 +7,10 @@ import shlex
 from pathlib import Path
 from typing import Any, Optional
 
+from .bot_context import project_memory_hook
 from .persistence.service import StewardshipService
 from .persistence.store import Store
-from .runtime import mark_hermes_host, open_store
+from .runtime import bot_db_path, mark_hermes_host, open_store
 
 
 class PluginState:
@@ -22,7 +23,10 @@ class PluginState:
     @classmethod
     def services(cls) -> StewardshipService:
         if cls._svc is None:
-            cls._store = open_store(cls.db_path)
+            # A bot in another profile reads Dockyard where it runs (normally the
+            # root profile) instead of opening an empty copy in its own profile
+            # (checks round 1). Otherwise the usual resolution and its checks.
+            cls._store = open_store(cls.db_path if cls.db_path is not None else bot_db_path())
             cls._svc = StewardshipService(cls._store)
             # Review bug 2: the plugin tool path proposes initiatives, so it
             # must raise approval notifications like every other interface.
@@ -252,4 +256,12 @@ def register(runtime: Any) -> dict:
         )
     except AttributeError:
         pass
+
+    # Project memory for bots working on a project (checks round 1, pick 1b).
+    try:
+        runtime.register_hook("pre_llm_call", project_memory_hook)
+    except AttributeError:
+        pass
+    else:
+        registered["hooks"].append("pre_llm_call")
     return registered

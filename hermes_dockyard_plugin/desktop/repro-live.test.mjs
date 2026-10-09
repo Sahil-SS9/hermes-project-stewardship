@@ -1136,7 +1136,8 @@ async function testProjectDashboardScreen() {
   const doc = runtime.dom.window.document;
   assert(doc.querySelector('[data-project-dashboard]'), 'project dashboard screen is missing');
   assert.match(doc.body.textContent, /Checkout reliability rebuild/);
-  assert.equal(doc.querySelectorAll('[data-project-view]').length, 9, 'project dashboard must expose nine supported views (design round f: one Vision tab replaced Objectives and Initiatives)');
+  assert.equal(doc.querySelectorAll('[data-project-view]').length, 10, 'project dashboard must expose ten supported views (design round f: one Vision tab replaced Objectives and Initiatives; checks round 1: Memory)');
+  assert(doc.querySelector('[data-project-view="memory"]'), 'the Memory tab (checks round 1, pick 1b) is on the project view bar');
   // Projects land on Overview (owner decision); the Vision screen is
   // reachable from the project view bar.
   assert(doc.querySelector('[data-project-view].active')?.getAttribute('data-project-view'), 'overview', 'Projects must land on Overview');
