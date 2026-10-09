@@ -80,7 +80,9 @@ of the plugin now shares one name.
 
 ### Fixed
 - #1: the tests collect from a checkout folder of any name.
-- #4: `hermes plugins install ... --enable` now switches the backend on too.
+- #4: switching the plugin on after the `hermes-dockyard` →
+  `hermes-project-stewardship` rename is what mounts the dashboard; the
+  `--enable` flag alone could not reach the backend under the old name.
 - #5: no exact version pins, so Hermes can admit the plugin next to its own
   pinned tools. Thanks to Apostol Apostolov (#6).
 - New work shows in Backlog on a real Hermes host, and the host's links show
