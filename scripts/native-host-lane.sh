@@ -57,7 +57,17 @@ if [ "$CODE" -ne 0 ]; then
   echo "NATIVE LANE FAILED (exit $CODE)" >&2
   exit "$CODE"
 fi
-# The lane must exercise native cells: count 's' progress characters and any
-# explicit SKIPPED summaries mentioning native host as evidence, but the hard
-# guarantee is REQUIRE_NATIVE=1 converts skips into failures. Echo the audit.
+# The lane must exercise native cells: the header above promises that a skip
+# means misconfiguration, so count skips from the captured log and fail loudly
+# when any appear. Echo the actual pass/skip counts the way the header claims.
+SKIPS=0
+for CHUNK in $(grep -oE '[0-9]+ skipped' "$LOG" | cut -d' ' -f1); do
+  SKIPS=$((SKIPS + CHUNK))
+done
+PASSED=$(grep -oE '[0-9]+ passed' "$LOG" | tail -1 | cut -d' ' -f1)
+echo "native lane counts: ${PASSED:-0} passed, $SKIPS skipped"
+if [ "$SKIPS" -gt 0 ]; then
+  echo "FATAL: $SKIPS skip(s) in the native lane - a skip here is misconfiguration" >&2
+  exit 3
+fi
 echo "NATIVE LANE GREEN against $HOST"
