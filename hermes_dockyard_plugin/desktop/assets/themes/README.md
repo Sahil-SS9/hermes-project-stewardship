@@ -18,8 +18,8 @@ themes ship (plus Match Hermes, the default), with the background art made to st
 | neon | Neon Block Night | dark | HPSUI2 (21/09) | neon.avif |
 | grove | Kodama Grove Night | dark | HPSUI2 | grove.avif |
 
-v6 = `/home/kensei/HPS-UI-Concepts-v6/index.html` (identical to `/home/sahil/Desktop/HPSUI/index6.html`).
-HPSUI2 = `/home/sahil/Desktop/HPSUI/HPSUI2/index.html`. Colours: `theme-palettes.py` (copied values are
+v6 = `HPS-UI-Concepts-v6/index.html` (identical to `HPSUI/index6.html`); design concept files, not in
+this repository. HPSUI2 = `HPSUI/HPSUI2/index.html`. Colours: `theme-palettes.py` (copied values are
 marked; derived ones fill Project Stewardship's token ladder). Every pair Project Stewardship uses passes WCAG AA
 (`python3 theme-palettes.py` exits 0). v6 rules kept: neutral text, one contrasting accent per theme,
 status colours (green/amber/red) identical in every theme of a mode.
@@ -31,7 +31,7 @@ designed. Warnings keep their icon and label.
 
 | File | From | Provenance |
 |---|---|---|
-| cobalt.avif | /home/kensei/HPS-UI-Concepts-v5/assets/midnight-cobalt.png | Supplied by Sahil (v4 README: "Sahil's five supplied images"; OCR found no text) |
+| cobalt.avif | HPS-UI-Concepts-v5/assets/midnight-cobalt.png | Supplied by Sahil (v4 README: "Sahil's five supplied images"; OCR found no text) |
 | estuary.avif | .../deep-estuary.png | same |
 | burgundy.avif | .../burgundy-ink.png | same |
 | violet.avif | .../violet-signal.png | same |
@@ -60,8 +60,8 @@ that keeps a 5% margin over the contrast minimums below, capped near double the 
 | neon | 55% | 45-55.8% | 2.1x |
 | grove | 56% | 44.4-55.2% | 2.1x |
 
-`python3 bake-backgrounds.py [SOURCE_DIR]` re-bakes all seven from the sources above (default
-`/home/kensei/HPS-UI-Concepts-v5/assets`) and prints each image's brightest point (blurred 12.5%
+`python3 bake-backgrounds.py SOURCE_DIR` re-bakes all seven from the sources above (SOURCE_DIR is
+the `HPS-UI-Concepts-v5/assets` folder) and prints each image's brightest point (blurred 12.5%
 sample, measured on the shipped AVIF). Those go in `theme-palettes.py` (`ART_BRIGHTEST`), whose gate
 keeps body text at 7:1 or more and secondary text at 4.5:1 or more even over that point
 (`tests/test_theme_palettes.py` runs the gate).

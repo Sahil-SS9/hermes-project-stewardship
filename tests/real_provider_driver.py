@@ -9,12 +9,16 @@ canvas data only; no live project data, no canvas mutation.
 import json
 import os
 import sys
+from pathlib import Path
 
 HERMES_HOME = os.environ.get("HERMES_PROVIDER_TEST_HOME") or os.path.expanduser("~/.hermes")
 os.environ["HERMES_HOME"] = HERMES_HOME
 
-sys.path.insert(0, "/home/kensei/repos/hermes-agent-vanilla")
-sys.path.insert(0, "/home/kensei/worktrees/stewardship-release-candidate-r3/src")
+# The upstream Hermes checkout (HPS_HERMES_SOURCE, see tests/hermes_source.py)
+# and THIS repository's source, never another checkout's.
+if os.environ.get("HPS_HERMES_SOURCE", "").strip():
+    sys.path.insert(0, os.path.expanduser(os.environ["HPS_HERMES_SOURCE"].strip()))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from hermes_project_stewardship.persistence.canvas_curation import CanvasCurationService  # noqa: E402
 from hermes_project_stewardship.persistence.hermes_curation_provider import HermesCurationProvider  # noqa: E402

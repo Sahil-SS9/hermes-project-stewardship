@@ -13,7 +13,7 @@ margin over those minimums, capped near double the v6 visibility (luminance
 spread). Cobalt stops at 1.8x: its bright core is the limit.
 
 Needs ImageMagick 6 with AVIF (libheif). Sources: assets/themes/README.md.
-Run: python3 bake-backgrounds.py [SOURCE_DIR]  (default: HPS-UI-Concepts-v5/assets)
+Run: python3 bake-backgrounds.py SOURCE_DIR  (the HPS-UI-Concepts-v5/assets folder)
 """
 import importlib.util
 import os
@@ -22,7 +22,7 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SOURCE = sys.argv[1] if len(sys.argv) > 1 else '/home/kensei/HPS-UI-Concepts-v5/assets'
+SOURCE = sys.argv[1] if len(sys.argv) > 1 else None  # the HPS-UI-Concepts-v5/assets folder
 
 # The page colours come from the palette file, so the two cannot drift apart.
 _spec = importlib.util.spec_from_file_location('theme_palettes', os.path.join(HERE, 'theme-palettes.py'))
@@ -74,6 +74,8 @@ def brightest(image):
 
 
 if __name__ == '__main__':
+    if SOURCE is None:
+        sys.exit('usage: python3 bake-backgrounds.py SOURCE_DIR  (the HPS-UI-Concepts-v5/assets folder)')
     found = {}
     with tempfile.TemporaryDirectory() as work:
         for theme_id in ART:

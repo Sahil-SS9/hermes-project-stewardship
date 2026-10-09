@@ -24,6 +24,11 @@ Native lanes must FAIL, not skip, when the host is absent
 (`STEWARD_REQUIRE_NATIVE_HOST=1`). The fallback lane (no host) keeps its
 documented host-optional skips and is not a vanilla certification.
 
+Tests find the Hermes checkout through `HPS_HERMES_SOURCE` (see
+`tests/hermes_source.py`); `scripts/native-host-lane.sh` sets it to the tree it
+tests. Unset, the tests that need a real tree skip, or fail under
+`STEWARD_REQUIRE_NATIVE_HOST=1`.
+
 Host APIs known to differ across these revisions and handled explicitly:
 `hermes_cli.kanban_db.connect` → `hermes_cli.kanban_db_connect.connect`
 (tests support both trees); `scoped_kanban_home` exists only on some forks

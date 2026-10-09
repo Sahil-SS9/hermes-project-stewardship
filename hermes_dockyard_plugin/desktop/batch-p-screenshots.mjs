@@ -5,10 +5,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {chromium} from './browser-harness.mjs';
+import os from 'node:os';
+import path from 'node:path';
 
 const BASE = process.env.STEWARD_DESKTOP_URL;
 const API = process.env.STEWARD_API_URL;
-const OUT = '/home/kensei/HPS-Audit-2026-09-24/evidence/p/screens';
+// HPS_SCREENS_OUT: where to write the screenshots (default: a folder in the temp dir).
+const OUT = process.env.HPS_SCREENS_OUT || path.join(os.tmpdir(), 'hps-batch-p-screens');
 
 test('Batch P planning acceptance screenshots (3 widths x 2 themes)', {timeout: 300000}, async () => {
   assert.ok(BASE && API, 'Run via run-browser-suite.mjs');

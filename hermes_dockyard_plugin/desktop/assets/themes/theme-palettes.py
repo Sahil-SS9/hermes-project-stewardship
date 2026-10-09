@@ -1,14 +1,15 @@
 """Project Stewardship theme palettes and their contrast gate (design round d + h, 05/10).
 
 Sources (Sahil-approved, read 05/10):
-- /home/kensei/HPS-UI-Concepts-v6/index.html (== Desktop/HPSUI/index6.html, 21/09 22:11):
+- HPS-UI-Concepts-v6/index.html (== HPSUI/index6.html, 21/09 22:11; design concept
+  files, not in this repository):
   Caffeine Paper, Kodama Grove, Midnight Cobalt, Deep Estuary, Burgundy Ink,
   Violet Signal, Ember Spectrum. v6 rules: neutral text layer, ONE contrasting
   brand accent per theme, status colours semantic only (never re-tinted),
   wallpaper 42% / blur 4px / saturation 0.9 / brightness 0.78 / one veil.
   05/10: Sahil asked for the art to stand out more; per-theme strengths are in
   bake-backgrounds.py (about double the v6 visibility, within this gate).
-- /home/sahil/Desktop/HPSUI/HPSUI2/index.html (21/09 16:04): Neon Block Night,
+- HPSUI/HPSUI2/index.html (21/09 16:04): Neon Block Night,
   Kodama Grove Night.
 Values marked v6/hpsui2 are copied; the rest are derived to fill Project Stewardship's
 token ladder and must pass the gate below. Run: python3 theme-palettes.py [--json]

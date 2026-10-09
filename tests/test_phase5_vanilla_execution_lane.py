@@ -1,25 +1,24 @@
 """Disposable Phase 5 native-host execution gate.
 
 This is deliberately a real vanilla host lane: the only host implementation
-loaded is the pinned checkout in /home/kensei/repos/hermes-agent-vanilla, while
-all state lives below tmp_path. Workers are deterministic and never call a
+loaded is the pinned upstream checkout named by HPS_HERMES_SOURCE
+(tests/hermes_source.py; unset, the test skips), while all state lives below
+tmp_path. Workers are deterministic and never call a
 model or a live fleet.
 """
 from __future__ import annotations
 
-import os
 import sys
-from pathlib import Path
 
 from hermes_project_stewardship.kanban.host_adapter import create_project_kanban_adapter
 from hermes_project_stewardship.persistence.workflow_service import WorkflowService
 from hermes_project_stewardship.persistence.store import Store
 
-
-VANILLA = Path("/home/kensei/repos/hermes-agent-vanilla")
+from .hermes_source import require_hermes_tree
 
 
 def test_phase5_complete_multistep_execution_on_pinned_vanilla(tmp_path, monkeypatch):
+    vanilla = require_hermes_tree()
     # This test owns only tmp_path state; clear the orchestration child marker so
     # vanilla's production write guard does not mistake the disposable lane for
     # an attempted delegated live mutation.
@@ -30,7 +29,7 @@ def test_phase5_complete_multistep_execution_on_pinned_vanilla(tmp_path, monkeyp
     except ImportError:
         pass
     # Import the genuine host runtime, not the stewardship compatibility host.
-    sys.path.insert(0, str(VANILLA))
+    sys.path.insert(0, str(vanilla))
     try:
         home = tmp_path / "hermes-home"
         # kanban_db resolves the board umbrella from HERMES_KANBAN_HOME before
@@ -39,7 +38,6 @@ def test_phase5_complete_multistep_execution_on_pinned_vanilla(tmp_path, monkeyp
         monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "kanban-root"))
         monkeypatch.setenv("HERMES_HOME", str(home))
         adapter = create_project_kanban_adapter(hermes_home=home)
-        assert "hermes-agent-vanilla" in str(VANILLA)
         assert adapter.host_provenance["host_module"].startswith("hermes_project_stewardship")
         assert adapter.host.capabilities()["contract_version"]
 
@@ -116,4 +114,4 @@ def test_phase5_complete_multistep_execution_on_pinned_vanilla(tmp_path, monkeyp
         finally:
             store.close()
     finally:
-        sys.path.remove(str(VANILLA))
+        sys.path.remove(str(vanilla))

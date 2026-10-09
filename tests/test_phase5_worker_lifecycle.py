@@ -21,7 +21,6 @@ already-closed run must not re-open or duplicate anything.
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 from hermes_project_stewardship.kanban.host_adapter import (
     create_project_kanban_adapter,
@@ -34,8 +33,7 @@ from hermes_project_stewardship.persistence.workflow_service import (
     WorkflowService,
 )
 
-
-VANILLA = Path("/home/kensei/repos/hermes-agent-vanilla")
+from .hermes_source import require_hermes_tree
 
 
 def _clear_delegated_child(monkeypatch) -> None:
@@ -58,8 +56,9 @@ def _claimable(adapter, project_id: str, title: str):
 
 
 def test_phase5_worker_claim_execute_result_and_team_binding(tmp_path, monkeypatch):
+    vanilla = require_hermes_tree()
     _clear_delegated_child(monkeypatch)
-    sys.path.insert(0, str(VANILLA))
+    sys.path.insert(0, str(vanilla))
     try:
         home = tmp_path / "hermes-home"
         # kanban_db resolves the board umbrella from HERMES_KANBAN_HOME before
@@ -191,4 +190,4 @@ def test_phase5_worker_claim_execute_result_and_team_binding(tmp_path, monkeypat
         finally:
             store.close()
     finally:
-        sys.path.remove(str(VANILLA))
+        sys.path.remove(str(vanilla))

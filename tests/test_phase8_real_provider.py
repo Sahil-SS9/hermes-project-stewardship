@@ -20,10 +20,11 @@ requires_real = pytest.mark.skipif(
 @requires_real
 def test_real_hermes_provider_curation_contract():
     driver = Path(__file__).parent / "real_provider_driver.py"
+    # HPS_REAL_PROVIDER_PYTHON: an interpreter that has Hermes's provider
+    # dependencies installed (for example your Hermes install's venv python).
     candidates = [
-        Path("/home/kensei/repos/KenseiAgent/.venv/bin/python3"),
-        Path(sys.executable),
-    ]
+        Path(p) for p in (os.environ.get("HPS_REAL_PROVIDER_PYTHON", "").strip(),) if p
+    ] + [Path(sys.executable)]
     interpreter = next((c for c in candidates if c.exists()), sys.executable)
     result = subprocess.run(
         [str(interpreter), str(driver)],

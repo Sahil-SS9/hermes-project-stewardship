@@ -12,25 +12,19 @@ upstream checkout and every piece of state lives under tmp_path.
 """
 from __future__ import annotations
 
-import os
-from pathlib import Path
 
 import pytest
 
 from hermes_project_stewardship.kanban.host_adapter import create_project_kanban_adapter
 from hermes_project_stewardship.persistence.store import Store
 
+from .hermes_source import require_hermes_tree
 from .r2_helpers import HUMAN, World
-
-VANILLA = Path("/home/kensei/repos/hermes-agent-vanilla")
 
 
 @pytest.fixture
 def real(tmp_path, monkeypatch):
-    if not VANILLA.is_dir():
-        if os.environ.get("STEWARD_REQUIRE_NATIVE_HOST") == "1":
-            pytest.fail(f"pinned upstream Hermes tree is missing: {VANILLA}")
-        pytest.skip("pinned upstream Hermes tree is not installed")
+    vanilla = require_hermes_tree()
     # This test owns only tmp_path state: clear the orchestration child marker
     # so vanilla's write guard does not mistake it for a live delegated write.
     monkeypatch.delenv("HERMES_DELEGATED_CHILD_CONTEXT", raising=False)
@@ -42,7 +36,7 @@ def real(tmp_path, monkeypatch):
         )
     except ImportError:
         pass
-    monkeypatch.syspath_prepend(str(VANILLA))
+    monkeypatch.syspath_prepend(str(vanilla))
     home = tmp_path / "hermes-home"
     # Pin BOTH roots to tmp_path (kanban_db resolves HERMES_KANBAN_HOME first),
     # and drop any inherited board overrides.

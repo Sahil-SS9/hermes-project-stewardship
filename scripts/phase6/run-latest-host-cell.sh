@@ -11,7 +11,7 @@
 #
 # This script runs the Phase 6 compatibility suite against a FRESH clone of
 # upstream main in a disposable directory. It never touches:
-#   - /home/kensei/repos/hermes-agent-vanilla (shared snapshot, read-only)
+#   - your pinned hermes-agent checkout (HPS_HERMES_SOURCE; read-only)
 #   - any live installation, gateway or home
 #
 # Usage:  bash scripts/phase6/run-latest-host-cell.sh [UPSTREAM_SHA]

@@ -22,10 +22,10 @@ from hermes_project_stewardship.persistence.repair import RepairError, repair_da
 from hermes_project_stewardship.persistence.schema_guard import SchemaDriftError
 from hermes_project_stewardship.persistence.store import Store
 
-SNAPSHOT = Path(os.environ.get(
-    "HPS_LIVE_SNAPSHOT",
-    "/home/kensei/HPS-Audit-2026-09-24/evidence/live-db/"
-    "dockyard-live-v33-snapshot-20260930T2330BST.db"))
+# HPS_LIVE_SNAPSHOT: a COPY of a real schema-v33 database (the maintainer's
+# is a private evidence snapshot). Unset, the snapshot tests skip.
+_SNAPSHOT_ENV = os.environ.get("HPS_LIVE_SNAPSHOT", "").strip()
+SNAPSHOT = Path(_SNAPSHOT_ENV).expanduser() if _SNAPSHOT_ENV else None
 
 EXPECTED_ROWS = {
     "dockyard_a2a_messages": 2, "dockyard_backlog": 2, "dockyard_bot_groups": 1,
@@ -53,8 +53,8 @@ def _counts(path: Path) -> dict:
 
 @pytest.fixture
 def snapshot_copy(tmp_path):
-    if not SNAPSHOT.is_file():
-        pytest.skip(f"evidence snapshot not present: {SNAPSHOT}")
+    if SNAPSHOT is None or not SNAPSHOT.is_file():
+        pytest.skip(f"set HPS_LIVE_SNAPSHOT to a copy of a real v33 database (now: {SNAPSHOT})")
     copy = tmp_path / "snapshot-copy.db"
     shutil.copy2(SNAPSHOT, copy)
     return copy

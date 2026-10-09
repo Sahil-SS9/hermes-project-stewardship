@@ -90,8 +90,8 @@ Negative:
 
 ## References
 
-- `/home/kensei/planning-canvas-research-findings.md`
-- `/home/kensei/HPS-Implementation-Plan.md` Phase 8
+- `planning-canvas-research-findings.md` (the maintainer's research notes; not in this repository)
+- `HPS-Implementation-Plan.md` Phase 8 (the maintainer's plan; not in this repository)
 - `/tmp/dockyard-ux-research/canvas/preview/canvas.js`
 - `https://tldraw.dev/docs/assets`
 - `https://help.miro.com/hc/en-us/articles/20970362792210-Miro-AI-reference`

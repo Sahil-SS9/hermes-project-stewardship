@@ -2,6 +2,7 @@
 // undo/redo, duplicate, marquee (P1 signed behaviours), through the real
 // disposable backend with the shipped plugin bundle.
 import assert from 'node:assert/strict'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
@@ -112,7 +113,8 @@ test('Batch P rendered journey: undo/duplicate/marquee + plan doc + backlog conf
     }
     assert.deepEqual(errors, [], errors.join('\n'))
   } catch (failure) {
-    try { await page.screenshot({ path: '/home/kensei/HPS-Audit-2026-09-24/evidence/p/screens/batchp-journey-failure.png', fullPage: true }) } catch {}
+    const shot = path.join(os.tmpdir(), 'batchp-journey-failure.png')
+    try { await page.screenshot({ path: shot, fullPage: true }); console.error(`failure screenshot: ${shot}`) } catch {}
     throw failure
   } finally {
     await browser?.close()
