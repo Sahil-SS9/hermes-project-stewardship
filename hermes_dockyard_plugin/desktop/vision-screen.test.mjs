@@ -85,7 +85,7 @@ plugin_api._app = create_app(store, kanban_adapter=adapter, auth_principal='desk
 plugin_api._client = plugin_api.httpx.AsyncClient(
     transport=plugin_api.httpx.ASGITransport(app=plugin_api._app), base_url='http://dockyard.test')
 app = FastAPI()
-app.include_router(plugin_api.plugin_api, prefix='/api/plugins/hermes-dockyard')
+app.include_router(plugin_api.plugin_api, prefix='/api/plugins/hermes-project-stewardship')
 import uvicorn
 uvicorn.run(app, host='127.0.0.1', port=int(os.environ['VISION_PORT']), log_level='error')
 `
@@ -108,7 +108,7 @@ test('Vision: propose with checks, withdraw, mark complete, delete archived mile
   let serverOutput = ''
   child.stdout.on('data', (d) => { serverOutput += d })
   child.stderr.on('data', (d) => { serverOutput += d })
-  const base = `http://127.0.0.1:${port}/api/plugins/hermes-dockyard`
+  const base = `http://127.0.0.1:${port}/api/plugins/hermes-project-stewardship`
   const originalError = console.error
   const originalWarn = console.warn
   const warnings = []

@@ -1,4 +1,4 @@
-// Product constraint (locked 26/08, re-confirmed by Sahil 02/10): Dockyard
+// Product constraint (locked 26/08, re-confirmed by Sahil 02/10): Project Stewardship
 // never uses string-to-DOM sinks (innerHTML / outerHTML / insertAdjacentHTML),
 // eval, or browser storage (localStorage / sessionStorage / cookies).
 //

@@ -1,7 +1,7 @@
 "use strict";
 (() => {
   // src/api.ts
-  var BASE = "/api/plugins/hermes-dockyard";
+  var BASE = "/api/plugins/hermes-project-stewardship";
   function createApi(sdk) {
     const get = (path) => sdk.fetchJSON(`${BASE}${path}`);
     const post = (path, body) => sdk.fetchJSON(`${BASE}${path}`, {
@@ -2205,7 +2205,7 @@
       } catch (err) {
         if (disposed || gen !== renderSeq || !main2.isConnected) return;
         main2.replaceChildren(
-          textEl("div", "dy-error", `Dockyard backend unreachable: ${String(err)}`)
+          textEl("div", "dy-error", `Project Stewardship backend unreachable: ${String(err)}`)
         );
       }
     };
@@ -2219,7 +2219,7 @@
     mark.className = "dy-mark";
     mark.setAttribute("aria-hidden", "true");
     const h1 = document.createElement("h1");
-    h1.textContent = "Hermes Dockyard";
+    h1.textContent = "Hermes Project Stewardship";
     brand.append(mark, h1);
     const nav = document.createElement("nav");
     nav.className = "dy-tabs";
@@ -3724,12 +3724,12 @@
       }, []);
       return React.createElement("div", { ref, className: "dy-host" });
     };
-    registry.register("hermes-dockyard", DockyardTab);
+    registry.register("hermes-project-stewardship", DockyardTab);
   }
   void whenReady().then(() => {
     const sdk = getSDK();
     if (!sdk) {
-      console.error("[hermes-dockyard] Hermes plugin SDK not present");
+      console.error("[hermes-project-stewardship] Hermes plugin SDK not present");
       return;
     }
     registerPlugin(sdk);

@@ -191,7 +191,7 @@ export type CanvasNodePurpose = 'task' | 'gate' | 'branch' | 'loop';
 export const STATUS_ORDER = ['done', 'working', 'blocked', 'pending'] as const;
 export type CanvasNodeStatusToken = (typeof STATUS_ORDER)[number];
 
-// The canvas colours four states. Runs report Dockyard's words (backlog,
+// The canvas colours four states. Runs report Project Stewardship's words (backlog,
 // in_progress, in_review, blocked, done); history saved before 08/10/2026
 // may carry the host's own (triage, todo, ready, running, review, archived).
 // Every word maps to one of the four; anything unknown is pending.

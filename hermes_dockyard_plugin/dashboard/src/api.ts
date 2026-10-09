@@ -1,4 +1,4 @@
-// Typed wrappers over the host SDK for the Dockyard plugin backend.
+// Typed wrappers over the host SDK for the Project Stewardship plugin backend.
 import type { ObjectiveView } from './objective-evidence';
 export interface HermesPluginSDK {
   readonly sdkVersion: string;
@@ -8,7 +8,7 @@ export interface HermesPluginSDK {
   fetchJSON: <T = any>(url: string, init?: RequestInit, opts?: { allowUnauthorized?: boolean }) => Promise<T>;
 }
 
-const BASE = '/api/plugins/hermes-dockyard';
+const BASE = '/api/plugins/hermes-project-stewardship';
 
 export interface PortfolioProject {
   project_id: string;

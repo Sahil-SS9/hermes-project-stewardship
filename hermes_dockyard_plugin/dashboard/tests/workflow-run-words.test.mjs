@@ -1,5 +1,5 @@
 // A run's words on the canvas (08/10/2026, WORKFLOWS-R1.md engine round).
-// Runs report Dockyard's words (backlog, in_progress, in_review, blocked,
+// Runs report Project Stewardship's words (backlog, in_progress, in_review, blocked,
 // done); the canvas colours them as its four states and says round k of N,
 // not needed, waiting, stuck after N rounds and needs your OK. Compiles the
 // REAL src/workflow-canvas.ts with the repo's own esbuild, like

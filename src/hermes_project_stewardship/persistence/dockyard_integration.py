@@ -1,4 +1,4 @@
-"""G3 P2/P3: Dockyard ⇄ engine integration service.
+"""G3 P2/P3: Project Stewardship ⇄ engine integration service.
 
 Zero-CLI orchestration seam (PRD Gate G3): a dockyard work-item or
 approved initiative flows proposal → approval → Kanban execution →

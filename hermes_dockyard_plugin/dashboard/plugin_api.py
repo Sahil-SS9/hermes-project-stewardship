@@ -1,7 +1,7 @@
-"""Dockyard Dashboard plugin backend.
+"""Project Stewardship Dashboard plugin backend.
 
-Mounted by the Hermes dashboard host at /api/plugins/hermes-dockyard/.
-Thin proxy over the Dockyard API (create_app) so the plugin frontend
+Mounted by the Hermes dashboard host at /api/plugins/hermes-project-stewardship/.
+Thin proxy over the Project Stewardship API (create_app) so the plugin frontend
 never needs to know where the stewardship service lives. The host
 contract expects an ``APIRouter`` named ``plugin_api`` in this module.
 """
@@ -98,7 +98,7 @@ except (StateSelectionError, SchemaDriftError, NewerSchemaError) as exc:
     # migrated. The host keeps loading; proxied routes return 503 with the
     # reason until an operator selects or repairs state (P addendum fix 3).
     _startup_error = str(exc)
-    logger.error("Dockyard plugin startup degraded: %s", exc)
+    logger.error("Project Stewardship plugin startup degraded: %s", exc)
 
 
 # One process-lifetime client over ASGI: no per-request TestClient churn
@@ -108,20 +108,20 @@ except (StateSelectionError, SchemaDriftError, NewerSchemaError) as exc:
 _BASE_URL = os.environ.get("DOCKYARD_PLUGIN_URL", "http://dockyard.local")
 _ACTOR_ID = os.environ.get("DOCKYARD_ACTOR_ID", "dashboard-user")
 _client = httpx.AsyncClient(
-    # Degraded startup: no Dockyard app exists yet; requests are rejected in
+    # Degraded startup: no Project Stewardship app exists yet; requests are rejected in
     # _proxy before ever reaching the transport.
     transport=httpx.ASGITransport(app=_app if _app is not None else APIRouter()),
     base_url=_BASE_URL,
     timeout=httpx.Timeout(10.0, read=30.0),
 )
-logger.info("Dockyard plugin HTTP client initialised (base_url=%s)", _BASE_URL)
+logger.info("Project Stewardship plugin HTTP client initialised (base_url=%s)", _BASE_URL)
 
 
 def _degraded_503() -> HTTPException:
     """Fail-closed reply when state selection blocked startup (Phase1 F2)."""
     return HTTPException(
         503,
-        "Dockyard plugin did not start: " + (_startup_error or "unknown startup error")
+        "Project Stewardship plugin did not start: " + (_startup_error or "unknown startup error")
         + " Set STEWARD_DB_PATH (or --db) to select the authoritative database,"
         " or repair it with `stewardctl db repair` on a copy, then restart the"
         " dashboard host.",
@@ -130,7 +130,7 @@ def _degraded_503() -> HTTPException:
 
 async def _proxy(method: str, path: str, json_body: dict | None = None,
                  params: dict | None = None):
-    """Forward a request to the Dockyard API app and normalise the reply."""
+    """Forward a request to the Project Stewardship API app and normalise the reply."""
     if _app is None:
         # Fail closed: never silently pick an alternate database.
         logger.error("Proxy %s %s rejected: plugin startup degraded", method, path)
@@ -158,11 +158,11 @@ async def _proxy(method: str, path: str, json_body: dict | None = None,
         return response.json()
     except ValueError:
         logger.error("Upstream returned invalid JSON on successful %s %s", method, path)
-        raise HTTPException(502, "Dockyard returned an invalid response")
+        raise HTTPException(502, "Project Stewardship returned an invalid response")
 
 
 def _upstream_error(response) -> tuple[object, str | None]:
-    """A refusal from the Dockyard API as (detail, error code).
+    """A refusal from the Project Stewardship API as (detail, error code).
 
     The API answers every error as ``{"error": {"code", "message",
     "fields"?}}`` (api/middleware.py). Passing that whole body on as this
@@ -178,7 +178,7 @@ def _upstream_error(response) -> tuple[object, str | None]:
     except ValueError:
         # cor-003: upstream non-JSON failures (plain-text 500s) must not
         # become an opaque JSONDecodeError here.
-        return (response.text[:500] or "Dockyard returned an error"), "upstream_error"
+        return (response.text[:500] or "Project Stewardship returned an error"), "upstream_error"
     if isinstance(body, dict) and isinstance(body.get("error"), dict):
         error = body["error"]
         message = str(error.get("message") or "request failed")
@@ -488,8 +488,8 @@ async def health() -> dict:
     # No filesystem paths in responses: dashboard viewers need liveness only.
     # Degraded startup (Phase1 F2): state selection blocked init; fail closed.
     if _app is None:
-        return {"ok": False, "service": "hermes-dockyard", "status": "degraded"}
-    return {"ok": True, "service": "hermes-dockyard"}
+        return {"ok": False, "service": "hermes-project-stewardship", "status": "degraded"}
+    return {"ok": True, "service": "hermes-project-stewardship"}
 
 
 # ---------------------------------------------------------------- reads --

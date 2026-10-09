@@ -147,7 +147,7 @@ def test_message_lists_each_alert_and_cannot_ping_or_break_markdown():
         _row(2, project_id="beta", title="Approve **v2** ||spoiler|| @here"),
     ])
     lines = text.splitlines()
-    assert lines[0] == "**Dockyard**: 2 new alerts"
+    assert lines[0] == "**Project Stewardship**: 2 new alerts"
     assert lines[1].startswith("- **CRITICAL** alpha: ")
     assert "@everyone" not in text and "@here" not in text and "<@123456>" not in text
     assert "@\u200beveryone" in text and "<@\u200b123456>" in text
@@ -160,7 +160,7 @@ def test_message_is_cut_under_the_limit_and_says_how_many_more():
     text = discord_message(rows)
     assert len(text) <= MESSAGE_CAP < 2000
     shown = text.count("\n- ")
-    assert text.endswith(f"...and {40 - shown} more in Dockyard.")
+    assert text.endswith(f"...and {40 - shown} more in Project Stewardship.")
     assert discord_message([]) == ""
 
 

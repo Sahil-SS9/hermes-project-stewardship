@@ -1,4 +1,4 @@
-"""Dockyard v4-approved UI contract tests.
+"""Project Stewardship v4-approved UI contract tests.
 
 Locks the approved baseline (Sahil, 2026-08-22): the file at
 design/dockyard-mockups-v4-approved.html is the canonical UI. Only palette

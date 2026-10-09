@@ -1,4 +1,4 @@
-"""Native event observation: trace native task events to Dockyard work.
+"""Native event observation: trace native task events to Project Stewardship work.
 
 Observer-only contract (plan P3.1): this module READS the native host's task
 records, lifecycle events and run history, and writes observations to the

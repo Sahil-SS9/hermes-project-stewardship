@@ -223,19 +223,19 @@ const isDockyardNode = (n) => n && typeof n === 'object' && typeof n.id === 'str
 export function readImport(text) {
   const raw = String(text ?? '').trim()
   if (!raw) return { kind: 'invalid', reason: 'Paste a workflow, or choose a file, first.' }
-  if (new TextEncoder().encode(raw).length > IMPORT_MAX_BYTES) return { kind: 'invalid', reason: 'This file is too big: Dockyard imports up to 256 KB.' }
+  if (new TextEncoder().encode(raw).length > IMPORT_MAX_BYTES) return { kind: 'invalid', reason: 'This file is too big: Project Stewardship imports up to 256 KB.' }
   let data = null
   try { data = JSON.parse(raw) } catch { data = null }
   if (data && typeof data === 'object') {
     const nodes = Array.isArray(data.definition?.nodes) ? data.definition.nodes : Array.isArray(data.nodes) ? data.nodes : null
     if (nodes && nodes.length && nodes.every(isDockyardNode)) {
-      const warnings = data.schema && data.schema !== 'stewardship.workflow/v2' ? [`The file says it is "${data.schema}"; Dockyard reads it as its own format.`] : []
+      const warnings = data.schema && data.schema !== 'stewardship.workflow/v2' ? [`The file says it is "${data.schema}"; Project Stewardship reads it as its own format.`] : []
       return { kind: 'dockyard', name: typeof data.name === 'string' ? data.name : '', nodes, warnings }
     }
     if (nodes && nodes.some((n) => n && typeof n.type === 'string' && 'parameters' in n)) return fromN8n(data)
   }
   if (/^\s*jobs\s*:/m.test(raw)) return fromActions(raw)
-  return { kind: 'invalid', reason: "This isn't a workflow Dockyard can read. Check the text, or describe what you want to the AI instead." }
+  return { kind: 'invalid', reason: "This isn't a workflow Project Stewardship can read. Check the text, or describe what you want to the AI instead." }
 }
 function fromN8n(data) {
   const names = data.nodes.map((n) => String(n.name ?? n.type))

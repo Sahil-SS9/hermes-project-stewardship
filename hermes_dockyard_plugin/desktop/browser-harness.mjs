@@ -39,7 +39,7 @@ export function buildBundle(realBackend = false) {
     "import { createRoot } from 'react-dom/client';",
     'const ctx = {',
     '  rest: async (p, init = {}) => {',
-    realBackend ? "    const r = await fetch('/api/plugins/hermes-dockyard' + p, { method: init.method || 'GET', headers: { 'content-type': 'application/json', 'x-hermes-session-token': 'demo-session-token' }," : "    const r = await fetch('/api' + p, { method: init.method || 'GET', headers: { 'content-type': 'application/json' },",
+    realBackend ? "    const r = await fetch('/api/plugins/hermes-project-stewardship' + p, { method: init.method || 'GET', headers: { 'content-type': 'application/json', 'x-hermes-session-token': 'demo-session-token' }," : "    const r = await fetch('/api' + p, { method: init.method || 'GET', headers: { 'content-type': 'application/json' },",
     "      body: init.method && init.method !== 'GET' ? JSON.stringify(init.body) : undefined });",
     "    if (!r.ok) { let detail = ''; try { detail = (await r.json())?.detail ?? ''; } catch {} throw Error(`${r.status}: ${detail}`); }",
     '    return r.json();',

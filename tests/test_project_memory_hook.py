@@ -1,10 +1,10 @@
 """Project memory reaches bots (Sahil 08/10, pick 1b = A).
 
-A bot works on a Dockyard project when a Kanban worker runs one of the project's tasks.
+A bot works on a project in Project Stewardship when a Kanban worker runs one of the project's tasks.
 Workers run in the bot's own profile (``HERMES_HOME=<root>/profiles/<bot>``) with
-``HERMES_KANBAN_TASK`` and ``HERMES_KANBAN_BOARD`` set; Dockyard itself normally runs
+``HERMES_KANBAN_TASK`` and ``HERMES_KANBAN_BOARD`` set; Project Stewardship itself normally runs
 in the root profile. Pinned here:
-- the bot finds Dockyard's data: an explicit path, else its own profile's copy if it
+- the bot finds Project Stewardship's data: an explicit path, else its own profile's copy if it
   has projects, else the root profile's copy if it has projects; an empty stray copy
   never wins;
 - the ``pre_llm_call`` hook gives a worker its project's memory: board -> project
@@ -12,7 +12,7 @@ in the root profile. Pinned here:
 - it gives nothing (and writes nothing) when there is no database, the schema is
   older than v38, the board is not bound, the project is off, or there is no memory;
 - it never raises;
-- Dockyard's existing bot tools use the same lookup, so enabling Dockyard in a bot's
+- Project Stewardship's existing bot tools use the same lookup, so enabling Project Stewardship in a bot's
   profile no longer creates an empty copy there.
 """
 from __future__ import annotations
@@ -81,7 +81,7 @@ def _projects(home: Path, rows: list[tuple[str, str, str | None]]) -> Path:
 
 @pytest.fixture()
 def fleet(tmp_path, monkeypatch):
-    """A root profile running Dockyard and a bot profile the worker runs in."""
+    """A root profile running Project Stewardship and a bot profile the worker runs in."""
     root = tmp_path / "hermes"
     bot = root / "profiles" / "coder"
     bot.mkdir(parents=True)
@@ -109,7 +109,7 @@ def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-# ---- finding Dockyard's data ----------------------------------------------------
+# ---- finding Project Stewardship's data ----------------------------------------------------
 
 def test_lookup_prefers_explicit_then_own_then_root(fleet, monkeypatch, tmp_path):
     root, bot = fleet
@@ -140,7 +140,7 @@ def test_worker_gets_its_projects_memory(fleet, monkeypatch):
     _projects(root, [("p_abc", "alpha", "alpha-board")])
     _worker(monkeypatch)
     out = _turn()
-    assert out and out["context"].startswith("Dockyard project memory for project alpha")
+    assert out and out["context"].startswith("Project Stewardship memory for project alpha")
     assert "Never push to main" in out["context"]
     # Later turns of the same worker get it too: the context is per turn.
     assert _turn(is_first_turn=False, session_id="s1")["context"] == out["context"]

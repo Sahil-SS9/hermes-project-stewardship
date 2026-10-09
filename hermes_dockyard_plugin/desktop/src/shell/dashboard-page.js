@@ -136,7 +136,7 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   const dirtySaver = useRef(null)
   const [navSaving, setNavSaving] = useState(false)
   const markDirty = (projectId) => (dirty, saver) => { setDirtyProject(dirty ? projectId : null); dirtySaver.current = dirty ? (saver ?? null) : null }
-  // Sahil 02/10: Dockyard reopens on the last project the person chose. The
+  // Sahil 02/10: Project Stewardship reopens on the last project the person chose. The
   // choice is kept in the backend (GET/PUT /settings/last-project), never in
   // browser storage (26/08 locked rule). Only a person's choice is saved:
   // the automatic first pick (the remembered project, or All projects when

@@ -1,4 +1,4 @@
-"""Canonical Dockyard work service contract tests."""
+"""Canonical Project Stewardship work service contract tests."""
 from __future__ import annotations
 
 from typing import Any

@@ -220,7 +220,7 @@ async function openPlanning(page, host) {
   await page.goto(`${host.base}/desktop`, { waitUntil: 'load' });
   await page.addScriptTag({ url: `${host.base}/api/bundle.js` });
   await page.waitForSelector('[data-tab="project"]', { timeout: 20000 });
-  // Sahil 05/10: Dockyard opens on All projects; pick the project first.
+  // Sahil 05/10: Project Stewardship opens on All projects; pick the project first.
   await pickProject(page, PROJECT);
   await page.click('[data-tab="project"]');
   await page.waitForSelector('[data-project-view="planning"]', { timeout: 20000 });

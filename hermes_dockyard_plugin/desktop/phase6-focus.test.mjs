@@ -39,7 +39,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 function evaluatePlugin(source, host) {
   const loaded = evaluatePluginBundle(source, host, { assertImports: false });
   assert.deepEqual([...new Set(loaded.imports)].sort(), ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime']);
-  assert.equal(loaded.plugin.id, 'hermes-dockyard');
+  assert.equal(loaded.plugin.id, 'hermes-project-stewardship');
   return loaded;
 }
 

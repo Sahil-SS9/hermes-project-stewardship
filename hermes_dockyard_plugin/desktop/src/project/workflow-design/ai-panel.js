@@ -63,7 +63,7 @@ export function shownStatus(suggestion, nodes) {
   return open && !sameSteps(suggestion.base, nodes) ? 'stale' : suggestion.status
 }
 
-// Pinned or not is remembered while Dockyard is open (across projects and
+// Pinned or not is remembered while Project Stewardship is open (across projects and
 // screens). The plugin keeps nothing in browser storage, and there is no
 // preferences store on the server yet, so a restart starts unpinned.
 let pinnedNow = false

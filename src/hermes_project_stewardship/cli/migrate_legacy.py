@@ -1,4 +1,4 @@
-"""Bounded CLI for isolated legacy Dockyard work migration proofs."""
+"""Bounded CLI for isolated legacy Project Stewardship work migration proofs."""
 from __future__ import annotations
 
 import argparse
@@ -13,7 +13,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="dockyard-migrate-legacy",
         description=(
-            "Migrate a marker-owned legacy Dockyard DB copy into a marker-owned "
+            "Migrate a marker-owned legacy Project Stewardship DB copy into a marker-owned "
             "isolated Hermes home. Never operates on unmarked roots."
         ),
     )

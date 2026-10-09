@@ -1757,7 +1757,7 @@ MIGRATIONS.append(Migration(
 ))
 
 
-# v39 (checks round 1, Sahil 08/10 pick 1a = A): chat links. Dockyard's Chat
+# v39 (checks round 1, Sahil 08/10 pick 1a = A): chat links. Project Stewardship's Chat
 # button opens a fresh Desktop chat with one of the project's bots, but a plugin
 # cannot learn that chat's id (Desktop saves a chat on its first message). So
 # the button records a one-time link here (bot, project, expiry); the first

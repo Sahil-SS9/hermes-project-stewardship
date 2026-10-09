@@ -1,4 +1,4 @@
-"""Consistent, versioned Dockyard database export and isolated restore."""
+"""Consistent, versioned Project Stewardship database export and isolated restore."""
 from __future__ import annotations
 
 import hashlib

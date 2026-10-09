@@ -1,5 +1,5 @@
 // Bundle the theme backgrounds and fonts into src/styles/theme-assets.js as
-// data URLs, so Dockyard's themes work offline with nothing fetched at run
+// data URLs, so Project Stewardship's themes work offline with nothing fetched at run
 // time. Sources and licences: assets/themes/README.md.
 // Run: node hermes_dockyard_plugin/desktop/make-theme-assets.mjs
 import { readFileSync, writeFileSync } from 'node:fs'

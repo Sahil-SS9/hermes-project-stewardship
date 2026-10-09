@@ -1925,7 +1925,7 @@ def create_app(
                 "queued": ne.pending_delivery(project_id)}
 
 
-    # ------------------- Dockyard work management (G1) ----------------- #
+    # ------------------- Project Stewardship work management (G1) ----------------- #
 
     def _principal_id(candidate: str) -> str:
         return current_principal() or candidate
@@ -2412,7 +2412,7 @@ def create_app(
             raise HTTPException(404, str(exc))
 
 
-    # ------------------- Dockyard bot layer (G2) ---------------------- #
+    # ------------------- Project Stewardship bot layer (G2) ---------------------- #
 
     @router.post("/projects/{project_id}/bots")
     def register_bot(project_id: str, body: BotRegister):
@@ -2518,7 +2518,7 @@ def create_app(
         return {"group": name, "messages": feed}
 
 
-    # ------------------- Dockyard product polish (G4) ------------------ #
+    # ------------------- Project Stewardship product polish (G4) ------------------ #
 
     @router.get("/inbox")
     def approval_inbox():
@@ -3333,7 +3333,7 @@ def create_app(
 
     @router.post("/onboard")
     def onboard(body: OnboardingRequest):
-        """Provision canonical Hermes state before Dockyard governance metadata."""
+        """Provision canonical Hermes state before Project Stewardship governance metadata."""
         slug = (body.slug or body.project_id).strip()
         board_slug = (body.board_slug or slug).strip()
         name = (body.name or body.project_id.replace("-", " ").title()).strip()
@@ -3482,7 +3482,7 @@ def create_app(
                 409,
                 {
                     "code": "governance_incomplete",
-                    "message": "Canonical project exists; Dockyard governance setup can be retried",
+                    "message": "Canonical project exists; Project Stewardship governance setup can be retried",
                     "fields": {"idempotency_key": [key]},
                 },
             ) from None

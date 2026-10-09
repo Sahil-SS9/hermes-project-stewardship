@@ -200,7 +200,7 @@ export function ProjectMemoryPanel({ project }) {
       state.context
         ? jsx('pre', { className: 'dockyard-content-preview', 'data-memory-preview': true, children: state.context })
         : jsx('p', { className: 'dockyard-meta', 'data-memory-preview': true, children: 'Nothing yet. Bots get no project memory until you add some.' }),
-      jsx('small', { className: 'dy-mem-count', children: `${number(state.context.length)} of ${number(state.cap)} characters. Bots get this when they work on this project's tasks, or in a chat opened from Dockyard.` }),
+      jsx('small', { className: 'dy-mem-count', children: `${number(state.context.length)} of ${number(state.cap)} characters. Bots get this when they work on this project's tasks, or in a chat opened from Project Stewardship.` }),
       jsxs('div', { className: 'dy-mem-suggestions', 'data-memory-suggestions': suggestions.status, children: [
         jsx('h3', { children: 'From finished work' }),
         suggestions.status === 'loading' ? jsx('p', { className: 'dockyard-meta', children: 'Loading finished work...' }) : null,

@@ -46,7 +46,7 @@ MAX_PROPOSAL_NODES = 5              # agent-proposed nodes applied without human
 MAX_REVISIONS_PER_RUN = 10          # total revisions (auto or approved) per run
 BRANCH_STATUSES = frozenset({"done", "blocked"})
 # Host words for a card nobody has picked up yet (Hermes "triage" is
-# Dockyard's To do). Only such a card is handed to its bot.
+# Project Stewardship's To do). Only such a card is handed to its bot.
 _UNSTARTED = frozenset({"triage", "backlog"})
 _REASON_LIMIT = 500
 _TICK_LEASE_KEY = "workflows.tick_lease"

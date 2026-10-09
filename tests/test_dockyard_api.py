@@ -1,4 +1,4 @@
-"""Dockyard RPC routes: work-items + backlog over /stewardship/v1."""
+"""Project Stewardship RPC routes: work-items + backlog over /stewardship/v1."""
 from __future__ import annotations
 
 import base64

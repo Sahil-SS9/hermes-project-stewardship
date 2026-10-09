@@ -40,7 +40,7 @@ ROOT = Path(__file__).parents[1]
 PROXY = ROOT / "hermes_dockyard_plugin/dashboard/plugin_api.py"
 TOKEN = "synthetic-desktop-token"
 HEADERS = {"x-hermes-session-token": TOKEN}
-BASE = "/api/plugins/hermes-dockyard"
+BASE = "/api/plugins/hermes-project-stewardship"
 DEFAULTS = {"theme": "auto", "font": "system"}
 
 

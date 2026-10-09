@@ -3,7 +3,7 @@
 // Sahil 05/10 (demo feedback h, design round d + h): the colour themes he
 // designed in September (HPS-UI-Concepts-v6 + HPSUI2), with their backgrounds
 // and fonts. The palettes are generated from assets/themes/theme-palettes.py,
-// which checks every colour pair Dockyard uses against WCAG AA; edit there and
+// which checks every colour pair Project Stewardship uses against WCAG AA; edit there and
 // regenerate rather than editing a colour here. Sources and licences:
 // assets/themes/README.md. The choice lives in the backend (/settings/appearance).
 import { THEME_ART } from './theme-assets.js'

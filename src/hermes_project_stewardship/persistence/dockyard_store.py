@@ -1,4 +1,4 @@
-"""Dockyard persistence: WorkItem + Backlog CRUD on the stewardship Store.
+"""Project Stewardship persistence: WorkItem + Backlog CRUD on the stewardship Store.
 
 G1 (PRD v0.3 §4.1): work-items live in the SAME canonical DB as stewardship
 state (TE-01: no state duplication). This module adds typed accessors; the

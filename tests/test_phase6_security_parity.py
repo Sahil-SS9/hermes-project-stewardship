@@ -248,7 +248,7 @@ def test_pm0605_every_dashboard_call_resolves_to_backend_route(phase6):
         from fastapi import FastAPI
 
         host = FastAPI()
-        host.include_router(plugin.plugin_api, prefix="/api/plugins/hermes-dockyard")
+        host.include_router(plugin.plugin_api, prefix="/api/plugins/hermes-project-stewardship")
         proxy = TestClient(host)
 
         # The exact calls dashboard/src/api.ts can make (dashboard subset).
@@ -271,10 +271,10 @@ def test_pm0605_every_dashboard_call_resolves_to_backend_route(phase6):
         ]
         for method, path, body in calls:
             if method == "get":
-                resp = proxy.get(f"/api/plugins/hermes-dockyard{path}")
+                resp = proxy.get(f"/api/plugins/hermes-project-stewardship{path}")
             else:
                 resp = proxy.post(
-                    f"/api/plugins/hermes-dockyard{path}",
+                    f"/api/plugins/hermes-project-stewardship{path}",
                     json=body,
                 )
             assert resp.status_code != 500, f"{method.upper()} {path} leaks a raw error"

@@ -29,12 +29,12 @@ function boot() {
   return { dom, calls };
 }
 
-test('registers hermes-dockyard tab with the host registry', async () => {
+test('registers hermes-project-stewardship tab with the host registry', async () => {
   const { dom, calls } = boot();
   try {
     await new Promise((r) => setTimeout(r, 50)); // registration is async (whenReady)
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].name, 'hermes-dockyard');
+    assert.equal(calls[0].name, 'hermes-project-stewardship');
     assert.equal(typeof calls[0].comp, 'function');
   } finally {
     dom.window.close();

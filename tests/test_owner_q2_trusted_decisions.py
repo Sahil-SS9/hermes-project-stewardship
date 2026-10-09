@@ -28,7 +28,7 @@ from hermes_project_stewardship.persistence.store import Store
 
 ROOT = Path(__file__).parents[1]
 PROXY = ROOT / "hermes_dockyard_plugin/dashboard/plugin_api.py"
-BASE = "/api/plugins/hermes-dockyard"
+BASE = "/api/plugins/hermes-project-stewardship"
 V = "/stewardship/v1"
 TOKEN = "synthetic-q2-session-token"
 # The proxy's identity headers (the contract this decision defines).

@@ -1,4 +1,4 @@
-"""Contract tests for Dockyard's in-process ProjectKanbanHost adapter."""
+"""Contract tests for Project Stewardship's in-process ProjectKanbanHost adapter."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -229,7 +229,7 @@ class FakeProjectKanbanHost:
 
 def _adapter_type():
     adapter_type = getattr(kanban, "ProjectKanbanHostAdapter", None)
-    assert adapter_type is not None, "Dockyard host adapter is not implemented"
+    assert adapter_type is not None, "Project Stewardship host adapter is not implemented"
     return adapter_type
 
 

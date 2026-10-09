@@ -1,4 +1,4 @@
-// Dockyard plugin app shell: header + three panels (Dashboard, Inbox, Notifications)
+// Project Stewardship plugin app shell: header + three panels (Dashboard, Inbox, Notifications)
 // + onboarding form. Vanilla TS DOM, host React only for the registration wrapper.
 // Product constraint (locked): no string→DOM sinks, no eval, no storage. All text
 // is inert (createElement + textContent); user and API strings are never parsed
@@ -134,7 +134,7 @@ export function initApp(
     } catch (err) {
       if (disposed || gen !== renderSeq || !main.isConnected) return;
       main.replaceChildren(
-        textEl('div', 'dy-error', `Dockyard backend unreachable: ${String(err)}`),
+        textEl('div', 'dy-error', `Project Stewardship backend unreachable: ${String(err)}`),
       );
     }
   };
@@ -152,7 +152,7 @@ export function initApp(
   mark.className = 'dy-mark';
   mark.setAttribute('aria-hidden', 'true');
   const h1 = document.createElement('h1');
-  h1.textContent = 'Hermes Dockyard';
+  h1.textContent = 'Hermes Project Stewardship';
   brand.append(mark, h1);
 
   const nav = document.createElement('nav');

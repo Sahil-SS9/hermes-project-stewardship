@@ -1,4 +1,4 @@
-"""Dockyard governance metadata for canonical Hermes work records."""
+"""Project Stewardship governance metadata for canonical Hermes work records."""
 from __future__ import annotations
 import json
 
@@ -9,7 +9,7 @@ from .store import Store, iso
 
 
 class CanonicalWorkMetadataStore:
-    """Persist only Dockyard-owned metadata keyed by canonical work identity."""
+    """Persist only Project Stewardship-owned metadata keyed by canonical work identity."""
 
     def __init__(self, store: Store) -> None:
         self.store = store

@@ -55,9 +55,9 @@ def _root_db_path() -> Path:
 
 
 def locate_shared_db() -> Path | None:
-    """Where a bot finds Dockyard's data (checks round 1, pick 1b).
+    """Where a bot finds Project Stewardship's data (checks round 1, pick 1b).
 
-    Dockyard normally runs in the root profile while its bots run in their own
+    Project Stewardship normally runs in the root profile while its bots run in their own
     profiles. Order: an explicit path; else this profile's copy if it holds
     projects; else the root profile's copy if it holds projects; else ``None``.
     An empty copy never wins, so a stray one cannot hide the real data. Opens
@@ -73,7 +73,7 @@ def locate_shared_db() -> Path | None:
 
 
 def bot_db_path() -> Path | None:
-    """The database Dockyard's bot tools should name, or ``None`` for the host default.
+    """The database Project Stewardship's bot tools should name, or ``None`` for the host default.
 
     Only a redirect to the root profile's copy is returned. In every other case the
     caller keeps the usual resolution (``resolve_db_path``) with all its checks.

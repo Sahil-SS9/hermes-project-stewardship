@@ -1,4 +1,4 @@
-"""Dockyard milestones + saved views: store, service, API (PM-04/PM-05)."""
+"""Project Stewardship milestones + saved views: store, service, API (PM-04/PM-05)."""
 from __future__ import annotations
 
 import pytest

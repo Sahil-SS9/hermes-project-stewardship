@@ -1,7 +1,7 @@
 """Workflows run on their own (08/10 engine round, WORKFLOWS-R1.md).
 
 Real-host lane: the pinned vanilla Hermes board, every byte under tmp_path.
-The tests act out the two parts Dockyard does not do itself, with the board's
+The tests act out the two parts Project Stewardship does not do itself, with the board's
 own code:
 
 - Hermes's dispatcher: ``recompute_ready`` makes a ``todo`` card ``ready``

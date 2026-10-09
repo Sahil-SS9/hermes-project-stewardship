@@ -234,7 +234,7 @@ test('Builder: New workflow first asks where it lives (this project or global), 
   })
 })
 
-test('Builder: a template, a Dockyard import and an n8n import each create the workflow they showed', { timeout: 120000 }, async () => {
+test('Builder: a template, a Project Stewardship import and an n8n import each create the workflow they showed', { timeout: 120000 }, async () => {
   const fromTemplate = unique('tpl')
   const fromDockyard = unique('dock')
   const fromN8n = unique('n8n')
@@ -263,7 +263,7 @@ test('Builder: a template, a Dockyard import and an n8n import each create the w
     const dock = await create('import', fromDockyard, async () => {
       await page.locator('[data-wfd-import-text]').fill('hello')
       await page.locator('[data-action="wfd-import-check"]').click()
-      assert.match(await page.locator('[data-wfd-import-error]').textContent(), /isn't a workflow Dockyard can read/)
+      assert.match(await page.locator('[data-wfd-import-error]').textContent(), /isn't a workflow Project Stewardship can read/)
       await page.locator('[data-wfd-import-text]').fill(JSON.stringify(exported))
       await page.locator('[data-action="wfd-import-check"]').click()
       assert.match(await page.locator('[data-wfd-import="dockyard"]').textContent(), /5 steps\. It imports exactly/)
@@ -820,7 +820,7 @@ test('Builder: the AI chat is a sidebar outside the canvas; unpinned it floats a
     await page.mouse.up()
     await until(async () => (await versionsOf(name)).length === 2, 'the move saves')
     assert.ok(await sidebar(page).isVisible(), 'and the pinned chat stays')
-    // Pinned is remembered while Dockyard is open; closing gives the page its width back.
+    // Pinned is remembered while Project Stewardship is open; closing gives the page its width back.
     await page.locator('[data-action="wfd-ai-close"]').click()
     await sidebar(page).waitFor({ state: 'detached' })
     await until(async () => Math.abs((await canvasBox()).width - before.width) <= 1, 'closing gives the page its width back')

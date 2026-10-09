@@ -1,7 +1,7 @@
-"""Canonical Hermes work service for Dockyard.
+"""Canonical Hermes work service for Project Stewardship.
 
-This service owns Dockyard's production work-item seam. Hermes Project/Kanban
-records remain authoritative for task and epic state. Dockyard writes only its
+This service owns Project Stewardship's production work-item seam. Hermes Project/Kanban
+records remain authoritative for task and epic state. Project Stewardship writes only its
 own governance metadata around those canonical records.
 """
 from __future__ import annotations
@@ -17,7 +17,7 @@ from .store import Store
 
 
 class CanonicalWorkPort(Protocol):
-    """Backend-neutral canonical work operations consumed by Dockyard."""
+    """Backend-neutral canonical work operations consumed by Project Stewardship."""
 
     def create_work(
         self,
@@ -105,10 +105,10 @@ _UNSET = object()
 
 
 def dockyard_status(status: Any) -> str | None:
-    """Dockyard's word for a card's status, whichever word the host reported.
+    """Project Stewardship's word for a card's status, whichever word the host reported.
 
     Host reads may carry the host's own words (Hermes: triage, todo, ready,
-    running, review); words that are already Dockyard's pass through.
+    running, review); words that are already Project Stewardship's pass through.
     """
     if status is None:
         return None
@@ -117,20 +117,20 @@ def dockyard_status(status: Any) -> str | None:
 
 
 class CanonicalWorkPartialError(RuntimeError):
-    """Canonical work exists, but Dockyard metadata is incomplete."""
+    """Canonical work exists, but Project Stewardship metadata is incomplete."""
 
     code = "ranking_incomplete"
 
     def __init__(self, item: dict[str, Any]) -> None:
         super().__init__(
-            "canonical work was created, but Dockyard ranking is incomplete"
+            "canonical work was created, but Project Stewardship ranking is incomplete"
         )
         self.item = dict(item)
         self.item_ref = str(item.get("ref") or item.get("id") or "")
 
 
 class CanonicalWorkService:
-    """Business rules over canonical Hermes work plus Dockyard governance."""
+    """Business rules over canonical Hermes work plus Project Stewardship governance."""
 
     def __init__(self, store: Store, port: CanonicalWorkPort) -> None:
         self.store = store

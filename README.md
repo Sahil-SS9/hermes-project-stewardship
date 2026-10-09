@@ -48,7 +48,7 @@ the fail-closed freeze sit:
 ## Architecture
 
 Canonical Hermes Projects/Kanban owns projects, tasks, epics, hierarchy,
-dependencies and execution state. Dockyard owns stewardship policy, evidence,
+dependencies and execution state. Project Stewardship owns stewardship policy, evidence,
 rankings, views, workflows, approvals and audit metadata in its SQLite WAL
 store. Production work writes cross the versioned host adapter; there is no
 legacy task dual-write path.

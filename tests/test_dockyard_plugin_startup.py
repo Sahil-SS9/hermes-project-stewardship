@@ -44,7 +44,7 @@ def other():
     return {{"alive": True}}
 
 app.include_router(unrelated)
-app.include_router(plugin_api.plugin_api, prefix="/api/plugins/hermes-dockyard")
+app.include_router(plugin_api.plugin_api, prefix="/api/plugins/hermes-project-stewardship")
 
 out = {{
     "startup_error": getattr(plugin_api, "_startup_error", "MISSING"),
@@ -53,8 +53,8 @@ out = {{
     "canonical_created": Path({canonical!r}).exists(),
 }}
 with TestClient(app) as client:
-    out["health"] = client.get("/api/plugins/hermes-dockyard/health").json()
-    r = client.get("/api/plugins/hermes-dockyard/dashboard")
+    out["health"] = client.get("/api/plugins/hermes-project-stewardship/health").json()
+    r = client.get("/api/plugins/hermes-project-stewardship/dashboard")
     out["dashboard_status"] = r.status_code
     out["dashboard_body"] = r.json()
     out["unrelated"] = client.get("/host/other").json()

@@ -31,7 +31,7 @@ test('W0-P1: 403 on archive shows intelligible permission error and keeps action
     await createWorkflow(page, name);
     // Reproduce the exact structured-detail 403 shape that W0 captured. The
     // browser bridge stringifies an object detail as "403: [object Object]".
-    await page.route(`**/api/plugins/hermes-dockyard/projects/payments-relaunch/workflows/${name}/archive`, route =>
+    await page.route(`**/api/plugins/hermes-project-stewardship/projects/payments-relaunch/workflows/${name}/archive`, route =>
       route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ detail: { required_capability: 'project_archive' } }) }));
     await page.locator('[data-action="archive-workflow"]').click();
     const alert = page.locator('[data-executable-workflows] [role="alert"]');

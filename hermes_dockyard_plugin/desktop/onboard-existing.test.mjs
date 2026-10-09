@@ -19,7 +19,7 @@ async function expectWizard(page, intent) {
   await wizard(page).waitFor()
   assert.equal(await wizard(page).getAttribute('data-onboarding-intent'), intent)
   assert.equal(await wizard(page).locator('.dockyard-onboarding-head .dockyard-card-label').innerText(), intent === 'existing' ? 'EXISTING PROJECT' : 'NEW PROJECT')
-  assert.equal(await page.getByRole('heading', { name: 'Bring a project into Dockyard' }).count(), 1)
+  assert.equal(await page.getByRole('heading', { name: 'Bring a project into Project Stewardship' }).count(), 1)
   return fieldLabels(page)
 }
 

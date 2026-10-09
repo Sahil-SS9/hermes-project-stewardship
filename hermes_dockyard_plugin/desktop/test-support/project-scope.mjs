@@ -1,4 +1,4 @@
-// Sahil 05/10 (design round d): Dockyard opens on All projects when nothing is
+// Sahil 05/10 (design round d): Project Stewardship opens on All projects when nothing is
 // remembered, every screen follows the global switcher, and screens that work
 // on one project ask for one. Journeys written before then got a project
 // without asking (the app used to open on the project needing most

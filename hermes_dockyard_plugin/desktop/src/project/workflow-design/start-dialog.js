@@ -214,7 +214,7 @@ export function NewWorkflowDialog({ project, taken, templates, members, onCreate
     if (way === 'import') return jsxs('div', { className: 'dy-wfd-way-body', children: [
       jsxs('label', { className: 'dy-wfd-field', children: [
         jsx('span', { children: 'Paste the workflow' }),
-        jsx('textarea', { rows: 5, value: importText, 'data-wfd-import-text': true, placeholder: 'A Dockyard export (JSON). Other formats go through the AI.', onChange: (e) => { setImportText(e.target.value); setImported(null) } }),
+        jsx('textarea', { rows: 5, value: importText, 'data-wfd-import-text': true, placeholder: 'A Project Stewardship export (JSON). Other formats go through the AI.', onChange: (e) => { setImportText(e.target.value); setImported(null) } }),
       ] }),
       jsxs('div', { className: 'dy-wfd-row', children: [
         jsxs('label', { className: 'dy-wfd-file', children: [jsx('span', { children: 'or choose a file' }), jsx('input', { type: 'file', accept: '.json,.yaml,.yml,.txt', 'data-wfd-import-file': true, onChange: async (e) => { const text = await readFileText(e.target.files?.[0]); setImportText(text); check(text) } })] }),

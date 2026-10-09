@@ -2,7 +2,7 @@
 
 Every pytest process gets a disposable state root before application modules
 are imported. SQLite connections to the operator's real Hermes state are
-rejected as a second line of defence, and the live Dockyard database is
+rejected as a second line of defence, and the live Project Stewardship database is
 fingerprinted before and after the run.
 """
 from __future__ import annotations
@@ -155,7 +155,7 @@ _require_isolated_environment()
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     after = _fingerprint(_LIVE_DOCKYARD_FILES)
     if after != _LIVE_BEFORE:
-        print("\nERROR: live Dockyard database changed during pytest; refusing a green result")
+        print("\nERROR: live Project Stewardship database changed during pytest; refusing a green result")
         session.exitstatus = 1
     if _OFFLINE_ATTEMPTS:
         print(f"\nERROR: code outside any test tried to go online (refused): {_OFFLINE_ATTEMPTS[:5]}")

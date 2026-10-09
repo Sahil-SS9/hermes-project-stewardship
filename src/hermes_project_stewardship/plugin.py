@@ -23,7 +23,7 @@ class PluginState:
     @classmethod
     def services(cls) -> StewardshipService:
         if cls._svc is None:
-            # A bot in another profile reads Dockyard where it runs (normally the
+            # A bot in another profile reads Project Stewardship where it runs (normally the
             # root profile) instead of opening an empty copy in its own profile
             # (checks round 1). Otherwise the usual resolution and its checks.
             cls._store = open_store(cls.db_path if cls.db_path is not None else bot_db_path())

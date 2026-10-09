@@ -1,6 +1,6 @@
 """Project Stewardship observation package (Phase 3).
 
-Connects native Hermes task events to Dockyard initiatives and outcomes:
+Connects native Hermes task events to Project Stewardship initiatives and outcomes:
 - native_events: read-only native task observation + atomic event claims;
 - recovery: run-once observation with classification, crash/restart recovery,
   host-identity-verified completion, and the bounded reconciliation command.

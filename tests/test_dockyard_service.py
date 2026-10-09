@@ -1,4 +1,4 @@
-"""Dockyard service tests: business rules + audit integration (TE-01)."""
+"""Project Stewardship service tests: business rules + audit integration (TE-01)."""
 from __future__ import annotations
 
 import sqlite3
@@ -92,7 +92,7 @@ def test_rerank_flow_records_reason_chain(dsvc, enabled, bot, human):
 
 # ---------------------------------------------------------------------------
 # Slice 3: atomic create+queue with distinct assignee, first-class initiative
-# linkage, and reason-mandatory validation (Dockyard slice on top of G5).
+# linkage, and reason-mandatory validation (Project Stewardship slice on top of G5).
 # ---------------------------------------------------------------------------
 
 

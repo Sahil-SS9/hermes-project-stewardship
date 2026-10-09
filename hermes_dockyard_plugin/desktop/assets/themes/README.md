@@ -1,4 +1,4 @@
-# Dockyard themes: sources, licences and how the assets are made
+# Project Stewardship themes: sources, licences and how the assets are made
 
 Design round d + h (Sahil's demo feedback 04/10, round started 05/10). Sahil 05/10: all nine
 themes ship (plus Match Hermes, the default), with the background art made to stand out more.
@@ -7,7 +7,7 @@ themes ship (plus Match Hermes, the default), with the background art made to st
 
 | Id | Name | Mode | Source | Background |
 |---|---|---|---|---|
-| auto | Match Hermes | follows Hermes Desktop | Dockyard's own light/dark | none |
+| auto | Match Hermes | follows Hermes Desktop | Project Stewardship's own light/dark | none |
 | caffeine | Caffeine Paper | light | HPS-UI-Concepts-v6 (approved 21/09) | none |
 | kodama | Kodama Grove | light | v6 | none |
 | cobalt | Midnight Cobalt | dark | v6 | cobalt.avif |
@@ -20,7 +20,7 @@ themes ship (plus Match Hermes, the default), with the background art made to st
 
 v6 = `/home/kensei/HPS-UI-Concepts-v6/index.html` (identical to `/home/sahil/Desktop/HPSUI/index6.html`).
 HPSUI2 = `/home/sahil/Desktop/HPSUI/HPSUI2/index.html`. Colours: `theme-palettes.py` (copied values are
-marked; derived ones fill Dockyard's token ladder). Every pair Dockyard uses passes WCAG AA
+marked; derived ones fill Project Stewardship's token ladder). Every pair Project Stewardship uses passes WCAG AA
 (`python3 theme-palettes.py` exits 0). v6 rules kept: neutral text, one contrasting accent per theme,
 status colours (green/amber/red) identical in every theme of a mode.
 

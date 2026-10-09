@@ -19,7 +19,7 @@ const HEALTH_ORDER = ['critical', 'degraded', 'watch', 'healthy']
 export const HEALTH_WORD = Object.freeze({ healthy: 'Healthy', watch: 'Watch', degraded: 'Degraded', critical: 'Critical', unknown: 'Not verified' })
 const TRIGGER_WORD = Object.freeze({
   manual: 'Run on request', gateway: 'Run from a chat command', webhook: 'Run by a webhook',
-  internal: 'Run by Dockyard', schedule: 'Run on schedule', scheduled: 'Run on schedule',
+  internal: 'Run by Project Stewardship', schedule: 'Run on schedule', scheduled: 'Run on schedule',
 })
 export const EVENT_FILTERS = Object.freeze([['all', 'All events'], ['initiatives', 'Initiatives'], ['work', 'Work'], ['health', 'Health and checks']])
 

@@ -11,7 +11,7 @@ Discord channel). The message is built so nothing in an alert can misbehave in D
 ping; Markdown characters are escaped, so a title cannot restyle or hide the message;
 and it stays under Discord's 2,000-character limit, saying how many were left out.
 Each alert is marked sent when printed (``--mark``): if the Discord post itself fails,
-that alert is not retried in Discord; it is still in Dockyard's inbox.
+that alert is not retried in Discord; it is still in Project Stewardship's inbox.
 """
 from __future__ import annotations
 
@@ -37,8 +37,8 @@ def discord_message(rows: Iterable[Dict[str, Any]]) -> str:
     if not alerts:
         return ""
     count = len(alerts)
-    header = f"**Dockyard**: {count} new {'alert' if count == 1 else 'alerts'}"
-    reserve = len("\n...and 999 more in Dockyard.")
+    header = f"**Project Stewardship**: {count} new {'alert' if count == 1 else 'alerts'}"
+    reserve = len("\n...and 999 more in Project Stewardship.")
     lines = [header]
     used = len(header)
     shown = 0
@@ -51,7 +51,7 @@ def discord_message(rows: Iterable[Dict[str, Any]]) -> str:
         used += len(line)
         shown += 1
     if shown < count:
-        lines.append(f"\n...and {count - shown} more in Dockyard.")
+        lines.append(f"\n...and {count - shown} more in Project Stewardship.")
     return "".join(lines)
 
 

@@ -161,7 +161,7 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
         jsxs('section', { className: 'dockyard-feature-card dockyard-project-hero', children: [
           jsx(StatusTag, { tone: healthTone, label: healthLabel }),
           jsx('h2', { children: view.settings?.mission || project.id }),
-          jsx('p', { children: 'Work distribution and current delivery state from the canonical Dockyard backend.' }),
+          jsx('p', { children: 'Work distribution and current delivery state from the canonical Project Stewardship backend.' }),
           jsx(WorkBar, { work: project.work ?? {}, label: `${project.id} delivery state` }),
           jsxs('div', { className: 'dockyard-work-legend', children: [
             jsxs('span', { className: 'backlog', children: [jsx('i', {}), `${number(project.work?.backlog ?? 0)} backlog`] }),

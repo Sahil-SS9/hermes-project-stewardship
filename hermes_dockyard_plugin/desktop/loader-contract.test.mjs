@@ -43,7 +43,7 @@ test('committed plugin is a self-contained Desktop ESM bundle', async () => {
   assert.match(source, /^\/\/ GENERATED — edit desktop\/src\//)
   assert.match(source, /export\s*\{[\s\S]*as default[\s\S]*\}/)
   const loaded = evaluateArtifact(source, { navigate() {} }, { assertImports: false })
-  assert.equal(loaded.plugin.id, 'hermes-dockyard')
+  assert.equal(loaded.plugin.id, 'hermes-project-stewardship')
 })
 
 test('the loader contract rejects the pre-split relative-import plugin', async () => {

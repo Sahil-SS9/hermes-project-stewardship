@@ -1,4 +1,4 @@
-"""Bake Dockyard's theme backgrounds (design round d + h).
+"""Bake Project Stewardship's theme backgrounds (design round d + h).
 
 Sahil 05/10: keep all nine themes; the background art should stand out a bit
 more. Each dark theme's art is laid over its page colour, blurred, dimmed and

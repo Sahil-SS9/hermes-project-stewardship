@@ -1,4 +1,4 @@
-"""Parents of Dockyard work items, kept beside the Hermes boards.
+"""Parents of Project Stewardship work items, kept beside the Hermes boards.
 
 Owner decision 4 = B (04/10/2026): a parent only groups work (an epic and its
 tasks); it never blocks. A Hermes dependency link does block (the child waits

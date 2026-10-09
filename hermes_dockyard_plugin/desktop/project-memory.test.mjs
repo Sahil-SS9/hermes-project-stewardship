@@ -19,7 +19,7 @@ import { pickProject, rememberedProject, restoreRememberedProject } from './test
 const require = createRequire(fileURLToPath(new URL('../dashboard/package.json', import.meta.url)))
 const { chromium } = require('playwright')
 const BASE = process.env.STEWARD_DESKTOP_URL || 'http://127.0.0.1:19500/desktop'
-const API = process.env.STEWARD_API_URL || 'http://127.0.0.1:19500/api/plugins/hermes-dockyard'
+const API = process.env.STEWARD_API_URL || 'http://127.0.0.1:19500/api/plugins/hermes-project-stewardship'
 const HEADERS = { 'x-hermes-session-token': 'demo-session-token' }
 const MARKER = { timeout: 20000 }
 const RUN = `m${Date.now().toString(36)}`
@@ -96,7 +96,7 @@ test('Memory: add, edit with history, archive and restore; bots see exactly the 
     // "What bots see" is the backend's own text for bots, word for word.
     const backend = await call(`/projects/${pid}/memory`)
     assert.equal(await preview(page), backend.context)
-    assert.ok(backend.context.startsWith(`Dockyard project memory for project ${projectId}`))
+    assert.ok(backend.context.startsWith(`Project Stewardship memory for project ${projectId}`))
     assert.ok(backend.context.indexOf(rule) < backend.context.indexOf(fact), 'rules before facts')
 
     // Edit keeps history.

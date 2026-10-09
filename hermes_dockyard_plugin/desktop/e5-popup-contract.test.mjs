@@ -9,7 +9,7 @@
 //    sent as { body, tag, data } shows its title with no text and no link.
 //    The browser harness stub only records calls, so it can never catch a
 //    wrong field name. This test pins the host's real field list.
-// 2. The 26/08 locked rule (re-confirmed by Sahil 02/10): Dockyard never uses
+// 2. The 26/08 locked rule (re-confirmed by Sahil 02/10): Project Stewardship never uses
 //    localStorage, sessionStorage or cookies. The backend's popup_shown_at
 //    mark is what stops a pop-up repeating, including across reloads.
 //
@@ -132,7 +132,7 @@ test('E5 pop-ups use only fields the Desktop host renders, with text and an acti
   assert.equal(typeof item.action?.label, 'string', 'an Open action is offered')
   assert.equal(typeof item.action?.onClick, 'function')
   item.action.onClick()
-  assert.deepEqual(navigations, ['/dockyard'], 'Open goes to Dockyard')
+  assert.deepEqual(navigations, ['/dockyard'], 'Open goes to Project Stewardship')
 })
 
 test('E5 "and N more" pop-up is a valid host notification too', { timeout: 15000 }, async () => {

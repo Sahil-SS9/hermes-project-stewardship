@@ -171,7 +171,7 @@ def _load_plugin(tmp_path: Path, module_name: str, env: dict) -> dict:
 def test_fix2_host_load_uses_profile_default(tmp_path):
     home = tmp_path / "home"
     home.mkdir()
-    out = _load_plugin(tmp_path, "hermes_dashboard_plugin_hermes-dockyard", _clean_env(home))
+    out = _load_plugin(tmp_path, "hermes_dashboard_plugin_hermes-project-stewardship", _clean_env(home))
     assert out["startup_error"] is None and out["has_store"] is True
     assert out["db"] == str(home / "plugin-data" / "hermes-dockyard" / "dockyard.db")
 
@@ -350,7 +350,7 @@ def test_fix3_plugin_shows_503_and_host_survives(tmp_path):
     home.mkdir()
     env = _clean_env(home)
     env["STEWARD_DB_PATH"] = str(db)
-    out = _load_plugin(tmp_path, "hermes_dashboard_plugin_hermes-dockyard", env)
+    out = _load_plugin(tmp_path, "hermes_dashboard_plugin_hermes-project-stewardship", env)
     assert out["has_store"] is False and out["status"] == 503
     assert "gap" in out["startup_error"] and "stewardctl db repair" in out["detail"]
     assert _sha(db) == before

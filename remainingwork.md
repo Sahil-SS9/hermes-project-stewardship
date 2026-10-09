@@ -108,13 +108,13 @@ Broader product opportunity ideas are explicitly excluded from this verdict and 
 ## Evidence
 
 - All 8 tracked tasks are complete.
-- The verified Dockyard rc2 evidence baseline is
+- The verified Project Stewardship rc2 evidence baseline is
   `859e02db0cdcbf7f4875adab15c345a4a105c401`; this note is committed on top of
   that baseline and the final local/remote `main` identity must be read from Git.
 - KenseiAgent local `main` and `origin/main` match at `750aca15b08604befeba7932310b463612544559`.
 - Both GitHub repositories use `main` as the default branch.
 - Fresh-clone verification passed:
-  - Dockyard: 399 passed, 5 declared optional-environment skips
+  - Project Stewardship: 399 passed, 5 declared optional-environment skips
   - Host/Kanban: 49 passed
   - Cross-repository integration: 9 passed
   - Desktop harness: 20/20
@@ -123,8 +123,8 @@ Broader product opportunity ideas are explicitly excluded from this verdict and 
   - Runtime health: HTTP 200
 - Obsolete and redundant branches, refs and worktrees were removed.
 - Remaining KenseiAgent branches, worktrees and stash entries contain unique or active unrelated work and were intentionally preserved.
-- Dockyard `origin` exposes only the canonical `main` branch.
-- Dockyard GitHub default branch is `main`.
+- Project Stewardship `origin` exposes only the canonical `main` branch.
+- Project Stewardship GitHub default branch is `main`.
 - KenseiAgent remote branches with unique patches were preserved rather than deleted.
 
 ## Delivered selected scope
@@ -162,8 +162,8 @@ Broader product opportunity ideas are explicitly excluded from this verdict and 
 
 Version: `0.2.0rc2`
 
-- Dockyard implementation commit: `580e296e9ba95e804a115571e78e43a665c23981`
-- Dockyard rc2 canonical evidence baseline: `859e02db0cdcbf7f4875adab15c345a4a105c401`
+- Project Stewardship implementation commit: `580e296e9ba95e804a115571e78e43a665c23981`
+- Project Stewardship rc2 canonical evidence baseline: `859e02db0cdcbf7f4875adab15c345a4a105c401`
 - KenseiAgent canonical host main commit: `750aca15b08604befeba7932310b463612544559`
 - Original host-contract commit before replay: `ce7d9d4fb407a5f43ec6691e4aeb340d0b43a6c9`
 
@@ -182,10 +182,10 @@ These are separate deployment/activation operations, not unfinished engineering:
 1. Install or activate the plugin.
 2. Run a production migration, if a valid owned legacy source is discovered.
 3. Restart the affected dashboard/Desktop services.
-4. Enable Dockyard scheduler automation.
+4. Enable Project Stewardship scheduler automation.
 5. Perform live post-activation QA in the actual Hermes Desktop host.
 
-Sahil changed direction before these operations were executed. No Dockyard installation, production migration, service restart, scheduler activation or live Desktop launch was performed during the aborted rollout attempt.
+Sahil changed direction before these operations were executed. No Project Stewardship installation, production migration, service restart, scheduler activation or live Desktop launch was performed during the aborted rollout attempt.
 
 Each deferred operation requires renewed explicit validation in chat before execution.
 
@@ -198,14 +198,14 @@ Prior proven deployment notes identify two distinct services:
 - Hermes gateway on port `8642`: RPC/agent surface; it does not serve dashboard plugin routes.
 - Hermes dashboard host on port `9119`: serves `/api/dashboard/plugins` and `/api/plugins/<name>/*`.
 
-Backend discovery must prove Dockyard appears with `has_api: true` before Desktop activation is considered successful.
+Backend discovery must prove Project Stewardship appears with `has_api: true` before Desktop activation is considered successful.
 
 ### One plugin ID, one Desktop door
 
-Dockyard previously used both possible Desktop plugin doors:
+Project Stewardship previously used both possible Desktop plugin doors:
 
-- Standalone: `~/.hermes/desktop-plugins/hermes-dockyard/plugin.js`
-- Unified: `~/.hermes/plugins/hermes-dockyard/desktop/plugin.js`
+- Standalone: `~/.hermes/desktop-plugins/hermes-project-stewardship/plugin.js`
+- Unified: `~/.hermes/plugins/hermes-project-stewardship/desktop/plugin.js`
 
 Do not activate both. For a Python-plus-Desktop package, the unified door is the preferred authoritative location and must be explicitly enabled. Duplicate doors can produce stale UI despite matching source hashes.
 
@@ -219,7 +219,7 @@ Before future installation:
 
 ### Python/backend dependency
 
-The dashboard API imports `hermes_project_stewardship`. The package must be installed from the canonical Dockyard `main` checkout into the exact Python environment used by the dashboard host. Verify import and version before restart.
+The dashboard API imports `hermes_project_stewardship`. The package must be installed from the canonical Project Stewardship `main` checkout into the exact Python environment used by the dashboard host. Verify import and version before restart.
 
 ### Desktop launch safety
 
@@ -237,7 +237,7 @@ A prior GPU-enabled launch froze the desktop. The display may also require Sahil
 No production migration should run merely because a migration CLI exists. First prove:
 
 - the legacy source database exists;
-- it is owned by Dockyard;
+- it is owned by Project Stewardship;
 - its ownership marker is valid;
 - the canonical target is correct and isolated;
 - a consistent backup exists;
@@ -248,9 +248,9 @@ If no valid legacy source exists, record migration as not applicable rather than
 
 ### Scheduler boundary
 
-The Hermes scheduler is already operational for other jobs. No Dockyard-specific scheduler job was selected or enabled during the aborted rollout.
+The Hermes scheduler is already operational for other jobs. No Project Stewardship-specific scheduler job was selected or enabled during the aborted rollout.
 
-Future Dockyard automation should be created only after manual activation and live QA pass. It must use an idempotent internal trigger, expose failures to an operator, and remain separately pausable.
+Future Project Stewardship automation should be created only after manual activation and live QA pass. It must use an idempotent internal trigger, expose failures to an operator, and remain separately pausable.
 
 ### Live QA requirements
 
@@ -264,12 +264,12 @@ A future activation is not complete until all of the following are verified:
 - Work and Delivery tabs show current `rc2` capabilities;
 - one real mutation is read back from the backend;
 - one initiative approval-to-observation journey completes;
-- renderer/dashboard logs contain no Dockyard route or API errors;
+- renderer/dashboard logs contain no Project Stewardship route or API errors;
 - rollback restores the prior working state.
 
 ## Preserved unrelated work
 
-The remaining KenseiAgent branches, worktrees, remote refs and stash were intentionally retained because they contain active or unique work, including blog, Walkie Talkie, anti-scripted, strict-persona, recovery/parking and macOS updater changes. They are not Dockyard cleanup residue.
+The remaining KenseiAgent branches, worktrees, remote refs and stash were intentionally retained because they contain active or unique work, including blog, Walkie Talkie, anti-scripted, strict-persona, recovery/parking and macOS updater changes. They are not Project Stewardship cleanup residue.
 
 ## Product opportunities
 

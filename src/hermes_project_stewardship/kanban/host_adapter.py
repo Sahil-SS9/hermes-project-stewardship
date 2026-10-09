@@ -1,4 +1,4 @@
-"""Dockyard adapter for the versioned in-process ProjectKanbanHost service."""
+"""Project Stewardship adapter for the versioned in-process ProjectKanbanHost service."""
 from __future__ import annotations
 
 import hashlib
@@ -41,8 +41,8 @@ _COLUMN_STATUS = {
     "blocked": "blocked",
 }
 # Hermes Kanban refuses to complete a card with no result/summary evidence.
-# Dockyard closes cards on an operator's explicit move, so say so.
-_DONE_EVIDENCE = "Completed through Hermes Dockyard (operator marked this item done)."
+# Project Stewardship closes cards on an operator's explicit move, so say so.
+_DONE_EVIDENCE = "Completed through Hermes Project Stewardship (operator marked this item done)."
 
 _SAFE_HOST_MESSAGES = {
     "board_not_found": "canonical board was not found",
@@ -59,7 +59,7 @@ _SAFE_HOST_MESSAGES = {
 
 
 class KanbanAdapterError(RuntimeError):
-    """Stable, redacted error raised at the Dockyard to Hermes boundary."""
+    """Stable, redacted error raised at the Project Stewardship to Hermes boundary."""
 
     def __init__(
         self,
@@ -146,7 +146,7 @@ class UnavailableKanbanAdapter(KanbanAdapter):
 
 
 class ProjectKanbanHostAdapter(KanbanAdapter):
-    """Translate Dockyard board/card calls to canonical Hermes host calls.
+    """Translate Project Stewardship board/card calls to canonical Hermes host calls.
 
     P3 deliberately binds only to existing project and board records. Native
     project and board provisioning belongs to the separately gated P4 slice.
@@ -269,7 +269,7 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
         except KeyError:
             raise KanbanAdapterError(
                 "validation_error",
-                "Dockyard board column is not supported by canonical Kanban",
+                "Project Stewardship board column is not supported by canonical Kanban",
                 fields={"column": column},
             ) from None
 
@@ -496,7 +496,7 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
         if target is None:
             raise KanbanAdapterError(
                 "validation_error",
-                "Dockyard work status is not supported by canonical Kanban",
+                "Project Stewardship work status is not supported by canonical Kanban",
                 fields={"status": status},
             )
         try:
@@ -504,7 +504,7 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
             if target == "blocked":
                 self.host.block_task(
                     item_id,
-                    reason="Dockyard work item blocked",
+                    reason="Project Stewardship work item blocked",
                     kind="dependency",
                     board=board,
                 )
@@ -858,7 +858,7 @@ def create_project_kanban_adapter(
     hermes_home: str | Path | None = None,
     board: str | None = None,
 ) -> ProjectKanbanHostAdapter:
-    """Compose Dockyard against the active Hermes host implementation.
+    """Compose Project Stewardship against the active Hermes host implementation.
 
     P1.3 selection order: the plugin's own vanilla host is the canonical
     implementation and always satisfies the contract. A host-tree module

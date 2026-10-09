@@ -28,7 +28,7 @@ PROXY = ROOT / "hermes_dockyard_plugin/dashboard/plugin_api.py"
 DESKTOP_SRC = ROOT / "hermes_dockyard_plugin/desktop/src"
 TOKEN = "synthetic-desktop-token"
 HEADERS = {"x-hermes-session-token": TOKEN}
-BASE = "/api/plugins/hermes-dockyard"
+BASE = "/api/plugins/hermes-project-stewardship"
 WILD = object()  # a path segment the app fills in at run time
 
 

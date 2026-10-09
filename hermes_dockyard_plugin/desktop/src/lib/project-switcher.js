@@ -2,7 +2,7 @@
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 // Sahil 04/10 (demo feedback d): one global project switcher, with "All
 // projects"; the Roadmap and Notifications pickers go. Design round 05/10:
-// Sahil chose direction A, a breadcrumb "Dockyard / [Project]" with a search
+// Sahil chose direction A, a breadcrumb "Project Stewardship / [Project]" with a search
 // popover (the palette and project-row directions were removed). Its menu
 // ends with "New project" then "Onboard existing project" (Sahil 05/10), the
 // same two ways in as the top bar's buttons.

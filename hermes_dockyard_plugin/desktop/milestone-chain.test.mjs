@@ -9,7 +9,7 @@
 // against the spawned server, which is exactly what the Hermes host provides.
 //
 // Server process: a python child serves the FastAPI app that mounts the
-// plugin router under /api/plugins/hermes-dockyard with the backend app
+// plugin router under /api/plugins/hermes-project-stewardship with the backend app
 // installed as plugin_api._app (identical to the pytest client fixture in
 // tests/test_dockyard_plugin_backend.py). Temp DB per run.
 //
@@ -69,7 +69,7 @@ plugin_api._client = plugin_api.httpx.AsyncClient(
 )
 StewardshipService(store).enable("chain-project", lead_profile="fixture", autonomy_level=2)
 app = FastAPI()
-app.include_router(plugin_api.plugin_api, prefix="/api/plugins/hermes-dockyard")
+app.include_router(plugin_api.plugin_api, prefix="/api/plugins/hermes-project-stewardship")
 import uvicorn
 uvicorn.run(app, host="127.0.0.1", port=int(os.environ["PM0009_PORT"]), log_level="error")
 `;
@@ -93,7 +93,7 @@ function waitReady(url, timeoutMs = 30000) {
 function evaluatePlugin(source, host) {
   const loaded = evaluatePluginBundle(source, host, { assertImports: false });
   assert.deepEqual([...new Set(loaded.imports)].sort(), ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime']);
-  assert.equal(loaded.plugin.id, 'hermes-dockyard');
+  assert.equal(loaded.plugin.id, 'hermes-project-stewardship');
   return loaded;
 }
 
@@ -114,7 +114,7 @@ test('milestone journey: real UI drives real HTTP through proxy to backend', asy
   let serverOutput = '';
   child.stdout.on('data', (d) => { serverOutput += d; });
   child.stderr.on('data', (d) => { serverOutput += d; });
-  const base = `http://127.0.0.1:${port}/api/plugins/hermes-dockyard`;
+  const base = `http://127.0.0.1:${port}/api/plugins/hermes-project-stewardship`;
   const originalConsoleError = console.error;
   const originalConsoleWarn = console.warn;
   const reactWarnings = [];

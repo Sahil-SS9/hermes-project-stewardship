@@ -6,8 +6,8 @@
 // a bot opens a fresh Hermes Desktop chat with it through the plugin kit's own
 // door (host.newChat, the same one the sidebar "+" uses). The chat opens in the
 // normal chat list, not as a tile in the Bots tab: placing it there needs the
-// Bots plugin's private key format, and Dockyard does not depend on it.
-// Before opening, Dockyard records a one-time link so the chat's first
+// Bots plugin's private key format, and Project Stewardship does not depend on it.
+// Before opening, Project Stewardship records a one-time link so the chat's first
 // message gets this project's memory (persistence/chat_links.py). Everything
 // here takes host and api as arguments so it is tested without a browser.
 
@@ -31,7 +31,7 @@ export function chatTargets(members, lead) {
   return out
 }
 
-// The bot's route on the connection Dockyard's data lives on (the active one).
+// The bot's route on the connection Project Stewardship's data lives on (the active one).
 // Backend profile first (targetProfile), then the Desktop profile name.
 export function chatRoute(routes, activeConnectionId, profile) {
   if (!activeConnectionId) return null
@@ -64,7 +64,7 @@ export async function openProjectChat({ host, api, projectId, profile }) {
 }
 
 export function chatOutcomeMessage(profile, outcome) {
-  if (!outcome?.opened) return ['danger', 'This version of Hermes Desktop cannot open a chat from Dockyard. Update Hermes Desktop.']
-  if (!outcome.linked) return ['danger', `Chat with ${profile} opened, but without this project's memory: Dockyard could not link it.`]
+  if (!outcome?.opened) return ['danger', 'This version of Hermes Desktop cannot open a chat from Project Stewardship. Update Hermes Desktop.']
+  if (!outcome.linked) return ['danger', `Chat with ${profile} opened, but without this project's memory: Project Stewardship could not link it.`]
   return ['success', `Chat with ${profile} opened. Its first message brings this project's memory.`]
 }

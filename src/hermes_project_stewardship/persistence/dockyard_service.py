@@ -1,4 +1,4 @@
-"""Dockyard service layer: business rules over DockyardStore.
+"""Project Stewardship service layer: business rules over DockyardStore.
 
 TE-01 pattern: constructed on the SAME Store as StewardshipService, so
 platform work-items and stewardship state share one canonical backend.

@@ -46,7 +46,7 @@ test('Phase 7 rendered settings + onboarding journeys with real data', { timeout
     // Membership data from the canonical host must be visible somewhere on the
     // settings surface (bot profiles are real project members).
     const team = await page.evaluate(async () => {
-      const res = await fetch('/api/plugins/hermes-dockyard/projects/payments-relaunch/team', {
+      const res = await fetch('/api/plugins/hermes-project-stewardship/projects/payments-relaunch/team', {
         headers: { 'x-hermes-session-token': 'demo-session-token' },
       })
       return res.json()

@@ -1,4 +1,4 @@
-"""Dockyard bot layer domain: registry entries, groups, A2A messages.
+"""Project Stewardship bot layer domain: registry entries, groups, A2A messages.
 
 PRD v0.3 §4.2 (BM-01..BM-06). Pure domain rules; persistence in
 dockyard_store.py, orchestration in dockyard_service.py.

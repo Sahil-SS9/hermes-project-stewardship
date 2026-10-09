@@ -1,4 +1,4 @@
-"""Adapter implementing Dockyard's host contract on vanilla Hermes APIs."""
+"""Adapter implementing Project Stewardship's host contract on vanilla Hermes APIs."""
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -347,7 +347,7 @@ class ProjectKanbanHost:
 
         The parent comes from the plugin's own store, never from a Hermes link,
         and shows only while the parent task still exists on the board. It
-        replaces any native parent field the host has: for Dockyard items the
+        replaces any native parent field the host has: for Project Stewardship items the
         plugin's store is the only writer.
         """
         stored = self._work_parents.for_board(board)
@@ -368,7 +368,7 @@ class ProjectKanbanHost:
 
     @staticmethod
     def _native_status(status: str) -> str:
-        # Dockyard's backlog/todo vocabulary maps to vanilla's triage/ready
+        # Project Stewardship's backlog/todo vocabulary maps to vanilla's triage/ready
         # vocabulary. Never write fork-only statuses into the host database.
         return {"backlog": "triage", "todo": "ready"}.get(status, status)
 
@@ -568,7 +568,7 @@ class ProjectKanbanHost:
             closing = changes["status"] == "done"
             result = self.transition_task(
                 epic_id, "done" if closing else "ready", board=board,
-                **({"summary": changes.get("summary") or "Epic closed through Hermes Dockyard."} if closing else {}),
+                **({"summary": changes.get("summary") or "Epic closed through Hermes Project Stewardship."} if closing else {}),
             )
         return result
 

@@ -4173,7 +4173,7 @@ async function api(path, init) {
     return result;
   } catch (error) {
     const raw = String(error?.message ?? error).slice(0, 240);
-    const message = /^403:\s*\[object Object\]$/.test(raw) && /^\/projects\/[^/]+\/workflows\/[^/]+\/archive$/.test(path) ? "403 Forbidden: archive permission (project_archive) is required or this action is denied. No change was made." : /(?:error\s*)?500|internal service error/i.test(raw) ? "Dockyard could not confirm the request." : raw;
+    const message = /^403:\s*\[object Object\]$/.test(raw) && /^\/projects\/[^/]+\/workflows\/[^/]+\/archive$/.test(path) ? "403 Forbidden: archive permission (project_archive) is required or this action is denied. No change was made." : /(?:error\s*)?500|internal service error/i.test(raw) ? "Project Stewardship could not confirm the request." : raw;
     if (method !== "GET" && !init?.suppressErrorToast && !quiet) emitToast("danger", message);
     const failure = new Error(message);
     failure.cause = error;
@@ -6898,7 +6898,7 @@ function OnboardingWizard({ onClose, onComplete, intent = "new" }) {
         jsxs("header", { className: "dockyard-onboarding-head", children: [
           jsxs("div", { children: [
             jsx("span", { className: "dockyard-card-label", children: intent === "existing" ? "EXISTING PROJECT" : "NEW PROJECT" }),
-            jsx("h2", { id: "dockyard-onboarding-title", children: "Bring a project into Dockyard" }),
+            jsx("h2", { id: "dockyard-onboarding-title", children: "Bring a project into Project Stewardship" }),
             jsx("p", { children: "Four bounded steps. Nothing runs until the final review." })
           ] }),
           jsx("button", { type: "button", className: "dockyard-modal-close", "aria-label": "Close onboarding", disabled: submitting, onClick: onClose, children: "\xD7" })
@@ -7165,7 +7165,7 @@ function ConsoleBar({ tab, counts, onTab, onNewProject, onOnboardExisting, proje
       jsxs("div", { className: "dockyard-brand", children: [
         jsx("span", { className: "dockyard-brand-mark", children: jsx(Icon, { name: "dock" }) }),
         jsxs("span", { className: "dockyard-brand-copy", children: [
-          jsx("strong", { children: "Dockyard" }),
+          jsx("strong", { children: "Project Stewardship" }),
           jsx("span", { children: "Fleet oversight" })
         ] })
       ] }),
@@ -7175,7 +7175,7 @@ function ConsoleBar({ tab, counts, onTab, onNewProject, onOnboardExisting, proje
     jsx("nav", {
       className: "dockyard-tabs",
       role: "tablist",
-      "aria-label": "Dockyard sections",
+      "aria-label": "Project Stewardship sections",
       children: tabs.map(([key, label, count], index) => jsxs("button", {
         id: `dockyard-tab-${key}`,
         type: "button",
@@ -7246,13 +7246,13 @@ function EmptyState({ title, description, icon = "project" }) {
 function ErrorState({ error, onRetry }) {
   return jsxs("section", { className: "dockyard-state-panel", "data-state": "error", children: [
     jsx("span", { className: "dockyard-error-icon", children: jsx(Icon, { name: "alert" }) }),
-    jsx("h2", { children: "Dockyard could not load this view" }),
+    jsx("h2", { children: "Project Stewardship could not load this view" }),
     jsx("p", { children: String(error) }),
     jsx(Button, { action: "retry", variant: "primary", onClick: onRetry, children: "Try again" })
   ] });
 }
 function LoadingState() {
-  return jsxs("div", { className: "dockyard-skeleton-page", "data-state": "loading", "aria-label": "Loading Dockyard data", children: [
+  return jsxs("div", { className: "dockyard-skeleton-page", "data-state": "loading", "aria-label": "Loading Project Stewardship data", children: [
     jsx("div", { className: "dockyard-skeleton title" }),
     jsx("div", { className: "dockyard-skeleton copy" }),
     jsxs("div", { className: "dockyard-overview-grid", children: [
@@ -15625,7 +15625,7 @@ var isDockyardNode = (n) => n && typeof n === "object" && typeof n.id === "strin
 function readImport(text2) {
   const raw = String(text2 ?? "").trim();
   if (!raw) return { kind: "invalid", reason: "Paste a workflow, or choose a file, first." };
-  if (new TextEncoder().encode(raw).length > IMPORT_MAX_BYTES) return { kind: "invalid", reason: "This file is too big: Dockyard imports up to 256 KB." };
+  if (new TextEncoder().encode(raw).length > IMPORT_MAX_BYTES) return { kind: "invalid", reason: "This file is too big: Project Stewardship imports up to 256 KB." };
   let data = null;
   try {
     data = JSON.parse(raw);
@@ -15635,13 +15635,13 @@ function readImport(text2) {
   if (data && typeof data === "object") {
     const nodes = Array.isArray(data.definition?.nodes) ? data.definition.nodes : Array.isArray(data.nodes) ? data.nodes : null;
     if (nodes && nodes.length && nodes.every(isDockyardNode)) {
-      const warnings = data.schema && data.schema !== "stewardship.workflow/v2" ? [`The file says it is "${data.schema}"; Dockyard reads it as its own format.`] : [];
+      const warnings = data.schema && data.schema !== "stewardship.workflow/v2" ? [`The file says it is "${data.schema}"; Project Stewardship reads it as its own format.`] : [];
       return { kind: "dockyard", name: typeof data.name === "string" ? data.name : "", nodes, warnings };
     }
     if (nodes && nodes.some((n) => n && typeof n.type === "string" && "parameters" in n)) return fromN8n(data);
   }
   if (/^\s*jobs\s*:/m.test(raw)) return fromActions(raw);
-  return { kind: "invalid", reason: "This isn't a workflow Dockyard can read. Check the text, or describe what you want to the AI instead." };
+  return { kind: "invalid", reason: "This isn't a workflow Project Stewardship can read. Check the text, or describe what you want to the AI instead." };
 }
 function fromN8n(data) {
   const names = data.nodes.map((n) => String(n.name ?? n.type));
@@ -15945,7 +15945,7 @@ function ImportResult({ result }) {
   if (!result) return null;
   if (result.kind === "invalid") return jsx("p", { className: "dy-wfd-error", role: "alert", "data-wfd-import-error": true, children: result.reason });
   if (result.kind === "dockyard") return jsxs("div", { className: "dy-wfd-import-ok", role: "status", "data-wfd-import": "dockyard", children: [
-    jsx("p", { children: `A Dockyard workflow${result.name ? ` ("${result.name}")` : ""} with ${result.nodes.length} step${result.nodes.length === 1 ? "" : "s"}. It imports exactly.` }),
+    jsx("p", { children: `A Project Stewardship workflow${result.name ? ` ("${result.name}")` : ""} with ${result.nodes.length} step${result.nodes.length === 1 ? "" : "s"}. It imports exactly.` }),
     ...result.warnings.map((w) => jsx("p", { className: "dockyard-meta", children: w }, w)),
     jsx(StepsPreview, { nodes: result.nodes })
   ] });
@@ -16094,7 +16094,7 @@ function RepeatPopover({ node, anchor, check: savedCheck, onSave, onStop, onClos
 // hermes_dockyard_plugin/desktop/src/project/workflow-design/builtin-templates.json
 var builtin_templates_default = {
   schema: "dockyard.builtin-templates/v1",
-  about: "Built-in workflow templates (07/10/2026). Sources and reasoning: HPS-Audit-2026-09-24/WORKFLOW-TEMPLATES-RESEARCH.md. Steps name no bot: on use, Dockyard asks who does the work (the other steps) and who checks it (check_steps). Every save runs the engine's validator; tests/test_builtin_workflow_templates.py holds these to it.",
+  about: "Built-in workflow templates (07/10/2026). Sources and reasoning: HPS-Audit-2026-09-24/WORKFLOW-TEMPLATES-RESEARCH.md. Steps name no bot: on use, Project Stewardship asks who does the work (the other steps) and who checks it (check_steps). Every save runs the engine's validator; tests/test_builtin_workflow_templates.py holds these to it.",
   groups: [
     {
       id: "loops",
@@ -18238,7 +18238,7 @@ function NewWorkflowDialog({ project, taken, templates, members, onCreate, onClo
     if (way === "import") return jsxs("div", { className: "dy-wfd-way-body", children: [
       jsxs("label", { className: "dy-wfd-field", children: [
         jsx("span", { children: "Paste the workflow" }),
-        jsx("textarea", { rows: 5, value: importText, "data-wfd-import-text": true, placeholder: "A Dockyard export (JSON). Other formats go through the AI.", onChange: (e) => {
+        jsx("textarea", { rows: 5, value: importText, "data-wfd-import-text": true, placeholder: "A Project Stewardship export (JSON). Other formats go through the AI.", onChange: (e) => {
           setImportText(e.target.value);
           setImported(null);
         } })
@@ -19365,7 +19365,7 @@ function ProjectMemoryPanel({ project }) {
     jsxs("aside", { className: "dockyard-feature-card", "data-memory-preview-card": true, children: [
       jsx("span", { className: "dockyard-card-label", children: "WHAT BOTS SEE" }),
       state.context ? jsx("pre", { className: "dockyard-content-preview", "data-memory-preview": true, children: state.context }) : jsx("p", { className: "dockyard-meta", "data-memory-preview": true, children: "Nothing yet. Bots get no project memory until you add some." }),
-      jsx("small", { className: "dy-mem-count", children: `${number(state.context.length)} of ${number(state.cap)} characters. Bots get this when they work on this project's tasks, or in a chat opened from Dockyard.` }),
+      jsx("small", { className: "dy-mem-count", children: `${number(state.context.length)} of ${number(state.cap)} characters. Bots get this when they work on this project's tasks, or in a chat opened from Project Stewardship.` }),
       jsxs("div", { className: "dy-mem-suggestions", "data-memory-suggestions": suggestions.status, children: [
         jsx("h3", { children: "From finished work" }),
         suggestions.status === "loading" ? jsx("p", { className: "dockyard-meta", children: "Loading finished work..." }) : null,
@@ -22199,8 +22199,8 @@ async function openProjectChat({ host: host3, api: api2, projectId, profile }) {
   return { opened: true, linked, via: route ? "route" : "profile" };
 }
 function chatOutcomeMessage(profile, outcome) {
-  if (!outcome?.opened) return ["danger", "This version of Hermes Desktop cannot open a chat from Dockyard. Update Hermes Desktop."];
-  if (!outcome.linked) return ["danger", `Chat with ${profile} opened, but without this project's memory: Dockyard could not link it.`];
+  if (!outcome?.opened) return ["danger", "This version of Hermes Desktop cannot open a chat from Project Stewardship. Update Hermes Desktop."];
+  if (!outcome.linked) return ["danger", `Chat with ${profile} opened, but without this project's memory: Project Stewardship could not link it.`];
   return ["success", `Chat with ${profile} opened. Its first message brings this project's memory.`];
 }
 
@@ -22602,7 +22602,7 @@ var TRIGGER_WORD = Object.freeze({
   manual: "Run on request",
   gateway: "Run from a chat command",
   webhook: "Run by a webhook",
-  internal: "Run by Dockyard",
+  internal: "Run by Project Stewardship",
   schedule: "Run on schedule",
   scheduled: "Run on schedule"
 });
@@ -23115,7 +23115,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
         jsxs("section", { className: "dockyard-feature-card dockyard-project-hero", children: [
           jsx(StatusTag, { tone: healthTone, label: healthLabel }),
           jsx("h2", { children: view.settings?.mission || project.id }),
-          jsx("p", { children: "Work distribution and current delivery state from the canonical Dockyard backend." }),
+          jsx("p", { children: "Work distribution and current delivery state from the canonical Project Stewardship backend." }),
           jsx(WorkBar, { work: project.work ?? {}, label: `${project.id} delivery state` }),
           jsxs("div", { className: "dockyard-work-legend", children: [
             jsxs("span", { className: "backlog", children: [jsx("i", {}), `${number(project.work?.backlog ?? 0)} backlog`] }),
@@ -24244,7 +24244,7 @@ function AppearanceSettings({ appearance, onAppearance }) {
         ] })
       ]
     }, option.id)) }),
-    jsx("p", { className: "dy-appearance-note", children: theme === "auto" ? "Match Hermes: light or dark, the same as Hermes Desktop, and it changes when Hermes does." : "The theme applies to the whole app straight away, for everyone using this Dockyard." }),
+    jsx("p", { className: "dy-appearance-note", children: theme === "auto" ? "Match Hermes: light or dark, the same as Hermes Desktop, and it changes when Hermes does." : "The theme applies to the whole app straight away, for everyone using this Hermes." }),
     jsx("h3", { className: "dockyard-app-settings-sub", id: "dy-appearance-font", children: "Typeface" }),
     jsx("div", { className: "dy-font-grid", role: "radiogroup", "aria-labelledby": "dy-appearance-font", children: FONTS.map((option) => jsxs("button", {
       type: "button",
@@ -25614,8 +25614,8 @@ function surfacePopup(item) {
     id: `dockyard-notification-${item?.id}`,
     kind: "info",
     title: item?.title ?? "Fleet notification",
-    message: text2 || "Open Dockyard to review it.",
-    action: { label: "Open Dockyard", onClick: openDockyard }
+    message: text2 || "Open Project Stewardship to review it.",
+    action: { label: "Open Project Stewardship", onClick: openDockyard }
   });
 }
 function surfaceMore(count) {
@@ -25623,8 +25623,8 @@ function surfaceMore(count) {
     id: "dockyard-notification-more",
     kind: "info",
     title: `and ${count} more notification${count === 1 ? "" : "s"}`,
-    message: "See them all in Dockyard Notifications.",
-    action: { label: "Open Dockyard", onClick: openDockyard }
+    message: "See them all in Project Stewardship Notifications.",
+    action: { label: "Open Project Stewardship", onClick: openDockyard }
   });
 }
 function startPopupPoller(ctxRest) {
@@ -25655,8 +25655,8 @@ function startPopupPoller(ctxRest) {
   window.setTimeout(tick, 1500);
 }
 var __plugin = {
-  id: "hermes-dockyard",
-  name: "Hermes Dockyard",
+  id: "hermes-project-stewardship",
+  name: "Hermes Project Stewardship",
   register(ctx) {
     bindContext(ctx);
     startPopupPoller(ctx.rest);
@@ -25671,14 +25671,14 @@ var __plugin = {
         id: "nav",
         area: "sidebar.nav",
         order: 55,
-        data: { codicon: "project", label: "Dockyard", path: "/dockyard" }
+        data: { codicon: "project", label: "Project Stewardship", path: "/dockyard" }
       },
       {
         id: "open",
         area: "palette",
         data: {
-          id: "hermes-dockyard.open",
-          label: "Dockyard: Open fleet overview",
+          id: "hermes-project-stewardship.open",
+          label: "Project Stewardship: Open fleet overview",
           keywords: ["dockyard", "fleet", "projects", "approvals", "notifications"],
           run: () => host2.navigate("/dockyard")
         }

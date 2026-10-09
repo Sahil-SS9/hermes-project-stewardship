@@ -80,7 +80,7 @@ function AppearanceSettings({ appearance, onAppearance }) {
       }, option.id)) }),
     jsx('p', { className: 'dy-appearance-note', children: theme === 'auto'
       ? 'Match Hermes: light or dark, the same as Hermes Desktop, and it changes when Hermes does.'
-      : 'The theme applies to the whole app straight away, for everyone using this Dockyard.' }),
+      : 'The theme applies to the whole app straight away, for everyone using this Hermes.' }),
     jsx('h3', { className: 'dockyard-app-settings-sub', id: 'dy-appearance-font', children: 'Typeface' }),
     jsx('div', { className: 'dy-font-grid', role: 'radiogroup', 'aria-labelledby': 'dy-appearance-font', children: FONTS.map((option) =>
       jsxs('button', {

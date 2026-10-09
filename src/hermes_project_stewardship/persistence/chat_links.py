@@ -1,6 +1,6 @@
 """One-time links that tell a new Desktop chat which project it is about.
 
-Checks round 1 (Sahil 08/10, pick 1a = A). Dockyard's Chat button opens a fresh Desktop
+Checks round 1 (Sahil 08/10, pick 1a = A). Project Stewardship's Chat button opens a fresh Desktop
 chat with one of the project's bots. A plugin cannot learn that chat's id: Desktop saves
 a chat on its first message, and ``host.newChat`` returns nothing. So the button first
 records a link here (bot, project, ten minutes). The bot-side hook (``bot_context.py``)

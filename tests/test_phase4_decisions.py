@@ -205,12 +205,12 @@ def test_dashboard_proxy_forwards_decision_fields_and_exposes_readers():
         base_url="http://dockyard.test",
     )
     app = FastAPI()
-    app.include_router(plugin_api.plugin_api, prefix="/api/plugins/hermes-dockyard")
+    app.include_router(plugin_api.plugin_api, prefix="/api/plugins/hermes-project-stewardship")
 
     project_id = "decision-ui"
     try:
         test_client = TestClient(app)
-        created = test_client.post("/api/plugins/hermes-dockyard/onboard", json={
+        created = test_client.post("/api/plugins/hermes-project-stewardship/onboard", json={
             "project_id": project_id, "repo_path": "/srv/decision-ui",
             "mission": "proxy contract", "lead_profile": "octacon"})
         assert created.status_code == 200, created.text
@@ -219,24 +219,24 @@ def test_dashboard_proxy_forwards_decision_fields_and_exposes_readers():
         ini = service.propose_initiative(project_id, title="Proxy", rationale="r")
 
         payload = test_client.get(
-            f"/api/plugins/hermes-dockyard/initiatives/{ini['ref']}/decision")
+            f"/api/plugins/hermes-project-stewardship/initiatives/{ini['ref']}/decision")
         assert payload.status_code == 200, payload.text
         fingerprint = payload.json()["fingerprint"]
 
         stale = test_client.post(
-            f"/api/plugins/hermes-dockyard/initiatives/{ini['ref']}/reject",
+            f"/api/plugins/hermes-project-stewardship/initiatives/{ini['ref']}/reject",
             json={"expected_fingerprint": "stale", "reason": "owner reason",
                   "note": "owner note"})
         assert stale.status_code == 409, stale.text
 
         good = test_client.post(
-            f"/api/plugins/hermes-dockyard/initiatives/{ini['ref']}/reject",
+            f"/api/plugins/hermes-project-stewardship/initiatives/{ini['ref']}/reject",
             json={"expected_fingerprint": fingerprint, "reason": "owner reason",
                   "note": "owner note"})
         assert good.status_code == 200, good.text
 
         receipts = test_client.get(
-            f"/api/plugins/hermes-dockyard/initiatives/{ini['ref']}/decision/receipts")
+            f"/api/plugins/hermes-project-stewardship/initiatives/{ini['ref']}/decision/receipts")
         assert receipts.status_code == 200, receipts.text
         assert receipts.json()["receipts"][0]["reason"] == "owner reason"
         assert receipts.json()["receipts"][0]["note"] == "owner note"

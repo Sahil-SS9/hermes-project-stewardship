@@ -77,7 +77,7 @@ writeFileSync(
 );
 
 const meta = {
-  name: 'hermes-dockyard',
+  name: 'hermes-project-stewardship',
   builtFrom: [
     'src/index.ts', 'src/app.ts', 'src/api.ts',
     'src/style.css', 'src/workflow-canvas-css.ts',

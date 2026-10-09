@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/local-ci.sh — local CI mirror for Project Stewardship ("Dockyard").
+# scripts/local-ci.sh — local CI mirror for Project Stewardship.
 #
 # Why this exists: GitHub Actions is rate-limited for this account; the repo's
 # gate sequence cannot run there for now. This script mirrors the ci.yml gate

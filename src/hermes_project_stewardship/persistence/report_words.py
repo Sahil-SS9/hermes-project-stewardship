@@ -46,7 +46,7 @@ _INITIATIVE_TYPES = frozenset(code for code in EVENT_WORDS if code.startswith("i
 HEALTH_WORDS = {"healthy": "Healthy", "watch": "Watch", "degraded": "Degraded",
                 "critical": "Critical", "unknown": "Not verified"}
 TRIGGER_WORDS = {"manual": "Run on request", "gateway": "Run from a chat command",
-                 "webhook": "Run by a webhook", "internal": "Run by Dockyard",
+                 "webhook": "Run by a webhook", "internal": "Run by Project Stewardship",
                  "schedule": "Run on schedule", "scheduled": "Run on schedule"}
 
 WORK_STATUS_WORDS = {

@@ -1,9 +1,9 @@
-# Hermes Dockyard roadmap
+# Hermes Project Stewardship roadmap
 
 Status: canonical forward-looking backlog
 Updated: 26/08/2026
 
-This file is the single roadmap for work that remains after the current Dockyard build. Historical checklists and discrepancy reports are evidence sources, not active backlogs. A box in an older document is a claim to re-test against current code.
+This file is the single roadmap for work that remains after the current Project Stewardship build. Historical checklists and discrepancy reports are evidence sources, not active backlogs. A box in an older document is a claim to re-test against current code.
 
 ## Authority and state model
 
@@ -43,7 +43,7 @@ The following capabilities exist in current code and are not roadmap items unles
 - Durable domain events, notification records, quiet hours, dedupe, acknowledgement and optional critical auto-freeze.
 - GitHub webhook HMAC validation and replay protection.
 - Optional bearer authentication, mutating-request rate limiting and consistent API error envelopes.
-- Kanban bridge contracts, a local reference adapter and Dockyard-to-stewardship integration seam.
+- Kanban bridge contracts, a local reference adapter and UI-to-backend integration seam.
 - Discord adapter and reusable message-card templates.
 - Responsive light/dark Desktop UI with keyboard navigation, reduced-motion handling and numerically checked contrast.
 - Versioned, manually started workflow graphs that materialise canonical tasks,
@@ -65,8 +65,8 @@ State: complete locally
 
 Outcome:
 
-- The canonical convergence and Dockyard RC land as verified local commits:
-  Dockyard `0a65a0bb7b6da68d31f04ca5a55cfabc78d5b662` and host
+- The canonical convergence and Project Stewardship RC land as verified local commits:
+  Project Stewardship `0a65a0bb7b6da68d31f04ca5a55cfabc78d5b662` and host
   `ce7d9d4fb407a5f43ec6691e4aeb340d0b43a6c9`.
 
 Acceptance:
@@ -98,7 +98,7 @@ Current evidence:
 Acceptance:
 
 - README status is generated from current evidence rather than copied counts.
-- Changelog describes the Dockyard platform slice and its intentional deviations.
+- Changelog describes the Project Stewardship platform slice and its intentional deviations.
 - Old trackers are clearly labelled historical and link here.
 - No document calls Saved views an executable workflow engine.
 
@@ -109,7 +109,7 @@ Source: historical P10
 
 Outcome:
 
-- An operator can export a consistent Dockyard database and restore it into an isolated environment.
+- An operator can export a consistent Project Stewardship database and restore it into an isolated environment.
 
 Acceptance:
 
@@ -477,7 +477,7 @@ The following old open markers have current code/tests and should not be copied 
   automation trigger and has no activated scheduler.
 - Notifications remain a primary tab rather than an appbar popover.
 - Theme follows the host OS rather than using an in-panel toggle.
-- The Dockyard command-palette entry remains an intentional Desktop integration.
+- The Project Stewardship command-palette entry remains an intentional Desktop integration.
 
 ## Explicitly out of scope
 

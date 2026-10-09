@@ -1,4 +1,4 @@
-"""Project memory (Sahil 08/10, pick 1b = A: "Dockyard keeps each project's own memory
+"""Project memory (Sahil 08/10, pick 1b = A: "Project Stewardship keeps each project's own memory
 (facts, decisions, rules) and gives it to a bot whenever it works on that project").
 
 Design and the facts it rests on: HPS-Audit-2026-09-24/BUILD-CHECKS-R1.md. Pinned here:
@@ -197,7 +197,7 @@ def test_bot_context_orders_rules_decisions_facts(memory):
     archived = _add(memory, "Archived rule", kind="rule")
     memory.archive("alpha", archived["id"], actor="sahil", interface="rpc")
     text = memory.bot_context("alpha")
-    assert text.startswith("Dockyard project memory for project alpha (mission: ship the alpha app)")
+    assert text.startswith("Project Stewardship memory for project alpha (mission: ship the alpha app)")
     assert "Archived rule" not in text
     order = [text.index(s) for s in ("Never push to main", "Decided to use Expo", "New fact", "Old fact")]
     assert order == sorted(order)
@@ -211,7 +211,7 @@ def test_bot_context_is_capped_and_says_what_was_left_out(memory):
     text = memory.bot_context("alpha")
     assert len(text) <= CONTEXT_CAP
     assert "fact 29" in text  # newest first
-    assert "more in Dockyard" in text
+    assert "more in Project Stewardship" in text
     left_out = int(text.rsplit("...and ", 1)[1].split(" ", 1)[0])
     shown = text.count("\n- ")
     assert shown + left_out == 30

@@ -27,7 +27,7 @@ if os.environ.get("HPS_ISOLATION_PROBE"):
     except RuntimeError as exc:
         assert "test isolation refused SQLite path" in str(exc)
     else:
-        raise AssertionError("the pytest SQLite guard allowed the live Dockyard database")
+        raise AssertionError("the pytest SQLite guard allowed the live Project Stewardship database")
 
 
 def _collect(env: dict[str, str]) -> subprocess.CompletedProcess[str]:

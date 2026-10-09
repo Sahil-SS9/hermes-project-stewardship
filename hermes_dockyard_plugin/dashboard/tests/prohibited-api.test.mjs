@@ -1,4 +1,4 @@
-// Product constraint (locked): the Dockyard dashboard must never reach for
+// Product constraint (locked): the Project Stewardship dashboard must never reach for
 // string→DOM sinks (innerHTML / outerHTML / insertAdjacentHTML), eval, or
 // persistent storage (localStorage / sessionStorage / cookies). User and API
 // text must stay inert — build the DOM with createElement / textContent /

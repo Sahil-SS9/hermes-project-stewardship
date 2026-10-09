@@ -58,9 +58,9 @@ with TestClient(app) as client:
 sys.path.insert(0, {str(ROOT / "hermes_dockyard_plugin/dashboard")!r})
 import plugin_api
 host = FastAPI()
-host.include_router(plugin_api.plugin_api, prefix="/api/plugins/hermes-dockyard")
+host.include_router(plugin_api.plugin_api, prefix="/api/plugins/hermes-project-stewardship")
 with TestClient(host) as client:
-    response = client.get("/api/plugins/hermes-dockyard/projects/shared/settings")
+    response = client.get("/api/plugins/hermes-project-stewardship/projects/shared/settings")
     assert response.status_code == 200, response.text
     plugin = response.json()["project_id"]
 print(json.dumps({{"core": str(state.store.db_path),

@@ -1,6 +1,6 @@
 """Project memory (checks round 1; Sahil 08/10 pick 1b = A).
 
-Dockyard keeps a short memory for each project - facts, decisions and rules - and
+Project Stewardship keeps a short memory for each project - facts, decisions and rules - and
 gives it to the bots working on that project (``bot_context.py``). It works with any
 memory provider because it never touches one: a bot's own memory is unchanged.
 
@@ -81,13 +81,13 @@ def context_for(conn: sqlite3.Connection, project_id: str) -> str:
     mission = " ".join(str(project["mission"] or "").split())
     if len(mission) > _MISSION_CAP:
         mission = mission[: _MISSION_CAP - 3].rstrip() + "..."
-    header = f"Dockyard project memory for project {project_id}"
+    header = f"Project Stewardship memory for project {project_id}"
     header += f" (mission: {mission})." if mission else "."
-    header += " The project owner keeps this in Dockyard; follow its rules."
+    header += " The project owner keeps this in Project Stewardship; follow its rules."
     lines = [header]
     used = len(header)
     shown = 0
-    reserve = len("\n...and 999 more in Dockyard.")
+    reserve = len("\n...and 999 more in Project Stewardship.")
     for kind in KINDS:
         heading_added = False
         for entry in (e for e in entries if e["kind"] == kind):
@@ -104,7 +104,7 @@ def context_for(conn: sqlite3.Connection, project_id: str) -> str:
             shown += 1
     left_out = len(entries) - shown
     if left_out:
-        lines.append(f"\n...and {left_out} more in Dockyard.")
+        lines.append(f"\n...and {left_out} more in Project Stewardship.")
     return "".join(lines)
 
 

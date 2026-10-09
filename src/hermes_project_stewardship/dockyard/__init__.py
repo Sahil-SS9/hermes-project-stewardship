@@ -1,4 +1,4 @@
-"""Dockyard platform — G1 groundwork.
+"""Project Stewardship platform — G1 groundwork.
 
 Domain model for the work-management core (PRD v0.3 §3.1, §4.1).
 Pure domain: no IO, no engine imports. The stewardship trust engine is

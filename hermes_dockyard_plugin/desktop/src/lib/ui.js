@@ -381,7 +381,7 @@ export function OnboardingWizard({ onClose, onComplete, intent = 'new' }) {
         jsxs('header', { className: 'dockyard-onboarding-head', children: [
           jsxs('div', { children: [
             jsx('span', { className: 'dockyard-card-label', children: intent === 'existing' ? 'EXISTING PROJECT' : 'NEW PROJECT' }),
-            jsx('h2', { id: 'dockyard-onboarding-title', children: 'Bring a project into Dockyard' }),
+            jsx('h2', { id: 'dockyard-onboarding-title', children: 'Bring a project into Project Stewardship' }),
             jsx('p', { children: 'Four bounded steps. Nothing runs until the final review.' }),
           ]}),
           jsx('button', { type: 'button', className: 'dockyard-modal-close', 'aria-label': 'Close onboarding', disabled: submitting, onClick: onClose, children: '×' }),
@@ -634,14 +634,14 @@ export function ConsoleBar({ tab, counts, onTab, onNewProject, onOnboardExisting
       jsxs('div', { className: 'dockyard-brand', children: [
         jsx('span', { className: 'dockyard-brand-mark', children: jsx(Icon, { name: 'dock' }) }),
         jsxs('span', { className: 'dockyard-brand-copy', children: [
-          jsx('strong', { children: 'Dockyard' }),
+          jsx('strong', { children: 'Project Stewardship' }),
           jsx('span', { children: 'Fleet oversight' }),
         ]}),
       ]}),
       projects.length > 0 ? jsx(ProjectSwitcher, { projects, scope: selectedProject, onChange: onProjectChange, onNewProject, onOnboardExisting }) : null,
     ]}),
     jsx(FleetSearch, { onOpen }),
-    jsx('nav', { className: 'dockyard-tabs', role: 'tablist', 'aria-label': 'Dockyard sections', children:
+    jsx('nav', { className: 'dockyard-tabs', role: 'tablist', 'aria-label': 'Project Stewardship sections', children:
       tabs.map(([key, label, count], index) => jsxs('button', {
         id: `dockyard-tab-${key}`,
         type: 'button',
@@ -715,14 +715,14 @@ export function EmptyState({ title, description, icon = 'project' }) {
 export function ErrorState({ error, onRetry }) {
   return jsxs('section', { className: 'dockyard-state-panel', 'data-state': 'error', children: [
     jsx('span', { className: 'dockyard-error-icon', children: jsx(Icon, { name: 'alert' }) }),
-    jsx('h2', { children: 'Dockyard could not load this view' }),
+    jsx('h2', { children: 'Project Stewardship could not load this view' }),
     jsx('p', { children: String(error) }),
     jsx(Button, { action: 'retry', variant: 'primary', onClick: onRetry, children: 'Try again' }),
   ]})
 }
 
 export function LoadingState() {
-  return jsxs('div', { className: 'dockyard-skeleton-page', 'data-state': 'loading', 'aria-label': 'Loading Dockyard data', children: [
+  return jsxs('div', { className: 'dockyard-skeleton-page', 'data-state': 'loading', 'aria-label': 'Loading Project Stewardship data', children: [
     jsx('div', { className: 'dockyard-skeleton title' }),
     jsx('div', { className: 'dockyard-skeleton copy' }),
     jsxs('div', { className: 'dockyard-overview-grid', children: [

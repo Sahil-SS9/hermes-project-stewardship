@@ -41,7 +41,7 @@ def _observe(host, task_id):
 
 
 def test_real_host_external_transition_visible_to_dockyard(tmp_path, monkeypatch):
-    """P3.1: an external native completion is visible to Dockyard's observer.
+    """P3.1: an external native completion is visible to Project Stewardship's observer.
 
     Drives the real vanilla host: provision → create → external claim +
     complete through native kanban_db, then observes through the same host

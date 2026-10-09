@@ -111,7 +111,7 @@ test('phase 4 real Desktop journeys: objectives, reports, saved views', { timeou
     await t.test('objectives on Vision: create → edit → evaluate now → archive', async () => {
       await page.goto(`${BASE}/desktop`, { waitUntil: 'load' });
       await page.waitForSelector('[data-tab="dashboard"]', { timeout: 20000 });
-      // Sahil 05/10: Dockyard opens on All projects; pick the project first.
+      // Sahil 05/10: Project Stewardship opens on All projects; pick the project first.
       await pickProject(page, 'payments-relaunch');
       await page.click('[data-tab="project"]');
       // Design round f: objectives live on the project's Vision screen.

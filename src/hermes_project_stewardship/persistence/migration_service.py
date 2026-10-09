@@ -1,4 +1,4 @@
-"""One-shot legacy Dockyard work migration into canonical Hermes work."""
+"""One-shot legacy Project Stewardship work migration into canonical Hermes work."""
 from __future__ import annotations
 
 import hashlib

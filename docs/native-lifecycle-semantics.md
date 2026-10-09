@@ -1,6 +1,6 @@
 # Native task lifecycle semantics
 
-Dockyard delegates status changes to the native Hermes lifecycle functions; it does not represent manual status changes as verified worker execution.
+Project Stewardship delegates status changes to the native Hermes lifecycle functions; it does not represent manual status changes as verified worker execution.
 
 - An unclaimed task has no run identity to protect. Where the native host permits it, an explicit review request (including `force_review=True`) and subsequent completion may therefore occur without `expected_run_id`. This is a manual lifecycle action, not evidence that a worker ran.
 - `create_task(initial_status="review" | "done")` records a task directly in the requested lifecycle state through native review/completion operations. No worker run is implied. Native events and completion timestamps remain authoritative; outcome verification is a separate requirement.

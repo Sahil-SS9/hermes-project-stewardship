@@ -1,4 +1,4 @@
-"""Backend contract tests for the Dockyard dashboard plugin.
+"""Backend contract tests for the Project Stewardship dashboard plugin.
 
 Verifies the REAL host contract: plugin_api router shape, proxy paths,
 and end-to-end behaviour through the plugin's own endpoints.
@@ -56,7 +56,7 @@ def client():
     )
     plugin_api._client = test_client
     app = FastAPI()
-    app.include_router(plugin_api.plugin_api, prefix="/api/plugins/hermes-dockyard")
+    app.include_router(plugin_api.plugin_api, prefix="/api/plugins/hermes-project-stewardship")
     try:
         with TestClient(app) as c:
             yield c
@@ -78,7 +78,7 @@ def test_assessment_proxy_preserves_server_authority(client, human):
     transport = plugin_api.httpx.AsyncClient(transport=plugin_api.httpx.ASGITransport(app=application), base_url='http://test', headers={'Authorization': 'Bearer proxy-test'})
     plugin_api._client = transport
     try:
-        path = f'/api/plugins/hermes-dockyard/projects/{pid}/objectives/{objective["id"]}/assessment'
+        path = f'/api/plugins/hermes-project-stewardship/projects/{pid}/objectives/{objective["id"]}/assessment'
         forged = client.post(path, json={'passed': True, 'evidence': ['test:1'], 'actor': 'forged'})
         assert forged.status_code == 422
         response = client.post(path, json={'passed': True, 'evidence': ['test:1']})
@@ -93,10 +93,10 @@ def test_assessment_proxy_preserves_server_authority(client, human):
 
 
 def test_host_contract_router_and_health(client):
-    r = client.get("/api/plugins/hermes-dockyard/health")
+    r = client.get("/api/plugins/hermes-project-stewardship/health")
     assert r.status_code == 200
     assert r.json()["ok"] is True
-    assert r.json()["service"] == "hermes-dockyard"
+    assert r.json()["service"] == "hermes-project-stewardship"
 
 
 def test_milestone_proxy_round_trip_is_not_false_empty(client):
@@ -105,17 +105,17 @@ def test_milestone_proxy_round_trip_is_not_false_empty(client):
     service = StewardshipService(plugin_api._store)
     service.enable(project_id, lead_profile="fixture")
     created = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/milestones",
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/milestones",
         json={"name": "Release", "due": "2026-12-01"},
     )
     assert created.status_code == 200, created.text
     listed = client.get(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/milestones"
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/milestones"
     )
     assert listed.status_code == 200, listed.text
     assert [item["name"] for item in listed.json()["milestones"]] == ["Release"]
     detail = client.get(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/milestones/Release"
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/milestones/Release"
     )
     assert detail.status_code == 200, detail.text
 
@@ -124,7 +124,7 @@ def test_all_milestone_operations_cross_proxy_and_backend(client):
     from hermes_project_stewardship.persistence.service import StewardshipService
     pid = "milestone-all-operations"
     StewardshipService(plugin_api._store).enable(pid, lead_profile="fixture")
-    base = f"/api/plugins/hermes-dockyard/projects/{pid}/milestones"
+    base = f"/api/plugins/hermes-project-stewardship/projects/{pid}/milestones"
     assert client.post(base, json={"name": "Plan", "due": "2026-12-01"}).status_code == 200
     assert client.patch(f"{base}/Plan", json={"closed": True}).status_code == 200
     assert client.post(f"{base}/Plan/rename", json={"new_name": "Shipped"}).status_code == 200
@@ -136,7 +136,7 @@ def test_all_milestone_operations_cross_proxy_and_backend(client):
 
 
 def test_milestone_server_error_branches_are_explicit(client):
-    base = "/api/plugins/hermes-dockyard/projects/missing/milestones"
+    base = "/api/plugins/hermes-project-stewardship/projects/missing/milestones"
     assert client.get(base).status_code == 404
     assert client.get(f"{base}/none").status_code == 404
     assert client.patch(f"{base}/none", json={"closed": True}).status_code == 409
@@ -145,7 +145,7 @@ def test_milestone_server_error_branches_are_explicit(client):
 
 
 @pytest.mark.parametrize(("status", "payload", "expected", "code"), [
-    # The Dockyard API's own envelope (api/middleware.py): the message is the
+    # The Project Stewardship API's own envelope (api/middleware.py): the message is the
     # detail, the code rides in a header, field reasons join the message.
     (422, {"error": {"code": "validation_error",
                      "message": "workflow dependencies must reference existing nodes"}},
@@ -174,7 +174,7 @@ def test_milestone_proxy_propagates_backend_failures(client, monkeypatch, status
         async def request(self, *_args, **_kwargs):
             return Response()
     monkeypatch.setattr(plugin_api, "_client", Backend())
-    response = client.get("/api/plugins/hermes-dockyard/projects/p/milestones")
+    response = client.get("/api/plugins/hermes-project-stewardship/projects/p/milestones")
     assert response.status_code == status
     # The reason is the bridge's own detail: the Desktop host prints
     # "<status>: <detail>", and the old nested object printed as
@@ -193,7 +193,7 @@ def test_proxy_reports_a_non_json_failure_as_text(client, monkeypatch):
         async def request(self, *_args, **_kwargs):
             return Response()
     monkeypatch.setattr(plugin_api, "_client", Backend())
-    response = client.get("/api/plugins/hermes-dockyard/projects/p/milestones")
+    response = client.get("/api/plugins/hermes-project-stewardship/projects/p/milestones")
     assert response.status_code == 502
     assert response.json()["detail"] == "upstream exploded"
     assert response.headers.get("x-dockyard-error-code") == "upstream_error"
@@ -206,7 +206,7 @@ def test_default_plugin_database_is_durable_and_private(tmp_path, monkeypatch):
     monkeypatch.delenv("DOCKYARD_PLUGIN_DB", raising=False)
     monkeypatch.delenv("STEWARD_DB_PATH", raising=False)
     # Fix 2: the default is reserved for the host; simulate its module name.
-    monkeypatch.setitem(sys.modules, "hermes_dashboard_plugin_hermes-dockyard", plugin_api)
+    monkeypatch.setitem(sys.modules, "hermes_dashboard_plugin_hermes-project-stewardship", plugin_api)
 
     default_path = plugin_api._default_db_path()
 
@@ -236,27 +236,27 @@ def test_proxy_rejects_invalid_success_payload(client, monkeypatch):
             return InvalidJsonResponse()
 
     monkeypatch.setattr(plugin_api, "_client", InvalidJsonClient())
-    response = client.get("/api/plugins/hermes-dockyard/dashboard")
+    response = client.get("/api/plugins/hermes-project-stewardship/dashboard")
     assert response.status_code == 502
-    assert response.json()["detail"] == "Dockyard returned an invalid response"
+    assert response.json()["detail"] == "Project Stewardship returned an invalid response"
 
 
 def test_onboard_then_dashboard_flow(client):
-    r = client.post("/api/plugins/hermes-dockyard/onboard", json={
+    r = client.post("/api/plugins/hermes-project-stewardship/onboard", json={
         "project_id": "alpha", "repo_path": "/srv/a",
         "mission": "test mission", "lead_profile": "octacon"})
     assert r.status_code == 200, r.text
 
-    dash = client.get("/api/plugins/hermes-dockyard/dashboard")
+    dash = client.get("/api/plugins/hermes-project-stewardship/dashboard")
     assert dash.status_code == 200
     projects = dash.json().get("projects", [])
     assert any(p["id"] == "alpha" for p in projects)
 
-    inbox = client.get("/api/plugins/hermes-dockyard/inbox")
+    inbox = client.get("/api/plugins/hermes-project-stewardship/inbox")
     assert inbox.status_code == 200
     assert "items" in inbox.json()
 
-    notes = client.get("/api/plugins/hermes-dockyard/notifications")
+    notes = client.get("/api/plugins/hermes-project-stewardship/notifications")
     assert notes.status_code == 200
     assert "notifications" in notes.json()
 
@@ -271,12 +271,12 @@ def test_onboarding_member_contract_survives_proxy_and_persists(client):
         "idempotency_key": "member-path-key",
     }
     preflight = client.post(
-        "/api/plugins/hermes-dockyard/onboard/preflight", json=payload
+        "/api/plugins/hermes-project-stewardship/onboard/preflight", json=payload
     )
     assert preflight.status_code == 200, preflight.text
     contract = preflight.json()["preflight"]
     created = client.post(
-        "/api/plugins/hermes-dockyard/onboard",
+        "/api/plugins/hermes-project-stewardship/onboard",
         json={
             **payload,
             "expected_membership_revision": contract["membership_revision"],
@@ -285,7 +285,7 @@ def test_onboarding_member_contract_survives_proxy_and_persists(client):
     )
     assert created.status_code == 200, created.text
     settings = client.get(
-        "/api/plugins/hermes-dockyard/projects/member-path/settings"
+        "/api/plugins/hermes-project-stewardship/projects/member-path/settings"
     )
     assert settings.status_code == 200
     assert settings.json()["owner"] == {
@@ -296,7 +296,7 @@ def test_onboarding_member_contract_survives_proxy_and_persists(client):
 
 
 def test_existing_onboarding_rejects_conflicting_default_key_reuse(client):
-    r = client.post("/api/plugins/hermes-dockyard/onboard", json={
+    r = client.post("/api/plugins/hermes-project-stewardship/onboard", json={
         "project_id": "alpha", "repo_path": "/srv/a",
         "mission": "again", "lead_profile": "octacon"})
     assert r.status_code == 409
@@ -307,7 +307,7 @@ def test_existing_onboarding_rejects_conflicting_default_key_reuse(client):
 
 def test_rich_dashboard_reads_are_exposed_through_plugin_router(client):
     project_id = "rich-ui"
-    created = client.post("/api/plugins/hermes-dockyard/onboard", json={
+    created = client.post("/api/plugins/hermes-project-stewardship/onboard", json={
         "project_id": project_id, "repo_path": "/srv/rich-ui",
         "mission": "prove the richer desktop UI", "lead_profile": "octacon"})
     assert created.status_code == 200, created.text
@@ -320,7 +320,7 @@ def test_rich_dashboard_reads_are_exposed_through_plugin_router(client):
         "/workload": "busy",
     }
     for path, key in expected.items():
-        response = client.get(f"/api/plugins/hermes-dockyard{path}")
+        response = client.get(f"/api/plugins/hermes-project-stewardship{path}")
         assert response.status_code == 200, (path, response.text)
         assert key in response.json(), (path, response.json())
 
@@ -329,7 +329,7 @@ def test_plugin_approve_and_reject_use_real_upstream_contract(client):
     from hermes_project_stewardship.persistence.service import StewardshipService
 
     project_id = "decision-ui"
-    created = client.post("/api/plugins/hermes-dockyard/onboard", json={
+    created = client.post("/api/plugins/hermes-project-stewardship/onboard", json={
         "project_id": project_id, "repo_path": "/srv/decision-ui",
         "mission": "verify owner decisions", "lead_profile": "octacon"})
     assert created.status_code == 200, created.text
@@ -341,37 +341,37 @@ def test_plugin_approve_and_reject_use_real_upstream_contract(client):
         project_id, title="Reject me", rationale="insufficient value")
 
     approve_response = client.post(
-        f"/api/plugins/hermes-dockyard/initiatives/{approved['ref']}/approve")
+        f"/api/plugins/hermes-project-stewardship/initiatives/{approved['ref']}/approve")
     assert approve_response.status_code == 200, approve_response.text
     assert approve_response.json()["status"] == "executing"
 
     completed = client.post(
-        f"/api/plugins/hermes-dockyard/initiatives/{approved['ref']}/complete",
+        f"/api/plugins/hermes-project-stewardship/initiatives/{approved['ref']}/complete",
         json={"verified": True, "regressed": False},
     )
     assert completed.status_code == 200, completed.text
     assert completed.json()["engine_status"] == "completed"
     observations = client.get(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/observations"
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/observations"
     )
     assert observations.status_code == 200, observations.text
     assert observations.json()["observations"][0]["status"] == "pending"
     observed = client.post(
-        f"/api/plugins/hermes-dockyard/observations/{approved['ref']}/run",
+        f"/api/plugins/hermes-project-stewardship/observations/{approved['ref']}/run",
         json={},
     )
     assert observed.status_code == 200, observed.text
     assert observed.json()["status"] == "completed"
 
     reject_response = client.post(
-        f"/api/plugins/hermes-dockyard/initiatives/{rejected['ref']}/reject")
+        f"/api/plugins/hermes-project-stewardship/initiatives/{rejected['ref']}/reject")
     assert reject_response.status_code == 200, reject_response.text
     assert reject_response.json()["status"] == "rejected"
 
 
 def test_project_management_and_visualisation_routes(client):
     project_id = "project-ui"
-    created = client.post("/api/plugins/hermes-dockyard/onboard", json={
+    created = client.post("/api/plugins/hermes-project-stewardship/onboard", json={
         "project_id": project_id, "repo_path": "/srv/project-ui",
         "mission": "exercise project dashboard operations",
         "lead_profile": "octacon"})
@@ -386,41 +386,41 @@ def test_project_management_and_visualisation_routes(client):
         ref = work.json()["ref"]
 
     transition = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items/{ref}/transition",
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/work-items/{ref}/transition",
         json={"status": "in_progress"})
     assert transition.status_code == 200, transition.text
     assert transition.json()["status"] == "in_progress"
 
     added = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/backlog", json={
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/backlog", json={
             "ref": ref, "rank": 1, "reason": "highest verified impact"})
     assert added.status_code == 200, added.text
 
     reranked = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/backlog/{ref}/rerank",
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/backlog/{ref}/rerank",
         json={"new_rank": 2, "reason": "dependency now leads"})
     assert reranked.status_code == 200, reranked.text
 
     backlog = client.get(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/backlog")
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/backlog")
     assert backlog.status_code == 200
     assert backlog.json()["backlog"][0]["item_ref"] == ref
 
     saved = client.put(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/views", json={
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/views", json={
             "name": "Owner focus", "layout": "board",
             "filters": {"status": "in_progress"}, "shared": False})
     assert saved.status_code == 200, saved.text
     views = client.get(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/views")
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/views")
     assert views.status_code == 200
     assert any(view["name"] == "Owner focus" for view in views.json()["views"])
 
     frozen = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/freeze")
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/freeze")
     assert frozen.status_code == 200, frozen.text
     resumed = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/resume")
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/resume")
     assert resumed.status_code == 200, resumed.text
 
 
@@ -444,7 +444,7 @@ def test_project_archive_restore_roundtrip_through_plugin_proxy(client):
     plugin_api._client = transport
     try:
         project_id = "phase5-archive-proxy"
-        created = client.post("/api/plugins/hermes-dockyard/onboard", json={
+        created = client.post("/api/plugins/hermes-project-stewardship/onboard", json={
             "project_id": project_id,
             "repo_path": "/srv/phase5-archive-proxy",
             "mission": "verify archive proxy parity",
@@ -453,7 +453,7 @@ def test_project_archive_restore_roundtrip_through_plugin_proxy(client):
         assert created.status_code == 200, created.text
 
         defined = client.post(
-            f"/api/plugins/hermes-dockyard/projects/{project_id}/workflows",
+            f"/api/plugins/hermes-project-stewardship/projects/{project_id}/workflows",
             json={
                 "name": "release",
                 "nodes": [{
@@ -464,24 +464,24 @@ def test_project_archive_restore_roundtrip_through_plugin_proxy(client):
         )
         assert defined.status_code == 200, defined.text
         started = client.post(
-            f"/api/plugins/hermes-dockyard/projects/{project_id}/workflows/release/start",
+            f"/api/plugins/hermes-project-stewardship/projects/{project_id}/workflows/release/start",
             json={"version": 1, "run_key": "proxy-run-1"},
         )
         assert started.status_code == 200, started.text
         history = client.get(
-            f"/api/plugins/hermes-dockyard/projects/{project_id}/workflows/release/runs"
+            f"/api/plugins/hermes-project-stewardship/projects/{project_id}/workflows/release/runs"
         )
         assert history.status_code == 200, history.text
         assert history.json()["runs"][0]["version"] == 1
 
         archived = client.post(
-            f"/api/plugins/hermes-dockyard/projects/{project_id}/archive")
+            f"/api/plugins/hermes-project-stewardship/projects/{project_id}/archive")
         assert archived.status_code == 200, archived.text
         assert archived.json()["enabled"] is False
         assert archived.json()["archived_at"]
 
         restored = client.post(
-            f"/api/plugins/hermes-dockyard/projects/{project_id}/restore")
+            f"/api/plugins/hermes-project-stewardship/projects/{project_id}/restore")
         assert restored.status_code == 200, restored.text
         assert restored.json()["enabled"] is True
         assert restored.json()["archived_at"] is None
@@ -492,7 +492,7 @@ def test_project_archive_restore_roundtrip_through_plugin_proxy(client):
 
 def test_work_item_editor_assignment_and_dependencies_through_plugin(client):
     project_id = "work-editor-ui"
-    created = client.post("/api/plugins/hermes-dockyard/onboard", json={
+    created = client.post("/api/plugins/hermes-project-stewardship/onboard", json={
         "project_id": project_id,
         "repo_path": "/srv/work-editor-ui",
         "mission": "exercise complete work management",
@@ -515,7 +515,7 @@ def test_work_item_editor_assignment_and_dependencies_through_plugin(client):
     second_ref = second.json()["ref"]
 
     edited = client.patch(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items/{first_ref}",
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/work-items/{first_ref}",
         json={
             "title": "Edited through Desktop",
             "type": "bug",
@@ -531,30 +531,30 @@ def test_work_item_editor_assignment_and_dependencies_through_plugin(client):
     assert edited.json()["labels"] == ["desktop", "release"]
 
     assigned = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items/{first_ref}/assign",
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/work-items/{first_ref}/assign",
         json={"assignee_id": "octacon"},
     )
     assert assigned.status_code == 200, assigned.text
     assert assigned.json()["assignee"] == "octacon"
 
     linked = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items/{first_ref}/dependencies",
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/work-items/{first_ref}/dependencies",
         json={"dependency_ref": second_ref},
     )
     assert linked.status_code == 200, linked.text
     detail = client.get(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items/{first_ref}"
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/work-items/{first_ref}"
     )
     assert detail.status_code == 200, detail.text
     assert [row["ref"] for row in detail.json()["dependencies"]] == [second_ref]
 
     removed = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items/{first_ref}/dependencies/{second_ref}/remove",
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/work-items/{first_ref}/dependencies/{second_ref}/remove",
         json={},
     )
     assert removed.status_code == 200, removed.text
     detail = client.get(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items/{first_ref}"
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/work-items/{first_ref}"
     )
     assert detail.json()["dependencies"] == []
 
@@ -566,19 +566,19 @@ def test_bot_group_read_routes(client):
             "member_ids": [], "actor_id": "sahil"})
         assert created.status_code == 200, created.text
 
-    groups = client.get("/api/plugins/hermes-dockyard/bot-groups")
+    groups = client.get("/api/plugins/hermes-project-stewardship/bot-groups")
     assert groups.status_code == 200
     assert any(group["name"] == "ui-crew" for group in groups.json()["groups"])
 
     messages = client.get(
-        "/api/plugins/hermes-dockyard/bot-groups/ui-crew/messages")
+        "/api/plugins/hermes-project-stewardship/bot-groups/ui-crew/messages")
     assert messages.status_code == 200
     assert "messages" in messages.json()
 
 
 def test_project_settings_patch_and_report_history(client):
     project_id = "reports-ui"
-    created = client.post("/api/plugins/hermes-dockyard/onboard", json={
+    created = client.post("/api/plugins/hermes-project-stewardship/onboard", json={
         "project_id": project_id,
         "repo_path": "/srv/reports-ui",
         "mission": "Make delivery evidence readable",
@@ -587,7 +587,7 @@ def test_project_settings_patch_and_report_history(client):
     assert created.status_code == 200, created.text
 
     updated = client.patch(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/settings",
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/settings",
         json={
             "mission": "Make delivery evidence readable and exportable",
             "autonomy_level": 2,
@@ -619,7 +619,7 @@ def test_project_settings_patch_and_report_history(client):
         assert work.status_code == 200, work.text
 
     generated = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/reports",
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/reports",
         json={"report_type": "executive", "include_activity": True},
     )
     assert generated.status_code == 200, generated.text
@@ -634,7 +634,7 @@ def test_project_settings_patch_and_report_history(client):
     assert "| Ref | Work item | Status | Assignee |" not in report["content"]
 
     delivery = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/reports",
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/reports",
         json={"report_type": "delivery", "include_activity": False},
     )
     assert delivery.status_code == 200, delivery.text
@@ -643,7 +643,7 @@ def test_project_settings_patch_and_report_history(client):
     assert "## Recent activity" not in delivery.json()["content"]
 
     risk = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/reports",
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/reports",
         json={"report_type": "risk", "include_activity": True},
     )
     assert risk.status_code == 200, risk.text
@@ -652,7 +652,7 @@ def test_project_settings_patch_and_report_history(client):
     assert "## Recent activity" not in risk.json()["content"]
 
     full = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/reports",
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/reports",
         json={"report_type": "full", "include_activity": True},
     )
     assert full.status_code == 200, full.text
@@ -660,12 +660,12 @@ def test_project_settings_patch_and_report_history(client):
     assert "## Recent activity" in full.json()["content"]
 
     history = client.get(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/reports")
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/reports")
     assert history.status_code == 200, history.text
     assert any(item["report_id"] == report["report_id"] for item in history.json()["reports"])
 
     fetched = client.get(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/reports/{report['report_id']}")
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/reports/{report['report_id']}")
     assert fetched.status_code == 200, fetched.text
     assert fetched.json()["content"] == report["content"]
 
@@ -679,7 +679,7 @@ def test_report_counts_waiting_initiatives_and_uses_plain_words(client):
     import re
 
     project_id = "reports-words"
-    created = client.post("/api/plugins/hermes-dockyard/onboard", json={
+    created = client.post("/api/plugins/hermes-project-stewardship/onboard", json={
         "project_id": project_id,
         "repo_path": "/srv/reports-words",
         "mission": "Readable reports",
@@ -687,7 +687,7 @@ def test_report_counts_waiting_initiatives_and_uses_plain_words(client):
     })
     assert created.status_code == 200, created.text
     updated = client.patch(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/settings",
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/settings",
         json={"verification_policy": {"require_tests": True, "max_open_initiatives": 3}},
     )
     assert updated.status_code == 200, updated.text
@@ -709,7 +709,7 @@ def test_report_counts_waiting_initiatives_and_uses_plain_words(client):
     assert initiative["status"] == "pending_approval"
 
     generated = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/reports",
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/reports",
         json={"report_type": "full", "include_activity": True},
     )
     assert generated.status_code == 200, generated.text
@@ -739,7 +739,7 @@ def test_report_counts_waiting_initiatives_and_uses_plain_words(client):
 
 def test_bot_session_transcripts_are_profile_scoped(client, tmp_path, monkeypatch):
     project_id = "sessions-ui"
-    created = client.post("/api/plugins/hermes-dockyard/onboard", json={
+    created = client.post("/api/plugins/hermes-project-stewardship/onboard", json={
         "project_id": project_id,
         "repo_path": "/srv/sessions-ui",
         "mission": "Inspect bot execution evidence",
@@ -808,7 +808,7 @@ def test_bot_session_transcripts_are_profile_scoped(client, tmp_path, monkeypatc
     monkeypatch.setenv("DOCKYARD_SESSION_ROOT", str(session_root))
 
     sessions = client.get(
-        "/api/plugins/hermes-dockyard/bots/transcript-bot/sessions")
+        "/api/plugins/hermes-project-stewardship/bots/transcript-bot/sessions")
     assert sessions.status_code == 200, sessions.text
     payload = sessions.json()
     assert payload["profile"] == "octacon"
@@ -816,7 +816,7 @@ def test_bot_session_transcripts_are_profile_scoped(client, tmp_path, monkeypatc
     assert payload["sessions"][0]["status"] == "active"
 
     transcript = client.get(
-        "/api/plugins/hermes-dockyard/bots/transcript-bot/sessions/sess-octacon-1")
+        "/api/plugins/hermes-project-stewardship/bots/transcript-bot/sessions/sess-octacon-1")
     assert transcript.status_code == 200, transcript.text
     roles = [message["role"] for message in transcript.json()["messages"]]
     assert roles == ["user", "assistant", "tool"]
@@ -827,7 +827,7 @@ def test_bot_session_transcripts_are_profile_scoped(client, tmp_path, monkeypatc
     assert transcript.json()["scope_note"] == "System prompts and private reasoning are excluded."
 
     hidden = client.get(
-        "/api/plugins/hermes-dockyard/bots/transcript-bot/sessions/hidden-session")
+        "/api/plugins/hermes-project-stewardship/bots/transcript-bot/sessions/hidden-session")
     assert hidden.status_code == 404
     assert "private hidden request" not in hidden.text
 
@@ -835,7 +835,7 @@ def test_bot_session_transcripts_are_profile_scoped(client, tmp_path, monkeypatc
 def test_manifest_declares_required_fields():
     import json
     manifest = json.loads((PLUGIN_DIR / "manifest.json").read_text())
-    assert manifest["name"] == "hermes-dockyard"
+    assert manifest["name"] == "hermes-project-stewardship"
     assert manifest["entry"].startswith("dist/")
     assert manifest["css"].startswith("dist/")
 
@@ -855,13 +855,13 @@ def test_built_dist_present():
 
 def test_plugin_create_queued_item_proxy(client):
     project_id = "queued-ui"
-    client.post("/api/plugins/hermes-dockyard/onboard", json={
+    client.post("/api/plugins/hermes-project-stewardship/onboard", json={
         "project_id": project_id, "repo_path": "/srv/queued",
         "mission": "exercise the queued item proxy",
         "lead_profile": "octacon",
     })
     r = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/backlog/items",
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/backlog/items",
         json={
             "type": "task", "title": "Investigate customer checkout",
             "assignee_id": "octacon-bot", "assignee_kind": "bot",
@@ -873,25 +873,25 @@ def test_plugin_create_queued_item_proxy(client):
     assert body["ref"].startswith("test-t-") and body["rank"] == 1
 
     work = client.get(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/work-items"
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/work-items"
     ).json()["work_items"]
     assert any(w["ref"] == body["ref"] and w["assignee"] == "octacon-bot"
                and w["created_by"] == plugin_api._ACTOR_ID for w in work)
     entries = client.get(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/backlog"
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/backlog"
     ).json()["backlog"]
     assert entries[0]["item_ref"] == body["ref"]
 
 
 def test_plugin_create_queued_item_rejects_same_creator_assignee(client):
     project_id = "queued-self"
-    client.post("/api/plugins/hermes-dockyard/onboard", json={
+    client.post("/api/plugins/hermes-project-stewardship/onboard", json={
         "project_id": project_id, "repo_path": "/srv/queued-self",
         "mission": "exercise the queued item proxy self-assign",
         "lead_profile": "octacon",
     })
     r = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/backlog/items",
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/backlog/items",
         json={
             "type": "task", "title": "Self assigned",
             "assignee_id": plugin_api._ACTOR_ID, "assignee_kind": "human",
@@ -902,12 +902,12 @@ def test_plugin_create_queued_item_rejects_same_creator_assignee(client):
 
 
 def test_plugin_create_queued_item_rejects_cross_project_initiative(client):
-    client.post("/api/plugins/hermes-dockyard/onboard", json={
+    client.post("/api/plugins/hermes-project-stewardship/onboard", json={
         "project_id": "a-proj", "repo_path": "/srv/a",
         "mission": "exercise cross-project initiative guard",
         "lead_profile": "octacon",
     })
-    b = client.post("/api/plugins/hermes-dockyard/onboard", json={
+    b = client.post("/api/plugins/hermes-project-stewardship/onboard", json={
         "project_id": "b-proj", "repo_path": "/srv/b",
         "mission": "exercise cross-project initiative guard too",
         "lead_profile": "octacon",
@@ -919,7 +919,7 @@ def test_plugin_create_queued_item_rejects_cross_project_initiative(client):
             json={"title": "Only in a", "rationale": "r"},
         ).json()
     r = client.post(
-        "/api/plugins/hermes-dockyard/projects/b-proj/backlog/items",
+        "/api/plugins/hermes-project-stewardship/projects/b-proj/backlog/items",
         json={
             "type": "task", "title": "Cross project",
             "assignee_id": "octacon-bot", "assignee_kind": "bot",
@@ -932,45 +932,45 @@ def test_plugin_create_queued_item_rejects_cross_project_initiative(client):
 
 def test_plugin_project_lifecycle_proxy_routes(client):
     project_id = "lifecycle-ui"
-    client.post("/api/plugins/hermes-dockyard/onboard", json={
+    client.post("/api/plugins/hermes-project-stewardship/onboard", json={
         "project_id": project_id, "repo_path": "/srv/lifecycle",
         "mission": "exercise enable/disable/pause/resume/freeze",
         "lead_profile": "octacon",
     })
 
     disable = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/disable")
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/disable")
     assert disable.status_code == 200, disable.text
     settings = client.get(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/settings").json()
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/settings").json()
     assert settings["enabled"] is False
 
     re_enable = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/re-enable")
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/re-enable")
     assert re_enable.status_code == 200, re_enable.text
     assert re_enable.json()["enabled"] is True
 
     pause = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/pause")
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/pause")
     assert pause.status_code == 200, pause.text
     freeze = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/freeze")
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/freeze")
     assert freeze.status_code == 200, freeze.text
     resume = client.post(
-        f"/api/plugins/hermes-dockyard/projects/{project_id}/resume")
+        f"/api/plugins/hermes-project-stewardship/projects/{project_id}/resume")
     assert resume.status_code == 200, resume.text
 
 
 def test_plugin_mission_objective_and_content_management_routes(client):
     project_id = "management-ui"
-    created = client.post("/api/plugins/hermes-dockyard/onboard", json={
+    created = client.post("/api/plugins/hermes-project-stewardship/onboard", json={
         "project_id": project_id,
         "repo_path": "/srv/management-ui",
         "mission": "Manage project outcomes and supporting evidence",
         "lead_profile": "octacon",
     })
     assert created.status_code == 200, created.text
-    base = f"/api/plugins/hermes-dockyard/projects/{project_id}"
+    base = f"/api/plugins/hermes-project-stewardship/projects/{project_id}"
 
     objective = client.post(f"{base}/objectives", json={
         "name": "Release confidence",

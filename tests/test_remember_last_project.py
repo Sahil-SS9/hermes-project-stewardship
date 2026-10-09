@@ -1,6 +1,6 @@
 """The app remembers the last project the person chose, in the backend.
 
-Sahil decided 02/10: Dockyard should reopen on the last project chosen, and
+Sahil decided 02/10: Project Stewardship should reopen on the last project chosen, and
 the choice must live in the backend (dockyard_app_settings, schema v36), never
 in the browser (26/08 locked rule: no localStorage, sessionStorage or cookies).
 
@@ -34,7 +34,7 @@ ROOT = Path(__file__).parents[1]
 PROXY = ROOT / "hermes_dockyard_plugin/dashboard/plugin_api.py"
 TOKEN = "synthetic-desktop-token"
 HEADERS = {"x-hermes-session-token": TOKEN}
-BASE = "/api/plugins/hermes-dockyard"
+BASE = "/api/plugins/hermes-project-stewardship"
 
 
 def _enable(store, *pids):

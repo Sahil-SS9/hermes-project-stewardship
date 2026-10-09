@@ -94,7 +94,7 @@ plugin_api._app = create_app(store, kanban_adapter=adapter,
 plugin_api._client = plugin_api.httpx.AsyncClient(
     transport=plugin_api.httpx.ASGITransport(app=plugin_api._app), base_url="http://dockyard.test")
 app = FastAPI()
-app.include_router(plugin_api.plugin_api, prefix="/api/plugins/hermes-dockyard")
+app.include_router(plugin_api.plugin_api, prefix="/api/plugins/hermes-project-stewardship")
 
 @app.get("/desktop")
 def desktop():

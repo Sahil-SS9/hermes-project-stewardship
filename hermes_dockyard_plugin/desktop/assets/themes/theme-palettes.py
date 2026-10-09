@@ -1,4 +1,4 @@
-"""Dockyard theme palettes and their contrast gate (design round d + h, 05/10).
+"""Project Stewardship theme palettes and their contrast gate (design round d + h, 05/10).
 
 Sources (Sahil-approved, read 05/10):
 - /home/kensei/HPS-UI-Concepts-v6/index.html (== Desktop/HPSUI/index6.html, 21/09 22:11):
@@ -10,7 +10,7 @@ Sources (Sahil-approved, read 05/10):
   bake-backgrounds.py (about double the v6 visibility, within this gate).
 - /home/sahil/Desktop/HPSUI/HPSUI2/index.html (21/09 16:04): Neon Block Night,
   Kodama Grove Night.
-Values marked v6/hpsui2 are copied; the rest are derived to fill Dockyard's
+Values marked v6/hpsui2 are copied; the rest are derived to fill Project Stewardship's
 token ladder and must pass the gate below. Run: python3 theme-palettes.py [--json]
 """
 import json
@@ -41,7 +41,7 @@ def hue(h):
     hh = ((g - b) / d) % 6 if mx == r else ((b - r) / d + 2 if mx == g else (r - g) / d + 4)
     return hh * 60
 
-# Dockyard's own status colours (styles/tokens.js), shared by every theme of that mode.
+# Project Stewardship's own status colours (styles/tokens.js), shared by every theme of that mode.
 LIGHT_STATUS = dict(success='#136c4a', successBg='#e7f6ef', warning='#805200', warningBg='#fff3d4',
                     danger='#a72a2a', dangerBg='#ffeded', info='#315ca8', infoBg='#eaf2ff')
 DARK_STATUS = dict(success='#72cda2', successBg='#16372a', warning='#f0bd64', warningBg='#3a2c14',

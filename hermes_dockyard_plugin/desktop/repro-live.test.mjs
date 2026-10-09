@@ -1,4 +1,4 @@
-// Dockyard desktop runtime harness.
+// Project Stewardship desktop runtime harness.
 // Exercises real React effects in jsdom, write interactions, every UI state,
 // CSS parsing, contrast metadata and Chromium layout at 700px and 1600px.
 import assert from 'node:assert/strict';
@@ -284,7 +284,7 @@ function evaluatePlugin(source, host) {
   // through the loader's runtime options.
   const loaded = evaluatePluginBundle(source, host, { runtime: rt, assertImports: false });
   assert.deepEqual([...new Set(loaded.imports)].sort(), ['@hermes/plugin-sdk', 'react', 'react/jsx-runtime']);
-  assert.equal(loaded.plugin.id, 'hermes-dockyard');
+  assert.equal(loaded.plugin.id, 'hermes-project-stewardship');
   return loaded;
 }
 
@@ -1006,7 +1006,7 @@ async function testStylesAndPopulatedDashboard() {
   const root = document.querySelector('.dockyard-root');
   assert(root, 'missing .dockyard-root container');
   const rootStyle = runtime.dom.window.getComputedStyle(root);
-  assert(!rootStyle.fontFamily.includes('Times New Roman'), `host font leaked into Dockyard: ${rootStyle.fontFamily}`);
+  assert(!rootStyle.fontFamily.includes('Times New Roman'), `host font leaked into Project Stewardship: ${rootStyle.fontFamily}`);
   assert.notEqual(rootStyle.backgroundColor, 'rgba(0, 0, 0, 0)', 'root background is not explicit');
   assert.notEqual(rootStyle.color, 'rgba(0, 0, 0, 0)', 'root text colour is not explicit');
   assert.equal(document.querySelectorAll('[data-project-row]').length, 2, 'dashboard should render both projects');

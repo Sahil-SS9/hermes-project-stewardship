@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { chromium } from './browser-harness.mjs'
 const BASE = process.env.STEWARD_DESKTOP_URL || 'http://127.0.0.1:19500/desktop'
-const API = process.env.STEWARD_API_URL || 'http://127.0.0.1:19500/api/plugins/hermes-dockyard'
+const API = process.env.STEWARD_API_URL || 'http://127.0.0.1:19500/api/plugins/hermes-project-stewardship'
 // Sahil 05/10: the Onboard tab became the "Onboard existing project" button beside New project.
 const tabs = ['dashboard','project','roadmap','backlog','workflows','inbox','notifications','settings']
 test('Phase 3 rendered Desktop: scope isolation, dirty switching, keyboard and narrow layout', {timeout:120000}, async()=>{

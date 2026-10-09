@@ -1,7 +1,7 @@
 """Give a bot its project's memory (checks round 1; Sahil 08/10 picks 1b = A and 1a = A).
 
 Registered as Hermes' ``pre_llm_call`` hook by ``plugin.register``. For each turn it
-works out whether the bot is working on a Dockyard project and, if so, returns that
+works out whether the bot is working on a project in Project Stewardship and, if so, returns that
 project's memory (``memory_service.context_for``). Hermes adds the text to that
 turn's user message only; it is not saved in the transcript, and the bot's own
 memory provider is never touched.
@@ -9,9 +9,9 @@ memory provider is never touched.
 A bot is working on a project when:
 * it is a Kanban worker on the project's board: the dispatcher sets
   ``HERMES_KANBAN_TASK`` and ``HERMES_KANBAN_BOARD``, and the board maps to exactly
-  one Hermes project in the owner's projects list, which is the Dockyard project by
+  one Hermes project in the owner's projects list, which is the Project Stewardship project by
   id or slug - the same resolution as ``KanbanAdapter.project_board``; or
-* it is in a Desktop chat opened from Dockyard's Chat button: the first message of a
+* it is in a Desktop chat opened from Project Stewardship's Chat button: the first message of a
   new chat on the Desktop chat panel (``platform="desktop"``) in this bot's profile
   claims the oldest open link for this bot, once (``persistence/chat_links.py``).
   Later turns of that chat, also after a restart, find the claimed link. Never in a
@@ -20,7 +20,7 @@ Nothing is guessed: an unbound board, a board shared by two projects, an expired
 used link, or a project that is switched off gives nothing.
 
 Safety:
-* never creates or migrates a database and never writes Dockyard data, except the
+* never creates or migrates a database and never writes Project Stewardship data, except the
   one claim of a chat link (a single UPDATE on an existing file); a schema too old
   for a feature is skipped rather than upgraded;
 * never raises: any error means no memory for this turn (logged at debug);
@@ -69,7 +69,7 @@ def project_memory_hook(**kwargs: Any) -> Optional[Dict[str, str]]:
     try:
         return _hook(**kwargs)
     except Exception:  # a memory problem must never break a bot's turn
-        logger.debug("Dockyard project memory skipped for this turn", exc_info=True)
+        logger.debug("Project Stewardship memory skipped for this turn", exc_info=True)
         return None
 
 
@@ -135,7 +135,7 @@ def _hermes_projects_for_board(home: Path, board: str) -> List[Tuple[str, str]]:
     return [(str(row["id"]), str(row["slug"])) for row in rows]
 
 
-# ---- Desktop chats opened from Dockyard ---------------------------------------
+# ---- Desktop chats opened from Project Stewardship ---------------------------------------
 
 def _linked_chat(session_id: str, *, first_turn: bool) -> Optional[Tuple[Path, str]]:
     with _LOCK:
@@ -218,7 +218,7 @@ def _active_project(conn: sqlite3.Connection, project_id: str) -> bool:
 
 
 def _owner_home(db: Path) -> Path:
-    """The Hermes home that owns Dockyard's database (its projects list sits beside it)."""
+    """The Hermes home that owns Project Stewardship's database (its projects list sits beside it)."""
     if db.parent.name == "hermes-dockyard" and db.parent.parent.name == "plugin-data":
         return db.parent.parent.parent
     home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes").expanduser().resolve()

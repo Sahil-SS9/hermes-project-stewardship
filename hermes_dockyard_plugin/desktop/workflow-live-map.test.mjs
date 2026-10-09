@@ -111,7 +111,7 @@ test('W5 live map attributes come from the canonical run projection', async () =
   assert.equal(assemble['data-wf-needs-attention'], undefined);
   assert.equal(approve['data-wf-needs-attention'], 'true');
   assert.match(String(approve.children), /needs attention/);
-  // Dockyard's words reach the readout as the canvas's words.
+  // Project Stewardship's words reach the readout as the canvas's words.
   assert.match(String(approve.children), /Approve — awaiting decision/);
   assert.match(String(assemble.children), /Assemble — done/);
   await rm(dir, { recursive: true, force: true });

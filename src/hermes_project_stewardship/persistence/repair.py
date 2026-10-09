@@ -1,4 +1,4 @@
-"""Rebuild a damaged Dockyard database into this code's schema (P addendum fix 5).
+"""Rebuild a damaged Project Stewardship database into this code's schema (P addendum fix 5).
 
 ``stewardctl db repair --db-source SRC --db-target NEW --backup-dir DIR``
 

@@ -1,5 +1,5 @@
 /**
- * Hermes Dockyard desktop runtime plugin.
+ * Hermes Project Stewardship desktop runtime plugin.
  * The committed plugin.js is generated from these hand-edited modules.
  */
 import { jsx } from './runtime/react.js'
@@ -125,8 +125,8 @@ function surfacePopup(item) {
     id: `dockyard-notification-${item?.id}`,
     kind: 'info',
     title: item?.title ?? 'Fleet notification',
-    message: text || 'Open Dockyard to review it.',
-    action: { label: 'Open Dockyard', onClick: openDockyard },
+    message: text || 'Open Project Stewardship to review it.',
+    action: { label: 'Open Project Stewardship', onClick: openDockyard },
   })
 }
 
@@ -135,8 +135,8 @@ function surfaceMore(count) {
     id: 'dockyard-notification-more',
     kind: 'info',
     title: `and ${count} more notification${count === 1 ? '' : 's'}`,
-    message: 'See them all in Dockyard Notifications.',
-    action: { label: 'Open Dockyard', onClick: openDockyard },
+    message: 'See them all in Project Stewardship Notifications.',
+    action: { label: 'Open Project Stewardship', onClick: openDockyard },
   })
 }
 
@@ -175,8 +175,8 @@ function startPopupPoller(ctxRest) {
 }
 
 const __plugin = {
-  id: 'hermes-dockyard',
-  name: 'Hermes Dockyard',
+  id: 'hermes-project-stewardship',
+  name: 'Hermes Project Stewardship',
   register(ctx) {
     bindContext(ctx)
     startPopupPoller(ctx.rest)
@@ -191,14 +191,14 @@ const __plugin = {
         id: 'nav',
         area: 'sidebar.nav',
         order: 55,
-        data: { codicon: 'project', label: 'Dockyard', path: '/dockyard' },
+        data: { codicon: 'project', label: 'Project Stewardship', path: '/dockyard' },
       },
       {
         id: 'open',
         area: 'palette',
         data: {
-          id: 'hermes-dockyard.open',
-          label: 'Dockyard: Open fleet overview',
+          id: 'hermes-project-stewardship.open',
+          label: 'Project Stewardship: Open fleet overview',
           keywords: ['dockyard', 'fleet', 'projects', 'approvals', 'notifications'],
           run: () => host.navigate('/dockyard'),
         },

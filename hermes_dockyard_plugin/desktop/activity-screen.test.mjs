@@ -28,7 +28,7 @@ import { activityRows, groupByDay, matchesFilter } from './src/lib/event-vocab.j
 const require = createRequire(fileURLToPath(new URL('../dashboard/package.json', import.meta.url)))
 const { chromium } = require('playwright')
 const BASE = process.env.STEWARD_DESKTOP_URL || 'http://127.0.0.1:19500/desktop'
-const API = process.env.STEWARD_API_URL || 'http://127.0.0.1:19500/api/plugins/hermes-dockyard'
+const API = process.env.STEWARD_API_URL || 'http://127.0.0.1:19500/api/plugins/hermes-project-stewardship'
 const HEADERS = { 'x-hermes-session-token': 'demo-session-token' }
 const TZ = 'Europe/London'
 const OPEN_STATES = new Set(['pending_approval', 'changes_requested', 'approved', 'active', 'measuring'])

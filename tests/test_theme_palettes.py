@@ -1,4 +1,4 @@
-"""Dockyard's theme colours and their contrast gate (design round d + h).
+"""Project Stewardship's theme colours and their contrast gate (design round d + h).
 
 Sahil 05/10: all nine themes ship (plus Match Hermes, the default), and the
 dark themes' background art stands out more. assets/themes/theme-palettes.py
@@ -8,7 +8,7 @@ brightest point of each background image (ART_BRIGHTEST, measured on the
 shipped images by bake-backgrounds.py). Until now the gate only ran by hand.
 
 Rules pinned here:
-- The gate passes: no colour pair Dockyard uses is below its minimum.
+- The gate passes: no colour pair Project Stewardship uses is below its minimum.
 - The app's themes (src/styles/themes.js) carry exactly the palette file's
   name, mode, background and colours, theme by theme: no hand-edited drift.
 - Every theme with background art ships its image and has a measured
@@ -72,7 +72,7 @@ def test_the_contrast_gate_passes():
 def test_the_app_uses_exactly_the_palette_files_colours():
     palettes = _palettes()
     app = _app_themes()
-    # Match Hermes is Dockyard's own light/dark, not a palette.
+    # Match Hermes is Project Stewardship's own light/dark, not a palette.
     assert app.pop("auto") == {"name": "Match Hermes", "mode": "auto", "art": None, "tokens": None}
     assert sorted(app) == sorted(palettes.THEMES)
     for key, theme in palettes.THEMES.items():

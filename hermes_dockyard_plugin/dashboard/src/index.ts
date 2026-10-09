@@ -1,4 +1,4 @@
-// Entry: register the Dockyard tab with the host plugin registry.
+// Entry: register the Project Stewardship tab with the host plugin registry.
 import { initApp } from './app';
 import { getSDK } from './api';
 import type { HermesPluginSDK } from './api';
@@ -30,13 +30,13 @@ function registerPlugin(sdk: HermesPluginSDK): void {
     }, []);
     return React.createElement('div', { ref, className: 'dy-host' });
   };
-  registry.register('hermes-dockyard', DockyardTab);
+  registry.register('hermes-project-stewardship', DockyardTab);
 }
 
 void whenReady().then(() => {
   const sdk: HermesPluginSDK | null = getSDK();
   if (!sdk) {
-    console.error('[hermes-dockyard] Hermes plugin SDK not present');
+    console.error('[hermes-project-stewardship] Hermes plugin SDK not present');
     return;
   }
   registerPlugin(sdk);

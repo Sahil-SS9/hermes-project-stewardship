@@ -35,7 +35,7 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Dockyard plugin build artefacts
+# Project Stewardship plugin build artefacts
 # node_modules may be a real directory OR a symlink in the isolated candidate
 # worktree; ignore both forms so `git add -A` never stages it, without hiding
 # the committed dist files.
@@ -44,7 +44,7 @@ hermes_dockyard_plugin/dashboard/node_modules
 hermes_dockyard_plugin/dashboard/.tmp-dockyard-plugin/
 tests/.tmp-dockyard-plugin/
 
-# Dockyard dashboard dist is committed because the host contract requires
+# Project Stewardship dashboard dist is committed because the host contract requires
 # dist/index.js and dist/style.css present in a clean worktree.
 # build-meta.json is regenerated metadata and stays ignored.
 !hermes_dockyard_plugin/dashboard/dist/

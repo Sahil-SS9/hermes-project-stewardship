@@ -1,8 +1,8 @@
 """Chat with a project's bots (Sahil 08/10, pick 1a = A), carrying the project's memory.
 
-Dockyard's Chat button opens a fresh Desktop chat with one of the project's bots. A
+Project Stewardship's Chat button opens a fresh Desktop chat with one of the project's bots. A
 plugin cannot learn the new chat's id: Desktop saves a chat on its first message and
-``host.newChat`` returns nothing. So Dockyard records a one-time link first (bot,
+``host.newChat`` returns nothing. So Project Stewardship records a one-time link first (bot,
 project, ten minutes), and the first message of a new Desktop chat with that bot claims
 it; from then on that chat gets the project's memory. Pinned here:
 - migration v39: ``project_chat_links``, one chat per link;
@@ -44,7 +44,7 @@ def _seed(store: Store, project: str, *, memory: str) -> None:
 
 @pytest.fixture()
 def fleet(tmp_path, monkeypatch):
-    """Dockyard in the root profile with two projects; the bot 'coder' in its own profile."""
+    """Project Stewardship in the root profile with two projects; the bot 'coder' in its own profile."""
     root = tmp_path / "hermes"
     bot = root / "profiles" / "coder"
     bot.mkdir(parents=True)

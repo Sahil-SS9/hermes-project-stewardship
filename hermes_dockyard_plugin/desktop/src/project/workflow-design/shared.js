@@ -140,7 +140,7 @@ export function ImportResult({ result }) {
   if (!result) return null
   if (result.kind === 'invalid') return jsx('p', { className: 'dy-wfd-error', role: 'alert', 'data-wfd-import-error': true, children: result.reason })
   if (result.kind === 'dockyard') return jsxs('div', { className: 'dy-wfd-import-ok', role: 'status', 'data-wfd-import': 'dockyard', children: [
-    jsx('p', { children: `A Dockyard workflow${result.name ? ` ("${result.name}")` : ''} with ${result.nodes.length} step${result.nodes.length === 1 ? '' : 's'}. It imports exactly.` }),
+    jsx('p', { children: `A Project Stewardship workflow${result.name ? ` ("${result.name}")` : ''} with ${result.nodes.length} step${result.nodes.length === 1 ? '' : 's'}. It imports exactly.` }),
     ...result.warnings.map((w) => jsx('p', { className: 'dockyard-meta', children: w }, w)),
     jsx(StepsPreview, { nodes: result.nodes }),
   ] })

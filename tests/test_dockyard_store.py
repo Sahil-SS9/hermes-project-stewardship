@@ -1,4 +1,4 @@
-"""Dockyard persistence tests: WorkItem + Backlog CRUD on the shared Store."""
+"""Project Stewardship persistence tests: WorkItem + Backlog CRUD on the shared Store."""
 from __future__ import annotations
 
 import sqlite3

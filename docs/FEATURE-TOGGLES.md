@@ -2,7 +2,7 @@
 
 ## Goal
 
-A single config space where users enable/disable parts of Dockyard/Project
+A single config space where users enable/disable parts of Project
 Stewardship (Dashboard tabs, workflow canvas, milestones, notifications,
 initiatives) without breaking anything or losing data. Disabling hides the
 surface and fails closed its API paths; re-enabling restores everything intact.
