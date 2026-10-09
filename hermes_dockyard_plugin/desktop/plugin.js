@@ -23856,6 +23856,8 @@ var NOTIFICATIONS_CSS = `
 .dockyard-root .dy-notif-settings .dy-notif-setting { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
 .dockyard-root .dy-notif-settings label { font-size: 12px; color: var(--dy-text-2); }
 .dockyard-root .dy-notif-settings select, .dockyard-root .dy-notif-settings input[type="time"] { border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); color: inherit; padding: 4px 8px; font: inherit; }
+/* A control that does nothing right now (Discord's level while Discord is off) looks it. */
+.dockyard-root .dy-notif-settings select:disabled, .dockyard-root .dy-notif-settings input:disabled { opacity: .5; cursor: not-allowed; }
 .dockyard-root .dy-notif-settings .dy-notif-override-link { font-size: 12px; }
 /* Sahil 05/10: the settings live only in App settings; the screen points there. */
 .dockyard-root .dy-notif-settings-link { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 14px 0 0; color: var(--dy-text-2); font-size: 13px; }
@@ -24131,6 +24133,8 @@ function NotificationSettings({ settings, busy, error, onSave }) {
   const value = settings ?? {};
   const channels = value.channels ?? {};
   const desktop = channels.desktop ?? {};
+  const discord = channels.discord ?? {};
+  const discordOn = discord.enabled === true;
   const quiet = value.quiet_hours ?? {};
   const bypass = value.bypass_quiet_hours ?? ["approval_required"];
   const approvalsBypass = bypass.includes("approval_required");
@@ -24148,6 +24152,15 @@ function NotificationSettings({ settings, busy, error, onSave }) {
       jsx("label", { htmlFor: "dy-notif-popups-severity", children: "Pop-up minimum severity" }),
       jsx("select", { id: "dy-notif-popups-severity", value: desktop.min_severity ?? "high", disabled: busy, onChange: (e) => onSave({ channels: { ...channels, desktop: { ...desktop, min_severity: e.target.value } } }), children: SEVERITIES2.map((s) => jsx("option", { value: s, children: s }, s)) })
     ] }),
+    jsxs("div", { className: "dy-notif-setting", children: [
+      jsx("label", { htmlFor: "dy-notif-discord-enabled", children: "Discord alerts" }),
+      jsx("select", { id: "dy-notif-discord-enabled", value: discordOn ? "on" : "off", disabled: busy, onChange: (e) => onSave({ channels: { ...channels, discord: { ...discord, enabled: e.target.value === "on" } } }), children: [["off", "Off"], ["on", "On"]].map(([v, label]) => jsx("option", { value: v, children: label }, v)) })
+    ] }),
+    jsxs("div", { className: "dy-notif-setting", children: [
+      jsx("label", { htmlFor: "dy-notif-discord-severity", children: "Discord minimum severity" }),
+      jsx("select", { id: "dy-notif-discord-severity", value: discord.min_severity ?? "high", disabled: busy || !discordOn, onChange: (e) => onSave({ channels: { ...channels, discord: { ...discord, min_severity: e.target.value } } }), children: SEVERITIES2.map((s) => jsx("option", { value: s, children: s }, s)) })
+    ] }),
+    jsx("p", { className: "dy-notif-override-link", "data-discord-note": true, children: "Discord alerts are posted by a scheduled job on this computer once it is set up. Until then nothing is sent." }),
     jsxs("div", { className: "dy-notif-setting", children: [
       jsx("label", { htmlFor: "dy-notif-quiet-start", children: "Quiet hours" }),
       jsx("input", { id: "dy-notif-quiet-start", type: "time", value: quiet.start ?? "", disabled: busy, onChange: (e) => onSave({ quiet_hours: { ...quiet || {}, start: e.target.value, end: quiet.end ?? "" } }) }),

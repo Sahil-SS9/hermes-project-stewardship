@@ -14,8 +14,8 @@ from typing import List
 # the edited v3). Later lanes take the next free number when they merge.
 # Never edit a released migration (v1-v17 shipped in v0.3.0); fix forward
 # with a new version instead. Batch R2 owns v35. Batch E owns v36. Checks
-# round 1: project memory v38, chat links v39.
-SCHEMA_VERSION = 39
+# round 1: project memory v38, chat links v39, Discord alerts v40.
+SCHEMA_VERSION = 40
 
 
 @dataclass(frozen=True)
@@ -1783,5 +1783,21 @@ MIGRATIONS.append(Migration(
     downgrade_sql="""
         DROP INDEX IF EXISTS idx_project_chat_links_open;
         DROP TABLE IF EXISTS project_chat_links;
+        """,
+))
+
+
+# v40 (checks round 1, Sahil 08/10 pick 2 = A): Discord alerts. Each alert is
+# posted to Discord at most once; this mark records when it was handed to the
+# Discord job (events/discord_alerts.py). A separate column, so the in-app and
+# pop-up marks keep their meaning.
+MIGRATIONS.append(Migration(
+    version=40,
+    name="Discord alerts: each alert goes to Discord once",
+    upgrade_sql="""
+        ALTER TABLE notifications ADD COLUMN discord_sent_at TEXT;
+        """,
+    downgrade_sql="""
+        ALTER TABLE notifications DROP COLUMN discord_sent_at;
         """,
 ))

@@ -9,15 +9,21 @@ policy = deep-merge(built-in default, app-wide setting, project override).
  "bypass_quiet_hours": ["approval_required"],
  "channels": {
    "in_app":  {"min_severity": "low"},
-   "desktop": {"enabled": true, "min_severity": "high", "quiet_hours_apply": true}}}
+   "desktop": {"enabled": true, "min_severity": "high", "quiet_hours_apply": true},
+   "discord": {"enabled": false, "min_severity": "high", "quiet_hours_apply": true}}}
 ```
 
 Legacy shapes are normalised on write and read:
 - a top-level ``min_severity`` becomes ``channels.in_app.min_severity``;
 - ``channels`` as a list: ``["desktop"]`` turns pop-ups on, a list without
-  it turns pop-ups off; ``"discord"`` is kept but unused until the Discord
-  batch;
+  it turns pop-ups off; ``"discord"`` in the list turns Discord alerts on;
 - unknown keys are rejected (ServiceError → 422 at the API).
+
+Discord alerts (checks round 1, Sahil 08/10 pick 2 = A) follow the pop-up
+rules: Discord on for the project, at or above its level, still new, under
+24 hours old, not sent before; quiet hours hold them unless the kind skips
+quiet hours. ``discord_due`` lists them; events/discord_alerts.py turns them
+into the one message a no-AI cron job posts, and marks them sent.
 
 Auto-resolve (matching on dedupe_key/subject within the project):
 - ``approval_required`` for X resolves when a decision event for X arrives
@@ -82,12 +88,16 @@ DEFAULT_EFFECTIVE_POLICY: Dict[str, Any] = {
         "in_app": {"min_severity": "low"},
         "desktop": {"enabled": True, "min_severity": "high",
                     "quiet_hours_apply": True},
+        # Off until someone switches it on (checks round 1, pick 2).
+        "discord": {"enabled": False, "min_severity": "high",
+                    "quiet_hours_apply": True},
     },
 }
 
 _CHANNEL_SETTINGS: Dict[str, Tuple[str, ...]] = {
     "in_app": ("min_severity",),
     "desktop": ("enabled", "min_severity", "quiet_hours_apply"),
+    "discord": ("enabled", "min_severity", "quiet_hours_apply"),
 }
 
 _KNOWN_POLICY_KEYS = ("dedupe_window_minutes", "quiet_hours",
@@ -257,8 +267,8 @@ def _is_hhmm(value: Any) -> bool:
 
 def _normalize_channels(channels_raw: Any, *, strict: bool = False) -> Dict[str, Any]:
     channels: Dict[str, Any] = {
-        "in_app": dict(DEFAULT_EFFECTIVE_POLICY["channels"]["in_app"]),
-        "desktop": dict(DEFAULT_EFFECTIVE_POLICY["channels"]["desktop"]),
+        name: dict(DEFAULT_EFFECTIVE_POLICY["channels"][name])
+        for name in ("in_app", "desktop", "discord")
     }
     if channels_raw is None:
         return channels
@@ -270,20 +280,10 @@ def _normalize_channels(channels_raw: Any, *, strict: bool = False) -> Dict[str,
                     raise ServiceError(f"unknown channel '{name}'")
                 continue
         channels["desktop"]["enabled"] = "desktop" in channels_raw
-        if "discord" in channels_raw:
-            # Kept but unused until the Discord batch (Q2 = A).
-            channels["discord"] = {"enabled": True}
+        channels["discord"]["enabled"] = "discord" in channels_raw
         return channels
     if isinstance(channels_raw, dict):
         for name, patch in channels_raw.items():
-            if name == "discord":
-                # Carried but unused until the Discord batch (Q2 = A).
-                if not isinstance(patch, dict):
-                    if strict:
-                        raise ServiceError("channels.discord must be an object")
-                    continue
-                channels["discord"] = dict(patch)
-                continue
             if name not in channels:
                 if strict:
                     raise ServiceError(f"unknown channel '{name}'")
@@ -309,23 +309,14 @@ def _normalize_channels(channels_raw: Any, *, strict: bool = False) -> Dict[str,
                              if k != "min_severity"}
                     if not patch:
                         continue
-            if name == "desktop" and "enabled" in patch:
-                if not isinstance(patch["enabled"], bool):
+            for flag in ("enabled", "quiet_hours_apply"):
+                if flag in patch and not isinstance(patch[flag], bool):
                     if strict:
                         raise ServiceError(
-                            "channels.desktop.enabled must be a boolean")
-                    patch = {k: v for k, v in patch.items() if k != "enabled"}
-                    if not patch:
-                        continue
-            if name == "desktop" and "quiet_hours_apply" in patch:
-                if not isinstance(patch["quiet_hours_apply"], bool):
-                    if strict:
-                        raise ServiceError(
-                            "channels.desktop.quiet_hours_apply must be a boolean")
-                    patch = {k: v for k, v in patch.items()
-                             if k != "quiet_hours_apply"}
-                    if not patch:
-                        continue
+                            f"channels.{name}.{flag} must be a boolean")
+                    patch = {k: v for k, v in patch.items() if k != flag}
+            if not patch:
+                continue
             channels[name].update(patch)
         return channels
     if strict:
@@ -1038,6 +1029,70 @@ class NotificationEngine:
                     (now, int(nid)),
                 )
                 marked += cur.rowcount
+        return marked
+
+    def discord_due(self, *, clock_now: Optional[datetime] = None,
+                    limit: int = 200) -> List[Dict[str, Any]]:
+        """Alerts due for Discord now, oldest first (checks round 1, pick 2).
+
+        The pop-up rules, on the project's ``channels.discord``: Discord on,
+        at or above its level, still new (not seen, not resolved), under 24
+        hours old, not sent before; quiet hours hold an alert (it is due once
+        they end) unless its kind skips quiet hours or the channel ignores
+        them. Plain rows: id, project_id, severity, kind, title, created_at.
+        """
+        now = clock_now or self.store._clock()
+        rows = self.store._conn.execute(
+            "SELECT id, project_id, severity, kind, title, created_at FROM notifications"
+            " WHERE resolved_at IS NULL AND acked_at IS NULL AND discord_sent_at IS NULL"
+            " ORDER BY created_at, id LIMIT ?",
+            (int(limit),),
+        ).fetchall()
+        local_now = now.astimezone(self._zone())
+        cutoff = now - timedelta(hours=24)
+        policies: Dict[str, Dict[str, Any]] = {}
+        due: List[Dict[str, Any]] = []
+        for row in rows:
+            try:
+                created = datetime.fromisoformat(str(row["created_at"]))
+            except (TypeError, ValueError):
+                continue
+            if created.tzinfo is None:
+                from datetime import timezone
+                created = created.replace(tzinfo=timezone.utc)
+            if created < cutoff:
+                continue  # older than 24 hours never goes to Discord
+            project_id = row["project_id"]
+            if project_id not in policies:
+                try:
+                    policies[project_id] = self.effective(project_id)
+                except ServiceError:
+                    policies[project_id] = dict(DEFAULT_EFFECTIVE_POLICY)
+            policy = policies[project_id]
+            discord = (policy.get("channels") or {}).get("discord") or {}
+            if not discord.get("enabled", False):
+                continue
+            if SEVERITY_ORDER.get(row["severity"], 0) < SEVERITY_ORDER.get(
+                    discord.get("min_severity", "high"), SEVERITY_ORDER["high"]):
+                continue
+            if (discord.get("quiet_hours_apply", True) and in_quiet_hours(policy, local_now)
+                    and row["kind"] not in (policy.get("bypass_quiet_hours") or [])):
+                continue  # held during quiet hours; due when they end
+            due.append({key: row[key] for key in
+                        ("id", "project_id", "severity", "kind", "title", "created_at")})
+        return due
+
+    def mark_discord_sent(self, ids: List[int]) -> int:
+        """Set discord_sent_at; idempotent, so an alert goes to Discord once."""
+        now = iso(self.store._clock())
+        marked = 0
+        with self.store.tx() as cx:
+            for nid in ids:
+                marked += cx.execute(
+                    "UPDATE notifications SET discord_sent_at=?"
+                    " WHERE id=? AND discord_sent_at IS NULL",
+                    (now, int(nid)),
+                ).rowcount
         return marked
 
     # ------------------------------------------------------------------ #

@@ -105,6 +105,16 @@ def build_parser() -> argparse.ArgumentParser:
              "because the CLI process binds no host of its own",
     )
 
+    notes = sub.add_parser("notifications", help="alerts")
+    nsub = notes.add_subparsers(dest="action", required=True)
+    nd = nsub.add_parser(
+        "discord-due",
+        help="print the alerts due for Discord as one message (the Discord job runs this)")
+    nd.add_argument(
+        "--mark", action="store_true",
+        help="mark the printed alerts as sent, so each goes to Discord once",
+    )
+
     content = sub.add_parser("content", help="managed project content (PM-0602)")
     csub = content.add_subparsers(dest="action", required=True)
     cr = csub.add_parser("remove", help="remove a managed file (destructive)")
@@ -301,6 +311,15 @@ def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) 
     g = args.group
     if g == "workflows":
         return _workflows_tick(args, store)
+    if g == "notifications":
+        # Checks round 1 (Sahil 08/10, pick 2): the Discord job's one message.
+        from ..events.discord_alerts import run as discord_run
+        from ..events.notifications import NotificationEngine
+
+        text = discord_run(NotificationEngine(store, svc), mark=bool(args.mark))
+        if text:
+            print(text)
+        return EXIT_OK
     if g == "export":
         manifest = export_store(store, args.output)
         print(json.dumps(manifest, sort_keys=True))
