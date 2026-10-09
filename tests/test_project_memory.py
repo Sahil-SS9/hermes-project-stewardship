@@ -65,7 +65,7 @@ def test_v38_rebuilds_project_knowledge_and_keeps_old_rows(tmp_path, monkeypatch
         old.close()
     upgraded = Store(path)
     try:
-        assert upgraded.schema_version == 38
+        assert upgraded.schema_version == migrations.SCHEMA_VERSION >= 38  # through v38 to the latest
         columns = [r[1] for r in upgraded._conn.execute("PRAGMA table_info(project_knowledge)")]
         assert columns == ["id", "project_id", "kind", "text", "source", "supersedes_id",
                            "created_by", "created_at", "archived_at", "archived_by"]

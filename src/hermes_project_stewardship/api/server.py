@@ -3557,12 +3557,14 @@ def create_app(
         router, RoadmapService(store, svc, work), authority=_membership_authority)
     # --- end Batch R2
 
-    # --- Project memory (checks round 1; see api/memory_routes.py)
+    # --- Project memory and chat links (checks round 1; see api/memory_routes.py)
+    from ..persistence.chat_links import ChatLinkService
     from ..persistence.memory_service import ProjectMemoryService
     from .memory_routes import install as _install_memory_routes
 
     _install_memory_routes(
-        router, ProjectMemoryService(store), authority=_membership_authority,
+        router, ProjectMemoryService(store), chat_links=ChatLinkService(store, membership_service),
+        authority=_membership_authority,
         finished_work=lambda project_id: work.list(project_id, status="done"),
         work_error=_raise_work_error)
     # --- end project memory

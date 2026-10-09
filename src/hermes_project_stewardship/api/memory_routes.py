@@ -1,4 +1,4 @@
-"""Project memory routes (checks round 1; Sahil 08/10 pick 1b = A).
+"""Project memory and chat-link routes (checks round 1; Sahil 08/10 picks 1b and 1a).
 
 Kept in their own module, like ``roadmap_routes.py``, so ``api/server.py`` only
 carries one import and one call.
@@ -7,7 +7,8 @@ Authority: memory rules become instructions to the project's bots, so every writ
 needs the project-owner capability (``project_archive``, the same one goal and
 milestone edits use) and a payload can never name its own actor (unknown fields are
 refused). Reads need no capability. The list read also reports ``can_write`` so the
-Desktop hides actions the server would refuse; every write is still checked.
+Desktop hides actions the server would refuse; every write is still checked. A chat
+link decides which memory a new chat gets, so opening one needs the same capability.
 """
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ from typing import Any, Callable, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict
 
+from ..persistence.chat_links import ChatLinkInvalid, ChatLinkNotFound, ChatLinkService
 from ..persistence.memory_service import (
     CONTEXT_CAP,
     MemoryConflict,
@@ -44,7 +46,12 @@ class MemoryEditRequest(_Strict):
     text: Optional[str] = None
 
 
+class ChatLinkRequest(_Strict):
+    profile: str
+
+
 def install(router: APIRouter, memory: ProjectMemoryService, *,
+            chat_links: ChatLinkService,
             authority: Callable[[str], str],
             finished_work: Callable[[str], List[Dict[str, Any]]],
             work_error: Callable[[Exception], Any]) -> None:
@@ -53,9 +60,9 @@ def install(router: APIRouter, memory: ProjectMemoryService, *,
     def _run(call: Callable[[], Any]) -> Any:
         try:
             return call()
-        except MemoryNotFound as exc:
+        except (MemoryNotFound, ChatLinkNotFound) as exc:
             raise HTTPException(404, str(exc)) from None
-        except MemoryInvalid as exc:
+        except (MemoryInvalid, ChatLinkInvalid) as exc:
             raise HTTPException(422, str(exc)) from None
         except MemoryConflict as exc:
             raise HTTPException(409, str(exc)) from None
@@ -108,3 +115,9 @@ def install(router: APIRouter, memory: ProjectMemoryService, *,
     def restore_memory(project_id: str, entry_id: int):
         principal = authority(WRITE_CAPABILITY)
         return _run(lambda: memory.restore(project_id, entry_id, actor=principal, interface="rpc"))
+
+    @router.post("/projects/{project_id}/chat-links")
+    def open_chat_link(project_id: str, body: ChatLinkRequest):
+        principal = authority(WRITE_CAPABILITY)
+        return _run(lambda: chat_links.open(project_id, profile=body.profile, actor=principal,
+                                            interface="rpc"))

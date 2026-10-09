@@ -40,6 +40,9 @@ export const OVERVIEW_CSS = `
 .dockyard-root .dy-ov-refresh:hover { background: var(--dy-surface-subtle); color: var(--dy-text); }
 .dockyard-root .dy-ov-refresh:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
 .dockyard-root .dy-ov-refresh svg { width: 14px; height: 14px; }
+/* Chat (checks round 1, pick 1a): the trigger matches the Refresh button's height. */
+.dockyard-root .dy-ov-chat .dy-plan-menu-trigger { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 9px; border-radius: 7px; font-size: 12px; font-weight: 650; }
+.dockyard-root .dy-ov-chat .dy-plan-menu-trigger svg { width: 14px; height: 14px; }
 
 /* 3. The mission as the one headline. */
 .dockyard-root .dy-ov-headline { margin: 0; color: var(--dy-text); font-size: 22px; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; }

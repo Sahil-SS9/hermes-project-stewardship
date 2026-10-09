@@ -2253,4 +2253,17 @@ async def archive_project_memory(project_id: str, entry_id: int) -> dict:
 @plugin_api.post("/projects/{project_id}/memory/{entry_id}/restore")
 async def restore_project_memory(project_id: str, entry_id: int) -> dict:
     return await _proxy("POST", _memory_path(project_id, f"/{entry_id}/restore"))
+
+
+class ChatLinkBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    profile: str
+
+
+@plugin_api.post("/projects/{project_id}/chat-links")
+async def open_project_chat_link(project_id: str, body: ChatLinkBody) -> dict:
+    # The Chat button's one-time link: the bot's next new Desktop chat gets this
+    # project's memory (checks round 1, pick 1a).
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/chat-links",
+                        body.model_dump())
 # --- end project memory

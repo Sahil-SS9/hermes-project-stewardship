@@ -13,9 +13,9 @@ from typing import List
 # Schema numbers: W owns v31, Batch P owns v32-v34 (v34 = forward fix for
 # the edited v3). Later lanes take the next free number when they merge.
 # Never edit a released migration (v1-v17 shipped in v0.3.0); fix forward
-# with a new version instead. Batch R2 owns v35. Batch E owns v36. Project
-# memory (checks round 1) owns v38.
-SCHEMA_VERSION = 38
+# with a new version instead. Batch R2 owns v35. Batch E owns v36. Checks
+# round 1: project memory v38, chat links v39.
+SCHEMA_VERSION = 39
 
 
 @dataclass(frozen=True)
@@ -1753,5 +1753,35 @@ MIGRATIONS.append(Migration(
         FROM project_knowledge;
         DROP TABLE project_knowledge;
         ALTER TABLE project_knowledge_v1 RENAME TO project_knowledge;
+        """,
+))
+
+
+# v39 (checks round 1, Sahil 08/10 pick 1a = A): chat links. Dockyard's Chat
+# button opens a fresh Desktop chat with one of the project's bots, but a plugin
+# cannot learn that chat's id (Desktop saves a chat on its first message). So
+# the button records a one-time link here (bot, project, expiry); the first
+# message of a new Desktop chat with that bot claims it (bot_context.py) and the
+# chat then gets the project's memory. One chat per link: session_id is unique.
+MIGRATIONS.append(Migration(
+    version=39,
+    name="chat links: a new Desktop chat with a project bot carries the project",
+    upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS project_chat_links (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id  TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            profile     TEXT NOT NULL,
+            created_by  TEXT NOT NULL,
+            created_at  TEXT NOT NULL,
+            expires_at  TEXT NOT NULL,
+            session_id  TEXT UNIQUE,
+            claimed_at  TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_chat_links_open
+            ON project_chat_links(profile, expires_at) WHERE session_id IS NULL;
+        """,
+    downgrade_sql="""
+        DROP INDEX IF EXISTS idx_project_chat_links_open;
+        DROP TABLE IF EXISTS project_chat_links;
         """,
 ))

@@ -86,6 +86,9 @@ test('Memory: add, edit with history, archive and restore; bots see exactly the 
   await withPage({ width: 1280, height: 900 }, async (page) => {
     await openMemory(page, projectId)
     await addEntry(page, 'rule', rule)
+    // One toast per change, not the generic "Change saved" as well.
+    await page.locator('.dockyard-toast', { hasText: 'Added to the project memory.' }).waitFor(MARKER)
+    assert.equal(await page.locator('.dockyard-toast').count(), 1, 'exactly one toast for the first change')
     await addEntry(page, 'fact', fact)
     assert.equal(await page.locator('[data-memory-group="rule"]').locator('[data-memory-entry]', { hasText: rule }).count(), 1, 'the rule is under Rules')
     assert.equal(await page.locator('[data-memory-group="fact"]').locator('[data-memory-entry]', { hasText: fact }).count(), 1, 'the fact is under Facts')

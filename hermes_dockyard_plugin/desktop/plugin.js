@@ -12,7 +12,7 @@ import {
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 
 // hermes_dockyard_plugin/desktop/src/index.js
-import { host } from "@hermes/plugin-sdk";
+import { host as host2 } from "@hermes/plugin-sdk";
 
 // hermes_dockyard_plugin/desktop/src/styles/tokens.js
 var LIGHT_TOKENS = Object.freeze({
@@ -3159,6 +3159,9 @@ var OVERVIEW_CSS = `
 .dockyard-root .dy-ov-refresh:hover { background: var(--dy-surface-subtle); color: var(--dy-text); }
 .dockyard-root .dy-ov-refresh:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
 .dockyard-root .dy-ov-refresh svg { width: 14px; height: 14px; }
+/* Chat (checks round 1, pick 1a): the trigger matches the Refresh button's height. */
+.dockyard-root .dy-ov-chat .dy-plan-menu-trigger { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 9px; border-radius: 7px; font-size: 12px; font-weight: 650; }
+.dockyard-root .dy-ov-chat .dy-plan-menu-trigger svg { width: 14px; height: 14px; }
 
 /* 3. The mission as the one headline. */
 .dockyard-root .dy-ov-headline { margin: 0; color: var(--dy-text); font-size: 22px; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; }
@@ -10270,19 +10273,19 @@ function renderDoc(target, doc) {
   const blocks = doc && doc.type === "doc" && Array.isArray(doc.content) && doc.content.length ? doc.content : [{ type: "paragraph" }];
   for (const node of blocks) target.appendChild(renderBlock(node));
 }
-var closestIn = (host2, node, test) => {
+var closestIn = (host3, node, test) => {
   let el2 = node && node.nodeType === 3 ? node.parentElement : node;
-  while (el2 && el2 !== host2) {
+  while (el2 && el2 !== host3) {
     if (test(el2)) return el2;
     el2 = el2.parentElement;
   }
   return null;
 };
-var blockOf = (host2, node) => closestIn(host2, node, (el2) => /^(P|DIV|H[1-6]|LI)$/.test(el2.tagName));
-var listDepth = (host2, node) => {
+var blockOf = (host3, node) => closestIn(host3, node, (el2) => /^(P|DIV|H[1-6]|LI)$/.test(el2.tagName));
+var listDepth = (host3, node) => {
   let n = 0;
   let el2 = node && node.nodeType === 3 ? node.parentElement : node;
-  while (el2 && el2 !== host2) {
+  while (el2 && el2 !== host3) {
     if (el2.tagName === "UL" || el2.tagName === "OL") n += 1;
     el2 = el2.parentElement;
   }
@@ -10291,9 +10294,9 @@ var listDepth = (host2, node) => {
 var exec = (command, value) => document.execCommand(command, false, value);
 var RENAME = { B: "strong", I: "em", STRIKE: "s", DEL: "s" };
 var INNER_BLOCKS = /* @__PURE__ */ new Set(["P", "DIV", "H1", "H2", "H3", "UL", "OL"]);
-function normaliseDom(host2, { afterDelete = false } = {}) {
+function normaliseDom(host3, { afterDelete = false } = {}) {
   const sel = window.getSelection();
-  const keep = sel.rangeCount && host2.contains(sel.anchorNode) ? [sel.anchorNode, sel.anchorOffset, sel.focusNode, sel.focusOffset] : null;
+  const keep = sel.rangeCount && host3.contains(sel.anchorNode) ? [sel.anchorNode, sel.anchorOffset, sel.focusNode, sel.focusOffset] : null;
   const swap = (el2, tag) => {
     const next = document.createElement(tag);
     for (const attr of el2.attributes) if (attr.name === "style" || attr.name === "data-size" || attr.name === "class" || attr.name === "start" || attr.name === "type") next.setAttribute(attr.name, attr.value);
@@ -10306,7 +10309,7 @@ function normaliseDom(host2, { afterDelete = false } = {}) {
     el2.replaceWith(...el2.childNodes);
     changed = true;
   };
-  const walker = document.createTreeWalker(host2, 4);
+  const walker = document.createTreeWalker(host3, 4);
   for (let text2 = walker.nextNode(); text2; text2 = walker.nextNode()) {
     const value = text2.nodeValue || "";
     if (!value.includes("\u200B") || value.replace(ZWSP, "") === "") continue;
@@ -10318,30 +10321,30 @@ function normaliseDom(host2, { afterDelete = false } = {}) {
     text2.nodeValue = value.replace(ZWSP, "");
     changed = true;
   }
-  for (const el2 of [...host2.querySelectorAll("b, i, strike, del")]) {
+  for (const el2 of [...host3.querySelectorAll("b, i, strike, del")]) {
     swap(el2, RENAME[el2.tagName]);
     changed = true;
   }
-  for (const el2 of [...host2.children]) if (el2.tagName === "DIV") {
+  for (const el2 of [...host3.children]) if (el2.tagName === "DIV") {
     swap(el2, "p");
     changed = true;
   }
-  for (const el2 of [...host2.querySelectorAll("font, span:not([data-size])")]) unwrap(el2);
-  for (const el2 of [...host2.querySelectorAll("strong, em, u, s, [data-size]")]) {
+  for (const el2 of [...host3.querySelectorAll("font, span:not([data-size])")]) unwrap(el2);
+  for (const el2 of [...host3.querySelectorAll("strong, em, u, s, [data-size]")]) {
     if (el2.style && el2.style.length) {
       el2.removeAttribute("style");
       changed = true;
     }
   }
-  for (const el2 of [...host2.querySelectorAll("ul, ol")]) if (!el2.querySelector("li")) {
+  for (const el2 of [...host3.querySelectorAll("ul, ol")]) if (!el2.querySelector("li")) {
     el2.remove();
     changed = true;
   }
-  if (afterDelete && !host2.textContent.replace(ZWSP, "").trim() && host2.querySelector("ul, ol")) {
-    while (host2.firstChild) host2.removeChild(host2.firstChild);
+  if (afterDelete && !host3.textContent.replace(ZWSP, "").trim() && host3.querySelector("ul, ol")) {
+    while (host3.firstChild) host3.removeChild(host3.firstChild);
     const p = document.createElement("p");
     p.appendChild(document.createElement("br"));
-    host2.appendChild(p);
+    host3.appendChild(p);
     if (keep) {
       keep[0] = p;
       keep[1] = 0;
@@ -10350,7 +10353,7 @@ function normaliseDom(host2, { afterDelete = false } = {}) {
     }
     changed = true;
   }
-  for (const el2 of [...host2.querySelectorAll("li[style], li > p[style], li > h1[style], li > h2[style], li > h3[style]")]) {
+  for (const el2 of [...host3.querySelectorAll("li[style], li > p[style], li > h1[style], li > h2[style], li > h3[style]")]) {
     if (el2.style.textAlign) {
       el2.style.removeProperty("text-align");
       if (!el2.getAttribute("style")) el2.removeAttribute("style");
@@ -10358,7 +10361,7 @@ function normaliseDom(host2, { afterDelete = false } = {}) {
     }
   }
   for (let guard = 0; guard < 200; guard += 1) {
-    const outer = [...host2.querySelectorAll("p, h1, h2, h3")].find((el2) => [...el2.children].some((c) => INNER_BLOCKS.has(c.tagName)));
+    const outer = [...host3.querySelectorAll("p, h1, h2, h3")].find((el2) => [...el2.children].some((c) => INNER_BLOCKS.has(c.tagName)));
     if (!outer) break;
     let anchor = outer;
     let run = null;
@@ -10403,7 +10406,7 @@ var TOOLS = [
   ["justify", "Justify", { icon: "align-justify" }, () => exec("justifyFull"), (s) => s.align === "justify"]
 ];
 var POS_BLOCKS = /* @__PURE__ */ new Set(["P", "H1", "H2", "H3", "LI"]);
-function measure(host2, target, targetOffset) {
+function measure(host3, target, targetOffset) {
   let n = 0;
   const go = (el2) => {
     if (el2.nodeType === 3) {
@@ -10412,7 +10415,7 @@ function measure(host2, target, targetOffset) {
       return null;
     }
     if (el2.nodeType !== 1) return null;
-    if (el2 !== host2 && POS_BLOCKS.has(el2.tagName) && !(el2.tagName === "P" && el2.parentElement?.tagName === "LI")) n += 1;
+    if (el2 !== host3 && POS_BLOCKS.has(el2.tagName) && !(el2.tagName === "P" && el2.parentElement?.tagName === "LI")) n += 1;
     if (el2.tagName === "BR") n += 1;
     const kids = el2.childNodes;
     for (let i = 0; i < kids.length; i += 1) {
@@ -10422,12 +10425,12 @@ function measure(host2, target, targetOffset) {
     }
     return el2 === target ? n : null;
   };
-  const found = go(host2);
+  const found = go(host3);
   return found === null ? n : found;
 }
-function locate(host2, pos) {
+function locate(host3, pos) {
   let n = 0;
-  let last = [host2, 0];
+  let last = [host3, 0];
   const go = (el2) => {
     if (el2.nodeType === 3) {
       const len = el2.nodeValue.length;
@@ -10437,7 +10440,7 @@ function locate(host2, pos) {
       return null;
     }
     if (el2.nodeType !== 1) return null;
-    if (el2 !== host2 && POS_BLOCKS.has(el2.tagName) && !(el2.tagName === "P" && el2.parentElement?.tagName === "LI")) {
+    if (el2 !== host3 && POS_BLOCKS.has(el2.tagName) && !(el2.tagName === "P" && el2.parentElement?.tagName === "LI")) {
       n += 1;
       if (n >= pos && !el2.querySelector("li")) return [el2, 0];
     }
@@ -10451,22 +10454,22 @@ function locate(host2, pos) {
     }
     return null;
   };
-  return go(host2) || last;
+  return go(host3) || last;
 }
 var MARK_TAGS = /* @__PURE__ */ new Set(["STRONG", "B", "EM", "I", "U", "S", "STRIKE", "DEL"]);
 var isMark = (el2) => MARK_TAGS.has(el2.tagName) || el2.hasAttribute?.("data-size");
-function selectedTexts(host2) {
+function selectedTexts(host3) {
   const sel = window.getSelection();
   if (!sel.rangeCount) return [];
   const range = sel.getRangeAt(0);
-  if (range.collapsed || !host2.contains(range.commonAncestorContainer)) return [];
+  if (range.collapsed || !host3.contains(range.commonAncestorContainer)) return [];
   const { endContainer: ec, endOffset: eo } = range;
   if (ec.nodeType === 3 && eo > 0 && eo < ec.nodeValue.length) ec.splitText(eo);
   const { startContainer: sc, startOffset: so } = range;
   let first = null;
   if (sc.nodeType === 3 && so > 0 && so < sc.nodeValue.length) first = sc.splitText(so);
   const out = [];
-  const walker = document.createTreeWalker(host2, 4);
+  const walker = document.createTreeWalker(host3, 4);
   for (let text2 = walker.nextNode(); text2; text2 = walker.nextNode()) {
     if (!text2.nodeValue || !range.intersectsNode(text2)) continue;
     if (text2 === sc && !first && so >= text2.nodeValue.length) continue;
@@ -10495,9 +10498,9 @@ function splitAround(outer, node) {
   if (head.textContent) outer.before(head);
   if (tail.textContent) outer.after(tail);
 }
-function liftOut(host2, node, test) {
+function liftOut(host3, node, test) {
   for (let guard = 0; guard < 20; guard += 1) {
-    const outer = closestIn(host2, node, test);
+    const outer = closestIn(host3, node, test);
     if (!outer || POS_BLOCKS.has(outer.tagName)) return;
     splitAround(outer, node);
     outer.replaceWith(...outer.childNodes);
@@ -10509,12 +10512,12 @@ var sizeSpan = (size) => {
   span.className = `dy-rt-${size}`;
   return span;
 };
-var blocksIn = (host2) => {
+var blocksIn = (host3) => {
   const sel = window.getSelection();
   if (!sel.rangeCount) return [];
   const range = sel.getRangeAt(0);
-  const caretBlock = blockOf(host2, range.startContainer);
-  const endBlock = blockOf(host2, range.endContainer);
+  const caretBlock = blockOf(host3, range.startContainer);
+  const endBlock = blockOf(host3, range.endContainer);
   let skip = null;
   if (endBlock && endBlock !== caretBlock) {
     const head = document.createRange();
@@ -10522,23 +10525,23 @@ var blocksIn = (host2) => {
     head.setEnd(range.endContainer, range.endOffset);
     if (head.toString() === "") skip = endBlock;
   }
-  const all = [...host2.querySelectorAll("p, h1, h2, h3, li")].filter((el2) => el2 !== skip && range.intersectsNode(el2) && !(skip && skip.contains(el2)));
+  const all = [...host3.querySelectorAll("p, h1, h2, h3, li")].filter((el2) => el2 !== skip && range.intersectsNode(el2) && !(skip && skip.contains(el2)));
   return all.length ? all : caretBlock ? [caretBlock] : [];
 };
-function setBlockStyle(host2, style) {
+function setBlockStyle(host3, style) {
   const sel = window.getSelection();
   if (style !== "p" && sel.rangeCount) {
     for (let guard = 0; guard < MAX_LIST_LEVELS + 1; guard += 1) {
-      if (!closestIn(host2, sel.anchorNode, (el2) => el2.tagName === "LI")) break;
+      if (!closestIn(host3, sel.anchorNode, (el2) => el2.tagName === "LI")) break;
       exec("outdent");
     }
   }
   exec("formatBlock", style);
 }
-function clearFormatting(host2) {
-  const texts = selectedTexts(host2);
-  const blocks = blocksIn(host2);
-  for (const text2 of texts) liftOut(host2, text2, isMark);
+function clearFormatting(host3) {
+  const texts = selectedTexts(host3);
+  const blocks = blocksIn(host3);
+  for (const text2 of texts) liftOut(host3, text2, isMark);
   for (const block of blocks) {
     block.style.removeProperty("text-align");
     if (!block.getAttribute("style")) block.removeAttribute("style");
@@ -10551,15 +10554,15 @@ function clearFormatting(host2) {
   }
   reselect(texts);
 }
-function stateAt(host2) {
+function stateAt(host3) {
   const empty = { style: "p", size: "normal", align: "left", list: null, bold: false, italic: false, underline: false, strike: false };
   const sel = typeof window !== "undefined" ? window.getSelection() : null;
-  if (!host2 || !sel || !sel.rangeCount || !host2.contains(sel.anchorNode)) return empty;
+  if (!host3 || !sel || !sel.rangeCount || !host3.contains(sel.anchorNode)) return empty;
   const node = sel.anchorNode;
-  const heading = closestIn(host2, node, (el2) => /^H[1-3]$/.test(el2.tagName));
-  const sized = closestIn(host2, node, (el2) => el2.hasAttribute("data-size"));
-  const list = closestIn(host2, node, (el2) => el2.tagName === "UL" || el2.tagName === "OL");
-  const block = blockOf(host2, node);
+  const heading = closestIn(host3, node, (el2) => /^H[1-3]$/.test(el2.tagName));
+  const sized = closestIn(host3, node, (el2) => el2.hasAttribute("data-size"));
+  const list = closestIn(host3, node, (el2) => el2.tagName === "UL" || el2.tagName === "OL");
+  const block = blockOf(host3, node);
   const align = !list && block && alignOf(block) || "left";
   const q = (c) => {
     try {
@@ -10568,25 +10571,25 @@ function stateAt(host2) {
       return false;
     }
   };
-  const has = (tags) => Boolean(closestIn(host2, node, (el2) => tags.includes(el2.tagName)));
+  const has = (tags) => Boolean(closestIn(host3, node, (el2) => tags.includes(el2.tagName)));
   return {
     style: heading ? heading.tagName.toLowerCase() : "p",
     size: sized && RICH_TEXT_SIZES.includes(sized.getAttribute("data-size")) ? sized.getAttribute("data-size") : "normal",
     align,
     list: list ? list.tagName : null,
-    anyList: Boolean(list) || blocksIn(host2).some((b) => closestIn(host2, b, (el2) => el2.tagName === "UL" || el2.tagName === "OL")),
+    anyList: Boolean(list) || blocksIn(host3).some((b) => closestIn(host3, b, (el2) => el2.tagName === "UL" || el2.tagName === "OL")),
     bold: has(["STRONG", "B"]) || !heading && q("bold"),
     italic: has(["EM", "I"]) || q("italic"),
     underline: has(["U"]) || q("underline"),
     strike: has(["S", "STRIKE", "DEL"]) || q("strikeThrough")
   };
 }
-function applySize(host2, size) {
+function applySize(host3, size) {
   const sel = window.getSelection();
   if (!sel.rangeCount) return;
   const range = sel.getRangeAt(0);
   if (range.collapsed) {
-    const current = closestIn(host2, range.startContainer, (el2) => el2.hasAttribute("data-size"));
+    const current = closestIn(host3, range.startContainer, (el2) => el2.hasAttribute("data-size"));
     const marker = document.createTextNode("\u200B");
     if (size === "normal") {
       if (!current) return;
@@ -10604,9 +10607,9 @@ function applySize(host2, size) {
     sel.addRange(caret);
     return;
   }
-  const texts = selectedTexts(host2);
+  const texts = selectedTexts(host3);
   for (const text2 of texts) {
-    liftOut(host2, text2, (el2) => el2.hasAttribute("data-size"));
+    liftOut(host3, text2, (el2) => el2.hasAttribute("data-size"));
     if (size !== "normal") {
       const span = sizeSpan(size);
       text2.before(span);
@@ -10616,7 +10619,7 @@ function applySize(host2, size) {
   reselect(texts);
 }
 function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOnly, label = "Description" }) {
-  const host2 = useRef(null);
+  const host3 = useRef(null);
   const saved = useRef(null);
   const changeRef = useRef(onChange);
   const problemRef = useRef(onProblem);
@@ -10630,13 +10633,13 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
   changeRef.current = onChange;
   problemRef.current = onProblem;
   const refresh = () => {
-    const el2 = host2.current;
+    const el2 = host3.current;
     const sel = window.getSelection();
     if (el2 && sel.rangeCount && el2.contains(sel.anchorNode)) saved.current = sel.getRangeAt(0).cloneRange();
     setState(stateAt(el2));
   };
   const caretNow = () => {
-    const el2 = host2.current;
+    const el2 = host3.current;
     const sel = window.getSelection();
     if (!el2 || !sel.rangeCount || !el2.contains(sel.anchorNode)) return [0, 0];
     return [measure(el2, sel.anchorNode, sel.anchorOffset), measure(el2, sel.focusNode, sel.focusOffset)];
@@ -10668,7 +10671,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     }
   };
   const emit = (typing = false) => {
-    const el2 = host2.current;
+    const el2 = host3.current;
     if (!el2) return;
     normaliseDom(el2, { afterDelete: typing === "delete" });
     const doc = domToDoc(el2);
@@ -10678,7 +10681,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     refresh();
   };
   const travel = (step) => {
-    const el2 = host2.current;
+    const el2 = host3.current;
     const h = history.current;
     const next = h.index + step;
     if (!el2 || readOnly || next < 0 || next >= h.stack.length) return;
@@ -10698,7 +10701,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     refresh();
   };
   useEffect(() => {
-    const el2 = host2.current;
+    const el2 = host3.current;
     renderDoc(el2, value && value.type === "doc" ? value : plainToDoc(fallbackText));
     try {
       exec("defaultParagraphSeparator", "p");
@@ -10727,10 +10730,10 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     };
   }, []);
   useEffect(() => {
-    if (host2.current && history.current.stack.length) report(domToDoc(host2.current));
+    if (host3.current && history.current.stack.length) report(domToDoc(host3.current));
   }, [restSize]);
   const run = (act) => {
-    const el2 = host2.current;
+    const el2 = host3.current;
     if (!el2 || readOnly) return;
     el2.focus();
     if (saved.current) {
@@ -10753,11 +10756,11 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     }
     if (event.key === "Tab") {
       const sel = window.getSelection();
-      const li = sel.rangeCount ? closestIn(host2.current, sel.anchorNode, (n) => n.tagName === "LI") : null;
+      const li = sel.rangeCount ? closestIn(host3.current, sel.anchorNode, (n) => n.tagName === "LI") : null;
       if (!li) return;
       event.preventDefault();
       if (event.shiftKey) exec("outdent");
-      else if (listDepth(host2.current, li) < MAX_LIST_LEVELS) exec("indent");
+      else if (listDepth(host3.current, li) < MAX_LIST_LEVELS) exec("indent");
       emit();
     }
   };
@@ -10774,9 +10777,9 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     if (scratch.childNodes.length === 1 && scratch.firstChild.tagName === "P") frag.append(...scratch.firstChild.childNodes);
     else frag.append(...scratch.childNodes);
     const last = frag.lastChild;
-    const line = blockOf(host2.current, range.startContainer);
+    const line = blockOf(host3.current, range.startContainer);
     const blocks = frag.firstChild && frag.firstChild.nodeType === 1 && /^(P|H[1-3]|UL|OL)$/.test(frag.firstChild.tagName);
-    if (blocks && line && line.parentNode === host2.current && !line.textContent.replace(ZWSP, "")) line.replaceWith(frag);
+    if (blocks && line && line.parentNode === host3.current && !line.textContent.replace(ZWSP, "")) line.replaceWith(frag);
     else range.insertNode(frag);
     if (last) {
       const caret = document.createRange();
@@ -10793,7 +10796,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     if (!data) return;
     event.preventDefault();
     const sel = window.getSelection();
-    if (!sel.rangeCount || !host2.current.contains(sel.anchorNode)) return;
+    if (!sel.rangeCount || !host3.current.contains(sel.anchorNode)) return;
     insertData(data, sel.getRangeAt(0));
   };
   const onDrop = (event) => {
@@ -10806,13 +10809,13 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     const data = event.dataTransfer;
     if (!data) return;
     const at = document.caretRangeFromPoint ? document.caretRangeFromPoint(event.clientX, event.clientY) : null;
-    const range = at && host2.current.contains(at.startContainer) ? at : (() => {
+    const range = at && host3.current.contains(at.startContainer) ? at : (() => {
       const r = document.createRange();
-      r.selectNodeContents(host2.current);
+      r.selectNodeContents(host3.current);
       r.collapse(false);
       return r;
     })();
-    host2.current.focus();
+    host3.current.focus();
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
@@ -10881,7 +10884,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     ] }),
     problem ? jsx("p", { className: "dy-rt-problem", role: "alert", "data-canvas-rich-problem": true, children: problem }) : null,
     jsx("div", { className: `dy-rt-host${readOnly ? " readonly" : ""}`, children: jsx("div", {
-      ref: host2,
+      ref: host3,
       className: "dy-rt-body",
       "data-canvas-rich-text": "true",
       role: "textbox",
@@ -13837,10 +13840,10 @@ function buildLayout(nodes, opts) {
   };
 }
 var canvasSeq = 0;
-function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pollMs = 8e3) {
-  host2.replaceChildren();
-  host2.className = "dy-wf dy-wf-scope";
-  const canvasWindow = host2.ownerDocument?.defaultView ?? globalThis.window;
+function mountWorkflowCanvas(host3, projectId, runName, fetchRuns, handlers, pollMs = 8e3) {
+  host3.replaceChildren();
+  host3.className = "dy-wf dy-wf-scope";
+  const canvasWindow = host3.ownerDocument?.defaultView ?? globalThis.window;
   const wrap = elu("div", "dy-wf-wrap");
   const svg = sEl("svg", { class: "dy-wf-svg" });
   svg.setAttribute("data-lod", "read");
@@ -13952,12 +13955,12 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     const on = motionButton.getAttribute("aria-pressed") === "true";
     motionButton.setAttribute("aria-pressed", String(!on));
     motionButton.textContent = on ? "Motion off" : "Motion on";
-    host2.classList.toggle("dy-wf-still", on);
+    host3.classList.toggle("dy-wf-still", on);
   });
   playbackBar.append(playbackButton, playbackSlider, playbackLabel, motionButton);
   wrap.append(svg, feed, minimap, passport, zoomBar, listView, playbackBar, openHint, help);
   playbackBar.style.overflowX = "auto";
-  host2.appendChild(wrap);
+  host3.appendChild(wrap);
   let panX = 0;
   let panY = 0;
   let zoom = 1;
@@ -14502,7 +14505,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     }
     if (playbackLabel) playbackLabel.textContent = playbackIndex === null ? timeline.length ? `Live \xB7 ${timeline.length} events` : "Live" : `Event ${playbackIndex + 1}/${timeline.length}`;
     renderList(run);
-    const active = host2.ownerDocument?.activeElement ?? null;
+    const active = host3.ownerDocument?.activeElement ?? null;
     const focusedId = active && viewport.contains(active) ? active.closest(".dy-wf-node")?.getAttribute("data-node-id") ?? null : null;
     viewport.replaceChildren();
     viewport.appendChild(defs);
@@ -15032,7 +15035,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     if (e.target?.closest?.(".dy-wf-node")) return;
     hideHint();
     dragging = true;
-    host2.classList.add("dy-wf-panning");
+    host3.classList.add("dy-wf-panning");
     lastX = e.clientX;
     lastY = e.clientY;
     const target = e.target;
@@ -15060,7 +15063,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     if (dragSession) {
       endDragSession(e, true);
       dragging = false;
-      host2.classList.remove("dy-wf-panning");
+      host3.classList.remove("dy-wf-panning");
       return;
     }
     if (connectFrom) {
@@ -15077,7 +15080,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     if (dragSession) endDragSession(e, false);
     cancelConnect();
     dragging = false;
-    host2.classList.remove("dy-wf-panning");
+    host3.classList.remove("dy-wf-panning");
     try {
       svg.releasePointerCapture(e.pointerId);
     } catch {
@@ -15093,9 +15096,9 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     const cx = (ev.clientX - rect.left) / sx;
     const cy = (ev.clientY - rect.top) / sy;
     cameraSet = true;
-    host2.classList.add("dy-wf-panning");
+    host3.classList.add("dy-wf-panning");
     if (wheelSettle) clearTimeout(wheelSettle);
-    wheelSettle = setTimeout(() => host2.classList.remove("dy-wf-panning"), 160);
+    wheelSettle = setTimeout(() => host3.classList.remove("dy-wf-panning"), 160);
     const factor = ev.deltaY < 0 ? ZOOM_IN : ZOOM_OUT;
     const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom * factor));
     const k = next / zoom;
@@ -15311,11 +15314,11 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     } else updateMinimap();
   };
   canvasWindow.addEventListener("resize", onResize);
-  let lastHostWidth = host2.clientWidth;
+  let lastHostWidth = host3.clientWidth;
   let resizeFrame = 0;
   const RO = canvasWindow.ResizeObserver;
   const hostObserver = RO ? new RO(() => {
-    const w = host2.clientWidth;
+    const w = host3.clientWidth;
     if (w === lastHostWidth) return;
     lastHostWidth = w;
     if (resizeFrame) canvasWindow.cancelAnimationFrame(resizeFrame);
@@ -15324,7 +15327,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       onResize();
     });
   }) : null;
-  hostObserver?.observe(host2);
+  hostObserver?.observe(host3);
   disposers.push(() => {
     disposed = true;
     if (timer) clearInterval(timer);
@@ -15336,7 +15339,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     canvasWindow.removeEventListener("resize", onResize);
     hostObserver?.disconnect();
     if (resizeFrame) canvasWindow.cancelAnimationFrame(resizeFrame);
-    host2.replaceChildren();
+    host3.replaceChildren();
   });
   const dispose = () => {
     disposers.forEach((d) => d());
@@ -15392,7 +15395,7 @@ var toCanvasRun = (run) => ({
     ts: event.ts
   }))
 });
-function mountDesktopWorkflowCanvas(host2, projectId, workflowName, definition, runs, handlers = {}) {
+function mountDesktopWorkflowCanvas(host3, projectId, workflowName, definition, runs, handlers = {}) {
   const read = (value) => typeof value === "function" ? value() : value;
   const fetchRuns = async () => {
     const mapped = (read(runs) ?? []).map(toCanvasRun);
@@ -15400,7 +15403,7 @@ function mountDesktopWorkflowCanvas(host2, projectId, workflowName, definition, 
     const nodes = (read(definition)?.nodes ?? []).map(toCanvasNode);
     return [{ run_key: `definition:${workflowName}`, version: 0, status: "definition", started_at: null, updated_at: null, nodes }];
   };
-  return mountWorkflowCanvas(host2, projectId, workflowName, fetchRuns, {
+  return mountWorkflowCanvas(host3, projectId, workflowName, fetchRuns, {
     onApprove: handlers.onApprove ?? (() => void 0),
     onReject: handlers.onReject ?? (() => void 0),
     onRetry: handlers.onRetry,
@@ -18627,14 +18630,14 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     onEditFrame: (nodeId, rect) => setRepeatAt({ nodeId, rect })
   });
   const fitCanvasHeight = () => {
-    const host2 = canvasRef.current;
-    if (!host2) return;
+    const host3 = canvasRef.current;
+    if (!host3) return;
     if (window.innerWidth <= 640) {
-      host2.style.height = "";
+      host3.style.height = "";
       return;
     }
-    const top = host2.getBoundingClientRect().top + window.scrollY;
-    host2.style.height = `${Math.max(360, Math.round(window.innerHeight - top - 12))}px`;
+    const top = host3.getBoundingClientRect().top + window.scrollY;
+    host3.style.height = `${Math.max(360, Math.round(window.innerHeight - top - 12))}px`;
   };
   useEffect(() => {
     const onResize = () => fitCanvasHeight();
@@ -18642,13 +18645,13 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     return () => window.removeEventListener("resize", onResize);
   }, []);
   const growForPanel = () => {
-    const host2 = canvasRef.current;
-    if (!host2 || window.innerWidth <= 640) return;
-    const stage = host2.closest(".dockyard-wf3-stage");
+    const host3 = canvasRef.current;
+    if (!host3 || window.innerWidth <= 640) return;
+    const stage = host3.closest(".dockyard-wf3-stage");
     const toolbar = stage?.querySelector(".dockyard-wf3-toolbar");
     const want = Math.min(820, Math.round(window.innerHeight - (toolbar?.getBoundingClientRect().height ?? 0) - 24));
-    if (host2.getBoundingClientRect().height >= want - 4) return;
-    host2.style.height = `${want}px`;
+    if (host3.getBoundingClientRect().height >= want - 4) return;
+    host3.style.height = `${want}px`;
     stage?.scrollIntoView({ block: "start" });
   };
   const onSelectStep = (nodeId) => {
@@ -19284,7 +19287,7 @@ function ProjectMemoryPanel({ project }) {
     setBusy(true);
     setError(null);
     try {
-      await api(path, init);
+      await api(path, { ...init, quiet: true });
       await load();
       if (done) emitToast("success", done);
       return true;
@@ -22148,6 +22151,59 @@ function PlanScreen({ project, focus, onFocusConsumed, onOpenRoadmap }) {
   ] });
 }
 
+// hermes_dockyard_plugin/desktop/src/project/header-strip.js
+import { host } from "@hermes/plugin-sdk";
+
+// hermes_dockyard_plugin/desktop/src/project/chat.js
+function chatTargets(members, lead) {
+  const list = Array.isArray(members) ? members : [];
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  const push = (slug2, role) => {
+    const profile = String(slug2 ?? "").trim();
+    if (!profile || seen.has(profile)) return;
+    seen.add(profile);
+    out.push({ profile, role });
+  };
+  const leadSlug = String(lead ?? "").trim() || list.find((member) => member?.role === "lead")?.profile_slug;
+  if (leadSlug) push(leadSlug, "lead");
+  for (const member of list) {
+    if (member?.state === "departed") continue;
+    push(member?.profile_slug, member?.role === "lead" ? "lead" : "member");
+  }
+  return out;
+}
+function chatRoute(routes, activeConnectionId, profile) {
+  if (!activeConnectionId) return null;
+  const list = (Array.isArray(routes) ? routes : []).filter((route) => route?.connectionId === activeConnectionId);
+  return list.find((route) => route?.targetProfile === profile) ?? list.find((route) => route?.profile === profile) ?? null;
+}
+async function openProjectChat({ host: host3, api: api2, projectId, profile }) {
+  if (typeof host3?.newChat !== "function") return { opened: false, reason: "unsupported" };
+  let linked = false;
+  try {
+    await api2(`/projects/${encodeURIComponent(projectId)}/chat-links`, { method: "POST", body: { profile }, quiet: true });
+    linked = true;
+  } catch {
+    linked = false;
+  }
+  let route = null;
+  try {
+    if (typeof host3.profileRoutes === "function") {
+      route = chatRoute(await host3.profileRoutes(), host3.activeConnectionId?.() ?? null, profile);
+    }
+  } catch {
+    route = null;
+  }
+  host3.newChat(route ? { ...route } : profile);
+  return { opened: true, linked, via: route ? "route" : "profile" };
+}
+function chatOutcomeMessage(profile, outcome) {
+  if (!outcome?.opened) return ["danger", "This version of Hermes Desktop cannot open a chat from Dockyard. Update Hermes Desktop."];
+  if (!outcome.linked) return ["danger", `Chat with ${profile} opened, but without this project's memory: Dockyard could not link it.`];
+  return ["success", `Chat with ${profile} opened. Its first message brings this project's memory.`];
+}
+
 // hermes_dockyard_plugin/desktop/src/project/attention.js
 var STALLED_AFTER_DAYS = 14;
 var PHASE_LABEL = { paused: "Paused", frozen: "Frozen", disabled: "Disabled", archived: "Archived" };
@@ -22356,6 +22412,37 @@ function ageText(days) {
   if (days < 1) return "Under a day";
   return `${number(days)} ${days === 1 ? "day" : "days"}`;
 }
+function ProjectChatMenu({ projectId, lead }) {
+  const [members, setMembers] = useState(null);
+  useEffect(() => {
+    let live = true;
+    setMembers(null);
+    api(`/projects/${encodeURIComponent(projectId)}/members`).then((result) => {
+      if (live) setMembers(result?.members ?? []);
+    }).catch(() => {
+      if (live) setMembers([]);
+    });
+    return () => {
+      live = false;
+    };
+  }, [projectId]);
+  const targets = chatTargets(members, lead);
+  if (targets.length === 0) return null;
+  const open = async (profile) => {
+    const [tone, message] = chatOutcomeMessage(profile, await openProjectChat({ host, api, projectId, profile }));
+    emitToast(tone, message);
+  };
+  return jsx("span", { className: "dy-ov-chat", "data-strip-chat": projectId, children: jsx(Menu, {
+    label: `Chat with a bot on ${projectId}`,
+    action: "project-chat",
+    trigger: jsxs(Fragment, { children: [jsx(Icon, { name: "message-square" }), jsx("span", { children: "Chat" })] }),
+    items: targets.map((target) => ({
+      id: target.profile,
+      label: target.role === "lead" ? `${target.profile} (lead)` : target.profile,
+      onSelect: () => open(target.profile)
+    }))
+  }) });
+}
 function AttentionDrawer({ projectId, attention, onClose, onOpenItem }) {
   const [expanded, setExpanded] = useState(null);
   useDialogFocusManager("[data-attention-drawer] .dy-ov-attn-panel");
@@ -22476,6 +22563,7 @@ function ProjectHeaderStrip({ project, view, onRefresh, onOpenRoadmap, onOpenIte
             event.preventDefault();
             onOpenRoadmap?.();
           }, children: "View in Roadmap" }) }),
+          jsx(ProjectChatMenu, { projectId: project.id, lead }, `chat:${project.id}`),
           jsx("button", { type: "button", className: "dy-ov-refresh", "data-action": "refresh", "aria-label": "Refresh", title: "Refresh", onClick: onRefresh, children: jsx(Icon, { name: "refresh" }) })
         ] })
       ] }),
@@ -25505,11 +25593,11 @@ function DashboardPage({ inboxCss = "" } = {}) {
 var POPUP_INTERVAL_MS = 6e4;
 var POPUP_CAP = 3;
 function openDockyard() {
-  host?.navigate?.("/dockyard");
+  host2?.navigate?.("/dockyard");
 }
 function surfacePopup(item) {
   const text2 = String(item?.body ?? "").trim();
-  host.notify({
+  host2.notify({
     id: `dockyard-notification-${item?.id}`,
     kind: "info",
     title: item?.title ?? "Fleet notification",
@@ -25518,7 +25606,7 @@ function surfacePopup(item) {
   });
 }
 function surfaceMore(count) {
-  host.notify({
+  host2.notify({
     id: "dockyard-notification-more",
     kind: "info",
     title: `and ${count} more notification${count === 1 ? "" : "s"}`,
@@ -25527,7 +25615,7 @@ function surfaceMore(count) {
   });
 }
 function startPopupPoller(ctxRest) {
-  if (typeof host?.notify !== "function") return;
+  if (typeof host2?.notify !== "function") return;
   if (typeof window === "undefined" || window.__dockyardPopupPoller) return;
   const surfaced = /* @__PURE__ */ new Set();
   const tick = async () => {
@@ -25579,7 +25667,7 @@ var __plugin = {
           id: "hermes-dockyard.open",
           label: "Dockyard: Open fleet overview",
           keywords: ["dockyard", "fleet", "projects", "approvals", "notifications"],
-          run: () => host.navigate("/dockyard")
+          run: () => host2.navigate("/dockyard")
         }
       }
     ]);

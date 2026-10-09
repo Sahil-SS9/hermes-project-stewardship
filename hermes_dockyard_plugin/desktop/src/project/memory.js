@@ -126,12 +126,13 @@ export function ProjectMemoryPanel({ project }) {
     }
   }
   useEffect(() => { load() }, [project.id])
-  // One door for every write: refresh after it, and say what went wrong in the panel.
+  // One door for every write: refresh after it, and say what went wrong in the
+  // panel. `quiet`: the panel says what happened itself (one toast, not two).
   const write = async (path, init, done) => {
     setBusy(true)
     setError(null)
     try {
-      await api(path, init)
+      await api(path, { ...init, quiet: true })
       await load()
       if (done) emitToast('success', done)
       return true
