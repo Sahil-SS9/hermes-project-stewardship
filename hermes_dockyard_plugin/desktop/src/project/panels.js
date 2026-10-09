@@ -66,11 +66,11 @@ export function ProjectSettingsPanel({ project, settings, onRefresh, onDirty }) 
         : phase === 'frozen'
           ? ['resume', 'archive', 'disable']
           : ['disable']
-  const update = (key, value) => setForm((current) => {
-    const next = { ...current, [key]: value }
-    onDirty?.(editing && JSON.stringify(next) !== JSON.stringify(buildForm()))
-    return next
-  })
+  // The effect above reports unsaved changes after each edit. Calling onDirty
+  // here, inside the state updater, updated the parent while this panel was
+  // rendering (React: "Cannot update a component while rendering a different
+  // component", 09/10).
+  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }))
   const save = async () => {
     if (!enabled || !editing) return
     setSaving(true)

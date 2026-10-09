@@ -2400,6 +2400,23 @@ async function testActualObjectiveEvidence() {
   } finally { await runtime.dispose(); }
 }
 
+// React's own warnings about real product bugs (a list without keys; a parent
+// updated while a child renders) must fail this run, not scroll past in the log.
+// 09/10: BacklogView (3 lists) and ProjectSettingsPanel both did, under a green
+// run. The act(...) notices are test-harness noise and stay out of this check.
+const PRODUCT_WARNING = /Each child in a list should have a unique "key" prop|Cannot update a component .* while rendering a different component/;
+const productWarnings = [];
+const consoleErrorBeforeGuard = console.error;
+console.error = (...args) => {
+  let next = 1;
+  const text = String(args[0]).replace(/%s/g, () => String(args[next++] ?? '')) + ' ' + args.slice(next).map(String).join(' ');
+  if (PRODUCT_WARNING.test(text)) productWarnings.push(text.replace(/\s+/g, ' ').slice(0, 220));
+  consoleErrorBeforeGuard(...args);
+};
+async function testNoReactProductWarnings() {
+  assert.deepEqual(productWarnings, [], `React reported product bugs:\n${productWarnings.join('\n')}`);
+}
+
 const tests = [
   ['actual API objective evidence and authority', testActualObjectiveEvidence],
   ['styles and populated dashboard', testStylesAndPopulatedDashboard],
@@ -2430,6 +2447,7 @@ const tests = [
   ['onboarding journey to first assessment', testOnboardingJourneyToFirstAssessment],
   ['first assessment completion action', testFirstAssessmentCompletionAction],
   ['contrast metadata', testContrastMetadata],
+  ['no React product warnings (keys, update while rendering)', testNoReactProductWarnings],
   ['Chromium layouts', testChromiumLayouts],
 ];
 

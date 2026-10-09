@@ -8686,28 +8686,28 @@ function BacklogBoard(ctx) {
         jsxs("label", { className: "cm-filter", children: [
           jsx("span", { children: "Type" }),
           jsx("select", { "data-filter-field": "type", "aria-label": "Filter by type", value: columnFilters.type, onChange: (event) => setColumnFilters((current) => ({ ...current, type: event.target.value })), children: [
-            jsx("option", { value: "", children: "All types" }),
+            jsx("option", { value: "", children: "All types" }, "all"),
             ...typeFilterValues.map((type) => jsx("option", { value: type, children: typeLabel2(type) }, type))
           ] })
         ] }),
         jsxs("label", { className: "cm-filter", children: [
           jsx("span", { children: "Status" }),
           jsx("select", { "data-filter-field": "status", "aria-label": "Filter by status", value: columnFilters.status, onChange: (event) => setColumnFilters((current) => ({ ...current, status: event.target.value })), children: [
-            jsx("option", { value: "", children: "All statuses" }),
+            jsx("option", { value: "", children: "All statuses" }, "all"),
             ...statusFilterValues.map((status) => jsx("option", { value: status, children: STATUS_LABELS[status] || readableLabel(status) }, status))
           ] })
         ] }),
         jsxs("label", { className: "cm-filter", children: [
           jsx("span", { children: "Initiative" }),
           jsx("select", { "data-filter-field": "initiative", "aria-label": "Filter by initiative", value: columnFilters.initiative, onChange: (event) => setColumnFilters((current) => ({ ...current, initiative: event.target.value })), children: [
-            jsx("option", { value: "", children: "All initiatives" }),
+            jsx("option", { value: "", children: "All initiatives" }, "all"),
             ...initiativeFilterValues.map((ref) => jsx("option", { value: ref, children: initiativeLabel(ref) }, ref))
           ] })
         ] }),
         jsxs("label", { className: "cm-filter", children: [
           jsx("span", { children: "Assignee" }),
           jsx("select", { "data-filter-field": "assignee", "aria-label": "Filter by assignee", value: columnFilters.assignee, onChange: (event) => setColumnFilters((current) => ({ ...current, assignee: event.target.value })), children: [
-            jsx("option", { value: "", children: "All assignees" }),
+            jsx("option", { value: "", children: "All assignees" }, "all"),
             hasUnassignedItems ? jsx("option", { value: "__unassigned__", children: "Unassigned" }, "unassigned") : null,
             ...assigneeFilterValues.map((owner) => jsx("option", { value: owner, children: ownerLabel(owner) }, owner))
           ] })
@@ -8873,7 +8873,7 @@ function BacklogBoard(ctx) {
                 cell === "status" ? jsx("select", { autoFocus: true, className: "cell-edit is-input", "data-cell-input": "status", value: item.status && STATUS_UI[item.status] || "backlog", onChange: (event) => {
                   setEditing(null);
                   changeStatus(ref, event.target.value);
-                }, onBlur: () => setEditing(null), children: validStatusChoices.map((st) => jsx("option", { value: st, children: STATUS_LABELS[st] }, st)) }) : jsx("button", { type: "button", className: `cell-edit cell-status tree-status ${stUi === "done" ? "success" : overdue || stUi === "blocked" ? "danger" : stUi === "in_progress" ? "info" : stUi === "in_review" ? "warning" : "neutral"}`, "data-cell": "status", title: "Change status", onClick: (event) => {
+                }, onBlur: () => setEditing(null), children: validStatusChoices.map((st) => jsx("option", { value: st, children: STATUS_LABELS[st] }, st)) }) : jsxs("button", { type: "button", className: `cell-edit cell-status tree-status ${stUi === "done" ? "success" : overdue || stUi === "blocked" ? "danger" : stUi === "in_progress" ? "info" : stUi === "in_review" ? "warning" : "neutral"}`, "data-cell": "status", title: "Change status", onClick: (event) => {
                   event.stopPropagation();
                   setEditing({ ref, field: "status" });
                 }, children: [
@@ -8895,7 +8895,7 @@ function BacklogBoard(ctx) {
                 }, onBlur: () => setEditing(null), children: [
                   jsx("option", { value: "", children: "Unassigned" }),
                   ...(view.bots ?? []).map((bot) => jsx("option", { value: bot.id, children: bot.name || bot.id }, bot.id))
-                ] }) : jsx("button", { type: "button", className: "cell-edit cell-who", "data-cell": "assignee", title: item.type === "epic" ? "Epics are never assigned \u2014 their children carry the work" : "Change assignee", disabled: (item.type || "task") === "epic", onClick: (event) => {
+                ] }) : jsxs("button", { type: "button", className: "cell-edit cell-who", "data-cell": "assignee", title: item.type === "epic" ? "Epics are never assigned \u2014 their children carry the work" : "Change assignee", disabled: (item.type || "task") === "epic", onClick: (event) => {
                   event.stopPropagation();
                   if ((item.type || "task") === "epic") {
                     flashCell(ref, "assignee", "Epics are never assigned \u2014 assign one of its children instead.");
@@ -8934,7 +8934,7 @@ function BacklogBoard(ctx) {
                     },
                     children: validTypeChoices.map((type) => jsx("option", { value: type, children: typeLabel2(type) }, type))
                   })
-                ] }) : jsx("div", { className: "tree-menu-static", children: [jsx("span", { children: "Type" }), jsx("strong", { children: typeLabel2(item.type) })] }),
+                ] }) : jsxs("div", { className: "tree-menu-static", children: [jsx("span", { children: "Type" }), jsx("strong", { children: typeLabel2(item.type) })] }),
                 mayAddChild || mayReparent || depth === 0 && entry ? jsx("div", { className: "menu-label", children: "Structure" }) : null,
                 mayAddChild ? jsxs("button", { type: "button", role: "menuitem", "data-menu-action": "add-child", onClick: () => {
                   setMenuRef(null);
@@ -19436,11 +19436,7 @@ function ProjectSettingsPanel({ project, settings, onRefresh, onDirty }) {
   };
   const archived = Boolean(lifecycleState?.archived_at);
   const lifecycleActions = archived ? ["restore"] : !enabled ? ["enable"] : phase === "active" ? ["pause", "freeze", "archive", "disable"] : phase === "paused" ? ["resume", "freeze", "archive", "disable"] : phase === "frozen" ? ["resume", "archive", "disable"] : ["disable"];
-  const update = (key, value) => setForm((current) => {
-    const next = { ...current, [key]: value };
-    onDirty?.(editing && JSON.stringify(next) !== JSON.stringify(buildForm()));
-    return next;
-  });
+  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const save2 = async () => {
     if (!enabled || !editing) return;
     setSaving(true);
