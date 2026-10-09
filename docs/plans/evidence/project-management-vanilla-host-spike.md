@@ -1,6 +1,6 @@
 # Vanilla-host capability spike (PM-0011/0013/0014/0015)
 
-Date: 2026-09-10. Vanilla checkout: `/home/kensei/repos/hermes-agent-vanilla`; revision `8c098e9e819169879a7b2f74990e83b5d39696c8`. The checkout was read-only. Runtime probes used fresh `/tmp/pm0-vanilla-home-*` homes and did not touch `~/.hermes`.
+Date: 2026-09-10. Vanilla checkout: a clean upstream Hermes Agent checkout (`hermes-agent-vanilla`); revision `8c098e9e819169879a7b2f74990e83b5d39696c8`. The checkout was read-only. Runtime probes used fresh `/tmp/pm0-vanilla-home-*` homes and did not touch `~/.hermes`.
 
 ## Executive verdicts
 
@@ -87,7 +87,7 @@ There were no `from hermes...` or `import hermes...` references in the listed da
 
 **UNPROVEN runtime:** the requested install dockyard plugin → write `plugin-data/hermes-dockyard/dockyard.db` → disable → re-enable → simulated uninstall/reinstall test was not completed because this clean vanilla runtime could not load optional plugin dependencies (`httpx` was absent; probe emitted `Failed to load plugin ... No module named 'httpx'`). Thus retention across actual uninstall/reinstall remains unproven. Source evidence supports disable/re-enable persistence; it does not prove behavior of an external plugin installer's uninstall policy.
 
-**RESOLVED by follow-up runtime probe (same day, Kensei verification pass).** Method: temp git repo `/tmp/pm0-synth-plugin` containing a synthetic `manifest_version: 1` plugin named `hermes-project-stewardship` (the real repo manifest is v2 and this vanilla revision's installer rejects v2 — noted as a separate compatibility finding below); disposable runtime via `PYTHONPATH=/home/kensei/repos/hermes-agent-vanilla` on `/tmp/pm0-vanilla-venv`; `HERMES_HOME=/tmp/pm0-vanilla-home-retention`; a `plugin-data/hermes-project-stewardship/dockyard.db` created with a marker row before any lifecycle command. Transcript:
+**RESOLVED by follow-up runtime probe (same day, Kensei verification pass).** Method: temp git repo `/tmp/pm0-synth-plugin` containing a synthetic `manifest_version: 1` plugin named `hermes-project-stewardship` (the real repo manifest is v2 and this vanilla revision's installer rejects v2 — noted as a separate compatibility finding below); disposable runtime via `PYTHONPATH=<vanilla checkout>` on `/tmp/pm0-vanilla-venv`; `HERMES_HOME=/tmp/pm0-vanilla-home-retention`; a `plugin-data/hermes-project-stewardship/dockyard.db` created with a marker row before any lifecycle command. Transcript:
 
 ```text
 1 INSTALL file:// --no-enable          rc=0  "Plugin installed but not enabled"

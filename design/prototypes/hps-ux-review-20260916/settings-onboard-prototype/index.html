@@ -32,7 +32,7 @@ const FEATURE_LABELS={workflow_canvas:'Workflow canvas',milestones:'Milestones',
 /* The one addition: group the flat list */
 const GROUPS=[['Workflow & planning',['workflow_canvas','milestones','initiatives']],['Signals',['inbox','notifications']],['Views',['saved_views']]];
 const PROFILES=['octacon','quan','remii','kensei'];
-const EXISTING=[{slug:'hermes-core',repo:'/home/kensei/repos/hermes-agent'},{slug:'dockyard-plugin',repo:'/home/kensei/repos/hermes_dockyard_plugin'}];
+const EXISTING=[{slug:'hermes-core',repo:'~/repos/hermes-agent'},{slug:'dockyard-plugin',repo:'~/repos/hermes_dockyard_plugin'}];
 
 /* ================= SETTINGS =================
    Existing buildFeaturesPanel markup: details.dy-features > summary + .dy-features-body
@@ -109,7 +109,7 @@ function renderOnboard(){
  };
  card.append(
   mkField('Project ID','ob-id','e.g. hermes-core'),
-  mkField('Repo path','ob-repo','/home/kensei/repos/…'),
+  mkField('Repo path','ob-repo','~/repos/…'),
   mkField('Mission','ob-mission','What is this project for?'),
   mkField('Lead profile','ob-lead','',true)
  );

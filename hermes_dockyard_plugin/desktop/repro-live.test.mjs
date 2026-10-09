@@ -1797,7 +1797,7 @@ async function testOnboardingWizardAndToastSurface() {
   assert.equal(wizard.querySelectorAll('[data-wizard-step]').length, 4, 'onboarding wizard must expose four steps');
   assert(wizard.querySelector('[role="progressbar"]'), 'wizard progress semantics are missing');
   await runtime.setValue('[data-field="project-id"]', 'checkout-ops');
-  await runtime.setValue('[data-field="repo-path"]', '/home/sahil/repos/checkout');
+  await runtime.setValue('[data-field="repo-path"]', '/srv/repos/checkout');
   await runtime.click('[data-action="wizard-next"]');
   assert.equal(wizard.querySelector('[data-wizard-step].active')?.getAttribute('data-wizard-step'), '2', 'wizard did not advance');
   await runtime.setValue('[data-field="mission"]', 'Reduce payment failures without weakening release gates.');
@@ -1815,7 +1815,7 @@ async function testOnboardingWizardAndToastSurface() {
   const onboard = runtime.calls.find((call) => call.method === 'POST' && call.path === '/onboard');
   assert.deepEqual(onboard?.body, {
     project_id: 'checkout-ops',
-    repo_path: '/home/sahil/repos/checkout',
+    repo_path: '/srv/repos/checkout',
     mission: 'Reduce payment failures without weakening release gates.',
     lead_profile: 'octacon',
     member_profiles: ['quan'],

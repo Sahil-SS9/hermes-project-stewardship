@@ -1,5 +1,7 @@
 # Project Stewardship Management — Revised Implementation Plan
 
+> **0.4.0 note:** the Phase 3, Phase 4 and UX-contract evidence files named below were moved out of the repository because they held the maintainer's machine paths; the maintainer keeps them in a private archive.
+>
 > **Execution status:** Phases 0–4 complete. Phase 5 corrected candidate is ready for re-review on checkpoint `13370ce9b9bc85582b8ae13245eaa3ac0341e707`; PM-0501..PM-0509 are implemented, independent-review findings are repaired, and final evidence is in `docs/plans/evidence/project-management-phase5.md`. Phase 5 remains uncommitted.
 >
 > **Parent WIP branch:** `feat/trustworthy-daily-stewardship-20260908`

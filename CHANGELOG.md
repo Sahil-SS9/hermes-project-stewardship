@@ -73,6 +73,11 @@ of the plugin now shares one name.
   manifest, Desktop app, API path `/api/plugins/hermes-project-stewardship/`).
 - A parent item only groups work; it never blocks its children.
 
+- Old internal working notes (dated plans, release evidence and design
+  hand-overs from earlier releases) moved out of the repository: they held
+  the maintainer's machine paths. The prototypes, mockups and tests that
+  stay use neutral example paths, and a test keeps home-folder paths out.
+
 ### Fixed
 - #1: the tests collect from a checkout folder of any name.
 - #4: `hermes plugins install ... --enable` now switches the backend on too.

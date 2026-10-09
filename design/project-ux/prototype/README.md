@@ -5,7 +5,7 @@ Standalone Vite/React interaction prototype. All data is deterministic and synth
 ## Open locally
 
 ```bash
-cd /home/kensei/repos/hermes-project-stewardship/design/project-ux/prototype
+cd design/project-ux/prototype
 npm ci
 npm run dev -- --host 127.0.0.1
 ```

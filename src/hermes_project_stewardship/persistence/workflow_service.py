@@ -22,7 +22,7 @@ Phase 5 (team-bound workflows) extends the Phase 2 execution foundation:
 - versioned plugin-native **JSON import/export** with validation preview,
   size limits and semantic round-trip fidelity.
 
-Deliberate scope limits (see evidence file phase-5.md, P5.12):
+Deliberate scope limits (approved policy limits, P5.12):
   ``IMPORT_MAX_BYTES``, ``MAX_LOOP_ITERATIONS``, ``MAX_PROPOSAL_NODES`` and
   ``MAX_REVISIONS_PER_RUN`` — the minimum plugin-specific bounds; no cost
   dashboard is built on top of them.

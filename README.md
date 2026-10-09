@@ -192,7 +192,6 @@ Reference and history
 
 Phase 8 preparation (planning records — no merge, install or activation is implied)
 
-- [Parent reconciliation plan](docs/release/0.3.0-phase8-reconciliation-plan.md)
 - [Post-integration test and evidence checklist](docs/release/0.3.0-post-integration-test-checklist.md)
 - [Independent review packet template](docs/release/0.3.0-phase8-independent-review-packet.md)
 - [Deployment decision checklist](docs/release/0.3.0-deployment-decision-checklist.md)
