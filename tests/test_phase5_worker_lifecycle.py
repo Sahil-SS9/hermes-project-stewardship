@@ -162,7 +162,7 @@ def test_phase5_worker_claim_execute_result_and_team_binding(tmp_path, monkeypat
                 # Duplicate worker result against the closed claim must not
                 # overwrite or duplicate: expected_run_id no longer matches
                 # any open run.
-                dup = kanban_db.complete_task(
+                kanban_db.complete_task(
                     conn, build["id"], result="replayed result",
                     expected_run_id=claimed.current_run_id)
                 after = kanban_db.get_task(conn, build["id"])

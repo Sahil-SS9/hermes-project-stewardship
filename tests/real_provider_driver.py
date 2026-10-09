@@ -45,8 +45,6 @@ def _canvas(revision: int) -> dict:
 
 
 def main() -> int:
-    verdicts = {}
-
     provider = HermesCurationProvider()
     result = CanvasCurationService(provider=provider).curate(_canvas(1))
     ok_valid = result.get("status") != "provider_failed"
