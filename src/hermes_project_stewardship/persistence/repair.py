@@ -53,6 +53,7 @@ class RepairReport:
     foreign_key_violations: int = 0
     reopened_by_store: bool = False
     created_at: str = ""
+    managed_content: Dict[str, object] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -64,8 +65,52 @@ class RepairReport:
         return json.dumps({**asdict(self), "ok": self.ok}, sort_keys=True, indent=2)
 
 
+def _managed_content_report(
+    source: Path, backup: Path, target: Path, active_records: int
+) -> Dict[str, object]:
+    """R-REPAIR (3b): the report must carry the managed-content story.
+
+    ``project-content`` lives at the DATABASE PARENT by design and repair
+    copies rows only, so a target under a different parent strands every
+    content record until the operator brings the tree across — and the
+    copied rows keep the SOURCE files' dev/ino identity, so removal refuses
+    ("identity changed") until identities are recomputed. Report the roots,
+    whether the target's root exists, and the identity caveat; never claim
+    repair moved content when it did not.
+    """
+    source_root = source.parent / "project-content"
+    target_root = target.parent / "project-content"
+    relocated = source_root.resolve() != target_root.resolve()
+    identity_note = (
+        "copied rows keep the SOURCE files' file_dev/file_ino; if the content"
+        " tree is copied or moved across (new inodes), recompute identity like"
+        " restore does, or removal refuses with 'identity changed'")
+    return {
+        "content_root": str(target_root),
+        "source_content_root": str(source_root),
+        "relocated": relocated,
+        "content_root_present": target_root.is_dir(),
+        "active_records": active_records,
+        "moved_by_repair": False,
+        "identity_note": identity_note,
+    }
+
+
 def _ro(path: Path) -> sqlite3.Connection:
     return sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)
+
+
+def _active_content_records(source: sqlite3.Connection) -> int:
+    """Count active managed-content rows the repaired database references."""
+    try:
+        row = source.execute(
+            "SELECT COUNT(*) FROM project_content WHERE removal_state='active'"
+        ).fetchone()
+    except sqlite3.Error:
+        return 0
+    finally:
+        source.close()
+    return int(row[0])
 
 
 def _quote(name: str) -> str:
@@ -115,6 +160,10 @@ def repair_database(source, target, backup_dir) -> RepairReport:
             leftover.unlink(missing_ok=True)
         raise
     report.created_at = datetime.now(timezone.utc).isoformat()
+    report.managed_content = _managed_content_report(
+        source, backup, target,
+        _active_content_records(_ro(backup)),
+    )
     if not report.ok:
         raise RepairError(f"repair verification failed: {report.as_json()}")
     return report
