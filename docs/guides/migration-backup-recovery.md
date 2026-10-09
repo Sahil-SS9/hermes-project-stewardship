@@ -26,7 +26,7 @@ metadata but do not claim complete managed-content lifecycle recovery.
 |---|---|---|
 | **Database rollback** (select the preserved previous database + previous code, or the isolated-runner rollback) | The Stewardship SQLite database and its schema/rows | Cannot undo a truncated managed file, and cannot be done by downgrading a schema in place |
 | **File truncation** (`remove_project_content`) | — | **Irreversible.** Truncating the verified inode to zero bytes is not recoverable from a database backup; only a backup of the filesystem content can restore it, and only if taken before removal |
-| **Backup restoration** (`stewardctl export` → `stewardctl restore`) | A consistent, versioned copy of the Stewardship **database only** | Cannot restore the managed content directory, and cannot restore canonical Hermes Projects/Kanban/Profiles state |
+| **Backup restoration** (`stewardctl export` → `stewardctl restore`) | A consistent, versioned copy of the Stewardship database; v2 archives include the active managed content as it was at export time | v1 archives are database-only; content added after the export, and canonical Hermes Projects/Kanban/Profiles state, are never restored by `stewardctl restore` |
 
 Any release note, runbook or checklist that collapses these three into
 "rollback" is wrong and must be corrected.
@@ -48,19 +48,27 @@ stewardctl restore --archive /abs/archive-dir --target /abs/new-restored.db
 - The export refuses an existing destination path, a non-directory parent and a
   symlinked parent.
 - Restore refuses: a symlinked/non-directory archive, a missing or symlinked
-  manifest, a non-`1` manifest version, absolute or `..` database paths, any
-  symlink along the archive path, a checksum mismatch, a byte-size mismatch, a
-  pre-existing target, a non-directory target parent, and a database whose
-  integrity or `schema_version` does not match the manifest.
+  manifest, an unsupported manifest version, absolute or `..` database paths,
+  any symlink along the archive path, a checksum mismatch, a byte-size
+  mismatch, a pre-existing target, a non-directory target parent, and a
+  database whose integrity or `schema_version` does not match the manifest.
+  Manifest v2 archives additionally require the archived managed-content
+  records to match the snapshot's active `project_content` rows exactly.
 
 Honest limits to state alongside it:
 
-- **The archive covers the database only.** Managed project content lives at
-  `<database parent>/project-content` and is *not* included. A restored database
-  can therefore reference content files that do not exist in the restored
-  environment. Any cutover that uses export/restore must back up the managed
-  content directory separately, or explicitly accept that managed content is
-  left behind. Do not present `stewardctl export` as a full-system backup.
+- **The archive v2 covers the database plus active managed content.** Since
+  the versioned manifest gained v2, `stewardctl export` also archives the
+  active `project-content` rows and `stewardctl restore` writes them to
+  `<restored database parent>/project-content`, re-deriving the recorded
+  device/inode identity. Restore accepts older v1 archives but treats them as
+  database-only, and a v2 archive whose active content rows disagree with the
+  manifest is refused. Managed content created *after* an export is not in
+  that archive (R-B1's fix makes the manifest match its snapshot; later work
+  belongs to the next export). Canonical Hermes Projects/Kanban/Profiles
+  state remains outside every archive. Do not present `stewardctl export` as
+  a canonical-Hermes backup, and note that a v1 archive still leaves managed
+  content to be backed up separately.
 - Export/restore does not touch canonical Hermes Projects, Kanban, Profiles or
   repository state. Those have their own owners and their own backups.
 - Copying a live `.db` file without its WAL sidecars is not a valid backup
@@ -83,8 +91,15 @@ Honest limits to state alongside it:
   (`stewardctl --db <db> export --output <folder>`), then open the database with
   0.4.0. To go back, restore that export with 0.3.0
   (`stewardctl restore --archive <folder> --target <new.db>`) and point 0.3.0 at
-  the restored file. 0.3.0 itself does not check schema versions: it opens an
-  upgraded database without a warning, so never point it at one.
+  the restored file. 0.3.0 writes and accepts only manifest v1
+  (database-only archives): it refuses a newer-version archive outright, and
+  the backup does not carry managed content — copy
+  `<old db parent>/project-content` to `<new db parent>/project-content`
+  after restoring, or the 0.3.0 instance works against a database whose
+  content rows point nowhere. Restore into a fresh location: the target
+  database must not exist, and neither should `<target parent>/project-content`
+  (v2-era restore recreates it). 0.3.0 itself does not check schema versions:
+  it opens an upgraded database without a warning, so never point it at one.
 - Migration proof obligations already met in earlier phases (recorded in
   `docs/plans/evidence/project-management-phase*.md`, historical, not a fresh
   gate): existing mission/owner/member/objective/milestone/workflow/evidence/
@@ -145,5 +160,7 @@ Honest limits to state alongside it:
   minimum/latest vanilla Hermes revision for the compatibility promise; the
   claim is bounded to host contract v2 (`docs/api.md`). Treat any stronger
   compatibility claim as unproven until Phase 6 supplies it.
-- The export archive has never been presented as including managed content; if a
-  release note implies otherwise, that is a defect to fix.
+- `stewardctl export` v2 archives include the snapshot's active managed
+  content, and restore re-derives it; what must never be claimed is that an
+  export covers canonical Hermes state or managed content created after the
+  export (a v1 archive is database-only).

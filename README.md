@@ -123,12 +123,16 @@ stewardctl restore --archive ./dockyard-export --target ./restored.db
 ```
 
 Exports use SQLite's online backup API and include a versioned manifest,
-SHA-256 digest, byte size, schema version and integrity result. Restore refuses
+SHA-256 digest, byte size, schema version and integrity result. v2 archives
+also carry the active managed-content directory as it was at export time;
+restore writes it under `<target parent>/project-content` and re-derives the
+recorded identity. Older v1 archives restore as database-only. Restore refuses
 existing targets, traversal, symlinks, checksum mismatches and invalid schemas.
 
-The archive contains the Stewardship **database only**. Managed project content
-lives outside it, at `<database parent>/project-content`, so a restore does not
-bring managed files back — back that directory up separately. See
+Even for a v2 archive the export is not a full-system backup: managed content
+created after the export is absent, and canonical Hermes Projects/Kanban/
+Profiles state lives elsewhere — back the content directory up as well when a
+complete cutover image is needed. See
 [Migration, backup and recovery prerequisites](docs/guides/migration-backup-recovery.md)
 for the difference between database rollback, irreversible file removal and
 backup restoration.
