@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tests.lane_b_phase7_fixtures import (  # noqa: E402
+from .lane_b_phase7_fixtures import (  # noqa: E402
     LANE_B_DARK,
     LANE_B_LIGHT,
     contrast_ratio,

@@ -10,7 +10,7 @@ Proven 04/10/2026 on disposable upstream Hermes (evidence/c/C2/other-states-prob
 """
 from __future__ import annotations
 
-from tests.r2_helpers import HUMAN
+from .r2_helpers import HUMAN
 
 
 def test_new_task_and_epic_read_back_as_backlog(real_host):

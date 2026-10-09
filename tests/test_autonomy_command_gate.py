@@ -29,8 +29,8 @@ from hermes_project_stewardship.security.allowlist import (
     run_allowlisted,
 )
 
-from tests.conftest import make_repo
-from tests.test_cycles import wire_repo
+from .conftest import make_repo
+from .test_cycles import wire_repo
 
 COMMAND_LEVEL = int(AutonomyLevel.BUILDER)  # 3
 

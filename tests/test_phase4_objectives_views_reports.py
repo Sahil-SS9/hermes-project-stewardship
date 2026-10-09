@@ -35,8 +35,8 @@ from hermes_project_stewardship.persistence.service import (  # noqa: E402
 )
 from hermes_project_stewardship.persistence.store import Store  # noqa: E402
 
-from tests.conftest import enable_project  # noqa: E402
-from tests.lane_b_phase7_fixtures import make_service_client  # noqa: E402
+from .conftest import enable_project  # noqa: E402
+from .lane_b_phase7_fixtures import make_service_client  # noqa: E402
 
 HUMAN = Actor(id="sahil", display_name="Sahil", kind=ActorKind.HUMAN)
 _EXPIRED = "2026-08-20T00:00:00+00:00"  # frozen clock is 2026-08-21 12:00 UTC

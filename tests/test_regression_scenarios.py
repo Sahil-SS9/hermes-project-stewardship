@@ -14,7 +14,7 @@ from hermes_project_stewardship.gateway import (
 )
 from hermes_project_stewardship.verification.engine import CollectorSpec
 
-from tests.conftest import make_repo
+from .conftest import make_repo
 
 
 def wire_repo(svc, pid, repo):

@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 fastapi = pytest.importorskip("fastapi")
-from tests.lane_b_phase7_fixtures import make_service_client  # noqa: E402
+from .lane_b_phase7_fixtures import make_service_client  # noqa: E402
 
 
 @pytest.fixture()

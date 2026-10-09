@@ -37,7 +37,7 @@ from hermes_project_stewardship.persistence.store import Store  # noqa: E402
 from hermes_project_stewardship.gateway.handler import (  # noqa: E402
     CommandRequest,
 )
-from tests.conftest import make_repo  # noqa: E402
+from .conftest import make_repo  # noqa: E402
 
 V = "/stewardship/v1"
 

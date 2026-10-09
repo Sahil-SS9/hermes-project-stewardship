@@ -14,7 +14,7 @@ from hermes_project_stewardship.persistence.service import (
     FeatureDisabledError,
     ServiceError,
 )
-from tests.r2_helpers import HUMAN, World
+from .r2_helpers import HUMAN, World
 
 
 @pytest.fixture()

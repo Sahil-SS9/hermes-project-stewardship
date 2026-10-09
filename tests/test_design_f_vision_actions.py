@@ -19,8 +19,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 from hermes_project_stewardship.api.server import create_app  # noqa: E402
 from hermes_project_stewardship.kanban import ReferenceKanbanAdapter  # noqa: E402
 from hermes_project_stewardship.persistence.service import ServiceError  # noqa: E402
-from tests.r2_helpers import HUMAN, World  # noqa: E402
-from tests.test_owner_q2_trusted_decisions import BASE, TOKEN, _load_plugin  # noqa: E402
+from .r2_helpers import HUMAN, World  # noqa: E402
+from .test_owner_q2_trusted_decisions import BASE, TOKEN, _load_plugin  # noqa: E402
 
 V1 = "/stewardship/v1"
 BEARER = {"Authorization": "Bearer t0k"}
@@ -352,7 +352,7 @@ def test_desktop_deletes_work_through_the_plugin_proxy_when_archive_does(tmp_pat
     from hermes_project_stewardship.persistence.store import Store
     import importlib.util
     from fastapi import FastAPI
-    from tests.test_owner_q2_trusted_decisions import PROXY
+    from .test_owner_q2_trusted_decisions import PROXY
 
     db_path = tmp_path / "db.sqlite"
     for name, value in (("HERMES_HOME", str(tmp_path)), ("HERMES_KANBAN_HOME", str(tmp_path)),

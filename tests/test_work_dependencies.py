@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from hermes_project_stewardship.api.server import create_app  # noqa: E402
 from hermes_project_stewardship.kanban import ReferenceKanbanAdapter  # noqa: E402
 from hermes_project_stewardship.kanban.host_adapter import KanbanAdapterError  # noqa: E402
-from tests.r2_helpers import HUMAN, World  # noqa: E402
+from .r2_helpers import HUMAN, World  # noqa: E402
 
 V1 = "/stewardship/v1"
 BEARER = {"Authorization": "Bearer t0k"}
@@ -216,7 +216,7 @@ def proxy(tmp_path, monkeypatch):
     spec.loader.exec_module(module)
     store = module._store
     adapter = ReferenceKanbanAdapter(store)
-    from tests.conftest import FrozenClock
+    from .conftest import FrozenClock
     w = World(store, FrozenClock(), adapter=adapter)
     w.project("alpha")
     module._app = create_app(

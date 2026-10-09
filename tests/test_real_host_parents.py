@@ -11,7 +11,7 @@ every piece of state lives under tmp_path.
 """
 from __future__ import annotations
 
-from tests.r2_helpers import HUMAN
+from .r2_helpers import HUMAN
 
 
 def test_parent_shows_changes_and_clears_and_never_links(real_host):

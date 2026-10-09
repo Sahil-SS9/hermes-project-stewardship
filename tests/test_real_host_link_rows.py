@@ -20,7 +20,7 @@ import pytest
 from hermes_project_stewardship.kanban.host_adapter import create_project_kanban_adapter
 from hermes_project_stewardship.persistence.store import Store
 
-from tests.r2_helpers import HUMAN, World
+from .r2_helpers import HUMAN, World
 
 VANILLA = Path("/home/kensei/repos/hermes-agent-vanilla")
 

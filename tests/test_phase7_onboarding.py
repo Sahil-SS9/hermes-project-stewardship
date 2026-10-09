@@ -263,8 +263,8 @@ def test_tooling_suggestions_are_inert_manual_objectives(tmp_path):
 def test_first_assessment_is_read_only_and_leaves_automation_off(engine, enabled, svc, tmp_path):
     """P7.6: a manual cycle run is the first read-only assessment: it records
     health/evidence and creates no initiatives when nothing is proposed."""
-    from tests.test_cycles import wire_repo
-    from tests.conftest import make_repo
+    from .test_cycles import wire_repo
+    from .conftest import make_repo
 
     repo = make_repo(tmp_path / "repo")
     wire_repo(svc, enabled, repo)

@@ -20,8 +20,8 @@ from urllib.parse import unquote, urlsplit
 
 import pytest
 
-from tests.offline_guard import ATTEMPTS as _OFFLINE_ATTEMPTS
-from tests.offline_guard import install as _install_offline_guard
+from .offline_guard import ATTEMPTS as _OFFLINE_ATTEMPTS
+from .offline_guard import install as _install_offline_guard
 
 
 # Read by the repo-root conftest.py: while this module is loaded it owns every
@@ -272,7 +272,7 @@ def real_host(tmp_path: Path, monkeypatch):
         pytest.skip("optional native Hermes runtime not installed")
     from hermes_project_stewardship.kanban.host_adapter import create_project_kanban_adapter
     from hermes_project_stewardship.persistence.store import Store
-    from tests.r2_helpers import World
+    from .r2_helpers import World
 
     # This fixture owns only tmp_path state: clear the orchestration child marker
     # so Hermes' write guard does not mistake it for a live delegated write.

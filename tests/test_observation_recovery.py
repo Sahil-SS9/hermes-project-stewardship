@@ -37,7 +37,7 @@ from hermes_project_stewardship.persistence.service import (
     FeatureDisabledError,
 )
 from hermes_project_stewardship.persistence.store import Store
-from tests.conftest import make_repo
+from .conftest import make_repo
 
 
 # --------------------------------------------------------------------------- #

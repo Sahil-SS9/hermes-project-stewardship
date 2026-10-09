@@ -14,7 +14,7 @@ from __future__ import annotations
 import pytest
 
 fastapi = pytest.importorskip("fastapi")
-from tests.lane_b_phase7_fixtures import (  # noqa: E402
+from .lane_b_phase7_fixtures import (  # noqa: E402
     lane_b_tmp_repo,
     make_service_client,
     make_store,

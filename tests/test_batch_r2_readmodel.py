@@ -6,7 +6,7 @@ import pytest
 from hermes_project_stewardship.kanban import ReferenceKanbanAdapter
 from hermes_project_stewardship.persistence.roadmap_service import RoadmapNotFound
 from hermes_project_stewardship.persistence.service import FeatureDisabledError
-from tests.r2_helpers import HUMAN, World, find
+from .r2_helpers import HUMAN, World, find
 
 
 @pytest.fixture()

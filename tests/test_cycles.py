@@ -10,7 +10,7 @@ from hermes_project_stewardship.cycles.engine import CycleEngine, CycleRefused
 from hermes_project_stewardship.persistence.service import ServiceError
 from hermes_project_stewardship.verification.engine import CollectorSpec
 
-from tests.conftest import make_repo
+from .conftest import make_repo
 
 
 def wire_repo(svc, pid: str, repo: Path) -> None:

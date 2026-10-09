@@ -40,7 +40,7 @@ from hermes_project_stewardship.persistence.workflow_service import (  # noqa: E
     WorkflowService,
 )
 
-from tests.conftest import enable_project  # noqa: E402
+from .conftest import enable_project  # noqa: E402
 
 BASE = "/stewardship/v1"
 

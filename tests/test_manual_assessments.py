@@ -24,7 +24,7 @@ from hermes_project_stewardship.persistence.backup import export_store, restore_
 from hermes_project_stewardship.persistence.service import ServiceError, StewardshipService
 from hermes_project_stewardship.persistence.store import Store
 
-from tests.conftest import enable_project
+from .conftest import enable_project
 
 # Frozen clock in conftest: 2026-08-21 12:00 UTC.
 _NOT_EXPIRED = "2027-01-01T00:00:00+00:00"

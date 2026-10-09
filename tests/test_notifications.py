@@ -16,7 +16,7 @@ from hermes_project_stewardship.events.notifications import (
     NotificationEngine,
     in_quiet_hours,
 )
-from tests.conftest import make_repo
+from .conftest import make_repo
 
 
 def wire_repo(svc, pid, repo):

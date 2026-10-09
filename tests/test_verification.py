@@ -13,7 +13,7 @@ from hermes_project_stewardship.verification.engine import (
     reconcile_with_advisory,
 )
 
-from tests.conftest import make_repo
+from .conftest import make_repo
 
 
 def test_clean_repo_verifies_ok(tmp_path: Path):

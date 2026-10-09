@@ -18,7 +18,7 @@ from hermes_project_stewardship.domain.policy import (
 )
 from hermes_project_stewardship.persistence.service import ServiceError
 from hermes_project_stewardship.security import scan_text
-from tests.conftest import make_repo
+from .conftest import make_repo
 
 
 # --------------------------------------------------------------------- #
