@@ -26,6 +26,7 @@ import {makeTestStateRoot, stateEnv, disposeTestState} from './test-state-guard.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { evaluatePlugin as evaluatePluginBundle } from './test-support/load-plugin.mjs';
+import { freePort } from './test-support/free-port.mjs';
 import { createRequire } from 'node:module';
 import { LUCIDE_ICON_NODES } from './lucide-icons.js';
 
@@ -100,7 +101,7 @@ const FALSE_EMPTY_MESSAGE = 'No milestones yet. A milestone groups the work for 
 
 test('milestone journey: real UI drives real HTTP through proxy to backend', async () => {
   // 1. spawn the real server (real backend + real proxy router + temp DB)
-  const port = 18900 + Math.floor(Math.random() * 500);
+  const port = await freePort();
   const child = spawn(PYTHON, ['-c', SERVER_SCRIPT], {
     env: {
       ...TEST_ENV,

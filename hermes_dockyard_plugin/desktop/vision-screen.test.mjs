@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { makeTestStateRoot, stateEnv } from './test-state-guard.mjs'
 import { evaluatePlugin as evaluatePluginBundle } from './test-support/load-plugin.mjs'
+import { freePort } from './test-support/free-port.mjs'
 
 const require = createRequire(fileURLToPath(new URL('../dashboard/package.json', import.meta.url)))
 const { JSDOM, VirtualConsole } = require('jsdom')
@@ -99,7 +100,7 @@ async function waitReady(url, timeoutMs = 30000) {
 }
 
 test('Vision: propose with checks, withdraw, mark complete, delete archived milestone and goal', { timeout: 180000 }, async () => {
-  const port = 19400 + Math.floor(Math.random() * 400)
+  const port = await freePort()
   const child = spawn(PYTHON, ['-c', SERVER_SCRIPT], {
     env: { ...TEST_ENV, STEWARD_TEST_PYTHON: PYTHON, VISION_PORT: String(port), PLUGIN_DIR: fileURLToPath(new URL('../dashboard', import.meta.url)) },
     stdio: ['ignore', 'pipe', 'pipe'],
