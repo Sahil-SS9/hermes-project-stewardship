@@ -56,3 +56,25 @@ def test_runtime_dependencies_are_declared():
     plugin_deps = project["project"]["optional-dependencies"]["plugin"]
     assert any(dep.startswith("httpx2") for dep in plugin_deps)
     assert any(dep.startswith("fastapi") for dep in plugin_deps)
+
+
+def test_no_requirement_pins_an_exact_version():
+    """Issue #5: Hermes admits a plugin by locking its own pinned dependencies together
+    with the plugin's dependencies and EVERY extra, dev tooling included (one uv
+    workspace, `uv lock`). An exact pin anywhere here therefore stops the plugin being
+    enabled as soon as Hermes pins another version (ty==0.0.21 vs Hermes' ty==0.0.82).
+    Our own CI stays reproducible through uv.lock, not through pins in pyproject.toml.
+    """
+    from packaging.requirements import Requirement
+
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    groups = {"dependencies": project.get("dependencies", []),
+              **project.get("optional-dependencies", {})}
+    exact = [
+        f"{group}: {spec}"
+        for group, specs in groups.items()
+        for spec in specs
+        if any(s.operator == "===" or (s.operator == "==" and not s.version.endswith(".*"))
+               for s in Requirement(spec).specifier)
+    ]
+    assert exact == [], f"exact pins stop Hermes admitting the plugin (#5): {exact}"
