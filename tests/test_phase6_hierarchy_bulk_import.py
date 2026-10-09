@@ -101,3 +101,20 @@ def test_csv_cycle_and_oversize_refused_before_write(store, enabled):
         assert "byte limit" in str(exc)
     else:
         raise AssertionError("oversize CSV accepted")
+
+
+def test_csv_rejects_parent_key_pointing_outside_this_import(store, enabled):
+    """R-MIN7 pin: the validator's unknown-parent branch
+    ('parent_key is not in this import') was asserted nowhere; this row-class
+    must be refused and never written."""
+    dy = DockyardService(store)
+    csv_text = ("row_key,type,title,parent_key\n"
+                "orphan-1,task,Orphan task,ghost-epic\n")
+    preview = dy.preview_csv_import(enabled, csv_text)
+    assert preview["valid"] is False
+    assert any(
+        error.get("field") == "parent_key" and "not in this import" in error["error"]
+        for error in preview["errors"]
+    ), preview["errors"]
+    assert dy.import_csv(enabled, csv_text, actor=ACTOR)["imported"] == 0
+    assert dy.list(enabled) == []

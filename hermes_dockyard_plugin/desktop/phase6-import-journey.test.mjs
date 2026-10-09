@@ -55,18 +55,24 @@ test('Phase 6 rendered import journey: invalid preview writes nothing, valid com
     // --- 1. INVALID csv: unknown type + unknown parent -> preview errors.
     // CSV columns must match the canonical validator (assignee/due/parent
     // are not importable columns; parent_key + labels + estimate_days are).
+    // Row 2 has an unsupported type; row 3 has a well-typed title but a
+    // parent_key pointing outside this import (distinct error class).
     const badCsv = [
       'row_key,type,title,parent_key',
       `epic-key-early,${epicTitle},`,
-      `task-key-early,${taskTitle.replace('P6 e2e', 'nonsense')},`,
+      `task-key-early,${taskTitle.replace('P6 e2e', 'nonsense')},,`,
+      `task-key-badparent,task,${taskTitle},ghost-epic-key`,
     ].join('\n')
     await page.locator('[data-import-input]').fill(badCsv)
     await page.locator('[data-action="import-next"]').click()
     await page.waitForTimeout(800)
-    // server-side preview must flag the bad row; the good row may pass
+    // server-side preview must flag each bad row; distinct error classes
+    // get distinct asserts (the type error and the unknown-parent error
+    // must each be able to fail independently).
     const preview = await page.locator('[data-import-preview]').innerText()
-    assert.match(preview, /unsupported work type/, 'preview flags the invalid type row')
-    assert.match(preview, /unsupported work type/, 'server-side validator supplies the row error')
+    assert.match(preview, /unsupported work type/, 'preview flags the invalid type rows')
+    assert.match(preview, /nonsense/, 'preview shows the nonsense-typed row')
+    assert.match(preview, /not in this import/, 'validator refuses a parent_key outside this import')
     // Errors block the commit entirely: the primary action is rendered but
     // disabled with an explicit blocked label (approved contract).
     const blockedButton = page.locator('[data-bulk-import-layer] [data-import-blocked]')
