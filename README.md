@@ -9,16 +9,14 @@ enforces explicit autonomy policy, and measures whether the project actually
 improved. CLI, RPC, dashboard and Desktop share one backend; authenticated
 approval remains on RPC/dashboard and permission-bound gateway adapters.
 
-> Status: **v0.3.0 local release candidate.** O1 complete work management
-> and O2 initiative-to-observation delivery are implemented. Phases 0–5 of the
-> project-management plan (`docs/plans/2026-09-10-project-management-stewardship.md`)
-> are checkpointed. Phase 6 (surface, security and vanilla-compatibility
-> hardening), Phase 7 (final regression, accessibility and visual proof) and
-> Phase 8 (parent reconciliation, independent QA and merge) are **not complete**.
-> The release is **not installed and not activated**; production rollout is not
-> authorised. Run `hermes verify --json` for current test and readiness evidence
-> on your own checkout, and read `docs/guides/canonical-ownership-and-surfaces.md`
-> for what each surface does and does not support today.
+> Status: **v0.4.0.** The Project Stewardship Desktop app is the main surface;
+> the CLI, RPC and dashboard share its backend. **Upgrading from 0.3.0:** the
+> plugin now has one name, `hermes-project-stewardship`, so switch it on once
+> after upgrading, and export your database first. The
+> [changelog's upgrade notes](CHANGELOG.md) cover both, and how to go back.
+> Run `hermes verify --json` for current test and readiness evidence on your
+> own checkout, and read `docs/guides/canonical-ownership-and-surfaces.md` for
+> what each surface does and does not support today.
 
 ---
 

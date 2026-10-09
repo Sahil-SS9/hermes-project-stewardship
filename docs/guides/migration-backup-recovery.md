@@ -78,6 +78,13 @@ Honest limits to state alongside it:
 - Pre-upgrade snapshot is mandatory before any upgrade that changes schema; the
   snapshot must be verified (manifest integrity plus a restore into a separate
   temporary path) before cutover.
+- **0.3.0 → 0.4.0** (schema 17 → 40; rehearsed with 0.3.0's own code against
+  the 0.4.0 candidate, every row kept): export with 0.3.0
+  (`stewardctl --db <db> export --output <folder>`), then open the database with
+  0.4.0. To go back, restore that export with 0.3.0
+  (`stewardctl restore --archive <folder> --target <new.db>`) and point 0.3.0 at
+  the restored file. 0.3.0 itself does not check schema versions: it opens an
+  upgraded database without a warning, so never point it at one.
 - Migration proof obligations already met in earlier phases (recorded in
   `docs/plans/evidence/project-management-phase*.md`, historical, not a fresh
   gate): existing mission/owner/member/objective/milestone/workflow/evidence/

@@ -4,6 +4,95 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - Unreleased
+
+The Project Stewardship Desktop app becomes the main surface, and every part
+of the plugin now shares one name.
+
+### Upgrade notes (read before upgrading from 0.3.0)
+- **One name: `hermes-project-stewardship`** (#4). In 0.3.0 the dashboard half
+  was named `hermes-dockyard`, so `hermes plugins install ... --enable` left its
+  backend off. After upgrading, switch the plugin on once under its new name:
+  add `hermes-project-stewardship` to `plugins.enabled` (or enable it in Hermes
+  Desktop). An old `hermes-dockyard` entry becomes harmless. Your data stays
+  where it was (`plugin-data/hermes-dockyard/`).
+- **Export a backup first.** The first time 0.4.0 opens your database it moves
+  the schema from 17 to 40 and keeps every row:
+  `stewardctl --db <your database> export --output <folder>`.
+- **Going back to 0.3.0:** restore that export into a new database with 0.3.0
+  (`stewardctl restore --archive <folder> --target <new.db>`) and point 0.3.0
+  at it. Never open an upgraded database with 0.3.0: it does not check schema
+  versions.
+- **Databases written by development builds** are refused with a schema error
+  instead of being half-migrated. `stewardctl db repair --db-source <copy>
+  --db-target <new.db> --backup-dir <folder>` rebuilds a copy into this schema,
+  keeps every row, and refuses if it cannot.
+- **Scripts must name their database.** Scripts and the standalone API server
+  need `--db` or `STEWARD_DB_PATH`; only the Hermes host and an installed
+  `stewardctl` use the profile default.
+
+### Added
+- **Project Stewardship Desktop app** (formerly "Dockyard"): Dashboard,
+  Projects, Roadmap, Backlog, Workflows, Approval Inbox, Notifications and App
+  settings, with a project switcher (All projects or one project) that
+  remembers your last choice. Nine themes with their own backgrounds, and a
+  font choice; every colour pair passes WCAG AA.
+- **Project tabs:** Overview, Vision (goals, objectives and their evidence),
+  Planning (canvas from board to clarify, plan and document; undo, redo,
+  duplicate, marquee select), Kanban (board and list, collapsible columns,
+  "blocked by" links), Workflows, Activity (timeline), Content, Reports
+  (readable pages in plain words), Memory and Settings. Every tab has a header
+  strip with a "Needs attention" drawer.
+- **Roadmap:** all projects by default, with a project picker; links existing
+  items (create and edit stay on each item's own screen).
+- **Backlog:** board and list, bulk import (template, validation, preview),
+  bulk reassignment, item details, and in-place edits of rank, title, status
+  and assignee.
+- **Workflows:** a library of global and project workflows, switched on per
+  project; a builder with a start dialog, 30 built-in templates, loops drawn
+  as a frame, if-stuck steps and an AI chat sidebar that suggests first. Runs
+  move on by themselves; the live map marks blocked steps and pending
+  decisions.
+- **Approval Inbox:** every decision waiting on you, with its evidence.
+- **Notifications:** open and resolved states, per-channel settings, pop-ups
+  and a Notifications screen. Optional **Discord alerts** through the Discord
+  bot Hermes already uses (alerts only).
+- **Project memory:** rules, decisions and facts per project, handed to the
+  bots that work on it, with any memory provider. **Chat:** open a Hermes
+  Desktop chat with a project's lead or any of its bots. See
+  `docs/guides/project-memory-chat-discord.md`.
+- **Onboarding** of an existing project: host discovery, safe retry and a
+  first read-only assessment.
+- **Management:** team membership and work transfer; project lifecycle
+  (pause, freeze, archive, restore); fleet overview with deep links;
+  milestones and capacity planning; evidence-backed decisions.
+- `stewardctl db repair` (see the upgrade notes).
+
+### Changed
+- One name everywhere: **Hermes Project Stewardship** (plugin id, dashboard
+  manifest, Desktop app, API path `/api/plugins/hermes-project-stewardship/`).
+- A parent item only groups work; it never blocks its children.
+
+### Fixed
+- #1: the tests collect from a checkout folder of any name.
+- #4: `hermes plugins install ... --enable` now switches the backend on too.
+- #5: no exact version pins, so Hermes can admit the plugin next to its own
+  pinned tools. Thanks to Apostol Apostolov (#6).
+- New work shows in Backlog on a real Hermes host, and the host's links show
+  as dependencies and roadmap blockers.
+- Workflows: the on/off switch and the search box reach 3:1 contrast in every
+  theme; two React warnings (settings panel, backlog lists) are gone.
+- Tests stay offline and never touch a live Hermes home. Tests that need a
+  Hermes checkout or a database snapshot read `HPS_HERMES_SOURCE` or
+  `HPS_LIVE_SNAPSHOT`, and skip without them.
+
+### Security
+- The acting user is always the authenticated principal, never a name the
+  caller supplies.
+- The plugin passes Hermes's plugin security admission scan.
+- The standalone API server fails closed: 503 until `STEWARD_RPC_TOKEN` is set,
+  401 for requests without it.
+
 ## [0.3.0] - 2026-08-31
 
 ### Added
