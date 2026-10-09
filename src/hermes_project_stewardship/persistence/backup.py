@@ -62,11 +62,19 @@ def _safe_file(root: Path, relative: str, *, label: str) -> Path:
     return candidate
 
 
-def _content_records(store: Store, source_root: Path, destination_root: Path) -> list[dict[str, Any]]:
-    rows = store._conn.execute(
-        "SELECT content_id, project_id, stored_path, size_bytes, sha256, removal_state "
-        "FROM project_content ORDER BY content_id"
-    ).fetchall()
+def _content_records(
+    rows_reader, source_root: Path, destination_root: Path
+) -> list[dict[str, Any]]:
+    """Build manifest content records from given ``project_content`` rows.
+
+    R-B1 (3b): the rows MUST come from the export's database snapshot, not the
+    live connection. The snapshot (``store._conn.backup``) and the manifest are
+    two halves of one archive; reading either half from a different point in
+    time splits the archive and makes a "successful" export unrestorable.
+    ``rows_reader`` is a callable returning the rows so the snapshot connection
+    can be the source while it is still open.
+    """
+    rows = rows_reader()
     records = []
     for row in rows:
         if row["removal_state"] != "active":
@@ -104,12 +112,25 @@ def export_store(store: Store, archive: Path) -> dict[str, Any]:
             schema_row = target.execute(
                 "SELECT COALESCE(MAX(version),0) FROM schema_migrations"
             ).fetchone()
+            target.row_factory = sqlite3.Row
+
+            # R-B1: content rows come from the SNAPSHOT, at the same point in
+            # time as the archived database. A commit landing after .backup()
+            # lands in the NEXT export instead, so manifest and snapshot can
+            # no longer disagree and a successful export always restores.
+            def snapshot_rows() -> list:
+                return target.execute(
+                    "SELECT content_id, project_id, stored_path, size_bytes, sha256,"
+                    " removal_state FROM project_content ORDER BY content_id"
+                ).fetchall()
+
+            content_records = _content_records(
+                snapshot_rows,
+                store.db_path.parent / "project-content", temporary / "content",
+            )
         finally:
             target.close()
         os.chmod(database, 0o600)
-        content_records = _content_records(
-            store, store.db_path.parent / "project-content", temporary / "content"
-        )
         manifest = {
             "manifest_version": 2,
             "created_at": iso(store._clock()),
