@@ -13,6 +13,7 @@ import { KANBAN_CSS } from '../styles/kanban-css.js'
 import { OVERVIEW_CSS } from '../styles/overview-css.js'
 import { ACTIVITY_CSS } from '../styles/activity-css.js'
 import { REPORTS_CSS } from '../styles/reports-css.js'
+import { MEMORY_CSS } from '../styles/memory-css.js'
 import workflowCanvasCss from '../../workflow-canvas-css.js'
 export let _rest = null
 export let _os = null
@@ -124,6 +125,8 @@ export function useDockyardStyles() {
   useStylesheet('dy-activity-stylesheet', 'dyActivityStylesheet', ACTIVITY_CSS)
   // C7 Reports (06/10): the Reports tab (C7-owned, same rule as the blocks above).
   useStylesheet('dy-reports-stylesheet', 'dyReportsStylesheet', REPORTS_CSS)
+  // Project memory (checks round 1, 08/10): the Memory tab (same rule as above).
+  useStylesheet('dy-memory-stylesheet', 'dyMemoryStylesheet', MEMORY_CSS)
   // Sahil 05/10 (design round d + h): colour themes, backgrounds and fonts.
   // Last, so a chosen theme's colours win over every block above.
   useStylesheet('dy-theme-stylesheet', 'dyThemeStylesheet', THEME_CSS)

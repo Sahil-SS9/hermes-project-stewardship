@@ -45,7 +45,8 @@ def upgraded(tmp_path, monkeypatch):
 
 
 def test_the_upgrade_keeps_every_row_and_column(upgraded):
-    assert upgraded.schema_version == 37
+    # Upgraded through v37 to the latest schema (later versions only add to it).
+    assert upgraded.schema_version == migrations.SCHEMA_VERSION >= 37
     row = upgraded._conn.execute(f"SELECT {COLUMNS} FROM project_content").fetchone()
     assert tuple(row) == ROW
     indexes = {r[0] for r in upgraded._conn.execute(

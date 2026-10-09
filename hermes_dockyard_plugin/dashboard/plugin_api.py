@@ -2196,3 +2196,74 @@ async def effective_notification_settings(
     return await _proxy(
         "GET", "/stewardship/v1/settings/notifications/effective", params=params)
 
+
+# --- Project memory proxy routes (checks round 1; one contiguous block) ---------
+# Bodies are strict (extra="forbid"): the caller can never name its own actor.
+# Writes need the project-owner capability, checked by the backend.
+
+class MemoryAddBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: str
+    text: str
+    source: str = "human"
+
+
+class MemoryEditBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: str | None = None
+    text: str | None = None
+
+
+def _memory_path(project_id: str, tail: str = "") -> str:
+    return f"/stewardship/v1/projects/{quote(project_id, safe='')}/memory{tail}"
+
+
+@plugin_api.get("/projects/{project_id}/memory")
+async def project_memory(project_id: str, include_archived: bool = False) -> dict:
+    params = {"include_archived": "true"} if include_archived else None
+    return await _proxy("GET", _memory_path(project_id), params=params)
+
+
+@plugin_api.get("/projects/{project_id}/memory/suggestions")
+async def project_memory_suggestions(project_id: str) -> dict:
+    return await _proxy("GET", _memory_path(project_id, "/suggestions"))
+
+
+@plugin_api.get("/projects/{project_id}/memory/{entry_id}/history")
+async def project_memory_history(project_id: str, entry_id: int) -> dict:
+    return await _proxy("GET", _memory_path(project_id, f"/{entry_id}/history"))
+
+
+@plugin_api.post("/projects/{project_id}/memory")
+async def add_project_memory(project_id: str, body: MemoryAddBody) -> dict:
+    return await _proxy("POST", _memory_path(project_id), body.model_dump())
+
+
+@plugin_api.patch("/projects/{project_id}/memory/{entry_id}")
+async def edit_project_memory(project_id: str, entry_id: int, body: MemoryEditBody) -> dict:
+    return await _proxy("PATCH", _memory_path(project_id, f"/{entry_id}"),
+                        body.model_dump(exclude_unset=True))
+
+
+@plugin_api.post("/projects/{project_id}/memory/{entry_id}/archive")
+async def archive_project_memory(project_id: str, entry_id: int) -> dict:
+    return await _proxy("POST", _memory_path(project_id, f"/{entry_id}/archive"))
+
+
+@plugin_api.post("/projects/{project_id}/memory/{entry_id}/restore")
+async def restore_project_memory(project_id: str, entry_id: int) -> dict:
+    return await _proxy("POST", _memory_path(project_id, f"/{entry_id}/restore"))
+
+
+class ChatLinkBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    profile: str
+
+
+@plugin_api.post("/projects/{project_id}/chat-links")
+async def open_project_chat_link(project_id: str, body: ChatLinkBody) -> dict:
+    # The Chat button's one-time link: the bot's next new Desktop chat gets this
+    # project's memory (checks round 1, pick 1a).
+    return await _proxy("POST", f"/stewardship/v1/projects/{quote(project_id, safe='')}/chat-links",
+                        body.model_dump())
+# --- end project memory

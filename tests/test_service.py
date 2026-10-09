@@ -227,13 +227,6 @@ def test_audit_trail_records_material_actions(svc, enabled):
     assert "initiative.approved" in actions
 
 
-def test_knowledge_roundtrip(svc, enabled):
-    kid = svc.add_knowledge(enabled, type="decision", statement="use uv",
-                            source="cycle:1", confidence=0.9)
-    rows = svc.knowledge(enabled)
-    assert rows[0]["id"] == kid and rows[0]["statement"] == "use uv"
-
-
 def test_retention_prune(store, svc, enabled, clock):
     svc.record_health_snapshot("demo", status="healthy", score=1.0,
                                evidence=[], contradictions=[])

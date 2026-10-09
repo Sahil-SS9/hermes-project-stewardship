@@ -21,7 +21,18 @@ export function buildBundle(realBackend = false) {
   const sdk = path.join(outDir, 'sdk.js');
   const entry = path.join(outDir, 'entry.jsx');
   const bundle = path.join(outDir, 'bundle.js');
-  fs.writeFileSync(sdk, "export const host = { navigate() {}, notify(item) { (window.__hostNotifyCalls ??= []).push(item); if (typeof window.__hostNotifyWaitResolve === 'function') { window.__hostNotifyWaitResolve(item); window.__hostNotifyWaitResolve = undefined; } } };\n");
+  fs.writeFileSync(sdk, [
+    'export const host = {',
+    '  navigate() {},',
+    "  notify(item) { (window.__hostNotifyCalls ??= []).push(item); if (typeof window.__hostNotifyWaitResolve === 'function') { window.__hostNotifyWaitResolve(item); window.__hostNotifyWaitResolve = undefined; } },",
+    // Chat (checks round 1): a test gives the fake Desktop its bots through
+    // window.__hostProfileRoutes and __hostActiveConnectionId; every newChat
+    // call is recorded in window.__hostNewChatCalls.
+    '  newChat(target, options) { (window.__hostNewChatCalls ??= []).push({ target, options: options ?? null }) },',
+    '  profileRoutes: async () => window.__hostProfileRoutes ?? [],',
+    '  activeConnectionId: () => window.__hostActiveConnectionId ?? null,',
+    '};',
+  ].join('\n') + '\n');
   fs.writeFileSync(entry, [
     `import plugin from ${JSON.stringify(path.join(REPO, 'hermes_dockyard_plugin', 'desktop', 'plugin.js'))};`,
     "import React from 'react';",

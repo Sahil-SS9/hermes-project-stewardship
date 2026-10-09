@@ -9,9 +9,12 @@
 //      blue needs review, green on track, grey for idle or switched off);
 //      clicking it, or Enter / Space, opens the "Needs attention" drawer;
 //   2. a small eyebrow row: project, lead, evidence when not healthy, and
-//      on the right recency, View in Roadmap and Refresh;
+//      on the right recency, View in Roadmap, Chat and Refresh;
 //   3. the mission as the one headline;
 //   4. the delivery bar as a thin strip with % complete and a legend.
+// Chat (checks round 1, Sahil 08/10 pick 1a = A): a small menu of the
+// project's bots, lead first; picking one opens a fresh Desktop chat with it
+// (project/chat.js). Shown only when the project has a bot to chat with.
 // The project picker the 16/09 mock-up had in the eyebrow row is not here:
 // Sahil 04/10 chose one global switcher for the whole app.
 // Every fact comes from projectAttention() and existing routes (see
@@ -21,11 +24,18 @@ import { useEffect } from '../runtime/react.js'
 import { jsx } from '../runtime/react.js'
 import { jsxs } from '../runtime/react.js'
 import { Fragment } from '../runtime/react.js'
+import { host } from '@hermes/plugin-sdk'
+import { api } from '../runtime/context.js'
+import { emitToast } from '../runtime/context.js'
 import { Button } from '../lib/ui.js'
 import { Icon } from '../lib/ui.js'
 import { healthDetails } from '../lib/ui.js'
 import { number } from '../lib/ui.js'
 import { useDialogFocusManager } from '../lib/ui.js'
+import { Menu } from './plan/plan-ui.js'
+import { chatOutcomeMessage } from './chat.js'
+import { chatTargets } from './chat.js'
+import { openProjectChat } from './chat.js'
 import { projectAttention } from './attention.js'
 import { deliveryCounts } from './attention.js'
 import { lastActivity } from './attention.js'
@@ -39,6 +49,37 @@ function ageText(days) {
   if (typeof days !== 'number' || !Number.isFinite(days)) return null
   if (days < 1) return 'Under a day'
   return `${number(days)} ${days === 1 ? 'day' : 'days'}`
+}
+
+// Chat with the project's bots (checks round 1, pick 1a): the team, lead
+// first. The team loads once per project; until it does, the lead from the
+// settings is listed. Nothing shows when there is no bot to chat with.
+function ProjectChatMenu({ projectId, lead }) {
+  const [members, setMembers] = useState(null)
+  useEffect(() => {
+    let live = true
+    setMembers(null)
+    api(`/projects/${encodeURIComponent(projectId)}/members`)
+      .then((result) => { if (live) setMembers(result?.members ?? []) })
+      .catch(() => { if (live) setMembers([]) })
+    return () => { live = false }
+  }, [projectId])
+  const targets = chatTargets(members, lead)
+  if (targets.length === 0) return null
+  const open = async (profile) => {
+    const [tone, message] = chatOutcomeMessage(profile, await openProjectChat({ host, api, projectId, profile }))
+    emitToast(tone, message)
+  }
+  return jsx('span', { className: 'dy-ov-chat', 'data-strip-chat': projectId, children: jsx(Menu, {
+    label: `Chat with a bot on ${projectId}`,
+    action: 'project-chat',
+    trigger: jsxs(Fragment, { children: [jsx(Icon, { name: 'message-square' }), jsx('span', { children: 'Chat' })] }),
+    items: targets.map((target) => ({
+      id: target.profile,
+      label: target.role === 'lead' ? `${target.profile} (lead)` : target.profile,
+      onSelect: () => open(target.profile),
+    })),
+  }) })
 }
 
 function AttentionDrawer({ projectId, attention, onClose, onOpenItem }) {
@@ -151,6 +192,7 @@ export function ProjectHeaderStrip({ project, view, onRefresh, onOpenRoadmap, on
       jsxs('div', { className: 'dy-ov-meta', children: [
         jsx('span', { 'data-strip-updated': true, children: recent ? `Updated ${recent}` : 'No activity yet' }),
         jsx('span', { 'data-roadmap-link': true, children: jsx('a', { href: '#', onClick: (event) => { event.preventDefault(); onOpenRoadmap?.() }, children: 'View in Roadmap' }) }),
+        jsx(ProjectChatMenu, { projectId: project.id, lead }, `chat:${project.id}`),
         jsx('button', { type: 'button', className: 'dy-ov-refresh', 'data-action': 'refresh', 'aria-label': 'Refresh', title: 'Refresh', onClick: onRefresh, children: jsx(Icon, { name: 'refresh' }) }),
       ]}),
     ]}),

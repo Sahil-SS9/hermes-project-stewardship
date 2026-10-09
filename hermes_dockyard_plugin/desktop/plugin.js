@@ -12,7 +12,7 @@ import {
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 
 // hermes_dockyard_plugin/desktop/src/index.js
-import { host } from "@hermes/plugin-sdk";
+import { host as host2 } from "@hermes/plugin-sdk";
 
 // hermes_dockyard_plugin/desktop/src/styles/tokens.js
 var LIGHT_TOKENS = Object.freeze({
@@ -3159,6 +3159,9 @@ var OVERVIEW_CSS = `
 .dockyard-root .dy-ov-refresh:hover { background: var(--dy-surface-subtle); color: var(--dy-text); }
 .dockyard-root .dy-ov-refresh:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 1px; }
 .dockyard-root .dy-ov-refresh svg { width: 14px; height: 14px; }
+/* Chat (checks round 1, pick 1a): the trigger matches the Refresh button's height. */
+.dockyard-root .dy-ov-chat .dy-plan-menu-trigger { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 9px; border-radius: 7px; font-size: 12px; font-weight: 650; }
+.dockyard-root .dy-ov-chat .dy-plan-menu-trigger svg { width: 14px; height: 14px; }
 
 /* 3. The mission as the one headline. */
 .dockyard-root .dy-ov-headline { margin: 0; color: var(--dy-text); font-size: 22px; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; }
@@ -3345,6 +3348,28 @@ var REPORTS_CSS = `
   .dockyard-root .dy-rep-actions .dockyard-button { min-height: 40px; }
   .dockyard-root .dy-rep-facts { grid-template-columns: minmax(0, 1fr); }
   .dockyard-root .dy-rep-facts dd { border-top: 0; }
+}
+`;
+
+// hermes_dockyard_plugin/desktop/src/styles/memory-css.js
+var MEMORY_CSS = `
+.dockyard-root .dy-mem-group { display: grid; gap: 8px; margin-top: 18px; }
+.dockyard-root .dy-mem-group h3,
+.dockyard-root .dy-mem-suggestions h3 { margin: 0; color: var(--dy-text-2); font-size: 10px; font-weight: 760; letter-spacing: .06em; text-transform: uppercase; }
+.dockyard-root .dy-mem-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 11px 12px; border: 1px solid var(--dy-border); border-radius: 9px; background: var(--dy-surface-subtle); color: var(--dy-text); }
+.dockyard-root .dy-mem-entry[data-archived="true"] { border-style: dashed; color: var(--dy-text-2); }
+.dockyard-root .dy-mem-entry .dockyard-inline-editor { grid-column: 1 / -1; margin-top: 0; }
+.dockyard-root .dy-mem-body { display: grid; gap: 4px; min-width: 0; }
+.dockyard-root .dy-mem-text { margin: 0; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.dockyard-root .dy-mem-meta { color: var(--dy-text-3); font-size: 9px; overflow-wrap: anywhere; }
+.dockyard-root .dy-mem-count { display: block; margin-top: 6px; color: var(--dy-text-3); font-size: 9px; }
+.dockyard-root .dy-mem-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; }
+.dockyard-root .dy-mem-history { grid-column: 1 / -1; display: grid; gap: 6px; margin: 0; padding: 10px 12px 0 22px; border-top: 1px solid var(--dy-border); color: var(--dy-text-2); font-size: 11px; }
+.dockyard-root .dy-mem-history small { display: block; color: var(--dy-text-3); font-size: 9px; }
+.dockyard-root .dy-mem-suggestions { display: grid; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--dy-border); }
+@container dockyard (max-width: 640px) {
+  .dockyard-root .dy-mem-entry { grid-template-columns: minmax(0, 1fr); }
+  .dockyard-root .dy-mem-actions { justify-content: flex-start; }
 }
 `;
 
@@ -4180,6 +4205,7 @@ function useDockyardStyles() {
   useStylesheet("dy-overview-stylesheet", "dyOverviewStylesheet", OVERVIEW_CSS);
   useStylesheet("dy-activity-stylesheet", "dyActivityStylesheet", ACTIVITY_CSS);
   useStylesheet("dy-reports-stylesheet", "dyReportsStylesheet", REPORTS_CSS);
+  useStylesheet("dy-memory-stylesheet", "dyMemoryStylesheet", MEMORY_CSS);
   useStylesheet("dy-theme-stylesheet", "dyThemeStylesheet", THEME_CSS);
 }
 
@@ -10247,19 +10273,19 @@ function renderDoc(target, doc) {
   const blocks = doc && doc.type === "doc" && Array.isArray(doc.content) && doc.content.length ? doc.content : [{ type: "paragraph" }];
   for (const node of blocks) target.appendChild(renderBlock(node));
 }
-var closestIn = (host2, node, test) => {
+var closestIn = (host3, node, test) => {
   let el2 = node && node.nodeType === 3 ? node.parentElement : node;
-  while (el2 && el2 !== host2) {
+  while (el2 && el2 !== host3) {
     if (test(el2)) return el2;
     el2 = el2.parentElement;
   }
   return null;
 };
-var blockOf = (host2, node) => closestIn(host2, node, (el2) => /^(P|DIV|H[1-6]|LI)$/.test(el2.tagName));
-var listDepth = (host2, node) => {
+var blockOf = (host3, node) => closestIn(host3, node, (el2) => /^(P|DIV|H[1-6]|LI)$/.test(el2.tagName));
+var listDepth = (host3, node) => {
   let n = 0;
   let el2 = node && node.nodeType === 3 ? node.parentElement : node;
-  while (el2 && el2 !== host2) {
+  while (el2 && el2 !== host3) {
     if (el2.tagName === "UL" || el2.tagName === "OL") n += 1;
     el2 = el2.parentElement;
   }
@@ -10268,9 +10294,9 @@ var listDepth = (host2, node) => {
 var exec = (command, value) => document.execCommand(command, false, value);
 var RENAME = { B: "strong", I: "em", STRIKE: "s", DEL: "s" };
 var INNER_BLOCKS = /* @__PURE__ */ new Set(["P", "DIV", "H1", "H2", "H3", "UL", "OL"]);
-function normaliseDom(host2, { afterDelete = false } = {}) {
+function normaliseDom(host3, { afterDelete = false } = {}) {
   const sel = window.getSelection();
-  const keep = sel.rangeCount && host2.contains(sel.anchorNode) ? [sel.anchorNode, sel.anchorOffset, sel.focusNode, sel.focusOffset] : null;
+  const keep = sel.rangeCount && host3.contains(sel.anchorNode) ? [sel.anchorNode, sel.anchorOffset, sel.focusNode, sel.focusOffset] : null;
   const swap = (el2, tag) => {
     const next = document.createElement(tag);
     for (const attr of el2.attributes) if (attr.name === "style" || attr.name === "data-size" || attr.name === "class" || attr.name === "start" || attr.name === "type") next.setAttribute(attr.name, attr.value);
@@ -10283,7 +10309,7 @@ function normaliseDom(host2, { afterDelete = false } = {}) {
     el2.replaceWith(...el2.childNodes);
     changed = true;
   };
-  const walker = document.createTreeWalker(host2, 4);
+  const walker = document.createTreeWalker(host3, 4);
   for (let text2 = walker.nextNode(); text2; text2 = walker.nextNode()) {
     const value = text2.nodeValue || "";
     if (!value.includes("\u200B") || value.replace(ZWSP, "") === "") continue;
@@ -10295,30 +10321,30 @@ function normaliseDom(host2, { afterDelete = false } = {}) {
     text2.nodeValue = value.replace(ZWSP, "");
     changed = true;
   }
-  for (const el2 of [...host2.querySelectorAll("b, i, strike, del")]) {
+  for (const el2 of [...host3.querySelectorAll("b, i, strike, del")]) {
     swap(el2, RENAME[el2.tagName]);
     changed = true;
   }
-  for (const el2 of [...host2.children]) if (el2.tagName === "DIV") {
+  for (const el2 of [...host3.children]) if (el2.tagName === "DIV") {
     swap(el2, "p");
     changed = true;
   }
-  for (const el2 of [...host2.querySelectorAll("font, span:not([data-size])")]) unwrap(el2);
-  for (const el2 of [...host2.querySelectorAll("strong, em, u, s, [data-size]")]) {
+  for (const el2 of [...host3.querySelectorAll("font, span:not([data-size])")]) unwrap(el2);
+  for (const el2 of [...host3.querySelectorAll("strong, em, u, s, [data-size]")]) {
     if (el2.style && el2.style.length) {
       el2.removeAttribute("style");
       changed = true;
     }
   }
-  for (const el2 of [...host2.querySelectorAll("ul, ol")]) if (!el2.querySelector("li")) {
+  for (const el2 of [...host3.querySelectorAll("ul, ol")]) if (!el2.querySelector("li")) {
     el2.remove();
     changed = true;
   }
-  if (afterDelete && !host2.textContent.replace(ZWSP, "").trim() && host2.querySelector("ul, ol")) {
-    while (host2.firstChild) host2.removeChild(host2.firstChild);
+  if (afterDelete && !host3.textContent.replace(ZWSP, "").trim() && host3.querySelector("ul, ol")) {
+    while (host3.firstChild) host3.removeChild(host3.firstChild);
     const p = document.createElement("p");
     p.appendChild(document.createElement("br"));
-    host2.appendChild(p);
+    host3.appendChild(p);
     if (keep) {
       keep[0] = p;
       keep[1] = 0;
@@ -10327,7 +10353,7 @@ function normaliseDom(host2, { afterDelete = false } = {}) {
     }
     changed = true;
   }
-  for (const el2 of [...host2.querySelectorAll("li[style], li > p[style], li > h1[style], li > h2[style], li > h3[style]")]) {
+  for (const el2 of [...host3.querySelectorAll("li[style], li > p[style], li > h1[style], li > h2[style], li > h3[style]")]) {
     if (el2.style.textAlign) {
       el2.style.removeProperty("text-align");
       if (!el2.getAttribute("style")) el2.removeAttribute("style");
@@ -10335,7 +10361,7 @@ function normaliseDom(host2, { afterDelete = false } = {}) {
     }
   }
   for (let guard = 0; guard < 200; guard += 1) {
-    const outer = [...host2.querySelectorAll("p, h1, h2, h3")].find((el2) => [...el2.children].some((c) => INNER_BLOCKS.has(c.tagName)));
+    const outer = [...host3.querySelectorAll("p, h1, h2, h3")].find((el2) => [...el2.children].some((c) => INNER_BLOCKS.has(c.tagName)));
     if (!outer) break;
     let anchor = outer;
     let run = null;
@@ -10380,7 +10406,7 @@ var TOOLS = [
   ["justify", "Justify", { icon: "align-justify" }, () => exec("justifyFull"), (s) => s.align === "justify"]
 ];
 var POS_BLOCKS = /* @__PURE__ */ new Set(["P", "H1", "H2", "H3", "LI"]);
-function measure(host2, target, targetOffset) {
+function measure(host3, target, targetOffset) {
   let n = 0;
   const go = (el2) => {
     if (el2.nodeType === 3) {
@@ -10389,7 +10415,7 @@ function measure(host2, target, targetOffset) {
       return null;
     }
     if (el2.nodeType !== 1) return null;
-    if (el2 !== host2 && POS_BLOCKS.has(el2.tagName) && !(el2.tagName === "P" && el2.parentElement?.tagName === "LI")) n += 1;
+    if (el2 !== host3 && POS_BLOCKS.has(el2.tagName) && !(el2.tagName === "P" && el2.parentElement?.tagName === "LI")) n += 1;
     if (el2.tagName === "BR") n += 1;
     const kids = el2.childNodes;
     for (let i = 0; i < kids.length; i += 1) {
@@ -10399,12 +10425,12 @@ function measure(host2, target, targetOffset) {
     }
     return el2 === target ? n : null;
   };
-  const found = go(host2);
+  const found = go(host3);
   return found === null ? n : found;
 }
-function locate(host2, pos) {
+function locate(host3, pos) {
   let n = 0;
-  let last = [host2, 0];
+  let last = [host3, 0];
   const go = (el2) => {
     if (el2.nodeType === 3) {
       const len = el2.nodeValue.length;
@@ -10414,7 +10440,7 @@ function locate(host2, pos) {
       return null;
     }
     if (el2.nodeType !== 1) return null;
-    if (el2 !== host2 && POS_BLOCKS.has(el2.tagName) && !(el2.tagName === "P" && el2.parentElement?.tagName === "LI")) {
+    if (el2 !== host3 && POS_BLOCKS.has(el2.tagName) && !(el2.tagName === "P" && el2.parentElement?.tagName === "LI")) {
       n += 1;
       if (n >= pos && !el2.querySelector("li")) return [el2, 0];
     }
@@ -10428,22 +10454,22 @@ function locate(host2, pos) {
     }
     return null;
   };
-  return go(host2) || last;
+  return go(host3) || last;
 }
 var MARK_TAGS = /* @__PURE__ */ new Set(["STRONG", "B", "EM", "I", "U", "S", "STRIKE", "DEL"]);
 var isMark = (el2) => MARK_TAGS.has(el2.tagName) || el2.hasAttribute?.("data-size");
-function selectedTexts(host2) {
+function selectedTexts(host3) {
   const sel = window.getSelection();
   if (!sel.rangeCount) return [];
   const range = sel.getRangeAt(0);
-  if (range.collapsed || !host2.contains(range.commonAncestorContainer)) return [];
+  if (range.collapsed || !host3.contains(range.commonAncestorContainer)) return [];
   const { endContainer: ec, endOffset: eo } = range;
   if (ec.nodeType === 3 && eo > 0 && eo < ec.nodeValue.length) ec.splitText(eo);
   const { startContainer: sc, startOffset: so } = range;
   let first = null;
   if (sc.nodeType === 3 && so > 0 && so < sc.nodeValue.length) first = sc.splitText(so);
   const out = [];
-  const walker = document.createTreeWalker(host2, 4);
+  const walker = document.createTreeWalker(host3, 4);
   for (let text2 = walker.nextNode(); text2; text2 = walker.nextNode()) {
     if (!text2.nodeValue || !range.intersectsNode(text2)) continue;
     if (text2 === sc && !first && so >= text2.nodeValue.length) continue;
@@ -10472,9 +10498,9 @@ function splitAround(outer, node) {
   if (head.textContent) outer.before(head);
   if (tail.textContent) outer.after(tail);
 }
-function liftOut(host2, node, test) {
+function liftOut(host3, node, test) {
   for (let guard = 0; guard < 20; guard += 1) {
-    const outer = closestIn(host2, node, test);
+    const outer = closestIn(host3, node, test);
     if (!outer || POS_BLOCKS.has(outer.tagName)) return;
     splitAround(outer, node);
     outer.replaceWith(...outer.childNodes);
@@ -10486,12 +10512,12 @@ var sizeSpan = (size) => {
   span.className = `dy-rt-${size}`;
   return span;
 };
-var blocksIn = (host2) => {
+var blocksIn = (host3) => {
   const sel = window.getSelection();
   if (!sel.rangeCount) return [];
   const range = sel.getRangeAt(0);
-  const caretBlock = blockOf(host2, range.startContainer);
-  const endBlock = blockOf(host2, range.endContainer);
+  const caretBlock = blockOf(host3, range.startContainer);
+  const endBlock = blockOf(host3, range.endContainer);
   let skip = null;
   if (endBlock && endBlock !== caretBlock) {
     const head = document.createRange();
@@ -10499,23 +10525,23 @@ var blocksIn = (host2) => {
     head.setEnd(range.endContainer, range.endOffset);
     if (head.toString() === "") skip = endBlock;
   }
-  const all = [...host2.querySelectorAll("p, h1, h2, h3, li")].filter((el2) => el2 !== skip && range.intersectsNode(el2) && !(skip && skip.contains(el2)));
+  const all = [...host3.querySelectorAll("p, h1, h2, h3, li")].filter((el2) => el2 !== skip && range.intersectsNode(el2) && !(skip && skip.contains(el2)));
   return all.length ? all : caretBlock ? [caretBlock] : [];
 };
-function setBlockStyle(host2, style) {
+function setBlockStyle(host3, style) {
   const sel = window.getSelection();
   if (style !== "p" && sel.rangeCount) {
     for (let guard = 0; guard < MAX_LIST_LEVELS + 1; guard += 1) {
-      if (!closestIn(host2, sel.anchorNode, (el2) => el2.tagName === "LI")) break;
+      if (!closestIn(host3, sel.anchorNode, (el2) => el2.tagName === "LI")) break;
       exec("outdent");
     }
   }
   exec("formatBlock", style);
 }
-function clearFormatting(host2) {
-  const texts = selectedTexts(host2);
-  const blocks = blocksIn(host2);
-  for (const text2 of texts) liftOut(host2, text2, isMark);
+function clearFormatting(host3) {
+  const texts = selectedTexts(host3);
+  const blocks = blocksIn(host3);
+  for (const text2 of texts) liftOut(host3, text2, isMark);
   for (const block of blocks) {
     block.style.removeProperty("text-align");
     if (!block.getAttribute("style")) block.removeAttribute("style");
@@ -10528,15 +10554,15 @@ function clearFormatting(host2) {
   }
   reselect(texts);
 }
-function stateAt(host2) {
+function stateAt(host3) {
   const empty = { style: "p", size: "normal", align: "left", list: null, bold: false, italic: false, underline: false, strike: false };
   const sel = typeof window !== "undefined" ? window.getSelection() : null;
-  if (!host2 || !sel || !sel.rangeCount || !host2.contains(sel.anchorNode)) return empty;
+  if (!host3 || !sel || !sel.rangeCount || !host3.contains(sel.anchorNode)) return empty;
   const node = sel.anchorNode;
-  const heading = closestIn(host2, node, (el2) => /^H[1-3]$/.test(el2.tagName));
-  const sized = closestIn(host2, node, (el2) => el2.hasAttribute("data-size"));
-  const list = closestIn(host2, node, (el2) => el2.tagName === "UL" || el2.tagName === "OL");
-  const block = blockOf(host2, node);
+  const heading = closestIn(host3, node, (el2) => /^H[1-3]$/.test(el2.tagName));
+  const sized = closestIn(host3, node, (el2) => el2.hasAttribute("data-size"));
+  const list = closestIn(host3, node, (el2) => el2.tagName === "UL" || el2.tagName === "OL");
+  const block = blockOf(host3, node);
   const align = !list && block && alignOf(block) || "left";
   const q = (c) => {
     try {
@@ -10545,25 +10571,25 @@ function stateAt(host2) {
       return false;
     }
   };
-  const has = (tags) => Boolean(closestIn(host2, node, (el2) => tags.includes(el2.tagName)));
+  const has = (tags) => Boolean(closestIn(host3, node, (el2) => tags.includes(el2.tagName)));
   return {
     style: heading ? heading.tagName.toLowerCase() : "p",
     size: sized && RICH_TEXT_SIZES.includes(sized.getAttribute("data-size")) ? sized.getAttribute("data-size") : "normal",
     align,
     list: list ? list.tagName : null,
-    anyList: Boolean(list) || blocksIn(host2).some((b) => closestIn(host2, b, (el2) => el2.tagName === "UL" || el2.tagName === "OL")),
+    anyList: Boolean(list) || blocksIn(host3).some((b) => closestIn(host3, b, (el2) => el2.tagName === "UL" || el2.tagName === "OL")),
     bold: has(["STRONG", "B"]) || !heading && q("bold"),
     italic: has(["EM", "I"]) || q("italic"),
     underline: has(["U"]) || q("underline"),
     strike: has(["S", "STRIKE", "DEL"]) || q("strikeThrough")
   };
 }
-function applySize(host2, size) {
+function applySize(host3, size) {
   const sel = window.getSelection();
   if (!sel.rangeCount) return;
   const range = sel.getRangeAt(0);
   if (range.collapsed) {
-    const current = closestIn(host2, range.startContainer, (el2) => el2.hasAttribute("data-size"));
+    const current = closestIn(host3, range.startContainer, (el2) => el2.hasAttribute("data-size"));
     const marker = document.createTextNode("\u200B");
     if (size === "normal") {
       if (!current) return;
@@ -10581,9 +10607,9 @@ function applySize(host2, size) {
     sel.addRange(caret);
     return;
   }
-  const texts = selectedTexts(host2);
+  const texts = selectedTexts(host3);
   for (const text2 of texts) {
-    liftOut(host2, text2, (el2) => el2.hasAttribute("data-size"));
+    liftOut(host3, text2, (el2) => el2.hasAttribute("data-size"));
     if (size !== "normal") {
       const span = sizeSpan(size);
       text2.before(span);
@@ -10593,7 +10619,7 @@ function applySize(host2, size) {
   reselect(texts);
 }
 function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOnly, label = "Description" }) {
-  const host2 = useRef(null);
+  const host3 = useRef(null);
   const saved = useRef(null);
   const changeRef = useRef(onChange);
   const problemRef = useRef(onProblem);
@@ -10607,13 +10633,13 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
   changeRef.current = onChange;
   problemRef.current = onProblem;
   const refresh = () => {
-    const el2 = host2.current;
+    const el2 = host3.current;
     const sel = window.getSelection();
     if (el2 && sel.rangeCount && el2.contains(sel.anchorNode)) saved.current = sel.getRangeAt(0).cloneRange();
     setState(stateAt(el2));
   };
   const caretNow = () => {
-    const el2 = host2.current;
+    const el2 = host3.current;
     const sel = window.getSelection();
     if (!el2 || !sel.rangeCount || !el2.contains(sel.anchorNode)) return [0, 0];
     return [measure(el2, sel.anchorNode, sel.anchorOffset), measure(el2, sel.focusNode, sel.focusOffset)];
@@ -10645,7 +10671,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     }
   };
   const emit = (typing = false) => {
-    const el2 = host2.current;
+    const el2 = host3.current;
     if (!el2) return;
     normaliseDom(el2, { afterDelete: typing === "delete" });
     const doc = domToDoc(el2);
@@ -10655,7 +10681,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     refresh();
   };
   const travel = (step) => {
-    const el2 = host2.current;
+    const el2 = host3.current;
     const h = history.current;
     const next = h.index + step;
     if (!el2 || readOnly || next < 0 || next >= h.stack.length) return;
@@ -10675,7 +10701,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     refresh();
   };
   useEffect(() => {
-    const el2 = host2.current;
+    const el2 = host3.current;
     renderDoc(el2, value && value.type === "doc" ? value : plainToDoc(fallbackText));
     try {
       exec("defaultParagraphSeparator", "p");
@@ -10704,10 +10730,10 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     };
   }, []);
   useEffect(() => {
-    if (host2.current && history.current.stack.length) report(domToDoc(host2.current));
+    if (host3.current && history.current.stack.length) report(domToDoc(host3.current));
   }, [restSize]);
   const run = (act) => {
-    const el2 = host2.current;
+    const el2 = host3.current;
     if (!el2 || readOnly) return;
     el2.focus();
     if (saved.current) {
@@ -10730,11 +10756,11 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     }
     if (event.key === "Tab") {
       const sel = window.getSelection();
-      const li = sel.rangeCount ? closestIn(host2.current, sel.anchorNode, (n) => n.tagName === "LI") : null;
+      const li = sel.rangeCount ? closestIn(host3.current, sel.anchorNode, (n) => n.tagName === "LI") : null;
       if (!li) return;
       event.preventDefault();
       if (event.shiftKey) exec("outdent");
-      else if (listDepth(host2.current, li) < MAX_LIST_LEVELS) exec("indent");
+      else if (listDepth(host3.current, li) < MAX_LIST_LEVELS) exec("indent");
       emit();
     }
   };
@@ -10751,9 +10777,9 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     if (scratch.childNodes.length === 1 && scratch.firstChild.tagName === "P") frag.append(...scratch.firstChild.childNodes);
     else frag.append(...scratch.childNodes);
     const last = frag.lastChild;
-    const line = blockOf(host2.current, range.startContainer);
+    const line = blockOf(host3.current, range.startContainer);
     const blocks = frag.firstChild && frag.firstChild.nodeType === 1 && /^(P|H[1-3]|UL|OL)$/.test(frag.firstChild.tagName);
-    if (blocks && line && line.parentNode === host2.current && !line.textContent.replace(ZWSP, "")) line.replaceWith(frag);
+    if (blocks && line && line.parentNode === host3.current && !line.textContent.replace(ZWSP, "")) line.replaceWith(frag);
     else range.insertNode(frag);
     if (last) {
       const caret = document.createRange();
@@ -10770,7 +10796,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     if (!data) return;
     event.preventDefault();
     const sel = window.getSelection();
-    if (!sel.rangeCount || !host2.current.contains(sel.anchorNode)) return;
+    if (!sel.rangeCount || !host3.current.contains(sel.anchorNode)) return;
     insertData(data, sel.getRangeAt(0));
   };
   const onDrop = (event) => {
@@ -10783,13 +10809,13 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     const data = event.dataTransfer;
     if (!data) return;
     const at = document.caretRangeFromPoint ? document.caretRangeFromPoint(event.clientX, event.clientY) : null;
-    const range = at && host2.current.contains(at.startContainer) ? at : (() => {
+    const range = at && host3.current.contains(at.startContainer) ? at : (() => {
       const r = document.createRange();
-      r.selectNodeContents(host2.current);
+      r.selectNodeContents(host3.current);
       r.collapse(false);
       return r;
     })();
-    host2.current.focus();
+    host3.current.focus();
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
@@ -10858,7 +10884,7 @@ function RichTextEditor({ value, fallbackText, onChange, onProblem, rest, readOn
     ] }),
     problem ? jsx("p", { className: "dy-rt-problem", role: "alert", "data-canvas-rich-problem": true, children: problem }) : null,
     jsx("div", { className: `dy-rt-host${readOnly ? " readonly" : ""}`, children: jsx("div", {
-      ref: host2,
+      ref: host3,
       className: "dy-rt-body",
       "data-canvas-rich-text": "true",
       role: "textbox",
@@ -13814,10 +13840,10 @@ function buildLayout(nodes, opts) {
   };
 }
 var canvasSeq = 0;
-function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pollMs = 8e3) {
-  host2.replaceChildren();
-  host2.className = "dy-wf dy-wf-scope";
-  const canvasWindow = host2.ownerDocument?.defaultView ?? globalThis.window;
+function mountWorkflowCanvas(host3, projectId, runName, fetchRuns, handlers, pollMs = 8e3) {
+  host3.replaceChildren();
+  host3.className = "dy-wf dy-wf-scope";
+  const canvasWindow = host3.ownerDocument?.defaultView ?? globalThis.window;
   const wrap = elu("div", "dy-wf-wrap");
   const svg = sEl("svg", { class: "dy-wf-svg" });
   svg.setAttribute("data-lod", "read");
@@ -13929,12 +13955,12 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     const on = motionButton.getAttribute("aria-pressed") === "true";
     motionButton.setAttribute("aria-pressed", String(!on));
     motionButton.textContent = on ? "Motion off" : "Motion on";
-    host2.classList.toggle("dy-wf-still", on);
+    host3.classList.toggle("dy-wf-still", on);
   });
   playbackBar.append(playbackButton, playbackSlider, playbackLabel, motionButton);
   wrap.append(svg, feed, minimap, passport, zoomBar, listView, playbackBar, openHint, help);
   playbackBar.style.overflowX = "auto";
-  host2.appendChild(wrap);
+  host3.appendChild(wrap);
   let panX = 0;
   let panY = 0;
   let zoom = 1;
@@ -14479,7 +14505,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     }
     if (playbackLabel) playbackLabel.textContent = playbackIndex === null ? timeline.length ? `Live \xB7 ${timeline.length} events` : "Live" : `Event ${playbackIndex + 1}/${timeline.length}`;
     renderList(run);
-    const active = host2.ownerDocument?.activeElement ?? null;
+    const active = host3.ownerDocument?.activeElement ?? null;
     const focusedId = active && viewport.contains(active) ? active.closest(".dy-wf-node")?.getAttribute("data-node-id") ?? null : null;
     viewport.replaceChildren();
     viewport.appendChild(defs);
@@ -15009,7 +15035,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     if (e.target?.closest?.(".dy-wf-node")) return;
     hideHint();
     dragging = true;
-    host2.classList.add("dy-wf-panning");
+    host3.classList.add("dy-wf-panning");
     lastX = e.clientX;
     lastY = e.clientY;
     const target = e.target;
@@ -15037,7 +15063,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     if (dragSession) {
       endDragSession(e, true);
       dragging = false;
-      host2.classList.remove("dy-wf-panning");
+      host3.classList.remove("dy-wf-panning");
       return;
     }
     if (connectFrom) {
@@ -15054,7 +15080,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     if (dragSession) endDragSession(e, false);
     cancelConnect();
     dragging = false;
-    host2.classList.remove("dy-wf-panning");
+    host3.classList.remove("dy-wf-panning");
     try {
       svg.releasePointerCapture(e.pointerId);
     } catch {
@@ -15070,9 +15096,9 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     const cx = (ev.clientX - rect.left) / sx;
     const cy = (ev.clientY - rect.top) / sy;
     cameraSet = true;
-    host2.classList.add("dy-wf-panning");
+    host3.classList.add("dy-wf-panning");
     if (wheelSettle) clearTimeout(wheelSettle);
-    wheelSettle = setTimeout(() => host2.classList.remove("dy-wf-panning"), 160);
+    wheelSettle = setTimeout(() => host3.classList.remove("dy-wf-panning"), 160);
     const factor = ev.deltaY < 0 ? ZOOM_IN : ZOOM_OUT;
     const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom * factor));
     const k = next / zoom;
@@ -15288,11 +15314,11 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     } else updateMinimap();
   };
   canvasWindow.addEventListener("resize", onResize);
-  let lastHostWidth = host2.clientWidth;
+  let lastHostWidth = host3.clientWidth;
   let resizeFrame = 0;
   const RO = canvasWindow.ResizeObserver;
   const hostObserver = RO ? new RO(() => {
-    const w = host2.clientWidth;
+    const w = host3.clientWidth;
     if (w === lastHostWidth) return;
     lastHostWidth = w;
     if (resizeFrame) canvasWindow.cancelAnimationFrame(resizeFrame);
@@ -15301,7 +15327,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
       onResize();
     });
   }) : null;
-  hostObserver?.observe(host2);
+  hostObserver?.observe(host3);
   disposers.push(() => {
     disposed = true;
     if (timer) clearInterval(timer);
@@ -15313,7 +15339,7 @@ function mountWorkflowCanvas(host2, projectId, runName, fetchRuns, handlers, pol
     canvasWindow.removeEventListener("resize", onResize);
     hostObserver?.disconnect();
     if (resizeFrame) canvasWindow.cancelAnimationFrame(resizeFrame);
-    host2.replaceChildren();
+    host3.replaceChildren();
   });
   const dispose = () => {
     disposers.forEach((d) => d());
@@ -15369,7 +15395,7 @@ var toCanvasRun = (run) => ({
     ts: event.ts
   }))
 });
-function mountDesktopWorkflowCanvas(host2, projectId, workflowName, definition, runs, handlers = {}) {
+function mountDesktopWorkflowCanvas(host3, projectId, workflowName, definition, runs, handlers = {}) {
   const read = (value) => typeof value === "function" ? value() : value;
   const fetchRuns = async () => {
     const mapped = (read(runs) ?? []).map(toCanvasRun);
@@ -15377,7 +15403,7 @@ function mountDesktopWorkflowCanvas(host2, projectId, workflowName, definition, 
     const nodes = (read(definition)?.nodes ?? []).map(toCanvasNode);
     return [{ run_key: `definition:${workflowName}`, version: 0, status: "definition", started_at: null, updated_at: null, nodes }];
   };
-  return mountWorkflowCanvas(host2, projectId, workflowName, fetchRuns, {
+  return mountWorkflowCanvas(host3, projectId, workflowName, fetchRuns, {
     onApprove: handlers.onApprove ?? (() => void 0),
     onReject: handlers.onReject ?? (() => void 0),
     onRetry: handlers.onRetry,
@@ -18604,14 +18630,14 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     onEditFrame: (nodeId, rect) => setRepeatAt({ nodeId, rect })
   });
   const fitCanvasHeight = () => {
-    const host2 = canvasRef.current;
-    if (!host2) return;
+    const host3 = canvasRef.current;
+    if (!host3) return;
     if (window.innerWidth <= 640) {
-      host2.style.height = "";
+      host3.style.height = "";
       return;
     }
-    const top = host2.getBoundingClientRect().top + window.scrollY;
-    host2.style.height = `${Math.max(360, Math.round(window.innerHeight - top - 12))}px`;
+    const top = host3.getBoundingClientRect().top + window.scrollY;
+    host3.style.height = `${Math.max(360, Math.round(window.innerHeight - top - 12))}px`;
   };
   useEffect(() => {
     const onResize = () => fitCanvasHeight();
@@ -18619,13 +18645,13 @@ function ExecutableWorkflowsPanel({ project, workflows, onRefresh, onOpenLibrary
     return () => window.removeEventListener("resize", onResize);
   }, []);
   const growForPanel = () => {
-    const host2 = canvasRef.current;
-    if (!host2 || window.innerWidth <= 640) return;
-    const stage = host2.closest(".dockyard-wf3-stage");
+    const host3 = canvasRef.current;
+    if (!host3 || window.innerWidth <= 640) return;
+    const stage = host3.closest(".dockyard-wf3-stage");
     const toolbar = stage?.querySelector(".dockyard-wf3-toolbar");
     const want = Math.min(820, Math.round(window.innerHeight - (toolbar?.getBoundingClientRect().height ?? 0) - 24));
-    if (host2.getBoundingClientRect().height >= want - 4) return;
-    host2.style.height = `${want}px`;
+    if (host3.getBoundingClientRect().height >= want - 4) return;
+    host3.style.height = `${want}px`;
     stage?.scrollIntoView({ block: "start" });
   };
   const onSelectStep = (nodeId) => {
@@ -19147,6 +19173,213 @@ function ProjectContentPanel({ project, content, onRefresh }) {
       onConfirm: applyContentAction,
       onCancel: () => setContentAction(null)
     }) : null
+  ] });
+}
+
+// hermes_dockyard_plugin/desktop/src/project/memory.js
+var MEMORY_KINDS = Object.freeze([
+  ["rule", "Rule", "Rules"],
+  ["decision", "Decision", "Decisions"],
+  ["fact", "Fact", "Facts"]
+]);
+var MEMORY_MAX_TEXT = 500;
+var kindLabel = (kind) => (MEMORY_KINDS.find(([key]) => key === kind) ?? [kind, kind])[1];
+function memoryMeta(entry) {
+  const parts = [`Added by ${entry.created_by}`];
+  const when = formatWhen(entry.created_at);
+  if (when) parts.push(when);
+  if (String(entry.source ?? "").startsWith("work:")) parts.push(`from finished work ${entry.source.slice(5)}`);
+  if (entry.supersedes_id != null) parts.push("edited");
+  if (entry.archived_at) parts.push(`archived by ${entry.archived_by}`);
+  return parts.join(" \xB7 ");
+}
+function KindSelect({ value, onChange, label }) {
+  return jsxs("label", { children: [
+    label,
+    jsx("select", { value, "data-memory-kind": true, onChange: (event) => onChange(event.target.value), children: MEMORY_KINDS.map(([key, name]) => jsx("option", { value: key, children: name }, key)) })
+  ] });
+}
+function TextBox({ value, onChange, label, field }) {
+  return jsxs("label", { children: [
+    label,
+    jsx("textarea", { value, rows: 3, maxLength: MEMORY_MAX_TEXT, [field]: true, onChange: (event) => onChange(event.target.value) }),
+    jsx("small", { className: "dy-mem-count", "aria-live": "polite", children: `${number(value.length)} / ${number(MEMORY_MAX_TEXT)}` })
+  ] });
+}
+function MemoryEntry({ entry, canWrite, busy, onEdit, onArchive, onRestore }) {
+  const [editing, setEditing] = useState(false);
+  const [text2, setText] = useState(entry.text);
+  const [kind, setKind] = useState(entry.kind);
+  const [history, setHistory] = useState(null);
+  const showHistory = async () => {
+    if (history) {
+      setHistory(null);
+      return;
+    }
+    try {
+      const result = await api(`/projects/${encodeURIComponent(entry.project_id)}/memory/${entry.id}/history`);
+      setHistory(result.history ?? []);
+    } catch (failure) {
+      emitToast("danger", String(failure?.message ?? failure));
+    }
+  };
+  const save2 = async () => {
+    const changed = await onEdit(entry, { text: text2.trim() === entry.text ? void 0 : text2, kind: kind === entry.kind ? void 0 : kind });
+    if (changed) setEditing(false);
+  };
+  return jsxs("article", { className: "dy-mem-entry", "data-memory-entry": entry.id, "data-memory-entry-kind": entry.kind, "data-archived": entry.archived_at ? "true" : "false", children: [
+    editing ? jsxs("div", { className: "dockyard-inline-editor", "data-memory-editor": entry.id, children: [
+      jsx(KindSelect, { value: kind, onChange: setKind, label: "Kind" }),
+      jsx(TextBox, { value: text2, onChange: setText, label: "Text", field: "data-memory-edit-text" }),
+      jsxs("div", { className: "dy-mem-actions", children: [
+        jsx(Button, { action: "save-memory-entry", variant: "primary", small: true, disabled: busy || !text2.trim(), onClick: save2, children: "Save" }),
+        jsx(Button, { action: "cancel-memory-edit", small: true, onClick: () => {
+          setEditing(false);
+          setText(entry.text);
+          setKind(entry.kind);
+        }, children: "Cancel" })
+      ] })
+    ] }) : jsxs("div", { className: "dy-mem-body", children: [
+      jsx("p", { className: "dy-mem-text", children: entry.text }),
+      jsx("small", { className: "dy-mem-meta", children: memoryMeta(entry) })
+    ] }),
+    !editing ? jsxs("div", { className: "dy-mem-actions", children: [
+      entry.supersedes_id != null ? jsx(Button, { action: "memory-history", small: true, ariaLabel: `History of: ${entry.text}`, onClick: showHistory, children: history ? "Hide history" : "History" }) : null,
+      canWrite && !entry.archived_at ? jsx(Button, { action: "edit-memory-entry", small: true, ariaLabel: `Edit: ${entry.text}`, disabled: busy, onClick: () => setEditing(true), children: "Edit" }) : null,
+      canWrite && !entry.archived_at ? jsx(Button, { action: "archive-memory-entry", small: true, ariaLabel: `Archive: ${entry.text}`, disabled: busy, onClick: () => onArchive(entry), children: "Archive" }) : null,
+      canWrite && entry.archived_at ? jsx(Button, { action: "restore-memory-entry", small: true, ariaLabel: `Restore: ${entry.text}`, disabled: busy, onClick: () => onRestore(entry), children: "Restore" }) : null
+    ] }) : null,
+    history ? jsx("ol", { className: "dy-mem-history", "data-memory-history": entry.id, children: history.map((version) => jsxs("li", { children: [
+      jsx("span", { children: `${kindLabel(version.kind)}: ${version.text}` }),
+      jsx("small", { children: `${version.created_by} \xB7 ${formatWhen(version.created_at)}` })
+    ] }, version.id)) }) : null
+  ] });
+}
+function ProjectMemoryPanel({ project }) {
+  const encoded = encodeURIComponent(project.id);
+  const [state, setState] = useState({ status: "loading", entries: [], context: "", cap: 2e3, canWrite: false });
+  const [suggestions, setSuggestions] = useState({ status: "loading", items: [] });
+  const [showArchived, setShowArchived] = useState(false);
+  const [kind, setKind] = useState("rule");
+  const [text2, setText] = useState("");
+  const [source, setSource] = useState("human");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const load = async () => {
+    try {
+      const result = await api(`/projects/${encoded}/memory?include_archived=true`);
+      setState({ status: "ready", entries: result.entries ?? [], context: result.context ?? "", cap: result.cap ?? 2e3, canWrite: Boolean(result.can_write) });
+    } catch (failure) {
+      setState((current) => ({ ...current, status: "error" }));
+      setError(String(failure?.message ?? failure));
+    }
+    try {
+      const result = await api(`/projects/${encoded}/memory/suggestions`);
+      setSuggestions({ status: "ready", items: result.suggestions ?? [] });
+    } catch {
+      setSuggestions({ status: "unavailable", items: [] });
+    }
+  };
+  useEffect(() => {
+    load();
+  }, [project.id]);
+  const write = async (path, init, done) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(path, { ...init, quiet: true });
+      await load();
+      if (done) emitToast("success", done);
+      return true;
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+  const add = async () => {
+    const added = await write(`/projects/${encoded}/memory`, { method: "POST", body: { kind, text: text2, source } }, "Added to the project memory.");
+    if (added) {
+      setText("");
+      setSource("human");
+    }
+  };
+  const edit = (entry, changes) => {
+    const body = Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== void 0));
+    if (Object.keys(body).length === 0) {
+      setError("Nothing to change: the entry already says this.");
+      return Promise.resolve(false);
+    }
+    return write(`/projects/${encoded}/memory/${entry.id}`, { method: "PATCH", body }, "Memory entry updated.");
+  };
+  const archive = (entry) => write(`/projects/${encoded}/memory/${entry.id}/archive`, { method: "POST", body: {} }, "Archived. Bots no longer see it.");
+  const restore = (entry) => write(`/projects/${encoded}/memory/${entry.id}/restore`, { method: "POST", body: {} }, "Restored. Bots see it again.");
+  const useSuggestion = (item) => {
+    setKind("fact");
+    setText(item.text);
+    setSource(`work:${item.work_id}`);
+  };
+  const active = state.entries.filter((entry) => !entry.archived_at);
+  const archived = state.entries.filter((entry) => entry.archived_at);
+  const entryProps = { canWrite: state.canWrite, busy, onEdit: edit, onArchive: archive, onRestore: restore };
+  return jsxs("div", { className: "dockyard-content-layout", "data-project-memory": project.id, children: [
+    jsxs("section", { className: "dockyard-feature-card", children: [
+      jsxs("div", { className: "dockyard-section-head", children: [
+        jsxs("div", { children: [
+          jsx("h2", { children: "Project memory" }),
+          jsx("p", { children: "What this project's bots are told when they work on it: rules first, then decisions, then facts." })
+        ] }),
+        jsx(StatusTag, { tone: "neutral", label: `${number(active.length)} ${plural2(active.length, "entry", "entries")}` })
+      ] }),
+      state.status === "loading" ? jsx("p", { className: "dockyard-meta", children: "Loading memory..." }) : null,
+      state.status === "ready" && state.canWrite ? jsxs("div", { className: "dockyard-inline-editor", "data-memory-add": true, children: [
+        jsx(KindSelect, { value: kind, onChange: setKind, label: "Kind" }),
+        jsx(TextBox, { value: text2, onChange: setText, label: "Text", field: "data-memory-text" }),
+        source !== "human" ? jsxs("p", { className: "dockyard-meta", "data-memory-source": source, children: [
+          `Starting from finished work ${source.slice(5)}. `,
+          jsx(Button, { action: "clear-memory-source", small: true, onClick: () => {
+            setSource("human");
+            setText("");
+          }, children: "Clear" })
+        ] }) : null,
+        jsx("div", { className: "dy-mem-actions", children: jsx(Button, { action: "add-memory-entry", variant: "primary", disabled: busy || !text2.trim(), onClick: add, children: busy ? "Saving..." : "Add to memory" }) })
+      ] }) : null,
+      state.status === "ready" && !state.canWrite ? jsx("p", { className: "dockyard-meta", "data-memory-read-only": true, children: "Only the project owner can change the memory." }) : null,
+      error ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: error }) : null,
+      state.status === "ready" && active.length === 0 ? jsx("p", { className: "dockyard-meta", "data-memory-empty": true, children: "No memory yet. Add the facts, decisions and rules the bots should know." }) : null,
+      ...MEMORY_KINDS.map(([key, , heading]) => {
+        const group = active.filter((entry) => entry.kind === key);
+        if (group.length === 0) return null;
+        return jsxs("div", { className: "dy-mem-group", "data-memory-group": key, children: [
+          jsx("h3", { children: heading }),
+          ...group.map((entry) => jsx(MemoryEntry, { entry, ...entryProps }, `${entry.id}:${entry.archived_at ?? ""}`))
+        ] }, key);
+      }),
+      archived.length > 0 ? jsx("div", { className: "dy-mem-actions", children: jsx(Button, { action: "toggle-archived-memory", small: true, onClick: () => setShowArchived(!showArchived), children: showArchived ? "Hide archived" : `Show archived (${number(archived.length)})` }) }) : null,
+      showArchived && archived.length > 0 ? jsxs("div", { className: "dy-mem-group", "data-memory-group": "archived", children: [
+        jsx("h3", { children: "Archived" }),
+        ...archived.map((entry) => jsx(MemoryEntry, { entry, ...entryProps }, `${entry.id}:${entry.archived_at}`))
+      ] }) : null
+    ] }),
+    jsxs("aside", { className: "dockyard-feature-card", "data-memory-preview-card": true, children: [
+      jsx("span", { className: "dockyard-card-label", children: "WHAT BOTS SEE" }),
+      state.context ? jsx("pre", { className: "dockyard-content-preview", "data-memory-preview": true, children: state.context }) : jsx("p", { className: "dockyard-meta", "data-memory-preview": true, children: "Nothing yet. Bots get no project memory until you add some." }),
+      jsx("small", { className: "dy-mem-count", children: `${number(state.context.length)} of ${number(state.cap)} characters. Bots get this when they work on this project's tasks, or in a chat opened from Dockyard.` }),
+      jsxs("div", { className: "dy-mem-suggestions", "data-memory-suggestions": suggestions.status, children: [
+        jsx("h3", { children: "From finished work" }),
+        suggestions.status === "loading" ? jsx("p", { className: "dockyard-meta", children: "Loading finished work..." }) : null,
+        suggestions.status === "unavailable" ? jsx("p", { className: "dockyard-meta", children: "Finished work is unavailable right now." }) : null,
+        suggestions.status === "ready" && suggestions.items.length === 0 ? jsx("p", { className: "dockyard-meta", children: "No finished work with a result to start from." }) : null,
+        ...suggestions.items.map((item) => jsxs("article", { className: "dy-mem-entry", "data-memory-suggestion": item.work_id, children: [
+          jsxs("div", { className: "dy-mem-body", children: [
+            jsx("p", { className: "dy-mem-text", children: item.text }),
+            jsx("small", { className: "dy-mem-meta", children: [item.title, item.work_id].filter(Boolean).join(" \xB7 ") })
+          ] }),
+          state.canWrite ? jsx("div", { className: "dy-mem-actions", children: jsx(Button, { action: "use-memory-suggestion", small: true, ariaLabel: `Start an entry from: ${item.title || item.work_id}`, onClick: () => useSuggestion(item), children: "Use this" }) }) : null
+        ] }, item.work_id))
+      ] })
+    ] })
   ] });
 }
 
@@ -21918,6 +22151,59 @@ function PlanScreen({ project, focus, onFocusConsumed, onOpenRoadmap }) {
   ] });
 }
 
+// hermes_dockyard_plugin/desktop/src/project/header-strip.js
+import { host } from "@hermes/plugin-sdk";
+
+// hermes_dockyard_plugin/desktop/src/project/chat.js
+function chatTargets(members, lead) {
+  const list = Array.isArray(members) ? members : [];
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  const push = (slug2, role) => {
+    const profile = String(slug2 ?? "").trim();
+    if (!profile || seen.has(profile)) return;
+    seen.add(profile);
+    out.push({ profile, role });
+  };
+  const leadSlug = String(lead ?? "").trim() || list.find((member) => member?.role === "lead")?.profile_slug;
+  if (leadSlug) push(leadSlug, "lead");
+  for (const member of list) {
+    if (member?.state === "departed") continue;
+    push(member?.profile_slug, member?.role === "lead" ? "lead" : "member");
+  }
+  return out;
+}
+function chatRoute(routes, activeConnectionId, profile) {
+  if (!activeConnectionId) return null;
+  const list = (Array.isArray(routes) ? routes : []).filter((route) => route?.connectionId === activeConnectionId);
+  return list.find((route) => route?.targetProfile === profile) ?? list.find((route) => route?.profile === profile) ?? null;
+}
+async function openProjectChat({ host: host3, api: api2, projectId, profile }) {
+  if (typeof host3?.newChat !== "function") return { opened: false, reason: "unsupported" };
+  let linked = false;
+  try {
+    await api2(`/projects/${encodeURIComponent(projectId)}/chat-links`, { method: "POST", body: { profile }, quiet: true });
+    linked = true;
+  } catch {
+    linked = false;
+  }
+  let route = null;
+  try {
+    if (typeof host3.profileRoutes === "function") {
+      route = chatRoute(await host3.profileRoutes(), host3.activeConnectionId?.() ?? null, profile);
+    }
+  } catch {
+    route = null;
+  }
+  host3.newChat(route ? { ...route } : profile);
+  return { opened: true, linked, via: route ? "route" : "profile" };
+}
+function chatOutcomeMessage(profile, outcome) {
+  if (!outcome?.opened) return ["danger", "This version of Hermes Desktop cannot open a chat from Dockyard. Update Hermes Desktop."];
+  if (!outcome.linked) return ["danger", `Chat with ${profile} opened, but without this project's memory: Dockyard could not link it.`];
+  return ["success", `Chat with ${profile} opened. Its first message brings this project's memory.`];
+}
+
 // hermes_dockyard_plugin/desktop/src/project/attention.js
 var STALLED_AFTER_DAYS = 14;
 var PHASE_LABEL = { paused: "Paused", frozen: "Frozen", disabled: "Disabled", archived: "Archived" };
@@ -22126,6 +22412,37 @@ function ageText(days) {
   if (days < 1) return "Under a day";
   return `${number(days)} ${days === 1 ? "day" : "days"}`;
 }
+function ProjectChatMenu({ projectId, lead }) {
+  const [members, setMembers] = useState(null);
+  useEffect(() => {
+    let live = true;
+    setMembers(null);
+    api(`/projects/${encodeURIComponent(projectId)}/members`).then((result) => {
+      if (live) setMembers(result?.members ?? []);
+    }).catch(() => {
+      if (live) setMembers([]);
+    });
+    return () => {
+      live = false;
+    };
+  }, [projectId]);
+  const targets = chatTargets(members, lead);
+  if (targets.length === 0) return null;
+  const open = async (profile) => {
+    const [tone, message] = chatOutcomeMessage(profile, await openProjectChat({ host, api, projectId, profile }));
+    emitToast(tone, message);
+  };
+  return jsx("span", { className: "dy-ov-chat", "data-strip-chat": projectId, children: jsx(Menu, {
+    label: `Chat with a bot on ${projectId}`,
+    action: "project-chat",
+    trigger: jsxs(Fragment, { children: [jsx(Icon, { name: "message-square" }), jsx("span", { children: "Chat" })] }),
+    items: targets.map((target) => ({
+      id: target.profile,
+      label: target.role === "lead" ? `${target.profile} (lead)` : target.profile,
+      onSelect: () => open(target.profile)
+    }))
+  }) });
+}
 function AttentionDrawer({ projectId, attention, onClose, onOpenItem }) {
   const [expanded, setExpanded] = useState(null);
   useDialogFocusManager("[data-attention-drawer] .dy-ov-attn-panel");
@@ -22246,6 +22563,7 @@ function ProjectHeaderStrip({ project, view, onRefresh, onOpenRoadmap, onOpenIte
             event.preventDefault();
             onOpenRoadmap?.();
           }, children: "View in Roadmap" }) }),
+          jsx(ProjectChatMenu, { projectId: project.id, lead }, `chat:${project.id}`),
           jsx("button", { type: "button", className: "dy-ov-refresh", "data-action": "refresh", "aria-label": "Refresh", title: "Refresh", onClick: onRefresh, children: jsx(Icon, { name: "refresh" }) })
         ] })
       ] }),
@@ -22738,6 +23056,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
     ["planning", "Planning"],
     ["workflows", "Workflows"],
     ["content", "Content"],
+    ["memory", "Memory"],
     ["activity", "Activity"],
     ["reports", "Reports"],
     ["settings", "Settings"]
@@ -22780,6 +23099,8 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
     panel = jsx(ExecutableWorkflowsPanel, { project, workflows: view.workflows ?? [], onRefresh, onOpenLibrary, openWorkflow, onOpenWorkflowDone }, project.id);
   } else if (projectView === "content") {
     panel = jsx(ProjectContentPanel, { project, content: view.content ?? [], onRefresh }, project.id);
+  } else if (projectView === "memory") {
+    panel = jsx(ProjectMemoryPanel, { project }, project.id);
   } else if (projectView === "activity") {
     panel = jsx(ProjectActivityPanel, { project, view, onOpenItem: openAttentionItem }, project.id);
   } else if (projectView === "settings") {
@@ -23535,6 +23856,8 @@ var NOTIFICATIONS_CSS = `
 .dockyard-root .dy-notif-settings .dy-notif-setting { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
 .dockyard-root .dy-notif-settings label { font-size: 12px; color: var(--dy-text-2); }
 .dockyard-root .dy-notif-settings select, .dockyard-root .dy-notif-settings input[type="time"] { border: 1px solid var(--dy-border); border-radius: 8px; background: var(--dy-surface-subtle); color: inherit; padding: 4px 8px; font: inherit; }
+/* A control that does nothing right now (Discord's level while Discord is off) looks it. */
+.dockyard-root .dy-notif-settings select:disabled, .dockyard-root .dy-notif-settings input:disabled { opacity: .5; cursor: not-allowed; }
 .dockyard-root .dy-notif-settings .dy-notif-override-link { font-size: 12px; }
 /* Sahil 05/10: the settings live only in App settings; the screen points there. */
 .dockyard-root .dy-notif-settings-link { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 14px 0 0; color: var(--dy-text-2); font-size: 13px; }
@@ -23558,7 +23881,7 @@ var KIND_LABELS = {
 };
 var STATE_LABELS = { new: "New", seen: "Seen", resolved: "Resolved" };
 var PAGE_SIZE = 50;
-var kindLabel = (kind) => KIND_LABELS[kind] ?? "Other";
+var kindLabel2 = (kind) => KIND_LABELS[kind] ?? "Other";
 function dayBucket(createdAt) {
   const value = String(createdAt || "");
   const stamp2 = Date.parse(value);
@@ -23760,7 +24083,7 @@ function NotificationRow({ note, busy, selected, onSelect, onSeen, onOpen }) {
               jsx(StatusTag, { tone: state === "new" ? "info" : "neutral", label: STATE_LABELS[state] ?? state })
             ] }),
             jsx("p", { children: note.body ?? "" }),
-            jsx("span", { className: "dockyard-meta", children: `${note.project || "Fleet"} \xB7 ${kindLabel(note.kind)} \xB7 ${note.severity}${when ? ` \xB7 ${when}` : ""}` })
+            jsx("span", { className: "dockyard-meta", children: `${note.project || "Fleet"} \xB7 ${kindLabel2(note.kind)} \xB7 ${note.severity}${when ? ` \xB7 ${when}` : ""}` })
           ] })
         ] })
       }),
@@ -23779,7 +24102,7 @@ function NotificationDetail({ note, busy, resolveOpen, onResolveToggle, resolveN
     jsxs("h3", { children: [note.title ?? "Fleet notification", " ", jsx(StatusTag, { tone: state === "new" ? "info" : "neutral", label: STATE_LABELS[state] ?? state })] }),
     jsx("p", { children: note.body ?? "" }),
     jsx("span", { className: "dockyard-meta", children: `Project: ${note.project || "Fleet"}` }),
-    jsx("span", { className: "dockyard-meta", children: `Type: ${kindLabel(note.kind)} \xB7 Severity: ${note.severity}` }),
+    jsx("span", { className: "dockyard-meta", children: `Type: ${kindLabel2(note.kind)} \xB7 Severity: ${note.severity}` }),
     jsx("span", { className: "dockyard-meta", children: `Created: ${formatWhen(note.created_at)}` }),
     seenBy ? jsx("span", { className: "dockyard-meta", children: `Seen by ${seenBy}${note.acked_at ? ` at ${formatWhen(note.acked_at)}` : ""}` }) : null,
     resolvedBy ? jsxs("span", { className: "dockyard-meta", children: [
@@ -23810,6 +24133,8 @@ function NotificationSettings({ settings, busy, error, onSave }) {
   const value = settings ?? {};
   const channels = value.channels ?? {};
   const desktop = channels.desktop ?? {};
+  const discord = channels.discord ?? {};
+  const discordOn = discord.enabled === true;
   const quiet = value.quiet_hours ?? {};
   const bypass = value.bypass_quiet_hours ?? ["approval_required"];
   const approvalsBypass = bypass.includes("approval_required");
@@ -23827,6 +24152,15 @@ function NotificationSettings({ settings, busy, error, onSave }) {
       jsx("label", { htmlFor: "dy-notif-popups-severity", children: "Pop-up minimum severity" }),
       jsx("select", { id: "dy-notif-popups-severity", value: desktop.min_severity ?? "high", disabled: busy, onChange: (e) => onSave({ channels: { ...channels, desktop: { ...desktop, min_severity: e.target.value } } }), children: SEVERITIES2.map((s) => jsx("option", { value: s, children: s }, s)) })
     ] }),
+    jsxs("div", { className: "dy-notif-setting", children: [
+      jsx("label", { htmlFor: "dy-notif-discord-enabled", children: "Discord alerts" }),
+      jsx("select", { id: "dy-notif-discord-enabled", value: discordOn ? "on" : "off", disabled: busy, onChange: (e) => onSave({ channels: { ...channels, discord: { ...discord, enabled: e.target.value === "on" } } }), children: [["off", "Off"], ["on", "On"]].map(([v, label]) => jsx("option", { value: v, children: label }, v)) })
+    ] }),
+    jsxs("div", { className: "dy-notif-setting", children: [
+      jsx("label", { htmlFor: "dy-notif-discord-severity", children: "Discord minimum severity" }),
+      jsx("select", { id: "dy-notif-discord-severity", value: discord.min_severity ?? "high", disabled: busy || !discordOn, onChange: (e) => onSave({ channels: { ...channels, discord: { ...discord, min_severity: e.target.value } } }), children: SEVERITIES2.map((s) => jsx("option", { value: s, children: s }, s)) })
+    ] }),
+    jsx("p", { className: "dy-notif-override-link", "data-discord-note": true, children: "Discord alerts are posted by a scheduled job on this computer once it is set up. Until then nothing is sent." }),
     jsxs("div", { className: "dy-notif-setting", children: [
       jsx("label", { htmlFor: "dy-notif-quiet-start", children: "Quiet hours" }),
       jsx("input", { id: "dy-notif-quiet-start", type: "time", value: quiet.start ?? "", disabled: busy, onChange: (e) => onSave({ quiet_hours: { ...quiet || {}, start: e.target.value, end: quiet.end ?? "" } }) }),
@@ -25272,11 +25606,11 @@ function DashboardPage({ inboxCss = "" } = {}) {
 var POPUP_INTERVAL_MS = 6e4;
 var POPUP_CAP = 3;
 function openDockyard() {
-  host?.navigate?.("/dockyard");
+  host2?.navigate?.("/dockyard");
 }
 function surfacePopup(item) {
   const text2 = String(item?.body ?? "").trim();
-  host.notify({
+  host2.notify({
     id: `dockyard-notification-${item?.id}`,
     kind: "info",
     title: item?.title ?? "Fleet notification",
@@ -25285,7 +25619,7 @@ function surfacePopup(item) {
   });
 }
 function surfaceMore(count) {
-  host.notify({
+  host2.notify({
     id: "dockyard-notification-more",
     kind: "info",
     title: `and ${count} more notification${count === 1 ? "" : "s"}`,
@@ -25294,7 +25628,7 @@ function surfaceMore(count) {
   });
 }
 function startPopupPoller(ctxRest) {
-  if (typeof host?.notify !== "function") return;
+  if (typeof host2?.notify !== "function") return;
   if (typeof window === "undefined" || window.__dockyardPopupPoller) return;
   const surfaced = /* @__PURE__ */ new Set();
   const tick = async () => {
@@ -25346,7 +25680,7 @@ var __plugin = {
           id: "hermes-dockyard.open",
           label: "Dockyard: Open fleet overview",
           keywords: ["dockyard", "fleet", "projects", "approvals", "notifications"],
-          run: () => host.navigate("/dockyard")
+          run: () => host2.navigate("/dockyard")
         }
       }
     ]);

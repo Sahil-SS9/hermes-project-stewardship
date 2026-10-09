@@ -11,11 +11,11 @@ from dataclasses import dataclass
 from typing import List
 
 # Schema numbers: W owns v31, Batch P owns v32-v34 (v34 = forward fix for
-# Schema numbers: W owns v31, Batch P owns v32-v34 (v34 = forward fix for
 # the edited v3). Later lanes take the next free number when they merge.
 # Never edit a released migration (v1-v17 shipped in v0.3.0); fix forward
-# with a new version instead. Batch R2 owns v35. Batch E owns v36.
-SCHEMA_VERSION = 37
+# with a new version instead. Batch R2 owns v35. Batch E owns v36. Checks
+# round 1: project memory v38, chat links v39, Discord alerts v40.
+SCHEMA_VERSION = 40
 
 
 @dataclass(frozen=True)
@@ -1689,4 +1689,115 @@ MIGRATIONS.append(Migration(
             ON project_content(project_id, uploaded_at DESC);
         """,
     downgrade_sql=next(m.upgrade_sql for m in MIGRATIONS if m.version == 24),
+))
+
+
+# v38 (checks round 1, Sahil 08/10 pick 1b = A): project memory. The original
+# project_knowledge table (v1) was never wired: no callers, no routes, no rows in
+# the real database. It is rebuilt as the store for each project's memory: a closed
+# list of kinds (fact, decision, rule), text the same length the service allows,
+# archive instead of delete, and edit history through supersedes_id with ONE
+# successor per entry (two edits of the same entry cannot both win). Old rows come
+# through: decisions stay decisions; findings and incidents are facts. Migrations
+# run with foreign keys off (Store.migrate), so the self-reference survives the
+# rename. The downgrade rebuilds the v1 shape: rules go back as decisions and
+# archived entries lose the archive mark.
+MIGRATIONS.append(Migration(
+    version=38,
+    name="project memory: facts, decisions and rules per project",
+    upgrade_sql="""
+        CREATE TABLE project_knowledge_v38 (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id    TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            kind          TEXT NOT NULL CHECK (kind IN ('fact','decision','rule')),
+            text          TEXT NOT NULL CHECK (length(text) BETWEEN 1 AND 500),
+            source        TEXT NOT NULL,
+            supersedes_id INTEGER REFERENCES project_knowledge(id),
+            created_by    TEXT NOT NULL,
+            created_at    TEXT NOT NULL,
+            archived_at   TEXT,
+            archived_by   TEXT
+        );
+        INSERT INTO project_knowledge_v38(
+            id, project_id, kind, text, source, supersedes_id, created_by, created_at
+        )
+        SELECT id, project_id,
+               CASE type WHEN 'decision' THEN 'decision' ELSE 'fact' END,
+               substr(trim(statement), 1, 500), source, supersedes_id, source, created_at
+        FROM project_knowledge
+        WHERE length(trim(statement)) > 0;
+        DROP TABLE project_knowledge;
+        ALTER TABLE project_knowledge_v38 RENAME TO project_knowledge;
+        CREATE INDEX idx_project_knowledge_project
+            ON project_knowledge(project_id, archived_at, kind);
+        CREATE UNIQUE INDEX idx_project_knowledge_one_successor
+            ON project_knowledge(supersedes_id) WHERE supersedes_id IS NOT NULL;
+        """,
+    downgrade_sql="""
+        DROP INDEX IF EXISTS idx_project_knowledge_one_successor;
+        DROP INDEX IF EXISTS idx_project_knowledge_project;
+        CREATE TABLE project_knowledge_v1 (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id  TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            type        TEXT NOT NULL CHECK (type IN ('decision','finding','incident')),
+            statement   TEXT NOT NULL,
+            source      TEXT NOT NULL,
+            confidence  REAL NOT NULL DEFAULT 0.5,
+            supersedes_id INTEGER REFERENCES project_knowledge(id),
+            created_at  TEXT NOT NULL
+        );
+        INSERT INTO project_knowledge_v1(id, project_id, type, statement, source, supersedes_id, created_at)
+        SELECT id, project_id,
+               CASE kind WHEN 'fact' THEN 'finding' ELSE 'decision' END,
+               text, source, supersedes_id, created_at
+        FROM project_knowledge;
+        DROP TABLE project_knowledge;
+        ALTER TABLE project_knowledge_v1 RENAME TO project_knowledge;
+        """,
+))
+
+
+# v39 (checks round 1, Sahil 08/10 pick 1a = A): chat links. Dockyard's Chat
+# button opens a fresh Desktop chat with one of the project's bots, but a plugin
+# cannot learn that chat's id (Desktop saves a chat on its first message). So
+# the button records a one-time link here (bot, project, expiry); the first
+# message of a new Desktop chat with that bot claims it (bot_context.py) and the
+# chat then gets the project's memory. One chat per link: session_id is unique.
+MIGRATIONS.append(Migration(
+    version=39,
+    name="chat links: a new Desktop chat with a project bot carries the project",
+    upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS project_chat_links (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id  TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            profile     TEXT NOT NULL,
+            created_by  TEXT NOT NULL,
+            created_at  TEXT NOT NULL,
+            expires_at  TEXT NOT NULL,
+            session_id  TEXT UNIQUE,
+            claimed_at  TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_chat_links_open
+            ON project_chat_links(profile, expires_at) WHERE session_id IS NULL;
+        """,
+    downgrade_sql="""
+        DROP INDEX IF EXISTS idx_project_chat_links_open;
+        DROP TABLE IF EXISTS project_chat_links;
+        """,
+))
+
+
+# v40 (checks round 1, Sahil 08/10 pick 2 = A): Discord alerts. Each alert is
+# posted to Discord at most once; this mark records when it was handed to the
+# Discord job (events/discord_alerts.py). A separate column, so the in-app and
+# pop-up marks keep their meaning.
+MIGRATIONS.append(Migration(
+    version=40,
+    name="Discord alerts: each alert goes to Discord once",
+    upgrade_sql="""
+        ALTER TABLE notifications ADD COLUMN discord_sent_at TEXT;
+        """,
+    downgrade_sql="""
+        ALTER TABLE notifications DROP COLUMN discord_sent_at;
+        """,
 ))

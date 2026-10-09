@@ -3361,40 +3361,7 @@ class StewardshipService:
             )
         return self.initiative_by_ref(ref)
 
-    # ------------------------------------------------------------------ #
-    # Knowledge                                                          #
-    # ------------------------------------------------------------------ #
-
-    def add_knowledge(
-        self,
-        project_id: str,
-        *,
-        type: str,
-        statement: str,
-        source: str,
-        confidence: float = 0.5,
-        supersedes_id: Optional[int] = None,
-    ) -> int:
-        self._require(project_id)
-        if type not in ("decision", "finding", "incident"):
-            raise ServiceError(f"invalid knowledge type '{type}'")
-        with self.store.tx() as cx:
-            cur = cx.execute(
-                """
-                INSERT INTO project_knowledge(project_id, type, statement, source,
-                                              confidence, supersedes_id, created_at)
-                VALUES(?,?,?,?,?,?,?)
-                """,
-                (project_id, type, statement, source, confidence, supersedes_id, iso(self._clock())),
-            )
-        return int(cur.lastrowid)
-
-    def knowledge(self, project_id: str, limit: int = 50) -> List[Dict[str, Any]]:
-        rows = self.store._conn.execute(
-            "SELECT * FROM project_knowledge WHERE project_id=? ORDER BY id DESC LIMIT ?",
-            (project_id, limit),
-        ).fetchall()
-        return [dict(r) for r in rows]
+    # Project memory (the old knowledge table) lives in memory_service.py.
 
     # ------------------------------------------------------------------ #
     # Gateway permissions                                                #

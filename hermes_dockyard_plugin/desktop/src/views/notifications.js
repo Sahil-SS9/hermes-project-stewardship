@@ -308,6 +308,9 @@ export function NotificationSettings({ settings, busy, error, onSave }) {
   const value = settings ?? {}
   const channels = value.channels ?? {}
   const desktop = channels.desktop ?? {}
+  // Checks round 1 (Sahil 08/10, pick 2 = A): Discord alerts, off by default.
+  const discord = channels.discord ?? {}
+  const discordOn = discord.enabled === true
   const quiet = value.quiet_hours ?? {}
   const bypass = value.bypass_quiet_hours ?? ['approval_required']
   const approvalsBypass = bypass.includes('approval_required')
@@ -328,6 +331,17 @@ export function NotificationSettings({ settings, busy, error, onSave }) {
       jsx('select', { id: 'dy-notif-popups-severity', value: desktop.min_severity ?? 'high', disabled: busy, onChange: (e) => onSave({ channels: { ...channels, desktop: { ...desktop, min_severity: e.target.value } } }), children:
         SEVERITIES.map((s) => jsx('option', { value: s, children: s }, s)) }),
     ]}),
+    jsxs('div', { className: 'dy-notif-setting', children: [
+      jsx('label', { htmlFor: 'dy-notif-discord-enabled', children: 'Discord alerts' }),
+      jsx('select', { id: 'dy-notif-discord-enabled', value: discordOn ? 'on' : 'off', disabled: busy, onChange: (e) => onSave({ channels: { ...channels, discord: { ...discord, enabled: e.target.value === 'on' } } }), children:
+        [['off', 'Off'], ['on', 'On']].map(([v, label]) => jsx('option', { value: v, children: label }, v)) }),
+    ]}),
+    jsxs('div', { className: 'dy-notif-setting', children: [
+      jsx('label', { htmlFor: 'dy-notif-discord-severity', children: 'Discord minimum severity' }),
+      jsx('select', { id: 'dy-notif-discord-severity', value: discord.min_severity ?? 'high', disabled: busy || !discordOn, onChange: (e) => onSave({ channels: { ...channels, discord: { ...discord, min_severity: e.target.value } } }), children:
+        SEVERITIES.map((s) => jsx('option', { value: s, children: s }, s)) }),
+    ]}),
+    jsx('p', { className: 'dy-notif-override-link', 'data-discord-note': true, children: 'Discord alerts are posted by a scheduled job on this computer once it is set up. Until then nothing is sent.' }),
     jsxs('div', { className: 'dy-notif-setting', children: [
       jsx('label', { htmlFor: 'dy-notif-quiet-start', children: 'Quiet hours' }),
       jsx('input', { id: 'dy-notif-quiet-start', type: 'time', value: quiet.start ?? '', disabled: busy, onChange: (e) => onSave({ quiet_hours: { ...(quiet || {}), start: e.target.value, end: quiet.end ?? '' } }) }),
