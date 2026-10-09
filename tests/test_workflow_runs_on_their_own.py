@@ -81,7 +81,15 @@ class Lane:
     # ---- the board -------------------------------------------------------
     @contextmanager
     def conn(self):
-        conn = self.kb.connect(board=self.board)
+        # hermes_cli.kanban_db.connect moved to kanban_db_connect on current
+        # hosts (the old path was removed upstream on 2026-09-14); support both
+        # trees, as test_phase4_team_management.py does. The product's own
+        # vanilla_host._kanban already does.
+        try:
+            from hermes_cli import kanban_db_connect as connect_module
+        except ImportError:
+            connect_module = self.kb
+        conn = connect_module.connect(board=self.board)
         try:
             yield conn
         finally:
