@@ -37,6 +37,7 @@ from datetime import datetime, timedelta
 from typing import Any, Mapping, Sequence
 
 from .canonical_work_service import CanonicalWorkPort, dockyard_status
+from ..kanban.host_adapter import MISSING_LINK_CODES, KanbanAdapterError
 from .store import Store, iso
 
 # ---- approved policy limits (P5.12) ---------------------------------------
@@ -621,6 +622,20 @@ class WorkflowService:
             raise ValueError("workflow run was not found")
         return row
 
+    def _live_work_index(self, project_id: str) -> dict[str, Any]:
+        """Hermes's live tasks by id, for annotating the run ledger.
+
+        Empty when Hermes has no project (or board) for this one (unlinked,
+        10/10/2026): the ledger is stewardship's own record and still reads,
+        just without live status. Any other host failure still fails closed.
+        """
+        try:
+            return {item["id"]: item for item in self.port.list_work(project_id)}
+        except KanbanAdapterError as exc:
+            if exc.code not in MISSING_LINK_CODES:
+                raise
+            return {}
+
     def runs(self, project_id: str, name: str) -> list[dict[str, Any]]:
         """Read-only run ledger with per-node canonical status for the canvas."""
         known = self.store._conn.execute(
@@ -636,7 +651,7 @@ class WorkflowService:
             "ORDER BY version DESC, started_at DESC, run_key DESC",
             (project_id, name),
         ).fetchall()
-        work_index = {item["id"]: item for item in self.port.list_work(project_id)}
+        work_index = self._live_work_index(project_id)
         runs: list[dict[str, Any]] = []
         for row in rows:
             result = json.loads(row["result_json"]) or {}

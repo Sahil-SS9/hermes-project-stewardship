@@ -26,7 +26,13 @@ The running application is authoritative. Use:
   routes that need Hermes (work items, work dependencies, milestones, team,
   memory suggestions, report generation), while its stewardship data still
   reads normally. `/dashboard` reports `linked: false` and `/portfolio` status
-  `unlinked` for it.
+  `unlinked` for it. Reads that only annotate stewardship records with live
+  Hermes state degrade instead of failing: a workflow's run ledger
+  (`GET /projects/{id}/workflows/{name}/runs`) lists its runs without live task
+  status, and the roadmap reports `work_host: "unlinked"` and delivery
+  `{"state": "unavailable", "reason": "unlinked"}` (`"host_unavailable"` only
+  when Hermes failed). A run's timeline still needs Hermes (404) and records
+  nothing without it.
 - Actor/interface attribution is explicit on policy and governance mutations.
 
 ## Main route groups

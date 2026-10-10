@@ -27,7 +27,7 @@ from ..dockyard import (
     make_ref,
 )
 from ..dockyard.bots import Bot
-from ..kanban.host_adapter import KanbanAdapterError
+from ..kanban.host_adapter import MISSING_LINK_CODES, KanbanAdapterError
 from .dockyard_store import DockyardStore
 from .planning import forecast_milestone
 from .service import ServiceError, StewardshipService
@@ -1352,7 +1352,7 @@ class DockyardService:
 
     _STALLED_AFTER_DAYS = 14
 
-    _UNLINKED = frozenset({"project_not_found", "board_not_found"})
+    _UNLINKED = MISSING_LINK_CODES
 
     def _linked_work(self, project_id: str) -> Optional[List[Dict]]:
         """Canonical work for one project; None when Hermes has no such project.

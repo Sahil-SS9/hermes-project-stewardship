@@ -42,3 +42,12 @@ export async function hermesRead(link, read, empty) {
     return empty
   }
 }
+
+// Why delivery numbers are missing, by the backend's reason. The old words
+// blamed the work host for every reason, including archived records and a
+// project Hermes answered for: it has no such project.
+export function unavailableWords(reason) {
+  if (reason === 'unlinked') return `${UNLINKED_TITLE}: its work cannot be shown.`
+  if (reason === 'archived') return 'Unavailable: archived.'
+  return 'Unavailable: the work host did not respond.'
+}

@@ -5,6 +5,7 @@
 // latest plan, so it never shows a stale copy after a change.
 import { api } from '../../runtime/context.js'
 import { emitToast } from '../../runtime/context.js'
+import { unavailableWords } from '../../data/unlinked.js'
 import { useEffect } from '../../runtime/react.js'
 import { useRef } from '../../runtime/react.js'
 import { useState } from '../../runtime/react.js'
@@ -205,7 +206,7 @@ export function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
       }) }, 'objectives'),
       jsx(Section, { title: 'Delivery', children: !item.delivery || item.delivery.state === 'no_linked_work'
         ? jsx('p', { className: 'dockyard-meta', children: 'No linked work yet.' })
-        : item.delivery.state === 'unavailable' ? jsx('p', { className: 'dockyard-meta', children: 'Unavailable: the work host did not respond.' })
+        : item.delivery.state === 'unavailable' ? jsx('p', { className: 'dockyard-meta', children: unavailableWords(item.delivery.reason) })
           : jsx('div', { className: 'dy-plan-buckets', children: [
               ...BUCKETS.map(([key, label]) => jsxs('span', { children: [jsx('strong', { children: number(item.delivery[key] ?? 0) }), label] }, key)),
               item.delivery.blocked > 0 ? jsxs('span', { className: 'blocked', children: [jsx('strong', { children: number(item.delivery.blocked) }), 'Blocked'] }, 'blocked') : null,

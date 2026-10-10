@@ -7,6 +7,7 @@ from .bridge import (  # noqa: F401
     ReferenceKanbanAdapter,
 )
 from .host_adapter import (  # noqa: F401
+    MISSING_LINK_CODES,
     KanbanAdapterError,
     ProjectKanbanHostAdapter,
     UnavailableKanbanAdapter,

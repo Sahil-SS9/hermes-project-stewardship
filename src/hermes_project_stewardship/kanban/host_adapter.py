@@ -58,6 +58,13 @@ _SAFE_HOST_MESSAGES = {
 }
 
 
+# The host's codes for "Hermes has no project (or board) for this id": an
+# unlinked stewardship project (10/10/2026), not an outage. Reads that only
+# annotate stewardship records with live Hermes state degrade on these codes;
+# every other host failure still fails closed.
+MISSING_LINK_CODES = frozenset({"project_not_found", "board_not_found"})
+
+
 class KanbanAdapterError(RuntimeError):
     """Stable, redacted error raised at the Project Stewardship to Hermes boundary."""
 

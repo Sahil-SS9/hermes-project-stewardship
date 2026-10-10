@@ -13,6 +13,9 @@
 // it shows only when the server says this principal may write (can_write).
 import { api } from '../runtime/context.js'
 import { emitToast } from '../runtime/context.js'
+import { UNLINKED_LABEL } from '../data/unlinked.js'
+import { UNLINKED_TITLE } from '../data/unlinked.js'
+import { unavailableWords } from '../data/unlinked.js'
 import { useEffect } from '../runtime/react.js'
 import { useMemo } from '../runtime/react.js'
 import { useRef } from '../runtime/react.js'
@@ -97,7 +100,7 @@ function treeKeydown(event) {
 function deliveryChips(delivery) {
   if (!delivery) return null
   if (delivery.state === 'no_linked_work') return chip('No linked work')
-  if (delivery.state === 'unavailable') return chip('Unavailable')
+  if (delivery.state === 'unavailable') return chip(delivery.reason === 'unlinked' ? UNLINKED_LABEL : 'Unavailable')
   const chips = BUCKETS
     .map(([key, label]) => Number(delivery[key] ?? 0) > 0
       ? jsx('span', { className: 'dy-rm-chip', children: `${label} ${number(delivery[key])}` }, key)
@@ -119,7 +122,7 @@ function goalChip(goal) {
 function deliveryDetail(delivery) {
   if (!delivery) return []
   if (delivery.state === 'no_linked_work') return [['Linked work', 'No linked work']]
-  if (delivery.state === 'unavailable') return [['Linked work', 'Unavailable (the work host did not respond)']]
+  if (delivery.state === 'unavailable') return [['Linked work', unavailableWords(delivery.reason)]]
   return [
     ...BUCKETS.map(([key, label]) => [label, number(delivery[key] ?? 0)]),
     ['Blocked', number(delivery.blocked ?? 0)],
@@ -182,7 +185,7 @@ function MilestoneItems({ projectId, milestoneId, onOpen }) {
   useEffect(() => {
     let current = true
     api(`/roadmap/projects/${encodeURIComponent(projectId)}/milestones/${milestoneId}/items`)
-      .then((result) => { if (current) { setItems(result.items ?? []); setError(result.state === 'unavailable' ? 'Work items are unavailable (the work host did not respond).' : null) } })
+      .then((result) => { if (current) { setItems(result.items ?? []); setError(result.state !== 'unavailable' ? null : result.reason === 'unlinked' ? `${UNLINKED_TITLE}: its work items cannot be shown.` : 'Work items are unavailable (the work host did not respond).') } })
       .catch((failure) => { if (current) setError(String(failure?.message ?? failure)) })
     return () => { current = false }
   }, [projectId, milestoneId])

@@ -18,6 +18,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Optional
 
+from ..kanban.host_adapter import MISSING_LINK_CODES, KanbanAdapterError
 from .service import ServiceError, StewardshipService
 from .store import Store, iso
 
@@ -58,7 +59,6 @@ _STATUS_BUCKET = {
     "blocked": "blocked",
 }
 
-HOST_UNAVAILABLE = {"state": "unavailable", "reason": "host_unavailable"}
 ARCHIVED_UNAVAILABLE = {"state": "unavailable", "reason": "archived"}
 
 
@@ -372,19 +372,27 @@ class RoadmapService:
         return {"projects": [self._project(pid) for pid in ids]}
 
     def _load_work(self, project_id: str):
-        """One canonical list call per project. ``None`` means the host failed."""
+        """One canonical list call per project: ``(work, None)``, or ``(None, why)``.
+
+        ``why`` is "unlinked" when Hermes has no project (or board) for it
+        (10/10/2026: Hermes answered, so "did not respond" would be untrue),
+        else "host_unavailable".
+        """
         try:
             items = self.work.list(project_id)
-        except Exception:  # noqa: BLE001 - any host failure is "unavailable"
-            return None
-        return {str(item["ref"]): item for item in items}
+        except KanbanAdapterError as exc:
+            return None, ("unlinked" if exc.code in MISSING_LINK_CODES else "host_unavailable")
+        except Exception:  # noqa: BLE001 - any other host failure is "unavailable"
+            return None, "host_unavailable"
+        return {str(item["ref"]): item for item in items}, None
 
     @staticmethod
-    def _delivery(refs, work, *, archived: bool = False) -> Dict[str, Any]:
+    def _delivery(refs, work, *, archived: bool = False,
+                  unreadable: Optional[str] = None) -> Dict[str, Any]:
         if archived:
             return dict(ARCHIVED_UNAVAILABLE)
         if work is None:
-            return dict(HOST_UNAVAILABLE)
+            return {"state": "unavailable", "reason": unreadable or "host_unavailable"}
         refs = list(dict.fromkeys(refs))
         if not refs:
             return {"state": "no_linked_work"}
@@ -437,7 +445,7 @@ class RoadmapService:
         features = settings["features"]
         want_initiatives = bool(features.get("initiatives", True))
         want_milestones = bool(features.get("milestones", True))
-        work = self._load_work(project_id)
+        work, unreadable = self._load_work(project_id)
 
         objectives = {int(r["id"]): dict(r) for r in cx.execute(
             "SELECT id, name, enabled, window FROM project_objectives"
@@ -541,7 +549,8 @@ class RoadmapService:
                 "due": ms["due"], "closed": bool(ms["closed_at"]),
                 "archived": archived, "overdue": overdue(ms),
                 "unavailable": "archived" if archived else None,
-                "delivery": self._delivery(milestone_refs.get(mid, []), work, archived=archived),
+                "delivery": self._delivery(milestone_refs.get(mid, []), work, archived=archived,
+                                           unreadable=unreadable),
                 "also_under": [{"ref": other, "title": ini_title.get(other, other)}
                                for other in under.get(mid, []) if other != current_ref],
             }
@@ -571,7 +580,7 @@ class RoadmapService:
                     reasons.append("no_milestone_link")
 
             union = list(dict.fromkeys([*bound.get(ref, []), *visible_refs]))
-            delivery = self._delivery(union, work)
+            delivery = self._delivery(union, work, unreadable=unreadable)
             visible = set(visible_refs)
             loose = [r for r in dict.fromkeys(bound.get(ref, [])) if r not in visible]
             if work is None:
@@ -636,7 +645,7 @@ class RoadmapService:
             "id": project_id, "label": project_id, "mission": settings["mission"],
             "enabled": settings["enabled"],
             "features": {"initiatives": want_initiatives, "milestones": want_milestones},
-            "work_host": "ok" if work is not None else "unavailable",
+            "work_host": "ok" if work is not None else ("unlinked" if unreadable == "unlinked" else "unavailable"),
             "initiatives": initiative_rows, "goals": goals, "unlinked": unlinked,
             "attention": bool(reasons_out), "attention_reasons": reasons_out,
         }
@@ -659,10 +668,10 @@ class RoadmapService:
             " ORDER BY item_ref", (milestone_id,))]
         head = {"id": ms["id"], "name": ms["name"], "due": ms["due"],
                 "closed": bool(ms["closed_at"]), "archived": ms["archived_at"] is not None}
-        work = self._load_work(project_id)
+        work, unreadable = self._load_work(project_id)
         if work is None:
-            return {"state": "unavailable", "milestone": head, "items": [],
-                    "delivery": dict(HOST_UNAVAILABLE)}
+            return {"state": "unavailable", "reason": unreadable, "milestone": head, "items": [],
+                    "delivery": {"state": "unavailable", "reason": unreadable}}
         items = []
         for ref in refs:
             item = work.get(ref)

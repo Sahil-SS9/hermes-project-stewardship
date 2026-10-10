@@ -38,6 +38,11 @@ async function hermesRead(link, read, empty) {
     return empty;
   }
 }
+function unavailableWords(reason) {
+  if (reason === "unlinked") return `${UNLINKED_TITLE}: its work cannot be shown.`;
+  if (reason === "archived") return "Unavailable: archived.";
+  return "Unavailable: the work host did not respond.";
+}
 
 // hermes_dockyard_plugin/desktop/src/styles/tokens.js
 var LIGHT_TOKENS = Object.freeze({
@@ -19332,8 +19337,8 @@ function ProjectMemoryPanel({ project }) {
     try {
       const result = await api(`/projects/${encoded}/memory/suggestions`);
       setSuggestions({ status: "ready", items: result.suggestions ?? [] });
-    } catch {
-      setSuggestions({ status: "unavailable", items: [] });
+    } catch (failure) {
+      setSuggestions({ status: isUnlinkedError(failure) ? "unlinked" : "unavailable", items: [] });
     }
   };
   useEffect(() => {
@@ -19426,6 +19431,7 @@ function ProjectMemoryPanel({ project }) {
         jsx("h3", { children: "From finished work" }),
         suggestions.status === "loading" ? jsx("p", { className: "dockyard-meta", children: "Loading finished work..." }) : null,
         suggestions.status === "unavailable" ? jsx("p", { className: "dockyard-meta", children: "Finished work is unavailable right now." }) : null,
+        suggestions.status === "unlinked" ? jsx("p", { className: "dockyard-meta", children: `${UNLINKED_TITLE}: finished work cannot be shown.` }) : null,
         suggestions.status === "ready" && suggestions.items.length === 0 ? jsx("p", { className: "dockyard-meta", children: "No finished work with a result to start from." }) : null,
         ...suggestions.items.map((item) => jsxs("article", { className: "dy-mem-entry", "data-memory-suggestion": item.work_id, children: [
           jsxs("div", { className: "dy-mem-body", children: [
@@ -21773,7 +21779,7 @@ function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
           }, o.id);
         })
       }) }, "objectives"),
-      jsx(Section2, { title: "Delivery", children: !item.delivery || item.delivery.state === "no_linked_work" ? jsx("p", { className: "dockyard-meta", children: "No linked work yet." }) : item.delivery.state === "unavailable" ? jsx("p", { className: "dockyard-meta", children: "Unavailable: the work host did not respond." }) : jsx("div", { className: "dy-plan-buckets", children: [
+      jsx(Section2, { title: "Delivery", children: !item.delivery || item.delivery.state === "no_linked_work" ? jsx("p", { className: "dockyard-meta", children: "No linked work yet." }) : item.delivery.state === "unavailable" ? jsx("p", { className: "dockyard-meta", children: unavailableWords(item.delivery.reason) }) : jsx("div", { className: "dy-plan-buckets", children: [
         ...BUCKETS.map(([key, label]) => jsxs("span", { children: [jsx("strong", { children: number(item.delivery[key] ?? 0) }), label] }, key)),
         item.delivery.blocked > 0 ? jsxs("span", { className: "blocked", children: [jsx("strong", { children: number(item.delivery.blocked) }), "Blocked"] }, "blocked") : null
       ] }) }, "delivery"),
@@ -24462,7 +24468,7 @@ function treeKeydown(event) {
 function deliveryChips(delivery) {
   if (!delivery) return null;
   if (delivery.state === "no_linked_work") return chip("No linked work");
-  if (delivery.state === "unavailable") return chip("Unavailable");
+  if (delivery.state === "unavailable") return chip(delivery.reason === "unlinked" ? UNLINKED_LABEL : "Unavailable");
   const chips = BUCKETS.map(([key, label]) => Number(delivery[key] ?? 0) > 0 ? jsx("span", { className: "dy-rm-chip", children: `${label} ${number(delivery[key])}` }, key) : null).filter(Boolean);
   if (Number(delivery.blocked ?? 0) > 0) {
     chips.push(jsx("span", { className: "dy-rm-chip blocked", children: `Blocked ${number(delivery.blocked)}` }, "blocked"));
@@ -24478,7 +24484,7 @@ function goalChip(goal) {
 function deliveryDetail(delivery) {
   if (!delivery) return [];
   if (delivery.state === "no_linked_work") return [["Linked work", "No linked work"]];
-  if (delivery.state === "unavailable") return [["Linked work", "Unavailable (the work host did not respond)"]];
+  if (delivery.state === "unavailable") return [["Linked work", unavailableWords(delivery.reason)]];
   return [
     ...BUCKETS.map(([key, label]) => [label, number(delivery[key] ?? 0)]),
     ["Blocked", number(delivery.blocked ?? 0)],
@@ -24550,7 +24556,7 @@ function MilestoneItems({ projectId, milestoneId, onOpen }) {
     api(`/roadmap/projects/${encodeURIComponent(projectId)}/milestones/${milestoneId}/items`).then((result) => {
       if (current) {
         setItems(result.items ?? []);
-        setError(result.state === "unavailable" ? "Work items are unavailable (the work host did not respond)." : null);
+        setError(result.state !== "unavailable" ? null : result.reason === "unlinked" ? `${UNLINKED_TITLE}: its work items cannot be shown.` : "Work items are unavailable (the work host did not respond).");
       }
     }).catch((failure) => {
       if (current) setError(String(failure?.message ?? failure));

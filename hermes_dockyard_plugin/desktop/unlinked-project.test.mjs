@@ -85,12 +85,15 @@ async function settle(page) {
   await page.quiet()
 }
 
-// Nothing on screen may read as a failed load: no error card, no alert that
-// names a failure. (The unlinked notice is role="status", not an alert.)
+// Nothing on screen may read as a failed load: no error card, and no alert or
+// inline error that names a failure or the missing link. The missing link is
+// explained once, by the notice (role="status"); a view that shows it as its
+// own error failed on the link instead of handling it.
 async function assertNoFailure(page, where) {
   assert.equal(await page.getByRole('heading', { name: ERROR_CARD }).count(), 0, `${where}: error card`)
-  const alerts = await page.locator('[role="alert"]').allInnerTexts()
-  const failed = alerts.filter((text) => FAILURE.test(text))
+  const shown = await page.evaluate(() => [...document.querySelectorAll('[role="alert"], .dockyard-inline-error, [data-state="error"]')]
+    .filter((node) => !node.closest('[data-unlinked-notice]')).map((node) => node.innerText))
+  const failed = shown.filter((text) => FAILURE.test(text) || text.includes(NOTICE))
   assert.deepEqual(failed, [], `${where}: failure shown`)
 }
 
@@ -247,5 +250,52 @@ test('an action that needs Hermes says the project is not linked, in words', asy
     assert.match(said, new RegExp(NOTICE), `the toast said: ${said}`)
     assert.ok(said.includes(NEXT_STEP(GHOST)) || said.includes('to link it'), `the toast says how to link it: ${said}`)
     assert.doesNotMatch(said, /canonical|\b(404|500)\b|could not confirm/i)
+  })
+})
+
+// Found by the real-data dry run (10/10/2026), past the views above: the
+// Roadmap, the Vision drawer and Memory explained a missing link as "the work
+// host did not respond" / "unavailable right now". Hermes did respond: it has
+// no such project. Every roadmap row is opened, and every Vision entry.
+test('Roadmap, Vision and Memory say "Not linked", never "did not respond"', async () => {
+  await withUnlinked([GHOST], async (page) => {
+    const WRONG = /did not respond|unavailable right now/i
+    await page.goto(BASE)
+    await openTab(page, 'Projects')
+    await chooseProject(page, 'Projects', GHOST)
+    await page.locator(`[data-project-dashboard="${GHOST}"]`).waitFor()
+    const views = page.getByRole('navigation', { name: 'Project views' })
+    await views.getByRole('button', { name: 'Memory', exact: true }).click()
+    await settle(page)
+    const memory = await page.locator(`[data-project-dashboard="${GHOST}"]`).innerText()
+    assert.doesNotMatch(memory, WRONG, 'Memory')
+    assert.match(memory, /Not linked to a Hermes project: finished work cannot be shown/)
+    await views.getByRole('button', { name: 'Vision', exact: true }).click()
+    await settle(page)
+    const entries = page.locator('[data-plan-id]')
+    let drawers = 0
+    for (let index = 0; index < Math.min(await entries.count(), 8); index += 1) {
+      await entries.nth(index).click()
+      await settle(page)
+      const drawer = page.locator('[data-plan-drawer]')
+      if (await drawer.count() === 0) continue
+      const words = await drawer.innerText()
+      if (/delivery/i.test(words)) drawers += 1  // section titles are upper-cased by CSS
+      assert.doesNotMatch(words, WRONG, `Vision drawer ${index}`)
+      await page.locator('[data-plan-drawer-close]').click()
+    }
+    assert.ok(drawers > 0, 'opened at least one Vision item with a Delivery section')
+    await openTab(page, 'Roadmap')
+    await page.locator('[data-roadmap-screen]').waitFor()
+    await settle(page)
+    const closed = page.locator('[data-rm-row][data-rm-expandable="true"][data-rm-open="false"] [data-rm-disclosure]')
+    for (let guard = 0; guard < 40 && await closed.count() > 0; guard += 1) {
+      await closed.first().click()
+      await settle(page)
+    }
+    const roadmap = await page.locator('[data-roadmap-screen]').innerText()
+    assert.doesNotMatch(roadmap, WRONG, 'Roadmap')
+    assert.match(roadmap, /Not linked/)
+    assert.ok(await page.locator('[data-rm-items-row]').count() > 0, 'opened a milestone and its work items')
   })
 })

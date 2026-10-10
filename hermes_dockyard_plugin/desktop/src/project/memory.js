@@ -14,6 +14,8 @@ import { jsx } from '../runtime/react.js'
 import { jsxs } from '../runtime/react.js'
 import { api } from '../runtime/context.js'
 import { emitToast } from '../runtime/context.js'
+import { isUnlinkedError } from '../data/unlinked.js'
+import { UNLINKED_TITLE } from '../data/unlinked.js'
 import { Button } from '../lib/ui.js'
 import { StatusTag } from '../lib/ui.js'
 import { formatWhen } from '../lib/ui.js'
@@ -121,8 +123,9 @@ export function ProjectMemoryPanel({ project }) {
     try {
       const result = await api(`/projects/${encoded}/memory/suggestions`)
       setSuggestions({ status: 'ready', items: result.suggestions ?? [] })
-    } catch {
-      setSuggestions({ status: 'unavailable', items: [] })
+    } catch (failure) {
+      // Finished work lives in Hermes: none to read for an unlinked project.
+      setSuggestions({ status: isUnlinkedError(failure) ? 'unlinked' : 'unavailable', items: [] })
     }
   }
   useEffect(() => { load() }, [project.id])
@@ -205,6 +208,7 @@ export function ProjectMemoryPanel({ project }) {
         jsx('h3', { children: 'From finished work' }),
         suggestions.status === 'loading' ? jsx('p', { className: 'dockyard-meta', children: 'Loading finished work...' }) : null,
         suggestions.status === 'unavailable' ? jsx('p', { className: 'dockyard-meta', children: 'Finished work is unavailable right now.' }) : null,
+        suggestions.status === 'unlinked' ? jsx('p', { className: 'dockyard-meta', children: `${UNLINKED_TITLE}: finished work cannot be shown.` }) : null,
         suggestions.status === 'ready' && suggestions.items.length === 0 ? jsx('p', { className: 'dockyard-meta', children: 'No finished work with a result to start from.' }) : null,
         ...suggestions.items.map((item) => jsxs('article', { className: 'dy-mem-entry', 'data-memory-suggestion': item.work_id, children: [
           jsxs('div', { className: 'dy-mem-body', children: [

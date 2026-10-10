@@ -101,7 +101,9 @@ of the plugin now shares one name.
   sorts near the top of the health table with its own filter and legend
   entry, and it is no longer tagged "Blocked" with an "Open work item" button.
   Work cannot be created in it, and an action that needs Hermes says why it
-  failed.
+  failed. Its workflows still open with their run history (without live task
+  status), and the Roadmap, Vision and Memory say "Not linked" instead of "the
+  work host did not respond", which they also no longer say of archived records.
 - The API answers a project Hermes does not know with a 404 carrying the
   host's code (`project_not_found` or `board_not_found`) on every route.
   `GET /projects/{id}/milestones` and `POST /projects/{id}/reports` used to

@@ -196,3 +196,72 @@ def test_real_host_every_project_route_answers_an_unlinked_project_cleanly(real_
         assert _error(response) == MISSING, read
         linked = client.get(f"/stewardship/v1/projects/{pid}/{read}", headers=AUTH)
         assert linked.status_code == 200, f"{read} (linked): {linked.text}"
+
+
+# ---- stewardship records that Hermes only annotates --------------------------
+# Found by the real-data dry run (10/10/2026), past the dummy-input sweep: any
+# workflow of an unlinked project failed to open (its run ledger read Hermes for
+# live task status), and the Roadmap said the work host "did not respond" when
+# Hermes had answered: it has no such project. Set up while linked, then
+# unlinked, the way Sahil's projects lost their link.
+
+RELEASE = {"name": "release", "nodes": [
+    {"id": "build", "title": "Build"},
+    {"id": "ship", "title": "Ship", "depends_on": ["build"]},
+]}
+
+
+def _history_then_unlinked(store, clock):
+    adapter = NoHermesProjectAdapter(store)
+    world = World(store, clock, adapter=adapter)
+    world.project(GHOST)
+    client = TestClient(create_app(store, kanban_adapter=adapter), raise_server_exceptions=False)
+    created = client.post(f"/stewardship/v1/projects/{GHOST}/workflows", json=RELEASE)
+    assert created.status_code == 200, created.text
+    started = client.post(f"/stewardship/v1/projects/{GHOST}/workflows/release/start", json={"run_key": "r1"})
+    assert started.status_code == 200, started.text
+    initiative = world.initiative(GHOST, "Ship")
+    milestone = world.milestone(GHOST, "Pilot")
+    world.link_milestone(GHOST, initiative, milestone)
+    world.item(GHOST, "pilot item", milestone="Pilot")
+    adapter.missing.add(GHOST)
+    return world, client, milestone
+
+
+def test_an_unlinked_projects_workflow_still_shows_its_run_history(store, clock):
+    _world, client, _milestone = _history_then_unlinked(store, clock)
+    response = client.get(f"/stewardship/v1/projects/{GHOST}/workflows/release/runs")
+    assert response.status_code == 200, response.text
+    runs = response.json()["runs"]
+    assert [run["run_key"] for run in runs] == ["r1"]
+    nodes = {node["node_id"]: node for node in runs[0]["nodes"]}
+    assert set(nodes) == {"build", "ship"}
+    assert all(node["task_ref"] for node in nodes.values()), "the ledger still names its tasks"
+    assert all(node["status"] is None for node in nodes.values()), "no live status without Hermes"
+
+
+def test_a_run_timeline_needs_hermes_and_records_nothing_without_it(store, clock):
+    _world, client, _milestone = _history_then_unlinked(store, clock)
+
+    def recorded() -> int:
+        return store._conn.execute(
+            "SELECT COUNT(*) FROM domain_events WHERE event_type='workflow.node_state'").fetchone()[0]
+
+    before = recorded()
+    response = client.get(f"/stewardship/v1/projects/{GHOST}/workflows/release/runs/r1/timeline")
+    assert response.status_code == 404, response.text
+    assert _error(response) == MISSING
+    assert recorded() == before, "a timeline read without Hermes must not invent step changes"
+
+
+def test_the_roadmap_says_not_linked_never_host_unavailable(store, clock):
+    world, _client, milestone = _history_then_unlinked(store, clock)
+    project = {row["id"]: row for row in world.roadmap.roadmap()["projects"]}[GHOST]
+    assert project["work_host"] == "unlinked"
+    initiative = project["initiatives"][0]
+    assert initiative["delivery"] == {"state": "unavailable", "reason": "unlinked"}
+    pilot = next(row for row in initiative["milestones"] if row["id"] == milestone)
+    assert pilot["delivery"] == {"state": "unavailable", "reason": "unlinked"}
+    items = world.roadmap.milestone_items(GHOST, milestone)
+    assert (items["state"], items.get("reason"), items["items"]) == ("unavailable", "unlinked", [])
+    assert items["delivery"] == {"state": "unavailable", "reason": "unlinked"}
