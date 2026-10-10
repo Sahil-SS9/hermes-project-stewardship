@@ -4,8 +4,10 @@
 #
 # Supported revisions are bound in docs/surfaces/supported-host-revisions.md.
 # This script runs the FULL suite with STEWARD_REQUIRE_NATIVE_HOST=1 against a
-# given Hermes source tree. Native cells must pass or FAIL — a skip here means
-# the lane is misconfigured, so the script asserts the skip count.
+# given Hermes source tree. Native cells must pass or FAIL: a skip because the
+# host is missing, or one of its modules fails to import, means the lane is
+# misconfigured, so it fails the lane. Platform-only and opt-in tests, and
+# modules a Hermes revision does not ship, may skip; pytest lists each reason.
 #
 # Usage:
 #   scripts/native-host-lane.sh <HERMES_SOURCE> [expected-revision-sha]
@@ -41,6 +43,8 @@ fi
 
 cd "$SANDBOX"
 LOG="$SANDBOX/lane.log"
+CODE=0
+# No -q here: pyproject's addopts has one, and -qq drops pytest's counts line.
 env -u STEWARD_DB_PATH \
   HERMES_HOME="$SANDBOX/home" \
   HERMES_KANBAN_HOME="$SANDBOX/kanban" \
@@ -49,25 +53,26 @@ env -u STEWARD_DB_PATH \
   PYTHONPATH="$REPO_ROOT/src:$HOST" \
   PYTHONDONTWRITEBYTECODE=1 \
   "$PY" -m pytest -c "$REPO_ROOT/pyproject.toml" "$REPO_ROOT/tests" \
-    -p no:cacheprovider --basetemp "$SANDBOX/pt" -q --tb=line -rf \
-    2>&1 | tee "$LOG" | tail -20
-CODE=${PIPESTATUS[0]}
+    -p no:cacheprovider --basetemp "$SANDBOX/pt" --tb=line -rfs \
+    2>&1 | tee "$LOG" | tail -20 || CODE=$?
 
 if [ "$CODE" -ne 0 ]; then
   echo "NATIVE LANE FAILED (exit $CODE)" >&2
   exit "$CODE"
 fi
-# The lane must exercise native cells: the header above promises that a skip
-# means misconfiguration, so count skips from the captured log and fail loudly
-# when any appear. Echo the actual pass/skip counts the way the header claims.
-SKIPS=0
-for CHUNK in $(grep -oE '[0-9]+ skipped' "$LOG" | cut -d' ' -f1); do
-  SKIPS=$((SKIPS + CHUNK))
-done
-PASSED=$(grep -oE '[0-9]+ passed' "$LOG" | tail -1 | cut -d' ' -f1)
-echo "native lane counts: ${PASSED:-0} passed, $SKIPS skipped"
-if [ "$SKIPS" -gt 0 ]; then
-  echo "FATAL: $SKIPS skip(s) in the native lane - a skip here is misconfiguration" >&2
+PASSED=$(grep -oE '[0-9]+ passed' "$LOG" | tail -1 | cut -d' ' -f1 || true)
+SKIPS=$(grep -oE '[0-9]+ skipped' "$LOG" | tail -1 | cut -d' ' -f1 || true)
+echo "native lane counts: ${PASSED:-0} passed, ${SKIPS:-0} skipped"
+# STEWARD_REQUIRE_NATIVE_HOST=1 turns the host fixtures' skips into failures,
+# but importorskip() still skips, so check the reasons. "could not import 'X':
+# No module named 'X'" means this revision does not ship X (an optional
+# capability); any other host skip means the host is missing or broken.
+HOST_SKIPS=$(grep -E '^SKIPPED \[' "$LOG" \
+  | grep -E "could not import 'hermes|native Hermes runtime|upstream Hermes tree" \
+  | grep -vE "could not import '([^']+)': No module named '\1'" || true)
+if [ -n "$HOST_SKIPS" ]; then
+  echo "FATAL: native tests skipped because the host is missing or fails to import:" >&2
+  echo "$HOST_SKIPS" >&2
   exit 3
 fi
 echo "NATIVE LANE GREEN against $HOST"
