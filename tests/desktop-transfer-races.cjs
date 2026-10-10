@@ -14,7 +14,7 @@ const requests=[];
 function api(path,opts){return new Promise(resolve=>requests.push({path,opts,resolve}));}
 const Button=({children,onClick,action,disabled})=>React.createElement('button',{'data-action':action,onClick,disabled},children);
 const noop=()=>null;
-const TeamsView=new Function('useRef','useState','useEffect','jsx','jsxs','api','Button','PageHead','StatusTag','DiscoveredProfilePicker','number','Icon','initials','formatWhen',code+';return TeamsView;')(React.useRef,React.useState,React.useEffect,rt.jsx,rt.jsxs,api,Button,noop,noop,noop,String,noop,String,String);
+const TeamsView=new Function('useRef','useState','useEffect','jsx','jsxs','api','Button','PageHead','StatusTag','DiscoveredProfilePicker','number','Icon','initials','formatWhen','UnlinkedNotice','isUnlinked',code+';return TeamsView;')(React.useRef,React.useState,React.useEffect,rt.jsx,rt.jsxs,api,Button,noop,noop,noop,String,noop,String,String,noop,p=>p?.linked===false);
 const root=createRoot(document.getElementById('root'));
 const render=async p=>act(async()=>root.render(React.createElement(TeamsView,{view:{project:{id:p}},onRefresh:noop})));
 const respond=async(path,value)=>{const i=requests.findIndex(r=>r.path===path);assert(i>=0,path);const [r]=requests.splice(i,1);await act(async()=>r.resolve(value));};
