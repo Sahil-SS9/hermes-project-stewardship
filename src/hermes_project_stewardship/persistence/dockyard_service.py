@@ -27,6 +27,7 @@ from ..dockyard import (
     make_ref,
 )
 from ..dockyard.bots import Bot
+from ..kanban.host_adapter import KanbanAdapterError
 from .dockyard_store import DockyardStore
 from .planning import forecast_milestone
 from .service import ServiceError, StewardshipService
@@ -1189,9 +1190,12 @@ class DockyardService:
         out["owed_decisions"] = inbox["count"]
         for p in projects:
             pid = p["project_id"]
+            linked = True
             if self.canonical_work is not None:
+                work = self._linked_work(pid)
+                linked = work is not None
                 by: Dict[str, int] = {}
-                for item in self.canonical_work.list(pid):
+                for item in work or ():
                     status = str(item["status"])
                     by[status] = by.get(status, 0) + 1
             else:
@@ -1213,6 +1217,7 @@ class DockyardService:
             ).fetchone()["n"]
             out["projects"].append({
                 "id": pid, "enabled": bool(p["enabled"]), "phase": p["phase"],
+                "linked": linked,
                 "health": health_row["status"] if health_row
                 else "unknown",
                 "work": {"backlog": by.get("backlog", 0),
@@ -1249,7 +1254,7 @@ class DockyardService:
                                 "title": pid, "ref": pid,
                                 "deep_link": f"s1:project/{pid}"})
             if self.canonical_work is not None:
-                work = self.canonical_work.list(pid)
+                work = self._linked_work(pid) or []
             else:
                 work = [dict(row) for row in self.store._conn.execute(
                     "SELECT ref, title FROM dockyard_work_items"
@@ -1347,17 +1352,35 @@ class DockyardService:
 
     _STALLED_AFTER_DAYS = 14
 
-    def _portfolio_items(self, project_id: str) -> List[Dict]:
+    _UNLINKED = frozenset({"project_not_found", "board_not_found"})
+
+    def _linked_work(self, project_id: str) -> Optional[List[Dict]]:
+        """Canonical work for one project; None when Hermes has no such project.
+
+        One unlinked project must not take the fleet pages down, so callers
+        flag it and carry on. Any other host failure still fails closed.
+        """
+        try:
+            return self.canonical_work.list(project_id)
+        except KanbanAdapterError as exc:
+            if exc.code in self._UNLINKED:
+                return None
+            raise
+
+    def _portfolio_items(self, project_id: str) -> Optional[List[Dict]]:
         """Work items as plain dicts with status/due/updated_at normalised.
 
         Prefers the canonical projection (same source the Work tab shows);
         falls back to the dockyard table when no adapter is wired.
         ``created_at`` rides along as a last-activity fallback (canonical
-        items carry no updated_at yet).
+        items carry no updated_at yet). None when the project is unlinked.
         """
         items: List[Dict] = []
         if self.canonical_work is not None:
-            for row in self.canonical_work.list(project_id):
+            work = self._linked_work(project_id)
+            if work is None:
+                return None
+            for row in work:
                 items.append({
                     "ref": row.get("ref", ""),
                     "status": str(row.get("status", "")),
@@ -1393,6 +1416,7 @@ class DockyardService:
 
         One read pass per project; no per-item loops against the DB.
         Status rules (documented in docs/PORTFOLIO-DESIGN.md):
+          unlinked — Hermes has no project for it, so its work is unreadable
           at_risk  — overdue item, blocked item, or overdue milestone
           stalled  — open items but no activity in 14+ days
           idle     — nothing in flight and no open milestone
@@ -1426,6 +1450,8 @@ class DockyardService:
             else:
                 health_freshness[pid] = None
             items = self._portfolio_items(pid)
+            linked = items is not None
+            items = items or []
             milestones = self.dy.milestone_list(pid)
 
             counts: Dict[str, int] = {}
@@ -1462,7 +1488,9 @@ class DockyardService:
             done = counts.get("done", 0)
             open_items = total - done
 
-            if overdue_items or blocked_items or overdue_milestones:
+            if not linked:
+                status = "unlinked"
+            elif overdue_items or blocked_items or overdue_milestones:
                 status = "at_risk"
             elif (open_items and last_activity is not None
                     and (now - last_activity).days >= self._STALLED_AFTER_DAYS):
@@ -1522,6 +1550,7 @@ class DockyardService:
         "project_attention": "Open the project and resolve its lifecycle state.",
         "stalled_project": "Check the project's last activity and re-plan.",
         "evidence_stale": "Re-run the objective evidence collection.",
+        "unlinked_project": "Create a Hermes project with this slug to link it.",
     }
 
     @staticmethod
@@ -1541,16 +1570,20 @@ class DockyardService:
             return f"s6:initiative/{ref}"
         return f"s1:project/{project_id}"
 
-    def _work_attention_rows(self, project_id: str) -> List[Dict]:
+    def _work_attention_rows(self, project_id: str) -> Optional[List[Dict]]:
         """Blocked + overdue work rows from the SAME source Work/portfolio use.
 
         Canonical first (adapter wired); legacy table only as the explicit
         no-adapter fallback. Each row normalises the fields the group builder
         needs: ref, title, blocked reason, due, created_at, assignee.
+        None when the project is unlinked.
         """
         rows: List[Dict] = []
         if self.canonical_work is not None:
-            for item in self.canonical_work.list(project_id):
+            work = self._linked_work(project_id)
+            if work is None:
+                return None
+            for item in work:
                 status = str(item.get("status") or "")
                 raw_reason = item.get("blocked_reason")
                 if isinstance(raw_reason, list):
@@ -1643,7 +1676,23 @@ class DockyardService:
             pid = p["project_id"]
             lead = p["owner_lead_profile"] or "unassigned"
 
-            for w in self._work_attention_rows(pid):
+            work_rows = self._work_attention_rows(pid)
+            if work_rows is None:
+                interventions.append({
+                    "kind": "project_attention",
+                    "cause": "unlinked_project",
+                    "project": pid,
+                    "ref": pid,
+                    "title": "Not linked to a Hermes project",
+                    "detail": ("Hermes has no project with this id or slug,"
+                               " so its work cannot be shown."),
+                    "owner": lead,
+                    "age_days": 0,
+                    "next_action": self._NEXT_ACTION["unlinked_project"],
+                    "deep_link": self._deep_link_for(
+                        "project_attention", pid, ""),
+                })
+            for w in work_rows or ():
                 if w["status"] == "blocked":
                     created = self._parse_iso(w["created_at"])
                     interventions.append({
