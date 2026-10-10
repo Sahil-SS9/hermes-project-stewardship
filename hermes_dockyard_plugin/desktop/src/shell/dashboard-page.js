@@ -156,6 +156,37 @@ export function DashboardPage({ inboxCss = '' } = {}) {
     )
     return memory.request
   }
+  // Open until the page goes away. A load a newer one superseded is stale for
+  // its tab, but still delivers the project list (below).
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  // The switcher's projects are the whole fleet's, not one tab's data. A quick
+  // tab switch used to throw them away with the superseded Dashboard load and
+  // leave the switcher empty (10/10/2026; the Roadmap test lost that race about
+  // 1 run in 10). Then the first pick: the remembered choice (a project still
+  // listed, or All projects); otherwise All projects (Sahil 05/10, design d).
+  // It never replaces a project someone chose meanwhile, and a list never
+  // replaces one from a newer load (an older load can finish last).
+  const projectsFrom = useRef(0)
+  const adoptProjects = (projects, serial) => {
+    if (serial < projectsFrom.current) return
+    projectsFrom.current = serial
+    const options = sortProjects(projects)
+    setProjectOptions(options)
+    if (!options.length) return
+    rememberedProject().then((saved) => {
+      if (!mounted.current) return
+      const pick = saved === ALL_PROJECTS || (saved && options.some((option) => option.id === saved)) ? saved : ALL_PROJECTS
+      setSelectedProject((chosen) => {
+        if (chosen) return chosen
+        lastProject.current.auto = pick
+        return pick
+      })
+    })
+  }
   useEffect(() => {
     const memory = lastProject.current
     const auto = memory.auto
@@ -217,22 +248,9 @@ export function DashboardPage({ inboxCss = '' } = {}) {
     askAppearance()
     loading.then(
       (result) => {
+        if (mounted.current && result?.projects) adoptProjects(result.projects, serial)
         if (!current || serial !== loadSerial.current) return
         setData({ tab, projectId: selectedProject, payload: result })
-        if (result.projects) {
-          const options = sortProjects(result.projects)
-          setProjectOptions(options)
-          if (!selectedProject && options.length) {
-            // First pick: the remembered choice (a project still listed, or
-            // All projects); otherwise All projects (Sahil 05/10, design d).
-            rememberedProject().then((saved) => {
-              if (!current || serial !== loadSerial.current) return
-              const pick = saved === ALL_PROJECTS || (saved && options.some((option) => option.id === saved)) ? saved : ALL_PROJECTS
-              lastProject.current.auto = pick
-              setSelectedProject(pick)
-            })
-          }
-        }
         if (tab === 'dashboard') {
           setCounts({
             approvals: Number(result.inbox?.count ?? result.owed_decisions ?? 0),

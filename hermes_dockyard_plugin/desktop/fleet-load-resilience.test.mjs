@@ -6,6 +6,11 @@
 //    half), but the Dashboard loader still asked for its work items. That one
 //    404 failed Dashboard, Projects, Backlog and Workflows and left the
 //    project switcher empty.
+// 2. A quick tab switch: a newer load threw away the Dashboard load it
+//    superseded, project list included, so the switcher stayed empty. The
+//    Roadmap test lost this race about 1 run in 10. The fix keeps the list
+//    from a superseded load, so (3) an older list that arrives last must not
+//    replace a newer one.
 //
 // The disposable backend's reference host knows every project, so the live
 // unlinked contract (linked: false, then the 404 body the live backend sent)
@@ -73,5 +78,75 @@ test('an unlinked project leaves every fleet tab working', async () => {
     await page.getByRole('tab', { name: 'Workflows', exact: true }).click();
     assert.equal(await shows(page, '[data-workflow-library-screen]'), 'content', 'Workflows');
     assert.deepEqual(asked, [], 'asked for work items of a project /dashboard marked unlinked');
+  } finally { await browser.close(); }
+});
+
+test('a quick tab switch still fills the project switcher', async () => {
+  assert.ok(BASE && API, 'Run via run-browser-suite.mjs');
+  await forgetScope();
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    page.setDefaultTimeout(8000);
+    // Hold the Dashboard read until the Roadmap is open, so the switch always
+    // wins the race the Roadmap test only sometimes lost.
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    await page.route(`${ROUTES}/dashboard`, async (route) => {
+      const response = await route.fetch();
+      await held;
+      await route.fulfill({ response });
+    });
+    await page.goto(BASE);
+    await page.getByRole('tab', { name: 'Roadmap' }).click();
+    await page.locator('[data-roadmap-screen]').waitFor();
+    release();
+    const trigger = page.locator('.dy-sw-trigger');
+    await trigger.waitFor();
+    assert.equal(await trigger.getAttribute('data-scope'), ALL_PROJECTS);
+    // The automatic first pick is not a person's choice, so nothing is saved.
+    const remembered = await (await fetch(`${API}/settings/last-project`, {
+      headers: { 'x-hermes-session-token': 'demo-session-token' },
+    })).json();
+    assert.equal(remembered.project_id, null);
+  } finally { await browser.close(); }
+});
+
+test('an older project list that arrives last does not replace a newer one', async () => {
+  assert.ok(BASE && API, 'Run via run-browser-suite.mjs');
+  await forgetScope();
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    page.setDefaultTimeout(8000);
+    // The first Dashboard read answers last, with an older list that lacks
+    // GHOST; later reads answer at once with the current list.
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    let reads = 0;
+    let oldAnswered;
+    await page.route(`${ROUTES}/dashboard`, (route) => {
+      reads += 1;
+      if (reads > 1) return route.continue();
+      oldAnswered = (async () => {
+        const response = await route.fetch();
+        const body = await response.json();
+        body.projects = body.projects.filter((project) => project.id !== GHOST);
+        await held;
+        await route.fulfill({ response, json: body });
+      })();
+      return oldAnswered;
+    });
+    await page.goto(BASE);
+    await page.getByRole('tab', { name: 'Projects', exact: true }).click();
+    await page.locator(`[data-project-chooser="Projects"] [data-choose-project="${GHOST}"]`).waitFor();
+    release();
+    await oldAnswered;
+    // Let the older load finish its follow-up reads before looking.
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: 'Project context', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Find project' }).fill(GHOST);
+    await page.getByRole('listbox', { name: 'Projects' }).getByRole('option', { name: GHOST, exact: true }).waitFor();
+    assert.equal(reads >= 2, true, 'the newer load read the Dashboard too');
   } finally { await browser.close(); }
 });
