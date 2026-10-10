@@ -66,9 +66,12 @@ export async function loadDashboardData() {
   ])
   const entries = await Promise.all((dashboard.projects ?? []).map(async (project) => {
     const projectId = encodeURIComponent(project.id)
+    // Unlinked (/dashboard says linked: false): Hermes has no project for it,
+    // so there are no work items to read. Asking is a 404 that failed every
+    // fleet page (10/10/2026).
     const [settings, workItems] = await Promise.all([
       api(`/projects/${projectId}/settings`),
-      api(`/projects/${projectId}/work-items`),
+      project.linked === false ? { work_items: [] } : api(`/projects/${projectId}/work-items`),
     ])
     return [project.id, { settings, workItems: workItems.work_items ?? [] }]
   }))

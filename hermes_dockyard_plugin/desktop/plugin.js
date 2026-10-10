@@ -6407,7 +6407,7 @@ async function loadDashboardData() {
     const projectId = encodeURIComponent(project.id);
     const [settings, workItems] = await Promise.all([
       api(`/projects/${projectId}/settings`),
-      api(`/projects/${projectId}/work-items`)
+      project.linked === false ? { work_items: [] } : api(`/projects/${projectId}/work-items`)
     ]);
     return [project.id, { settings, workItems: workItems.work_items ?? [] }];
   }));
