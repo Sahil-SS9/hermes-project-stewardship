@@ -14,6 +14,31 @@ import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 // hermes_dockyard_plugin/desktop/src/index.js
 import { host as host2 } from "@hermes/plugin-sdk";
 
+// hermes_dockyard_plugin/desktop/src/data/unlinked.js
+var UNLINKED_TITLE = "Not linked to a Hermes project";
+var UNLINKED_DETAIL = "Hermes has no project with this id or slug, so its work cannot be shown.";
+var UNLINKED_LABEL = "Not linked";
+function unlinkedNextStep(projectId) {
+  return `Create a Hermes project with the slug "${projectId}" to link it.`;
+}
+function isUnlinked(project) {
+  return project?.linked === false;
+}
+var MISSING_LINK = /canonical (project|board) was not found/i;
+function isUnlinkedError(error) {
+  return error?.unlinked === true || MISSING_LINK.test(String(error?.message ?? error ?? ""));
+}
+async function hermesRead(link, read, empty) {
+  if (link.unlinked) return empty;
+  try {
+    return await read();
+  } catch (error) {
+    if (!isUnlinkedError(error)) throw error;
+    link.unlinked = true;
+    return empty;
+  }
+}
+
 // hermes_dockyard_plugin/desktop/src/styles/tokens.js
 var LIGHT_TOKENS = Object.freeze({
   bg: "#f6f7f9",
@@ -1692,7 +1717,7 @@ var DOCKYARD_CSS = `
 .dockyard-root .dockyard-command-type { display: inline-block; width: fit-content; padding: 3px 6px; border-radius: 5px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 10px; font-weight: 700; }
 .dockyard-root .dockyard-command-type.approval { background: var(--dy-warning-bg); color: var(--dy-warning); }
 .dockyard-root .dockyard-command-health { font-weight: 700; }
-.dockyard-root .dockyard-command-health.at_risk, .dockyard-root .dockyard-command-health.stalled { color: var(--dy-warning); }
+.dockyard-root .dockyard-command-health.at_risk, .dockyard-root .dockyard-command-health.stalled, .dockyard-root .dockyard-command-health.unlinked { color: var(--dy-warning); }
 .dockyard-root .dockyard-command-progress { display: grid; gap: 5px; }
 .dockyard-root .dockyard-command-progress-track { display: block; height: 5px; border-radius: 5px; background: var(--dy-border); }
 .dockyard-root .dockyard-command-progress-track > span { display: block; height: 100%; border-radius: 5px; background: var(--dy-action); }
@@ -1734,6 +1759,8 @@ var DOCKYARD_CSS = `
 .dockyard-root .dockyard-health-segment.at_risk, .dockyard-root .dockyard-health-dot.at_risk { background: var(--dy-warning); }
 .dockyard-root .dockyard-health-segment.stalled, .dockyard-root .dockyard-health-dot.stalled { background: var(--dy-danger); }
 .dockyard-root .dockyard-health-segment.idle, .dockyard-root .dockyard-health-dot.idle { background: var(--dy-info); }
+/* Not linked to a Hermes project (10/10/2026): hatched amber, so the bar never reads it as "At risk" (solid amber). */
+.dockyard-root .dockyard-health-segment.unlinked, .dockyard-root .dockyard-health-dot.unlinked { background: repeating-linear-gradient(135deg, var(--dy-warning) 0 3px, var(--dy-warning-bg) 3px 6px); }
 .dockyard-root .dockyard-health-segment.unknown, .dockyard-root .dockyard-health-dot.unknown { background: var(--dy-neutral); }
 .dockyard-root .dockyard-command-health-legend { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .dockyard-root .dockyard-command-health-legend span { display: inline-flex; align-items: center; gap: 4px; color: var(--dy-text-2); font-size: 10px; white-space: nowrap; }
@@ -4173,10 +4200,13 @@ async function api(path, init) {
     return result;
   } catch (error) {
     const raw = String(error?.message ?? error).slice(0, 240);
-    const message = /^403:\s*\[object Object\]$/.test(raw) && /^\/projects\/[^/]+\/workflows\/[^/]+\/archive$/.test(path) ? "403 Forbidden: archive permission (project_archive) is required or this action is denied. No change was made." : /(?:error\s*)?500|internal service error/i.test(raw) ? "Project Stewardship could not confirm the request." : raw;
+    const unlinked = isUnlinkedError(error);
+    const projectInPath = /^\/projects\/([^/?]+)/.exec(path)?.[1];
+    const message = unlinked ? `${UNLINKED_TITLE}. ${projectInPath ? unlinkedNextStep(decodeURIComponent(projectInPath)) : "Link it to a Hermes project first."}` : /^403:\s*\[object Object\]$/.test(raw) && /^\/projects\/[^/]+\/workflows\/[^/]+\/archive$/.test(path) ? "403 Forbidden: archive permission (project_archive) is required or this action is denied. No change was made." : /(?:error\s*)?500|internal service error/i.test(raw) ? "Project Stewardship could not confirm the request." : raw;
     if (method !== "GET" && !init?.suppressErrorToast && !quiet) emitToast("danger", message);
     const failure = new Error(message);
     failure.cause = error;
+    if (unlinked) failure.unlinked = true;
     throw failure;
   }
 }
@@ -6447,10 +6477,11 @@ async function loadProjectData(projectId) {
   }
   if (!project) return { ...dashboard, project: null, projects };
   const encoded = encodeURIComponent(project.id);
+  const link = { unlinked: isUnlinked(project) };
   const portfolioRead = api("/portfolio").catch(() => null);
   const [settings, workItems, initiatives, objectives, goals, missionArchive, content, events, reports, milestones, workflows, views, canvas, discovery, portfolio] = await Promise.all([
     api(`/projects/${encoded}/settings`),
-    api(`/projects/${encoded}/work-items`),
+    hermesRead(link, () => api(`/projects/${encoded}/work-items`), { work_items: [] }),
     api(`/projects/${encoded}/initiatives`),
     api(`/projects/${encoded}/objectives`),
     api(`/projects/${encoded}/goals`),
@@ -6458,7 +6489,7 @@ async function loadProjectData(projectId) {
     api(`/projects/${encoded}/content`),
     api(`/projects/${encoded}/events`),
     api(`/projects/${encoded}/reports`),
-    api(`/projects/${encoded}/milestones`),
+    hermesRead(link, () => api(`/projects/${encoded}/milestones`), { milestones: [] }),
     api(`/projects/${encoded}/workflows`),
     api(`/projects/${encoded}/views`),
     api(`/projects/${encoded}/canvas`),
@@ -6468,7 +6499,7 @@ async function loadProjectData(projectId) {
   return {
     ...dashboard,
     projects,
-    project,
+    project: link.unlinked ? { ...project, linked: false } : project,
     settings,
     workItems: workItems.work_items ?? [],
     initiatives: initiatives.initiatives ?? [],
@@ -6493,15 +6524,16 @@ async function loadBacklogData(projectId) {
   if (projectId && !project) return { project: null, projects, missingProject: projectId, backlog: [], workItems: [], initiatives: [], bots: [] };
   if (!project) return { project: null, projects, backlog: [], workItems: [], initiatives: [], bots: [] };
   const encoded = encodeURIComponent(project.id);
+  const link = { unlinked: isUnlinked(project) };
   const [backlog, workItems, initiatives, bots, discovery] = await Promise.all([
     api(`/projects/${encoded}/backlog`),
-    api(`/projects/${encoded}/work-items`),
+    hermesRead(link, () => api(`/projects/${encoded}/work-items`), { work_items: [] }),
     api(`/projects/${encoded}/initiatives`),
     api("/bots"),
     api("/onboard/discover")
   ]);
   return {
-    project,
+    project: link.unlinked ? { ...project, linked: false } : project,
     projects,
     backlog: backlog.backlog ?? [],
     workItems: workItems.work_items ?? [],
@@ -6523,8 +6555,10 @@ async function loadTeamsData() {
     api("/onboard/discover")
   ]);
   const projects = sortProjects(dashboard.projects ?? []);
-  const project = projects[0] ?? null;
-  const team = project ? await api(`/projects/${encodeURIComponent(project.id)}/team`) : null;
+  const first = projects[0] ?? null;
+  const link = { unlinked: isUnlinked(first) };
+  const team = first ? await hermesRead(link, () => api(`/projects/${encodeURIComponent(first.id)}/team`), null) : null;
+  const project = first && link.unlinked ? { ...first, linked: false } : first;
   const messages = {};
   await Promise.all((groups.groups ?? []).map(async (group) => {
     const result = await api(`/bot-groups/${encodeURIComponent(group.name)}/messages`);
@@ -7249,6 +7283,12 @@ function ErrorState({ error, onRetry }) {
     jsx("h2", { children: "Project Stewardship could not load this view" }),
     jsx("p", { children: String(error) }),
     jsx(Button, { action: "retry", variant: "primary", onClick: onRetry, children: "Try again" })
+  ] });
+}
+function UnlinkedNotice({ projectId }) {
+  return jsxs("div", { className: "dockyard-view-only-note", role: "status", "data-unlinked-notice": projectId, children: [
+    jsx(Icon, { name: "alert" }),
+    jsxs("span", { children: [jsx("strong", { children: UNLINKED_TITLE }), `. ${UNLINKED_DETAIL} ${unlinkedNextStep(projectId)}`] })
   ] });
 }
 function LoadingState() {
@@ -9205,7 +9245,7 @@ function BacklogView({ view, onRefresh, preset }) {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [createOpen, createSaving]);
   if (!project) return jsx(EmptyState, { title: "No project selected", description: "Select a project before prioritising its backlog.", icon: "project" });
-  const canCreate = project.enabled !== false && project.phase === "active";
+  const canCreate = project.enabled !== false && project.phase === "active" && !isUnlinked(project);
   const workByRef = Object.fromEntries((view.workItems ?? []).map((item) => [item.ref, item]));
   const entries = [...view.backlog ?? []].sort((left, right) => Number(left.rank) - Number(right.rank));
   const requestMove = (entry, newRank) => {
@@ -9759,7 +9799,7 @@ function BacklogView({ view, onRefresh, preset }) {
     }).catch(() => {
     });
   };
-  return BacklogBoard({
+  const board = BacklogBoard({
     UNASSIGNED,
     unassigned,
     ROOT_TYPES,
@@ -9900,6 +9940,7 @@ function BacklogView({ view, onRefresh, preset }) {
     view,
     workByRef
   });
+  return isUnlinked(project) ? jsxs(Fragment, { children: [jsx(UnlinkedNotice, { projectId: project.id }, "unlinked"), board] }) : board;
 }
 var DOCKYARD_VIEW_TEST = Object.freeze({ name: "BacklogView" });
 
@@ -13031,9 +13072,29 @@ function WorkBar({ work, project = false, label = "Work distribution" }) {
     ]
   });
 }
+var ISSUE_CAUSES = Object.freeze({
+  blocked_item: { tag: "Blocked", tone: "blocker", impact: "Work blocked" },
+  overdue_item: { tag: "Overdue", tone: "blocker", impact: "Work overdue" },
+  evidence_stale: { tag: "Stale evidence", tone: "notice", impact: "Evidence out of date" },
+  unlinked_project: { tag: UNLINKED_LABEL, tone: "notice", impact: "Work cannot be shown" },
+  project_attention: { tag: "Project state", tone: "notice", impact: "Needs a decision" }
+});
+var ISSUE_FILTERS = Object.freeze([
+  ["all", "All issues"],
+  ["decision", "Decisions"],
+  ...Object.entries(ISSUE_CAUSES).map(([cause, { tag }]) => [cause, tag])
+]);
+var HEALTH_STATES = Object.freeze(["on_track", "at_risk", "stalled", "idle", "unlinked"]);
+function issueLabels(item) {
+  if (item?.kind === "initiative_approval") {
+    return { tag: "Approval", tone: "approval", impact: `Risk: ${readableLabel(item.risk)}`, open: "Review approval" };
+  }
+  const known = ISSUE_CAUSES[item?.cause] ?? { tag: readableLabel(item?.cause, "Issue"), tone: "notice", impact: "Needs attention" };
+  return { ...known, open: String(item?.deep_link ?? "").startsWith("s2:work/") ? "Open work item" : "Open project" };
+}
 function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
-  const STATUS_PRIORITY = { at_risk: 0, stalled: 1, on_track: 2, idle: 3 };
-  const projects = [...view.portfolio?.projects ?? []].sort((left, right) => (STATUS_PRIORITY[left.status] ?? 2) - (STATUS_PRIORITY[right.status] ?? 2));
+  const STATUS_PRIORITY = { at_risk: 0, unlinked: 1, stalled: 2, on_track: 3, idle: 4 };
+  const projects = [...view.portfolio?.projects ?? []].sort((left, right) => (STATUS_PRIORITY[left.status] ?? 3) - (STATUS_PRIORITY[right.status] ?? 3));
   const decisions = view.groups?.decisions ?? [];
   const interventions = view.groups?.interventions ?? [];
   const rows = [...decisions, ...interventions].sort((a, b) => (b.age_days ?? 0) - (a.age_days ?? 0));
@@ -13088,7 +13149,7 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
   const evidenceFiles = view.portfolio?.evidence_files;
   const workActive = Number(view.totals?.active_work ?? 0);
   const waiting = Number(view.inbox?.count ?? 0);
-  const statusName = { on_track: "On track", at_risk: "At risk", stalled: "Stalled", idle: "Idle" };
+  const statusName = { on_track: "On track", at_risk: "At risk", stalled: "Stalled", idle: "Idle", unlinked: UNLINKED_LABEL };
   const metric = (label, value, detail, icon, tone, onClick) => jsxs(onClick ? "button" : "div", {
     type: onClick ? "button" : void 0,
     onClick,
@@ -13104,6 +13165,7 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
     const total = Number(project.items?.total ?? 0);
     const done = Number(project.items?.done ?? 0);
     const status = statusName[project.status] ?? readableLabel(project.status, "Unknown");
+    const unreadable = project.status === "unlinked";
     return jsxs("div", {
       role: "row",
       className: "dockyard-command-row dockyard-command-project-row",
@@ -13113,11 +13175,11 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
         jsx("span", { role: "cell", children: project.owner || "Not assigned" }),
         jsx("span", { role: "cell", className: `dockyard-command-health ${project.status}`, children: status }),
         jsxs("span", { role: "cell", className: "dockyard-command-progress", children: [
-          jsx("span", { children: total ? `${number(done)} / ${number(total)} work items` : "No work items" }),
+          jsx("span", { children: unreadable ? "Unknown (not linked)" : total ? `${number(done)} / ${number(total)} work items` : "No work items" }),
           jsx("span", { className: "dockyard-command-progress-track", children: jsx("span", { style: { width: `${total ? Math.round(done / total * 100) : 0}%` } }) })
         ] }),
         jsx("span", { role: "cell", children: project.next_milestone ? `${project.next_milestone.name} \xB7 ${project.next_milestone.due || "No due date"}` : "Not scheduled" }),
-        jsx("span", { role: "cell", children: project.items?.blocked || project.items?.overdue ? `${number(project.items.blocked || 0)} blocked \xB7 ${number(project.items.overdue || 0)} overdue` : "No open blockers" })
+        jsx("span", { role: "cell", children: unreadable ? "Unknown (not linked)" : project.items?.blocked || project.items?.overdue ? `${number(project.items.blocked || 0)} blocked \xB7 ${number(project.items.overdue || 0)} overdue` : "No open blockers" })
       ]
     }, project.project_id);
   };
@@ -13149,14 +13211,7 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
     ] });
   }
   if (subview === "issues") {
-    const options = [
-      ["all", "All issues"],
-      ["decision", "Decisions"],
-      ["blocked_item", "Blocked"],
-      ["overdue_item", "Overdue"],
-      ["evidence_stale", "Stale evidence"],
-      ["project_attention", "Project state"]
-    ];
+    const options = ISSUE_FILTERS;
     const filtered = rows.filter((item) => issueFilter === "all" || (issueFilter === "decision" ? item.kind === "initiative_approval" : item.cause === issueFilter));
     return jsxs("div", { className: "dockyard-command dockyard-command-directory", "data-dashboard-subview": "issues", children: [
       jsx(Button, { small: true, onClick: () => setSubview("overview"), children: "\u2190 Back to Dashboard" }),
@@ -13188,8 +13243,8 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
           onClick: () => item.deep_link ? onOpen?.(item.deep_link) : onInbox?.(),
           children: [
             jsx("span", {
-              className: `dockyard-command-type ${item.kind === "initiative_approval" ? "approval" : "blocker"}`,
-              children: item.kind === "initiative_approval" ? "Approval" : readableLabel(item.cause, "Issue")
+              className: `dockyard-command-type ${issueLabels(item).tone}`,
+              children: issueLabels(item).tag
             }),
             jsxs("span", { className: "dockyard-command-title", children: [
               jsx("strong", { children: item.title }),
@@ -13228,9 +13283,9 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
         jsx("div", {
           className: "dockyard-command-health-track",
           role: "img",
-          "aria-label": `${number(onTrack)} on track, ${number(projects.filter((p) => p.status === "at_risk").length)} at risk, ${number(projects.filter((p) => p.status === "stalled").length)} stalled, ${number(projects.filter((p) => p.status === "idle").length)} idle, ${number(projects.filter((p) => !["on_track", "at_risk", "stalled", "idle"].includes(p.status)).length)} unverified`,
-          children: ["on_track", "at_risk", "stalled", "idle", "unknown"].map((state) => {
-            const count = projects.filter((p) => (["on_track", "at_risk", "stalled", "idle"].includes(p.status) ? p.status : "unknown") === state).length;
+          "aria-label": `${number(onTrack)} on track, ${number(projects.filter((p) => p.status === "at_risk").length)} at risk, ${number(projects.filter((p) => p.status === "stalled").length)} stalled, ${number(projects.filter((p) => p.status === "idle").length)} idle, ${number(projects.filter((p) => p.status === "unlinked").length)} not linked, ${number(projects.filter((p) => !HEALTH_STATES.includes(p.status)).length)} unverified`,
+          children: [...HEALTH_STATES, "unknown"].map((state) => {
+            const count = projects.filter((p) => (HEALTH_STATES.includes(p.status) ? p.status : "unknown") === state).length;
             return count ? jsx("span", { className: `dockyard-health-segment ${state}`, style: { width: `${count / projects.length * 100}%` } }, state) : null;
           })
         }),
@@ -13239,6 +13294,7 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
           ["at_risk", "At risk"],
           ["stalled", "Stalled"],
           ["idle", "Idle"],
+          ["unlinked", UNLINKED_LABEL],
           ["unknown", "Unverified"]
         ].map(([state, label]) => jsxs("span", { children: [jsx("i", { className: `dockyard-health-dot ${state}`, "aria-hidden": true }), label] }, state)) })
       ] }),
@@ -13296,10 +13352,10 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
                 onClick: () => setSelected(item),
                 "aria-label": `Inspect ${item.title}`,
                 children: [
-                  jsx("span", { className: `dockyard-command-type ${item.kind === "initiative_approval" ? "approval" : "blocker"}`, children: item.kind === "initiative_approval" ? "Approval" : "Blocked" }),
+                  jsx("span", { className: `dockyard-command-type ${issueLabels(item).tone}`, children: issueLabels(item).tag }),
                   jsxs("span", { className: "dockyard-command-title", children: [jsx("strong", { children: item.title }), jsx("small", { children: item.ref || item.detail || "" })] }),
                   jsx("span", { children: item.project }),
-                  jsx("span", { children: item.kind === "initiative_approval" ? `Risk: ${readableLabel(item.risk)}` : "Work blocked" }),
+                  jsx("span", { children: issueLabels(item).impact }),
                   jsx("span", { children: typeof item.age_days === "number" ? `${number(item.age_days)}d` : "Not recorded" })
                 ]
               }, `${item.kind}:${item.ref || index}`)) : jsx("p", { className: "dockyard-command-empty", children: "No decisions or blocked work need attention." })
@@ -13341,7 +13397,7 @@ function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
             ] }) : null,
             jsx("h4", { children: "Recent activity" }),
             jsx("div", { className: "dockyard-command-detail-activity", children: (view.notifications?.notifications ?? []).filter((note) => note.project === focusItem.project).slice(0, 3).map((note) => jsx("p", { children: `${note.title} \xB7 ${formatWhen(note.created_at)}` }, note.id)) }),
-            jsx(Button, { variant: "primary", onClick: () => focusItem.kind === "initiative_approval" ? onInbox?.() : onOpen?.(focusItem.deep_link), children: focusItem.kind === "initiative_approval" ? "Review approval" : "Open work item" })
+            jsx(Button, { variant: "primary", onClick: () => focusItem.kind === "initiative_approval" ? onInbox?.() : onOpen?.(focusItem.deep_link), children: issueLabels(focusItem).open })
           ] }) : jsx("p", { children: "Select an item to see its details." })
         ] })
       ] })
@@ -20907,12 +20963,13 @@ function statusOf(item) {
 }
 async function loadPlan(projectId) {
   const p = enc(projectId);
+  const link = { unlinked: false };
   const [roadmap, initiatives, objectives, goals, milestones, settings, missions, work] = await Promise.all([
     api(`/roadmap?project_id=${p}`),
     api(`/projects/${p}/initiatives`),
     api(`/projects/${p}/objectives?include_archived=true`),
     api(`/projects/${p}/goals?include_archived=true`),
-    api(`/projects/${p}/milestones?include_archived=true`),
+    hermesRead(link, () => api(`/projects/${p}/milestones?include_archived=true`), { milestones: [] }),
     api(`/projects/${p}/settings`),
     api(`/projects/${p}/missions/archive`).catch(() => ({ missions: [] })),
     api(`/projects/${p}/work-items`).catch(() => ({ work_items: [] }))
@@ -22314,6 +22371,18 @@ function projectAttention({ project, portfolio, milestones = [], now = /* @__PUR
         target: { kind: "view", view: "overview" },
         openLabel: "Open the assessment"
       });
+    } else if (entry.cause === "unlinked_project") {
+      items.push({
+        ...base,
+        key: "unlinked",
+        kind: "unlinked",
+        tone: "warning",
+        label: "Not linked",
+        title: entry.title || "Not linked to a Hermes project",
+        note: entry.detail || "",
+        target: { kind: "view", view: "settings" },
+        openLabel: "Open project settings"
+      });
     } else if (entry.cause === "project_attention") {
       const switchedOff = project.enabled === false || row.enabled === false;
       items.push({
@@ -22367,6 +22436,7 @@ function projectAttention({ project, portfolio, milestones = [], now = /* @__PUR
   let state;
   if (enabled === false) state = ["disabled", "neutral", "Disabled"];
   else if (phase && phase !== "active") state = [phase, "neutral", PHASE_LABEL[phase] ?? phase];
+  else if (row.status === "unlinked") state = ["unlinked", "warning", "Not linked"];
   else if (Number(row.items?.blocked ?? 0) > 0) state = ["blocked", "danger", "Blocked"];
   else if (row.status === "at_risk") state = ["at_risk", "warning", "At risk"];
   else if (row.status === "stalled") state = ["stalled", "warning", "Stalled"];
@@ -22381,6 +22451,7 @@ function projectAttention({ project, portfolio, milestones = [], now = /* @__PUR
     ["approval", "approval"]
   ].filter(([kind]) => count(kind) > 0);
   const sentences = [];
+  if (state[0] === "unlinked") sentences.push("Hermes has no project for it, so its work cannot be shown");
   if (countable.length > 0) {
     const total = countable.reduce((sum, [kind]) => sum + count(kind), 0);
     sentences.push(`${joinAnd(countable.map(([kind, word]) => plural4(count(kind), word)))} ${total === 1 ? "needs" : "need"} you`);
@@ -23163,6 +23234,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
       onOpenRoadmap,
       onOpenItem: openAttentionItem
     }, `strip:${project.id}`),
+    isUnlinked(project) ? jsx(UnlinkedNotice, { projectId: project.id }) : null,
     workNotice || notice ? jsxs("div", { className: "dockyard-view-only-note", role: "alert", "data-deep-link-notice": true, children: [
       jsx(Icon, { name: "alert" }),
       jsx("span", { children: workNotice || notice })
@@ -23232,6 +23304,7 @@ function TeamsView({ view, onRefresh }) {
   const [pendingOperations, setPendingOperations] = useState([]);
   const transferScope = useRef(null);
   const projectId = view.project?.id || view.projects?.[0]?.id || "";
+  const unlinked = isUnlinked(view.project);
   useEffect(() => {
     const members = team?.members ?? [];
     setProfiles((view.profiles ?? []).filter((profile) => profile.available !== false));
@@ -23356,7 +23429,9 @@ function TeamsView({ view, onRefresh }) {
       onRefresh
     }),
     jsxs("section", { className: "dockyard-feature-card", "data-team-management": true, children: [
-      jsxs("header", { children: [jsx("h2", { children: "Project team" }), jsx("span", { children: team ? `Revision ${team.membership_revision}` : "Loading canonical roster\u2026" })] }),
+      jsxs("header", { children: [jsx("h2", { children: "Project team" }), jsx("span", { children: team ? `Revision ${team.membership_revision}` : unlinked ? "Not linked" : "Loading canonical roster\u2026" })] }),
+      // The roster lives in Hermes: an unlinked project has none (10/10/2026).
+      unlinked ? jsx(UnlinkedNotice, { projectId }) : null,
       teamError ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: teamError }) : null,
       jsx("div", { className: "dockyard-bot-grid", children: (team?.members ?? []).map((member) => jsxs("article", { className: "dockyard-bot-card", "data-project-member": member.profile_slug, children: [
         jsxs("strong", { children: [member.profile_slug, member.role === "lead" ? " \xB7 Lead" : " \xB7 Member"] }),

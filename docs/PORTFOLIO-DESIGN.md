@@ -67,19 +67,25 @@ Status mix      (inline bars: to-do 8 · in progress 3 · blocked 1 · done 12)
 
 ### Section 2 — Project table (the core)
 - One row per project. Columns: name (link → Work tab deep link), status chip
-  (on track / at risk / idle / stalled — derived, see below), items
+  (on track / at risk / idle / stalled / not linked — derived, see below), items
   done/total with a 10-segment tick bar (not a percentage hero), next
   open milestone name + relative due date (warn colour when overdue), last
   activity (relative time).
 - Status derivation (documented, deterministic):
+  - **unlinked** ("Not linked") — Hermes has no project with this id or slug,
+    so its work cannot be read. Checked first: the other states need work
+    items. The row claims no work and no blockers ("Unknown (not linked)"),
+    and an `unlinked_project` intervention says how to link it (create a
+    Hermes project with that slug). Added 10/10/2026, when two real projects
+    were unlinked and took the pages down.
   - **at risk** — any overdue milestone, or overdue work items, or
     blocked > 0
   - **idle** — no items in progress AND no open milestone
   - **stalled** — no activity in 14+ days while items are open
   - **on track** — everything else
-- Sort: at risk first, then by next milestone due date (soonest open first);
-  idle/stalled sink to the bottom. No user-configurable sort in v1 (the
-  table is 10 rows max — sorting is theatre).
+- Sort: at risk first, then not linked, then by next milestone due date
+  (soonest open first); idle/stalled sink to the bottom. No user-configurable
+  sort in v1 (the table is 10 rows max — sorting is theatre).
 - 10-segment tick bar: pure CSS (repeating-linear-gradient background-size),
   no SVG, no chart library. Ticks are honest units (each = ceil(total/10)),
   not a smooth fake.

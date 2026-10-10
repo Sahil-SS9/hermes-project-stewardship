@@ -14,6 +14,8 @@ import { Button } from '../lib/ui.js'
 import { initials } from '../data/loaders.js'
 import { Icon } from '../lib/ui.js'
 import { formatWhen } from '../lib/ui.js'
+import { UnlinkedNotice } from '../lib/ui.js'
+import { isUnlinked } from '../data/unlinked.js'
 export function TeamsView({ view, onRefresh }) {
   const bots = view.bots ?? []
   const workload = view.workload ?? { busy: [], idle: [], stuck: [], offline: [] }
@@ -34,6 +36,7 @@ export function TeamsView({ view, onRefresh }) {
   const [pendingOperations, setPendingOperations] = useState([])
   const transferScope = useRef(null)
   const projectId = view.project?.id || view.projects?.[0]?.id || ''
+  const unlinked = isUnlinked(view.project)
   useEffect(() => {
     const members = team?.members ?? []
     setProfiles((view.profiles ?? []).filter((profile) => profile.available !== false))
@@ -137,7 +140,9 @@ export function TeamsView({ view, onRefresh }) {
       onRefresh,
     }),
     jsxs('section', { className: 'dockyard-feature-card', 'data-team-management': true, children: [
-      jsxs('header', { children: [jsx('h2', { children: 'Project team' }), jsx('span', { children: team ? `Revision ${team.membership_revision}` : 'Loading canonical roster…' })] }),
+      jsxs('header', { children: [jsx('h2', { children: 'Project team' }), jsx('span', { children: team ? `Revision ${team.membership_revision}` : unlinked ? 'Not linked' : 'Loading canonical roster…' })] }),
+      // The roster lives in Hermes: an unlinked project has none (10/10/2026).
+      unlinked ? jsx(UnlinkedNotice, { projectId }) : null,
       teamError ? jsx('p', { className: 'dockyard-inline-error', role: 'alert', children: teamError }) : null,
       jsx('div', { className: 'dockyard-bot-grid', children: (team?.members ?? []).map((member) => jsxs('article', { className: 'dockyard-bot-card', 'data-project-member': member.profile_slug, children: [
         jsxs('strong', { children: [member.profile_slug, member.role === 'lead' ? ' · Lead' : ' · Member'] }),

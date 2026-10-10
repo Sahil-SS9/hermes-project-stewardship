@@ -19,6 +19,8 @@ import { ProjectSettingsPanel } from '../project/panels.js'
 import { ProjectReportsPanel } from '../project/reports.js'
 import { Fragment } from '../runtime/react.js'
 import { StatusTag } from '../lib/ui.js'
+import { UnlinkedNotice } from '../lib/ui.js'
+import { isUnlinked } from '../data/unlinked.js'
 import { WorkBar } from '../views/dashboard.js'
 import { InitiativeRevisionRow } from '../views/dashboard.js'
 import { FirstAssessmentCard } from '../views/dashboard.js'
@@ -209,6 +211,7 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
     jsx(ProjectHeaderStrip, {
       project, view, onRefresh, onOpenRoadmap, onOpenItem: openAttentionItem,
     }, `strip:${project.id}`),
+    isUnlinked(project) ? jsx(UnlinkedNotice, { projectId: project.id }) : null,
     workNotice || notice ? jsxs('div', { className: 'dockyard-view-only-note', role: 'alert', 'data-deep-link-notice': true, children: [
       jsx(Icon, { name: 'alert' }),
       jsx('span', { children: workNotice || notice }),

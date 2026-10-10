@@ -7,6 +7,7 @@
 // archived milestone or goal) and Mark complete, which the browser dashboard
 // already had.
 import { api } from '../../runtime/context.js'
+import { hermesRead } from '../../data/unlinked.js'
 import { CLOSED_STATUSES } from '../../lib/plan-vocab.js'
 import { GOAL_LABEL } from '../../lib/plan-vocab.js'
 import { GOAL_TONE } from '../../lib/plan-vocab.js'
@@ -54,12 +55,14 @@ export function statusOf(item) {
 // archived rows the Roadmap leaves out.
 export async function loadPlan(projectId) {
   const p = enc(projectId)
+  // Milestones live in Hermes: an unlinked project has none (10/10/2026).
+  const link = { unlinked: false }
   const [roadmap, initiatives, objectives, goals, milestones, settings, missions, work] = await Promise.all([
     api(`/roadmap?project_id=${p}`),
     api(`/projects/${p}/initiatives`),
     api(`/projects/${p}/objectives?include_archived=true`),
     api(`/projects/${p}/goals?include_archived=true`),
-    api(`/projects/${p}/milestones?include_archived=true`),
+    hermesRead(link, () => api(`/projects/${p}/milestones?include_archived=true`), { milestones: [] }),
     api(`/projects/${p}/settings`),
     api(`/projects/${p}/missions/archive`).catch(() => ({ missions: [] })),
     api(`/projects/${p}/work-items`).catch(() => ({ work_items: [] })),

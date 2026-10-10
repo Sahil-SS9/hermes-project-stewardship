@@ -165,6 +165,9 @@ td.bad, .bad { color: var(--dy-bad); }
 .dy-root .dy-status-at_risk { color: var(--dy-bad); }
 .dy-root .dy-status-stalled { color: var(--dy-warn); }
 .dy-root .dy-status-idle { color: var(--dy-dim); }
+.dy-root .dy-status-unlinked { color: var(--dy-warn); }
+/* A project Hermes has no project for (10/10/2026): a state to fix, not an error. */
+.dy-root .dy-unlinked { border-left: 3px solid var(--dy-warn); font-size: 13px; }
 .dy-root .dy-idle { color: var(--dy-dim); }
 .dy-root .dy-portfolio { display: grid; gap: 14px; }
 .dy-root .dy-features summary { cursor: pointer; padding: 8px 12px; font-weight: 600; color: #e6edf3; }

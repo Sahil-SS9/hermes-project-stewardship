@@ -118,3 +118,31 @@ test('recency: the newest of the portfolio stamp and the project events; unreada
   assert.equal(timeAgo(null, NOW), null)
   assert.equal(timeAgo('garbage', NOW), null)
 })
+
+// Found on Sahil's live app (10/10/2026): a project Hermes has no project for
+// ("unlinked") fell through every banner state to "On track", and its
+// unlinked_project intervention never reached the drawer.
+const unlinkedEntry = { kind: 'project_attention', project: 'p1', cause: 'unlinked_project', ref: 'p1', title: 'Not linked to a Hermes project', detail: 'Hermes has no project with this id or slug, so its work cannot be shown.', owner: 'lead', age_days: 0, next_action: 'Create a Hermes project with this slug to link it.', deep_link: 's1:project/p1' }
+const unlinkedPortfolio = () => portfolio({ rowOver: { status: 'unlinked', items: { total: 0, done: 0, blocked: 0, overdue: 0 } }, interventions: [unlinkedEntry] })
+
+test('an unlinked project says "Not linked", never "On track", and the drawer explains it', () => {
+  const result = projectAttention({ project: project(), portfolio: unlinkedPortfolio(), now: NOW })
+  assert.equal(result.available, true)
+  assert.deepEqual([result.state, result.tone, result.label], ['unlinked', 'warning', 'Not linked'])
+  assert.match(result.summary, /Hermes has no project for it/)
+  const item = result.items.find((entry) => entry.kind === 'unlinked')
+  assert.ok(item, 'the missing link is in the drawer')
+  assert.equal(item.label, 'Not linked')
+  assert.equal(item.title, unlinkedEntry.title)
+  assert.equal(item.note, unlinkedEntry.detail)
+  assert.equal(item.next, unlinkedEntry.next_action)
+  assert.deepEqual(item.target, { kind: 'view', view: 'settings' })
+  assert.equal(item.openLabel, 'Open project settings')
+})
+
+test('switched off and lifecycle states still outrank a missing link', () => {
+  const off = projectAttention({ project: project({ enabled: false }), portfolio: unlinkedPortfolio(), now: NOW })
+  assert.equal(off.state, 'disabled')
+  const paused = projectAttention({ project: project({ phase: 'paused' }), portfolio: unlinkedPortfolio(), now: NOW })
+  assert.equal(paused.state, 'paused')
+})

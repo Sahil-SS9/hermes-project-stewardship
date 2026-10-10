@@ -117,6 +117,11 @@ export function projectAttention({ project, portfolio, milestones = [], now = ne
       items.push({ ...base, key: 'evidence', kind: 'evidence', tone: 'warning', label: 'Evidence out of date',
         title: entry.title || 'The last health check is old', note: entry.detail || '',
         target: { kind: 'view', view: 'overview' }, openLabel: 'Open the assessment' })
+    } else if (entry.cause === 'unlinked_project') {
+      // Hermes has no project for it (10/10/2026): its work cannot be read.
+      items.push({ ...base, key: 'unlinked', kind: 'unlinked', tone: 'warning', label: 'Not linked',
+        title: entry.title || 'Not linked to a Hermes project', note: entry.detail || '',
+        target: { kind: 'view', view: 'settings' }, openLabel: 'Open project settings' })
     } else if (entry.cause === 'project_attention') {
       const switchedOff = project.enabled === false || row.enabled === false
       items.push({ ...base, key: 'project', kind: 'project', tone: 'neutral',
@@ -154,6 +159,7 @@ export function projectAttention({ project, portfolio, milestones = [], now = ne
   let state
   if (enabled === false) state = ['disabled', 'neutral', 'Disabled']
   else if (phase && phase !== 'active') state = [phase, 'neutral', PHASE_LABEL[phase] ?? phase]
+  else if (row.status === 'unlinked') state = ['unlinked', 'warning', 'Not linked']
   else if (Number(row.items?.blocked ?? 0) > 0) state = ['blocked', 'danger', 'Blocked']
   else if (row.status === 'at_risk') state = ['at_risk', 'warning', 'At risk']
   else if (row.status === 'stalled') state = ['stalled', 'warning', 'Stalled']
@@ -166,6 +172,7 @@ export function projectAttention({ project, portfolio, milestones = [], now = ne
     ['blocked', 'blocked item'], ['overdue', 'overdue item'], ['milestone', 'overdue milestone'], ['approval', 'approval'],
   ].filter(([kind]) => count(kind) > 0)
   const sentences = []
+  if (state[0] === 'unlinked') sentences.push('Hermes has no project for it, so its work cannot be shown')
   if (countable.length > 0) {
     const total = countable.reduce((sum, [kind]) => sum + count(kind), 0)
     sentences.push(`${joinAnd(countable.map(([kind, word]) => plural(count(kind), word)))} ${total === 1 ? 'needs' : 'need'} you`)

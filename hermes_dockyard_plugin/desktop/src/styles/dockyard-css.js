@@ -1555,7 +1555,7 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-command-type { display: inline-block; width: fit-content; padding: 3px 6px; border-radius: 5px; background: var(--dy-surface-subtle); color: var(--dy-text-2); font-size: 10px; font-weight: 700; }
 .dockyard-root .dockyard-command-type.approval { background: var(--dy-warning-bg); color: var(--dy-warning); }
 .dockyard-root .dockyard-command-health { font-weight: 700; }
-.dockyard-root .dockyard-command-health.at_risk, .dockyard-root .dockyard-command-health.stalled { color: var(--dy-warning); }
+.dockyard-root .dockyard-command-health.at_risk, .dockyard-root .dockyard-command-health.stalled, .dockyard-root .dockyard-command-health.unlinked { color: var(--dy-warning); }
 .dockyard-root .dockyard-command-progress { display: grid; gap: 5px; }
 .dockyard-root .dockyard-command-progress-track { display: block; height: 5px; border-radius: 5px; background: var(--dy-border); }
 .dockyard-root .dockyard-command-progress-track > span { display: block; height: 100%; border-radius: 5px; background: var(--dy-action); }
@@ -1597,6 +1597,8 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-health-segment.at_risk, .dockyard-root .dockyard-health-dot.at_risk { background: var(--dy-warning); }
 .dockyard-root .dockyard-health-segment.stalled, .dockyard-root .dockyard-health-dot.stalled { background: var(--dy-danger); }
 .dockyard-root .dockyard-health-segment.idle, .dockyard-root .dockyard-health-dot.idle { background: var(--dy-info); }
+/* Not linked to a Hermes project (10/10/2026): hatched amber, so the bar never reads it as "At risk" (solid amber). */
+.dockyard-root .dockyard-health-segment.unlinked, .dockyard-root .dockyard-health-dot.unlinked { background: repeating-linear-gradient(135deg, var(--dy-warning) 0 3px, var(--dy-warning-bg) 3px 6px); }
 .dockyard-root .dockyard-health-segment.unknown, .dockyard-root .dockyard-health-dot.unknown { background: var(--dy-neutral); }
 .dockyard-root .dockyard-command-health-legend { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .dockyard-root .dockyard-command-health-legend span { display: inline-flex; align-items: center; gap: 4px; color: var(--dy-text-2); font-size: 10px; white-space: nowrap; }

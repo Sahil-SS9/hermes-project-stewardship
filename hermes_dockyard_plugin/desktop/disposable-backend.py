@@ -29,7 +29,6 @@ import plugin_api
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse
 from hermes_project_stewardship.api.server import create_app
-from hermes_project_stewardship.kanban import ReferenceKanbanAdapter
 from hermes_project_stewardship.persistence.service import StewardshipService
 
 store = plugin_api._store
@@ -39,10 +38,20 @@ store = plugin_api._store
 # `gh auth token` and called provider APIs with the operator's logins.
 from hermes_project_stewardship.persistence import hermes_curation_provider  # noqa: E402 (after env setup)
 hermes_curation_provider.list_hermes_models = lambda: {"available": False, "default": None, "providers": []}
+# Unlinked projects (10/10/2026): Hermes has no project for them, and the real
+# host answers every per-project call for one with project_not_found. The
+# adapter below does the same for the ids a test unlinks (PUT
+# /fixture/unlinked/<id>, DELETE to re-link), so every route answers as it did
+# on Sahil's live app, not only the routes a test thinks to mock. Starts empty:
+# no other test sees a difference.
+_unlinked_host_spec = _il.spec_from_file_location(
+    "_unlinked_host", Path(__file__).resolve().parents[2] / "tests" / "unlinked_host.py")
+_unlinked_host = _il.module_from_spec(_unlinked_host_spec)
+_unlinked_host_spec.loader.exec_module(_unlinked_host)  # noqa: E402 (file-path load after env setup)
 # Phase-5 workflow binding validates overrides against discovered profiles
 # (P5.2). Declare the fixture team's profiles through the adapter's own
 # constructor seam. This is reference-adapter coverage, not vanilla-host proof.
-adapter = ReferenceKanbanAdapter(
+adapter = _unlinked_host.NoHermesProjectAdapter(
     store, profiles=["worker", "reviewer", "fixture-lead", "octacon", "quan"])
 service = StewardshipService(store)
 # Fixture budget: the whole browser suite shares this one backend, and its
@@ -108,6 +117,16 @@ def bundle():
 def health():
     return {"state": str(root), "adapter": "reference", "backend": "real",
             "offline_refusals": list(_offline_guard.ATTEMPTS)}
+
+@app.put("/fixture/unlinked/{project_id}")
+def unlink_fixture_project(project_id: str):
+    adapter.missing.add(project_id)
+    return {"unlinked": sorted(adapter.missing)}
+
+@app.delete("/fixture/unlinked/{project_id}")
+def relink_fixture_project(project_id: str):
+    adapter.missing.discard(project_id)
+    return {"unlinked": sorted(adapter.missing)}
 
 if __name__ == "__main__":
     import uvicorn

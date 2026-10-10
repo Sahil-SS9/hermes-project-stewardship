@@ -92,6 +92,22 @@ of the plugin now shares one name.
 - Tests stay offline and never touch a live Hermes home. Tests that need a
   Hermes checkout or a database snapshot read `HPS_HERMES_SOURCE` or
   `HPS_LIVE_SNAPSHOT`, and skip without them.
+- A project Hermes has no project for ("unlinked") no longer breaks a page:
+  every tab loads for it, in the Desktop and the browser dashboard. Projects,
+  Backlog, Bot teams and the browser dashboard's Work and Delivery tabs say
+  "Not linked to a Hermes project" and how to link it (create a Hermes project
+  with that slug), instead of "404 canonical project was not found" or
+  "backend unreachable". Its status reads "Not linked" (never "On track"), it
+  sorts near the top of the health table with its own filter and legend
+  entry, and it is no longer tagged "Blocked" with an "Open work item" button.
+  Work cannot be created in it, and an action that needs Hermes says why it
+  failed.
+- The API answers a project Hermes does not know with a 404 carrying the
+  host's code (`project_not_found` or `board_not_found`) on every route.
+  `GET /projects/{id}/milestones` and `POST /projects/{id}/reports` used to
+  fail with a 500, and the team, member and transfer-preview routes reported
+  every Hermes error as 503. A 503 now means only that Hermes is unavailable.
+- A quick tab switch no longer leaves the project switcher empty.
 
 ### Security
 - The acting user is always the authenticated principal, never a name the

@@ -1,6 +1,8 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 import { api } from '../runtime/context.js'
+import { hermesRead } from './unlinked.js'
+import { isUnlinked } from './unlinked.js'
 export const HEALTH_PRIORITY = Object.freeze({ critical: 0, frozen: 0, attention: 0, degraded: 1, watch: 1, unknown: 2, healthy: 3 })
 export const RISK_PRIORITY = Object.freeze({ critical: 0, high: 0, medium: 1, low: 2 })
 export const SEVERITY_PRIORITY = Object.freeze({ critical: 0, high: 0, error: 0, medium: 1, warning: 1, low: 2, info: 3 })
@@ -119,6 +121,9 @@ export async function loadProjectData(projectId) {
   }
   if (!project) return { ...dashboard, project: null, projects }
   const encoded = encodeURIComponent(project.id)
+  // Work items and milestones live in Hermes: an unlinked project has none to
+  // read (10/10/2026), so the page shows the rest and says why.
+  const link = { unlinked: isUnlinked(project) }
   // C1 Overview: the header strip reads this project's row and its
   // decisions and interventions from the fleet portfolio (the Dashboard's
   // own rule, no second scoring). A failed portfolio read leaves the strip
@@ -126,7 +131,7 @@ export async function loadProjectData(projectId) {
   const portfolioRead = api('/portfolio').catch(() => null)
   const [settings, workItems, initiatives, objectives, goals, missionArchive, content, events, reports, milestones, workflows, views, canvas, discovery, portfolio] = await Promise.all([
     api(`/projects/${encoded}/settings`),
-    api(`/projects/${encoded}/work-items`),
+    hermesRead(link, () => api(`/projects/${encoded}/work-items`), { work_items: [] }),
     api(`/projects/${encoded}/initiatives`),
     api(`/projects/${encoded}/objectives`),
     api(`/projects/${encoded}/goals`),
@@ -134,7 +139,7 @@ export async function loadProjectData(projectId) {
     api(`/projects/${encoded}/content`),
     api(`/projects/${encoded}/events`),
     api(`/projects/${encoded}/reports`),
-    api(`/projects/${encoded}/milestones`),
+    hermesRead(link, () => api(`/projects/${encoded}/milestones`), { milestones: [] }),
     api(`/projects/${encoded}/workflows`),
     api(`/projects/${encoded}/views`),
     api(`/projects/${encoded}/canvas`),
@@ -144,7 +149,7 @@ export async function loadProjectData(projectId) {
   return {
     ...dashboard,
     projects,
-    project,
+    project: link.unlinked ? { ...project, linked: false } : project,
     settings,
     workItems: workItems.work_items ?? [],
     initiatives: initiatives.initiatives ?? [],
@@ -170,15 +175,16 @@ export async function loadBacklogData(projectId) {
   if (projectId && !project) return { project: null, projects, missingProject: projectId, backlog: [], workItems: [], initiatives: [], bots: [] }
   if (!project) return { project: null, projects, backlog: [], workItems: [], initiatives: [], bots: [] }
   const encoded = encodeURIComponent(project.id)
+  const link = { unlinked: isUnlinked(project) }
   const [backlog, workItems, initiatives, bots, discovery] = await Promise.all([
     api(`/projects/${encoded}/backlog`),
-    api(`/projects/${encoded}/work-items`),
+    hermesRead(link, () => api(`/projects/${encoded}/work-items`), { work_items: [] }),
     api(`/projects/${encoded}/initiatives`),
     api('/bots'),
     api('/onboard/discover'),
   ])
   return {
-    project,
+    project: link.unlinked ? { ...project, linked: false } : project,
     projects,
     backlog: backlog.backlog ?? [],
     workItems: workItems.work_items ?? [],
@@ -201,8 +207,13 @@ export async function loadTeamsData() {
     api('/bots'), api('/workload'), api('/bot-groups'), api('/dashboard'), api('/onboard/discover'),
   ])
   const projects = sortProjects(dashboard.projects ?? [])
-  const project = projects[0] ?? null
-  const team = project ? await api(`/projects/${encodeURIComponent(project.id)}/team`) : null
+  const first = projects[0] ?? null
+  // The roster lives in Hermes: none to read for an unlinked project.
+  const link = { unlinked: isUnlinked(first) }
+  const team = first
+    ? await hermesRead(link, () => api(`/projects/${encodeURIComponent(first.id)}/team`), null)
+    : null
+  const project = first && link.unlinked ? { ...first, linked: false } : first
   const messages = {}
   await Promise.all((groups.groups ?? []).map(async (group) => {
     const result = await api(`/bot-groups/${encodeURIComponent(group.name)}/messages`)

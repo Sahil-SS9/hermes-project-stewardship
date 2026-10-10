@@ -1,5 +1,6 @@
 // Typed wrappers over the host SDK for the Project Stewardship plugin backend.
 import type { ObjectiveView } from './objective-evidence';
+import { isUnlinkedError, unlinkedFailure } from './unlinked';
 export interface HermesPluginSDK {
   readonly sdkVersion: string;
   React: any;
@@ -14,7 +15,8 @@ export interface PortfolioProject {
   project_id: string;
   enabled?: boolean;
   phase?: string;
-  status: 'on_track' | 'at_risk' | 'stalled' | 'idle';
+  // 'unlinked': Hermes has no project for it, so its work cannot be read.
+  status: 'on_track' | 'at_risk' | 'stalled' | 'idle' | 'unlinked';
   items: { total: number; done: number; blocked: number; overdue: number };
   next_milestone?: { name: string; due: string | null; overdue: boolean } | null;
   last_activity?: string | null;
@@ -57,6 +59,8 @@ export interface DashboardView {
     id: string;
     enabled?: boolean;
     phase?: string;
+    // false: Hermes has no project for it (its work items cannot be read).
+    linked?: boolean;
     health?: string | null;
     work?: { backlog?: number; active?: number; done?: number; blocked?: number };
     unacked_notifications?: number;
@@ -194,21 +198,30 @@ export interface Observation {
 }
 
 export function createApi(sdk: HermesPluginSDK) {
-  const get = <T,>(path: string): Promise<T> => sdk.fetchJSON(`${BASE}${path}`);
+  // A project Hermes does not know (10/10/2026): a refusal for it is reported
+  // in words, whichever screen shows it.
+  const call = async <T,>(path: string, init?: RequestInit): Promise<T> => {
+    try {
+      return await sdk.fetchJSON<T>(`${BASE}${path}`, init);
+    } catch (error) {
+      throw isUnlinkedError(error) ? unlinkedFailure(error, path) : error;
+    }
+  };
+  const get = <T,>(path: string): Promise<T> => call<T>(path);
   const post = <T,>(path: string, body: unknown): Promise<T> =>
-    sdk.fetchJSON(`${BASE}${path}`, {
+    call<T>(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body ?? {}),
     });
   const put = <T,>(path: string, body: unknown): Promise<T> =>
-    sdk.fetchJSON(`${BASE}${path}`, {
+    call<T>(path, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body ?? {}),
     });
   const patch = <T,>(path: string, body: unknown): Promise<T> =>
-    sdk.fetchJSON(`${BASE}${path}`, {
+    call<T>(path, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body ?? {}),

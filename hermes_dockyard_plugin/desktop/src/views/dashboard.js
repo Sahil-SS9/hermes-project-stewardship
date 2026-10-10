@@ -18,6 +18,7 @@ import { Fragment } from '../runtime/react.js'
 import { useEffect } from '../runtime/react.js'
 import { api } from '../runtime/context.js'
 import { readableLabel } from '../data/loaders.js'
+import { UNLINKED_LABEL } from '../data/unlinked.js'
 import { EmptyState } from '../lib/ui.js'
 import { validationSummary } from '../data/loaders.js'
 import { unassignedWork } from '../data/loaders.js'
@@ -243,11 +244,36 @@ export function FleetGroups({ groups, onOpen }) {
   return jsxs(Fragment, { children: sections })
 }
 
+// What each Dashboard attention item is, in words. Until 10/10/2026 every item
+// that was not an approval read "Blocked" / "Work blocked" with "Open work
+// item", including a project Hermes has no project for. One table feeds the
+// "Needs you now" list, All issues and its filters.
+const ISSUE_CAUSES = Object.freeze({
+  blocked_item: { tag: 'Blocked', tone: 'blocker', impact: 'Work blocked' },
+  overdue_item: { tag: 'Overdue', tone: 'blocker', impact: 'Work overdue' },
+  evidence_stale: { tag: 'Stale evidence', tone: 'notice', impact: 'Evidence out of date' },
+  unlinked_project: { tag: UNLINKED_LABEL, tone: 'notice', impact: 'Work cannot be shown' },
+  project_attention: { tag: 'Project state', tone: 'notice', impact: 'Needs a decision' },
+})
+const ISSUE_FILTERS = Object.freeze([['all', 'All issues'], ['decision', 'Decisions'],
+  ...Object.entries(ISSUE_CAUSES).map(([cause, { tag }]) => [cause, tag])])
+// Portfolio statuses with a segment of their own in the fleet health bar.
+const HEALTH_STATES = Object.freeze(['on_track', 'at_risk', 'stalled', 'idle', 'unlinked'])
+
+export function issueLabels(item) {
+  if (item?.kind === 'initiative_approval') {
+    return { tag: 'Approval', tone: 'approval', impact: `Risk: ${readableLabel(item.risk)}`, open: 'Review approval' }
+  }
+  const known = ISSUE_CAUSES[item?.cause] ?? { tag: readableLabel(item?.cause, 'Issue'), tone: 'notice', impact: 'Needs attention' }
+  // Open goes where the item's deep link goes: one work item, or the project.
+  return { ...known, open: String(item?.deep_link ?? '').startsWith('s2:work/') ? 'Open work item' : 'Open project' }
+}
+
 export function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
-  // Attention-first ordering: at-risk/stalled projects outrank healthy ones.
-  const STATUS_PRIORITY = { at_risk: 0, stalled: 1, on_track: 2, idle: 3 }
+  // Attention-first ordering: at-risk, unlinked and stalled projects outrank healthy ones.
+  const STATUS_PRIORITY = { at_risk: 0, unlinked: 1, stalled: 2, on_track: 3, idle: 4 }
   const projects = [...(view.portfolio?.projects ?? [])].sort((left, right) =>
-    (STATUS_PRIORITY[left.status] ?? 2) - (STATUS_PRIORITY[right.status] ?? 2))
+    (STATUS_PRIORITY[left.status] ?? 3) - (STATUS_PRIORITY[right.status] ?? 3))
   const decisions = view.groups?.decisions ?? []
   const interventions = view.groups?.interventions ?? []
   const rows = [...decisions, ...interventions].sort((a, b) => (b.age_days ?? 0) - (a.age_days ?? 0))
@@ -292,7 +318,7 @@ export function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
   const evidenceFiles = view.portfolio?.evidence_files
   const workActive = Number(view.totals?.active_work ?? 0)
   const waiting = Number(view.inbox?.count ?? 0)
-  const statusName = { on_track: 'On track', at_risk: 'At risk', stalled: 'Stalled', idle: 'Idle' }
+  const statusName = { on_track: 'On track', at_risk: 'At risk', stalled: 'Stalled', idle: 'Idle', unlinked: UNLINKED_LABEL }
   const metric = (label, value, detail, icon, tone, onClick) => jsxs(onClick ? 'button' : 'div', {
     type: onClick ? 'button' : undefined, onClick,
     'data-metric': label.toLowerCase().replace(/[^a-z]+/g, '-'),
@@ -304,17 +330,19 @@ export function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
     const total = Number(project.items?.total ?? 0)
     const done = Number(project.items?.done ?? 0)
     const status = statusName[project.status] ?? readableLabel(project.status, 'Unknown')
+    // Hermes never reported this project's work: no "No work items" claim.
+    const unreadable = project.status === 'unlinked'
     return jsxs('div', { role: 'row', className: 'dockyard-command-row dockyard-command-project-row',
       'data-project-row': project.project_id, children: [
         jsx('span', { role: 'cell', children: jsx('button', { type: 'button', className: 'dockyard-button small', onClick: () => onOpen?.(`s1:project/${project.project_id}`), children: project.project_id }) }),
         jsx('span', { role: 'cell', children: project.owner || 'Not assigned' }),
         jsx('span', { role: 'cell', className: `dockyard-command-health ${project.status}`, children: status }),
         jsxs('span', { role: 'cell', className: 'dockyard-command-progress', children: [
-          jsx('span', { children: total ? `${number(done)} / ${number(total)} work items` : 'No work items' }),
+          jsx('span', { children: unreadable ? 'Unknown (not linked)' : total ? `${number(done)} / ${number(total)} work items` : 'No work items' }),
           jsx('span', { className: 'dockyard-command-progress-track', children: jsx('span', { style: { width: `${total ? Math.round((done / total) * 100) : 0}%` } }) }),
         ] }),
         jsx('span', { role: 'cell', children: project.next_milestone ? `${project.next_milestone.name} · ${project.next_milestone.due || 'No due date'}` : 'Not scheduled' }),
-        jsx('span', { role: 'cell', children: (project.items?.blocked || project.items?.overdue) ? `${number(project.items.blocked || 0)} blocked · ${number(project.items.overdue || 0)} overdue` : 'No open blockers' }),
+        jsx('span', { role: 'cell', children: unreadable ? 'Unknown (not linked)' : (project.items?.blocked || project.items?.overdue) ? `${number(project.items.blocked || 0)} blocked · ${number(project.items.overdue || 0)} overdue` : 'No open blockers' }),
       ]}, project.project_id)
   }
   const empty = projects.length === 0
@@ -340,8 +368,7 @@ export function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
     ] })
   }
   if (subview === 'issues') {
-    const options = [['all', 'All issues'], ['decision', 'Decisions'], ['blocked_item', 'Blocked'],
-      ['overdue_item', 'Overdue'], ['evidence_stale', 'Stale evidence'], ['project_attention', 'Project state']]
+    const options = ISSUE_FILTERS
     const filtered = rows.filter((item) => issueFilter === 'all' ||
       (issueFilter === 'decision' ? item.kind === 'initiative_approval' : item.cause === issueFilter))
     return jsxs('div', { className: 'dockyard-command dockyard-command-directory', 'data-dashboard-subview': 'issues', children: [
@@ -365,8 +392,8 @@ export function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
           className: 'dockyard-command-row dockyard-command-attention-row',
           onClick: () => item.deep_link ? onOpen?.(item.deep_link) : onInbox?.(),
           children: [
-            jsx('span', { className: `dockyard-command-type ${item.kind === 'initiative_approval' ? 'approval' : 'blocker'}`,
-              children: item.kind === 'initiative_approval' ? 'Approval' : readableLabel(item.cause, 'Issue') }),
+            jsx('span', { className: `dockyard-command-type ${issueLabels(item).tone}`,
+              children: issueLabels(item).tag }),
             jsxs('span', { className: 'dockyard-command-title', children: [jsx('strong', { children: item.title }),
               jsx('small', { children: item.ref || item.detail || '' })] }),
             jsx('span', { children: item.project }), jsx('span', { children: item.owner || readableLabel(item.risk, 'Not assigned') }),
@@ -397,14 +424,14 @@ export function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
       jsxs('div', { className: 'dockyard-command-health-summary', children: [
         jsx('span', { children: 'FLEET HEALTH' }),
         jsx('div', { className: 'dockyard-command-health-track', role: 'img',
-          'aria-label': `${number(onTrack)} on track, ${number(projects.filter((p) => p.status === 'at_risk').length)} at risk, ${number(projects.filter((p) => p.status === 'stalled').length)} stalled, ${number(projects.filter((p) => p.status === 'idle').length)} idle, ${number(projects.filter((p) => !['on_track', 'at_risk', 'stalled', 'idle'].includes(p.status)).length)} unverified`,
-          children: ['on_track', 'at_risk', 'stalled', 'idle', 'unknown'].map((state) => {
-            const count = projects.filter((p) => (['on_track', 'at_risk', 'stalled', 'idle'].includes(p.status) ? p.status : 'unknown') === state).length
+          'aria-label': `${number(onTrack)} on track, ${number(projects.filter((p) => p.status === 'at_risk').length)} at risk, ${number(projects.filter((p) => p.status === 'stalled').length)} stalled, ${number(projects.filter((p) => p.status === 'idle').length)} idle, ${number(projects.filter((p) => p.status === 'unlinked').length)} not linked, ${number(projects.filter((p) => !HEALTH_STATES.includes(p.status)).length)} unverified`,
+          children: [...HEALTH_STATES, 'unknown'].map((state) => {
+            const count = projects.filter((p) => (HEALTH_STATES.includes(p.status) ? p.status : 'unknown') === state).length
             return count ? jsx('span', { className: `dockyard-health-segment ${state}`, style: { width: `${count / projects.length * 100}%` } }, state) : null
           }),
         }),
         jsx('div', { className: 'dockyard-command-health-legend', children: [
-          ['on_track', 'On track'], ['at_risk', 'At risk'], ['stalled', 'Stalled'], ['idle', 'Idle'], ['unknown', 'Unverified'],
+          ['on_track', 'On track'], ['at_risk', 'At risk'], ['stalled', 'Stalled'], ['idle', 'Idle'], ['unlinked', UNLINKED_LABEL], ['unknown', 'Unverified'],
         ].map(([state, label]) => jsxs('span', { children: [jsx('i', { className: `dockyard-health-dot ${state}`, 'aria-hidden': true }), label] }, state)) }),
       ]}),
       unassignedTotal ? jsxs('div', { className: 'dockyard-soft-alert', 'data-unassigned-alert': 'fleet', role: 'status', children: [
@@ -440,9 +467,9 @@ export function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
               ]}),
               rows.length ? rows.map((item, index) => jsxs('button', { type: 'button', className: `dockyard-command-row dockyard-command-attention-row${focusItem === item ? ' is-selected' : ''}`,
                 onClick: () => setSelected(item), 'aria-label': `Inspect ${item.title}`, children: [
-                  jsx('span', { className: `dockyard-command-type ${item.kind === 'initiative_approval' ? 'approval' : 'blocker'}`, children: item.kind === 'initiative_approval' ? 'Approval' : 'Blocked' }),
+                  jsx('span', { className: `dockyard-command-type ${issueLabels(item).tone}`, children: issueLabels(item).tag }),
                   jsxs('span', { className: 'dockyard-command-title', children: [jsx('strong', { children: item.title }), jsx('small', { children: item.ref || item.detail || '' })] }),
-                  jsx('span', { children: item.project }), jsx('span', { children: item.kind === 'initiative_approval' ? `Risk: ${readableLabel(item.risk)}` : 'Work blocked' }),
+                  jsx('span', { children: item.project }), jsx('span', { children: issueLabels(item).impact }),
                   jsx('span', { children: typeof item.age_days === 'number' ? `${number(item.age_days)}d` : 'Not recorded' }),
                 ]}, `${item.kind}:${item.ref || index}`)) : jsx('p', { className: 'dockyard-command-empty', children: 'No decisions or blocked work need attention.' }),
             ]}),
@@ -476,7 +503,7 @@ export function DashboardView({ view, onInbox, onRefresh, onOpen, resetView }) {
             ]}) : null,
             jsx('h4', { children: 'Recent activity' }),
             jsx('div', { className: 'dockyard-command-detail-activity', children: (view.notifications?.notifications ?? []).filter((note) => note.project === focusItem.project).slice(0, 3).map((note) => jsx('p', { children: `${note.title} · ${formatWhen(note.created_at)}` }, note.id)) }),
-            jsx(Button, { variant: 'primary', onClick: () => focusItem.kind === 'initiative_approval' ? onInbox?.() : onOpen?.(focusItem.deep_link), children: focusItem.kind === 'initiative_approval' ? 'Review approval' : 'Open work item' }),
+            jsx(Button, { variant: 'primary', onClick: () => focusItem.kind === 'initiative_approval' ? onInbox?.() : onOpen?.(focusItem.deep_link), children: issueLabels(focusItem).open }),
           ]}) : jsx('p', { children: 'Select an item to see its details.' }),
         ]}),
       ]}),

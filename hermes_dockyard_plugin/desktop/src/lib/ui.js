@@ -5,6 +5,9 @@ import { ProjectSwitcher } from './project-switcher.js'
 import { jsxs } from '../runtime/react.js'
 import { jsx } from '../runtime/react.js'
 import { readableLabel } from '../data/loaders.js'
+import { UNLINKED_TITLE } from '../data/unlinked.js'
+import { UNLINKED_DETAIL } from '../data/unlinked.js'
+import { unlinkedNextStep } from '../data/unlinked.js'
 import { useEffect } from '../runtime/react.js'
 import { useState } from '../runtime/react.js'
 import { api } from '../runtime/context.js'
@@ -718,6 +721,15 @@ export function ErrorState({ error, onRetry }) {
     jsx('h2', { children: 'Project Stewardship could not load this view' }),
     jsx('p', { children: String(error) }),
     jsx(Button, { action: 'retry', variant: 'primary', onClick: onRetry, children: 'Try again' }),
+  ]})
+}
+
+// A project Hermes has no project for (10/10/2026): say what is missing and
+// how to link it, where its work would have been. A state, not an error.
+export function UnlinkedNotice({ projectId }) {
+  return jsxs('div', { className: 'dockyard-view-only-note', role: 'status', 'data-unlinked-notice': projectId, children: [
+    jsx(Icon, { name: 'alert' }),
+    jsxs('span', { children: [jsx('strong', { children: UNLINKED_TITLE }), `. ${UNLINKED_DETAIL} ${unlinkedNextStep(projectId)}`] }),
   ]})
 }
 

@@ -5,6 +5,7 @@
 // as markup.
 import type { Api, HermesPluginSDK, MilestoneDetail, MilestoneSummary, WorkItem } from './api';
 import { createApi } from './api';
+import { UNLINKED_DETAIL, UNLINKED_LABEL, UNLINKED_TITLE, hermesRead, isUnlinkedError, unlinkedNextStep } from './unlinked';
 import { renderObjectiveEvidence } from './objective-evidence';
 import { mountWorkflowCanvas, type CanvasRun } from './workflow-canvas';
 
@@ -134,7 +135,10 @@ export function initApp(
     } catch (err) {
       if (disposed || gen !== renderSeq || !main.isConnected) return;
       main.replaceChildren(
-        textEl('div', 'dy-error', `Project Stewardship backend unreachable: ${String(err)}`),
+        // A project Hermes does not know is a state to fix, not an outage.
+        isUnlinkedError(err)
+          ? textEl('div', 'dy-error', (err as Error).message)
+          : textEl('div', 'dy-error', `Project Stewardship backend unreachable: ${String(err)}`),
       );
     }
   };
@@ -295,8 +299,10 @@ async function renderDashboard(
     .map((p) => p.project_id);
   const stalled = projects.filter((p) => p.status === 'stalled')
     .map((p) => p.project_id);
+  const unlinked = projects.filter((p) => p.status === 'unlinked')
+    .map((p) => p.project_id);
   const at = view.attention ?? { overdue_items: 0, blocked_items: 0, overdue_milestones: 0 };
-  const hasAttention = atRisk.length > 0 || stalled.length > 0
+  const hasAttention = atRisk.length > 0 || stalled.length > 0 || unlinked.length > 0
     || (at.blocked_items ?? 0) > 0 || (at.overdue_items ?? 0) > 0
     || (at.overdue_milestones ?? 0) > 0;
   if (hasAttention) {
@@ -313,6 +319,7 @@ async function renderDashboard(
     };
     if (atRisk.length > 0) addLine('bad', `At risk: ${atRisk.join(', ')}`);
     if (stalled.length > 0) addLine('warn', `Stalled: ${stalled.join(', ')}`);
+    if (unlinked.length > 0) addLine('warn', `Not linked to Hermes: ${unlinked.join(', ')}`);
     if ((at.blocked_items ?? 0) > 0) addLine('warn', `Blocked items: ${at.blocked_items}`);
     if ((at.overdue_items ?? 0) > 0) addLine('bad', `Overdue items: ${at.overdue_items}`);
     if ((at.overdue_milestones ?? 0) > 0) addLine('bad', `Overdue milestones: ${at.overdue_milestones}`);
@@ -447,7 +454,22 @@ const STATUS_LABEL: Record<string, string> = {
   at_risk: 'At risk',
   stalled: 'Stalled',
   idle: 'Idle',
+  unlinked: UNLINKED_LABEL,
 };
+
+// A project Hermes has no project for (10/10/2026): say what is missing and
+// how to link it, where its work would have been. A state, not an error.
+function unlinkedNotice(projectId: string): HTMLElement {
+  const notice = document.createElement('div');
+  notice.className = 'dy-card dy-unlinked';
+  notice.setAttribute('role', 'status');
+  notice.dataset.unlinkedNotice = projectId;
+  notice.append(
+    textEl('strong', '', UNLINKED_TITLE),
+    textEl('span', '', `. ${UNLINKED_DETAIL} ${unlinkedNextStep(projectId)}`),
+  );
+  return notice;
+}
 
 const FEATURE_LABELS: Record<string, string> = {
   workflow_canvas: 'Workflow canvas',
@@ -539,8 +561,10 @@ async function renderWork(
     ? s.projectId
     : projects[0].id;
   s.projectId = projectId;
+  // Work items live in Hermes: none to read for an unlinked project.
+  const link = { unlinked: projects.find((p) => p.id === projectId)?.linked === false };
   const [workResponse, backlogResponse, viewsResponse] = await Promise.all([
-    s.api.workItems(projectId),
+    hermesRead(link, () => s.api.workItems(projectId), { work_items: [] }),
     s.api.backlog(projectId),
     s.api.views(projectId),
   ]);
@@ -799,8 +823,10 @@ async function renderWork(
   });
   draw();
 
-  const milestonesSection = buildMilestonesPanel(s, projectId, items, () =>
-    renderWork(main, s, isStale));
+  // Milestones live in Hermes too: an unlinked project says why instead.
+  const milestonesSection = link.unlinked
+    ? unlinkedNotice(projectId)
+    : buildMilestonesPanel(s, projectId, items, () => renderWork(main, s, isStale));
 
   const split = document.createElement('div');
   split.className = 'dy-work-split';
@@ -830,9 +856,11 @@ async function renderDelivery(
     ? s.projectId
     : projects[0].id;
   s.projectId = projectId;
+  // Work items live in Hermes: none to read for an unlinked project.
+  const link = { unlinked: projects.find((p) => p.id === projectId)?.linked === false };
   const [initiativeResponse, workResponse, observationResponse] = await Promise.all([
     s.api.initiatives(projectId),
-    s.api.workItems(projectId),
+    hermesRead(link, () => s.api.workItems(projectId), { work_items: [] }),
     s.api.observations(projectId),
   ]);
   if (isStale()) return;
@@ -944,7 +972,7 @@ async function renderDelivery(
     list.appendChild(textEl('div', 'dy-empty', 'No initiatives for this project.'));
   }
   const section = document.createElement('section');
-  section.append(toolbar, list);
+  section.append(toolbar, ...(link.unlinked ? [unlinkedNotice(projectId)] : []), list);
   main.replaceChildren(section);
 }
 

@@ -1,6 +1,9 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 import { useEffect } from './react.js'
+import { isUnlinkedError } from '../data/unlinked.js'
+import { UNLINKED_TITLE } from '../data/unlinked.js'
+import { unlinkedNextStep } from '../data/unlinked.js'
 import { DOCKYARD_CSS } from '../styles/dockyard-css.js'
 import { THEME_CSS } from '../styles/themes.js'
 import { SWITCHER_CSS } from '../styles/switcher-css.js'
@@ -58,11 +61,17 @@ export async function api(path, init) {
     return result
   } catch (error) {
     const raw = String(error?.message ?? error).slice(0, 240)
+    // A project Hermes does not know (10/10/2026) is a state to fix, not a
+    // "404: canonical project was not found": say so and how to link it.
+    const unlinked = isUnlinkedError(error)
+    const projectInPath = /^\/projects\/([^/?]+)/.exec(path)?.[1]
     // The Desktop host can stringify a structured 403 response detail as
     // "403: [object Object]" before passing the error to this plugin. The
     // original detail is unavailable here: preserve the status and offer
     // only the verified archive permission as an actionable hint.
-    const message = /^403:\s*\[object Object\]$/.test(raw) &&
+    const message = unlinked
+      ? `${UNLINKED_TITLE}. ${projectInPath ? unlinkedNextStep(decodeURIComponent(projectInPath)) : 'Link it to a Hermes project first.'}`
+      : /^403:\s*\[object Object\]$/.test(raw) &&
       /^\/projects\/[^/]+\/workflows\/[^/]+\/archive$/.test(path)
       ? '403 Forbidden: archive permission (project_archive) is required or this action is denied. No change was made.'
       : /(?:error\s*)?500|internal service error/i.test(raw)
@@ -71,6 +80,8 @@ export async function api(path, init) {
     if (method !== 'GET' && !init?.suppressErrorToast && !quiet) emitToast('danger', message)
     const failure = new Error(message)
     failure.cause = error
+    // Kept so a read that needs Hermes can still tell a missing link apart.
+    if (unlinked) failure.unlinked = true
     throw failure
   }
 }

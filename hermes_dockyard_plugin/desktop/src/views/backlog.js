@@ -21,6 +21,9 @@ import { WorkItemDetail } from '../work-item/detail.js'
 import { BacklogImportWizard } from './backlog-import-wizard.js'
 import { BacklogReasonModal } from './backlog-reason-modal.js'
 import { BacklogBoard } from './backlog-board.js'
+import { Fragment } from '../runtime/react.js'
+import { UnlinkedNotice } from '../lib/ui.js'
+import { isUnlinked } from '../data/unlinked.js'
 import {
   DOCKYARD_TYPE_NAMES,
   DOCKYARD_EDITABLE_TYPES,
@@ -141,7 +144,8 @@ export function BacklogView({ view, onRefresh, preset }) {
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [createOpen, createSaving])
   if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Select a project before prioritising its backlog.', icon: 'project' })
-  const canCreate = project.enabled !== false && project.phase === 'active'
+  // Work lives in Hermes: none can be created for an unlinked project.
+  const canCreate = project.enabled !== false && project.phase === 'active' && !isUnlinked(project)
   const workByRef = Object.fromEntries((view.workItems ?? []).map((item) => [item.ref, item]))
   const entries = [...(view.backlog ?? [])].sort((left, right) => Number(left.rank) - Number(right.rank))
   const requestMove = (entry, newRank) => {
@@ -652,7 +656,7 @@ export function BacklogView({ view, onRefresh, preset }) {
       else showTransfer(operation)
     }).catch(() => {})
   }
-  return BacklogBoard({
+  const board = BacklogBoard({
     UNASSIGNED,
     unassigned,
     ROOT_TYPES,
@@ -793,6 +797,10 @@ export function BacklogView({ view, onRefresh, preset }) {
     view,
     workByRef,
   })
+  // Hermes has no project for it: say so above the (empty) board.
+  return isUnlinked(project)
+    ? jsxs(Fragment, { children: [jsx(UnlinkedNotice, { projectId: project.id }, 'unlinked'), board] })
+    : board
 }
 
 export const DOCKYARD_VIEW_TEST = Object.freeze({ name: 'BacklogView' })
