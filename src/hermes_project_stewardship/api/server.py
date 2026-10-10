@@ -1946,18 +1946,6 @@ def create_app(
 
     # ------------------- Project Stewardship work management (G1) ----------------- #
 
-    def _unbound_actor(request: Request) -> str:
-        """Attribution when NO trusted caller is bound (open dev mode).
-
-        The owner chose NOT to refuse unbound writes (unlike decisions):
-        single-operator/CI rigs run tokenless intentionally, and open-mode
-        tests exercise these routes without a principal. But a spoofed
-        body/query actor must still not enter the audit trail masquerading
-        as a principal, so unbound writes record the deployment label the
-        docs already define for tokenless embeds ("stewardship-api").
-        """
-        return "stewardship-api"
-
     def principal_bound() -> Optional[str]:
         """The acting identity for THIS request: trusted callers only.
 
@@ -1982,6 +1970,18 @@ def create_app(
         bound_kind = "human" if bound else actor_kind
         return _Actor(id=bound_id, display_name=bound_id,
                       kind=_ActorKind(bound_kind))
+
+    def _view_actor(actor_id: str, actor_kind: str) -> Actor:
+        """Saved views act as the trusted caller when one is bound (R-M2): a
+        query actor never outranks it. Open dev mode has no trusted caller,
+        so there the query must name the actor."""
+        if not actor_id and not principal_bound():
+            raise HTTPException(
+                422, "actor_id is required when no trusted caller is bound")
+        try:
+            return _actor(actor_id, actor_kind)
+        except ValueError:
+            raise HTTPException(422, f"invalid actor_kind {actor_kind!r}")
 
     def _target_actor(actor_id: str, actor_kind: str) -> Actor:
         """An action TARGET (e.g. a new item's assignee) is named by the
@@ -2404,19 +2404,9 @@ def create_app(
     @router.get("/projects/{project_id}/views")
     def views_list(project_id: str, request: Request, actor_id: str = "",
                    actor_kind: str = "human"):
-        """R-M2 (3b): the acting identity binds to the trusted caller
-        (bearer principal or Desktop proxy user) when one is present; the
-        query actor is attribution only and never outranks them. Open
-        dev mode (no trusted caller) keeps caller-named attribution for
-        multi-actor view semantics; spoof denial is covered under bearer
-        and proxy-positive tests."""
+        """List the saved views the acting user may see (see _view_actor)."""
         svc.require_feature(project_id, "saved_views")
-        bound = principal_bound()
-        try:
-            actor = _actor(bound or actor_id, actor_kind) if not bound \
-                else _actor(bound, "human")
-        except ValueError:
-            raise HTTPException(422, f"invalid actor_kind {actor_kind!r}")
+        actor = _view_actor(actor_id, actor_kind)
         return {"views": dy.views_list(project_id, actor=actor)}
 
     @router.get("/projects/{project_id}/views/{name}/items")
@@ -2424,11 +2414,7 @@ def create_app(
                  actor_id: str = "", actor_kind: str = "human"):
         """Run a saved view's query; returns matching work items."""
         svc.require_feature(project_id, "saved_views")
-        bound = principal_bound()
-        try:
-            actor = _actor(bound, "human") if bound else _actor(actor_id, actor_kind)
-        except ValueError:
-            raise HTTPException(422, f"invalid actor_kind {actor_kind!r}")
+        actor = _view_actor(actor_id, actor_kind)
         return {"items": dy.view_items(project_id, name, actor=actor)}
 
     @router.delete("/projects/{project_id}/views/{name}")
@@ -2438,14 +2424,9 @@ def create_app(
 
         Error envelope: unknown/not-visible views map to 404 via the app
         ServiceError handler; views owned by another actor map to 409.
-        R-M2 (3b): trusted caller binds first; the query actor is
-        attribution only and never outranks the trusted identity."""
+        The acting user is the trusted caller when one is bound (R-M2)."""
         svc.require_feature(project_id, "saved_views")
-        bound = principal_bound()
-        try:
-            actor = _actor(bound, "human") if bound else _actor(actor_id, actor_kind)
-        except ValueError:
-            raise HTTPException(422, f"invalid actor_kind {actor_kind!r}")
+        actor = _view_actor(actor_id, actor_kind)
         return dy.view_delete(project_id, name, actor=actor)
 
     @router.post("/projects/{project_id}/reports")

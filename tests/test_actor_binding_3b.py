@@ -9,13 +9,11 @@ path proving Desktop writes still work and record the right user.
 
 Spoof contract: when a trusted caller is bound, ANY caller-supplied
 attribution string (body/query) is ignored — history and audit show the
-trusted identity. When no trusted caller is bound (open dev mode), the
-write is attributed to the deployment label ("stewardship-api"), NOT the
-caller's string — an unauthenticated caller's name never enters the audit
-trail. (Unbound writes are not refused on non-decision routes: the owner
-kept single-operator rigs working; decisions/gateway keep refusing.)
-Gateway: refuses entirely without a trusted caller (highest-value spoof:
-sender_id maps to stored permission rows). Nothing in-repo calls
+trusted identity. Open dev mode (no token, no Desktop proxy) has no caller to
+bind to, so attribution there stays caller-named, and non-decision writes are
+not refused: open mode is documented as dev-only. Decisions and gateway
+commands refuse without a trusted caller (the gateway's sender_id maps to
+stored permission rows: the highest-value spoof). Nothing in-repo calls
 /gateway/command anonymously.
 """
 from __future__ import annotations
@@ -56,17 +54,15 @@ def _seed_view(c):
 
 # ------------------------- R-M1: body actor spoofs ------------------------- #
 
-def test_settings_patch_body_actor_ignored_open_mode(tmp_path):
-    """R-M1: with a trusted caller bound, a body 'actor' never enters the
-    audit trail. (Open dev mode intentionally keeps caller-named
-    attribution — the owner preserved dev semantics; the spoof denial that
-    matters is the trusted-caller case right below.)"""
+def test_settings_patch_in_open_mode_keeps_the_caller_named_actor(tmp_path):
+    """Open dev mode has no trusted caller to bind to, so the body actor is
+    recorded as named. Pinned so a change to that contract is deliberate; the
+    spoof denial that matters is the trusted-caller case right below."""
     c, store = _open_env(tmp_path)
     r = c.patch(f"{V}/projects/p1/settings",
                 json={"mission": "updated", "actor": "forged-admin"})
     assert r.status_code == 200, r.text
-    tail = store.audit_tail(5)
-    assert tail, "settings patch is audited"
+    assert store.audit_tail(1)[0]["actor"] == "forged-admin"
 
 
 def test_proxy_bound_settings_ignores_spoofed_body_actor(tmp_path):
@@ -74,9 +70,7 @@ def test_proxy_bound_settings_ignores_spoofed_body_actor(tmp_path):
     desktop proxy user fixes attribution where notes §5 demand it: the
     real Desktop app reaches mutating routes through the proxy, not the
     bearer. Same contract as _decision_actor's Q2 binding."""
-    import os
     from hermes_project_stewardship.api.middleware import desktop_proxy_headers
-    os.environ["DOCKYARD_ACTOR_ID"] = "trusted-desktop"
     c, store = _open_env(tmp_path)
     r = c.patch(f"{V}/projects/p1/settings",
                 json={"mission": "updated", "actor": "forged"},
@@ -174,7 +168,6 @@ def test_view_delete_via_proxy_records_proxy_user(tmp_path, monkeypatch):
     monkeypatch.setenv("STEWARD_DB_PATH", str(tmp_path / "db.sqlite"))
     monkeypatch.setenv("DOCKYARD_ACTOR_ID", "trusted-desktop")
     monkeypatch.delenv("STEWARD_RPC_TOKEN", raising=False)
-    path = (tmp_path / "..").resolve()  # proxy path derived below
     from pathlib import Path as _P
     proxy_path = _P(__file__).parents[1] / "hermes_dockyard_plugin/dashboard/plugin_api.py"
     spec = importlib.util.spec_from_file_location("rm2_proxy", proxy_path)
@@ -205,6 +198,35 @@ def test_view_delete_via_proxy_records_proxy_user(tmp_path, monkeypatch):
     assert deleted.status_code == 200, deleted.text
     assert store._conn.execute(
         "SELECT 1 FROM dockyard_saved_views WHERE name='px'").fetchone() is None
+
+
+def test_view_delete_through_the_proxy_ignores_a_query_actor(tmp_path):
+    """R-M2: a Desktop proxy request naming `?actor_id=<owner>` must not
+    delete a view that belongs to someone else. On db320ea the query actor
+    won and the view was deleted."""
+    from hermes_project_stewardship.api.middleware import desktop_proxy_headers
+    c, store = _open_env(tmp_path)
+    r = c.put(f"{V}/projects/p1/views", json={
+        "name": "theirs", "layout": "table", "actor_id": "victim"})
+    assert r.status_code == 200, r.text
+    r = c.delete(f"{V}/projects/p1/views/theirs?actor_id=victim",
+                 headers=desktop_proxy_headers("trusted-desktop"))
+    assert r.status_code in (404, 409), r.text
+    row = store._conn.execute(
+        "SELECT owner_id FROM dockyard_saved_views WHERE name='theirs'").fetchone()
+    assert row is not None and row["owner_id"] == "victim", row
+
+
+def test_views_need_an_actor_when_no_trusted_caller_is_bound(tmp_path):
+    """Open dev mode: without a trusted caller the query must name the actor,
+    and the refusal says so (not a misleading 'invalid actor_kind')."""
+    c, _ = _open_env(tmp_path)
+    for request in (lambda: c.get(f"{V}/projects/p1/views"),
+                    lambda: c.get(f"{V}/projects/p1/views/mine/items"),
+                    lambda: c.delete(f"{V}/projects/p1/views/mine")):
+        r = request()
+        assert r.status_code == 422, r.text
+        assert "actor_id is required" in r.text, r.text
 
 
 # ------------------------- R-M3: gateway sender ---------------------------- #
