@@ -18,6 +18,15 @@ The running application is authoritative. Use:
 - Mutating routes are rate-limited with a bounded client cache.
 - Errors use `{"error":{"code","message","fields?"}}`.
 - Canonical host failures are redacted and fail closed.
+- A Hermes (canonical host) error has one status on every route: a missing
+  project, board, task or epic (`*_not_found`) is 404, `validation_error` is
+  422, a transition, write or idempotency conflict is 409, and anything else,
+  such as `host_unavailable`, is 503. A project Hermes has no project for (an
+  "unlinked" project) is therefore a 404 with code `project_not_found` on the
+  routes that need Hermes (work items, work dependencies, milestones, team,
+  memory suggestions, report generation), while its stewardship data still
+  reads normally. `/dashboard` reports `linked: false` and `/portfolio` status
+  `unlinked` for it.
 - Actor/interface attribution is explicit on policy and governance mutations.
 
 ## Main route groups

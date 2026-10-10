@@ -708,6 +708,22 @@ class WorkflowImportBody(BaseModel):
     document: Dict[str, Any]
 
 
+def _kanban_error_status(code: str) -> int:
+    """HTTP status for a Hermes (canonical host) error code.
+
+    A missing project, board, task or epic is a 404. For a project Hermes does
+    not know, that is an unlinked project, not an outage (10/10/2026). Only an
+    unavailable or failing host is a 503, so the API still fails closed.
+    """
+    if code.endswith("_not_found"):
+        return 404
+    if code == "validation_error":
+        return 422
+    if code in {"transition_conflict", "write_conflict", "idempotency_conflict"}:
+        return 409
+    return 503
+
+
 def create_app(
     store: Optional[Store] = None,
     db_path: Optional[Path] = None,
@@ -879,7 +895,8 @@ def create_app(
         try:
             return team_management.team(project_id)
         except KanbanAdapterError as exc:
-            raise HTTPException(503, {"code": exc.code, "message": exc.message}) from None
+            raise HTTPException(_kanban_error_status(exc.code),
+                                {"code": exc.code, "message": exc.message}) from None
         except (ServiceError, PreviewConflict) as exc:
             raise HTTPException(409, str(exc)) from None
 
@@ -891,7 +908,8 @@ def create_app(
                 raise ServiceError("add members as role 'member'; use lead transfer separately")
             member = team_management.add_member(project_id, body.profile_slug, actor=principal)
         except KanbanAdapterError as e:
-            raise HTTPException(503, {"code": e.code, "message": e.message}) from None
+            raise HTTPException(_kanban_error_status(e.code),
+                                {"code": e.code, "message": e.message}) from None
         except ServiceError as e:
             raise HTTPException(409, str(e)) from None
         return member.__dict__
@@ -918,7 +936,8 @@ def create_app(
         try:
             return team_management.preview(project_id, body.from_profile, body.to_profile)
         except KanbanAdapterError as exc:
-            raise HTTPException(503, {"code": exc.code, "message": exc.message}) from None
+            raise HTTPException(_kanban_error_status(exc.code),
+                                {"code": exc.code, "message": exc.message}) from None
         except (ServiceError, PreviewConflict) as exc:
             raise HTTPException(409, str(exc)) from None
 
@@ -2026,19 +2045,8 @@ def create_app(
                 f"canonical work {exc.item_ref} exists; ranking is incomplete",
             ) from None
         if isinstance(exc, KanbanAdapterError):
-            status_code = 503
-            if exc.code.endswith("_not_found"):
-                status_code = 404
-            elif exc.code == "validation_error":
-                status_code = 422
-            elif exc.code in {
-                "transition_conflict",
-                "write_conflict",
-                "idempotency_conflict",
-            }:
-                status_code = 409
             raise HTTPException(
-                status_code,
+                _kanban_error_status(exc.code),
                 {
                     "code": exc.code,
                     "message": exc.message,
@@ -3625,6 +3633,19 @@ def create_app(
                 "code": "feature_disabled",
                 "message": str(exc),
                 "fields": {"project_id": exc.project_id, "feature": exc.feature},
+            }),
+        )
+
+    @app.exception_handler(KanbanAdapterError)
+    async def kanban_envelope(request: Request, exc: KanbanAdapterError):
+        # Safety net for routes that do not catch a Hermes error themselves:
+        # a project Hermes does not know must never become a server error.
+        return error_envelope_handler(
+            request,
+            HTTPException(_kanban_error_status(exc.code), {
+                "code": exc.code,
+                "message": exc.message,
+                "fields": exc.fields,
             }),
         )
 
