@@ -152,8 +152,17 @@ def _cross_project_reads(app) -> list[str]:
 # Before archiving, the project must show on these, or the "nowhere" check below proves nothing.
 _SHOWN_BEFORE = [
     f"{API}/projects", f"{API}/dashboard", f"{API}/portfolio", f"{API}/inbox", f"{API}/search",
-    f"{API}/notifications", f"{API}/settings/last-project",
+    f"{API}/notifications", f"{API}/settings/last-project", f"{API}/workflow-library",
 ]
+
+
+def _define_own_workflow(client, headers, project_id=GONE):
+    """A workflow of the project's own: the workflow library lists every project's own
+    workflows (found by the rehearsal on a copy of a real database, 11/10/2026)."""
+    response = client.post(f"{API}/workflow-library", headers=headers, json={
+        "scope": "project", "name": "retired-flow", "owner_project_id": project_id,
+        "nodes": [{"id": "a", "title": "A", "depends_on": []}]})
+    assert response.status_code == 200, response.text
 
 
 def test_an_archived_project_appears_in_no_list_count_or_inbox(world, monkeypatch):
@@ -172,6 +181,7 @@ def test_an_archived_project_appears_in_no_list_count_or_inbox(world, monkeypatc
     assert client.put(f"{API}/settings/last-project", headers=headers,
                       json={"project_id": GONE}).status_code == 200
     svc.freeze(GONE, actor="sahil")
+    _define_own_workflow(client, headers)
     reads = _cross_project_reads(client.app)
     assert set(_SHOWN_BEFORE) <= set(reads)
     params = {f"{API}/search": {"q": GONE[:6]}}
@@ -206,6 +216,24 @@ def test_an_archived_project_appears_in_no_list_count_or_inbox(world, monkeypatc
     again = read_all()
     for path in _SHOWN_BEFORE:
         assert GONE in again[path][1], f"not back after restore: {path}"
+
+
+def test_an_archived_projects_own_workflows_still_open_by_name(world):
+    store, svc, client, headers = world
+    _define_own_workflow(client, headers)
+    _archive(client, headers)
+    # Hidden from the library, archived workflows included (that flag is about workflows).
+    for params in ({}, {"include_archived": True}, {"scope": "project"}):
+        listed = client.get(f"{API}/workflow-library", headers=headers, params=params)
+        assert listed.status_code == 200, listed.text
+        assert [w for w in listed.json()["workflows"] if w["owner_project_id"] == GONE] == [], params
+    # Its own Workflows tab, asked for by name, still has it.
+    own = client.get(f"{API}/projects/{GONE}/workflows/available", headers=headers)
+    assert own.status_code == 200, own.text
+    assert "retired-flow" in [w["name"] for w in own.json()["workflows"]]
+    _restore(client, headers)
+    listed = client.get(f"{API}/workflow-library", headers=headers).json()["workflows"]
+    assert [w["name"] for w in listed if w["owner_project_id"] == GONE] == ["retired-flow"]
 
 
 def test_the_archived_list_says_what_restore_brings_back(world):

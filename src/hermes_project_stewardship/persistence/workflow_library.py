@@ -36,7 +36,15 @@ class WorkflowLibrary:
         ).fetchone() is None:
             raise ValueError("project was not found")
 
-    def list(self, *, scope: str | None = None, include_archived: bool = False):
+    def list(self, *, scope: str | None = None, include_archived: bool = False,
+             archived_projects: bool = False):
+        """The library: global workflows and every project's own.
+
+        An archived project's own workflows are left out, as Archive hides a project
+        everywhere (owner decision 10/10/2026); ``include_archived`` is about archived
+        workflows, not projects. ``archived_projects=True`` keeps them, for the
+        project's own list (``available``), which still opens by name.
+        """
         if scope not in (None, "global", "project"):
             raise ValueError("scope must be global or project")
         result = []
@@ -49,11 +57,15 @@ class WorkflowLibrary:
                 if include_archived or row["archived_at"] is None:
                     result.append(self._present(row, "global"))
         if scope != "global":
+            hidden = set() if archived_projects else {r[0] for r in self.store._conn.execute(
+                "SELECT project_id FROM project_stewardship WHERE archived_at IS NOT NULL")}
             for row in self.store._conn.execute(
                 "SELECT w.* FROM dockyard_workflows w WHERE version=("
                 "SELECT MAX(version) FROM dockyard_workflows WHERE "
                 "project_id=w.project_id AND name=w.name) ORDER BY project_id,name"
             ):
+                if row["project_id"] in hidden:
+                    continue
                 if include_archived or row["archived_at"] is None:
                     # Internal execution snapshots are not library entries.
                     if self.store._conn.execute(
@@ -121,7 +133,7 @@ class WorkflowLibrary:
     def available(self, project_id: str):
         self._exists(project_id)
         return [{**row, "enabled": self.enabled(project_id, row["name"], row["scope"])}
-                for row in self.list() if row["scope"] == "global" or
+                for row in self.list(archived_projects=True) if row["scope"] == "global" or
                 row["owner_project_id"] == project_id]
 
     def toggle(self, project_id: str, name: str, scope: str, *, enabled: bool,

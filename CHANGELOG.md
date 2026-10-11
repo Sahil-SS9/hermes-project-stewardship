@@ -114,7 +114,8 @@ of the plugin now shares one name.
   An archived project no longer turns up in any list, count or inbox: the
   Dashboard and its health table, the Approval Inbox and "Needs you now"
   (where it used to appear as "This project is switched off"), notifications,
-  search, the project switcher and the remembered last project. Restore puts
+  search, the workflow library, the project switcher and the remembered last
+  project. Restore puts
   back its switch, phase and pause time as they were; it used to switch every
   project on and make it active. The project switcher's menu lists archived
   projects with what Restore brings back; Restore asks first, then opens the
