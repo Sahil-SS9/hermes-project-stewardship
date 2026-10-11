@@ -29,6 +29,11 @@ import { WorkflowLibraryView } from '../views/workflow-library.js'
 import { NotificationsView } from '../views/notifications.js'
 import { AppSettingsView } from '../views/app-settings.js'
 import { RoadmapView } from '../views/roadmap.js'
+import { ArchivedProjectsDialog } from '../views/archived-projects.js'
+import { loadArchivedProjects } from '../views/archived-projects.js'
+import { readArchiveReview } from './archive-review.js'
+import { ArchiveReviewBar } from './archive-review.js'
+import { restoreFromWords } from './archive-review.js'
 import { jsxs } from '../runtime/react.js'
 import { ConsoleBar } from '../lib/ui.js'
 import { ToastRegion } from '../lib/ui.js'
@@ -58,6 +63,16 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   // The switcher's choice: a project id, or ALL_PROJECTS ("*").
   const [selectedProject, setSelectedProject] = useState(null)
   const isAll = selectedProject === ALL_PROJECTS
+  // Archived projects (11/10/2026): hidden everywhere else; the switcher (A) or
+  // App settings (B) lists them. ?review=1 switches between the two places.
+  const [, setArchiveReviewTick] = useState(0)
+  const archiveReview = readArchiveReview()
+  const restoreFrom = restoreFromWords(archiveReview.place)
+  const [archivedCount, setArchivedCount] = useState(0)
+  const [archivedOpen, setArchivedOpen] = useState(false)
+  const askArchived = () => {
+    loadArchivedProjects().then((rows) => setArchivedCount(rows.length), () => setArchivedCount(0))
+  }
   // Sahil 05/10 (demo feedback h): theme and typeface for the whole app, kept
   // in the backend (/settings/appearance). Match Hermes follows Hermes
   // Desktop's own light/dark mode live (until now nothing set dark mode).
@@ -246,6 +261,7 @@ export function DashboardPage({ inboxCss = '' } = {}) {
     // No project picked yet: ask for the remembered one alongside this load.
     if (!selectedProject) rememberedProject()
     askAppearance()
+    askArchived()
     loading.then(
       (result) => {
         if (mounted.current && result?.projects) adoptProjects(result.projects, serial)
@@ -281,6 +297,24 @@ export function DashboardPage({ inboxCss = '' } = {}) {
     if (tab === 'roadmap') showRoadmap(projectId)
   }
   const showAllProjects = () => selectProject(ALL_PROJECTS)
+  // Archive (Project > Settings) hides the project everywhere, so the app
+  // leaves it for All projects and says where to restore it (11/10/2026).
+  const projectArchived = (projectId) => {
+    setDirtyProject(null)
+    setSelectedProject(ALL_PROJECTS)
+    goTab('dashboard')
+    refresh()
+    emitToast('success', `${projectId} is archived: hidden everywhere, nothing deleted. Restore it any time from ${restoreFrom}.`)
+  }
+  // Restored from the switcher's list: open the project. From App settings:
+  // stay there. The lists refresh either way.
+  const projectRestored = (projectId, open) => {
+    refresh()
+    if (!open) return
+    setArchivedOpen(false)
+    setSelectedProject(projectId)
+    goTab('project', { entryView: 'overview' })
+  }
   // opts.entryView / opts.project let a guarded switch land on a specific
   // project view (or owner project) once the unsaved-changes prompt clears.
   const pendingTabOpts = useRef({})
@@ -449,6 +483,8 @@ export function DashboardPage({ inboxCss = '' } = {}) {
       pendingWorkRef,
       onPendingWorkConsumed: () => setPendingWorkRef(null),
       notice: deepLinkNotice,
+      onArchived: projectArchived,
+      restoreFrom,
     }, `project:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
   } else if (tab === 'settings') {
     // Sahil 04/10 (demo feedback e): App settings. Project settings stay in the project.
@@ -460,6 +496,9 @@ export function DashboardPage({ inboxCss = '' } = {}) {
       onOpenProjectSettings: () => requestTab('project', { entryView: 'settings' }),
       onForgetProject: () => { lastProject.current.saved = null },
       onRefresh: refresh,
+      showArchived: archiveReview.place === 'settings',
+      onRestored: (projectId) => projectRestored(projectId, false),
+      onArchivedCount: setArchivedCount,
     }, 'app-settings')
   } else if (tab === 'workflows') {
     // Option A (Sahil 28/09): the top Workflows tab IS the library. Project
@@ -522,12 +561,15 @@ export function DashboardPage({ inboxCss = '' } = {}) {
     children: [
     jsxs('div', { className: 'dockyard-shell', children: [
       jsx(ConsoleBar, { tab, counts, projects: projectOptions, selectedProject, onProjectChange: selectProject,
-        onTab: requestTab, onNewProject: openNewProject, onOnboardExisting: openOnboardExisting, onOpen: openDeepLink }),
+        onTab: requestTab, onNewProject: openNewProject, onOnboardExisting: openOnboardExisting, onOpen: openDeepLink,
+        archivedCount, onOpenArchived: archiveReview.place === 'switcher' ? () => setArchivedOpen(true) : null }),
       jsx('main', {
         id: 'dockyard-panel',
         role: 'tabpanel',
         'aria-labelledby': `dockyard-tab-${tab}`,
-        children: content,
+        children: archiveReview.active
+          ? jsxs(Fragment, { children: [jsx(ArchiveReviewBar, { review: archiveReview, onChange: () => setArchiveReviewTick((tick) => tick + 1) }, 'archive-review'), content] })
+          : content,
       }),
     ]}),
     jsx(ToastRegion, { toasts, onDismiss: dismissToast }),
@@ -543,6 +585,7 @@ export function DashboardPage({ inboxCss = '' } = {}) {
         ]}),
       ]}),
     ]}) : null,
+    archivedOpen ? jsx(ArchivedProjectsDialog, { onClose: () => setArchivedOpen(false), onRestored: (projectId) => projectRestored(projectId, true), onCount: setArchivedCount }) : null,
     onboarding ? jsx(OnboardingWizard, { intent: onboarding, onClose: () => setOnboarding(null), onComplete: completeOnboarding }) : null,
   ]})
 }

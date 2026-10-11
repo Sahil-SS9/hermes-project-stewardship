@@ -502,6 +502,23 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-state-panel p { max-width: 480px; margin: 8px 0 0; color: var(--dy-text-2); font-size: 13px; }
 .dockyard-root .dockyard-state-panel .dockyard-button { margin-top: 18px; }
 .dockyard-root .dockyard-error-icon { color: var(--dy-danger); background: var(--dy-danger-bg); }
+/* A profile without the plugin's backend: a setting to change, not an error (11/10/2026). */
+.dockyard-root .dockyard-state-panel[data-state="plugin-off"] .dockyard-error-icon { color: var(--dy-info); background: var(--dy-info-bg); }
+.dockyard-root .dockyard-plugin-off-command {
+  display: block;
+  max-width: 100%;
+  margin-top: 12px;
+  padding: 8px 12px;
+  overflow-x: auto;
+  border: 1px solid var(--dy-border);
+  border-radius: 8px;
+  background: var(--dy-surface-subtle);
+  color: var(--dy-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  white-space: nowrap;
+  user-select: all;
+}
 @keyframes dockyard-skeleton-shimmer {
   from { transform: translateX(-100%); }
   to { transform: translateX(100%); }
@@ -978,6 +995,26 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dockyard-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .dockyard-root .dockyard-modal-head > div { min-width: 0; }
 .dockyard-root .dockyard-detail-modal { width: min(920px, 100%); }
+/* Archived projects (11/10/2026): the one list that shows them, with Restore. */
+.dockyard-root .dy-arch-modal { width: min(680px, 100%); }
+.dockyard-root .dy-arch-head h2 { margin: 0; }
+.dockyard-root .dy-arch-head p { margin: 6px 0 14px; color: var(--dy-text-2); font-size: 13px; }
+.dockyard-root .dy-arch-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.dockyard-root .dy-arch-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 12px 14px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface); }
+.dockyard-root .dy-arch-copy { display: grid; gap: 3px; min-width: 0; flex: 1 1 260px; }
+.dockyard-root .dy-arch-copy strong { color: var(--dy-text); font-size: 14px; overflow-wrap: anywhere; }
+.dockyard-root .dy-arch-mission { color: var(--dy-text-2); font-size: 13px; overflow-wrap: anywhere; }
+.dockyard-root .dy-arch-meta { color: var(--dy-text-3); font-size: 12px; }
+.dockyard-root .dy-arch-row .dockyard-button svg { width: 15px; height: 15px; margin-right: 6px; vertical-align: -3px; }
+.dockyard-root .dy-arch-confirm { display: grid; gap: 8px; flex: 1 1 100%; padding: 10px 12px; border: 1px solid var(--dy-accent-border); border-radius: 8px; background: var(--dy-accent-soft); color: var(--dy-text); font-size: 13px; }
+.dockyard-root .dy-arch-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.dockyard-root .dy-arch-empty { margin: 0; color: var(--dy-text-2); font-size: 13px; }
+/* Design review bar (?review=1); removed with the losing place after the pick. */
+.dockyard-root .dy-arch-review { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 14px; padding: 8px 12px; border: 1px dashed var(--dy-accent-border); border-radius: 10px; background: var(--dy-accent-soft); color: var(--dy-text); font-size: 12px; }
+.dockyard-root .dy-arch-review [role="group"] { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dockyard-root .dy-arch-review button { min-height: 32px; padding: 0 12px; border: 1px solid var(--dy-control-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text-2); font: inherit; cursor: pointer; }
+.dockyard-root .dy-arch-review button[aria-pressed="true"] { border-color: var(--dy-action); color: var(--dy-text); font-weight: 700; }
+.dockyard-root .dy-arch-review button:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
 .dockyard-root .dockyard-detail-columns { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; align-items: start; margin-top: 14px; }
 .dockyard-root .dockyard-detail-side { display: grid; gap: 2px; align-content: start; padding: 14px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-detail-side h3 { margin: 6px 0 2px; font-size: 12px; }

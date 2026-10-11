@@ -10,7 +10,7 @@ import { StatusTag } from '../lib/ui.js'
 import { Fragment } from '../runtime/react.js'
 import { Button } from '../lib/ui.js'
 import { effectiveMaxOpenInitiatives } from './settings-model.js'
-export function ProjectSettingsPanel({ project, settings, onRefresh, onDirty }) {
+export function ProjectSettingsPanel({ project, settings, onRefresh, onDirty, onArchived, restoreFrom }) {
   const buildForm = () => ({
     mission: settings?.mission ?? '',
     leadProfile: settings?.owner?.lead_profile ?? '',
@@ -116,7 +116,16 @@ export function ProjectSettingsPanel({ project, settings, onRefresh, onDirty }) 
     setLifecycleBusy(true)
     setMessage(null)
     try {
-      await api(`/projects/${encodeURIComponent(project.id)}/${config.endpoint}`, { method: 'POST', body: {} })
+      // Archive hides the project everywhere (11/10/2026): the app leaves it
+      // and says where to restore it, so no second toast here.
+      const archiving = pendingLifecycle === 'archive' && onArchived
+      await api(`/projects/${encodeURIComponent(project.id)}/${config.endpoint}`, { method: 'POST', body: {}, quiet: Boolean(archiving) })
+      if (archiving) {
+        setPendingLifecycle(null)
+        setLifecycleBusy(false)
+        onArchived(project.id)
+        return
+      }
       const readback = await api(`/projects/${encodeURIComponent(project.id)}/settings`)
       setLifecycleState(readback)
       if (readback.enabled === false) setEditing(false)
@@ -227,8 +236,8 @@ export function ProjectSettingsPanel({ project, settings, onRefresh, onDirty }) 
     jsxs('section', { className: 'dockyard-modal-layer', 'data-lifecycle-confirm': true, hidden: !pendingLifecycle, children: [
       jsxs('div', { className: 'dockyard-modal', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'dockyard-lifecycle-title', children: [
         jsx('h2', { id: 'dockyard-lifecycle-title', children: `${lifecycleCopy[pendingLifecycle]?.label || 'Change'} project?` }),
-        jsx('p', { children: pendingLifecycle === 'archive'
-          ? `This archives ${project.id} in stewardship only. The canonical project, board, tasks and repository remain untouched and available for explicit restore.`
+        jsx('p', { 'data-lifecycle-confirm-text': pendingLifecycle || '', children: pendingLifecycle === 'archive'
+          ? `${project.id} will be hidden everywhere: dashboard, projects, roadmap, inbox, search and alerts. Stewardship stops for it while it is archived. Nothing is deleted: its Hermes project, board, tasks and repository stay exactly as they are. Restore it any time from ${restoreFrom || 'the archived projects list'}, and it comes back exactly as it is now (${enabled ? 'switched on' : 'switched off'}, ${phase}).`
           : `This changes ${project.id} from its current ${enabled ? 'enabled' : 'disabled'} and ${phase} state.` }),
         jsxs('div', { className: 'dockyard-modal-actions', children: [
           jsx(Button, { disabled: lifecycleBusy, onClick: () => setPendingLifecycle(null), children: 'Cancel' }),

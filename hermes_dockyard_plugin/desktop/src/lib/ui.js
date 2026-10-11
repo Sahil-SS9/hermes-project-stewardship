@@ -8,6 +8,11 @@ import { readableLabel } from '../data/loaders.js'
 import { UNLINKED_TITLE } from '../data/unlinked.js'
 import { UNLINKED_DETAIL } from '../data/unlinked.js'
 import { unlinkedNextStep } from '../data/unlinked.js'
+import { isPluginOffError } from '../data/plugin-off.js'
+import { PLUGIN_OFF_TITLE } from '../data/plugin-off.js'
+import { PLUGIN_OFF_DETAIL } from '../data/plugin-off.js'
+import { PLUGIN_OFF_NEXT_STEP } from '../data/plugin-off.js'
+import { PLUGIN_OFF_COMMAND } from '../data/plugin-off.js'
 import { useEffect } from '../runtime/react.js'
 import { useState } from '../runtime/react.js'
 import { api } from '../runtime/context.js'
@@ -604,7 +609,7 @@ export function FleetSearch({ onOpen }) {
   ]})
 }
 
-export function ConsoleBar({ tab, counts, onTab, onNewProject, onOnboardExisting, projects = [], selectedProject, onProjectChange, onOpen }) {
+export function ConsoleBar({ tab, counts, onTab, onNewProject, onOnboardExisting, projects = [], selectedProject, onProjectChange, onOpen, onOpenArchived, archivedCount = 0 }) {
   // P3: the project context is persistent in the shell, not repeated in each panel.
   // Sahil 05/10: the Onboard tab became the "Onboard existing project" button
   // beside New project; both open the onboarding wizard.
@@ -641,7 +646,11 @@ export function ConsoleBar({ tab, counts, onTab, onNewProject, onOnboardExisting
           jsx('span', { children: 'Fleet oversight' }),
         ]}),
       ]}),
-      projects.length > 0 ? jsx(ProjectSwitcher, { projects, scope: selectedProject, onChange: onProjectChange, onNewProject, onOnboardExisting }) : null,
+      // Kept while archived projects exist, even with none listed, so the way
+      // back to them never disappears (11/10/2026).
+      projects.length > 0 || (onOpenArchived && archivedCount > 0)
+        ? jsx(ProjectSwitcher, { projects, scope: selectedProject, onChange: onProjectChange, onNewProject, onOnboardExisting, onOpenArchived, archivedCount })
+        : null,
     ]}),
     jsx(FleetSearch, { onOpen }),
     jsx('nav', { className: 'dockyard-tabs', role: 'tablist', 'aria-label': 'Project Stewardship sections', children:
@@ -716,6 +725,17 @@ export function EmptyState({ title, description, icon = 'project' }) {
 }
 
 export function ErrorState({ error, onRetry }) {
+  // A profile without the plugin's backend: a setting, not a failure (11/10/2026).
+  if (isPluginOffError(error)) {
+    return jsxs('section', { className: 'dockyard-state-panel', 'data-state': 'plugin-off', role: 'status', children: [
+      jsx('span', { className: 'dockyard-error-icon', children: jsx(Icon, { name: 'circle-help' }) }),
+      jsx('h2', { children: PLUGIN_OFF_TITLE }),
+      jsx('p', { children: PLUGIN_OFF_DETAIL }),
+      jsx('p', { children: PLUGIN_OFF_NEXT_STEP }),
+      jsx('code', { className: 'dockyard-plugin-off-command', 'data-plugin-off-command': true, children: PLUGIN_OFF_COMMAND }),
+      jsx(Button, { action: 'retry', variant: 'primary', onClick: onRetry, children: 'Try again' }),
+    ]})
+  }
   return jsxs('section', { className: 'dockyard-state-panel', 'data-state': 'error', children: [
     jsx('span', { className: 'dockyard-error-icon', children: jsx(Icon, { name: 'alert' }) }),
     jsx('h2', { children: 'Project Stewardship could not load this view' }),

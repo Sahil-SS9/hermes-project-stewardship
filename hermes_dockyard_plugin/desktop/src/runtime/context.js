@@ -4,6 +4,8 @@ import { useEffect } from './react.js'
 import { isUnlinkedError } from '../data/unlinked.js'
 import { UNLINKED_TITLE } from '../data/unlinked.js'
 import { unlinkedNextStep } from '../data/unlinked.js'
+import { isPluginOffError } from '../data/plugin-off.js'
+import { PLUGIN_OFF_TITLE } from '../data/plugin-off.js'
 import { DOCKYARD_CSS } from '../styles/dockyard-css.js'
 import { THEME_CSS } from '../styles/themes.js'
 import { SWITCHER_CSS } from '../styles/switcher-css.js'
@@ -61,6 +63,9 @@ export async function api(path, init) {
     return result
   } catch (error) {
     const raw = String(error?.message ?? error).slice(0, 240)
+    // A profile without the plugin's backend (11/10/2026): the host answers
+    // every call "404: Plugin not found". A setting to change, not a failure.
+    const pluginOff = isPluginOffError(error)
     // A project Hermes does not know (10/10/2026) is a state to fix, not a
     // "404: canonical project was not found": say so and how to link it.
     const unlinked = isUnlinkedError(error)
@@ -69,7 +74,9 @@ export async function api(path, init) {
     // "403: [object Object]" before passing the error to this plugin. The
     // original detail is unavailable here: preserve the status and offer
     // only the verified archive permission as an actionable hint.
-    const message = unlinked
+    const message = pluginOff
+      ? `${PLUGIN_OFF_TITLE}.`
+      : unlinked
       ? `${UNLINKED_TITLE}. ${projectInPath ? unlinkedNextStep(decodeURIComponent(projectInPath)) : 'Link it to a Hermes project first.'}`
       : /^403:\s*\[object Object\]$/.test(raw) &&
       /^\/projects\/[^/]+\/workflows\/[^/]+\/archive$/.test(path)
@@ -82,6 +89,7 @@ export async function api(path, init) {
     failure.cause = error
     // Kept so a read that needs Hermes can still tell a missing link apart.
     if (unlinked) failure.unlinked = true
+    if (pluginOff) failure.pluginOff = true
     throw failure
   }
 }

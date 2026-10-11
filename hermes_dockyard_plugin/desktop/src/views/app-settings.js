@@ -13,6 +13,7 @@ import { emitToast } from '../runtime/context.js'
 import { Button } from '../lib/ui.js'
 import { PageHead } from '../lib/ui.js'
 import { NotificationSettings } from './notifications.js'
+import { ArchivedProjectsList } from './archived-projects.js'
 import { NOTIFICATIONS_CSS } from '../styles/notifications-css.js'
 import { ALL_PROJECTS } from '../lib/project-switcher.js'
 import { THEMES } from '../styles/themes.js'
@@ -99,7 +100,7 @@ const section = (key, title, description, body) => jsxs('section', { className: 
   body,
 ] }, key)
 
-export function AppSettingsView({ view, selectedProject, appearance, onAppearance, onOpenProjectSettings, onForgetProject, onRefresh }) {
+export function AppSettingsView({ view, selectedProject, appearance, onAppearance, onOpenProjectSettings, onForgetProject, onRefresh, showArchived = false, onRestored, onArchivedCount }) {
   const projects = view.projects ?? []
   const nameOf = (id) => id === ALL_PROJECTS ? 'All projects' : projects.find((project) => project.id === id)?.name || id
   const [lastProject, setLastProject] = useState(view.lastProject ?? null)
@@ -171,5 +172,10 @@ export function AppSettingsView({ view, selectedProject, appearance, onAppearanc
       jsx(NotificationSettings, { settings: policy, busy: busy === 'notifications', error: policyError, onSave: saveNotifications })),
     // Sahil 05/10 (demo feedback h): the September themes, backgrounds and fonts.
     section('appearance', 'Appearance', 'Colour theme and typeface for the whole app.', jsx(AppearanceSettings, { appearance, onAppearance })),
+    // Archived projects are hidden everywhere else; restore them here (11/10/2026).
+    showArchived
+      ? section('archived', 'Archived projects', 'Hidden everywhere else, and nothing was deleted. Restore brings a project back exactly as it was archived.',
+          jsx(ArchivedProjectsList, { onRestored, onCount: onArchivedCount }))
+      : null,
   ] })
 }

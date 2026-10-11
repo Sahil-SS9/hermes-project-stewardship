@@ -152,7 +152,7 @@ function TriggerLabel({ projects, scope }) {
 // The ways into a new project, at the foot of the switcher's menu. Both open
 // the onboarding wizard (Sahil 05/10: "Onboard existing project" comes after
 // "New project").
-function SwitcherFoot({ onNewProject, onOnboardExisting, close }) {
+function SwitcherFoot({ onNewProject, onOnboardExisting, onOpenArchived, archivedCount = 0, close }) {
   // close() puts focus back on the switcher's button before the wizard opens,
   // so closing the wizard returns there (this menu item is gone by then).
   const action = (marker, icon, label, run) => jsxs('button', {
@@ -164,12 +164,15 @@ function SwitcherFoot({ onNewProject, onOnboardExisting, close }) {
   const actions = [
     onNewProject ? action('data-switcher-new-project', 'plus', 'New project', onNewProject) : null,
     onOnboardExisting ? action('data-switcher-onboard-existing', 'folder-open', 'Onboard existing project', onOnboardExisting) : null,
+    // Archived projects are hidden everywhere else; this is the way to them (11/10/2026).
+    onOpenArchived && archivedCount > 0
+      ? action('data-switcher-archived', 'archive', `Archived projects (${archivedCount})`, onOpenArchived) : null,
   ].filter(Boolean)
   return actions.length ? jsx('div', { className: 'dy-sw-foot', children: actions }) : null
 }
 
 // The breadcrumb next to the brand, with a search popover underneath.
-export function ProjectSwitcher({ projects, scope, onChange, onNewProject, onOnboardExisting }) {
+export function ProjectSwitcher({ projects, scope, onChange, onNewProject, onOnboardExisting, onOpenArchived, archivedCount = 0 }) {
   const [open, setOpen] = useState(false)
   const trigger = useRef(null)
   const list = useSwitcherList(projects, scope)
@@ -194,7 +197,7 @@ export function ProjectSwitcher({ projects, scope, onChange, onNewProject, onOnb
       open ? jsxs('div', { className: 'dy-sw-popover', role: 'dialog', 'aria-label': 'Switch project', children: [
         jsx(SwitcherSearch, { idPrefix: 'dy-sw', list, onPick: pick, onClose: () => close() }),
         jsx(SwitcherOptions, { idPrefix: 'dy-sw', list, scope, projects, onPick: pick }),
-        jsx(SwitcherFoot, { onNewProject, onOnboardExisting, close }),
+        jsx(SwitcherFoot, { onNewProject, onOnboardExisting, onOpenArchived, archivedCount, close }),
       ] }) : null,
     ],
   })
