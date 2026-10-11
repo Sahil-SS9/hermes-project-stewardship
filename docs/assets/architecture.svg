@@ -1,122 +1,201 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 560" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 840" width="1200" height="840" role="img" aria-labelledby="t d">
+  <title id="t">How Project Stewardship wires into Hermes</title>
+  <desc id="d">Five places you use it (Hermes Desktop, the Hermes web dashboard, your agents, the terminal and Discord) all reach one backend inside the plugin. Every write goes through its service layer into one Stewardship database on your machine. Projects, Kanban boards and bot profiles stay owned by Hermes: Stewardship reads them, and writes Kanban tasks only through the host contract. Two optional no-AI cron jobs move workflow runs on and post alerts to Discord.</desc>
   <defs>
-    <pattern id="grid2" width="40" height="40" patternUnits="userSpaceOnUse">
-      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.6"/>
     </pattern>
-    <marker id="a-slate" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
     </marker>
-    <marker id="a-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#fb923c"/>
+    <marker id="arrowAmber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#fbbf24"/>
     </marker>
+    <style>
+      .sans { font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+      .title { font-size: 30px; font-weight: 700; fill: #f8fafc; }
+      .subtitle { font-size: 17px; fill: #94a3b8; }
+      .band { font-size: 14px; font-weight: 700; letter-spacing: 2px; fill: #64748b; }
+      .name { font-size: 19px; font-weight: 700; fill: #f1f5f9; }
+      .sub { font-size: 15px; fill: #cbd5e1; }
+      .tiny { font-size: 14px; fill: #94a3b8; }
+      .chip { font-size: 16px; font-weight: 700; fill: #e2e8f0; }
+      .chipsub { font-size: 14px; fill: #a3b1c6; }
+      .label { font-size: 14px; fill: #94a3b8; }
+      .labelAmber { font-size: 14px; fill: #fbbf24; }
+      .flow { stroke: #94a3b8; stroke-width: 1.8; fill: none; }
+      .flowRead { stroke: #94a3b8; stroke-width: 1.8; fill: none; stroke-dasharray: 7 5; }
+      .flowAmber { stroke: #fbbf24; stroke-width: 1.8; fill: none; }
+    </style>
   </defs>
 
-  <rect width="1160" height="560" fill="#020617"/>
-  <rect width="1160" height="560" fill="url(#grid2)"/>
+  <rect width="1200" height="840" rx="18" fill="#020617"/>
+  <rect width="1200" height="840" rx="18" fill="url(#grid)"/>
 
-  <!-- ============ arrows first (render behind boxes) ============ -->
-  <!-- surfaces down into service -->
-  <g stroke="#94a3b8" stroke-width="1.5" fill="none">
-    <line x1="180" y1="118" x2="180" y2="156" marker-end="url(#a-slate)"/>
-    <line x1="580" y1="118" x2="580" y2="156" marker-end="url(#a-slate)"/>
-    <line x1="960" y1="118" x2="960" y2="156" marker-end="url(#a-slate)"/>
-  </g>
-  <!-- service -> cycle engine -->
-  <line x1="580" y1="216" x2="580" y2="246" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#a-slate)"/>
-  <!-- engine -> three subsystems -->
-  <g stroke="#94a3b8" stroke-width="1.5" fill="none">
-    <path d="M 400 296 V 330 H 250 V 346" marker-end="url(#a-slate)"/>
-    <line x1="580" y1="296" x2="580" y2="346" marker-end="url(#a-slate)"/>
-    <path d="M 760 296 V 330 H 910 V 346" marker-end="url(#a-slate)"/>
-  </g>
-  <!-- engine -> store ; kanban -> store -->
-  <g stroke="#fb923c" stroke-width="1.5" fill="none">
-    <path d="M 250 420 V 456" marker-end="url(#a-orange)"/>
-    <line x1="580" y1="420" x2="580" y2="456" marker-end="url(#a-orange)"/>
-    <path d="M 910 420 V 456" marker-end="url(#a-orange)"/>
-  </g>
+  <text x="40" y="54" class="sans title">How Project Stewardship wires into Hermes</text>
+  <text x="40" y="84" class="sans subtitle">One backend, five places to use it. Surfaces hold no state: every write goes through the service layer.</text>
 
-  <!-- ============ surfaces row ============ -->
-  <g>
-    <rect x="60" y="64" width="240" height="54" rx="6" fill="#0f172a"/>
-    <rect x="60" y="64" width="240" height="54" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
-    <text x="180" y="87" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">CLI — stewardctl</text>
-    <text x="180" y="105" text-anchor="middle" font-size="9" fill="#94a3b8">human output / --json reads</text>
+  <!-- ===== Flows (first, so they sit behind the boxes) ===== -->
+  <path d="M 236 206 L 236 260" class="flow" marker-end="url(#arrow)"/>
+  <path d="M 300 206 L 300 260" class="flow" marker-end="url(#arrow)"/>
+  <path d="M 200 338 L 200 368" class="flow" marker-end="url(#arrow)"/>
+  <path d="M 360 420 L 394 420" class="flow" marker-end="url(#arrow)"/>
+  <path d="M 600 206 L 600 260" class="flow" marker-end="url(#arrow)"/>
+  <path d="M 828 206 L 828 260" class="flow" marker-end="url(#arrow)"/>
+  <path d="M 936 360 L 902 360" class="flowAmber" marker-end="url(#arrowAmber)"/>
+  <path d="M 1056 262 L 1056 208" class="flowAmber" marker-end="url(#arrowAmber)"/>
+  <path d="M 480 512 L 480 584" class="flow" marker-end="url(#arrow)"/>
+  <path d="M 696 512 L 696 592" class="flowRead" marker-end="url(#arrow)"/>
+  <path d="M 862 512 L 862 592" class="flow" marker-end="url(#arrow)"/>
+  <path d="M 890 512 L 890 542 L 1075 542 L 1075 592" class="flowRead" marker-end="url(#arrow)"/>
 
-    <rect x="460" y="64" width="240" height="54" rx="6" fill="#0f172a"/>
-    <rect x="460" y="64" width="240" height="54" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
-    <text x="580" y="87" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">Desktop panel</text>
-    <text x="580" y="105" text-anchor="middle" font-size="9" fill="#94a3b8">React + Vite client of the RPC</text>
+  <text x="608" y="240" class="sans label">direct</text>
+  <text x="836" y="240" class="sans label">direct</text>
+  <text x="1048" y="240" class="sans labelAmber" text-anchor="end">posts what's due</text>
+  <text x="472" y="556" class="sans label" text-anchor="end">reads and writes</text>
+  <text x="854" y="572" class="sans label" text-anchor="end">host contract</text>
 
-    <rect x="840" y="64" width="260" height="54" rx="6" fill="#0f172a"/>
-    <rect x="840" y="64" width="260" height="54" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
-    <text x="970" y="87" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">Gateway adapters</text>
-    <text x="970" y="105" text-anchor="middle" font-size="9" fill="#94a3b8">Discord commands - webhooks</text>
-  </g>
+  <!-- ===== WHERE YOU WORK ===== -->
+  <text x="40" y="112" class="sans band">WHERE YOU WORK</text>
 
-  <!-- ============ API band ============ -->
-  <rect x="300" y="158" width="560" height="58" rx="6" fill="#0f172a"/>
-  <rect x="300" y="158" width="560" height="58" rx="6" fill="rgba(251,146,60,0.12)" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="6,3"/>
-  <text x="580" y="182" text-anchor="middle" font-size="12" font-weight="bold" fill="#fdba74">RPC API — /stewardship/v1</text>
-  <text x="580" y="200" text-anchor="middle" font-size="9" fill="#fed7aa">bearer auth - rate limiting - error envelope — the contract every surface binds to</text>
+  <rect x="40" y="120" width="208" height="86" rx="8" fill="#0f172a"/>
+  <rect x="40" y="120" width="208" height="86" rx="8" fill="rgba(8,51,68,0.45)" stroke="#22d3ee" stroke-width="1.6"/>
+  <text x="56" y="149" class="sans name">Hermes Desktop</text>
+  <text x="56" y="174" class="sans sub">full management page</text>
+  <text x="56" y="194" class="sans tiny">in the sidebar</text>
 
-  <!-- ============ service + engine ============ -->
-  <rect x="330" y="218" width="500" height="78" rx="6" fill="#0f172a"/>
-  <rect x="330" y="218" width="500" height="78" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
-  <text x="580" y="242" text-anchor="middle" font-size="13" font-weight="bold" fill="#f1f5f9">StewardshipService → CycleEngine</text>
-  <text x="580" y="261" text-anchor="middle" font-size="9" fill="#cbd5e1">mutex - idempotency keys - budget - pause/freeze gates</text>
-  <text x="580" y="277" text-anchor="middle" font-size="9" fill="#cbd5e1">restriction-only autonomy policy — never escalates permissions</text>
+  <rect x="268" y="120" width="208" height="86" rx="8" fill="#0f172a"/>
+  <rect x="268" y="120" width="208" height="86" rx="8" fill="rgba(8,51,68,0.45)" stroke="#22d3ee" stroke-width="1.6"/>
+  <text x="284" y="149" class="sans name">Web dashboard</text>
+  <text x="284" y="174" class="sans sub">dashboard and reports</text>
+  <text x="284" y="194" class="sans tiny">in your browser</text>
 
-  <!-- ============ subsystems row ============ -->
-  <g>
-    <rect x="110" y="348" width="280" height="72" rx="6" fill="#0f172a"/>
-    <rect x="110" y="348" width="280" height="72" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
-    <text x="250" y="371" text-anchor="middle" font-size="11" font-weight="bold" fill="#f1f5f9">VerificationEngine</text>
-    <text x="250" y="389" text-anchor="middle" font-size="9" fill="#cbd5e1">two-tier collectors: authority vs advisory</text>
-    <text x="250" y="404" text-anchor="middle" font-size="9" fill="#cbd5e1">contradiction detection - fail-closed on Unknown</text>
+  <rect x="496" y="120" width="208" height="86" rx="8" fill="#0f172a"/>
+  <rect x="496" y="120" width="208" height="86" rx="8" fill="rgba(8,51,68,0.45)" stroke="#22d3ee" stroke-width="1.6"/>
+  <text x="512" y="149" class="sans name">Your agents</text>
+  <text x="512" y="174" class="sans sub">tools, slash commands,</text>
+  <text x="512" y="194" class="sans sub">skill, project memory</text>
 
-    <rect x="450" y="348" width="260" height="72" rx="6" fill="#0f172a"/>
-    <rect x="450" y="348" width="260" height="72" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
-    <text x="580" y="371" text-anchor="middle" font-size="11" font-weight="bold" fill="#f1f5f9">Initiative lifecycle</text>
-    <text x="580" y="389" text-anchor="middle" font-size="9" fill="#cbd5e1">dedupe - concurrency caps - suppression</text>
-    <text x="580" y="404" text-anchor="middle" font-size="9" fill="#cbd5e1">approval state machine (human-only merge)</text>
+  <rect x="724" y="120" width="208" height="86" rx="8" fill="#0f172a"/>
+  <rect x="724" y="120" width="208" height="86" rx="8" fill="rgba(8,51,68,0.45)" stroke="#22d3ee" stroke-width="1.6"/>
+  <text x="740" y="149" class="sans name">Terminal</text>
+  <text x="740" y="174" class="mono sub">stewardctl</text>
+  <text x="740" y="194" class="mono tiny">hermes stewardship</text>
 
-    <rect x="770" y="348" width="290" height="72" rx="6" fill="#0f172a"/>
-    <rect x="770" y="348" width="290" height="72" rx="6" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1.5"/>
-    <text x="915" y="371" text-anchor="middle" font-size="11" font-weight="bold" fill="#f1f5f9">Security module</text>
-    <text x="915" y="389" text-anchor="middle" font-size="9" fill="#fecdd3">untrusted-content labelling + injection scan</text>
-    <text x="915" y="404" text-anchor="middle" font-size="9" fill="#fecdd3">allowlisted command runner (L≥3 gate)</text>
-  </g>
+  <rect x="952" y="120" width="208" height="86" rx="8" fill="#0f172a"/>
+  <rect x="952" y="120" width="208" height="86" rx="8" fill="rgba(8,51,68,0.45)" stroke="#22d3ee" stroke-width="1.6"/>
+  <text x="968" y="149" class="sans name">Discord</text>
+  <text x="968" y="174" class="sans sub">alerts in your channel</text>
+  <text x="968" y="194" class="sans tiny">high and critical</text>
 
-  <!-- ============ Kanban note ============ -->
-  <text x="1035" y="391" font-size="9" fill="#94a3b8">EXECUTE</text>
-  <text x="1035" y="404" font-size="9" fill="#94a3b8">via Kanban</text>
+  <!-- ===== INSIDE THE PLUGIN ===== -->
+  <text x="40" y="254" class="sans band">INSIDE THE PLUGIN</text>
 
-  <!-- ============ store ============ -->
-  <rect x="380" y="458" width="400" height="62" rx="6" fill="#0f172a"/>
-  <rect x="380" y="458" width="400" height="62" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
-  <text x="580" y="482" text-anchor="middle" font-size="12" font-weight="bold" fill="#f1f5f9">SQLite (WAL) — canonical stewardship DB</text>
-  <text x="580" y="500" text-anchor="middle" font-size="9" fill="#ddd6fe">numbered migrations - audit log on every material action - retention pruning</text>
+  <rect x="40" y="262" width="320" height="76" rx="8" fill="#0f172a"/>
+  <rect x="40" y="262" width="320" height="76" rx="8" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.6"/>
+  <text x="56" y="290" class="sans name">Plugin API</text>
+  <text x="56" y="313" class="sans sub">the Desktop and dashboard way in;</text>
+  <text x="56" y="331" class="sans sub">passes your token on, adds none</text>
 
-  <!-- ============ rule banner ============ -->
-  <rect x="60" y="228" width="230" height="58" rx="6" fill="none" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="4,4"/>
-  <text x="175" y="252" text-anchor="middle" font-size="10" font-weight="bold" fill="#fb7185">ONE STATE STORE</text>
-  <text x="175" y="268" text-anchor="middle" font-size="8.5" fill="#fecdd3">surfaces hold no state; every write</text>
-  <text x="175" y="281" text-anchor="middle" font-size="8.5" fill="#fecdd3">goes through the service layer</text>
+  <rect x="40" y="368" width="320" height="104" rx="8" fill="#0f172a"/>
+  <rect x="40" y="368" width="320" height="104" rx="8" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.6"/>
+  <text x="56" y="396" class="sans name">Stewardship API</text>
+  <text x="56" y="419" class="sans sub">checks who is asking,</text>
+  <text x="56" y="438" class="sans sub">rate-limits writes,</text>
+  <text x="56" y="457" class="sans sub">one error format</text>
+  <text x="344" y="396" class="mono tiny" text-anchor="end">/stewardship/v1</text>
 
-  <!-- ============ legend ============ -->
-  <g font-size="9" fill="#94a3b8">
-    <rect x="60" y="532" width="12" height="12" rx="3" fill="rgba(8,51,68,0.4)" stroke="#22d3ee"/>
-    <text x="78" y="542">surface (thin client)</text>
-    <rect x="220" y="532" width="12" height="12" rx="3" fill="rgba(6,78,59,0.4)" stroke="#34d399"/>
-    <text x="238" y="542">domain engine</text>
-    <rect x="360" y="532" width="12" height="12" rx="3" fill="rgba(136,19,55,0.4)" stroke="#fb7185"/>
-    <text x="378" y="542">security boundary</text>
-    <rect x="520" y="532" width="12" height="12" rx="3" fill="rgba(76,29,149,0.4)" stroke="#a78bfa"/>
-    <text x="538" y="542">canonical state</text>
-    <line x1="650" y1="538" x2="682" y2="538" stroke="#94a3b8" stroke-width="1.5"/>
-    <text x="690" y="542">transport</text>
-    <line x1="790" y1="538" x2="822" y2="538" stroke="#fb923c" stroke-width="1.5"/>
-    <text x="830" y="542">persistence writes</text>
-  </g>
+  <rect x="396" y="262" width="504" height="250" rx="10" fill="#0f172a"/>
+  <rect x="396" y="262" width="504" height="250" rx="10" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.6"/>
+  <text x="414" y="291" class="sans name">Service layer</text>
+  <text x="414" y="314" class="sans tiny">every material action is audited; unsure means stop</text>
+
+  <rect x="408" y="328" width="234" height="54" rx="6" fill="#0b1220" stroke="#10b981" stroke-width="1.1"/>
+  <text x="422" y="350" class="sans chip">Projects</text>
+  <text x="422" y="371" class="sans chipsub">lifecycle, members, archive</text>
+  <rect x="654" y="328" width="234" height="54" rx="6" fill="#0b1220" stroke="#10b981" stroke-width="1.1"/>
+  <text x="668" y="350" class="sans chip">Cycles</text>
+  <text x="668" y="371" class="sans chipsub">one at a time, with budgets</text>
+
+  <rect x="408" y="390" width="234" height="54" rx="6" fill="#0b1220" stroke="#10b981" stroke-width="1.1"/>
+  <text x="422" y="412" class="sans chip">Verification</text>
+  <text x="422" y="433" class="sans chipsub">evidence; Unknown stops it</text>
+  <rect x="654" y="390" width="234" height="54" rx="6" fill="#0b1220" stroke="#10b981" stroke-width="1.1"/>
+  <text x="668" y="412" class="sans chip">Initiatives</text>
+  <text x="668" y="433" class="sans chipsub">only a human can approve</text>
+
+  <rect x="408" y="452" width="234" height="54" rx="6" fill="#0b1220" stroke="#10b981" stroke-width="1.1"/>
+  <text x="422" y="474" class="sans chip">Workflows</text>
+  <text x="422" y="495" class="sans chipsub">steps become Kanban tasks</text>
+  <rect x="654" y="452" width="234" height="54" rx="6" fill="#0b1220" stroke="#10b981" stroke-width="1.1"/>
+  <text x="668" y="474" class="sans chip">Notifications</text>
+  <text x="668" y="495" class="sans chipsub">inbox, pop-ups, Discord</text>
+
+  <rect x="936" y="262" width="224" height="250" rx="10" fill="#0f172a"/>
+  <rect x="936" y="262" width="224" height="250" rx="10" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.6"/>
+  <text x="952" y="291" class="sans name">Background jobs</text>
+  <text x="952" y="314" class="sans tiny">Hermes cron, optional, no AI</text>
+  <rect x="948" y="328" width="200" height="82" rx="6" fill="#0b1220" stroke="#f59e0b" stroke-width="1.1"/>
+  <text x="962" y="352" class="sans chip">Discord alerts</text>
+  <text x="962" y="374" class="sans chipsub">posts what's due,</text>
+  <text x="962" y="393" class="sans chipsub">every minute</text>
+  <rect x="948" y="420" width="200" height="82" rx="6" fill="#0b1220" stroke="#f59e0b" stroke-width="1.1"/>
+  <text x="962" y="444" class="sans chip">Workflow timer</text>
+  <text x="962" y="466" class="sans chipsub">moves workflow runs on,</text>
+  <text x="962" y="485" class="sans chipsub">every minute</text>
+
+  <!-- ===== WHERE STATE LIVES ===== -->
+  <text x="40" y="576" class="sans band">WHERE STATE LIVES</text>
+
+  <rect x="40" y="584" width="520" height="134" rx="10" fill="#0f172a"/>
+  <rect x="40" y="584" width="520" height="134" rx="10" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.6"/>
+  <text x="56" y="613" class="sans name">Stewardship database</text>
+  <text x="56" y="638" class="sans sub">missions, goals, members, workflows, approvals,</text>
+  <text x="56" y="658" class="sans sub">evidence, notifications and the audit log</text>
+  <text x="56" y="684" class="sans tiny">SQLite, one file on your machine. Upgrades keep every row;</text>
+  <text x="56" y="704" class="sans tiny">a database from a newer version is refused, never rewritten.</text>
+
+  <rect x="590" y="560" width="580" height="196" rx="12" fill="none" stroke="#64748b" stroke-width="1.3" stroke-dasharray="8 5"/>
+
+  <rect x="606" y="592" width="180" height="128" rx="8" fill="#0f172a"/>
+  <rect x="606" y="592" width="180" height="128" rx="8" fill="rgba(30,41,59,0.6)" stroke="#94a3b8" stroke-width="1.6"/>
+  <text x="620" y="620" class="sans name">Projects</text>
+  <text x="620" y="644" class="sans sub">your projects and</text>
+  <text x="620" y="663" class="sans sub">their repositories</text>
+  <text x="620" y="698" class="sans tiny">read only</text>
+
+  <rect x="798" y="592" width="180" height="128" rx="8" fill="#0f172a"/>
+  <rect x="798" y="592" width="180" height="128" rx="8" fill="rgba(30,41,59,0.6)" stroke="#94a3b8" stroke-width="1.6"/>
+  <text x="812" y="620" class="sans name">Kanban</text>
+  <text x="812" y="644" class="sans sub">boards and tasks</text>
+  <text x="812" y="680" class="sans tiny">read; written only</text>
+  <text x="812" y="699" class="sans tiny">via the host contract</text>
+
+  <rect x="990" y="592" width="166" height="128" rx="8" fill="#0f172a"/>
+  <rect x="990" y="592" width="166" height="128" rx="8" fill="rgba(30,41,59,0.6)" stroke="#94a3b8" stroke-width="1.6"/>
+  <text x="1004" y="620" class="sans name">Profiles</text>
+  <text x="1004" y="644" class="sans sub">your bots</text>
+  <text x="1004" y="680" class="sans tiny">discovered,</text>
+  <text x="1004" y="699" class="sans tiny">never created</text>
+
+  <text x="606" y="744" class="sans tiny">Owned by Hermes. Stewardship never keeps a second copy.</text>
+
+  <!-- ===== Legend ===== -->
+  <line x1="40" y1="784" x2="86" y2="784" class="flow" marker-end="url(#arrow)"/>
+  <text x="96" y="789" class="sans label">reads and writes</text>
+  <line x1="222" y1="784" x2="268" y2="784" class="flowRead" marker-end="url(#arrow)"/>
+  <text x="278" y="789" class="sans label">reads only</text>
+  <line x1="372" y1="784" x2="418" y2="784" class="flowAmber" marker-end="url(#arrowAmber)"/>
+  <text x="428" y="789" class="sans label">scheduled, no AI</text>
+  <rect x="566" y="776" width="16" height="16" rx="3" fill="rgba(8,51,68,0.45)" stroke="#22d3ee"/>
+  <text x="590" y="789" class="sans label">surfaces</text>
+  <rect x="668" y="776" width="16" height="16" rx="3" fill="rgba(6,78,59,0.4)" stroke="#34d399"/>
+  <text x="692" y="789" class="sans label">plugin backend</text>
+  <rect x="810" y="776" width="16" height="16" rx="3" fill="rgba(76,29,149,0.4)" stroke="#a78bfa"/>
+  <text x="834" y="789" class="sans label">plugin state</text>
+  <rect x="938" y="776" width="16" height="16" rx="3" fill="rgba(30,41,59,0.6)" stroke="#94a3b8"/>
+  <text x="962" y="789" class="sans label">owned by Hermes</text>
+
+  <text x="40" y="822" class="sans tiny">Project Stewardship 0.4.0 fails closed: a missing link, Unknown health or a newer database stops the action instead of guessing.</text>
 </svg>

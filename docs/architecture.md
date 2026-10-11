@@ -1,5 +1,9 @@
 # Architecture
 
+![How Project Stewardship wires into Hermes](assets/architecture.svg)
+
+The picture above is the 0.4.0 wiring; the sections below give the rules behind it.
+
 ## One backend, many surfaces (non-negotiable)
 
 ```

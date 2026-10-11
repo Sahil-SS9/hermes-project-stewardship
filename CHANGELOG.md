@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] - Unreleased
+## [0.4.0] - 2026-10-11
 
 The Project Stewardship Desktop app becomes the main surface, and every part
 of the plugin now shares one name.
@@ -115,9 +115,8 @@ of the plugin now shares one name.
   Dashboard and its health table, the Approval Inbox and "Needs you now"
   (where it used to appear as "This project is switched off"), notifications,
   search, the workflow library, the project switcher and the remembered last
-  project. Restore puts
-  back its switch, phase and pause time as they were; it used to switch every
-  project on and make it active. The project switcher's menu lists archived
+  project. Restore puts back its switch, phase and pause time as they were; it
+  used to switch every project on and make it active. The project switcher's menu lists archived
   projects with what Restore brings back; Restore asks first, then opens the
   project. A switched-off project can be archived too. The CLI
   (`stewardctl project archive --list`, `stewardctl project restore`) and the

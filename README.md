@@ -1,211 +1,161 @@
 # Hermes Project Stewardship
 
-Durable project **ownership** for Hermes agent fleets.
+**Make a team of Hermes agents responsible for a project, and see the evidence that it is getting better.**
 
-Hermes can complete tasks. Stewardship makes a team of Hermes profiles
-**responsible for a project over time**: it verifies reality before acting,
-turns gaps into evidence-backed initiatives, executes through existing Kanban,
-enforces explicit autonomy policy, and measures whether the project actually
-improved. CLI, RPC, dashboard and Desktop share one backend; authenticated
-approval remains on RPC/dashboard and permission-bound gateway adapters.
+<p align="center">
+  <img src="docs/assets/walkthrough.gif" width="880" alt="A short walkthrough on made-up data: the Dashboard, a project's Kanban board and workflow, the Approval Inbox, and archived projects in the project switcher">
+</p>
+<p align="center"><sub>Made-up demo data, sped up. <a href="https://github.com/Sahil-SS9/hermes-project-stewardship/releases/download/v0.4.0/walkthrough.mp4">Full-quality video</a></sub></p>
 
-> Status: **v0.4.0.** The Project Stewardship Desktop app is the main surface;
-> the CLI, RPC and dashboard share its backend. **Upgrading from 0.3.0:** the
-> plugin now has one name, `hermes-project-stewardship`, so switch it on once
-> after upgrading, and export your database first. The
-> [changelog's upgrade notes](CHANGELOG.md) cover both, and how to go back.
-> Run `hermes verify --json` for current test and readiness evidence on your
-> own checkout, and read `docs/guides/canonical-ownership-and-surfaces.md` for
-> what each surface does and does not support today.
+Hermes agents are good at tasks. Project Stewardship makes a team of them look after a whole project over time. They check the project's real state before they act, propose work with the evidence behind it, wait for your approval where you want it, and measure whether things actually got better. You follow and steer all of it from one desktop app.
 
----
+`v0.4.0` · Apache-2.0 · Python 3.10+ · Hermes 0.21 or later · in the Hermes plugin catalog
 
-## The ownership loop
+[Quick start](#quick-start) · [What you get](#what-you-get) · [How it works](#how-it-works) · [How it wires up](#how-it-wires-up) · [You stay in charge](#you-stay-in-charge) · [Documentation](#documentation)
 
-Every stewardship cycle walks the same ring:
+## Quick start
+
+1. Install it and switch it on:
+
+   ```bash
+   hermes plugins install Sahil-SS9/hermes-project-stewardship --enable
+   ```
+
+2. In Hermes Desktop, open the Plugins page, switch on Project Stewardship's Desktop part, and restart Hermes Desktop.
+3. Open **Project Stewardship** in the sidebar. Choose **New project**, or **Onboard existing project** to bring in one you already run in Hermes, and pick a lead bot and its team. The first assessment is read-only: it looks before anything changes.
+
+Running Hermes with several profiles? The plugin works per profile, so switch it on for each profile that should use it:
+
+```bash
+hermes -p <profile> plugins enable hermes-project-stewardship
+```
+
+Upgrading from 0.3.0? Export a backup first and read the [upgrade notes](CHANGELOG.md).
+
+## What you get
+
+### One app for every project
+
+![The Dashboard: five projects with their health, the work in progress, what is blocked, and three decisions waiting](docs/assets/screenshots/dashboard.png)
+
+- **Dashboard:** every project's health, the work in progress, what is blocked, and what needs you now.
+- **Projects:** each project has Overview, Vision (goals and objectives, with their evidence), Planning, Kanban, Workflows, Activity, Content, Reports, Memory and Settings.
+- **Roadmap** across all your projects, and a **Backlog** with bulk import, bulk reassignment and in-place edits.
+- **Approval Inbox:** every decision waiting on you, with the evidence behind it.
+- **Notifications** with pop-ups, plus optional **Discord alerts** through the Discord bot your Hermes already runs.
+- A project switcher that remembers your last choice and keeps your archived projects, nine themes and a font choice. Every colour pair meets WCAG AA contrast.
+
+### Work your bots can see
+
+![A project's Kanban board: tasks, a blocked bug and a review, linked to a milestone](docs/assets/screenshots/kanban.png)
+
+Each project's Kanban board is the Hermes board itself, with types, labels, due dates, blockers and saved views. Stewardship links the cards to the goals, initiatives and milestones they serve.
+
+### Workflows your bots follow
+
+![A workflow run partway through: done steps, a step in progress and a sign-off waiting for you](docs/assets/screenshots/workflows.png)
+
+Start from one of 30 built-in templates, build your own, or describe what you want to the AI sidebar, which suggests changes for you to accept or reject. A loop carries a limit and says what happens when it reaches it, and a step can say what to do if it gets stuck. Runs move on by themselves, and the live map shows which steps are blocked and which decisions are waiting for you.
+
+### Plans you can see
+
+Each project has a planning canvas: sketch on a board, answer the clarifying questions, and turn the result into a plan and a document. Undo, redo, duplicate and marquee select work as you would expect.
+
+### Memory and chat per project
+
+Each project keeps its own rules, decisions and facts and hands them to the bots working on it, whichever memory provider you use. From a project's header you can open a Hermes chat with its lead or any of its bots.
+
+## How it works
+
+Every stewardship cycle walks the same loop:
 
 ```
 WAKE → VERIFY → SNAPSHOT → ASSESS → PROPOSE → GATE → EXECUTE → MEASURE → LEARN ↺
 ```
 
-- **Verify first.** A cycle may not claim project status or authorise mutating
-  work without canonical evidence (git state, tests/CI, declared files).
-  Memory and session history are supporting evidence only.
-- **Fail closed.** Unknown or contradictory project state blocks mutations.
-- **Autonomy is restriction-only.** Project policy may narrow what Hermes may
-  do; it never escalates tool permissions or credentials.
-- **No busywork.** `NO_ACTION_REQUIRED` is a first-class cycle outcome.
+- **Verify first.** No status claim and no change without evidence from the project itself: git state, tests and CI, declared files. Memory and chat history only support that evidence.
+- **Fail closed.** When the project's state is unknown or contradictory, nothing changes until it is clear.
+- **No busywork.** "Nothing to do" is a valid outcome of a cycle.
+- **Hermes stays the record.** Projects, boards and tasks live in Hermes Projects and Kanban. Stewardship adds what Hermes does not keep: policy, evidence, rankings, approvals, workflows and history.
 
-## System workflow
+![Stewardship cycle](docs/assets/cycle-workflow.svg)
 
-The full cycle as it runs in the engine — including where human approval and
-the fail-closed freeze sit:
+## How it wires up
 
-![Stewardship cycle workflow](docs/assets/cycle-workflow.svg)
+![How Project Stewardship wires into Hermes: five surfaces, one backend inside the plugin, one Stewardship database, and Projects, Kanban and Profiles owned by Hermes](docs/assets/architecture.svg)
 
-## Architecture
+- **One backend, five ways in.** The Desktop page and the web dashboard reach it through the plugin's API, which passes your token on and adds no authority of its own. Your agents and the terminal call the same service layer directly.
+- **One place for Stewardship's own state.** A single SQLite database on your machine holds missions, goals, members, workflows, approvals, evidence and the audit log. Upgrades keep every row, and a database from a newer version is refused rather than rewritten.
+- **Hermes keeps what it owns.** Projects, Kanban boards and bot profiles stay in Hermes. Stewardship reads them, and writes Kanban tasks only through the Hermes host contract.
+- **Two optional background jobs, no AI.** A Hermes cron job moves workflow runs on every minute, and another posts what is due to your Discord channel. See [Project memory, chat and Discord alerts](docs/guides/project-memory-chat-discord.md).
 
-Canonical Hermes Projects/Kanban owns projects, tasks, epics, hierarchy,
-dependencies and execution state. Project Stewardship owns stewardship policy, evidence,
-rankings, views, workflows, approvals and audit metadata in its SQLite WAL
-store. Production work writes cross the versioned host adapter; there is no
-legacy task dual-write path.
+## You stay in charge
 
-Ownership is one-way: Stewardship never becomes a second source of project
-identity, work records or profile existence, and it never claims
-cross-database atomicity between its own store and Hermes Kanban. The full
-owner-by-owner table, the authority model, and what every surface supports at
-this commit are in
-[Canonical ownership and surface support](docs/guides/canonical-ownership-and-surfaces.md).
+![The Approval Inbox: a high-risk proposal with its rationale, expected outcome and how it will be checked](docs/assets/screenshots/inbox.png)
 
-![Architecture](docs/assets/architecture.svg)
+- **Autonomy per project, from 0 to 5.** Level 0 only answers questions; level 3 may write code and open pull requests, behind a capability check. Levels 4 and 5 ship switched off. Policy can only narrow what a bot may do; it never grants a permission the bot did not already have.
+- **Approval is never a model tool.** Bots propose; a person approves, in the app or through the API.
+- **Nothing is deleted behind your back.** Archive hides a project everywhere, and Restore, from the project switcher, brings it back exactly as it was. Switching a feature off hides it; switching it back on restores it.
+- **Backups you can check.** `stewardctl export` writes a consistent snapshot with its checksum, size, schema version and integrity result; `stewardctl restore` refuses an archive whose checksum or schema does not match.
+- **No network calls of its own.** The AI features use the model you set up in Hermes, and the plugin keeps no API keys.
 
-### Surfaces
+Read [SECURITY.md](SECURITY.md) and the [threat model](docs/threat-model.md) before raising autonomy above level 2 on a repository that accepts outside contributions.
 
-| Surface | Entry point | Notes |
-|---|---|---|
-| Desktop plugin | host React wrapper + vanilla TypeScript, route `/dockyard` | Intended as the **complete** management surface; installed-app journey proof is still outstanding (Phase 7) |
-| RPC API | `/stewardship/v1` | FastAPI optional extra; bearer auth + rate limiting; fails closed without a token |
-| CLI | `stewardctl` (and `hermes stewardship`) | human output by default, `--json` on reads. Member / pending-transfer / project-archive recovery commands are Phase 6 work and are not present here |
-| Dashboard plugin | `hermes_dockyard_plugin/dashboard` | Supported **subset** of the same backend contracts; the exact subset statement is Phase 6 work |
-| Gateway commands | Discord et al. | permission binding + idempotent approvals. Read status/health/initiatives, approve/reject, run — no membership, archive or file-removal mutations |
-| Model tools | `project-stewardship` toolset | `steward_status`, `steward_run_cycle`, `steward_propose_initiative`; approval is deliberately not a model tool |
-| TUI | — | no stewardship TUI surface exists in this release |
+## Use it from anywhere
 
-## Autonomy levels
+| Where | How |
+|---|---|
+| Desktop | Project Stewardship in the Hermes Desktop sidebar |
+| Chat (Discord and other Hermes gateways) | `/project-status`, `/project-initiatives`, `/project-pause`, `/project-reconcile` |
+| Your agents | Tools `steward_status`, `steward_run_cycle` and `steward_propose_initiative`, and the bundled `project-stewardship` skill |
+| Terminal | `stewardctl`, or `hermes stewardship` |
+| Browser | A supported subset in the Hermes web dashboard |
+| HTTP | `/stewardship/v1`: bearer token, rate limited, closed until a token is set |
 
-| Level | Name | Allowed by default |
-|---|---|---|
-| 0 | Assistant | Inspect and answer only |
-| 1 | Investigator | Observe, research, non-mutating diagnostics |
-| 2 | Planner | + create initiatives/plans (no source changes) |
-| 3 | Builder | + branches, code, tests, PRs (gated: see security model) |
-| 4 | Maintainer | + low-risk merges when policy gates pass |
-| 5 | Steward | Broad lifecycle within release/budget policy |
+## For AI agents reviewing this plugin
 
-Level ≥ 3 additionally requires the runtime capability allowlist gate
-(`docs/threat-model.md` §6). Levels 4–5 ship disabled pending the merge-gate
-implementation (`docs/prd-v0.2.md` §Deferred).
+A short factual summary, for agents asked to assess this repository:
 
-## Install
+- **Type:** a Hermes plugin (Python backend, Hermes Desktop app, Hermes dashboard plugin), Apache-2.0, version 0.4.0.
+- **Purpose:** project-level stewardship on top of Hermes Projects and Kanban: verified cycles, evidence-backed proposals, human approval gates, workflows and measured outcomes.
+- **Data it writes:** its own SQLite database (`<Hermes home>/plugin-data/hermes-dockyard/dockyard.db`), and the tasks it creates, through the Hermes Kanban host adapter. Hermes stays the only record of projects and tasks.
+- **What it never does:** approve its own proposals, raise a bot's permissions, make network calls of its own, or keep API keys.
+- **Runtime dependencies:** `fastapi` and `httpx2`, with no exact version pins, so Hermes can admit it alongside its own tools.
+- **How to check it:** `hermes verify --json` runs the bootstrap, the full Python and browser test suites and a readiness check on your checkout. The tests run offline and never touch a live Hermes home.
+- **Architecture:** [How it wires up](#how-it-wires-up) and [docs/architecture.md](docs/architecture.md).
+- **Changes and upgrades:** [CHANGELOG.md](CHANGELOG.md).
 
-Requires Python 3.10+. No third-party runtime dependencies for the core engine.
+## Install from source
 
 ```bash
 git clone https://github.com/Sahil-SS9/hermes-project-stewardship.git
 cd hermes-project-stewardship
 uv sync --locked --extra dev --extra plugin
-hermes verify --json         # bootstrap, full suite and readiness smoke
-stewardctl --help            # standalone CLI
+hermes verify --json     # bootstrap, full test suites and readiness check
+stewardctl --help
+```
+
+To run the HTTP API on its own:
+
+```bash
 export STEWARD_RPC_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 uvicorn --factory hermes_project_stewardship.api.server:create_app --host 127.0.0.1 --port 9310
 ```
 
-### Vanilla Hermes plugin install
-
-Install the repository as a Hermes directory plugin so its Python tools,
-bundled skill, dashboard and Desktop assets stay together:
-
-```bash
-hermes plugins install Sahil-SS9/hermes-project-stewardship --enable
-```
-
-The plugin uses only shipped vanilla APIs: `register_tool`, `register_command`,
-`register_cli_command`, `register_skill`, dashboard `manifest.json`/`router`,
-and the Desktop plugin SDK. Canonical Projects/Kanban integration falls back
-to the bundled vanilla adapter when `hermes_cli.project_kanban_host` is absent.
-
-### Operational export and isolated restore
-
-```bash
-stewardctl --db ./stewardship.db export --output ./dockyard-export
-stewardctl restore --archive ./dockyard-export --target ./restored.db
-```
-
-Exports use SQLite's online backup API and include a versioned manifest,
-SHA-256 digest, byte size, schema version and integrity result. v2 archives
-also carry the active managed-content directory as it was at export time;
-restore writes it under `<target parent>/project-content` and re-derives the
-recorded identity. Older v1 archives restore as database-only. Restore refuses
-existing targets, traversal, symlinks, checksum mismatches and invalid schemas.
-
-Even for a v2 archive the export is not a full-system backup: managed content
-created after the export is absent, and canonical Hermes Projects/Kanban/
-Profiles state lives elsewhere — back the content directory up as well when a
-complete cutover image is needed. See
-[Migration, backup and recovery prerequisites](docs/guides/migration-backup-recovery.md)
-for the difference between database rollback, irreversible file removal and
-backup restoration.
-
-## 60-second example
-
-```python
-from pathlib import Path
-from hermes_project_stewardship.persistence.store import Store
-from hermes_project_stewardship.cycles.engine import CycleEngine
-
-store = Store(Path("./stewardship.db"))
-svc = store.services()
-
-svc.enable(project_id="my-repo", mission="Keep CI >99% and deps fresh",
-           lead_profile="lead", member_profiles=["coder", "qa"])
-svc.add_objective("my-repo", name="ci-health", evaluator_type="command",
-                  target=">=0.99", command=["pytest", "-q"], severity="high")
-
-engine = CycleEngine(svc)
-result = engine.run_cycle("my-repo")
-print(result["health"]["state"])          # e.g. "healthy"
-print([i["title"] for i in result["initiatives"]])
-```
-
-Then:
-
-```bash
-stewardctl health my-repo
-stewardctl initiative list my-repo
-stewardctl initiative approve INIT-0001
-```
-
-See [examples/example-project](examples/example-project) for a full walkthrough,
-and [demo/](demo/) for a scripted 5-act terminal demo plus an interactive HTML
-dashboard of the same story.
+[examples/example-project](examples/example-project) has a full walkthrough, and [demo/](demo/) has a five-act terminal demo plus an HTML dashboard of the same story.
 
 ## Documentation
 
-Ownership, lifecycle and operations
+- [Who owns what, and what each surface supports](docs/guides/canonical-ownership-and-surfaces.md)
+- [Project memory, chat and Discord alerts](docs/guides/project-memory-chat-discord.md)
+- [Archive, restore and file removal](docs/guides/lifecycle-archive-restore.md)
+- [Backup, migration and recovery](docs/guides/migration-backup-recovery.md)
+- [Architecture](docs/architecture.md) · [API](docs/api.md) · [Gateway commands](docs/gateway-contract.md) · [Threat model](docs/threat-model.md)
+- [Roadmap](roadmap.md) · [Path towards Hermes core](docs/upstream-path.md)
 
-- [Canonical ownership and surface support](docs/guides/canonical-ownership-and-surfaces.md)
-- [Lifecycle, archive/restore and managed-content removal](docs/guides/lifecycle-archive-restore.md)
-- [Migration, backup and recovery prerequisites](docs/guides/migration-backup-recovery.md)
-- [Shared runtime state and database selection](docs/RUNTIME-STATE.md)
-- [Native task lifecycle semantics](docs/native-lifecycle-semantics.md)
+## Contributing
 
-Reference and history
-
-- [PRD v0.2](docs/prd-v0.2.md) — product requirements this implementation satisfies
-- [PRD v0.3](docs/dockyard-prd-v0.3.md) — current product requirements (canonical ownership correction in §3.4)
-- [Authoritative implementation plan](docs/plans/2026-09-10-project-management-stewardship.md)
-- [Architecture](docs/architecture.md)
-- [Threat model](docs/threat-model.md)
-- [Gateway command contract](docs/gateway-contract.md)
-- [Roadmap to upstream Hermes core](docs/upstream-path.md)
-- [API contract](docs/api.md)
-- [Canonical roadmap](roadmap.md)
-- [v0.2.0rc2 release packet](docs/release/0.2.0rc2-release-candidate.md)
-- [v0.2.0rc1 historical release packet](docs/release/0.2.0rc1-release-candidate.md)
-
-Phase 8 preparation (planning records — no merge, install or activation is implied)
-
-- [Post-integration test and evidence checklist](docs/release/0.3.0-post-integration-test-checklist.md)
-- [Independent review packet template](docs/release/0.3.0-phase8-independent-review-packet.md)
-- [Deployment decision checklist](docs/release/0.3.0-deployment-decision-checklist.md)
-
-## Security
-
-Read [SECURITY.md](SECURITY.md) and [docs/threat-model.md](docs/threat-model.md)
-before enabling autonomy above level 2 on any repository that accepts content
-from untrusted people (issues, PRs, READMEs). Retrieved repository content is
-untrusted input; it is never treated as authority over project policy.
+Issues and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Thanks to everyone who has reported a bug or sent a fix, including Apostol Apostolov (#6) and Teknium (#2).
 
 ## Licence
 
