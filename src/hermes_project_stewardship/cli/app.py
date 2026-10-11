@@ -360,18 +360,15 @@ def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) 
         if args.action == "archive":
             # PM-0602: essential archive recovery — list, or archive one.
             if args.list or args.project_id is None:
-                archived = []
-                for row in svc.list_projects():
-                    settings = svc.settings(row["project_id"], include_disabled=True)
-                    if settings.get("archived_at"):
-                        archived.append(settings)
+                archived = svc.archived_projects()
                 if args.json:
                     print(json.dumps({"archived": [
                         {
                             "project_id": s["project_id"],
-                            "phase": s["phase"],
+                            "phase": s["restores_to"]["phase"],
                             "archived_at": s["archived_at"],
                             "archived_by": s["archived_by"],
+                            "restores_to": s["restores_to"],
                         }
                         for s in archived
                     ]}))

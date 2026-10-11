@@ -403,33 +403,74 @@ class StewardshipService:
         }
 
     def archive_project(self, project_id: str, *, actor: str, interface: str = "service") -> Dict[str, Any]:
+        """Hide a project everywhere (owner decision 10/10/2026); nothing is deleted.
+
+        The project is switched off while archived, so nothing runs on it, and
+        ``archived_prior_enabled`` remembers whether it was on. Phase and pause
+        time are left as they are, so Restore can bring back exactly this state.
+        """
         row = self._require_known(project_id)
         if row["archived_at"] is not None:
             raise ServiceError(f"project '{project_id}' is already archived")
         stamp = iso(self._clock())
+        was_enabled = int(bool(row["enabled"]))
         with self.store.tx() as cx:
             cx.execute(
-                "UPDATE project_stewardship SET enabled=0, archived_at=?, archived_by=?, updated_at=? WHERE project_id=?",
-                (stamp, actor, stamp, project_id),
+                "UPDATE project_stewardship SET enabled=0, archived_at=?, archived_by=?,"
+                " archived_prior_enabled=?, updated_at=? WHERE project_id=?",
+                (stamp, actor, was_enabled, stamp, project_id),
             )
         untouched = ["project", "board", "tasks", "repository"]
-        self.store.audit(actor=actor, interface=interface, action="project.archived", subject=project_id, detail={"canonical_untouched": untouched})
+        self.store.audit(actor=actor, interface=interface, action="project.archived", subject=project_id,
+                         detail={"canonical_untouched": untouched,
+                                 "was": {"enabled": bool(was_enabled), "phase": row["phase"]}})
         return {**self._row_settings(self._require_known(project_id)), "canonical_untouched": untouched}
 
     def restore_project(self, project_id: str, *, actor: str, interface: str = "service") -> Dict[str, Any]:
+        """Bring an archived project back exactly as it was archived.
+
+        Only the switch changed on archive; it goes back to what was remembered.
+        An archive made before v41 remembered nothing, so the project is switched
+        on, as Restore always did; its phase and pause time are kept either way.
+        """
         row = self._require_known(project_id)
         if row["archived_at"] is None:
             raise ServiceError(f"project '{project_id}' is not archived")
+        prior = row["archived_prior_enabled"] if "archived_prior_enabled" in row.keys() else None
+        enabled = 1 if prior is None else int(bool(prior))
         stamp = iso(self._clock())
         with self.store.tx() as cx:
             cx.execute(
-                "UPDATE project_stewardship SET enabled=1, phase='active', paused_at=NULL,"
-                " archived_at=NULL, archived_by=NULL, updated_at=? WHERE project_id=?",
-                (stamp, project_id),
+                "UPDATE project_stewardship SET enabled=?, archived_at=NULL, archived_by=NULL,"
+                " archived_prior_enabled=NULL, updated_at=? WHERE project_id=?",
+                (enabled, stamp, project_id),
             )
         untouched = ["project", "board", "tasks", "repository"]
-        self.store.audit(actor=actor, interface=interface, action="project.restored", subject=project_id, detail={"canonical_untouched": untouched})
+        self.store.audit(actor=actor, interface=interface, action="project.restored", subject=project_id,
+                         detail={"canonical_untouched": untouched,
+                                 "now": {"enabled": bool(enabled), "phase": row["phase"]},
+                                 "remembered": prior is not None})
         return {**self._row_settings(self._require_known(project_id)), "canonical_untouched": untouched}
+
+    def archived_projects(self) -> List[Dict[str, Any]]:
+        """The one list that shows archived projects, latest archive first,
+        with what Restore will bring back."""
+        rows = self.store._conn.execute(
+            "SELECT project_id, mission, owner_lead_profile, phase, archived_at, archived_by,"
+            " archived_prior_enabled FROM project_stewardship WHERE archived_at IS NOT NULL"
+            " ORDER BY archived_at DESC, project_id"
+        ).fetchall()
+        return [{
+            "project_id": r["project_id"],
+            "mission": r["mission"],
+            "lead_profile": r["owner_lead_profile"],
+            "archived_at": r["archived_at"],
+            "archived_by": r["archived_by"],
+            "restores_to": {
+                "enabled": True if r["archived_prior_enabled"] is None else bool(r["archived_prior_enabled"]),
+                "phase": r["phase"],
+            },
+        } for r in rows]
 
     # ------------------------------------------------------------------ #
     # Feature toggles (DY-FT-01): hide, never delete; re-enable restores. #
@@ -762,10 +803,13 @@ class StewardshipService:
             return False
         return s["enabled"] and s["phase"] == ProjectPhase.ACTIVE.value
 
-    def list_projects(self) -> List[Dict[str, Any]]:
+    def list_projects(self, *, include_archived: bool = False) -> List[Dict[str, Any]]:
+        """Configured projects. Archived ones are left out unless asked for:
+        ``archived_projects()`` is where they are listed."""
         rows = self.store._conn.execute(
             "SELECT project_id, enabled, phase, autonomy_level FROM project_stewardship"
-            " ORDER BY project_id"
+            + ("" if include_archived else " WHERE archived_at IS NULL")
+            + " ORDER BY project_id"
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -783,8 +827,8 @@ class StewardshipService:
     def last_project(self) -> Optional[str]:
         """The last project chosen in the app ("*" for All projects), or None.
 
-        A saved project that is no longer configured reads as None, so the app
-        never opens on a project that no longer exists.
+        A saved project that is no longer configured, or is archived, reads as
+        None, so the app never opens on a project it does not list.
         """
         row = self.store._conn.execute(
             "SELECT value_json FROM dockyard_app_settings WHERE key=?",
@@ -798,7 +842,8 @@ class StewardshipService:
         if project_id == self.ALL_PROJECTS:
             return project_id
         known = self.store._conn.execute(
-            "SELECT 1 FROM project_stewardship WHERE project_id=?", (project_id,)
+            "SELECT 1 FROM project_stewardship WHERE project_id=? AND archived_at IS NULL",
+            (project_id,),
         ).fetchone()
         return project_id if known else None
 

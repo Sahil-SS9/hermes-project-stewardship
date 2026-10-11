@@ -14,8 +14,9 @@ from typing import List
 # the edited v3). Later lanes take the next free number when they merge.
 # Never edit a released migration (v1-v17 shipped in v0.3.0); fix forward
 # with a new version instead. Batch R2 owns v35. Batch E owns v36. Checks
-# round 1: project memory v38, chat links v39, Discord alerts v40.
-SCHEMA_VERSION = 40
+# round 1: project memory v38, chat links v39, Discord alerts v40. Archive
+# follow-up (11/10): v41.
+SCHEMA_VERSION = 41
 
 
 @dataclass(frozen=True)
@@ -1799,5 +1800,21 @@ MIGRATIONS.append(Migration(
         """,
     downgrade_sql="""
         ALTER TABLE notifications DROP COLUMN discord_sent_at;
+        """,
+))
+
+# v41 (owner decision 10/10/2026: Archive hides a project; Restore brings it
+# back exactly). Archive switches a project off while it is archived; this
+# remembers whether it was on, so Restore can put back exactly that. NULL means
+# the archive was made before v41 (restore then switches it on, as it always
+# did). Phase and pause time are never touched by Archive, so they need no copy.
+MIGRATIONS.append(Migration(
+    version=41,
+    name="Archive remembers whether the project was switched on",
+    upgrade_sql="""
+        ALTER TABLE project_stewardship ADD COLUMN archived_prior_enabled INTEGER;
+        """,
+    downgrade_sql="""
+        ALTER TABLE project_stewardship DROP COLUMN archived_prior_enabled;
         """,
 ))

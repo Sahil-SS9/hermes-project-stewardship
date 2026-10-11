@@ -490,6 +490,13 @@ def wire_notification_stack(store: Store, svc: StewardshipService,
     return bus, engine
 
 
+
+# Archived projects are hidden everywhere (owner decision 10/10/2026): their
+# alerts leave the cross-project feed, counts, pop-ups and Discord, and "mark
+# all as seen" leaves them as they are, so Restore finds them unchanged.
+_LISTED = ("project_id NOT IN (SELECT project_id FROM project_stewardship"
+           " WHERE archived_at IS NOT NULL)")
+
 class NotificationEngine:
     def __init__(self, store: Store, service: StewardshipService,
                  *, zone: Optional[str] = None) -> None:
@@ -859,6 +866,8 @@ class NotificationEngine:
         if project_id:
             clauses.append("project_id=?")
             args.append(project_id)
+        else:
+            clauses.append(_LISTED)
         if kind:
             clauses.append("kind=?")
             args.append(kind)
@@ -915,6 +924,8 @@ class NotificationEngine:
         if project_id:
             clauses.append("n.project_id=?")
             args.append(project_id)
+        else:
+            clauses.append("n." + _LISTED)
         if kind:
             clauses.append("n.kind=?")
             args.append(kind)
@@ -944,6 +955,8 @@ class NotificationEngine:
         if project_id:
             clauses.append("project_id=?")
             args.append(project_id)
+        else:
+            clauses.append(_LISTED)
         where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
         base_sql = "SELECT n.* FROM notifications n" + where
         rows = self.store._conn.execute(base_sql, tuple(args)).fetchall()
@@ -974,8 +987,8 @@ class NotificationEngine:
         rows = self.store._conn.execute(
             "SELECT * FROM notifications"
             " WHERE resolved_at IS NULL AND acked_at IS NULL"
-            "   AND popup_shown_at IS NULL"
-            " ORDER BY created_at DESC, id DESC LIMIT 200",
+            "   AND popup_shown_at IS NULL AND " + _LISTED
+            + " ORDER BY created_at DESC, id DESC LIMIT 200",
         ).fetchall()
         due: List[Dict[str, Any]] = []
         extra_due = 0
@@ -1045,7 +1058,7 @@ class NotificationEngine:
         rows = self.store._conn.execute(
             "SELECT id, project_id, severity, kind, title, created_at FROM notifications"
             " WHERE resolved_at IS NULL AND acked_at IS NULL AND discord_sent_at IS NULL"
-            " ORDER BY created_at, id LIMIT ?",
+            " AND " + _LISTED + " ORDER BY created_at, id LIMIT ?",
             (int(limit),),
         ).fetchall()
         local_now = now.astimezone(self._zone())
@@ -1207,6 +1220,8 @@ class NotificationEngine:
         if project_id:
             sql += " AND project_id=?"
             args.append(project_id)
+        else:
+            sql += " AND " + _LISTED
         sql += " ORDER BY id ASC LIMIT 200"
         rows = self.store._conn.execute(sql, tuple(args)).fetchall()
         return [dict(r) for r in rows]

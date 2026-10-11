@@ -810,6 +810,13 @@ def create_app(
     def list_projects():
         return {"projects": svc.list_projects()}
 
+    # Archived projects are hidden from every other list; this is where they
+    # are listed, with what Restore brings back. Declared before any
+    # /projects/{project_id} route so "archived" is never read as a project id.
+    @router.get("/projects/archived")
+    def archived_projects():
+        return {"projects": svc.archived_projects()}
+
     def _lifecycle_authority() -> str:
         if embedded and not token:
             return "embedded-service"

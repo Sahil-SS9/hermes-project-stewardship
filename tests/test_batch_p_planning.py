@@ -382,9 +382,13 @@ def test_plan_table_migration_round_trip(tmp_path, monkeypatch):
     finally:
         store.close()
 
-    # Only the columns every schema from base to current shares.
+    # Only the columns every schema from base to current shares. (v41 added
+    # project_stewardship.archived_prior_enabled, so "*" no longer qualifies.)
     legacy = {
-        "project_stewardship": "*",
+        "project_stewardship": ("project_id, enabled, mission, owner_lead_profile, member_profiles_json,"
+                                " owner_team_id, autonomy_level, autonomy_policy_json, verification_policy_json,"
+                                " release_policy_json, notification_policy_json, phase, created_at, updated_at,"
+                                " paused_at, features_json, archived_at, archived_by"),
         "project_canvases": "canvas_id, project_id, revision, objects_json, connectors_json, created_at, updated_at, updated_by",
         "canvas_sessions": "session_id, project_id, canvas_revision, status, current_question_json, answers_json, created_at, updated_at",
         "canvas_proposals": "proposal_id, project_id, session_id, canvas_revision, proposal_json, status, created_at",

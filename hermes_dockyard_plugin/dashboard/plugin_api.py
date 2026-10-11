@@ -524,6 +524,13 @@ async def projects() -> dict:
     return await _proxy("GET", "/stewardship/v1/projects")
 
 
+# Archived projects: hidden from every other list, listed here with what
+# Restore brings back. Before any /projects/{project_id} route.
+@plugin_api.get("/projects/archived")
+async def archived_projects() -> dict:
+    return await _proxy("GET", "/stewardship/v1/projects/archived")
+
+
 @plugin_api.get("/projects/{project_id}/work-items")
 async def work_items(project_id: str, status: str | None = None) -> dict:
     # cor-004: quote path segments; pass query values structurally so a

@@ -42,8 +42,14 @@ def _schema(cx) -> list[tuple]:
                 "WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name")]
 
 
-def _rows(cx, table):
-    return [tuple(r) for r in cx.execute(f"SELECT * FROM {table} ORDER BY rowid")]
+def _rows(cx, table, cols="*"):
+    return [tuple(r) for r in cx.execute(f"SELECT {cols} FROM {table} ORDER BY rowid")]
+
+
+def _cols(cx, table):
+    """The table's columns as they are now, for reading the same ones after a
+    later migration adds more (v41 added one to project_stewardship)."""
+    return ", ".join(f'"{r[1]}"' for r in cx.execute(f"PRAGMA table_info({table})"))
 
 
 def _all_tables(cx, exclude=()):
@@ -151,14 +157,15 @@ def test_backfill_one_contract_per_active_goal_and_nothing_inferred(tmp_path, mo
 def test_upgrade_keeps_every_existing_row(tmp_path, monkeypatch):
     pre = _store_without_r2(tmp_path / "pre.db", monkeypatch)
     _seed_legacy(pre._conn)
-    legacy = {t: _rows(pre._conn, t) for t in _all_tables(pre._conn)}
+    legacy = {t: (_cols(pre._conn, t), _rows(pre._conn, t)) for t in _all_tables(pre._conn)}
     pre.close()
     store = Store(tmp_path / "pre.db")
     try:
-        for table, rows in legacy.items():
+        for table, (cols, rows) in legacy.items():
             if table == "schema_migrations":
                 continue
-            assert _rows(store._conn, table) == rows, table
+            # Every row keeps every value it had; later columns may be added.
+            assert _rows(store._conn, table, cols) == rows, table
     finally:
         store.close()
 

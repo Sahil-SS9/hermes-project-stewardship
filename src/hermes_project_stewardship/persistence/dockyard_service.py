@@ -39,6 +39,12 @@ import threading as _threading
 
 _PROMOTION_LOCK = _threading.Lock()
 
+# Archived projects are left out of every read that spans projects (owner
+# decision 10/10/2026: Archive hides a project everywhere). The one place that
+# lists them is StewardshipService.archived_projects().
+_LISTED = ("project_id NOT IN (SELECT project_id FROM project_stewardship"
+           " WHERE archived_at IS NOT NULL)")
+
 
 class DockyardService:
     def __init__(self, store: Store, *, canonical_work=None) -> None:
@@ -1145,6 +1151,7 @@ class DockyardService:
             SELECT project_id, ref, title, risk, priority, created_at
             FROM project_initiatives
             WHERE approval_state='pending' AND status='pending_approval'
+              AND """ + _LISTED + """
             ORDER BY created_at
             """
         ).fetchall()
@@ -1160,7 +1167,7 @@ class DockyardService:
             })
         frozen = self.store._conn.execute(
             "SELECT project_id, phase FROM project_stewardship"
-            " WHERE phase='frozen' OR enabled=0"
+            " WHERE (phase='frozen' OR enabled=0) AND archived_at IS NULL"
         ).fetchall()
         for r in frozen:
             items.append({
@@ -1182,7 +1189,8 @@ class DockyardService:
         Answers 'what does my fleet owe me right now?' (PRD §8.5)."""
         projects = self.store._conn.execute(
             "SELECT project_id, enabled, phase, autonomy_level"
-            " FROM project_stewardship ORDER BY project_id").fetchall()
+            " FROM project_stewardship WHERE archived_at IS NULL"
+            " ORDER BY project_id").fetchall()
         out = {"projects": [], "owed_decisions": 0, "totals":
                {"active_work": 0, "blocked": 0, "stuck_bots": 0,
                 "unacked_notifications": 0}}
@@ -1244,7 +1252,8 @@ class DockyardService:
             raise ValueError("search query must contain 2–100 characters")
         limit = max(1, min(int(limit), 50))
         projects = self.store._conn.execute(
-            "SELECT project_id FROM project_stewardship ORDER BY project_id"
+            "SELECT project_id FROM project_stewardship WHERE archived_at IS NULL"
+            " ORDER BY project_id"
         ).fetchall()
         results: List[Dict] = []
         for row in projects:
@@ -1432,11 +1441,11 @@ class DockyardService:
         health_freshness: Dict[str, Optional[int]] = {}
         evidence_files = self.store._conn.execute(
             "SELECT COUNT(*) AS n FROM project_content"
-            " WHERE removal_state='active' AND archived_at IS NULL"
+            " WHERE removal_state='active' AND archived_at IS NULL AND " + _LISTED
         ).fetchone()["n"]
         for p in self.store._conn.execute(
                 "SELECT project_id, enabled, phase, owner_lead_profile"
-                " FROM project_stewardship"
+                " FROM project_stewardship WHERE archived_at IS NULL"
                 " ORDER BY project_id").fetchall():
             pid = p["project_id"]
             health_row = self.store._conn.execute(
@@ -1655,7 +1664,7 @@ class DockyardService:
             "SELECT project_id, ref, title, risk, created_at"
             " FROM project_initiatives"
             " WHERE approval_state='pending' AND status='pending_approval'"
-            " ORDER BY created_at").fetchall()
+            " AND " + _LISTED + " ORDER BY created_at").fetchall()
         for r in pending:
             created = self._parse_iso(r["created_at"])
             age_days = max(0, (now - created).days) if created else 0
@@ -1672,7 +1681,8 @@ class DockyardService:
 
         for p in self.store._conn.execute(
                 "SELECT project_id, owner_lead_profile, phase, enabled"
-                " FROM project_stewardship ORDER BY project_id").fetchall():
+                " FROM project_stewardship WHERE archived_at IS NULL"
+                " ORDER BY project_id").fetchall():
             pid = p["project_id"]
             lead = p["owner_lead_profile"] or "unassigned"
 
@@ -1767,8 +1777,8 @@ class DockyardService:
 
         notes = self.store._conn.execute(
             "SELECT project_id, severity, kind, title, body, created_at"
-            " FROM notifications WHERE acked_at IS NULL"
-            " ORDER BY created_at DESC LIMIT 50").fetchall()
+            " FROM notifications WHERE acked_at IS NULL AND " + _LISTED
+            + " ORDER BY created_at DESC LIMIT 50").fetchall()
         for n in notes:
             informational.append({
                 "kind": n["kind"],
