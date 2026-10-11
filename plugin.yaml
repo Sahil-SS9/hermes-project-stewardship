@@ -9,7 +9,8 @@ provides_tools:
   - steward_status
   - steward_run_cycle
   - steward_propose_initiative
-provides_hooks: []
+provides_hooks:
+  - pre_llm_call
 python_dependencies:
   - fastapi>=0.104,<1
   - httpx2>=2.7,<3
