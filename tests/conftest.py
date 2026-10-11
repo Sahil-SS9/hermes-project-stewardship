@@ -8,7 +8,6 @@ fingerprinted before and after the run.
 from __future__ import annotations
 
 import atexit
-import hashlib
 import os
 import shutil
 import sqlite3
@@ -20,6 +19,7 @@ from urllib.parse import unquote, urlsplit
 
 import pytest
 
+from .live_db_guard import live_fingerprint as _live_fingerprint
 from .offline_guard import ATTEMPTS as _OFFLINE_ATTEMPTS
 from .offline_guard import install as _install_offline_guard
 
@@ -31,10 +31,7 @@ from .offline_guard import install as _install_offline_guard
 HPS_FAIL_CLOSED_STATE_ISOLATION = True
 
 _LIVE_HERMES_HOME = (Path.home() / ".hermes").resolve()
-_LIVE_DOCKYARD_FILES = tuple(
-    _LIVE_HERMES_HOME / "plugin-data" / "hermes-dockyard" / name
-    for name in ("dockyard.db", "dockyard.db-wal", "dockyard.db-shm")
-)
+_LIVE_DOCKYARD_DB = _LIVE_HERMES_HOME / "plugin-data" / "hermes-dockyard" / "dockyard.db"
 _DEFAULT_TMP_ROOT = Path(os.environ.get("TMPDIR") or (Path.home() / ".hermes" / "cache" / "scratch")).expanduser().resolve()
 _DEFAULT_TMP_ROOT.mkdir(parents=True, exist_ok=True)
 _EXPLICIT_STATE_ROOT = os.environ.get("HPS_TEST_STATE_ROOT")
@@ -107,24 +104,10 @@ sqlite3.connect = _guarded_sqlite_connect
 _install_offline_guard()
 
 
-def _fingerprint(paths: tuple[Path, ...]) -> tuple[tuple[str, int, str], ...]:
-    """Content fingerprint only.
-
-    WAL mode touches the -shm/-wal sidecar timestamps when any process merely
-    opens the database read-only, so mtimes are not a reliable write signal.
-    The main database file's size and content hash are.
-    """
-    result = []
-    for path in paths:
-        if not path.exists():
-            result.append((str(path), 0, ""))
-            continue
-        data = path.read_bytes()
-        result.append((str(path), len(data), hashlib.sha256(data).hexdigest()))
-    return tuple(result)
-
-
-_LIVE_BEFORE = _fingerprint(_LIVE_DOCKYARD_FILES)
+# Rows, not file bytes, and without the live workflow timer's own rows: see
+# tests/live_db_guard.py. Read through the real connect, which the guard above
+# would otherwise refuse for this path.
+_LIVE_BEFORE = _live_fingerprint(_LIVE_DOCKYARD_DB, connect=_REAL_SQLITE_CONNECT)
 
 
 def _cleanup() -> None:
@@ -153,9 +136,11 @@ _require_isolated_environment()
 
 @pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
-    after = _fingerprint(_LIVE_DOCKYARD_FILES)
+    after = _live_fingerprint(_LIVE_DOCKYARD_DB, connect=_REAL_SQLITE_CONNECT)
     if after != _LIVE_BEFORE:
-        print("\nERROR: live Project Stewardship database changed during pytest; refusing a green result")
+        print("\nERROR: live Project Stewardship database changed during pytest; refusing a green result"
+              " (the live workflow timer's heartbeat is already left out; if workflows are running"
+              " live, pause the dockyard-workflow-timer job and run again)")
         session.exitstatus = 1
     if _OFFLINE_ATTEMPTS:
         print(f"\nERROR: code outside any test tried to go online (refused): {_OFFLINE_ATTEMPTS[:5]}")
