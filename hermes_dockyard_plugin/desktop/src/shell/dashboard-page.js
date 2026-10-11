@@ -567,7 +567,9 @@ export function DashboardPage({ inboxCss = '' } = {}) {
         id: 'dockyard-panel',
         role: 'tabpanel',
         'aria-labelledby': `dockyard-tab-${tab}`,
-        children: archiveReview.active
+        // The review bar shows where the choice can be seen (the switcher on the
+        // Dashboard, and App settings); the choice itself follows the address.
+        children: archiveReview.active && (tab === 'dashboard' || tab === 'settings')
           ? jsxs(Fragment, { children: [jsx(ArchiveReviewBar, { review: archiveReview, onChange: () => setArchiveReviewTick((tick) => tick + 1) }, 'archive-review'), content] })
           : content,
       }),

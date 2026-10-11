@@ -322,6 +322,7 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
   const navigations = [];
   const clipboardWrites = [];
   const data = clone(mode === 'empty' ? EMPTY : POPULATED);
+  const archivedPrior = new Map()
   if (objectivePayload) data.objectives['payments-relaunch'] = objectivePayload;
   const deferred = mode === 'loading' ? createDeferred() : null;
   let shouldFail = failOnce;
@@ -441,6 +442,14 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       data.backlog[projectId].backlog.sort((left, right) => left.rank - right.rank);
       return { ...item, rank, priority_reason: init.body?.reason };
     }
+    // Archived projects (11/10/2026): the one list that shows them, with what Restore brings back.
+    if (method === 'GET' && path === '/projects/archived') {
+      return { projects: Object.values(data.settings).filter((settings) => settings.archived_at).map((settings) => ({
+        project_id: settings.project_id, mission: settings.mission ?? '', lead_profile: settings.owner?.lead_profile ?? null,
+        archived_at: settings.archived_at, archived_by: settings.archived_by ?? 'sahil',
+        restores_to: { enabled: archivedPrior.get(settings.project_id) ?? true, phase: settings.phase ?? 'active' },
+      })) };
+    }
     const lifecycle = path.match(/^\/projects\/([^/]+)\/(disable|re-enable|pause|resume|freeze|archive|restore)$/);
     if (method === 'POST' && lifecycle) {
       const projectId = decodeURIComponent(lifecycle[1]);
@@ -452,8 +461,10 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
       if (action === 'pause') settings.phase = 'paused';
       if (action === 'resume') settings.phase = 'active';
       if (action === 'freeze') settings.phase = 'frozen';
-      if (action === 'archive') { settings.enabled = false; settings.archived_at = '2026-09-12T12:00:00+00:00'; }
-      if (action === 'restore') { settings.enabled = true; settings.phase = 'active'; settings.paused_at = null; settings.archived_at = null; }
+      // As the backend (11/10/2026): Archive remembers the switch; Restore puts back
+      // exactly that and never touches the phase or pause time.
+      if (action === 'archive') { archivedPrior.set(projectId, settings.enabled !== false); settings.enabled = false; settings.archived_at = '2026-09-12T12:00:00+00:00'; settings.archived_by = 'sahil'; }
+      if (action === 'restore') { settings.enabled = archivedPrior.get(projectId) ?? true; archivedPrior.delete(projectId); settings.archived_at = null; settings.archived_by = null; }
       if (project) { project.enabled = settings.enabled; project.phase = settings.phase; }
       return clone(settings);
     }
@@ -673,7 +684,7 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
     if (method === 'POST' && /^\/projects\/[^/]+\/reassignments$/.test(path)) return { op_id: 'OP-BULK', state: 'completed', project_id: 'payments-relaunch', actor: 'sahil' };
     if (method === 'GET' && path === '/operations/OP-PHASE4') return { op_id: 'OP-PHASE4', state: 'completed', project_id: 'payments-relaunch', actor: 'sahil', items: [{ item_id: 'HDY-12', outcome: 'completed', actor: 'sahil' }, { item_id: 'HDY-13', outcome: 'completed', actor: 'sahil' }] };
     if (method === 'GET' && path === '/operations/OP-BULK') return { op_id: 'OP-BULK', state: 'completed', project_id: 'payments-relaunch', actor: 'sahil', operation_audit: { operation: 'OP-BULK', actor: 'sahil' }, items: [{ item_id: 'HDY-13', outcome: 'completed', audit: { actor: 'sahil', action: 'workitem.reassigned' } }] };
-    if (path === '/dashboard') return clone(data.dashboard);
+    if (path === '/dashboard') return clone({ ...data.dashboard, projects: data.dashboard.projects.filter((project) => !data.settings[project.id]?.archived_at) });
     if (path === '/portfolio') return clone(data.portfolio ?? POPULATED_PORTFOLIO);
     if (path === '/onboard/discover') return clone(data.DISCOVER);
     if (method === 'POST' && path === '/onboard/preflight') return clone(data.PREFLIGHT);
@@ -1549,13 +1560,25 @@ async function testPhase5ManagementJourneys() {
   await runtime.click('[data-project-view="settings"]');
   await runtime.click('[data-lifecycle-action="archive"]');
   assert(doc.querySelector('[data-lifecycle-confirm]') && !doc.querySelector('[data-lifecycle-confirm]').hidden, 'project archive did not ask for confirmation');
-  assert.match(doc.querySelector('[data-lifecycle-confirm]')?.textContent ?? '', /canonical project, board, tasks and repository remain untouched/i, 'project archive confirmation omits canonical retention assurance');
+  const archiveText = doc.querySelector('[data-lifecycle-confirm-text="archive"]')?.textContent ?? '';
+  assert.match(archiveText, /Nothing is deleted: its Hermes project, board, tasks and repository stay exactly as they are/i, 'project archive confirmation omits canonical retention assurance');
+  assert.match(archiveText, /hidden everywhere/i, 'project archive confirmation does not say the project is hidden');
+  assert.match(archiveText, /Restore it any time from the project switcher > Archived projects/i, 'project archive confirmation does not say where to restore it');
   await runtime.click('[data-action="confirm-lifecycle-action"]', 100);
   assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/archive'), 'project archive did not reach proxy');
-  assert(doc.querySelector('[data-lifecycle-action="restore"]'), 'project restore control is missing after archive');
-  await runtime.click('[data-lifecycle-action="restore"]');
-  await runtime.click('[data-action="confirm-lifecycle-action"]', 100);
+  // Archive hides the project everywhere (11/10/2026), so the app leaves it for All projects.
+  await runtime.flush(120);
+  assert.equal(doc.querySelector('.dy-sw-trigger')?.getAttribute('data-scope'), '*', 'archive did not leave the project for All projects');
+  assert(!doc.querySelector('[data-lifecycle-action="restore"]'), 'the archived project stayed open');
+  // Restore from the one list of archived projects, in the switcher's menu.
+  await runtime.click('.dy-sw-trigger');
+  assert.match(doc.querySelector('[data-switcher-archived]')?.textContent ?? '', /Archived projects \(1\)/, 'the switcher does not offer the archived project');
+  await runtime.click('[data-switcher-archived]', 100);
+  assert(doc.querySelector('[data-archived-project="payments-relaunch"]'), 'the archived list does not show the project');
+  await runtime.click('[data-restore-project="payments-relaunch"]');
+  await runtime.click('[data-archived-project="payments-relaunch"] [data-action="confirm-restore"]', 120);
   assert(runtime.calls.some((call) => call.path === '/projects/payments-relaunch/restore'), 'project restore did not reach proxy');
+  assert(!doc.querySelector('[data-archived-dialog]'), 'the archived list stayed open after restore');
   await runtime.dispose();
 }
 
