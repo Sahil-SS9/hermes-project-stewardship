@@ -156,8 +156,14 @@ _SHOWN_BEFORE = [
 ]
 
 
-def test_an_archived_project_appears_in_no_list_count_or_inbox(world):
+def test_an_archived_project_appears_in_no_list_count_or_inbox(world, monkeypatch):
     store, svc, client, headers = world
+    # /canvas/models lists the models Hermes has set up. With a real Hermes importable (as under
+    # `hermes verify`) that asks the providers over the network, which the offline guard
+    # refuses: answer as a machine without Hermes does, like desktop/disposable-backend.py.
+    from hermes_project_stewardship.persistence import hermes_curation_provider
+    monkeypatch.setattr(hermes_curation_provider, "list_hermes_models",
+                        lambda: {"available": False, "default": None, "providers": []})
     # Everything that puts a project on a list: a decision waiting (approval inbox), an unread
     # high alert (notifications), the app's last-chosen project, and frozen (attention).
     svc.propose_initiative(GONE, title="Retired work", rationale="evidence: CI red for 3 days")
