@@ -1826,9 +1826,9 @@ MIGRATIONS.append(Migration(
 # parent is allowed and shown as "Not placed yet". The 0.4.0 link tables
 # (project_objective_goals, project_objective_deliveries, initiative_milestones,
 # dockyard_milestone_items) are LEFT UNTOUCHED as read-only history so the
-# downgrade restores v41 byte-for-byte in content; the code stops reading and
-# writing them, and the v42->v41 downgrade simply drops the new columns/tables
-# (which are all nullable/new, so nothing is lost).
+# downgrade restores the pre-upgrade v41 content byte-for-byte. The code stops
+# reading and writing those tables. A downgrade drops v42-only ladder links and
+# check evidence, so operators must export/backup before downgrading.
 #
 # Conversion (D-L4): convert what maps unambiguously, record the rest in
 # roadmap_unplaced for the user to place by hand. Nothing is guessed from
@@ -1860,16 +1860,37 @@ MIGRATIONS.append(Migration(
         );
         CREATE INDEX IF NOT EXISTS idx_goal_tasks_goal ON goal_tasks(goal_id);
 
-        -- A goal's optional check, reusing the objective evaluator shape.
+        -- A goal's optional check. Row presence means enabled; the shape and
+        -- evidence window match objective checks, while evaluations remain
+        -- separate from legacy project-health scoring.
         CREATE TABLE IF NOT EXISTS goal_checks (
             goal_id        TEXT PRIMARY KEY REFERENCES project_goals(goal_id) ON DELETE CASCADE,
             evaluator_type TEXT NOT NULL CHECK (evaluator_type IN ('manual','command','integration')),
             target         TEXT NOT NULL,
             command_json   TEXT,
             integration    TEXT,
+            window         TEXT NOT NULL DEFAULT '30d',
             created_at     TEXT NOT NULL,
             updated_at     TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS goal_check_evaluations (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id    TEXT NOT NULL REFERENCES project_stewardship(project_id) ON DELETE CASCADE,
+            goal_id       TEXT NOT NULL REFERENCES project_goals(goal_id) ON DELETE CASCADE,
+            passed        INTEGER NOT NULL CHECK (passed IN (0,1)),
+            measured      REAL,
+            target_met    INTEGER NOT NULL CHECK (target_met IN (0,1)),
+            state         TEXT NOT NULL,
+            detail        TEXT NOT NULL DEFAULT '',
+            evidence_json TEXT NOT NULL DEFAULT '{}',
+            source        TEXT NOT NULL,
+            actor         TEXT NOT NULL,
+            interface     TEXT NOT NULL,
+            recorded_at   TEXT NOT NULL,
+            expires_at    TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_goal_check_evaluation_time
+            ON goal_check_evaluations(project_id, goal_id, recorded_at DESC);
 
         -- Items that could not be converted unambiguously; the user places or
         -- dismisses each. old_links_json preserves the 0.4.0 links verbatim.
