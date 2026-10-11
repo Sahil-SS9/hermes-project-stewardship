@@ -1,6 +1,6 @@
 {
   "schema": "dockyard.builtin-templates/v1",
-  "about": "Built-in workflow templates (07/10/2026). Sources and reasoning: HPS-Audit-2026-09-24/WORKFLOW-TEMPLATES-RESEARCH.md. Steps name no bot: on use, Project Stewardship asks who does the work (the other steps) and who checks it (check_steps). Every save runs the engine's validator; tests/test_builtin_workflow_templates.py holds these to it.",
+  "about": "Built-in workflow templates (07/10/2026). Steps name no bot: on use, Project Stewardship asks who does the work (the other steps) and who checks it (check_steps). Every save runs the engine's validator; tests/test_builtin_workflow_templates.py holds these to it.",
   "groups": [
     {
       "id": "loops",

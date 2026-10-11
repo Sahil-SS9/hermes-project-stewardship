@@ -9,8 +9,8 @@
 // workflow; the conversation then carries on in the AI sidebar beside the
 // canvas. Nothing is saved until Create workflow.
 //
-// Use a template offers the 30 built-in templates (builtin-templates.json,
-// HPS-Audit WORKFLOW-TEMPLATES-RESEARCH.md) on five tabs, then a Saved tab
+// Use a template offers the 30 built-in templates (builtin-templates.json)
+// on five tabs, then a Saved tab
 // for the ones in the library. A built-in names no bot: it asks who does the
 // work and who checks it, and warns when one bot would check its own work.
 import { useState } from '../../runtime/react.js'

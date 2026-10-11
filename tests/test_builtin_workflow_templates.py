@@ -4,9 +4,9 @@ The 30 templates ship inside the Desktop plugin as one JSON file
 (`hermes_dockyard_plugin/desktop/src/project/workflow-design/builtin-templates.json`),
 listed in the New workflow dialog next to templates saved in the library. This
 test holds them to the same validator as every workflow save, and to the rules
-in HPS-Audit WORKFLOW-TEMPLATES-RESEARCH.md:
+they were designed to:
 
-- the 30 names match the research doc, in five groups (7, 6, 6, 5, 6);
+- the 30 names are the designed set, in five groups (7, 6, 6, 5, 6);
 - every template keeps your sign-off and stays small (4 to 8 steps);
 - a step that runs only if another gets stuck is the last step on its path
   (the engine does not hold later steps for a branch yet), listed after the
