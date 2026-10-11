@@ -13,6 +13,7 @@ What v42 must prove:
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 
 import pytest
@@ -21,13 +22,15 @@ from hermes_project_stewardship.persistence import migrations, store as store_mo
 from hermes_project_stewardship.persistence.store import NewerSchemaError, Store
 
 L_NAME = "delivery ladder: one-parent chain task-goal-objective-milestone-initiative"
-NEW_TABLES = ("goal_tasks", "goal_checks", "roadmap_unplaced")
+NEW_TABLES = ("goal_tasks", "goal_checks", "goal_check_evaluations", "roadmap_unplaced")
 NEW_INDEXES = (
     "idx_project_goals_objective",
     "idx_project_objectives_milestone",
     "idx_dockyard_milestones_initiative",
     "idx_goal_tasks_goal",
+    "idx_goal_check_evaluation_time",
     "idx_roadmap_unplaced_open",
+    "idx_roadmap_unplaced_one_open",
 )
 OLD_LINK_TABLES = (
     "project_objective_goals",
@@ -227,7 +230,7 @@ def test_conversion_table_every_case(tmp_path, monkeypatch):
         assert cx.execute("SELECT objective_id FROM project_goals WHERE goal_id='G-2'").fetchone()[0] is None
         g2 = cx.execute("SELECT reason, old_links_json FROM roadmap_unplaced WHERE kind='goal' AND item_id='G-2'").fetchone()
         assert g2["reason"] == "goal had multiple objectives"
-        assert set(g2["old_links_json"]) >= {"2", "3"}  # both old objectives listed
+        assert json.loads(g2["old_links_json"]) == [2, 3]
 
         # 2a: obj 1 -> milestone 1 (INI-1 single delivers).
         assert cx.execute("SELECT milestone_id FROM project_objectives WHERE id=1").fetchone()[0] == 1
@@ -267,6 +270,157 @@ def test_depends_on_only_milestone_is_not_converted(tmp_path, monkeypatch):
             "SELECT initiative_ref FROM dockyard_milestones WHERE id=1").fetchone()[0] is None
         assert store._conn.execute(
             "SELECT 1 FROM roadmap_unplaced WHERE kind='milestone'").fetchone() is not None
+    finally:
+        store.close()
+
+
+def test_delivers_plus_depends_on_milestone_needs_placing(tmp_path, monkeypatch):
+    pre = _store_without_l(tmp_path / "mixed.db", monkeypatch)
+    pre._conn.executescript("""
+        INSERT INTO project_stewardship(project_id,enabled,created_at,updated_at)
+          VALUES('p1',1,'2026-01-01','2026-01-01');
+        INSERT INTO project_initiatives(ref,project_id,title,rationale,created_at) VALUES
+          ('INI-1','p1','I1','why','2026-02-01'),
+          ('INI-2','p1','I2','why','2026-02-01');
+        INSERT INTO dockyard_milestones(project_id,name,created_at)
+          VALUES('p1','Mixed','2026-02-01');
+        INSERT INTO initiative_milestones(
+          initiative_ref,milestone_id,relationship,created_by,created_at) VALUES
+          ('INI-1',1,'delivers','seed','2026-02-01'),
+          ('INI-2',1,'depends_on','seed','2026-02-01');
+    """)
+    pre.close()
+    store = Store(tmp_path / "mixed.db")
+    try:
+        cx = store._conn
+        assert cx.execute(
+            "SELECT initiative_ref FROM dockyard_milestones WHERE id=1").fetchone()[0] is None
+        row = cx.execute(
+            "SELECT old_links_json FROM roadmap_unplaced WHERE kind='milestone' AND item_id='1'"
+        ).fetchone()
+        assert len(json.loads(row["old_links_json"])) == 2
+    finally:
+        store.close()
+
+
+def test_duplicate_task_links_are_aggregated_in_one_unplaced_row(tmp_path, monkeypatch):
+    pre = _store_without_l(tmp_path / "duplicate-task.db", monkeypatch)
+    pre._conn.executescript("""
+        INSERT INTO project_stewardship(project_id,enabled,created_at,updated_at)
+          VALUES('p1',1,'2026-01-01','2026-01-01');
+        INSERT INTO project_initiatives(ref,project_id,title,rationale,created_at) VALUES
+          ('INI-1','p1','I1','why','2026-02-01'),
+          ('INI-2','p1','I2','why','2026-02-01');
+        INSERT INTO dockyard_milestones(project_id,name,created_at) VALUES
+          ('p1','M1','2026-02-01'), ('p1','M2','2026-02-01');
+        INSERT INTO initiative_milestones(
+          initiative_ref,milestone_id,relationship,created_by,created_at) VALUES
+          ('INI-1',1,'delivers','seed','2026-02-01'),
+          ('INI-2',2,'delivers','seed','2026-02-01');
+        INSERT INTO project_objectives(project_id,name,evaluator_type,target) VALUES
+          ('p1','O1','manual','>=1'), ('p1','O2','manual','>=1');
+        INSERT INTO project_objective_deliveries(
+          objective_id,initiative_ref,relationship,created_by,created_at) VALUES
+          (1,'INI-1','supports','seed','2026-02-01'),
+          (2,'INI-2','supports','seed','2026-02-01');
+        INSERT INTO project_goals(
+          goal_id,project_id,title,position,created_at,updated_at) VALUES
+          ('G-1','p1','G1',0,'2026-02-01','2026-02-01'),
+          ('G-2','p1','G2',1,'2026-02-01','2026-02-01');
+        INSERT INTO project_objective_goals(objective_id,goal_id) VALUES
+          (1,'G-1'), (2,'G-2');
+        INSERT INTO dockyard_milestone_items(milestone_id,item_ref) VALUES
+          (1,'task-shared'), (2,'task-shared');
+    """)
+    pre.close()
+    store = Store(tmp_path / "duplicate-task.db")
+    try:
+        cx = store._conn
+        assert cx.execute(
+            "SELECT 1 FROM goal_tasks WHERE item_ref='task-shared'").fetchone() is None
+        rows = cx.execute(
+            "SELECT old_links_json FROM roadmap_unplaced"
+            " WHERE kind='task' AND item_id='task-shared'"
+        ).fetchall()
+        assert len(rows) == 1
+        links = json.loads(rows[0]["old_links_json"])
+        assert {entry["milestone_id"] for entry in links} == {1, 2}
+        assert {entry["candidate_goal_id"] for entry in links} == {"G-1", "G-2"}
+    finally:
+        store.close()
+
+
+def test_task_is_not_placed_under_a_goal_that_failed_conversion(tmp_path, monkeypatch):
+    pre = _store_without_l(tmp_path / "ambiguous-goal.db", monkeypatch)
+    pre._conn.executescript("""
+        INSERT INTO project_stewardship(project_id,enabled,created_at,updated_at)
+          VALUES('p1',1,'2026-01-01','2026-01-01');
+        INSERT INTO project_initiatives(ref,project_id,title,rationale,created_at)
+          VALUES('INI-1','p1','I1','why','2026-02-01');
+        INSERT INTO dockyard_milestones(project_id,name,created_at)
+          VALUES('p1','M1','2026-02-01');
+        INSERT INTO initiative_milestones(
+          initiative_ref,milestone_id,relationship,created_by,created_at)
+          VALUES('INI-1',1,'delivers','seed','2026-02-01');
+        INSERT INTO project_objectives(project_id,name,evaluator_type,target) VALUES
+          ('p1','O1','manual','>=1'), ('p1','O2','manual','>=1');
+        INSERT INTO project_objective_deliveries(
+          objective_id,initiative_ref,relationship,created_by,created_at)
+          VALUES(1,'INI-1','supports','seed','2026-02-01');
+        INSERT INTO project_goals(
+          goal_id,project_id,title,position,created_at,updated_at)
+          VALUES('G-X','p1','Ambiguous',0,'2026-02-01','2026-02-01');
+        INSERT INTO project_objective_goals(objective_id,goal_id) VALUES
+          (1,'G-X'), (2,'G-X');
+        INSERT INTO dockyard_milestone_items(milestone_id,item_ref)
+          VALUES(1,'task-ambiguous');
+    """)
+    pre.close()
+    store = Store(tmp_path / "ambiguous-goal.db")
+    try:
+        cx = store._conn
+        assert cx.execute(
+            "SELECT objective_id FROM project_goals WHERE goal_id='G-X'"
+        ).fetchone()[0] is None
+        assert cx.execute(
+            "SELECT 1 FROM goal_tasks WHERE item_ref='task-ambiguous'"
+        ).fetchone() is None
+        assert cx.execute(
+            "SELECT 1 FROM roadmap_unplaced"
+            " WHERE kind='task' AND item_id='task-ambiguous'"
+        ).fetchone() is not None
+    finally:
+        store.close()
+
+
+def test_goal_check_storage_and_one_open_unplaced_invariant(tmp_path):
+    store = Store(tmp_path / "fresh.db")
+    try:
+        cx = store._conn
+        check_cols = {row[1] for row in cx.execute("PRAGMA table_info(goal_checks)")}
+        assert {"goal_id", "evaluator_type", "target", "command_json", "integration",
+                "window", "created_at", "updated_at"} <= check_cols
+        evidence_cols = {
+            row[1] for row in cx.execute("PRAGMA table_info(goal_check_evaluations)")}
+        assert {"project_id", "goal_id", "passed", "measured", "target_met", "state",
+                "detail", "evidence_json", "source", "actor", "interface",
+                "recorded_at", "expires_at"} <= evidence_cols
+        values = ("p1", "task", "t1", "manual", "[]", "now")
+        cx.execute(
+            "INSERT INTO roadmap_unplaced(project_id,kind,item_id,reason,old_links_json,created_at)"
+            " VALUES(?,?,?,?,?,?)", values)
+        with pytest.raises(sqlite3.IntegrityError):
+            cx.execute(
+                "INSERT INTO roadmap_unplaced(project_id,kind,item_id,reason,old_links_json,created_at)"
+                " VALUES(?,?,?,?,?,?)", values)
+        cx.execute(
+            "UPDATE roadmap_unplaced SET resolved_at='later', resolved_by='human' WHERE item_id='t1'")
+        cx.execute(
+            "INSERT INTO roadmap_unplaced(project_id,kind,item_id,reason,old_links_json,created_at)"
+            " VALUES(?,?,?,?,?,?)", values)
+        assert cx.execute(
+            "SELECT COUNT(*) FROM roadmap_unplaced WHERE item_id='t1'"
+        ).fetchone()[0] == 2
     finally:
         store.close()
 

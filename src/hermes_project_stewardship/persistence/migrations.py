@@ -1907,6 +1907,8 @@ MIGRATIONS.append(Migration(
         );
         CREATE INDEX IF NOT EXISTS idx_roadmap_unplaced_open
             ON roadmap_unplaced(project_id, kind) WHERE resolved_at IS NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_roadmap_unplaced_one_open
+            ON roadmap_unplaced(project_id, kind, item_id) WHERE resolved_at IS NULL;
 
         -- CONVERSION ---------------------------------------------------- //
         -- 1) objective -> goal: goal.objective_id = its single objective.
@@ -1955,18 +1957,17 @@ MIGRATIONS.append(Migration(
                WHERE d.objective_id = o.id) > 0
           AND o.milestone_id IS NULL;
 
-        -- 3) milestone -> initiative: milestone.initiative_ref = the single
-        --    initiative that 'delivers' it.
+        -- 3) milestone -> initiative: milestone.initiative_ref = its only old
+        --    initiative link, provided that link is 'delivers'. A milestone
+        --    with any second link (including depends_on) needs manual placing.
         UPDATE dockyard_milestones SET initiative_ref = (
             SELECT im.initiative_ref FROM initiative_milestones im
             WHERE im.milestone_id = dockyard_milestones.id
-              AND im.relationship = 'delivers'
-              AND (SELECT COUNT(*) FROM initiative_milestones im2
-                   WHERE im2.milestone_id = dockyard_milestones.id
-                     AND im2.relationship = 'delivers') = 1)
+              AND im.relationship = 'delivers')
         WHERE (SELECT COUNT(*) FROM initiative_milestones im
-               WHERE im.milestone_id = dockyard_milestones.id
-                 AND im.relationship = 'delivers') = 1;
+               WHERE im.milestone_id = dockyard_milestones.id) = 1
+          AND (SELECT im.relationship FROM initiative_milestones im
+               WHERE im.milestone_id = dockyard_milestones.id) = 'delivers';
         -- 3b) milestones under several initiatives, or depends_on only: needs placing.
         INSERT INTO roadmap_unplaced(project_id, kind, item_id, reason, old_links_json, created_at)
         SELECT m.project_id, 'milestone', CAST(m.id AS TEXT),
@@ -1980,35 +1981,77 @@ MIGRATIONS.append(Migration(
                WHERE im.milestone_id = m.id) > 0
           AND m.initiative_ref IS NULL;
 
-        -- 4) milestone -> tasks: after 1-3, a milestone's task is placed under
-        --    a goal only when the milestone has exactly one objective with
-        --    exactly one goal.
+        -- 4) milestone -> tasks. Classify every legacy link for a task before
+        --    inserting. A task converts only when every old milestone maps via
+        --    populated v42 parent columns to the same single goal. Duplicate or
+        --    mixed candidates become one Needs placing row with all old links.
+        WITH task_links AS (
+            SELECT mi.item_ref, m.project_id, mi.milestone_id, m.created_at,
+                   CASE
+                     WHEN (SELECT COUNT(*) FROM project_objectives o
+                           WHERE o.milestone_id = m.id) = 1
+                      AND (SELECT COUNT(*) FROM project_goals g
+                           JOIN project_objectives o ON o.id = g.objective_id
+                           WHERE o.milestone_id = m.id) = 1
+                     THEN (SELECT g.goal_id FROM project_goals g
+                           JOIN project_objectives o ON o.id = g.objective_id
+                           WHERE o.milestone_id = m.id)
+                   END AS candidate_goal
+            FROM dockyard_milestone_items mi
+            JOIN dockyard_milestones m ON m.id = mi.milestone_id
+        ), classified AS (
+            SELECT item_ref, project_id, MIN(created_at) AS created_at,
+                   COUNT(*) AS link_count,
+                   COUNT(candidate_goal) AS eligible_count,
+                   COUNT(DISTINCT candidate_goal) AS goal_count,
+                   MIN(candidate_goal) AS goal_id
+            FROM task_links
+            GROUP BY item_ref, project_id
+        )
         INSERT INTO goal_tasks(item_ref, project_id, goal_id, created_at)
-        SELECT mi.item_ref, m.project_id,
-               (SELECT og.goal_id FROM project_objective_goals og
-                WHERE og.objective_id = o.id),
-               m.created_at
-        FROM dockyard_milestone_items mi
-        JOIN dockyard_milestones m ON m.id = mi.milestone_id
-        JOIN project_objectives o ON o.milestone_id = m.id
-        WHERE (SELECT COUNT(*) FROM project_objectives o2
-               WHERE o2.milestone_id = m.id) = 1
-          AND (SELECT COUNT(*) FROM project_objective_goals og2
-               WHERE og2.objective_id = o.id) = 1
-          AND NOT EXISTS (SELECT 1 FROM goal_tasks gt WHERE gt.item_ref = mi.item_ref);
-        -- 4b) milestone items that could not be placed: needs placing.
-        INSERT INTO roadmap_unplaced(project_id, kind, item_id, reason, old_links_json, created_at)
-        SELECT m.project_id, 'task', mi.item_ref,
-               'task under a milestone that did not map to one goal',
-               json_array(mi.milestone_id),
-               m.created_at
-        FROM dockyard_milestone_items mi
-        JOIN dockyard_milestones m ON m.id = mi.milestone_id
-        WHERE NOT EXISTS (SELECT 1 FROM goal_tasks gt WHERE gt.item_ref = mi.item_ref);
+        SELECT item_ref, project_id, goal_id, created_at
+        FROM classified
+        WHERE eligible_count = link_count AND goal_count = 1;
+
+        WITH task_links AS (
+            SELECT mi.item_ref, m.project_id, mi.milestone_id, m.created_at,
+                   CASE
+                     WHEN (SELECT COUNT(*) FROM project_objectives o
+                           WHERE o.milestone_id = m.id) = 1
+                      AND (SELECT COUNT(*) FROM project_goals g
+                           JOIN project_objectives o ON o.id = g.objective_id
+                           WHERE o.milestone_id = m.id) = 1
+                     THEN (SELECT g.goal_id FROM project_goals g
+                           JOIN project_objectives o ON o.id = g.objective_id
+                           WHERE o.milestone_id = m.id)
+                   END AS candidate_goal
+            FROM dockyard_milestone_items mi
+            JOIN dockyard_milestones m ON m.id = mi.milestone_id
+        ), classified AS (
+            SELECT item_ref, project_id, MIN(created_at) AS created_at,
+                   COUNT(*) AS link_count,
+                   COUNT(candidate_goal) AS eligible_count,
+                   COUNT(DISTINCT candidate_goal) AS goal_count,
+                   json_group_array(json_object(
+                       'milestone_id', milestone_id,
+                       'candidate_goal_id', candidate_goal)) AS old_links_json
+            FROM task_links
+            GROUP BY item_ref, project_id
+        )
+        INSERT INTO roadmap_unplaced(
+            project_id, kind, item_id, reason, old_links_json, created_at)
+        SELECT project_id, 'task', item_ref,
+               'task milestone links did not map to one goal',
+               old_links_json, created_at
+        FROM classified
+        WHERE eligible_count <> link_count OR goal_count <> 1;
         """,
     downgrade_sql="""
+        DROP INDEX IF EXISTS idx_roadmap_unplaced_one_open;
         DROP INDEX IF EXISTS idx_roadmap_unplaced_open;
         DROP TABLE IF EXISTS roadmap_unplaced;
+        DROP INDEX IF EXISTS idx_goal_check_evaluation_time;
+        DROP TABLE IF EXISTS goal_check_evaluations;
         DROP TABLE IF EXISTS goal_checks;
         DROP INDEX IF EXISTS idx_goal_tasks_goal;
         DROP TABLE IF EXISTS goal_tasks;
