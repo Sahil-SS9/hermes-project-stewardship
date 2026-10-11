@@ -199,6 +199,14 @@ class Store:
 
     def _apply_migration(self, m) -> None:
         with self.tx() as cx:
+            # ``migrate`` read the ledger before taking the write lock, so another process
+            # opening the same older database at the same moment (Desktop backend,
+            # dashboard and gateway can all start together after an upgrade) may have
+            # applied this migration since. The lock (BEGIN IMMEDIATE) is held from here,
+            # so this check and the apply below are one step.
+            if cx.execute("SELECT 1 FROM schema_migrations WHERE version=?",
+                          (m.version,)).fetchone():
+                return
             statement = ""
             for character in m.upgrade_sql:
                 statement += character

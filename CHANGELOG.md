@@ -126,6 +126,10 @@ of the plugin now shares one name.
   switched on, as before.
 - On a profile where the plugin is not switched on, the Desktop page says so
   and how to switch it on, instead of "404: Plugin not found".
+- Two surfaces opening an older database at the same moment (the Desktop app,
+  the dashboard and the gateway can all start together after an upgrade) both
+  come up. The second used to fail with "duplicate column name" and stay down
+  until restarted; the database itself was never at risk.
 
 ### Security
 - The acting user is always the authenticated principal, never a name the
