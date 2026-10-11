@@ -17,6 +17,10 @@ const fieldLabels = (page) => wizard(page).locator('label').evaluateAll((nodes) 
 
 async function expectWizard(page, intent) {
   await wizard(page).waitFor()
+  // The fields include the discovered profiles, so read them only once host
+  // discovery has answered (or failed). Under load the second wizard was read
+  // before its discovery returned: 5 labels against 11 (gate a44f389, 11/10).
+  await wizard(page).locator('[data-discovered-projects], [data-discovery-failed]').first().waitFor()
   assert.equal(await wizard(page).getAttribute('data-onboarding-intent'), intent)
   assert.equal(await wizard(page).locator('.dockyard-onboarding-head .dockyard-card-label').innerText(), intent === 'existing' ? 'EXISTING PROJECT' : 'NEW PROJECT')
   assert.equal(await page.getByRole('heading', { name: 'Bring a project into Project Stewardship' }).count(), 1)
