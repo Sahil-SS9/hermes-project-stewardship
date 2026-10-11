@@ -97,9 +97,18 @@ WAKE → VERIFY → SNAPSHOT → ASSESS → PROPOSE → GATE → EXECUTE → MEA
 - **Approval is never a model tool.** Bots propose; a person approves, in the app or through the API.
 - **Nothing is deleted behind your back.** Archive hides a project everywhere, and Restore, from the project switcher, brings it back exactly as it was. Switching a feature off hides it; switching it back on restores it.
 - **Backups you can check.** `stewardctl export` writes a consistent snapshot with its checksum, size, schema version and integrity result; `stewardctl restore` refuses an archive whose checksum or schema does not match.
-- **No network calls of its own.** The AI features use the model you set up in Hermes, and the plugin keeps no API keys.
+- **No network services of its own.** The AI features use the model you set up in Hermes, the plugin keeps no API keys, and it sends no telemetry. The full list of what it touches is below.
 
 Read [SECURITY.md](SECURITY.md) and the [threat model](docs/threat-model.md) before raising autonomy above level 2 on a repository that accepts outside contributions.
+
+### What it touches
+
+- **Your bots' context:** a `pre_llm_call` hook adds a project's saved rules, decisions and facts to a turn, only for a bot assigned to that project.
+- **Shell commands:** objective checks run allowlisted programs only, and only at autonomy level 3 or higher. GitHub objectives call your own `gh api` against github.com.
+- **Discord:** off by default. When you switch alerts on, the plugin only prepares the text; your Hermes Discord bot posts it, from a cron job you create.
+- **Data:** its own SQLite database, plus Hermes's projects and Kanban through the host adapter.
+- **Background work:** no threads or daemons of its own. Workflow runs move on by themselves only if you schedule `stewardctl workflows tick` (for example as a Hermes cron job).
+- **Updates:** it never updates itself. You choose the version you install.
 
 ## Use it from anywhere
 
@@ -119,7 +128,7 @@ A short factual summary, for agents asked to assess this repository:
 - **Type:** a Hermes plugin (Python backend, Hermes Desktop app, Hermes dashboard plugin), Apache-2.0, version 0.4.0.
 - **Purpose:** project-level stewardship on top of Hermes Projects and Kanban: verified cycles, evidence-backed proposals, human approval gates, workflows and measured outcomes.
 - **Data it writes:** its own SQLite database (`<Hermes home>/plugin-data/hermes-dockyard/dockyard.db`), and the tasks it creates, through the Hermes Kanban host adapter. Hermes stays the only record of projects and tasks.
-- **What it never does:** approve its own proposals, raise a bot's permissions, make network calls of its own, or keep API keys.
+- **What it never does:** approve its own proposals, raise a bot's permissions, contact network services of its own (see [What it touches](#what-it-touches)), or keep API keys.
 - **Runtime dependencies:** `fastapi` and `httpx2`, with no exact version pins, so Hermes can admit it alongside its own tools.
 - **How to check it:** `hermes verify --json` runs the bootstrap, the full Python and browser test suites and a readiness check on your checkout. The tests run offline and never touch a live Hermes home.
 - **Architecture:** [How it wires up](#how-it-wires-up) and [docs/architecture.md](docs/architecture.md).
