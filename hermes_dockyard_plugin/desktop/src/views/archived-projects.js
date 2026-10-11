@@ -2,9 +2,10 @@
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 //
 // Archived projects (owner decisions 10/10/2026 and 11/10/2026). Archive hides
-// a project everywhere; this list is the one place that shows archived
-// projects, with what Restore brings back. Restore puts a project back exactly
-// as it was archived (backend: StewardshipService.restore_project).
+// a project everywhere; the project switcher's menu (Sahil's pick, option A)
+// opens the one list that shows archived projects, with what Restore brings
+// back. Restore puts a project back exactly as it was archived (backend:
+// StewardshipService.restore_project) and opens it.
 import { useEffect } from '../runtime/react.js'
 import { useState } from '../runtime/react.js'
 import { jsx } from '../runtime/react.js'
@@ -14,6 +15,9 @@ import { api } from '../runtime/context.js'
 import { emitToast } from '../runtime/context.js'
 import { Button } from '../lib/ui.js'
 import { Icon } from '../lib/ui.js'
+
+// Where the archive messages send people to restore a project.
+export const RESTORE_FROM = 'the project switcher > Archived projects'
 
 const PHASE_WORDS = { active: 'active', paused: 'paused', frozen: 'frozen' }
 
@@ -32,7 +36,7 @@ export async function loadArchivedProjects() {
   return result?.projects ?? []
 }
 
-export function ArchivedProjectsList({ onRestored, onCount }) {
+function ArchivedProjectsList({ onRestored, onCount }) {
   const [rows, setRows] = useState(null)
   const [error, setError] = useState(null)
   const [confirming, setConfirming] = useState(null)

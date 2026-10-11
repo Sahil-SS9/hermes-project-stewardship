@@ -10,7 +10,8 @@ import { StatusTag } from '../lib/ui.js'
 import { Fragment } from '../runtime/react.js'
 import { Button } from '../lib/ui.js'
 import { effectiveMaxOpenInitiatives } from './settings-model.js'
-export function ProjectSettingsPanel({ project, settings, onRefresh, onDirty, onArchived, restoreFrom }) {
+import { RESTORE_FROM } from '../views/archived-projects.js'
+export function ProjectSettingsPanel({ project, settings, onRefresh, onDirty, onArchived }) {
   const buildForm = () => ({
     mission: settings?.mission ?? '',
     leadProfile: settings?.owner?.lead_profile ?? '',
@@ -55,10 +56,12 @@ export function ProjectSettingsPanel({ project, settings, onRefresh, onDirty, on
     restore: { endpoint: 'restore', label: 'Restore', past: 'restored' },
   }
   const archived = Boolean(lifecycleState?.archived_at)
+  // A switched-off project can be archived too, and Restore brings it back
+  // switched off (FOLLOWUP-ARCHIVE-HIDE-RESTORE.md, 11/10/2026).
   const lifecycleActions = archived
     ? ['restore']
     : !enabled
-    ? ['enable']
+    ? ['enable', 'archive']
     : phase === 'active'
       ? ['pause', 'freeze', 'archive', 'disable']
       : phase === 'paused'
@@ -237,7 +240,7 @@ export function ProjectSettingsPanel({ project, settings, onRefresh, onDirty, on
       jsxs('div', { className: 'dockyard-modal', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'dockyard-lifecycle-title', children: [
         jsx('h2', { id: 'dockyard-lifecycle-title', children: `${lifecycleCopy[pendingLifecycle]?.label || 'Change'} project?` }),
         jsx('p', { 'data-lifecycle-confirm-text': pendingLifecycle || '', children: pendingLifecycle === 'archive'
-          ? `${project.id} will be hidden everywhere: dashboard, projects, roadmap, inbox, search and alerts. Stewardship stops for it while it is archived. Nothing is deleted: its Hermes project, board, tasks and repository stay exactly as they are. Restore it any time from ${restoreFrom || 'the archived projects list'}, and it comes back exactly as it is now (${enabled ? 'switched on' : 'switched off'}, ${phase}).`
+          ? `${project.id} will be hidden everywhere: dashboard, projects, roadmap, inbox, search and alerts. Stewardship stops for it while it is archived. Nothing is deleted: its Hermes project, board, tasks and repository stay exactly as they are. Restore it any time from ${RESTORE_FROM}, and it comes back exactly as it is now (${enabled ? 'switched on' : 'switched off'}, ${phase}).`
           : `This changes ${project.id} from its current ${enabled ? 'enabled' : 'disabled'} and ${phase} state.` }),
         jsxs('div', { className: 'dockyard-modal-actions', children: [
           jsx(Button, { disabled: lifecycleBusy, onClick: () => setPendingLifecycle(null), children: 'Cancel' }),

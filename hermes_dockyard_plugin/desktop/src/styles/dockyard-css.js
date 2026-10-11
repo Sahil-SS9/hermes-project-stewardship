@@ -1009,12 +1009,6 @@ export const DOCKYARD_CSS = `
 .dockyard-root .dy-arch-confirm { display: grid; gap: 8px; flex: 1 1 100%; padding: 10px 12px; border: 1px solid var(--dy-accent-border); border-radius: 8px; background: var(--dy-accent-soft); color: var(--dy-text); font-size: 13px; }
 .dockyard-root .dy-arch-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .dockyard-root .dy-arch-empty { margin: 0; color: var(--dy-text-2); font-size: 13px; }
-/* Design review bar (?review=1); removed with the losing place after the pick. */
-.dockyard-root .dy-arch-review { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 14px; padding: 8px 12px; border: 1px dashed var(--dy-accent-border); border-radius: 10px; background: var(--dy-accent-soft); color: var(--dy-text); font-size: 12px; }
-.dockyard-root .dy-arch-review [role="group"] { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.dockyard-root .dy-arch-review button { min-height: 32px; padding: 0 12px; border: 1px solid var(--dy-control-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text-2); font: inherit; cursor: pointer; }
-.dockyard-root .dy-arch-review button[aria-pressed="true"] { border-color: var(--dy-action); color: var(--dy-text); font-weight: 700; }
-.dockyard-root .dy-arch-review button:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
 .dockyard-root .dockyard-detail-columns { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; align-items: start; margin-top: 14px; }
 .dockyard-root .dockyard-detail-side { display: grid; gap: 2px; align-content: start; padding: 14px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-detail-side h3 { margin: 6px 0 2px; font-size: 12px; }

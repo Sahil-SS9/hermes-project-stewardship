@@ -31,9 +31,7 @@ import { AppSettingsView } from '../views/app-settings.js'
 import { RoadmapView } from '../views/roadmap.js'
 import { ArchivedProjectsDialog } from '../views/archived-projects.js'
 import { loadArchivedProjects } from '../views/archived-projects.js'
-import { readArchiveReview } from './archive-review.js'
-import { ArchiveReviewBar } from './archive-review.js'
-import { restoreFromWords } from './archive-review.js'
+import { RESTORE_FROM } from '../views/archived-projects.js'
 import { jsxs } from '../runtime/react.js'
 import { ConsoleBar } from '../lib/ui.js'
 import { ToastRegion } from '../lib/ui.js'
@@ -63,11 +61,8 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   // The switcher's choice: a project id, or ALL_PROJECTS ("*").
   const [selectedProject, setSelectedProject] = useState(null)
   const isAll = selectedProject === ALL_PROJECTS
-  // Archived projects (11/10/2026): hidden everywhere else; the switcher (A) or
-  // App settings (B) lists them. ?review=1 switches between the two places.
-  const [, setArchiveReviewTick] = useState(0)
-  const archiveReview = readArchiveReview()
-  const restoreFrom = restoreFromWords(archiveReview.place)
+  // Archived projects (Sahil 11/10/2026, option A): hidden everywhere else; the
+  // project switcher's menu lists them, and restoring one opens it.
   const [archivedCount, setArchivedCount] = useState(0)
   const [archivedOpen, setArchivedOpen] = useState(false)
   const askArchived = () => {
@@ -304,13 +299,11 @@ export function DashboardPage({ inboxCss = '' } = {}) {
     setSelectedProject(ALL_PROJECTS)
     goTab('dashboard')
     refresh()
-    emitToast('success', `${projectId} is archived: hidden everywhere, nothing deleted. Restore it any time from ${restoreFrom}.`)
+    emitToast('success', `${projectId} is archived: hidden everywhere, nothing deleted. Restore it any time from ${RESTORE_FROM}.`)
   }
-  // Restored from the switcher's list: open the project. From App settings:
-  // stay there. The lists refresh either way.
-  const projectRestored = (projectId, open) => {
+  // Restored from the switcher's list: the lists refresh and the project opens.
+  const projectRestored = (projectId) => {
     refresh()
-    if (!open) return
     setArchivedOpen(false)
     setSelectedProject(projectId)
     goTab('project', { entryView: 'overview' })
@@ -484,7 +477,6 @@ export function DashboardPage({ inboxCss = '' } = {}) {
       onPendingWorkConsumed: () => setPendingWorkRef(null),
       notice: deepLinkNotice,
       onArchived: projectArchived,
-      restoreFrom,
     }, `project:${payload.project?.id ?? payload.missingProject ?? 'none'}`)
   } else if (tab === 'settings') {
     // Sahil 04/10 (demo feedback e): App settings. Project settings stay in the project.
@@ -496,9 +488,6 @@ export function DashboardPage({ inboxCss = '' } = {}) {
       onOpenProjectSettings: () => requestTab('project', { entryView: 'settings' }),
       onForgetProject: () => { lastProject.current.saved = null },
       onRefresh: refresh,
-      showArchived: archiveReview.place === 'settings',
-      onRestored: (projectId) => projectRestored(projectId, false),
-      onArchivedCount: setArchivedCount,
     }, 'app-settings')
   } else if (tab === 'workflows') {
     // Option A (Sahil 28/09): the top Workflows tab IS the library. Project
@@ -562,16 +551,12 @@ export function DashboardPage({ inboxCss = '' } = {}) {
     jsxs('div', { className: 'dockyard-shell', children: [
       jsx(ConsoleBar, { tab, counts, projects: projectOptions, selectedProject, onProjectChange: selectProject,
         onTab: requestTab, onNewProject: openNewProject, onOnboardExisting: openOnboardExisting, onOpen: openDeepLink,
-        archivedCount, onOpenArchived: archiveReview.place === 'switcher' ? () => setArchivedOpen(true) : null }),
+        archivedCount, onOpenArchived: () => setArchivedOpen(true) }),
       jsx('main', {
         id: 'dockyard-panel',
         role: 'tabpanel',
         'aria-labelledby': `dockyard-tab-${tab}`,
-        // The review bar shows where the choice can be seen (the switcher on the
-        // Dashboard, and App settings); the choice itself follows the address.
-        children: archiveReview.active && (tab === 'dashboard' || tab === 'settings')
-          ? jsxs(Fragment, { children: [jsx(ArchiveReviewBar, { review: archiveReview, onChange: () => setArchiveReviewTick((tick) => tick + 1) }, 'archive-review'), content] })
-          : content,
+        children: content,
       }),
     ]}),
     jsx(ToastRegion, { toasts, onDismiss: dismissToast }),
@@ -587,7 +572,7 @@ export function DashboardPage({ inboxCss = '' } = {}) {
         ]}),
       ]}),
     ]}) : null,
-    archivedOpen ? jsx(ArchivedProjectsDialog, { onClose: () => setArchivedOpen(false), onRestored: (projectId) => projectRestored(projectId, true), onCount: setArchivedCount }) : null,
+    archivedOpen ? jsx(ArchivedProjectsDialog, { onClose: () => setArchivedOpen(false), onRestored: projectRestored, onCount: setArchivedCount }) : null,
     onboarding ? jsx(OnboardingWizard, { intent: onboarding, onClose: () => setOnboarding(null), onComplete: completeOnboarding }) : null,
   ]})
 }

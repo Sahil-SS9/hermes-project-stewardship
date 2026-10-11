@@ -17,7 +17,7 @@ of the plugin now shares one name.
   Desktop). An old `hermes-dockyard` entry becomes harmless. Your data stays
   where it was (`plugin-data/hermes-dockyard/`).
 - **Export a backup first.** The first time 0.4.0 opens your database it moves
-  the schema from 17 to 40 and keeps every row:
+  the schema from 17 to 41 and keeps every row:
   `stewardctl --db <your database> export --output <folder>`.
 - **Going back to 0.3.0:** restore that export into a new database with 0.3.0
   (`stewardctl restore --archive <folder> --target <new.db>`) and point 0.3.0
@@ -110,6 +110,21 @@ of the plugin now shares one name.
   fail with a 500, and the team, member and transfer-preview routes reported
   every Hermes error as 503. A 503 now means only that Hermes is unavailable.
 - A quick tab switch no longer leaves the project switcher empty.
+- **Archive hides a project everywhere, and Restore brings it back exactly.**
+  An archived project no longer turns up in any list, count or inbox: the
+  Dashboard and its health table, the Approval Inbox and "Needs you now"
+  (where it used to appear as "This project is switched off"), notifications,
+  search, the project switcher and the remembered last project. Restore puts
+  back its switch, phase and pause time as they were; it used to switch every
+  project on and make it active. The project switcher's menu lists archived
+  projects with what Restore brings back; Restore asks first, then opens the
+  project. A switched-off project can be archived too. The CLI
+  (`stewardctl project archive --list`, `stewardctl project restore`) and the
+  API (`GET /projects/archived`) list them as well. Schema 41 remembers
+  whether a project was switched on; one archived before that is restored
+  switched on, as before.
+- On a profile where the plugin is not switched on, the Desktop page says so
+  and how to switch it on, instead of "404: Plugin not found".
 
 ### Security
 - The acting user is always the authenticated principal, never a name the

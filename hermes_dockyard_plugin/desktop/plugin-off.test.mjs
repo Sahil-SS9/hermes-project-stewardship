@@ -1,4 +1,4 @@
-// A Hermes profile without the plugin's backend (Sahil's wesker profile,
+// A Hermes profile without the plugin's backend (a second profile,
 // 10/10/2026): the sidebar still offers Project Stewardship, and every call to
 // the backend gets the host's 404 {"detail": "Plugin not found"}. The page used
 // to show the red error card with "404: Plugin not found". Owner decision

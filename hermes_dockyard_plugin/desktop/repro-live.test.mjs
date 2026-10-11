@@ -1421,6 +1421,8 @@ async function testProjectLifecycleStateAndConfirmedActions() {
   assert.equal(doc.querySelector('[data-project-enabled-state]')?.textContent.trim(), 'Disabled');
   assert(doc.querySelector('[data-setting-field="mission"]')?.matches(':disabled'), 'disabled project settings remain editable');
   assertAction('enable');
+  // A switched-off project can still be archived (11/10/2026).
+  assertAction('archive');
   assertAction('disable', false);
   assertAction('pause', false);
   await runAction('enable', '/projects/payments-relaunch/re-enable');

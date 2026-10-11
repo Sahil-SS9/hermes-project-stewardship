@@ -38,7 +38,7 @@ import { RecentActivityCard } from './activity.js'
 // it, and "plan:<kind>:<id>" opens it on one item (the Roadmap's Open).
 const planView = (entry) => (parsePlanFocus(entry) || ['objectives', 'initiative', 'vision'].includes(entry) ? 'plan' : entry)
 
-export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap, onOpenLink, openWorkflow, onOpenWorkflowDone, onArchived, restoreFrom }) {
+export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap, onOpenLink, openWorkflow, onOpenWorkflowDone, onArchived }) {
   const [projectView, setProjectView] = useState(planView(initialView) || 'overview')
   const [planFocus, setPlanFocus] = useState(() => parsePlanFocus(initialView))
   // QA M-7: leaving the Planning view with unsaved board edits asks first.
@@ -148,7 +148,7 @@ export function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDi
     // same places as the header strip's "Needs attention" drawer.
     panel = jsx(ProjectActivityPanel, { project, view, onOpenItem: openAttentionItem }, project.id)
   } else if (projectView === 'settings') {
-    panel = jsx(ProjectSettingsPanel, { project, settings: view.settings ?? {}, onRefresh, onDirty: onProjectDirty, onArchived, restoreFrom }, `${project.id}:${view.settings?.updated_at || 'initial'}`)
+    panel = jsx(ProjectSettingsPanel, { project, settings: view.settings ?? {}, onRefresh, onDirty: onProjectDirty, onArchived }, `${project.id}:${view.settings?.updated_at || 'initial'}`)
   } else if (projectView === 'reports') {
     panel = jsx(ProjectReportsPanel, { project, reports: view.reports ?? [], onRefresh })
   } else {

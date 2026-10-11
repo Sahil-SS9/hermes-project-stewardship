@@ -1186,12 +1186,6 @@ var DOCKYARD_CSS = `
 .dockyard-root .dy-arch-confirm { display: grid; gap: 8px; flex: 1 1 100%; padding: 10px 12px; border: 1px solid var(--dy-accent-border); border-radius: 8px; background: var(--dy-accent-soft); color: var(--dy-text); font-size: 13px; }
 .dockyard-root .dy-arch-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .dockyard-root .dy-arch-empty { margin: 0; color: var(--dy-text-2); font-size: 13px; }
-/* Design review bar (?review=1); removed with the losing place after the pick. */
-.dockyard-root .dy-arch-review { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 14px; padding: 8px 12px; border: 1px dashed var(--dy-accent-border); border-radius: 10px; background: var(--dy-accent-soft); color: var(--dy-text); font-size: 12px; }
-.dockyard-root .dy-arch-review [role="group"] { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.dockyard-root .dy-arch-review button { min-height: 32px; padding: 0 12px; border: 1px solid var(--dy-control-border); border-radius: 999px; background: var(--dy-surface); color: var(--dy-text-2); font: inherit; cursor: pointer; }
-.dockyard-root .dy-arch-review button[aria-pressed="true"] { border-color: var(--dy-action); color: var(--dy-text); font-weight: 700; }
-.dockyard-root .dy-arch-review button:focus-visible { outline: 2px solid var(--dy-focus); outline-offset: 2px; }
 .dockyard-root .dockyard-detail-columns { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; align-items: start; margin-top: 14px; }
 .dockyard-root .dockyard-detail-side { display: grid; gap: 2px; align-content: start; padding: 14px; border: 1px solid var(--dy-border); border-radius: 10px; background: var(--dy-surface-subtle); }
 .dockyard-root .dockyard-detail-side h3 { margin: 6px 0 2px; font-size: 12px; }
@@ -19514,8 +19508,112 @@ function effectiveMaxOpenInitiatives(policies) {
   return policies?.verification?.max_open_initiatives ?? policies?.notification?.max_open_initiatives ?? DEFAULT_MAX_OPEN_INITIATIVES;
 }
 
+// hermes_dockyard_plugin/desktop/src/views/archived-projects.js
+var RESTORE_FROM = "the project switcher > Archived projects";
+var PHASE_WORDS = { active: "active", paused: "paused", frozen: "frozen" };
+function stateWords({ enabled, phase } = {}) {
+  return `${enabled ? "switched on" : "switched off"}, ${PHASE_WORDS[phase] ?? String(phase ?? "unknown")}`;
+}
+var day = (iso) => {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? String(iso ?? "") : date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+};
+async function loadArchivedProjects() {
+  const result = await api("/projects/archived", { suppressErrorToast: true });
+  return result?.projects ?? [];
+}
+function ArchivedProjectsList({ onRestored, onCount }) {
+  const [rows, setRows] = useState(null);
+  const [error, setError] = useState(null);
+  const [confirming, setConfirming] = useState(null);
+  const [busy, setBusy] = useState(null);
+  const load = async () => {
+    try {
+      const next = await loadArchivedProjects();
+      setRows(next);
+      setError(null);
+      onCount?.(next.length);
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    }
+  };
+  useEffect(() => {
+    load();
+  }, []);
+  const restore = async (row) => {
+    setBusy(row.project_id);
+    try {
+      await api(`/projects/${encodeURIComponent(row.project_id)}/restore`, { method: "POST", body: {}, quiet: true });
+      emitToast("success", `${row.project_id} is back, exactly as it was archived: ${stateWords(row.restores_to)}.`);
+      setConfirming(null);
+      await load();
+      onRestored?.(row.project_id);
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    }
+    setBusy(null);
+  };
+  if (error) return jsx("p", { className: "dockyard-inline-error", role: "alert", "data-archived-error": true, children: error });
+  if (!rows) return jsx("p", { className: "dockyard-meta", "data-archived-loading": true, children: "Loading archived projects..." });
+  if (!rows.length) {
+    return jsx("p", {
+      className: "dy-arch-empty",
+      "data-archived-empty": true,
+      children: "No archived projects. Archive one from its Settings tab: it is hidden everywhere else and waits here until you restore it."
+    });
+  }
+  return jsx("ul", { className: "dy-arch-list", "data-archived-list": true, children: rows.map((row) => {
+    const asking = confirming === row.project_id;
+    const working = busy === row.project_id;
+    return jsxs("li", { className: "dy-arch-row", "data-archived-project": row.project_id, children: [
+      jsxs("div", { className: "dy-arch-copy", children: [
+        jsx("strong", { children: row.project_id }),
+        row.mission ? jsx("span", { className: "dy-arch-mission", children: row.mission }) : null,
+        jsx("span", { className: "dy-arch-meta", children: `Archived ${day(row.archived_at)}${row.archived_by ? ` by ${row.archived_by}` : ""} \xB7 comes back ${stateWords(row.restores_to)}` })
+      ] }),
+      asking ? jsxs("div", { className: "dy-arch-confirm", role: "group", "aria-label": `Restore ${row.project_id}`, children: [
+        jsx("span", { children: `Restore ${row.project_id}? It comes back exactly as it was archived (${stateWords(row.restores_to)}) and shows on your dashboard, inbox and roadmap again.` }),
+        jsxs("span", { className: "dy-arch-confirm-actions", children: [
+          jsx(Button, { small: true, action: "cancel-restore", disabled: working, onClick: () => setConfirming(null), children: "Cancel" }),
+          jsx(Button, { small: true, variant: "primary", action: "confirm-restore", disabled: working, onClick: () => restore(row), children: working ? "Restoring..." : "Restore" })
+        ] })
+      ] }) : jsx(Button, {
+        small: true,
+        action: "restore-project",
+        data: { "data-restore-project": row.project_id },
+        onClick: () => setConfirming(row.project_id),
+        children: jsxs(Fragment, { children: [jsx(Icon, { name: "archive-restore" }), "Restore"] })
+      })
+    ] }, row.project_id);
+  }) });
+}
+function ArchivedProjectsDialog({ onClose, onRestored, onCount }) {
+  useEffect(() => {
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+  return jsx("section", {
+    className: "dockyard-modal-layer",
+    "data-archived-dialog": true,
+    onMouseDown: (event) => {
+      if (event.target === event.currentTarget) onClose();
+    },
+    children: jsxs("div", { className: "dockyard-modal dy-arch-modal", role: "dialog", "aria-modal": true, "aria-labelledby": "dy-arch-title", children: [
+      jsxs("header", { className: "dy-arch-head", children: [
+        jsx("h2", { id: "dy-arch-title", children: "Archived projects" }),
+        jsx("p", { children: "Hidden everywhere else, and nothing was deleted. Restore brings a project back exactly as it was archived." })
+      ] }),
+      jsx(ArchivedProjectsList, { onRestored, onCount }),
+      jsx("div", { className: "dockyard-modal-actions", children: jsx(Button, { action: "close-archived", onClick: onClose, children: "Close" }) })
+    ] })
+  });
+}
+
 // hermes_dockyard_plugin/desktop/src/project/panels.js
-function ProjectSettingsPanel({ project, settings, onRefresh, onDirty, onArchived, restoreFrom }) {
+function ProjectSettingsPanel({ project, settings, onRefresh, onDirty, onArchived }) {
   const buildForm = () => ({
     mission: settings?.mission ?? "",
     leadProfile: settings?.owner?.lead_profile ?? "",
@@ -19560,7 +19658,7 @@ function ProjectSettingsPanel({ project, settings, onRefresh, onDirty, onArchive
     restore: { endpoint: "restore", label: "Restore", past: "restored" }
   };
   const archived = Boolean(lifecycleState?.archived_at);
-  const lifecycleActions = archived ? ["restore"] : !enabled ? ["enable"] : phase === "active" ? ["pause", "freeze", "archive", "disable"] : phase === "paused" ? ["resume", "freeze", "archive", "disable"] : phase === "frozen" ? ["resume", "archive", "disable"] : ["disable"];
+  const lifecycleActions = archived ? ["restore"] : !enabled ? ["enable", "archive"] : phase === "active" ? ["pause", "freeze", "archive", "disable"] : phase === "paused" ? ["resume", "freeze", "archive", "disable"] : phase === "frozen" ? ["resume", "archive", "disable"] : ["disable"];
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const save2 = async () => {
     if (!enabled || !editing) return;
@@ -19745,7 +19843,7 @@ function ProjectSettingsPanel({ project, settings, onRefresh, onDirty, onArchive
     jsxs("section", { className: "dockyard-modal-layer", "data-lifecycle-confirm": true, hidden: !pendingLifecycle, children: [
       jsxs("div", { className: "dockyard-modal", role: "dialog", "aria-modal": true, "aria-labelledby": "dockyard-lifecycle-title", children: [
         jsx("h2", { id: "dockyard-lifecycle-title", children: `${lifecycleCopy[pendingLifecycle]?.label || "Change"} project?` }),
-        jsx("p", { "data-lifecycle-confirm-text": pendingLifecycle || "", children: pendingLifecycle === "archive" ? `${project.id} will be hidden everywhere: dashboard, projects, roadmap, inbox, search and alerts. Stewardship stops for it while it is archived. Nothing is deleted: its Hermes project, board, tasks and repository stay exactly as they are. Restore it any time from ${restoreFrom || "the archived projects list"}, and it comes back exactly as it is now (${enabled ? "switched on" : "switched off"}, ${phase}).` : `This changes ${project.id} from its current ${enabled ? "enabled" : "disabled"} and ${phase} state.` }),
+        jsx("p", { "data-lifecycle-confirm-text": pendingLifecycle || "", children: pendingLifecycle === "archive" ? `${project.id} will be hidden everywhere: dashboard, projects, roadmap, inbox, search and alerts. Stewardship stops for it while it is archived. Nothing is deleted: its Hermes project, board, tasks and repository stay exactly as they are. Restore it any time from ${RESTORE_FROM}, and it comes back exactly as it is now (${enabled ? "switched on" : "switched off"}, ${phase}).` : `This changes ${project.id} from its current ${enabled ? "enabled" : "disabled"} and ${phase} state.` }),
         jsxs("div", { className: "dockyard-modal-actions", children: [
           jsx(Button, { disabled: lifecycleBusy, onClick: () => setPendingLifecycle(null), children: "Cancel" }),
           jsx(Button, { action: "confirm-lifecycle-action", variant: ["disable", "freeze", "archive"].includes(pendingLifecycle) ? "danger" : "primary", disabled: lifecycleBusy, onClick: confirmLifecycle, children: lifecycleBusy ? "Applying..." : `Confirm ${lifecycleCopy[pendingLifecycle]?.label || "change"}` })
@@ -23124,7 +23222,7 @@ function RecentActivityCard({ view, onViewAll }) {
 
 // hermes_dockyard_plugin/desktop/src/project/dashboard.js
 var planView = (entry) => parsePlanFocus(entry) || ["objectives", "initiative", "vision"].includes(entry) ? "plan" : entry;
-function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap, onOpenLink, openWorkflow, onOpenWorkflowDone, onArchived, restoreFrom }) {
+function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pendingWorkRef, onPendingWorkConsumed, notice, initialView, onOpenLibrary, onOpenRoadmap, onOpenLink, openWorkflow, onOpenWorkflowDone, onArchived }) {
   const [projectView, setProjectView] = useState(planView(initialView) || "overview");
   const [planFocus, setPlanFocus] = useState(() => parsePlanFocus(initialView));
   const [canvasDirty, setCanvasDirty] = useState(false);
@@ -23247,7 +23345,7 @@ function ProjectDashboard({ view, onSelectProject, onRefresh, onProjectDirty, pe
   } else if (projectView === "activity") {
     panel = jsx(ProjectActivityPanel, { project, view, onOpenItem: openAttentionItem }, project.id);
   } else if (projectView === "settings") {
-    panel = jsx(ProjectSettingsPanel, { project, settings: view.settings ?? {}, onRefresh, onDirty: onProjectDirty, onArchived, restoreFrom }, `${project.id}:${view.settings?.updated_at || "initial"}`);
+    panel = jsx(ProjectSettingsPanel, { project, settings: view.settings ?? {}, onRefresh, onDirty: onProjectDirty, onArchived }, `${project.id}:${view.settings?.updated_at || "initial"}`);
   } else if (projectView === "reports") {
     panel = jsx(ProjectReportsPanel, { project, reports: view.reports ?? [], onRefresh });
   } else {
@@ -24326,109 +24424,6 @@ function NotificationSettings({ settings, busy, error, onSave }) {
   ] });
 }
 
-// hermes_dockyard_plugin/desktop/src/views/archived-projects.js
-var PHASE_WORDS = { active: "active", paused: "paused", frozen: "frozen" };
-function stateWords({ enabled, phase } = {}) {
-  return `${enabled ? "switched on" : "switched off"}, ${PHASE_WORDS[phase] ?? String(phase ?? "unknown")}`;
-}
-var day = (iso) => {
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? String(iso ?? "") : date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-};
-async function loadArchivedProjects() {
-  const result = await api("/projects/archived", { suppressErrorToast: true });
-  return result?.projects ?? [];
-}
-function ArchivedProjectsList({ onRestored, onCount }) {
-  const [rows, setRows] = useState(null);
-  const [error, setError] = useState(null);
-  const [confirming, setConfirming] = useState(null);
-  const [busy, setBusy] = useState(null);
-  const load = async () => {
-    try {
-      const next = await loadArchivedProjects();
-      setRows(next);
-      setError(null);
-      onCount?.(next.length);
-    } catch (failure) {
-      setError(String(failure?.message ?? failure));
-    }
-  };
-  useEffect(() => {
-    load();
-  }, []);
-  const restore = async (row) => {
-    setBusy(row.project_id);
-    try {
-      await api(`/projects/${encodeURIComponent(row.project_id)}/restore`, { method: "POST", body: {}, quiet: true });
-      emitToast("success", `${row.project_id} is back, exactly as it was archived: ${stateWords(row.restores_to)}.`);
-      setConfirming(null);
-      await load();
-      onRestored?.(row.project_id);
-    } catch (failure) {
-      setError(String(failure?.message ?? failure));
-    }
-    setBusy(null);
-  };
-  if (error) return jsx("p", { className: "dockyard-inline-error", role: "alert", "data-archived-error": true, children: error });
-  if (!rows) return jsx("p", { className: "dockyard-meta", "data-archived-loading": true, children: "Loading archived projects..." });
-  if (!rows.length) {
-    return jsx("p", {
-      className: "dy-arch-empty",
-      "data-archived-empty": true,
-      children: "No archived projects. Archive one from its Settings tab: it is hidden everywhere else and waits here until you restore it."
-    });
-  }
-  return jsx("ul", { className: "dy-arch-list", "data-archived-list": true, children: rows.map((row) => {
-    const asking = confirming === row.project_id;
-    const working = busy === row.project_id;
-    return jsxs("li", { className: "dy-arch-row", "data-archived-project": row.project_id, children: [
-      jsxs("div", { className: "dy-arch-copy", children: [
-        jsx("strong", { children: row.project_id }),
-        row.mission ? jsx("span", { className: "dy-arch-mission", children: row.mission }) : null,
-        jsx("span", { className: "dy-arch-meta", children: `Archived ${day(row.archived_at)}${row.archived_by ? ` by ${row.archived_by}` : ""} \xB7 comes back ${stateWords(row.restores_to)}` })
-      ] }),
-      asking ? jsxs("div", { className: "dy-arch-confirm", role: "group", "aria-label": `Restore ${row.project_id}`, children: [
-        jsx("span", { children: `Restore ${row.project_id}? It comes back exactly as it was archived (${stateWords(row.restores_to)}) and shows on your dashboard, inbox and roadmap again.` }),
-        jsxs("span", { className: "dy-arch-confirm-actions", children: [
-          jsx(Button, { small: true, action: "cancel-restore", disabled: working, onClick: () => setConfirming(null), children: "Cancel" }),
-          jsx(Button, { small: true, variant: "primary", action: "confirm-restore", disabled: working, onClick: () => restore(row), children: working ? "Restoring..." : "Restore" })
-        ] })
-      ] }) : jsx(Button, {
-        small: true,
-        action: "restore-project",
-        data: { "data-restore-project": row.project_id },
-        onClick: () => setConfirming(row.project_id),
-        children: jsxs(Fragment, { children: [jsx(Icon, { name: "archive-restore" }), "Restore"] })
-      })
-    ] }, row.project_id);
-  }) });
-}
-function ArchivedProjectsDialog({ onClose, onRestored, onCount }) {
-  useEffect(() => {
-    const closeOnEscape = (event) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onClose]);
-  return jsx("section", {
-    className: "dockyard-modal-layer",
-    "data-archived-dialog": true,
-    onMouseDown: (event) => {
-      if (event.target === event.currentTarget) onClose();
-    },
-    children: jsxs("div", { className: "dockyard-modal dy-arch-modal", role: "dialog", "aria-modal": true, "aria-labelledby": "dy-arch-title", children: [
-      jsxs("header", { className: "dy-arch-head", children: [
-        jsx("h2", { id: "dy-arch-title", children: "Archived projects" }),
-        jsx("p", { children: "Hidden everywhere else, and nothing was deleted. Restore brings a project back exactly as it was archived." })
-      ] }),
-      jsx(ArchivedProjectsList, { onRestored, onCount }),
-      jsx("div", { className: "dockyard-modal-actions", children: jsx(Button, { action: "close-archived", onClick: onClose, children: "Close" }) })
-    ] })
-  });
-}
-
 // hermes_dockyard_plugin/desktop/src/views/app-settings.js
 var moveChoice = (event, ids, current, choose) => {
   const index = Math.max(0, ids.indexOf(current));
@@ -24514,7 +24509,7 @@ var section2 = (key, title, description, body) => jsxs("section", { className: "
   jsxs("header", { children: [jsx("h2", { children: title }), description ? jsx("p", { children: description }) : null] }),
   body
 ] }, key);
-function AppSettingsView({ view, selectedProject, appearance, onAppearance, onOpenProjectSettings, onForgetProject, onRefresh, showArchived = false, onRestored, onArchivedCount }) {
+function AppSettingsView({ view, selectedProject, appearance, onAppearance, onOpenProjectSettings, onForgetProject, onRefresh }) {
   const projects = view.projects ?? [];
   const nameOf = (id) => id === ALL_PROJECTS ? "All projects" : projects.find((project) => project.id === id)?.name || id;
   const [lastProject, setLastProject] = useState(view.lastProject ?? null);
@@ -24581,14 +24576,7 @@ function AppSettingsView({ view, selectedProject, appearance, onAppearance, onOp
       jsx(NotificationSettings, { settings: policy, busy: busy === "notifications", error: policyError, onSave: saveNotifications })
     ),
     // Sahil 05/10 (demo feedback h): the September themes, backgrounds and fonts.
-    section2("appearance", "Appearance", "Colour theme and typeface for the whole app.", jsx(AppearanceSettings, { appearance, onAppearance })),
-    // Archived projects are hidden everywhere else; restore them here (11/10/2026).
-    showArchived ? section2(
-      "archived",
-      "Archived projects",
-      "Hidden everywhere else, and nothing was deleted. Restore brings a project back exactly as it was archived.",
-      jsx(ArchivedProjectsList, { onRestored, onCount: onArchivedCount })
-    ) : null
+    section2("appearance", "Appearance", "Colour theme and typeface for the whole app.", jsx(AppearanceSettings, { appearance, onAppearance }))
   ] });
 }
 
@@ -25351,44 +25339,6 @@ function RoadmapView({ initialScope = "all", onOpen, onRefresh }) {
   ] });
 }
 
-// hermes_dockyard_plugin/desktop/src/shell/archive-review.js
-var ARCHIVE_REVIEW_DEFAULTS = { place: "switcher" };
-var PLACES = [["switcher", "A: in the project switcher"], ["settings", "B: in App settings"]];
-function readArchiveReview(search = globalThis.location?.search ?? "") {
-  const params = new URLSearchParams(search);
-  const place = params.get("archived");
-  return {
-    active: params.get("review") === "1",
-    place: PLACES.some(([value]) => value === place) ? place : ARCHIVE_REVIEW_DEFAULTS.place
-  };
-}
-function restoreFromWords(place) {
-  return place === "settings" ? "App settings > Archived projects" : "the project switcher > Archived projects";
-}
-function writeArchiveReview(value) {
-  const url = new URL(globalThis.location.href);
-  url.searchParams.set("archived", value);
-  globalThis.history.replaceState(globalThis.history.state, "", url);
-}
-function ArchiveReviewBar({ review, onChange }) {
-  return jsxs("div", { className: "dy-arch-review", "data-archive-review": true, children: [
-    jsx("strong", { children: "Design review" }),
-    jsxs("span", { role: "group", "aria-label": "Where archived projects live", children: [
-      jsx("span", { children: "Archived projects:" }),
-      ...PLACES.map(([value, text2]) => jsx("button", {
-        type: "button",
-        "aria-pressed": review.place === value,
-        "data-review-choice": `archived:${value}`,
-        onClick: () => {
-          writeArchiveReview(value);
-          onChange?.();
-        },
-        children: text2
-      }, value))
-    ] })
-  ] });
-}
-
 // hermes_dockyard_plugin/desktop/src/data/scope.js
 var ownerOf = (item) => item?.project ?? item?.project_id ?? null;
 var keepFor = (projectId) => (item) => ownerOf(item) === projectId;
@@ -25442,9 +25392,6 @@ function DashboardPage({ inboxCss = "" } = {}) {
   const [tab, setTab] = useState("dashboard");
   const [selectedProject, setSelectedProject] = useState(null);
   const isAll = selectedProject === ALL_PROJECTS;
-  const [, setArchiveReviewTick] = useState(0);
-  const archiveReview = readArchiveReview();
-  const restoreFrom = restoreFromWords(archiveReview.place);
   const [archivedCount, setArchivedCount] = useState(0);
   const [archivedOpen, setArchivedOpen] = useState(false);
   const askArchived = () => {
@@ -25644,11 +25591,10 @@ function DashboardPage({ inboxCss = "" } = {}) {
     setSelectedProject(ALL_PROJECTS);
     goTab("dashboard");
     refresh();
-    emitToast("success", `${projectId} is archived: hidden everywhere, nothing deleted. Restore it any time from ${restoreFrom}.`);
+    emitToast("success", `${projectId} is archived: hidden everywhere, nothing deleted. Restore it any time from ${RESTORE_FROM}.`);
   };
-  const projectRestored = (projectId, open) => {
+  const projectRestored = (projectId) => {
     refresh();
-    if (!open) return;
     setArchivedOpen(false);
     setSelectedProject(projectId);
     goTab("project", { entryView: "overview" });
@@ -25824,8 +25770,7 @@ function DashboardPage({ inboxCss = "" } = {}) {
       pendingWorkRef,
       onPendingWorkConsumed: () => setPendingWorkRef(null),
       notice: deepLinkNotice,
-      onArchived: projectArchived,
-      restoreFrom
+      onArchived: projectArchived
     }, `project:${payload.project?.id ?? payload.missingProject ?? "none"}`);
   } else if (tab === "settings") {
     content = jsx(AppSettingsView, {
@@ -25837,10 +25782,7 @@ function DashboardPage({ inboxCss = "" } = {}) {
       onForgetProject: () => {
         lastProject.current.saved = null;
       },
-      onRefresh: refresh,
-      showArchived: archiveReview.place === "settings",
-      onRestored: (projectId) => projectRestored(projectId, false),
-      onArchivedCount: setArchivedCount
+      onRefresh: refresh
     }, "app-settings");
   } else if (tab === "workflows") {
     content = jsx(WorkflowLibraryView, {
@@ -25902,15 +25844,13 @@ function DashboardPage({ inboxCss = "" } = {}) {
           onOnboardExisting: openOnboardExisting,
           onOpen: openDeepLink,
           archivedCount,
-          onOpenArchived: archiveReview.place === "switcher" ? () => setArchivedOpen(true) : null
+          onOpenArchived: () => setArchivedOpen(true)
         }),
         jsx("main", {
           id: "dockyard-panel",
           role: "tabpanel",
           "aria-labelledby": `dockyard-tab-${tab}`,
-          // The review bar shows where the choice can be seen (the switcher on the
-          // Dashboard, and App settings); the choice itself follows the address.
-          children: archiveReview.active && (tab === "dashboard" || tab === "settings") ? jsxs(Fragment, { children: [jsx(ArchiveReviewBar, { review: archiveReview, onChange: () => setArchiveReviewTick((tick) => tick + 1) }, "archive-review"), content] }) : content
+          children: content
         })
       ] }),
       jsx(ToastRegion, { toasts, onDismiss: dismissToast }),
@@ -25937,7 +25877,7 @@ function DashboardPage({ inboxCss = "" } = {}) {
           ]
         })
       ] }) : null,
-      archivedOpen ? jsx(ArchivedProjectsDialog, { onClose: () => setArchivedOpen(false), onRestored: (projectId) => projectRestored(projectId, true), onCount: setArchivedCount }) : null,
+      archivedOpen ? jsx(ArchivedProjectsDialog, { onClose: () => setArchivedOpen(false), onRestored: projectRestored, onCount: setArchivedCount }) : null,
       onboarding ? jsx(OnboardingWizard, { intent: onboarding, onClose: () => setOnboarding(null), onComplete: completeOnboarding }) : null
     ]
   });

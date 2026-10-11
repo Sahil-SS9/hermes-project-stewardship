@@ -19,6 +19,10 @@ transition matrix. Any transition not listed is refused.
 | `disabled` | `active` (re-enable) |
 | `archived` | `active` (restore) |
 
+Archive and restore are not phase changes: archive switches a project off and
+stamps `archived_at`, leaving its phase and pause time as they are; restore
+puts the switch back as it was (§3).
+
 Side effects: `paused_at` is stamped on pause/freeze and cleared on resume;
 `updated_at` always changes. `freeze` refuses everything until an explicit
 resume; `pause` refuses gateway/cron/webhook cycles while manual cycles remain
@@ -66,7 +70,7 @@ approved) first.
 
 | Entity | Archive | Restore | Notes |
 |---|---|---|---|
-| Project | `POST /projects/{id}/archive` | `POST /projects/{id}/restore` | Lifecycle side effects apply. Canonical project, board, tasks and repository are untouched — Stewardship governs its own metadata only. |
+| Project | `POST /projects/{id}/archive` | `POST /projects/{id}/restore` | Archive hides the project from every list, count and inbox (Dashboard, health table, Approval Inbox, "Needs you now", notifications, search, project switcher, remembered last project); its own pages still open by name. It is switched off while archived, and schema 41 (`archived_prior_enabled`) remembers whether it was on. Restore puts back that switch with the phase and pause time untouched, so the project returns exactly as archived; one archived before schema 41 is restored switched on. Archived projects are listed by `GET /projects/archived`, `stewardctl project archive --list` and, in the Desktop, the project switcher > Archived projects. Canonical project, board, tasks and repository are untouched — Stewardship governs its own metadata only. |
 | Mission | `POST /projects/{id}/mission/archive` | — (restore is re-setting a mission) | `archived_missions` lists history; missions are single-instance metadata. |
 | Goal | `POST /projects/{id}/goals/{goal_id}/archive` | `.../restore` | Create/edit/reorder plus nullable objective linking (PM-0501). An archived goal can be deleted for good with `DELETE /projects/{id}/goals/{goal_id}` (409 while active): its objective links and contract go, the objectives stay and can join another goal. Same `project_archive` capability as archive; audited as `goal.deleted`. |
 | Objective | `POST /projects/{id}/objectives/{objective_id}/archive` | — (archived objectives are listed with `include_archived`) | `DELETE /projects/{id}/objectives/{objective_id}` removes an objective and its links; the Desktop offers it only once archived. |

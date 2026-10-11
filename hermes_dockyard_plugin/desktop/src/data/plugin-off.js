@@ -1,7 +1,7 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 //
-// A Hermes profile without the plugin's backend (Sahil's wesker profile,
+// A Hermes profile without the plugin's backend (a second profile,
 // 10/10/2026). The Desktop half is the same for every profile, so the sidebar
 // still offers Project Stewardship; every call to the backend then fails with
 // the host's "404: Plugin not found". That is a setting to change, not a
