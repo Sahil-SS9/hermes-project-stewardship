@@ -34,6 +34,7 @@ const INITIATIVE = Object.freeze({
   'initiative.started': { label: 'Initiative started', icon: 'flag', effect: ['In progress', 'info'] },
   'initiative.completed': { label: 'Initiative completed', icon: 'circle-check', effect: ['Complete', 'success'] },
   'initiative.regressed': { label: 'Initiative regressed', icon: 'triangle-alert', effect: ['Outcome went backwards', 'danger'] },
+  'initiative.ready_to_confirm': { label: 'Initiative ready to confirm', icon: 'circle-check', effect: ['A person can confirm it as delivered', 'info'] },
 })
 export const KNOWN_EVENT_TYPES = Object.freeze([
   ...Object.keys(INITIATIVE),

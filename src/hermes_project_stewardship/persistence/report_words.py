@@ -30,6 +30,7 @@ EVENT_WORDS = {
     "initiative.started": "Initiative started",
     "initiative.completed": "Initiative completed",
     "initiative.regressed": "Initiative regressed",
+    "initiative.ready_to_confirm": "Initiative ready to confirm",
     "project.health.changed": "Health changed",
     "project.critical": "Project critical",
     "stewardship.verification.failed": "Verification failed",

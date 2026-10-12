@@ -75,11 +75,19 @@ dy = DockyardService(store, canonical_work=work)
 mid = dy.milestone_create(pid, 'Beta', due='2026-12-01', actor=owner)
 item = work.create_item(pid, 'task', 'Write the beta notes', actor=owner)['ref']
 dy.milestone_attach(pid, 'Beta', item, actor=owner)
-LadderService(store, svc, work, RoadmapService(store, svc, work)).set_milestone_initiative(
-    pid, mid, running, actor='owner', interface='test')
+_ladder = LadderService(store, svc, work, RoadmapService(store, svc, work))
+_ladder.set_milestone_initiative(pid, mid, running, actor='owner', interface='test')
 oid = int(svc.add_objective(pid, name='Checkout time', evaluator_type='manual', target='>=1',
                             actor='owner', interface='test')['id'])
-svc.create_goal(pid, title='Faster checkout', objective_ids=[oid], actor='owner', interface='test')
+svc.record_assessment(pid, oid, passed=True, evidence=['test:1'], actor='owner',
+                      interface='dockyard:human', trusted_principal='owner')
+_ladder.set_objective_milestone(pid, oid, mid, actor='owner', interface='test')
+gid = svc.create_goal(pid, title='Faster checkout', objective_ids=[oid], actor='owner', interface='test')['goal_id']
+_ladder.set_goal_objective(pid, gid, oid, actor='owner', interface='test')
+# D-L3: "Mark complete" confirms delivery through the ladder rule, so the
+# initiative needs a reached milestone first — a done task under the goal.
+_ladder.set_task_goal(pid, item, gid, actor='owner', interface='test')
+work.transition(pid, item, 'done', actor=owner)
 # Same trust set-up as the browser suite's practice server: the signed-in
 # human may archive (and so delete); decisions are vouched for by the proxy.
 plugin_api._app = create_app(store, kanban_adapter=adapter, auth_principal='desk-owner',
