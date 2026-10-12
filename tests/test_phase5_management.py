@@ -57,6 +57,14 @@ def _managed_path(store: Store, content_id: str) -> Path:
 
 
 def test_goal_lifecycle_order_and_nullable_objective_links_preserve_unlinked(phase5):
+    """Goal lifecycle: create, list order, edit, reorder, archive, restore.
+
+    v42 gives a goal exactly one objective parent (D-L1), so where this used to
+    create a goal with two objectives it now creates one goal per objective. The
+    lifecycle it is actually testing — order, nullable parent, archive/restore
+    keeping the parent, and an unlinked objective staying unlinked — is
+    unchanged, and the parent is now read from project_goals.objective_id.
+    """
     store, service, _, client, headers = phase5
     linked_one = _objective(service, "demo", "Linked one")
     linked_two = _objective(service, "demo", "Linked two")
@@ -68,7 +76,7 @@ def test_goal_lifecycle_order_and_nullable_objective_links_preserve_unlinked(pha
         json={
             "title": "Ship recovery",
             "description": "Protect retry paths",
-            "objective_ids": [linked_one, linked_two],
+            "objective_ids": [linked_one],
         },
     )
     assert first.status_code == 200, first.text
@@ -87,11 +95,17 @@ def test_goal_lifecycle_order_and_nullable_objective_links_preserve_unlinked(pha
     )
     assert listed.status_code == 200, listed.text
     assert [row["goal_id"] for row in listed.json()["goals"]] == [first_id, second_id]
-    assert listed.json()["goals"][0]["objective_ids"] == [linked_one, linked_two]
+    assert listed.json()["goals"][0]["objective_ids"] == [linked_one]
     assert listed.json()["goals"][1]["objective_ids"] == []
     assert store._conn.execute(
-        "SELECT goal_id FROM project_objective_goals WHERE objective_id=?",
-        (unlinked,),
+        "SELECT 1 FROM project_goals WHERE goal_id=? AND objective_id=?",
+        (first_id, linked_one),
+    ).fetchone() is not None
+    assert store._conn.execute(
+        "SELECT objective_id FROM project_goals WHERE goal_id=?", (second_id,),
+    ).fetchone()[0] is None
+    assert store._conn.execute(
+        "SELECT 1 FROM project_goals WHERE objective_id=?", (unlinked,),
     ).fetchone() is None
 
     edited = client.patch(
@@ -106,9 +120,8 @@ def test_goal_lifecycle_order_and_nullable_objective_links_preserve_unlinked(pha
     assert edited.status_code == 200, edited.text
     assert edited.json()["objective_ids"] == [linked_two]
     assert store._conn.execute(
-        "SELECT goal_id FROM project_objective_goals WHERE objective_id=?",
-        (linked_one,),
-    ).fetchone() is None
+        "SELECT objective_id FROM project_goals WHERE goal_id=?", (first_id,),
+    ).fetchone()[0] == linked_two
 
     reordered = client.put(
         "/stewardship/v1/projects/demo/goals/order",

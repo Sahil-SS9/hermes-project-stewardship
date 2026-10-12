@@ -101,8 +101,13 @@ def test_details_view_lists_a_real_dependency_in_both_directions(real):
 def test_roadmap_milestone_items_list_the_real_blocker(real):
     world, pid = real
     milestone = world.milestone(pid, "Pilot")
+    objective = world.objective(pid, "Ship the pilot")
+    goal = world.goal(pid, "Pilot goal")
+    world.place_objective(pid, objective, milestone)
+    world.place_goal(pid, goal, objective)
     blocker = world.item(pid, "Blocker task")
-    blocked = world.item(pid, "Blocked task", milestone="Pilot")
+    blocked = world.item(pid, "Blocked task")
+    world.place_task(pid, blocked, goal)
     world.work.add_dependency(pid, blocked, blocker, actor=HUMAN)
 
     items = {i["ref"]: i for i in world.roadmap.milestone_items(pid, milestone)["items"]}
