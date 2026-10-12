@@ -12,6 +12,7 @@ import json
 from typing import Any, Dict, Optional
 
 from ..kanban.bridge import KanbanBridge
+from ..kanban.host_adapter import MISSING_LINK_CODES, KanbanAdapterError
 from ..dockyard import Actor, WorkItemStatus
 from .dockyard_service import DockyardService
 from .canonical_work_service import CanonicalWorkService
@@ -21,6 +22,10 @@ from .store import iso
 
 class IntegrationError(Exception):
     pass
+
+
+# Host answers meaning "this project cannot be bound to that board", not an outage.
+_BOARD_BINDING_CODES = MISSING_LINK_CODES | {"project_board_mismatch"}
 
 
 class DockyardIntegration:
@@ -68,6 +73,9 @@ class DockyardIntegration:
         """Human approval, then promotion + execution start."""
         ini = self.svc.initiative_by_ref(ref)
         if ini["status"] == "pending_approval":
+            # Resolve and verify the board first: an approval that cannot be
+            # bound is refused while still pending, never committed unbound.
+            self._resolve_board(ini["project_id"])
             try:
                 ini = self.svc.approve_initiative(
                     ref,
@@ -94,22 +102,47 @@ class DockyardIntegration:
         if promote and self.canonical_work is None:
             item = self.dy.promote_initiative(ini, actor=actor)
             out["work_item"] = item.ref
-        bound = self.bridge.bind(ini["ref"], start_execution=True)
+        bound = self.bind(ini["ref"], actor=actor)
         if self.canonical_work is not None:
-            for item_id in bound.get("card_ids") or []:
-                self.canonical_work.metadata.bind_work(
-                    ini["project_id"],
-                    "task",
-                    item_id,
-                    initiative_ref=ini["ref"],
-                    actor=actor,
-                )
             out["work_item_refs"] = list(bound.get("card_ids") or [])
         out["board_slug"] = bound.get("board_slug")
         out["cards"] = len(bound.get("card_ids") or [])
         out["status"] = self.svc.initiative_by_ref(
             ini["ref"])["status"]
         return out
+
+    def bind(self, ref: str, *, actor: Actor,
+             board_slug: Optional[str] = None) -> Dict[str, Any]:
+        """Bind an approved initiative to its project's board, then record
+        the canonical work binding of every card so reconciliation sees them."""
+        ini = self.svc.initiative_by_ref(ref)
+        slug, _ = self._resolve_board(ini["project_id"], board_slug)
+        bound = self.bridge.bind(ref, board_slug=slug, start_execution=True)
+        if self.canonical_work is not None:
+            for item_id in bound.get("card_ids") or []:
+                self.canonical_work.metadata.bind_work(
+                    ini["project_id"],
+                    "task",
+                    item_id,
+                    initiative_ref=ref,
+                    actor=actor,
+                )
+        return bound
+
+    def _resolve_board(self, project_id: str,
+                       board_slug: Optional[str] = None) -> tuple[str, str]:
+        try:
+            return self.bridge.resolve_board(project_id, board_slug)
+        except ServiceError as exc:
+            raise IntegrationError(str(exc)) from None
+        except KanbanAdapterError as exc:
+            if exc.code not in _BOARD_BINDING_CODES:
+                raise
+            slug = (exc.fields or {}).get("board_slug") or board_slug
+            target = f"board {slug}" if slug else "its board"
+            raise IntegrationError(
+                f"project {project_id} cannot be bound to {target}: {exc.message}"
+            ) from None
 
     def _existing_execution(self, ini: Dict[str, Any]) -> Dict[str, Any]:
         items = []

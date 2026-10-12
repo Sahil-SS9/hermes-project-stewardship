@@ -20,6 +20,178 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   `stewardctl project validation-steps <project> [--step S ... | --none | --default]`.
   No schema change.
 (by @appletechie)
+- **Approving an initiative no longer leaves it approved but unbound.** The
+  board is resolved and checked on the Kanban host before the approval is
+  recorded; a project with no usable board is refused with a 409 that names
+  the board, and the initiative stays pending. On the canonical Hermes host
+  the bridge no longer falls back to a `<project>-ops` board the host does
+  not have (other adapters keep that convention).
+- **`POST /initiatives/{ref}/bind-board` records canonical work bindings**
+  for the cards it creates, like approval does, so the work-items view and
+  reconciliation see them. A board the project is not bound to is a 409.
+
+    actor_id: str = "stewardship-api"
+            return integration.bind(
+                ref, board_slug=body.board_slug, actor=_actor(body.actor_id, "human"))
+        except (IntegrationError, ServiceError) as e:
+    # A host whose projects carry their own board binding sets this, so the
+    # bridge never guesses a "<project>-ops" board the host does not have.
+    requires_bound_board = False
+
+        Optional: adapters that cannot answer return None, and the bridge
+        falls back to "<project>-ops" unless ``requires_bound_board`` is set.
+        Onboarding may provision a board slug
+    def resolve_board(
+        self, project_id: str, board_slug: Optional[str] = None
+    ) -> tuple[str, str]:
+        """The board ``project_id`` binds to, verified on the host: (slug, board id).
+
+        Callers resolve before committing anything (an approval, cards), so a
+        project without a usable board is refused while it is still unchanged.
+        """
+        slug = board_slug or self.adapter.bound_board_slug(project_id)
+        if not slug:
+            if self.adapter.requires_bound_board:
+                raise ServiceError(
+                    f"project {project_id} has no board bound on the Kanban host;"
+                    " bind it to an existing board first"
+                )
+            slug = f"{project_id}-ops"
+        return slug, self.adapter.ensure_board(project_id, slug)
+
+        slug, board_id = self.resolve_board(project_id, board_slug)
+    requires_bound_board = True
+from ..kanban.host_adapter import MISSING_LINK_CODES, KanbanAdapterError
+# Host answers meaning "this project cannot be bound to that board", not an outage.
+_BOARD_BINDING_CODES = MISSING_LINK_CODES | {"project_board_mismatch"}
+
+            # Resolve and verify the board first: an approval that cannot be
+            # bound is refused while still pending, never committed unbound.
+            self._resolve_board(ini["project_id"])
+        bound = self.bind(ini["ref"], actor=actor)
+        if self.canonical_work is not None:
+            out["work_item_refs"] = list(bound.get("card_ids") or [])
+        out["board_slug"] = bound.get("board_slug")
+        out["cards"] = len(bound.get("card_ids") or [])
+        out["status"] = self.svc.initiative_by_ref(
+            ini["ref"])["status"]
+        return out
+
+    def bind(self, ref: str, *, actor: Actor,
+             board_slug: Optional[str] = None) -> Dict[str, Any]:
+        """Bind an approved initiative to its project's board, then record
+        the canonical work binding of every card so reconciliation sees them."""
+        ini = self.svc.initiative_by_ref(ref)
+        slug, _ = self._resolve_board(ini["project_id"], board_slug)
+        bound = self.bridge.bind(ref, board_slug=slug, start_execution=True)
+                    initiative_ref=ref,
+        return bound
+
+    def _resolve_board(self, project_id: str,
+                       board_slug: Optional[str] = None) -> tuple[str, str]:
+        try:
+            return self.bridge.resolve_board(project_id, board_slug)
+        except ServiceError as exc:
+            raise IntegrationError(str(exc)) from None
+        except KanbanAdapterError as exc:
+            if exc.code not in _BOARD_BINDING_CODES:
+                raise
+            slug = (exc.fields or {}).get("board_slug") or board_slug
+            target = f"board {slug}" if slug else "its board"
+            raise IntegrationError(
+                f"project {project_id} cannot be bound to {target}: {exc.message}"
+            ) from None
+def test_bind_never_guesses_a_board_for_hosts_that_bind_projects(svc, enabled, approved):
+    """A host that binds each project to a board (the canonical Hermes host)
+    gets no "<project>-ops" guess: an unbound project is refused."""
+    fake = FakeHostAdapter()
+    fake.requires_bound_board = True
+    bridge = KanbanBridge(svc, fake)
+    with pytest.raises(ServiceError, match="no board bound"):
+        bridge.bind(approved["ref"])
+    assert fake.boards == {} and fake.cards == []
+    assert ini_status(svc, approved["ref"]) == "approved"
+
+# ---- approval binds the project's own board, or is not committed -----------
+
+def _approval_client(tmp_path: Path, host: FakeProjectKanbanHost):
+    from fastapi.testclient import TestClient
+
+    from hermes_project_stewardship.api.server import create_app
+    from hermes_project_stewardship.persistence.store import Store
+
+    app = create_app(
+        Store(tmp_path / "dockyard.sqlite"),
+        kanban_adapter=_adapter_type()(host),
+        auth_token="test-token",
+        auth_principal="owner",
+        auth_principal_is_human=True,
+    )
+    svc = app.state.svc
+    svc.enable("project-1", mission="keep it green", lead_profile="lead",
+               member_profiles=[], autonomy_level=2)
+    ref = svc.propose_initiative(
+        "project-1", title="Fix flaky CI", rationale="3 flakes in 30d")["ref"]
+    client = TestClient(app, headers={"Authorization": "Bearer test-token"})
+    return client, svc, ref
+
+@pytest.mark.parametrize("board_slug", ["", "ghost"])
+def test_approval_is_not_committed_when_the_project_board_cannot_be_bound(
+    tmp_path: Path, board_slug: str,
+):
+    """Production 0.3/0.4: approving committed first, then binding fell back to
+    "<project>-ops" (no such board) and left the initiative approved but
+    unbound. The board is now resolved and verified before the approval."""
+    host = FakeProjectKanbanHost()
+    host.projects["project-1"]["board_slug"] = board_slug
+    client, svc, ref = _approval_client(tmp_path, host)
+
+    response = client.post(f"/stewardship/v1/initiatives/{ref}/approve", json={})
+
+    assert response.status_code == 409, response.text
+    assert "board" in response.text
+    assert "project-1-ops" not in response.text
+    assert svc.initiative_by_ref(ref)["status"] == "pending_approval"
+    assert svc.initiative_by_ref(ref)["board_slug"] is None
+    assert host.create_calls == []
+
+def test_approval_binds_the_hosts_board_and_records_canonical_bindings(tmp_path: Path):
+    client, svc, ref = _approval_client(tmp_path, FakeProjectKanbanHost())
+
+    response = client.post(f"/stewardship/v1/initiatives/{ref}/approve", json={})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["board_slug"] == "alpha"
+    assert svc.initiative_by_ref(ref)["status"] == "executing"
+    work = client.get("/stewardship/v1/projects/project-1/work-items").json()["work_items"]
+    assert sorted(item["ref"] for item in work if item["initiative_ref"] == ref) == sorted(
+        response.json()["work_item_refs"])
+
+def test_bind_board_route_records_canonical_bindings(tmp_path: Path):
+    """The bind-board route created cards without canonical work bindings, so
+    reconciliation and the work-items view could not see them."""
+    client, svc, ref = _approval_client(tmp_path, FakeProjectKanbanHost())
+    svc.approve_initiative(ref, actor="owner", interface="cli")
+
+    response = client.post(f"/stewardship/v1/initiatives/{ref}/bind-board", json={})
+
+    assert response.status_code == 200, response.text
+    card_ids = response.json()["card_ids"]
+    assert card_ids
+    work = client.get("/stewardship/v1/projects/project-1/work-items").json()["work_items"]
+    assert sorted(item["ref"] for item in work if item["initiative_ref"] == ref) == sorted(card_ids)
+
+def test_bind_board_route_refuses_a_board_the_project_is_not_bound_to(tmp_path: Path):
+    client, svc, ref = _approval_client(tmp_path, FakeProjectKanbanHost())
+    svc.approve_initiative(ref, actor="owner", interface="cli")
+
+    response = client.post(f"/stewardship/v1/initiatives/{ref}/bind-board",
+                           json={"board_slug": "someone-elses"})
+
+    assert response.status_code == 409, response.text
+    assert svc.initiative_by_ref(ref)["status"] == "approved"
+    assert svc.initiative_by_ref(ref)["board_slug"] is None
+(by @appletechie)
 
 ## [0.5.0] - 2026-10-12
 
