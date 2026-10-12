@@ -13,6 +13,12 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   budget is spent, another cycle is running, the project is unknown or a
   proposal is a duplicate. They used to raise, which Hermes reports as a tool
   error the agent cannot tell apart from a crash.
+- **Agent tool answers frame untrusted text as data.** Tool answers carry
+  objective details, command output, evidence and titles the code did not
+  write. Every string in an answer now has ANSI escapes, control characters
+  and bidi overrides stripped and is cut to 4000 characters, and the answer
+  carries `untrusted_evidence: true` and a fixed `untrusted_note`; the tool
+  descriptions say the same. Stored data is unchanged.
 
 ## [0.4.0] - 2026-10-11
 

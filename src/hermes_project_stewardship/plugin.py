@@ -12,6 +12,7 @@ from .cycles.engine import CycleRefused
 from .persistence.service import ServiceError, StewardshipService
 from .persistence.store import Store
 from .runtime import bot_db_path, mark_hermes_host, open_store
+from .security.untrusted import UNTRUSTED_NOTE, frame_untrusted
 
 
 class PluginState:
@@ -110,12 +111,13 @@ _TOOL_REQUIRED = {
 def _tool_handler(fn):
     def handle(args=None, **_kwargs):
         # A refusal (paused, frozen, budget, duplicate, unknown project) is an
-        # answer the agent must read, not a tool crash.
+        # answer the agent must read, not a tool crash. Answers and refusals
+        # alike carry text the code did not write, so both are framed as data.
         try:
             result = fn(**dict(args or {}))
         except (CycleRefused, ServiceError) as refusal:
-            return json.dumps({"refused": str(refusal)})
-        return json.dumps(result, sort_keys=True, default=str)
+            result = {"refused": str(refusal)}
+        return json.dumps(frame_untrusted(result), sort_keys=True, default=str)
 
     return handle
 
@@ -123,7 +125,7 @@ def _tool_handler(fn):
 def _schema(name: str) -> dict:
     return {
         "name": name,
-        "description": name.replace("_", " "),
+        "description": f"{name.replace('_', ' ')}. {UNTRUSTED_NOTE}",
         "parameters": {
             "type": "object",
             "properties": _TOOL_PROPERTIES[name],
