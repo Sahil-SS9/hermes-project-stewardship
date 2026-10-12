@@ -89,3 +89,58 @@ the numbered-migration discipline makes that a mechanical translation.
 - Regression: the six PRD scenarios (`tests/test_regression_scenarios.py`),
   plus mutex/idempotency/budget concurrency tests.
 - Clock injection everywhere (`Store(clock=…)`) — no wall-clock tests.
+
+## The delivery ladder
+
+Since 0.5.0 the delivery model is a strict one-parent chain. Each item has at
+most one parent at the next level up; a parent may have many children. An item
+with no parent is allowed and shown as "Not placed yet". Both ends of a link are
+always in the same project, and every placement write is audited in the same
+transaction.
+
+```mermaid
+flowchart TD
+    Initiative["Initiative<br/>(a person confirms 'delivered')"]
+    Milestone["Milestone<br/>(reached when ALL its objectives are met)"]
+    Objective["Objective<br/>(met when ALL its goals are met AND its check passes)"]
+    Goal["Goal<br/>(met when ALL its tasks are done AND its check passes)"]
+    Task["Task<br/>(Hermes Kanban work item)"]
+
+    Task -->|"has one"| Goal
+    Goal -->|"has one"| Objective
+    Objective -->|"has one"| Milestone
+    Milestone -->|"has one"| Initiative
+```
+
+Roll-up is automatic up to the milestone; a person confirms the initiative. When
+every milestone of an executing initiative is reached, the initiative shows
+"Ready to confirm" and an Approval Inbox item appears. Confirming is refused
+unless every milestone is reached. After completion, if any check in its ladder
+later fails, the observation path marks the initiative `regressed`.
+
+```mermaid
+stateDiagram-v2
+    [*] --> proposed
+    proposed --> pending_approval
+    pending_approval --> changes_requested
+    changes_requested --> pending_approval
+    pending_approval --> approved
+    pending_approval --> rejected
+    proposed --> rejected
+    approved --> executing
+    executing --> ready_to_confirm: every milestone reached
+    ready_to_confirm --> completed: a person confirms
+    executing --> cancelled
+    completed --> regressed: a check later fails
+    regressed --> executing: re-confirm after the check passes
+    rejected --> [*]
+    cancelled --> [*]
+    completed --> [*]
+```
+
+All states are derived at read time from stored links, task statuses and check
+results. Nothing is stored as a percentage or a blended score, and unknown is
+reported as unknown, never as met or as zero. On upgrade from 0.4.0, links that
+map unambiguously are converted and everything else is listed under "Needs
+placing" for a human to place by hand; the old link tables are kept as read-only
+history so the downgrade restores 0.4.0 exactly.

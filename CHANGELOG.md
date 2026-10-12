@@ -4,6 +4,63 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-10-12
+
+The delivery model becomes a strict ladder: **Task -> Goal -> Objective ->
+Milestone -> Initiative**, each item with at most one parent at the next level
+up. Work now rolls up automatically: a goal is met when all its tasks are done
+and its check passes; an objective is met when all its goals are met; a
+milestone is reached when all its objectives are met; and when every milestone
+of an executing initiative is reached, the initiative shows **Ready to confirm**
+and a person confirms it as delivered. Nothing is guessed: an item with no
+parent is shown as "Not placed yet", and unknown is shown as unknown, never as
+met or as zero.
+
+### Changed
+- **One parent per level (schema v42).** A goal has one objective, an objective
+  has one milestone, a milestone has one initiative, a task has one goal. New
+  nullable parent columns and a `goal_tasks` table replace the 0.4.0 many-to-many
+  link tables.
+- **Goals gain an optional check** using the existing objective evaluator
+  machinery (manual/command/integration, with the same autonomy gate for command
+  checks). A goal is met only when its tasks are done AND its check passes.
+- **Derived states, computed at read time.** Goal `not_started|in_progress|met|
+  at_risk|unknown`; objective the same; milestone `not_reached|reached` (with
+  `overdue` a separate flag); initiative governance plus `ready_to_confirm`. No
+  stored percentages, no blended scores, no forecasts.
+- **Human delivery confirmation.** `confirm-delivered` completes an executing
+  initiative and is refused (409) unless every milestone is reached. If a check
+  later fails, the observation path marks the initiative `regressed`.
+- **Roadmap (Desktop)** shows the ladder as an Outline tree with a state chip
+  per level, "Not placed yet" groups per level, a "Needs placing (n)" banner for
+  what the upgrade could not convert, and "Ready to confirm" on initiatives. The
+  kanban card names the goal a task works towards.
+
+### API changes
+- **New routes:** `PUT /projects/{pid}/tasks/{ref}/goal`,
+  `PUT /projects/{pid}/goals/{gid}/objective`,
+  `PUT /projects/{pid}/objectives/{oid}/milestone`,
+  `PUT /projects/{pid}/milestones/{mid}/initiative` (body `{parent_id|null}`),
+  `POST /projects/{pid}/initiatives/{ref}/confirm-delivered`,
+  `GET /projects/{pid}/roadmap/unplaced`,
+  `POST /projects/{pid}/roadmap/unplaced/{id}/dismiss`,
+  `GET|PUT /projects/{pid}/goals/{gid}/check`,
+  `POST /projects/{pid}/goals/{gid}/assessment`.
+- **Retired endpoints answer `410 Gone`** and name the replacement: the 0.4.0
+  `POST/DELETE .../initiatives/{ref}/milestones` and
+  `POST/DELETE .../objectives/{oid}/initiatives` link endpoints.
+- **CLI:** `stewardctl roadmap unplaced|place|confirm`. `steward_status` reports
+  the ladder states.
+
+### Upgrade notes (read before upgrading from 0.4.0)
+- **Export a backup first.** The schema moves from 41 to 42. The 0.4.0 link
+  tables are kept as read-only history, so the downgrade restores 0.4.0 exactly.
+- **Needs placing.** On upgrade, links that map unambiguously are converted;
+  anything else is listed under "Needs placing" with its old links so you can
+  place it by hand. Nothing is guessed from titles or shared work.
+- **Rollback.** 0.4.0 refuses a v42 database (`NewerSchemaError`); to go back,
+  downgrade the schema to 41 first (the old tables were never written).
+
 ## [0.4.0] - 2026-10-11
 
 The Project Stewardship Desktop app becomes the main surface, and every part
