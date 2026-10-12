@@ -10,6 +10,7 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { mkdirSync } from 'node:fs'
+import { ALL_PROJECTS, pickProject } from './test-support/project-scope.mjs'
 
 const require = createRequire(fileURLToPath(new URL('../dashboard/package.json', import.meta.url)))
 const { chromium } = require('playwright')
@@ -83,11 +84,15 @@ test('Batch L R1: capture every changed screen for signoff', { timeout: 300000 }
         page.on('pageerror', (error) => errors.push(String(error)))
         await page.goto(BASE)
         await page.waitForTimeout(1500)
+        // The switcher decides which projects exist for these captures: all of
+        // them for the Roadmap/Inbox/Notifications shots.
+        await pickProject(page, ALL_PROJECTS)
 
         // Roadmap: open a project; a ready initiative shows "Ready to confirm".
         await page.getByRole('tab', { name: 'Roadmap' }).click()
         await page.locator('[data-roadmap-screen]').waitFor()
-        await page.locator('[data-rm-node^="project:"]').first().click()
+        // The row that carries the ready initiative: payments-relaunch.
+        await page.locator('[data-rm-node="project:payments-relaunch"]').click()
         await page.locator('[data-rm-node^="initiative:"]').first().click()
         await page.waitForTimeout(1200)
         await setTheme(page, theme)
@@ -117,16 +122,26 @@ test('Batch L R1: capture every changed screen for signoff', { timeout: 300000 }
               await proxyCall(`/projects/payments-relaunch/objectives/${obj.id}/assessment`, { method: 'POST', body: { passed: true, evidence: ['shot:restore'] } })
             } catch { /* the refusal shot is best-effort; the run continues */ }
           }
-          await page.keyboard.press('Escape')
+          // Close the dialog through its own control, then reload: a fresh load
+          // guarantees no backdrop is left to intercept the next capture.
+          await page.locator('[data-rm-confirm-dialog] [aria-label="Close confirm dialog"]').click().catch(() => {})
+          await page.goto(BASE)
+          await page.waitForTimeout(1200)
+          await pickProject(page, ALL_PROJECTS)
         }
 
-        // Board: a card's planning row names the goal.
+        // Board: a card's planning row names the goal. The board needs a
+        // project that HAS cards (atlas-mobile), so the switcher is narrowed.
+        await page.goto(BASE)
+        await page.waitForTimeout(1200)
+        await pickProject(page, 'atlas-mobile')
         await page.getByRole('tab', { name: /Board|Work/i }).first().click()
         await page.waitForTimeout(1500)
         await setTheme(page, theme)
         await page.screenshot({ path: `${SHOTS}/board-${theme}-${width}.png` })
 
         // Work-item detail with the Goal picker (R2 fix 3/7).
+        await page.locator('[data-work-card]').first().waitFor({ timeout: 10000 }).catch(() => {})
         const firstCard = page.locator('[data-work-card]').first()
         if (await firstCard.count()) {
           await firstCard.locator('[data-card-toggle]').click()
@@ -153,6 +168,7 @@ test('Batch L R1: capture every changed screen for signoff', { timeout: 300000 }
         // Vision: the goal drawer with the check editor and its pickers.
         await page.getByRole('tab', { name: /Board|Work/i }).first().click()
         await page.waitForTimeout(800)
+        await page.locator('[data-work-card]').first().waitFor({ timeout: 10000 }).catch(() => {})
         const vCard = page.locator('[data-work-card]').filter({ hasText: 'Build setup screens' }).first()
         if (await vCard.count()) {
           await vCard.locator('[data-card-toggle]').click()
