@@ -98,7 +98,9 @@ test('cards: summary facts from real data; expanded card names links with ref, t
   assert.deepEqual(await links('blocked_by'), [`${guided.ref} Guided setup ${COLUMN[guided.status]}`, `${crash.ref} Crash on first launch ${COLUMN[crash.status]}`])
   assert.deepEqual(await links('blocks'), [`${analytics.ref} Wire up analytics ${COLUMN[analytics.status]}`])
   const planning = await card('Build setup screens').locator('[data-card-section="planning"] .dy-kb-row').allInnerTexts()
-  assert.deepEqual(planning.map((row) => row.replace(/\s+/g, ' ').trim()), ['Initiative Make setup effortless', 'Milestone Beta launch · due 1 Mar 2099', 'Objective Setup under two minutes (through the initiative)'])
+  // v42: a task works towards ONE goal, so the card names that goal directly.
+  // There is no "through the initiative" hop any more.
+  assert.deepEqual(planning.map((row) => row.replace(/\s+/g, ' ').trim()), ['Initiative Make setup effortless', 'Milestone Beta launch · due 1 Mar 2099', 'Goal Setup under two minutes'])
   await card('Crash on first launch').locator('[data-card-toggle]').click()
   const done = await card('Crash on first launch').locator(`[data-link-ref="${spike.ref}"]`).innerText()
   assert.match(done.replace(/\s+/g, ' '), /Try offline sync Done$/, 'a done blocker says Done in words')
@@ -276,7 +278,7 @@ test("List: C's columns, grouped by stage, linked items named, no sideways scrol
   await page.locator('[data-kanban-layout="list"]').click()
   assert.equal(await page.locator('[data-work-table]').count(), 1)
   assert.equal(await page.locator('[data-work-card]').count(), 0)
-  assert.deepEqual(await page.locator('[data-work-table] thead th').allInnerTexts(), ['Ref', 'Title', 'Type', 'State', 'Assignee', 'Blocked by', 'Blocks', 'Initiative', 'Milestone', 'Objective', 'Due', 'Move'])
+  assert.deepEqual(await page.locator('[data-work-table] thead th').allInnerTexts(), ['Ref', 'Title', 'Type', 'State', 'Assignee', 'Blocked by', 'Blocks', 'Initiative', 'Milestone', 'Goal', 'Due', 'Move'])
   const row = await page.locator(`[data-work-row="${d.by('Build setup screens').ref}"]`).innerText()
   for (const text of [`${d.by('Guided setup').ref} Guided setup`, 'Make setup effortless', 'Beta launch', 'Setup under two minutes']) assert.ok(row.includes(text), `${text} in ${row}`)
   assert.ok((await page.locator('[data-work-group]').allInnerTexts()).some((text) => /^Backlog \(\d+\)$/.test(text)))

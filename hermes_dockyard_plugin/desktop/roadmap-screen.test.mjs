@@ -150,7 +150,7 @@ test('Roadmap: View in Roadmap opens that project; the global switcher re-scopes
   }
 })
 
-test('Roadmap: Link… asks for the initiative, confirms, then links in the row’s own project', { timeout: 180000 }, async () => {
+test('Roadmap: Place… asks for the parent, confirms, then places in the row’s own project', { timeout: 180000 }, async () => {
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
   try {
@@ -158,41 +158,47 @@ test('Roadmap: Link… asks for the initiative, confirms, then links in the row�
     // never on whichever project happens to be listed first.
     await openRoadmap(page)
     await projectRow(page, 'payments-relaunch').click()
-    const group = page.locator('[data-rm-node="unlinked-objectives:payments-relaunch"]')
-    await group.waitFor()
-    await group.getByRole('button', { name: 'Link…' }).click()
-    const dialog = page.locator('[data-rm-link-dialog]')
-    await dialog.locator('select#dy-rm-link-choice').waitFor()
+    // v42: each level has its own "Not placed yet" group whose item rows are
+    // always listed, so the unplaced objective's Place… is reachable directly.
+    const item = page.locator('[data-rm-node^="not-placed-objectives:payments-relaunch:"]').first()
+    await item.waitFor()
+    await item.getByRole('button', { name: 'Place…' }).click()
+    const dialog = page.locator('[data-rm-place-dialog]')
+    await dialog.locator('select#dy-rm-place-choice').waitFor()
     assert.match(await dialog.innerText(), /Project payments-relaunch/)
     const create = dialog.getByRole('button', { name: 'Continue' })
     assert.equal(await create.isDisabled(), true, 'nothing is chosen for the human')
-    await dialog.locator('select#dy-rm-link-choice').selectOption({ label: 'Unlinked objective for linking' })
-    assert.equal(await create.isDisabled(), true, 'the initiative must be chosen too')
-    await dialog.locator('select#dy-rm-link-initiative').selectOption({ index: 1 })
+    await dialog.locator('select#dy-rm-place-choice').selectOption({ index: 1 })
     await create.click()
-    // Confirm step names both ends before anything is written.
-    await dialog.locator('[data-rm-link-confirm]').getByText('Unlinked objective for linking', { exact: false }).waitFor()
-    await dialog.getByRole('button', { name: 'Create link' }).click()
+    // The confirm step names the parent before anything is written.
+    await dialog.locator('[data-rm-place-confirm]').waitFor()
+    // Scope to the dialog's action row: the tree also has a "Place…" action, so
+    // an unscoped match would resolve to two buttons.
+    await dialog.locator('.dy-rm-modal-actions').getByRole('button', { name: 'Place' }).click()
+    // Placed: the objective leaves the "Not placed yet" group.
     await page
-      .waitForFunction(() => !document.querySelector('[data-rm-node="unlinked-objectives:payments-relaunch"]')?.innerText.includes('Unlinked objective for linking'))
-      .catch(() => assert.fail('linking did not remove the objective from the unlinked group'))
+      .waitForFunction(() => !document.querySelector('[data-rm-node^="not-placed-objectives:payments-relaunch:"]'))
+      .catch(() => assert.fail('placing did not remove the objective from the not-placed group'))
   } finally {
     await browser.close()
   }
 })
 
-test('Roadmap: narrow layout keeps one column and keeps Link… reachable', { timeout: 120000 }, async () => {
+test('Roadmap: narrow layout keeps one column and keeps Place… reachable', { timeout: 120000 }, async () => {
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage({ viewport: { width: 390, height: 780 } })
   try {
     await openRoadmap(page)
     await projectRow(page, 'payments-relaunch').click()
-    await firstOf(page, 'initiative').click()
     await page.locator('[data-rm-drawer]').waitFor()
     const columns = await page.evaluate(() => getComputedStyle(document.querySelector('.dy-rm-shell')).gridTemplateColumns.split(' ').length)
     assert.equal(columns, 1, 'narrow window renders a single column')
-    const link = page.locator('[data-rm-node="unlinked-milestones:payments-relaunch"]').getByRole('button', { name: 'Link…' })
-    assert.equal(await link.isVisible(), true, 'the narrow layout hides chips, never the Link… action')
+    // "Not placed yet" item rows are always listed with their Place… action, so
+    // the action is reachable at phone width (the narrow layout hides chips,
+    // never actions). The milestones group is the first one, nearest the top.
+    const place = page.locator('[data-rm-node^="not-placed-milestones:payments-relaunch:"]').first().getByRole('button', { name: 'Place…' })
+    await place.scrollIntoViewIfNeeded()
+    assert.equal(await place.isVisible(), true, 'the narrow layout hides chips, never the Place… action')
   } finally {
     await browser.close()
   }

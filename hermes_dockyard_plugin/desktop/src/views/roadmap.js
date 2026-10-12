@@ -34,36 +34,61 @@ import { plural } from '../lib/ui.js'
 import { useDialogFocusManager } from '../lib/ui.js'
 import { loadRoadmapData } from '../data/loaders.js'
 import { BUCKETS } from '../lib/plan-vocab.js'
-import { GOAL_LABEL } from '../lib/plan-vocab.js'
 import { ICON } from '../lib/plan-vocab.js'
-import { OUTCOME_LABEL } from '../lib/plan-vocab.js'
-import { REL_LABEL } from '../lib/plan-vocab.js'
-import { RELATIONSHIPS } from '../lib/plan-vocab.js'
 
 const CONTRACT_STATUS = { active: 'Active', paused: 'Paused', done: 'Done', cleared: 'Cleared' }
 
-// Link… flows. Choices are re-read for the one project the row belongs to, so
-// a stale or cross-project list is never offered; the human picks both the
-// item and the initiative (nothing is chosen for them).
-const LINK_KIND = {
+// v42 placement: one parent per level. The Roadmap only shows and places; each
+// item's own screen still owns create/edit. The human picks the parent from the
+// project's own candidates, so a stale or cross-project list is never offered
+// and nothing is chosen for them.
+const PLACE_KIND = {
   milestone: {
-    title: 'Link a milestone to an initiative',
+    title: 'Place a milestone under an initiative',
     itemLabel: 'Milestone',
-    relationships: RELATIONSHIPS.milestone,
-    items: (project) => (project.unlinked?.milestones ?? []).map((row) => ({ id: String(row.id), label: row.name })),
-    submit: (projectId, itemId, ref, relationship) => api(
-      `/projects/${encodeURIComponent(projectId)}/initiatives/${encodeURIComponent(ref)}/milestones`,
-      { method: 'POST', body: { milestone_id: Number(itemId), relationship } }),
+    path: (projectId, itemId) => `/projects/${encodeURIComponent(projectId)}/milestones/${itemId}/initiative`,
+    candidates: (project) => (project.initiatives ?? [])
+      .filter((row) => row.governance !== 'rejected' && row.governance !== 'cancelled')
+      .map((row) => ({ id: row.ref, label: row.title })),
   },
   objective: {
-    title: 'Link an objective to an initiative',
+    title: 'Place an objective under a milestone',
     itemLabel: 'Objective',
-    relationships: RELATIONSHIPS.objective,
-    items: (project) => (project.unlinked?.objectives ?? []).map((row) => ({ id: String(row.id), label: row.name })),
-    submit: (projectId, itemId, ref, relationship) => api(
-      `/projects/${encodeURIComponent(projectId)}/objectives/${encodeURIComponent(itemId)}/initiatives`,
-      { method: 'POST', body: { initiative_ref: ref, relationship } }),
+    path: (projectId, itemId) => `/projects/${encodeURIComponent(projectId)}/objectives/${itemId}/milestone`,
+    candidates: (project) => (project.milestones ?? []).map((row) => ({ id: String(row.id), label: row.name })),
   },
+  goal: {
+    title: 'Place a goal under an objective',
+    itemLabel: 'Goal',
+    path: (projectId, itemId) => `/projects/${encodeURIComponent(projectId)}/goals/${encodeURIComponent(itemId)}/objective`,
+    candidates: (project) => (project.objectives ?? []).map((row) => ({ id: String(row.id), label: row.name })),
+  },
+  task: {
+    title: 'Place a task under a goal',
+    itemLabel: 'Task',
+    path: (projectId, itemId) => `/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(itemId)}/goal`,
+    candidates: (project) => (project.goals ?? []).map((row) => ({ id: row.id, label: row.title })),
+  },
+}
+
+// Derived states, exactly as the backend computes them. Unknown is unknown:
+// never rendered as met, and never as zero.
+const STATE_LABEL = {
+  not_started: 'Not started', in_progress: 'In progress', met: 'Met',
+  at_risk: 'At risk', unknown: 'Unknown', reached: 'Reached', not_reached: 'Not reached',
+}
+const milestoneStateWords = (row) => (
+  `${STATE_LABEL[row.state] ?? words(row.state)}${row.overdue ? ' · overdue' : ''}${row.closed ? ' · closed' : ''}`)
+const objectiveStateWords = (row) => {
+  const check = row.check?.state
+  const checkText = check && check !== 'no_check' ? ` · check ${STATE_LABEL[check] ?? words(check)}` : ''
+  return `${STATE_LABEL[row.state] ?? words(row.state)}${checkText}`
+}
+const goalStateWords = (row) => {
+  const check = row.check?.state
+  const checkText = check && check !== 'no_check' ? ` · check ${STATE_LABEL[check] ?? words(check)}` : ''
+  const tasks = row.task_count ? ` · ${row.task_count} ${row.task_count === 1 ? 'task' : 'tasks'}` : ' · no tasks'
+  return `${STATE_LABEL[row.state] ?? words(row.state)}${tasks}${checkText}`
 }
 
 const words = (value) => String(value ?? '').replace(/_/g, ' ')
@@ -111,12 +136,6 @@ function deliveryChips(delivery) {
   }
   chips.push(jsx('span', { className: 'dy-rm-chip', children: `${number(delivery.total)} total` }, 'total'))
   return chips
-}
-
-function goalChip(goal) {
-  if (!goal) return null
-  if (goal.unavailable === 'archived') return chip(`Goal ${goal.title} — unavailable (archived)`)
-  return chip(`Goal: ${GOAL_LABEL[goal.state] ?? goal.state}`)
 }
 
 function deliveryDetail(delivery) {
@@ -248,8 +267,10 @@ function drawerBody(sel, project, contract, onOpen) {
       facts: [
         ['Initiatives', number(project.initiatives?.length ?? 0)],
         ['Goals', number(project.goals?.length ?? 0)],
-        ['Milestones not linked', number(project.unlinked?.milestones?.length ?? 0)],
-        ['Objectives not linked', number(project.unlinked?.objectives?.length ?? 0)],
+        ['Milestones not placed', number(project.not_placed?.milestones?.length ?? 0)],
+        ['Objectives not placed', number(project.not_placed?.objectives?.length ?? 0)],
+        ['Goals not placed', number(project.not_placed?.goals?.length ?? 0)],
+        ['Needs placing', number(project.needs_placing?.length ?? 0)],
         ['Work host', project.work_host === 'unavailable' ? 'Unavailable' : 'Connected'],
       ],
     }
@@ -261,57 +282,56 @@ function drawerBody(sel, project, contract, onOpen) {
       title: initiative.title, subtitle: `Governance: ${words(initiative.governance)}`, open,
       facts: [
         ...deliveryDetail(initiative.delivery),
-        ['Work not in a milestone', initiative.unmilestoned_work?.state === 'ok' ? number(initiative.unmilestoned_work.count) : 'Unavailable'],
-        ['Objectives linked', number(initiative.objectives?.length ?? 0)],
+        ['Milestones', number((initiative.milestones ?? []).length)],
+        ['Work not placed under a goal', number((initiative.not_placed?.tasks ?? []).length)],
         ['Attention', initiative.attention_reasons?.length ? initiative.attention_reasons.map(words).join(', ') : 'none'],
       ],
     }
   }
   if (sel.type === 'milestone') {
-    const milestone = (initiativeOf(sel.via)?.milestones ?? []).find((row) => row.id === sel.id)
+    const milestone = project.milestones.find((row) => row.id === sel.id)
     if (!milestone) return null
     return {
       title: milestone.name, open,
-      subtitle: milestone.relationship ? `Relationship: ${REL_LABEL[milestone.relationship] ?? milestone.relationship}` : 'Not linked yet',
+      subtitle: `${STATE_LABEL[milestone.state] ?? words(milestone.state)}${milestone.initiative_ref ? ` · under ${milestone.initiative_ref}` : ' · not placed yet'}`,
       facts: [
         ...deliveryDetail(milestone.delivery),
         ['Due', milestone.due ?? 'No due date'],
         ['Closed', milestone.closed ? 'Yes' : 'No'],
         ...(milestone.overdue ? [['Overdue', 'Yes — past due and not closed']] : []),
-        ...(milestone.archived ? [['Status', 'Unavailable (archived)']] : []),
-        ...(milestone.also_under?.length ? [['Also under', milestone.also_under.map((row) => row.title).join(', ')]] : []),
+        ['Objectives', number((milestone.objectives ?? []).length)],
       ],
-      extra: milestone.archived ? null : jsx(MilestoneItems, { projectId: project.id, milestoneId: milestone.id, onOpen }),
+      extra: jsx(MilestoneItems, { projectId: project.id, milestoneId: milestone.id, onOpen }),
     }
   }
   if (sel.type === 'objective') {
-    const objective = (initiativeOf(sel.via)?.objectives ?? []).find((row) => row.id === sel.id)
+    const objective = project.objectives.find((row) => row.id === sel.id)
     if (!objective) return null
+    const check = objective.check ?? {}
     return {
       title: objective.name, open,
-      subtitle: objective.relationship ? `Relationship: ${REL_LABEL[objective.relationship] ?? objective.relationship}` : 'Not linked yet',
+      subtitle: `${STATE_LABEL[objective.state] ?? words(objective.state)}${objective.milestone_id ? ` · under milestone ${objective.milestone_id}` : ' · not placed yet'}`,
       facts: [
-        ['Outcome', OUTCOME_LABEL[objective.outcome?.state] ?? 'Unknown'],
-        ['Evidence window', objective.outcome?.window ?? '—'],
-        ['Last evaluated', objective.outcome?.evaluated_at ?? 'Never'],
-        ...(objective.unavailable === 'archived' ? [['Status', 'Unavailable (archived)']] : []),
-        ...(objective.goal ? [['Goal', objective.goal.unavailable === 'archived' ? `${objective.goal.title} (unavailable, archived)` : `${objective.goal.title} — ${GOAL_LABEL[objective.goal.state] ?? objective.goal.state}`]] : []),
+        ['State', STATE_LABEL[objective.state] ?? words(objective.state)],
+        ['Check', check.state === 'no_check' || !check.state ? 'No check' : STATE_LABEL[check.state] ?? words(check.state)],
+        ['Evidence window', check.window ?? '—'],
+        ['Last evaluated', check.evaluated_at ?? 'Never'],
+        ['Goals', number((objective.goals ?? []).length)],
       ],
     }
   }
   if (sel.type === 'goal') {
     const goal = (project.goals ?? []).find((row) => row.id === sel.id)
-    if (!goal) {
-      // Archived goals are not in the goal list; the objective still names them.
-      return { title: sel.goal?.title ?? sel.id, subtitle: 'Goal', open, facts: [['Status', 'Unavailable (archived)']] }
-    }
+    if (!goal) return null
     const entry = contract?.key === `${project.id}/${goal.id}` ? contract : null
+    const check = goal.check ?? {}
     return {
       title: goal.title, subtitle: 'Goal · its contract is read-only here', open,
       facts: [
-        ['State', GOAL_LABEL[goal.state] ?? goal.state],
-        ['Objectives linked', number(goal.objectives_linked ?? 0)],
-        ['Objectives passed', goal.objectives_passed === null || goal.objectives_passed === undefined ? 'Unknown (evidence missing)' : number(goal.objectives_passed)],
+        ['State', STATE_LABEL[goal.state] ?? words(goal.state)],
+        ['Tasks', number(goal.task_count ?? 0)],
+        ['Check', check.state === 'no_check' || !check.state ? 'No check' : STATE_LABEL[check.state] ?? words(check.state)],
+        ['Placed under', goal.objective_id ? `Objective ${goal.objective_id}` : 'Not placed yet'],
         ...contractFacts(entry, goal.title),
       ],
     }
@@ -340,38 +360,35 @@ function Drawer({ type, body, onClose, onOpen }) {
   ]})
 }
 
-function LinkDialog({ kind, projectId, projectLabel, onClose, onDone }) {
-  const spec = LINK_KIND[kind]
-  const [choices, setChoices] = useState(null)
-  const [item, setItem] = useState('')
-  const [initiative, setInitiative] = useState('')
-  const [relationship, setRelationship] = useState(spec.relationships[0])
+function PlaceDialog({ kind, itemId, projectId, projectLabel, onClose, onDone }) {
+  const spec = PLACE_KIND[kind]
+  const [candidates, setCandidates] = useState(null)
+  const [parent, setParent] = useState('')
   const [step, setStep] = useState('choose')
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
-  useDialogFocusManager(`[data-rm-link-dialog][data-rm-step="${step}"] .dy-rm-modal`)
+  useDialogFocusManager(`[data-rm-place-dialog][data-rm-step="${step}"] .dy-rm-modal`)
   useEffect(() => {
     let current = true
     loadRoadmapData(projectId)
       .then((result) => {
         if (!current) return
         const project = result.projects?.[0]
-        setChoices({
-          items: project ? spec.items(project) : [],
-          initiatives: (project?.initiatives ?? []).map((row) => ({ ref: row.ref, title: row.title, governance: words(row.governance) })),
-        })
+        setCandidates(project ? spec.candidates(project) : [])
       })
       .catch((failure) => { if (current) setError(String(failure?.message ?? failure)) })
     return () => { current = false }
   }, [])
-  const itemLabel = choices?.items.find((row) => row.id === item)?.label ?? ''
-  const initiativeTitle = choices?.initiatives.find((row) => row.ref === initiative)?.title ?? ''
-  const ready = Boolean(choices && item && initiative)
-  const submit = async () => {
+  const parentLabel = candidates?.find((row) => row.id === parent)?.label ?? ''
+  const ready = Boolean(candidates && parent)
+  // A null parent is a real instruction: it unplaces the item ("Not placed yet").
+  const submit = async (nextParent) => {
     setBusy(true); setError(null)
     try {
-      await spec.submit(projectId, item, initiative, relationship)
-      emitToast('success', `Linked “${itemLabel}” to “${initiativeTitle}”.`)
+      await api(spec.path(projectId, itemId), { method: 'PUT', body: { parent_id: nextParent } })
+      emitToast('success', nextParent === null
+        ? `Removed the parent of “${itemId}”. It is now not placed yet.`
+        : `Placed “${itemId}” under “${parentLabel}”.`)
       onDone()
     } catch (failure) {
       setError(String(failure?.message ?? failure))
@@ -383,55 +400,49 @@ function LinkDialog({ kind, projectId, projectLabel, onClose, onDone }) {
     jsx('select', { id, value, onChange: (event) => onChange(event.target.value), children: options }),
   ]})
   const choose = jsxs('div', { className: 'dy-rm-modal-body', children: [
-    choices === null && !error ? jsx('p', { role: 'status', children: 'Loading choices…' }) : null,
-    choices && choices.items.length === 0
-      ? jsx('p', { children: `Nothing to link: every ${spec.itemLabel.toLowerCase()} in this project is already linked.` })
+    candidates === null && !error ? jsx('p', { role: 'status', children: 'Loading choices…' }) : null,
+    candidates && candidates.length === 0
+      ? jsx('p', { children: `Nothing to place it under: this project has no candidates yet. Create one on the project screen first.` })
       : null,
-    choices && choices.items.length > 0
-      ? field('dy-rm-link-choice', spec.itemLabel, item, setItem, [
-          jsx('option', { value: '', children: 'Choose…' }, ''),
-          ...choices.items.map((row) => jsx('option', { value: row.id, children: row.label }, row.id)),
-        ])
-      : null,
-    choices && choices.initiatives.length === 0
-      ? jsx('p', { children: 'This project has no initiatives yet. Create one on the project screen first.' })
-      : null,
-    choices && choices.initiatives.length > 0
-      ? field('dy-rm-link-initiative', 'Initiative', initiative, setInitiative, [
-          jsx('option', { value: '', children: 'Choose…' }, ''),
-          ...choices.initiatives.map((row) => jsx('option', { value: row.ref, children: `${row.title} (${row.governance})` }, row.ref)),
-        ])
-      : null,
-    choices
-      ? field('dy-rm-link-rel', 'Relationship', relationship, setRelationship,
-          spec.relationships.map((value) => jsx('option', { value, children: REL_LABEL[value] ?? value }, value)))
+    candidates && candidates.length > 0
+      ? field('dy-rm-place-choice', spec.itemLabel === 'Milestone' ? 'Initiative'
+          : spec.itemLabel === 'Objective' ? 'Milestone'
+          : spec.itemLabel === 'Goal' ? 'Objective' : 'Goal',
+          parent, setParent, [
+            jsx('option', { value: '', children: 'Choose…' }, ''),
+            ...candidates.map((row) => jsx('option', { value: row.id, children: row.label }, row.id)),
+          ])
       : null,
     jsx('p', { className: 'dy-rm-modal-error', role: 'alert', children: error }),
   ]})
-  const confirm = jsxs('div', { className: 'dy-rm-modal-body', 'data-rm-link-confirm': true, children: [
-    jsx('p', { className: 'dy-rm-confirm', children: `Link the ${spec.itemLabel.toLowerCase()} “${itemLabel}” to the initiative “${initiativeTitle}” (${REL_LABEL[relationship] ?? relationship})?` }),
-    jsx('p', { className: 'dy-rm-confirm', children: 'This records one link and an audit entry under your name.' }),
+  const confirm = jsxs('div', { className: 'dy-rm-modal-body', 'data-rm-place-confirm': true, children: [
+    jsx('p', { className: 'dy-rm-confirm', children: `Place the ${spec.itemLabel.toLowerCase()} “${itemId}” under “${parentLabel}”?` }),
+    jsx('p', { className: 'dy-rm-confirm', children: 'This records one placement and an audit entry under your name.' }),
     jsx('p', { className: 'dy-rm-modal-error', role: 'alert', children: error }),
   ]})
   return jsx('div', {
-    className: 'dy-rm-modal-backdrop', 'data-rm-link-dialog': true, 'data-rm-step': step,
+    className: 'dy-rm-modal-backdrop', 'data-rm-place-dialog': true, 'data-rm-step': step,
     onKeyDown: (event) => { if (event.key === 'Escape') { event.stopPropagation(); onClose() } },
     children: jsxs('section', { className: 'dy-rm-modal', role: 'dialog', 'aria-modal': true, 'aria-label': spec.title, children: [
       jsxs('header', { className: 'dy-rm-modal-head', children: [
-        jsxs('div', { children: [jsx('p', { className: 'dockyard-meta', children: 'Link' }), jsx('h3', { children: spec.title }), jsx('p', { children: `Project ${projectLabel}` })] }),
-        jsx(Button, { onClick: onClose, ariaLabel: 'Close link dialog', children: '×' }),
-      ]}),
+        jsxs('div', { children: [
+          jsx('p', { className: 'dockyard-meta', children: 'Place' }),
+          jsx('h3', { children: spec.title }),
+          jsx('p', { children: `Project ${projectLabel}` }),
+        ] }),
+        jsx(Button, { onClick: onClose, ariaLabel: 'Close place dialog', children: '×' }),
+      ] }),
       step === 'choose' ? choose : confirm,
       step === 'choose'
         ? jsxs('div', { className: 'dy-rm-modal-actions', children: [
             jsx(Button, { onClick: onClose, children: 'Cancel' }),
             jsx(Button, { variant: 'primary', disabled: !ready, onClick: () => { setError(null); setStep('confirm') }, children: 'Continue' }),
-          ]})
+          ] })
         : jsxs('div', { className: 'dy-rm-modal-actions', children: [
             jsx(Button, { disabled: busy, onClick: () => { setError(null); setStep('choose') }, children: 'Back' }),
-            jsx(Button, { variant: 'primary', disabled: busy, onClick: submit, children: busy ? 'Linking…' : 'Create link' }),
-          ]}),
-    ]}),
+            jsx(Button, { variant: 'primary', disabled: busy, onClick: () => submit(parent), children: busy ? 'Placing…' : 'Place' }),
+          ] }),
+    ] }),
   })
 }
 
@@ -449,7 +460,7 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
   const [openNodes, setOpenNodes] = useState(() => new Set())
   const [selection, setSelection] = useState(null)
   const [focusNode, setFocusNode] = useState(null)
-  const [linkDialog, setLinkDialog] = useState(null)
+  const [placeDialog, setPlaceDialog] = useState(null)
   const [contract, setContract] = useState(null)
   const [refreshTick, setRefreshTick] = useState(0)
   const loadSerial = useRef(0)
@@ -495,8 +506,9 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
           ...(row.objectives ?? []).flatMap((o) => [o.name, o.goal?.title]),
         ]),
         ...(project.goals ?? []).map((g) => g.title),
-        ...(project.unlinked?.milestones ?? []).map((m) => m.name),
-        ...(project.unlinked?.objectives ?? []).map((o) => o.name),
+        ...(project.not_placed?.milestones ?? []).map((m) => m.name),
+        ...(project.not_placed?.objectives ?? []).map((o) => o.name),
+        ...(project.not_placed?.goals ?? []).map((g) => g.title),
       ].join(' ').toLowerCase()
       return haystack.includes(query)
     }
@@ -523,16 +535,25 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
           if (childHit) next.add(`initiative:${row.ref}`)
           for (const o of goalHits) next.add(`objective:${o.id}@${row.ref}`)
         }
-        if ([...(project.unlinked?.milestones ?? []), ...(project.unlinked?.objectives ?? [])].some((x) => hit(x.name))) next.add(`project:${project.id}`)
+        const unplaced = [...(project.not_placed?.milestones ?? []),
+                          ...(project.not_placed?.objectives ?? []),
+                          ...(project.not_placed?.goals ?? [])]
+        if (unplaced.some((x) => hit(x.name ?? x.title))) next.add(`project:${project.id}`)
       }
       return next
     })
   }, [search, data])
 
-  const linkButton = (kind, project) => jsx(Button, {
-    small: true, action: `roadmap-link-${kind}`,
-    onClick: (event) => { event.stopPropagation(); setLinkDialog({ kind, projectId: project.id, projectLabel: project.label ?? project.id }) },
-    children: 'Link…',
+  // The caller names the item to place, so the dialog knows which child to PUT.
+  // No aria-label: the visible "Place…" is the accessible name (an aria-label
+  // would override it and the button would be unfindable by its own text).
+  const placeButton = (kind, project, itemId) => jsx(Button, {
+    small: true, action: `roadmap-place-${kind}`,
+    onClick: (event) => {
+      event.stopPropagation()
+      setPlaceDialog({ kind, itemId, projectId: project.id, projectLabel: project.label ?? project.id })
+    },
+    children: 'Place…',
   })
 
   // Rows are collected as (node, render) pairs so exactly one row holds the
@@ -567,6 +588,7 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
       const ref = initiative.ref
       const initiativeNode = `initiative:${ref}`
       const initiativeOpen = openNodes.has(initiativeNode)
+      const readyToConfirm = Boolean(initiative.ready_to_confirm)
       add(initiativeNode, (tabStop) => jsx(Row, {
         ...base(initiativeNode), tabStop, type: 'initiative', depth: 1,
         label: initiative.title,
@@ -576,94 +598,145 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
         expandable: true, open: initiativeOpen,
         chips: jsxs(Fragment, { children: [
           deliveryChips(initiative.delivery),
+          readyToConfirm ? chip('Ready to confirm', 'ready') : null,
           initiative.attention ? chip('Attention', 'attention') : null,
         ] }),
         onToggle: () => toggle(initiativeNode),
         onOpen: () => { openNode(initiativeNode); setSelection({ type: 'initiative', id: ref, projectId: pid, node: initiativeNode }) },
       }, initiativeNode))
       if (!initiativeOpen) continue
+      // v42: a milestone has ONE initiative, so there is no also_under copy.
       for (const milestone of initiative.milestones ?? []) {
-        // A milestone under two initiatives appears under both: the node key
-        // carries the parent so each copy has its own row, focus and selection.
         const milestoneNode = `milestone:${milestone.id}@${ref}`
-        const milestoneOpen = openNodes.has(milestoneNode) && !milestone.archived
+        const milestoneOpen = openNodes.has(milestoneNode)
         add(milestoneNode, (tabStop) => jsx(Row, {
           ...base(milestoneNode), tabStop, type: 'milestone', depth: 2,
           label: milestone.name,
-          detail: milestone.archived ? 'Unavailable (archived)' : `${milestone.relationship ? REL_LABEL[milestone.relationship] : 'not linked'}${milestone.also_under?.length ? ` · also under ${milestone.also_under.map((row) => row.title).join(', ')}` : ''}`,
-          expandable: !milestone.archived, open: milestoneOpen,
+          detail: milestoneStateWords(milestone),
+          expandable: true, open: milestoneOpen,
           chips: jsxs(Fragment, { children: [
             deliveryChips(milestone.delivery),
             milestone.overdue ? chip('Overdue', 'overdue') : null,
           ] }),
           onToggle: () => toggle(milestoneNode),
-          onOpen: () => { if (!milestone.archived) openNode(milestoneNode); setSelection({ type: 'milestone', id: milestone.id, via: ref, projectId: pid, node: milestoneNode }) },
+          onOpen: () => { openNode(milestoneNode); setSelection({ type: 'milestone', id: milestone.id, via: ref, projectId: pid, node: milestoneNode }) },
         }, milestoneNode))
         if (milestoneOpen) {
           const itemsNode = `items:${milestone.id}@${ref}`
           add(itemsNode, (tabStop) => jsx(MilestoneItemsRow, {
             node: itemsNode, projectId: pid, milestoneId: milestone.id, tabStop, onFocusRow: setFocusNode, onOpen,
           }, itemsNode))
+          // An objective has ONE milestone, so its goals sit directly beneath it.
+          for (const objective of milestone.objectives ?? []) {
+            const objectiveNode = `objective:${objective.id}@${milestone.id}@${ref}`
+            const objectiveOpen = openNodes.has(objectiveNode)
+            add(objectiveNode, (tabStop) => jsx(Row, {
+              ...base(objectiveNode), tabStop, type: 'objective', depth: 3,
+              label: objective.name,
+              detail: objectiveStateWords(objective),
+              expandable: (objective.goals ?? []).length > 0, open: objectiveOpen,
+              chips: jsx('span', { className: 'dy-rm-chips', children: chip(STATE_LABEL[objective.state] ?? words(objective.state), objective.state === 'met' ? 'passed' : objective.state === 'at_risk' ? 'failed' : '') }),
+              onToggle: () => toggle(objectiveNode),
+              onOpen: () => { openNode(objectiveNode); setSelection({ type: 'objective', id: objective.id, via: ref, projectId: pid, node: objectiveNode }) },
+            }, objectiveNode))
+            if (!objectiveOpen) continue
+            for (const goal of objective.goals ?? []) {
+              const goalNode = `goal:${goal.id}@${objective.id}@${milestone.id}@${ref}`
+              const goalOpen = openNodes.has(goalNode)
+              add(goalNode, (tabStop) => jsx(Row, {
+                ...base(goalNode), tabStop, type: 'goal', depth: 4,
+                label: goal.title,
+                detail: goalStateWords(goal),
+                expandable: (goal.tasks ?? []).length > 0, open: goalOpen,
+                chips: jsx('span', { className: 'dy-rm-chips', children: chip(STATE_LABEL[goal.state] ?? words(goal.state), goal.state === 'met' ? 'passed' : goal.state === 'at_risk' ? 'failed' : '') }),
+                onToggle: () => toggle(goalNode),
+                onOpen: () => { openNode(goalNode); setSelection({ type: 'goal', id: goal.id, projectId: pid, node: goalNode }) },
+              }, goalNode))
+              if (!goalOpen) continue
+              for (const task of goal.tasks ?? []) {
+                const taskNode = `task:${task.ref}@${goal.id}@${objective.id}@${ref}`
+                add(taskNode, (tabStop) => jsx(Row, {
+                  ...base(taskNode), tabStop, type: 'task', depth: 5,
+                  label: task.title,
+                  detail: words(task.bucket),
+                  expandable: false, open: false,
+                  chips: null,
+                  onToggle: () => {},
+                  onOpen: () => onOpen({ project: pid, entryView: 'board', workRef: task.ref }),
+                }, taskNode))
+              }
+            }
+          }
         }
       }
-      if (initiative.unmilestoned_work?.count > 0) {
+      // Work tagged with this initiative but under no goal: "Not placed yet".
+      if ((initiative.not_placed?.tasks ?? []).length) {
         const looseNode = `loose:${ref}`
         add(looseNode, (tabStop) => jsx(PlainRow, {
-          node: looseNode, depth: 2, tabStop, onFocusRow: setFocusNode, label: 'Not in a milestone',
-          detail: initiative.unmilestoned_work.items.map((item) => `${item.title} (${words(item.bucket)})`).join(', '),
+          node: looseNode, depth: 2, tabStop, onFocusRow: setFocusNode,
+          label: 'Not placed yet',
+          detail: initiative.not_placed.tasks.map((item) => `${item.title} (${words(item.bucket)})`).join(', '),
         }, looseNode))
       }
-      for (const objective of initiative.objectives ?? []) {
-        const objectiveNode = `objective:${objective.id}@${ref}`
-        const objectiveOpen = openNodes.has(objectiveNode) && Boolean(objective.goal)
-        add(objectiveNode, (tabStop) => jsx(Row, {
-          ...base(objectiveNode), tabStop, type: 'objective', depth: 2,
-          label: objective.name,
-          detail: objective.unavailable === 'archived' ? 'Unavailable (archived)' : `Outcome: ${OUTCOME_LABEL[objective.outcome?.state] ?? 'Unknown'}${objective.outcome?.evaluated_at ? '' : ' · never evaluated'}`,
-          expandable: Boolean(objective.goal), open: objectiveOpen,
-          chips: jsxs(Fragment, { children: [
-            chip(OUTCOME_LABEL[objective.outcome?.state] ?? 'Unknown', objective.outcome?.state === 'passed' ? 'passed' : objective.outcome?.state === 'failed' ? 'failed' : ''),
-            goalChip(objective.goal),
-          ] }),
-          onToggle: () => { if (objective.goal) toggle(objectiveNode) },
-          onOpen: () => { if (objective.goal) openNode(objectiveNode); setSelection({ type: 'objective', id: objective.id, via: ref, projectId: pid, node: objectiveNode }) },
-        }, objectiveNode))
-        if (objectiveOpen) {
-          const goal = objective.goal
-          const goalNode = `goal:${goal.id}@${objective.id}@${ref}`
-          add(goalNode, (tabStop) => jsx(Row, {
-            ...base(goalNode), tabStop, type: 'goal', depth: 3,
-            label: goal.unavailable === 'archived' ? `${goal.title} — unavailable (archived)` : goal.title,
-            detail: 'Goal context · contract in the drawer (read-only)',
-            expandable: false, open: false,
-            chips: goal.unavailable !== 'archived' ? chip(GOAL_LABEL[goal.state] ?? goal.state) : null,
-            onToggle: () => {},
-            onOpen: () => setSelection({ type: 'goal', id: goal.id, goal, projectId: pid, node: goalNode }),
-          }, goalNode))
-        }
+    }
+    // "Not placed yet" groups: one per level, so nothing is ever silently lost.
+    // Each unplaced item gets its own row with its own Place… action, because
+    // the action must name the item it places.
+    const notPlaced = project.not_placed ?? {}
+    const notPlacedSpec = [
+      ['milestones', 'Milestones not placed under an initiative', 'milestone'],
+      ['objectives', 'Objectives not placed under a milestone', 'objective'],
+      ['goals', 'Goals not placed under an objective', 'goal'],
+    ]
+    for (const [kind, groupLabel, placeKind] of notPlacedSpec) {
+      const rowsFor = notPlaced[kind] ?? []
+      if (!rowsFor.length) continue
+      const groupNode = `not-placed-${kind}:${pid}`
+      add(groupNode, (tabStop) => jsx(Row, {
+        ...base(groupNode), tabStop, type: placeKind, depth: 1,
+        label: groupLabel,
+        detail: `${rowsFor.length} ${rowsFor.length === 1 ? 'item' : 'items'}`,
+        // The group header is a label, not a disclosure: its item rows are
+        // always listed, so a "Not placed yet" item is never hidden behind a
+        // second click and its Place… action is always reachable.
+        expandable: false, open: false,
+        chips: null,
+        onToggle: () => {},
+        onOpen: () => setSelection({ type: 'project', id: pid, projectId: pid, node: groupNode }),
+      }, groupNode))
+      for (const row of rowsFor) {
+        const itemId = String(row.id ?? row.ref)
+        const itemNode = `not-placed-${kind}:${pid}:${itemId}`
+        add(itemNode, (tabStop) => jsx(Row, {
+          ...base(itemNode), tabStop, type: placeKind, depth: 2,
+          label: row.name ?? row.title ?? itemId,
+          detail: placeKind === 'goal' ? goalStateWords(row) : STATE_LABEL[row.state] ?? words(row.state),
+          expandable: false, open: false,
+          chips: null,
+          actions: canWrite ? placeButton(placeKind, project, itemId) : null,
+          onToggle: () => {},
+          onOpen: () => setSelection(
+            placeKind === 'goal'
+              ? { type: 'goal', id: itemId, projectId: pid, node: itemNode }
+              : { type: 'project', id: pid, projectId: pid, node: itemNode }),
+        }, itemNode))
       }
     }
-    const unlinkedMilestones = project.unlinked?.milestones ?? []
-    if (unlinkedMilestones.length) {
-      const node = `unlinked-milestones:${pid}`
+    // Needs placing: what the 0.4.0 upgrade could not convert. Each row keeps
+    // its old links so a human can place it by hand.
+    if ((project.needs_placing ?? []).length) {
+      const node = `needs-placing:${pid}`
       add(node, (tabStop) => jsx(Row, {
         ...base(node), tabStop, type: 'milestone', depth: 1,
-        label: 'Milestones not linked to an initiative',
-        detail: unlinkedMilestones.map((m) => m.name).join(', '),
+        label: `Needs placing (${project.needs_placing.length})`,
+        detail: project.needs_placing.map((row) => `${row.kind} ${row.item_id} — ${row.reason}`).join(', '),
         expandable: false, open: false,
-        actions: canWrite ? linkButton('milestone', project) : null,
-        onToggle: () => {}, onOpen: () => {},
-      }, node))
-    }
-    const unlinkedObjectives = project.unlinked?.objectives ?? []
-    if (unlinkedObjectives.length) {
-      const node = `unlinked-objectives:${pid}`
-      add(node, (tabStop) => jsx(Row, {
-        ...base(node), tabStop, type: 'objective', depth: 1,
-        label: 'Objectives not linked to an initiative',
-        detail: unlinkedObjectives.map((o) => o.name).join(', '),
-        expandable: false, open: false,
-        actions: canWrite ? linkButton('objective', project) : null,
+        actions: canWrite ? jsx(Button, {
+          small: true, action: 'roadmap-open-unplaced',
+          ariaLabel: 'Open the needs-placing list for this project',
+          onClick: (event) => { event.stopPropagation(); onOpen({ project: pid, entryView: 'roadmap-unplaced' }) },
+          children: 'Review',
+        }) : null,
         onToggle: () => {}, onOpen: () => {},
       }, node))
     }
@@ -714,10 +787,10 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
       jsx('button', { type: 'button', className: 'dy-rm-control dy-rm-reset', onClick: () => { setSearch(''); setAttentionOnly(false); setOpenNodes(new Set()) }, children: 'Reset' }),
     ]}),
     content,
-    linkDialog ? jsx(LinkDialog, {
-      ...linkDialog,
-      onClose: () => setLinkDialog(null),
-      onDone: () => { setLinkDialog(null); void load() },
+    placeDialog ? jsx(PlaceDialog, {
+      ...placeDialog,
+      onClose: () => setPlaceDialog(null),
+      onDone: () => { setPlaceDialog(null); void load() },
     }) : null,
   ]})
 }

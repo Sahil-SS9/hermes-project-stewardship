@@ -127,6 +127,15 @@ export function objectivesOfInitiative(roadmapProject, initiativeRef) {
   return initiative ? { initiative, objectives: initiative.objectives ?? [] } : { initiative: null, objectives: [] }
 }
 
+// v42: a task has ONE goal, read straight off the ladder. The card shows the
+// goal it works towards; a task under no goal shows nothing rather than a guess.
+export function goalOfTask(roadmapProject, itemRef) {
+  for (const goal of roadmapProject?.goals ?? []) {
+    if ((goal.tasks ?? []).some((task) => task.ref === itemRef)) return goal
+  }
+  return null
+}
+
 // Everything one card can show, from real data only.
 // `data` = { deps, initiatives, milestones, roadmapProject }; each may be missing.
 export function cardFacts(item, data = {}, today = null) {
@@ -146,11 +155,14 @@ export function cardFacts(item, data = {}, today = null) {
     ? objectivesOfInitiative(data.roadmapProject, item.initiative_ref).objectives.map((objective) => ({ id: objective.id, name: objective.name, relationship: objective.relationship ?? null }))
     : []
   const due = item.due ? String(item.due).slice(0, 10) : null
-  return {
-    blockedBy, blocks,
+  // v42: the goal this task works towards, straight off the ladder. A task with
+  // no goal is honestly "not placed yet", never shown as if it had one.
+  const goal = goalOfTask(data.roadmapProject, item.ref)
+  return { blockedBy, blocks,
     openBlockers: blockedBy.filter((card) => !card.done).length,
     openBlocks: blocks.filter((card) => !card.done).length,
     initiative, milestones, objectives,
+    goal: goal ? { id: goal.id, title: goal.title, state: goal.state } : null,
     due, overdue: isOverdue(item, today),
     labels: item.labels ?? [],
   }

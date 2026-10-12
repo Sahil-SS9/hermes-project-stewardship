@@ -62,7 +62,14 @@ function CardBody({ id, item, facts, moves, moving, today, onMove, onOpenItem, o
   // ("plan:<kind>:<id>", the same entry the Roadmap's Open uses).
   if (facts.initiative) planning.push(row('Initiative', goto('Initiative', () => onNavigate(`plan:initiative:${facts.initiative.ref}`), facts.initiative.title || facts.initiative.ref)))
   facts.milestones.forEach((milestone, index) => planning.push(row('Milestone', goto('Milestone', () => onNavigate(`plan:milestone:${milestone.id}`), milestone.due ? `${milestone.name} · due ${shortDate(milestone.due, today)}` : milestone.name), {}, `milestone:${index}`)))
-  facts.objectives.forEach((objective, index) => planning.push(row('Objective', jsxs('span', { children: [goto('Objective', () => onNavigate(`plan:objective:${objective.id}`), objective.name), jsx('span', { className: 'dy-kb-via', children: ' (through the initiative)' })] }), {}, `objective:${index}`)))
+  // v42: the goal this task works towards. A task with no goal says so.
+  if (facts.goal) {
+    planning.push(row('Goal', jsxs('span', { children: [
+      goto('Goal', () => onNavigate(`plan:goal:${facts.goal.id}`), facts.goal.title),
+    ] })))
+  } else {
+    planning.push(row('Goal', jsx('span', { className: 'dy-kb-via', children: 'Not placed yet' })))
+  }
 
   const details = [row('Assignee', item.assignee ? displayName(item.assignee) : 'Unassigned')]
   if (facts.due) details.push(row('Due', facts.overdue ? `${shortDate(facts.due, today)} · Overdue` : shortDate(facts.due, today), facts.overdue ? { 'data-overdue': 'true' } : {}))
@@ -576,7 +583,7 @@ export function KanbanScreen({ project, view, onRefresh, setWorkNotice, onOpenIt
     { key: 'blocks', heading: 'Blocks', cell: (item) => refsCell(facts(item).blocks) },
     { key: 'initiative', heading: 'Initiative', cell: (item) => facts(item).initiative ? (facts(item).initiative.title || facts(item).initiative.ref) : '' },
     { key: 'milestone', heading: 'Milestone', cell: (item) => facts(item).milestones.map((milestone) => milestone.name).join(', ') },
-    { key: 'objective', heading: 'Objective', cell: (item) => facts(item).objectives.map((objective) => objective.name).join(', ') },
+    { key: 'goal', heading: 'Goal', cell: (item) => facts(item).goal ? facts(item).goal.title : '' },
     { key: 'due', heading: 'Due', cell: (item) => facts(item).due ? `${shortDate(facts(item).due, today)}${facts(item).overdue ? ' · Overdue' : ''}` : '' },
     { key: 'move', heading: 'Move', cell: moveCell },
   ]

@@ -71,6 +71,11 @@ def seed_kanban_fixtures(service, adapter, roadmap, *, owner: str) -> None:
         pid, objective_id, beta_milestone, actor="fixture", interface="fixture")
     ladder.set_milestone_initiative(
         pid, beta_milestone, ref, actor="fixture", interface="fixture")
+    # The goal the board's tasks work towards, so the card can name it.
+    goal = service.create_goal(
+        pid, title="Setup under two minutes", objective_ids=[objective_id],
+        actor="fixture", interface="fixture")
+    ladder.set_task_goal(pid, screens, goal["goal_id"], actor="fixture", interface="fixture")
 
     dy.milestone_attach(pid, "Beta launch", screens, actor=human)
     dy.milestone_attach(pid, "Beta launch", analytics, actor=human)
