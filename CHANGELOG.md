@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Objective descriptions from the CLI.** `stewardctl objective add
+  --description` sets an objective's description, and the new `stewardctl
+  objective update --name <objective>` changes its description, target,
+  severity or command. The API and Desktop already could.
+  (by @appletechie)
+
 ## [0.5.0] - 2026-10-12
 
 The delivery model becomes a strict ladder: **Task -> Goal -> Objective ->
