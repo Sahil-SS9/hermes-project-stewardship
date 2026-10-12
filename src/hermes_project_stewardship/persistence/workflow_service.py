@@ -1348,7 +1348,9 @@ class WorkflowService:
         except ValueError as error:
             raise ValueError(f"proposal produces an invalid graph: {error}") from None
         revision_key = f"rev-{int(revisions['n']) + 1}"
-        policy_reason = self._within_policy(proposal)
+        policy_reason = (self._within_policy(proposal)
+                         or self._revision_membership(project_id, name, proposal,
+                                                      known_profiles, project_members))
         stamp = iso(self.store._clock())
         with self.store.tx() as cx:
             cx.execute(
@@ -1376,6 +1378,48 @@ class WorkflowService:
                 "reason": "within policy", "awaiting_approval": False,
                 **applied}
 
+    def _revision_assignee(self, project_id: str, name: str,
+                           node: Mapping[str, Any]) -> str | None:
+        """Who an added step is assigned to: its phase_team, else the binding's
+        single default override when unambiguous (conditional steps get none)."""
+        assignee = node.get("phase_team")
+        if assignee is None and not node.get("when"):
+            overrides = set(self.get_binding(project_id, name)["overrides"].values())
+            if len(overrides) == 1:
+                assignee = next(iter(overrides))
+        return assignee
+
+    def _revision_membership(self, project_id: str, name: str,
+                             proposal: Mapping[str, Any],
+                             known_profiles: Sequence[str] | None,
+                             project_members: Sequence[str] | None) -> str | None:
+        """Membership check for an agent revision, before anything is written.
+
+        Catalog review (PR #136752): the same rule as a run's start. A profile
+        the host does not know is refused outright; a known profile that is not
+        a project or bound-team member holds the revision for a person to
+        approve instead of auto-applying it.
+        """
+        allowed = set(project_members or [])
+        group_id = self.get_binding(project_id, name).get("group_id")
+        if group_id is not None:
+            allowed |= self._group_profiles(group_id)
+        outsiders: list[str] = []
+        for raw in proposal.get("add_nodes") or []:
+            node = self._clean_node(raw)
+            assignee = self._revision_assignee(project_id, name, node)
+            if not assignee:
+                continue
+            if known_profiles is not None and assignee not in set(known_profiles):
+                raise ValueError(
+                    f"proposal step {node['id']} names undiscovered profile {assignee!r}")
+            if assignee not in allowed:
+                outsiders.append(f"{node['id']}:{assignee}")
+        if outsiders:
+            return ("assigns work to someone who is not a project or team member: "
+                    + ", ".join(outsiders))
+        return None
+
     def _apply_revision(self, project_id: str, name: str, run, revision_key: str,
                         proposal: Mapping[str, Any], *, actor: str) -> dict[str, Any]:
         run_key = run["run_key"]
@@ -1386,12 +1430,7 @@ class WorkflowService:
         added: dict[str, str] = {}
         for raw in proposal.get("add_nodes") or []:
             node = self._clean_node(raw)
-            assignee = node.get("phase_team")
-            if assignee is None and not node.get("when"):
-                # reuse the binding's single default override when unambiguous
-                overrides = set(self.get_binding(project_id, name)["overrides"].values())
-                if len(overrides) == 1:
-                    assignee = next(iter(overrides))
+            assignee = self._revision_assignee(project_id, name, node)
             node["assignee"] = assignee
             node["team"] = None
             snapshot["nodes"].append(node)

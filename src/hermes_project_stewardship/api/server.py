@@ -3095,7 +3095,9 @@ def create_app(
                 project_id, name, run_key,
                 {"rationale": body.rationale, "add_nodes": body.add_nodes,
                  "add_edges": body.add_edges},
-                proposed_by=body.proposed_by,
+                # The trusted principal when one is bound; the body field is
+                # attribution only (catalog review, PR #136752).
+                proposed_by=_principal_id(body.proposed_by),
                 known_profiles=known, project_members=members)
         except ValueError as exc:
             raise HTTPException(404 if "not found" in str(exc) else 422, str(exc)) from None

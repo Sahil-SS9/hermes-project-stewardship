@@ -502,6 +502,71 @@ def test_agent_revisions_policy_approval_and_stale(store, enabled):
     assert r.json()["status"] == "pending"  # missing rationale needs a human
 
 
+def test_revision_assignees_are_checked_before_auto_apply(store, enabled):
+    # Catalog review (PR #136752): an agent revision is auto-applied only when
+    # every added step's assignee is a project or bound-team member; an
+    # undiscovered profile is refused outright.
+    adapter, client, _dy, _workflows = _env(store)
+    r = client.post(f"{BASE}/projects/{enabled}/workflows", json={
+        "name": "release", "nodes": [{"id": "build", "title": "Build"}]})
+    assert r.status_code == 200
+    assert client.post(f"{BASE}/projects/{enabled}/workflows/release/start",
+                       json={"run_key": "run-1"}).status_code == 200
+    proposals = f"{BASE}/projects/{enabled}/workflows/release/runs/run-1/proposals"
+
+    # "default" is a discovered profile but not a project or team member.
+    r = client.post(proposals, json={
+        "proposed_by": "agent-7", "rationale": "needs a soak",
+        "add_nodes": [{"id": "soak", "title": "Soak test", "phase_team": "default",
+                       "depends_on": ["build"]}]})
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "pending"
+    assert "not a project or team member" in r.json()["reason"]
+    assert "Soak test" not in _tasks_of(adapter, enabled)
+
+    # An undiscovered profile is refused before anything is recorded.
+    before = client.get(f"{proposals[:-len('proposals')]}revisions").json()["revisions"]
+    r = client.post(proposals, json={
+        "proposed_by": "agent-7", "rationale": "ghost work",
+        "add_nodes": [{"id": "ghost", "title": "Ghost", "phase_team": "nobody-here"}]})
+    assert r.status_code == 422
+    assert "undiscovered profile" in r.text
+    after = client.get(f"{proposals[:-len('proposals')]}revisions").json()["revisions"]
+    assert len(after) == len(before)
+
+    # With "default" in the bound team the same kind of step auto-applies.
+    group_id = _team_group(store)
+    assert client.put(f"{BASE}/projects/{enabled}/workflows/release/binding",
+                      json={"group_id": group_id, "overrides": {}}).status_code == 200
+    r = client.post(proposals, json={
+        "proposed_by": "agent-7", "rationale": "needs a lint",
+        "add_nodes": [{"id": "lint", "title": "Lint", "phase_team": "default",
+                       "depends_on": ["build"]}]})
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "auto_applied"
+    assert _tasks_of(adapter, enabled)["Lint"]["assignee"] == "default"
+
+
+def test_revision_proposer_is_the_trusted_principal_never_the_body(store, enabled):
+    adapter = ReferenceKanbanAdapter(store)
+    app = create_app(store, kanban_adapter=adapter, auth_token="test-token",
+                     auth_principal="test-user", auth_principal_is_human=True)
+    with TestClient(app, headers={"Authorization": "Bearer test-token"}) as client:
+        assert client.post(f"{BASE}/projects/{enabled}/workflows", json={
+            "name": "release", "nodes": [{"id": "build", "title": "Build"}]}).status_code == 200
+        assert client.post(f"{BASE}/projects/{enabled}/workflows/release/start",
+                           json={"run_key": "run-1"}).status_code == 200
+        r = client.post(
+            f"{BASE}/projects/{enabled}/workflows/release/runs/run-1/proposals",
+            json={"proposed_by": "mallory", "rationale": "",
+                  "add_nodes": [{"id": "doc", "title": "Doc"}]})
+        assert r.status_code == 200, r.text
+    row = store._conn.execute(
+        "SELECT proposed_by FROM dockyard_workflow_revisions WHERE project_id=? AND run_key='run-1'",
+        (enabled,)).fetchone()
+    assert row["proposed_by"] == "test-user"
+
+
 # ---------------------------------------------------------------- P5.8
 
 
