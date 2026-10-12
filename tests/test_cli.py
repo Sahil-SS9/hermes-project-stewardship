@@ -33,6 +33,27 @@ def test_cli_json_output_parses(db, capsys):
     assert cycle["health"]["state"] in {"healthy", "watch", "degraded", "critical", "unknown"}
 
 
+def test_cli_objective_description_add_and_update(db, capsys):
+    assert main(["--db", str(db), "project", "enable", "pd"]) == EXIT_OK
+    assert main(["--db", str(db), "objective", "add", "pd", "--name", "drift",
+                 "--description", "Uncommitted files in the checkout"]) == EXIT_OK
+    assert main(["--db", str(db), "objective", "update", "pd", "--name", "drift",
+                 "--description", "Uncommitted files; commit or revert them",
+                 "--target", "<=0", "--severity", "high"]) == EXIT_OK
+    capsys.readouterr()
+    main(["--db", str(db), "objective", "list", "pd", "--json"])
+    [objective] = json.loads(capsys.readouterr().out)
+    assert objective["description"] == "Uncommitted files; commit or revert them"
+    assert (objective["target"], objective["severity"]) == ("<=0", "high")
+
+
+def test_cli_objective_update_unknown_name_is_an_error(db, capsys):
+    assert main(["--db", str(db), "project", "enable", "pd"]) == EXIT_OK
+    assert main(["--db", str(db), "objective", "update", "pd", "--name", "ghost",
+                 "--description", "x"]) == EXIT_ERROR
+    assert "ghost" in capsys.readouterr().err
+
+
 def test_cli_unknown_project_exit_code(db):
     rc = main(["--db", str(db), "health", "ghost"])
     assert rc == EXIT_ERROR

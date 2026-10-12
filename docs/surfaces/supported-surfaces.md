@@ -103,7 +103,7 @@ Essential list/recovery operations only; authoring stays on Desktop:
   erasure).
 
 Plus the pre-existing operational commands (`project enable/disable/pause/
-resume/freeze/status`, `objective add/list`, `health`, `initiative …`,
+resume/freeze/status`, `objective add/update/list`, `health`, `initiative …`,
 `run`, `audit`, `export`, `restore`).
 
 ## TUI and messaging — discovery/approval/deep links only

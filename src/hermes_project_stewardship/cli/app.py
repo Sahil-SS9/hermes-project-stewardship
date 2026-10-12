@@ -134,6 +134,14 @@ def build_parser() -> argparse.ArgumentParser:
     oa.add_argument("--target", default=">=1")
     oa.add_argument("--severity", default="medium", choices=["info", "low", "medium", "high"])
     oa.add_argument("--command", nargs="+", help="argv for command evaluator")
+    oa.add_argument("--description", default="", help="what the objective means and how to fix it")
+    ou = osub.add_parser("update", help="change an existing objective")
+    ou.add_argument("project_id")
+    ou.add_argument("--name", required=True, help="the objective to change")
+    ou.add_argument("--description", default=None)
+    ou.add_argument("--target", default=None)
+    ou.add_argument("--severity", default=None, choices=["info", "low", "medium", "high"])
+    ou.add_argument("--command", nargs="+", default=None, help="argv for command evaluator")
     ol = osub.add_parser("list")
     ol.add_argument("project_id")
     ol.add_argument("--json", action="store_true")
@@ -527,8 +535,26 @@ def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) 
                 target=args.target,
                 severity=args.severity,
                 command=args.command,
+                description=args.description,
             )
             print(f"objective '{args.name}' saved")
+            return EXIT_OK
+        if args.action == "update":
+            match = [o for o in svc.objectives(args.project_id, include_disabled=True) if o.name == args.name]
+            if not match:
+                print(friendly_error(f"no objective named '{args.name}' in {args.project_id}"), file=sys.stderr)
+                return EXIT_ERROR
+            svc.update_objective(
+                args.project_id,
+                match[0].id,
+                description=args.description,
+                target=args.target,
+                severity=args.severity,
+                command=args.command,
+                actor="cli-user",
+                interface="cli",
+            )
+            print(f"objective '{args.name}' updated")
             return EXIT_OK
         if args.action == "list":
             objs = svc.objectives(args.project_id, include_disabled=True)
