@@ -17,10 +17,13 @@ mkdirSync(SHOTS, { recursive: true })
 const SIZES = [[1440, 900], [1024, 768], [390, 780]]
 
 async function setTheme(page, theme) {
+  // The shell themes via data-theme on .dockyard-root (see roadmap-screen's
+  // dark-theme test); localStorage keys do not drive it.
   await page.evaluate((t) => {
-    try { localStorage.setItem('dockyard-appearance', t) } catch {}
-    try { localStorage.setItem('dockyard-theme', t) } catch {}
+    const root = document.querySelector('.dockyard-root')
+    if (root) root.setAttribute('data-theme', t)
   }, theme)
+  await page.waitForTimeout(300)
 }
 
 test('Batch L: capture ladder + board screenshots for signoff', { timeout: 180000 }, async () => {
@@ -32,8 +35,6 @@ test('Batch L: capture ladder + board screenshots for signoff', { timeout: 18000
         const errors = []
         page.on('pageerror', (error) => errors.push(String(error)))
         await page.goto(BASE)
-        await setTheme(page, theme)
-        await page.reload()
         await page.waitForTimeout(1500)
 
         // Roadmap: open a project so the ladder tree and its state chips show.
@@ -42,11 +43,13 @@ test('Batch L: capture ladder + board screenshots for signoff', { timeout: 18000
         await page.locator('[data-rm-node^="project:"]').first().click()
         await page.locator('[data-rm-node^="initiative:"]').first().click()
         await page.waitForTimeout(1200)
+        await setTheme(page, theme)
         await page.screenshot({ path: `${SHOTS}/roadmap-${theme}-${width}.png` })
 
         // Board: a card's planning row names the goal it works towards.
         await page.getByRole('tab', { name: /Board|Work/i }).first().click()
         await page.waitForTimeout(1500)
+        await setTheme(page, theme)
         await page.screenshot({ path: `${SHOTS}/board-${theme}-${width}.png` })
 
         assert.deepEqual(errors, [], `no page errors (${theme} ${width})`)
