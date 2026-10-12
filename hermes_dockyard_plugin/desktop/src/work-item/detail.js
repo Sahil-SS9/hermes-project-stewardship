@@ -58,13 +58,17 @@ export function WorkItemDetail({ item, projectId, profiles, initiatives = [], on
     return record
   }
   // isDirty + undoChanges live here, after baseline/draft state exist.
+  // A goal change is a ladder placement, not a field patch, so it is tracked
+  // separately (goalDraft) — but it must still enable Save.
+  const goalChanged = goalDraft !== null && goalDraft !== (currentGoal ?? '')
   const isDirty = Boolean(draft && baseline && (
+    goalChanged ||
     draft.title !== baseline.title || draft.type !== baseline.type ||
     draft.body !== (baseline.body ?? '') || draft.labels !== baseline.labels ||
     draft.estimate_days !== baseline.estimate_days || draft.due !== baseline.due ||
     draft.parent_ref !== baseline.parent_ref || draft.initiative_ref !== baseline.initiative_ref || draft.evidence_refs !== baseline.evidence_refs ||
     (draft.assignee ?? '') !== (baseline.assignee ?? '') || draft.status !== baseline.status))
-  const undoChanges = () => { if (baseline) { setDraft({ ...baseline }); setParentReason(''); setConfirmDiscard(false); setError(null) } }
+  const undoChanges = () => { if (baseline) { setDraft({ ...baseline }); setGoalDraft(null); setParentReason(''); setConfirmDiscard(false); setError(null) } }
   useEffect(() => {
     if (!item) {
       setDraft(null)

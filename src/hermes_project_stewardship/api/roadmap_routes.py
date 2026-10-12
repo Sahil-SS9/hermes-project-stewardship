@@ -54,8 +54,11 @@ class ParentRequest(_Strict):
 
 
 class GoalCheckRequest(_Strict):
-    evaluator_type: str
-    target: str
+    # A person clearing the check sends {"clear": true}; otherwise the check
+    # fields are required to set one.
+    clear: Optional[bool] = None
+    evaluator_type: Optional[str] = None
+    target: Optional[str] = None
     command: Optional[Any] = None
     integration: Optional[str] = None
     window: Optional[str] = None
@@ -212,8 +215,18 @@ def install(router: APIRouter, roadmap: RoadmapService, ladder: LadderService, *
     @router.put("/projects/{project_id}/goals/{goal_id}/check")
     def set_goal_check(project_id: str, goal_id: str, body: GoalCheckRequest):
         principal = authority(WRITE_CAPABILITY)
+        if body.clear:
+            # A person clearing the check: remove it entirely (goal then has no
+            # check, and its state is derived from tasks alone).
+            return _run(lambda: ladder.set_goal_check(
+                project_id, goal_id, None, actor=principal, interface="rpc"))
+        fields = body.model_dump(exclude_unset=True, exclude={"clear"})
+        if not fields.get("evaluator_type") or not fields.get("target"):
+            raise HTTPException(
+                422, "evaluator_type and target are required to set a check;"
+                     " send {\"clear\": true} to remove it")
         return _run(lambda: ladder.set_goal_check(
-            project_id, goal_id, body.model_dump(exclude_unset=True),
+            project_id, goal_id, fields,
             actor=principal, interface="rpc"))
 
     @router.post("/projects/{project_id}/goals/{goal_id}/assessment")

@@ -409,3 +409,42 @@ test('Roadmap journey (c): a Needs-placing item is placed by hand and gone', { t
     await browser.close()
   }
 })
+
+// Batch L R2 fix 2: the goal-check editor, driven through the real control.
+test('Roadmap: a person sets a goal check through the rendered control, and clears it', { timeout: 180000 }, async () => {
+  const browser = await chromium.launch({ headless: true })
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  try {
+    const openGoal = async () => {
+      await openRoadmap(page)
+      await projectRow(page, 'payments-relaunch').click()
+      await page.locator('[data-rm-node^="initiative:"]').filter({ hasText: 'Confirm me when ready' }).first().click()
+      await page.locator('[data-rm-node^="milestone:"]').first().waitFor()
+      await page.locator('[data-rm-node^="milestone:"]').first().click()
+      await page.locator('[data-rm-node^="objective:"]').first().click()
+      await page.locator('[data-rm-node^="goal:"]').first().click()
+      await page.locator('[data-rm-goal-check]').waitFor()
+    }
+    await openGoal()
+    const editor = page.locator('[data-rm-goal-check]')
+    assert.match(await editor.locator('[data-rm-check-state]').innerText(), /none/)
+    await editor.getByRole('button', { name: 'Set check' }).click()
+    await editor.locator('[data-rm-check-target]').fill('>=1')
+    await editor.getByRole('button', { name: 'Save check' }).click()
+    // The rendered state reflects the new check straight away...
+    await page.waitForFunction(() => />=1/.test(document.querySelector('[data-rm-check-state]')?.textContent ?? ''))
+    // ...and after a reload it is still there, with the goal's state derived
+    // from it (an unassessed manual check is honestly unknown, never met).
+    await openGoal()
+    assert.match(await editor.locator('[data-rm-check-state]').innerText(), />=1/)
+    assert.match(await editor.locator('[data-rm-check-state]').innerText(), /unknown/i)
+    // Clearing it through the same control removes the check (state restored).
+    await editor.getByRole('button', { name: 'Edit check' }).click()
+    await editor.getByRole('button', { name: 'Clear check' }).click()
+    await page.waitForFunction(() => /none/.test(document.querySelector('[data-rm-check-state]')?.textContent ?? ''))
+    await openGoal()
+    assert.match(await editor.locator('[data-rm-check-state]').innerText(), /none/)
+  } finally {
+    await browser.close()
+  }
+})

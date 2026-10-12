@@ -7771,10 +7771,12 @@ function WorkItemDetail({ item, projectId, profiles, initiatives = [], onClose, 
     setBaseline(record);
     return record;
   };
-  const isDirty = Boolean(draft && baseline && (draft.title !== baseline.title || draft.type !== baseline.type || draft.body !== (baseline.body ?? "") || draft.labels !== baseline.labels || draft.estimate_days !== baseline.estimate_days || draft.due !== baseline.due || draft.parent_ref !== baseline.parent_ref || draft.initiative_ref !== baseline.initiative_ref || draft.evidence_refs !== baseline.evidence_refs || (draft.assignee ?? "") !== (baseline.assignee ?? "") || draft.status !== baseline.status));
+  const goalChanged = goalDraft !== null && goalDraft !== (currentGoal ?? "");
+  const isDirty = Boolean(draft && baseline && (goalChanged || draft.title !== baseline.title || draft.type !== baseline.type || draft.body !== (baseline.body ?? "") || draft.labels !== baseline.labels || draft.estimate_days !== baseline.estimate_days || draft.due !== baseline.due || draft.parent_ref !== baseline.parent_ref || draft.initiative_ref !== baseline.initiative_ref || draft.evidence_refs !== baseline.evidence_refs || (draft.assignee ?? "") !== (baseline.assignee ?? "") || draft.status !== baseline.status));
   const undoChanges = () => {
     if (baseline) {
       setDraft({ ...baseline });
+      setGoalDraft(null);
       setParentReason("");
       setConfirmDiscard(false);
       setError(null);
@@ -21236,6 +21238,14 @@ function buildPlan({ projectId, roadmap, initiatives, objectives, goals, milesto
   };
   const milestoneLinks = linksTo("milestones");
   const objectiveLinks = linksTo("objectives");
+  const milestoneOfObjective = new Map((project?.objectives ?? []).map((row) => [row.id, row.milestone_id ?? null]));
+  const initiativeOfMilestone = new Map((project?.milestones ?? []).map((row) => [row.id, row.initiative_ref ?? null]));
+  const objectivesOfInitiative2 = new Map((project?.initiatives ?? []).map((row) => [
+    row.ref,
+    (row.milestones ?? []).flatMap(
+      (milestone) => (milestone.objectives ?? []).map((o) => ({ id: o.id, title: o.name }))
+    )
+  ]));
   const goalRows = (goals?.goals ?? []).map((goal) => ({
     kind: "goal",
     id: goal.goal_id,
@@ -21244,6 +21254,7 @@ function buildPlan({ projectId, roadmap, initiatives, objectives, goals, milesto
     position: goal.position ?? 0,
     archived: Boolean(goal.archived_at),
     objectiveIds: (goal.objective_ids ?? []).map(Number),
+    objectiveId: goalRead.get(goal.goal_id)?.objective_id ?? (goal.objective_ids ?? [])[0] ?? null,
     state: goalRead.get(goal.goal_id)?.state ?? "unknown",
     objectivesPassed: goalRead.get(goal.goal_id)?.objectives_passed ?? null
   })).sort((a, b) => a.position - b.position);
@@ -21271,6 +21282,7 @@ function buildPlan({ projectId, roadmap, initiatives, objectives, goals, milesto
       // The backend record, for the evidence history and the human assessment
       // form (the same panel the old Objectives tab showed).
       record: row,
+      milestoneId: milestoneOfObjective.get(row.id) ?? null,
       initiatives: objectiveLinks.get(row.id) ?? [],
       goals: goalRows.filter((goal) => goal.objectiveIds.includes(row.id)).map((goal) => ({ id: goal.id, title: goal.title }))
     })),
@@ -21285,6 +21297,7 @@ function buildPlan({ projectId, roadmap, initiatives, objectives, goals, milesto
       done: row.done ?? 0,
       total: row.total ?? 0,
       itemRefs: row.item_refs ?? [],
+      initiativeRef: initiativeOfMilestone.get(row.id) ?? null,
       initiatives: milestoneLinks.get(row.id) ?? []
     })),
     initiatives: (initiatives?.initiatives ?? []).map((row) => {
@@ -21301,8 +21314,8 @@ function buildPlan({ projectId, roadmap, initiatives, objectives, goals, milesto
         // The backend record, handed unchanged to the approval panel: the
         // Inbox gives it the same record, so a review shows the same facts.
         record: row,
-        milestones: (link?.milestones ?? []).map((m) => ({ id: m.id, title: m.name, relationship: m.relationship })),
-        objectives: (link?.objectives ?? []).map((o) => ({ id: o.id, title: o.name, relationship: o.relationship })),
+        milestones: (link?.milestones ?? []).map((m) => ({ id: m.id, title: m.name, state: m.state })),
+        objectives: objectivesOfInitiative2.get(row.ref) ?? [],
         delivery: link?.delivery ?? null
       };
     }),
@@ -21372,11 +21385,15 @@ function planActions(projectId) {
     // of one parent on the child; a null parent unplaces it.
     linkMilestone: (ref, milestoneId) => api(`/projects/${p}/milestones/${Number(milestoneId)}/initiative`, { method: "PUT", quiet, body: { parent_id: ref } }),
     unlinkMilestone: (ref, milestoneId) => api(`/projects/${p}/milestones/${Number(milestoneId)}/initiative`, { method: "PUT", quiet, body: { parent_id: null } }),
+    // v42 unplacing helpers (names say what they do): a null parent unplaces.
+    unplaceMilestone: (milestoneId) => api(`/projects/${p}/milestones/${Number(milestoneId)}/initiative`, { method: "PUT", quiet, body: { parent_id: null } }),
+    unplaceObjective: (objectiveId) => api(`/projects/${p}/objectives/${Number(objectiveId)}/milestone`, { method: "PUT", quiet, body: { parent_id: null } }),
     linkObjective: (ref, objectiveId) => api(`/projects/${p}/objectives/${Number(objectiveId)}/milestone`, { method: "PUT", quiet, body: { parent_id: Number(ref) } }),
     unlinkObjective: (ref, objectiveId) => api(`/projects/${p}/objectives/${Number(objectiveId)}/milestone`, { method: "PUT", quiet, body: { parent_id: null } }),
     // A goal has one objective parent (v42): place it, or unplace it.
     linkGoal: (goalId, objectiveId) => api(`/projects/${p}/goals/${enc(goalId)}/objective`, { method: "PUT", quiet, body: { parent_id: Number(objectiveId) } }),
     unlinkGoal: (goalId) => api(`/projects/${p}/goals/${enc(goalId)}/objective`, { method: "PUT", quiet, body: { parent_id: null } }),
+    unplaceGoal: (goalId) => api(`/projects/${p}/goals/${enc(goalId)}/objective`, { method: "PUT", quiet, body: { parent_id: null } }),
     saveMission: (text2) => api(`/projects/${p}/settings`, { method: "PATCH", quiet, body: { mission: text2.trim() } }),
     archiveMission: () => api(`/projects/${p}/mission/archive`, { method: "POST", quiet, body: {} }),
     removeMission: () => api(`/projects/${p}/mission`, { method: "DELETE", quiet, body: {} }),
@@ -21507,8 +21524,7 @@ async function save(kind, mode, form, item, actions, linkTo) {
   if (kind === "milestone") {
     if (mode === "create") {
       const created = await actions.createMilestone(form);
-      if (linkTo) await actions.linkMilestone(linkTo.ref, created?.id, linkTo.relationship);
-      return `Created milestone \u201C${name}\u201D${linkTo ? " and linked it" : ""}.`;
+      return `Created milestone \u201C${name}\u201D. Place it under an initiative from its drawer.`;
     }
     if (name !== item.name) await actions.renameMilestone(item.name, name);
     if ((form.due || null) !== (item.due || null) || form.closed !== item.closed) await actions.updateMilestone(name, { due: form.due || null, closed: form.closed });
@@ -21520,8 +21536,7 @@ async function save(kind, mode, form, item, actions, linkTo) {
       return `Saved objective \u201C${name}\u201D.`;
     }
     const created = await actions.createObjective(form);
-    if (linkTo) await actions.linkObjective(linkTo.ref, created?.id, linkTo.relationship);
-    return `Created objective \u201C${name}\u201D${linkTo ? " and linked it" : ""}.`;
+    return `Created objective \u201C${name}\u201D. Place it under a milestone from its drawer.`;
   }
   if (mode === "create") {
     await actions.createGoal(form);
@@ -21617,7 +21632,7 @@ function ItemForm({ kind, mode = "create", item, plan, actions, linkTo, onClose,
   const note = kind !== "initiative" ? null : mode === "create" ? "A new initiative waits for approval before work starts. Reviewers see why it matters and its risk." : "Changes were requested. Update the proposal and resubmit it for approval. The title stays as proposed.";
   return jsx(PlanDialog, {
     dialogKey: `${mode}-${kind}`,
-    eyebrow: linkTo ? `Will be linked to ${linkTo.title}` : plan.label,
+    eyebrow: plan.label,
     title,
     busy,
     onClose,
@@ -21957,18 +21972,6 @@ function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
       setBusy(false);
     }
   };
-  const initiativeRows = (links, other) => links.map((link) => jsx(LinkRow, {
-    kind: "initiative",
-    title: link.title,
-    meta: REL_LABEL[link.relationship],
-    onOpen: open("initiative", link.ref),
-    unlinkLabel: `Unlink from ${link.title}`,
-    onUnlink: unlink(
-      `Unlink this ${other}?`,
-      `\u201C${item.title}\u201D stays in the project; it is no longer linked to \u201C${link.title}\u201D.`,
-      () => item.kind === "milestone" ? actions.unlinkMilestone(link.ref, item.id) : actions.unlinkObjective(link.ref, item.id)
-    )
-  }, link.ref));
   const status = statusOf(item);
   const tags = [jsx(StatusTag, { tone: status.tone, label: status.label }, "status")];
   let body;
@@ -22000,21 +22003,22 @@ function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
           title: m.title,
           onOpen: open("milestone", m.id),
           unlinkLabel: `Unlink ${m.title}`,
-          meta: [REL_LABEL[m.relationship], row?.due && `due ${row.due}`, row && `${row.done}/${row.total} done`, row?.closed && "closed"].filter(Boolean).join(" \xB7 "),
+          meta: [row?.due && `due ${row.due}`, row && `${row.done}/${row.total} done`, row?.closed && "closed"].filter(Boolean).join(" \xB7 "),
           onUnlink: unlink("Unlink this milestone?", `\u201C${m.title}\u201D stays in the project; it is no longer linked to \u201C${item.title}\u201D.`, () => actions.unlinkMilestone(item.ref, m.id))
         }, m.id);
       }) }) }, "milestones"),
-      jsx(Section2, { title: "Objectives", readOnly, action: linkButton("objective"), children: jsx(Links, {
-        empty: "No objectives linked yet. Work finishing does not prove the outcome; link an objective that measures it.",
+      // v42: an objective sits under a milestone (not under an initiative), so
+      // this list is read-only here — place/unplace an objective from its own
+      // drawer, or from the Roadmap.
+      jsx(Section2, { title: "Objectives (via its milestones)", children: jsx(Links, {
+        empty: "No objectives yet. An objective measures a goal and sits under a milestone.",
         rows: item.objectives.map((o) => {
           const row = plan.objectives.find((x) => x.id === o.id);
           return jsx(LinkRow, {
             kind: "objective",
             title: o.title,
             onOpen: open("objective", o.id),
-            unlinkLabel: `Unlink ${o.title}`,
-            meta: [REL_LABEL[o.relationship], row && OUTCOME_LABEL[row.outcome]].filter(Boolean).join(" \xB7 "),
-            onUnlink: unlink("Unlink this objective?", `\u201C${o.title}\u201D stays in the project; it no longer measures \u201C${item.title}\u201D.`, () => actions.unlinkObjective(item.ref, o.id))
+            meta: row && OUTCOME_LABEL[row.outcome]
           }, o.id);
         })
       }) }, "objectives"),
@@ -22036,7 +22040,25 @@ function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
   } else if (item.kind === "milestone") {
     body = [
       jsx(Facts, { rows: [["Due", item.due ?? "No due date"], ["Progress", `${number(item.done)} of ${number(item.total)} work items done`]] }, "facts"),
-      jsx(Section2, { title: "Initiatives", readOnly, action: linkButton("initiative"), children: jsx(Links, { empty: "Not linked to an initiative yet.", rows: initiativeRows(item.initiatives, "milestone") }) }, "initiatives"),
+      // v42 (R2 fix 5): a milestone's parent is an INITIATIVE (one only).
+      jsx(Section2, { title: "Initiative it is placed under", readOnly, action: linkButton("initiative"), children: jsx(Links, {
+        empty: "Not placed under an initiative yet.",
+        rows: (() => {
+          const parent = plan.initiatives.find((x) => x.ref === item.initiativeRef);
+          return parent ? [jsx(LinkRow, {
+            kind: "initiative",
+            title: parent.title,
+            onOpen: open("initiative", parent.ref),
+            unlinkLabel: `Unplace from ${parent.title}`,
+            onUnlink: unlink(
+              "Unplace this milestone?",
+              `\u201C${item.title}\u201D stays in the project; it is no longer under \u201C${parent.title}\u201D.`,
+              () => actions.unplaceMilestone(item.id),
+              "Unplace"
+            )
+          }, parent.ref)] : [];
+        })()
+      }) }, "initiative"),
       jsx(MilestoneWork, { milestone: item, plan, actions, onChanged, readOnly }, "work")
     ];
     footer = item.archived ? [
@@ -22103,7 +22125,26 @@ function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
           )
         }, goal.id)] : []
       }) }, "goal"),
-      jsx(Section2, { title: "Initiatives it measures", readOnly, action: linkButton("initiative"), children: jsx(Links, { empty: "Not linked to an initiative yet.", rows: initiativeRows(item.initiatives, "objective") }) }, "initiatives")
+      // v42 (R2 fix 5): an objective's parent is a MILESTONE (one only).
+      jsx(Section2, { title: "Milestone it is placed under", readOnly, action: linkButton("milestone"), children: jsx(Links, {
+        empty: "Not placed under a milestone yet.",
+        rows: (() => {
+          const parent = plan.milestones.find((x) => x.id === item.milestoneId);
+          return parent ? [jsx(LinkRow, {
+            kind: "milestone",
+            title: parent.title,
+            onOpen: open("milestone", parent.id),
+            unlinkLabel: `Unplace from ${parent.title}`,
+            meta: parent.due ? `due ${parent.due}` : void 0,
+            onUnlink: unlink(
+              "Unplace this objective?",
+              `\u201C${item.title}\u201D stays in the project; it is no longer under \u201C${parent.title}\u201D.`,
+              () => actions.unplaceObjective(item.id),
+              "Unplace"
+            )
+          }, parent.id)] : [];
+        })()
+      }) }, "milestone")
     ];
     footer = item.archived ? [jsx(Button, { variant: "danger", action: "plan-delete-objective", onClick: () => ui.remove(item), children: "Delete for good\u2026" }, "delete")] : [
       jsx(Button, { variant: "primary", action: "plan-edit", onClick: () => ui.edit(item), children: "Edit" }, "edit"),
@@ -22120,26 +22161,26 @@ function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
     };
     body = [
       jsx(Facts, { rows: [["Description", item.description || "\u2014"], ["Order", item.archived ? "\u2014" : `${index + 1} of ${active.length}`]] }, "facts"),
-      jsx(Section2, { title: "Objectives that measure it", readOnly, action: linkButton("objective", "+ Add"), children: jsx(Links, {
-        empty: "No objectives yet. A goal is met only when its objectives pass.",
-        rows: item.objectiveIds.map((id) => {
-          const row = plan.objectives.find((x) => x.id === id);
-          const title = row?.title ?? `Objective ${id}`;
-          return jsx(LinkRow, {
+      // v42: a goal's parent is an OBJECTIVE (one only).
+      jsx(Section2, { title: "Objective it is placed under", readOnly, action: item.objectiveId ? null : linkButton("objective", "+ Add"), children: jsx(Links, {
+        empty: "Not placed under an objective yet.",
+        rows: (() => {
+          const row = plan.objectives.find((x) => x.id === item.objectiveId);
+          return row ? [jsx(LinkRow, {
             kind: "objective",
-            title,
-            meta: row && OUTCOME_LABEL[row.outcome],
-            onOpen: open("objective", id),
-            unlinkLabel: `Remove ${title} from this goal`,
+            title: row.title,
+            meta: OUTCOME_LABEL[row.outcome],
+            onOpen: open("objective", row.id),
+            unlinkLabel: `Unplace from ${row.title}`,
             onUnlink: unlink(
-              "Remove from this goal?",
-              `\u201C${title}\u201D no longer measures \u201C${item.title}\u201D.`,
-              () => actions.updateGoal(item.id, { objective_ids: item.objectiveIds.filter((x) => x !== id) }),
-              "Remove"
+              "Unplace this goal?",
+              `\u201C${item.title}\u201D stays in the project; it is no longer under \u201C${row.title}\u201D.`,
+              () => actions.unplaceGoal(item.id),
+              "Unplace"
             )
-          }, id);
-        })
-      }) }, "objectives")
+          }, row.id)] : [];
+        })()
+      }) }, "objective")
     ];
     footer = item.archived ? [
       jsx(Button, { action: "plan-restore-goal", onClick: () => ui.restore(item), children: "Restore" }, "restore"),
@@ -25025,6 +25066,41 @@ function MilestoneItemsRow({ node, projectId, milestoneId, tabStop, onFocusRow, 
     children: jsx("div", { style: { minWidth: 0, flex: 1 }, children: jsx(MilestoneItems, { projectId, milestoneId, onOpen }) })
   });
 }
+function GoalCheckEditor({ projectId, goal, onChanged }) {
+  const check = goal.check ?? {};
+  const hasCheck = Boolean(check.state) && check.state !== "no_check";
+  const [open, setOpen] = useState(false);
+  const [evaluator, setEvaluator] = useState(check.evaluator_type ?? "manual");
+  const [target, setTarget] = useState(check.target ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const url = `/projects/${encodeURIComponent(projectId)}/goals/${encodeURIComponent(goal.id)}/check`;
+  const run = async (body, message) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(url, { method: "PUT", body });
+      emitToast("success", message);
+      setOpen(false);
+      onChanged?.();
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return jsxs("div", { className: "dy-rm-check-editor", "data-rm-goal-check": goal.id, children: [
+    jsxs("p", { children: ["Check: ", jsx("strong", { "data-rm-check-state": true, children: hasCheck ? `${check.evaluator_type ?? "check"} \xB7 ${check.target ?? ""} \xB7 ${STATE_LABEL[check.state] ?? words(check.state)}` : "none" })] }),
+    open ? jsxs("div", { className: "dy-rm-check-form", children: [
+      jsxs("label", { children: ["Type ", jsx("select", { "data-rm-check-evaluator": true, value: evaluator, onChange: (event) => setEvaluator(event.target.value), children: ["manual", "command", "integration"].map((value) => jsx("option", { value, children: value }, value)) })] }),
+      jsxs("label", { children: ["Target ", jsx("input", { "data-rm-check-target": true, value: target, placeholder: "e.g. >=1", onChange: (event) => setTarget(event.target.value) })] }),
+      jsx(Button, { small: true, variant: "primary", action: "roadmap-check-save", disabled: busy || !target.trim(), onClick: () => run({ evaluator_type: evaluator, target: target.trim() }, `Check set on \u201C${goal.title}\u201D.`), children: busy ? "Saving\u2026" : "Save check" }),
+      hasCheck ? jsx(Button, { small: true, action: "roadmap-check-clear", disabled: busy, onClick: () => run({ clear: true }, `Check cleared on \u201C${goal.title}\u201D.`), children: "Clear check" }) : null,
+      jsx(Button, { small: true, action: "roadmap-check-cancel", disabled: busy, onClick: () => setOpen(false), children: "Cancel" })
+    ] }) : jsx(Button, { small: true, action: "roadmap-check-edit", onClick: () => setOpen(true), children: hasCheck ? "Edit check" : "Set check" }),
+    error ? jsx("p", { className: "dy-rm-modal-error", role: "alert", children: error }) : null
+  ] });
+}
 function contractFacts(entry, goalTitle) {
   if (!entry || entry.loading) return [["Goal contract", "Loading\u2026"]];
   if (entry.error) return [["Goal contract", `Unavailable: ${entry.error}`]];
@@ -25043,7 +25119,7 @@ function contractFacts(entry, goalTitle) {
     ...contract.max_turns !== null && contract.max_turns !== void 0 ? [["Turn limit", number(contract.max_turns)]] : []
   ];
 }
-function drawerBody(sel, project, contract, onOpen) {
+function drawerBody(sel, project, contract, onOpen, onChanged) {
   const open = { project: project.id, entryView: sel.type === "project" ? "overview" : `plan:${sel.type}:${sel.id}` };
   const initiativeOf = (ref) => (project.initiatives ?? []).find((row) => row.ref === ref);
   if (sel.type === "project") {
@@ -25126,7 +25202,9 @@ function drawerBody(sel, project, contract, onOpen) {
         ["Check", check.state === "no_check" || !check.state ? "No check" : STATE_LABEL[check.state] ?? words(check.state)],
         ["Placed under", goal.objective_id ? `Objective ${goal.objective_id}` : "Not placed yet"],
         ...contractFacts(entry, goal.title)
-      ]
+      ],
+      // R2 fix 2: a person sets or clears the check here.
+      extra: jsx(GoalCheckEditor, { projectId: project.id, goal, onChanged })
     };
   }
   return null;
@@ -25520,7 +25598,7 @@ function RoadmapView({ initialScope = "all", onOpen, onRefresh }) {
   const nodes = rows.map((row) => row.node);
   const tabStop = nodes.includes(focusNode) ? focusNode : nodes[0];
   const selectedProject = selection ? projects.find((project) => project.id === selection.projectId) ?? null : null;
-  const body = selection && selectedProject ? drawerBody(selection, selectedProject, contract, onOpen) : null;
+  const body = selection && selectedProject ? drawerBody(selection, selectedProject, contract, onOpen, () => void load()) : null;
   const content = loading && !data ? jsx(LoadingState, {}) : error ? jsx(ErrorState, { error, onRetry: load }) : !visibleProjects.length ? jsx(EmptyState, { title: "No projects match this view", description: "Adjust the search, the attention filter, or the project in the switcher." }) : jsxs("div", { className: `dy-rm-shell${body ? "" : " full"}`, children: [
     jsxs("section", { className: "dy-rm-tree", role: "tree", "aria-label": "Project roadmap tree", onKeyDown: treeKeydown, "data-rm-tree": true, children: [
       jsxs("header", { className: "dy-rm-tree-head", children: [

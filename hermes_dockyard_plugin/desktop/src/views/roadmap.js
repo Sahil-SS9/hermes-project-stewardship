@@ -201,6 +201,47 @@ function MilestoneItemsRow({ node, projectId, milestoneId, tabStop, onFocusRow, 
   })
 }
 
+// Batch L (R2 fix 2): a person sets or clears a goal's check right here, via
+// GET/PUT /projects/{pid}/goals/{gid}/check. The goal's derived state follows.
+function GoalCheckEditor({ projectId, goal, onChanged }) {
+  const check = goal.check ?? {}
+  const hasCheck = Boolean(check.state) && check.state !== 'no_check'
+  const [open, setOpen] = useState(false)
+  const [evaluator, setEvaluator] = useState(check.evaluator_type ?? 'manual')
+  const [target, setTarget] = useState(check.target ?? '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const url = `/projects/${encodeURIComponent(projectId)}/goals/${encodeURIComponent(goal.id)}/check`
+  const run = async (body, message) => {
+    setBusy(true); setError(null)
+    try {
+      await api(url, { method: 'PUT', body })
+      emitToast('success', message)
+      setOpen(false)
+      onChanged?.()
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return jsxs('div', { className: 'dy-rm-check-editor', 'data-rm-goal-check': goal.id, children: [
+    jsxs('p', { children: ['Check: ', jsx('strong', { 'data-rm-check-state': true, children: hasCheck
+      ? `${check.evaluator_type ?? 'check'} · ${check.target ?? ''} · ${STATE_LABEL[check.state] ?? words(check.state)}`
+      : 'none' })] }),
+    open
+      ? jsxs('div', { className: 'dy-rm-check-form', children: [
+          jsxs('label', { children: ['Type ', jsx('select', { 'data-rm-check-evaluator': true, value: evaluator, onChange: (event) => setEvaluator(event.target.value), children: ['manual', 'command', 'integration'].map((value) => jsx('option', { value, children: value }, value)) })] }),
+          jsxs('label', { children: ['Target ', jsx('input', { 'data-rm-check-target': true, value: target, placeholder: 'e.g. >=1', onChange: (event) => setTarget(event.target.value) })] }),
+          jsx(Button, { small: true, variant: 'primary', action: 'roadmap-check-save', disabled: busy || !target.trim(), onClick: () => run({ evaluator_type: evaluator, target: target.trim() }, `Check set on “${goal.title}”.`), children: busy ? 'Saving…' : 'Save check' }),
+          hasCheck ? jsx(Button, { small: true, action: 'roadmap-check-clear', disabled: busy, onClick: () => run({ clear: true }, `Check cleared on “${goal.title}”.`), children: 'Clear check' }) : null,
+          jsx(Button, { small: true, action: 'roadmap-check-cancel', disabled: busy, onClick: () => setOpen(false), children: 'Cancel' }),
+        ] })
+      : jsx(Button, { small: true, action: 'roadmap-check-edit', onClick: () => setOpen(true), children: hasCheck ? 'Edit check' : 'Set check' }),
+    error ? jsx('p', { className: 'dy-rm-modal-error', role: 'alert', children: error }) : null,
+  ] })
+}
+
 // The goal contract, read-only (plan §5). An outcome that still equals the
 // goal title is labelled as copied, never presented as a separate statement.
 function contractFacts(entry, goalTitle) {
@@ -225,7 +266,7 @@ function contractFacts(entry, goalTitle) {
 }
 
 // The drawer always reads the project the selected node belongs to.
-function drawerBody(sel, project, contract, onOpen) {
+function drawerBody(sel, project, contract, onOpen, onChanged) {
   // "Open" lands on the project, or on the item itself inside its Plan screen.
   const open = { project: project.id, entryView: sel.type === 'project' ? 'overview' : `plan:${sel.type}:${sel.id}` }
   const initiativeOf = (ref) => (project.initiatives ?? []).find((row) => row.ref === ref)
@@ -302,6 +343,8 @@ function drawerBody(sel, project, contract, onOpen) {
         ['Placed under', goal.objective_id ? `Objective ${goal.objective_id}` : 'Not placed yet'],
         ...contractFacts(entry, goal.title),
       ],
+      // R2 fix 2: a person sets or clears the check here.
+      extra: jsx(GoalCheckEditor, { projectId: project.id, goal, onChanged }),
     }
   }
   return null
@@ -636,7 +679,7 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
   const tabStop = nodes.includes(focusNode) ? focusNode : nodes[0]
 
   const selectedProject = selection ? projects.find((project) => project.id === selection.projectId) ?? null : null
-  const body = selection && selectedProject ? drawerBody(selection, selectedProject, contract, onOpen) : null
+  const body = selection && selectedProject ? drawerBody(selection, selectedProject, contract, onOpen, () => void load()) : null
 
   const content = loading && !data
     ? jsx(LoadingState, {})
