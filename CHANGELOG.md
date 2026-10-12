@@ -11,7 +11,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   --description` sets an objective's description, and the new `stewardctl
   objective update --name <objective>` changes its description, target,
   severity or command. The API and Desktop already could.
-  (by @appletechie)
+- **Per-project validation steps.** `verification_policy.validation_steps`
+  (project settings) lists the cards created after Implement when an
+  initiative is bound. Unset keeps the Validate and Outcome check cards; an
+  empty list creates the Implement card only. An initiative's own
+  `validation_contract.steps` still win. Set it through
+  `PATCH /projects/{id}/settings` or
+  `stewardctl project validation-steps <project> [--step S ... | --none | --default]`.
+  No schema change.
+(by @appletechie)
 
 ## [0.5.0] - 2026-10-12
 

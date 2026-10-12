@@ -97,6 +97,10 @@ Essential list/recovery operations only; authoring stays on Desktop:
   is available; the operation journal is never touched on refusal.
 - `project archive <id>` / `project archive --list` /
   `project restore <id>` — essential archive recovery.
+- `project validation-steps <project> [--step S ... | --none | --default]` —
+  the cards created after Implement when an initiative is bound (the
+  `verification_policy.validation_steps` setting): unset means Validate and
+  Outcome check, `--none` means the Implement card only.
 - `content remove <project> <content_id> --confirm` — managed-file removal,
   requires explicit `--confirm`; performs the verified descriptor-bound
   truncation (zero-byte marker retained — this is not secure physical

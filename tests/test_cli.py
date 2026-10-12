@@ -65,3 +65,19 @@ def test_cli_objective_command_requires_argv(db):
     rc = main(["--db", str(db), "objective", "add", "po", "--name", "x",
                "--evaluator", "command", "--target", ">=1"])
     assert rc == EXIT_ERROR  # missing --command refused, not crashed
+
+
+def test_cli_project_validation_steps(db, capsys):
+    main(["--db", str(db), "project", "enable", "pv"])
+    capsys.readouterr()
+
+    def steps(*flags):
+        assert main(["--db", str(db), "project", "validation-steps", "pv", *flags]) == EXIT_OK
+        return json.loads(capsys.readouterr().out)["validation_steps"]
+
+    assert steps() is None  # the default: Validate + Outcome check
+    assert steps("--none") == []
+    assert steps("--step", "Validate: npm test", "--step", "Outcome check: deployed") == [
+        "Validate: npm test", "Outcome check: deployed"]
+    assert steps() == ["Validate: npm test", "Outcome check: deployed"]
+    assert steps("--default") is None

@@ -662,6 +662,17 @@ class StewardshipService:
             changed.append(f"{name}_policy")
 
         merge_policy("autonomy", autonomy_policy)
+        if verification_policy and "validation_steps" in verification_policy:
+            steps = verification_policy["validation_steps"]
+            # None restores the default Validate + Outcome check cards.
+            if steps is not None and (
+                not isinstance(steps, list) or len(steps) > 10 or any(
+                    not isinstance(step, str) or not step.strip() or len(step) > 120
+                    for step in steps)
+            ):
+                raise ServiceError(
+                    "validation_steps must be null or a list of at most 10 card"
+                    " titles of 1-120 characters")
         merge_policy("verification", verification_policy)
         merge_policy("release", release_policy)
         if notification_policy is not None:
