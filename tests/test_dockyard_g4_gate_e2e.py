@@ -26,7 +26,7 @@ def c(tmp_path):
         create_app(store, auth_token="test-token", auth_principal="test-user", auth_principal_is_human=True, kanban_adapter=ReferenceKanbanAdapter(store)),
         headers={"Authorization": "Bearer test-token"},
     )
-    yield client
+    yield client, store
     store.close()
 
 
@@ -36,9 +36,10 @@ CONTRACT = {"steps": ["implement", "verify", "measure"],
 
 
 def test_week_of_oversight_zero_terminal(c):
+    client, store = c
     # ---- MONDAY: onboard two projects via the wizard endpoint -------- #
     for pid in ("checkout-service", "content-engine"):
-        r = c.post(f"{V}/onboard", json={
+        r = client.post(f"{V}/onboard", json={
             "project_id": pid,
             "repo_path": f"/srv/{pid}",
             "mission": f"keep {pid} healthy",
@@ -48,26 +49,26 @@ def test_week_of_oversight_zero_terminal(c):
 
     # ---- TUESDAY: bots propose; items land on boards ----------------- #
     for pid in ("checkout-service", "content-engine"):
-        r = c.post(f"{V}/projects/{pid}/initiatives", json={
+        r = client.post(f"{V}/projects/{pid}/initiatives", json={
             "title": f"Improve {pid} pipeline",
             "rationale": "objective breach: flaky checks block releases",
             "validation_contract": CONTRACT})
         assert r.status_code == 200
 
     # ---- WEDNESDAY: open the Approval Inbox once, decide everything -- #
-    inbox = c.get(f"{V}/inbox").json()
+    inbox = client.get(f"{V}/inbox").json()
     approvals = [i for i in inbox["items"]
                  if i["kind"] == "initiative_approval"]
     assert len(approvals) >= 2
     assert all("deep_link" in i for i in inbox["items"])
     for i in approvals:
-        r = c.post(f"{V}/initiatives/{i['ref']}/approve", json={
+        r = client.post(f"{V}/initiatives/{i['ref']}/approve", json={
             "actor": "sahil", "interface": "dockyard:human"})
         assert r.status_code == 200
 
     # approved initiatives are executing with cards bound
     for i in approvals:
-        ini = c.get(
+        ini = client.get(
             f"{V}/projects/{i['project']}/initiatives").json()
         mine = [x for x in ini["initiatives"] if x["ref"] == i["ref"]][0]
         assert mine["status"] in ("executing", "approved")
@@ -75,38 +76,37 @@ def test_week_of_oversight_zero_terminal(c):
 
     # ---- THURSDAY: bots work; notifications accumulate --------------- #
     # (execution events flow through the engine; check feed shape)
-    feed = c.get(f"{V}/notifications").json()["notifications"]
+    feed = client.get(f"{V}/notifications").json()["notifications"]
     assert isinstance(feed, list)
 
     # ---- FRIDAY: measure outcomes from the board --------------------- #
-    from hermes_project_stewardship.kanban.bridge import KanbanBridge
-    from hermes_project_stewardship.kanban import ReferenceKanbanAdapter
-    from hermes_project_stewardship.persistence.service import (
-        StewardshipService,
-    )
-    # complete one initiative through its board (as the executor bot would)
-    store = None  # bridge needs store; use app-level objects via new client? 
-    # The RPC exposes /complete; use it:
+    from .r2_helpers import make_ready
+
+    # D-L3: /complete now confirms delivery through the ladder rule, so the
+    # initiative needs a reached milestone first. Build one for the initiative
+    # we are about to confirm (via the app's own services), then /complete
+    # (a person confirms) succeeds.
     for i in approvals[:1]:
-        r = c.post(f"{V}/initiatives/{i['ref']}/complete", json={
+        make_ready(client.app, i["project"], i["ref"])
+        r = client.post(f"{V}/initiatives/{i['ref']}/complete", json={
             "outcome": {"pipeline_green": True}, "regressed": False})
         assert r.status_code == 200
 
     # ---- SATURDAY: read the dashboard roll-up ------------------------ #
-    d = c.get(f"{V}/dashboard").json()
+    d = client.get(f"{V}/dashboard").json()
     ids = {p["id"] for p in d["projects"]}
     assert {"checkout-service", "content-engine"} <= ids
     assert d["totals"]["active_work"] >= 0
 
     # ---- SUNDAY: ack remaining alerts -------------------------------- #
-    feed = c.get(f"{V}/notifications").json()["notifications"]
+    feed = client.get(f"{V}/notifications").json()["notifications"]
     for n in [x for x in feed if not x["acked"]][:5]:
-        assert c.post(f"{V}/notifications/{n['id']}/ack").status_code == 200
+        assert client.post(f"{V}/notifications/{n['id']}/ack").status_code == 200
 
     # ---- PROOF: the whole week left an auditable trail, zero CLI ----- #
     # (audit rows were written server-side at each step)
     # and the inbox no longer owes the pending approvals decided above
-    inbox_after = c.get(f"{V}/inbox").json()
+    inbox_after = client.get(f"{V}/inbox").json()
     still_pending = [i for i in inbox_after["items"]
                      if i["kind"] == "initiative_approval"
                      and i["ref"] in {a["ref"] for a in approvals}]

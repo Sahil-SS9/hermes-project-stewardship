@@ -74,11 +74,13 @@ def test_full_loop_proposal_to_measured_outcome(env):
     ini_now = svc.initiative_by_ref(ref)
     assert ini_now["board_slug"] == out["board_slug"]
 
-    # 5. MEASURED OUTCOME loop-back: completion syncs twin + reputation
+    # 5. MEASURED OUTCOME loop-back: board-done syncs twin + reputation but
+    #    leaves the initiative executing (D-L3 — a person confirms delivery,
+    #    and only when every milestone is reached).
     done = integ.complete_from_board(
         ref, outcome={"flake_rate": 0.0, "matrix_green": True},
         regressed=False, actor=human)
-    assert done["engine_status"] == "completed"
+    assert done["engine_status"] == "executing"
     assert done["work_item_status"] == "done"
 
     final = dy.get("demo", twin_ref)

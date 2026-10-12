@@ -62,3 +62,34 @@ def seed_roadmap_fixtures(service, adapter, roadmap, ladder=None) -> None:
         pid, name="Unlinked objective for linking", evaluator_type="manual", target=">=1",
         actor="fixture", interface="fixture")
     dy.milestone_create(pid, "Unlinked milestone for linking", actor=HUMAN)
+
+    # A fully-reached initiative (Batch L journeys): the goal's task is done,
+    # so the milestone is reached and the initiative shows "Ready to confirm".
+    ready_ref = service.propose_initiative(
+        pid, title="Confirm me when ready", rationale="Delivered in full")["ref"]
+    try:
+        service.approve_initiative(ready_ref, actor="fixture", interface="fixture")
+        service.start_execution(ready_ref)
+    except Exception:
+        pass
+    ready_mid = dy.milestone_create(pid, "Ready milestone", due="2099-01-15", actor=HUMAN)
+    ladder.set_milestone_initiative(pid, ready_mid, ready_ref,
+                                    actor="fixture", interface="fixture")
+    ready_oid = int(service.add_objective(
+        pid, name="Ready objective", evaluator_type="manual", target=">=1",
+        actor="fixture", interface="fixture")["id"])
+    service.record_assessment(
+        pid, ready_oid, passed=True, evidence=["fixture:2"], actor="fixture",
+        interface="dockyard:human", trusted_principal="fixture")
+    ladder.set_objective_milestone(pid, ready_oid, ready_mid,
+                                   actor="fixture", interface="fixture")
+    ready_gid = service.create_goal(
+        pid, title="Ready goal", objective_ids=[ready_oid],
+        actor="fixture", interface="fixture")["goal_id"]
+    ladder.set_goal_objective(pid, ready_gid, ready_oid, actor="fixture", interface="fixture")
+    ready_task = adapter.create_work(
+        pid, kind="task", title="Ready task", body="fixture",
+        assignee="worker", created_by="fixture")
+    adapter.transition_work(pid, "task", ready_task["ref"], "done")
+    ladder.set_task_goal(pid, ready_task["ref"], ready_gid,
+                         actor="fixture", interface="fixture")

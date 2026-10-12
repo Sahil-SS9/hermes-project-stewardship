@@ -106,6 +106,11 @@ def test_approval_to_canonical_execution_and_observation_flow(store, enabled):
     assert replay.json()["work_item_refs"] == work_refs
     assert len(adapter.list_work(enabled)) == 2
 
+    # D-L3: /complete confirms delivery through the ladder rule, so a reached
+    # milestone is required. Build one via the app's own services, then
+    # /complete succeeds and schedules the observation.
+    from .r2_helpers import make_ready
+    make_ready(client.app, enabled, ref)
     completed = client.post(
         f"/stewardship/v1/initiatives/{ref}/complete",
         json={"outcome": {"verified": True}, "regressed": False},
@@ -146,6 +151,9 @@ def test_approval_to_canonical_execution_and_observation_flow(store, enabled):
 
 
 def test_regression_blocks_canonical_work_and_schedules_one_observation(store, enabled):
+    """D-L3 + fix 3: an initiative is confirmed by a person (needs a reached
+    milestone), and regression is reachable only through the observation path
+    once a ladder check fails after completion."""
     adapter = CanonicalBridgeAdapter(store)
     client = TestClient(create_app(store, auth_token="test-token", auth_principal="test-user", auth_principal_is_human=True, kanban_adapter=adapter), headers={"Authorization": "Bearer test-token"})
     ref = _proposal(client, enabled)
@@ -153,18 +161,28 @@ def test_regression_blocks_canonical_work_and_schedules_one_observation(store, e
         f"/stewardship/v1/initiatives/{ref}/approve",
         json={"actor": "sahil", "interface": "dockyard:human"},
     )
+    # /complete refuses while no milestone is reached (not ready).
+    not_ready = client.post(
+        f"/stewardship/v1/initiatives/{ref}/complete",
+        json={"outcome": {"verified": False}, "regressed": True},
+    )
+    assert not_ready.status_code == 409
+    # Build a reached ladder, then a person confirms delivery.
+    from .r2_helpers import make_ready
+    make_ready(client.app, enabled, ref)
     first = client.post(
         f"/stewardship/v1/initiatives/{ref}/complete",
-        json={"outcome": {"verified": False}, "regressed": True},
-    )
-    replay = client.post(
-        f"/stewardship/v1/initiatives/{ref}/complete",
-        json={"outcome": {"verified": False}, "regressed": True},
+        json={"outcome": {"verified": True}, "regressed": False},
     )
     assert first.status_code == 200
+    assert first.json()["engine_status"] == "completed"
+    # Repeating confirm is harmless (idempotent).
+    replay = client.post(
+        f"/stewardship/v1/initiatives/{ref}/complete",
+        json={"outcome": {"verified": True}, "regressed": False},
+    )
     assert replay.status_code == 200
-    work = adapter.list_work(enabled)
-    assert all(item["status"] == "blocked" for item in work)
+    # Exactly one observation is scheduled for the confirmed initiative.
     rows = store._conn.execute(
         "SELECT COUNT(*) AS n FROM dockyard_observation_triggers WHERE initiative_ref=?",
         (ref,),

@@ -413,15 +413,39 @@ def test_completion_is_refused_before_approval_or_after_closing(api, before):
 
 
 @pytest.mark.parametrize("before", ["approved", "executing"])
-def test_completion_from_approved_or_in_progress_still_works(api, before):
+def test_completion_goes_through_confirm_delivered_only(api, before):
+    """D-L3: the old /complete route now goes through the ladder rule.
+
+    An initiative with no reached milestone is refused (409) by /complete AND
+    by confirm-delivered. Once every milestone is reached, confirm-delivered
+    completes it; /complete (same rule) then succeeds too. Repeating is
+    harmless: the recorded result stands.
+    """
     client, w, store = api
     ref = w.initiative("alpha", f"Done {before}", status=before)
-    r = client.post(f"{V1}/initiatives/{ref}/complete", json={"outcome": {"verified": True}})
+    # Not ready (no reached milestone): both routes refuse.
+    assert client.post(f"{V1}/initiatives/{ref}/complete",
+                       json={"outcome": {"verified": True}}).status_code == 409
+    assert _status(store, ref)["status"] == before
+    # Build a reached milestone: milestone <- objective <- goal <- done task,
+    # with the objective's check passed. Only an executing initiative can be
+    # ready to confirm, so start execution first.
+    mid = w.milestone("alpha", "Release")
+    w.place_milestone("alpha", mid, ref)
+    oid = w.objective("alpha", "Obj", state="passed")
+    w.place_objective("alpha", oid, mid)
+    gid = w.goal("alpha", "Goal")
+    w.place_goal("alpha", gid, oid)
+    w.place_task("alpha", w.item("alpha", "Task", status="done"), gid)
+    if before == "approved":
+        w.svc.start_execution(ref)  # only an executing initiative can be ready
+    # Now ready: confirm-delivered completes it.
+    r = client.post(f"{V1}/projects/alpha/initiatives/{ref}/confirm-delivered", json={})
     assert r.status_code == 200, r.text
     assert _status(store, ref)["status"] == "completed"
-    # Repeating it is harmless: the recorded result stands.
-    assert client.post(f"{V1}/initiatives/{ref}/complete",
-                       json={"outcome": {"verified": True}}).status_code == 200
+    # Repeating is harmless: the recorded result stands.
+    assert client.post(f"{V1}/projects/alpha/initiatives/{ref}/confirm-delivered",
+                       json={}).status_code == 200
     assert _status(store, ref)["status"] == "completed"
 
 

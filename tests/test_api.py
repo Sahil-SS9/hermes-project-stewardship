@@ -96,6 +96,11 @@ def test_full_lifecycle_over_rpc(env):
                json={"actor": "h", "interface": "rpc"})
     assert r.json()["status"] == "executing"
     assert r.json()["board_slug"] == "p1-ops"
+    # D-L3: /complete confirms delivery through the ladder rule, so a reached
+    # milestone is required. Build one via the app's own services, then
+    # /complete succeeds and schedules the observation.
+    from .r2_helpers import make_ready
+    make_ready(c.app, "p1", ref)
     r = c.post(f"/stewardship/v1/initiatives/{ref}/complete",
                json={"outcome": {"ok": True}})
     assert r.json()["engine_status"] == "completed"

@@ -133,24 +133,34 @@ def ini_status(svc, ref: str) -> str:
     return svc.initiative_by_ref(ref)["status"]
 
 
-def test_complete_from_board_moves_cards_and_records_outcome(
+def test_complete_from_board_moves_cards_but_leaves_initiative_executing(
     svc, enabled, store, approved
 ):
+    """D-L3: board-done no longer completes an initiative.
+
+    A person confirms delivery through LadderService.confirm_delivered, and only
+    when every milestone is reached. complete_from_board still does the board
+    cleanup (moving the initiative's cards to done), but the initiative stays
+    `executing` — it is not flipped to `completed` behind the rule.
+    """
     adapter = ReferenceKanbanAdapter(store)
     bridge = KanbanBridge(svc, adapter)
     out = bridge.bind(approved["ref"])
     final = bridge.complete_from_board(
         approved["ref"], outcome={"ci_pass_rate": 0.995}, regressed=False
     )
-    assert final["status"] == "completed"
+    assert final["status"] == "executing"
     cards = adapter.cards(out["board_id"])
     assert all(c["column"] == "done" for c in cards)
 
 
-def test_regressed_completion_via_bridge(svc, enabled, store, approved):
+def test_regressed_completion_via_bridge_is_refused(svc, enabled, store, approved):
+    """Regression is reachable only through the observation path (fix 3), never
+    from a board-done completion. complete_from_board leaves the initiative
+    executing regardless of the regressed flag."""
     bridge = KanbanBridge(svc, ReferenceKanbanAdapter(store))
     bridge.bind(approved["ref"])
     final = bridge.complete_from_board(
         approved["ref"], outcome={"ci_pass_rate": 0.91}, regressed=True
     )
-    assert final["status"] == "regressed"
+    assert final["status"] == "executing"

@@ -1077,3 +1077,70 @@ def test_same_state_replay_stays_deduped(store):
     assert first["observed_tasks"] == 1
     # Unchanged state: the second pass does not re-observe the task.
     assert second["observed_tasks"] == 0
+
+
+def test_observation_regresses_a_confirmed_initiative_when_a_check_fails(store):
+    """Fix 3 / D-L3: regression is reachable only through the observation path.
+
+    A confirmed initiative whose ladder check later fails is marked regressed
+    when the real observation entry point runs — not from any completion route.
+    The regression is audited and raises an initiative.regressed event.
+    """
+    from hermes_project_stewardship.events.bus import EventBus
+    from hermes_project_stewardship.persistence.service import StewardshipService
+
+    # Build a confirmed initiative with a goal check, using the service + ladder.
+    svc = StewardshipService(store)
+    svc.enable("demo", mission="m", lead_profile="lead", autonomy_level=2)
+    bus = EventBus(store)
+    svc.attach_event_bus(bus)
+    ref = svc.propose_initiative("demo", title="Ship it", rationale="value")["ref"]
+    svc.approve_initiative(ref, actor="sahil", interface="test")
+    svc.start_execution(ref)
+    from hermes_project_stewardship.kanban import ReferenceKanbanAdapter
+    from hermes_project_stewardship.persistence.canonical_work_service import (
+        CanonicalWorkService,
+    )
+    from hermes_project_stewardship.persistence.dockyard_service import DockyardService
+    from hermes_project_stewardship.persistence.ladder_service import LadderService
+    from hermes_project_stewardship.persistence.roadmap_service import RoadmapService
+
+    adapter = ReferenceKanbanAdapter(store)
+    work = CanonicalWorkService(store, adapter)
+    dy = DockyardService(store, canonical_work=work)
+    ladder = LadderService(store, svc, work, RoadmapService(store, svc, work))
+    from hermes_project_stewardship.dockyard import Actor, ActorKind
+    human = Actor(id="sahil", display_name="sahil", kind=ActorKind.HUMAN)
+    mid = dy.milestone_create("demo", "Release", actor=human)
+    ladder.set_milestone_initiative("demo", mid, ref, actor="sahil", interface="test")
+    oid = int(svc.add_objective("demo", name="Obj", evaluator_type="manual",
+                                target=">=1", actor="sahil", interface="test")["id"])
+    svc.record_assessment("demo", oid, passed=True, evidence=["t:1"], actor="sahil",
+                          interface="dockyard:human", trusted_principal="sahil")
+    ladder.set_objective_milestone("demo", oid, mid, actor="sahil", interface="test")
+    gid = svc.create_goal("demo", title="Goal", objective_ids=[oid],
+                          actor="sahil", interface="test")["goal_id"]
+    ladder.set_goal_objective("demo", gid, oid, actor="sahil", interface="test")
+    task = work.create_item("demo", "task", "Task", actor=human)
+    work.transition("demo", task["ref"], "done", actor=human)
+    ladder.set_task_goal("demo", task["ref"], gid, actor="sahil", interface="test")
+    ladder.confirm_delivered("demo", ref, actor="sahil", interface="test")
+    assert svc.initiative_by_ref(ref)["status"] == "completed"
+
+    # A goal check now fails after confirmation.
+    ladder.set_goal_check("demo", gid, {"evaluator_type": "manual", "target": ">=1"},
+                          actor="sahil", interface="test")
+    ladder.record_goal_assessment("demo", gid, passed=False, evidence=["t:2"],
+                                  trusted_principal="sahil", interface="desktop")
+
+    # The real observation entry point regresses it (audit + event).
+    seed_observation(store, ref=ref, status="pending")
+    reconciler = make_service(store, FakeObservationHost(), engine=StubEngine("healthy"),
+                              service=svc)
+    reconciler.run_observation(ref)
+    assert svc.initiative_by_ref(ref)["status"] == "regressed"
+    events = [r["event_type"] for r in store._conn.execute(
+        "SELECT event_type FROM domain_events")]
+    assert "initiative.regressed" in events
+    audited = [r for r in store.audit_tail(200) if r["action"] == "initiative.regressed"]
+    assert audited and audited[0]["subject"] == ref

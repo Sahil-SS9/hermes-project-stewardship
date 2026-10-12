@@ -48,7 +48,10 @@ from ..events.bus import (
     EventBus,
     HEALTH_CHANGED,
     INITIATIVE_APPROVED,
+    INITIATIVE_COMPLETED,
+    INITIATIVE_READY_TO_CONFIRM,
     INITIATIVE_REJECTED,
+    INITIATIVE_REGRESSED,
     INITIATIVE_WITHDRAWN,
     PROJECT_CRITICAL,
     VERIFICATION_FAILED,
@@ -69,6 +72,11 @@ _EVENT_MAP = {
     APPROVAL_REQUIRED: ("approval_required", "high"),
     # A gentle note (medium: in the app, never a desktop pop-up by default).
     WORK_UNASSIGNED: ("unassigned_work", "medium"),
+    # Batch L (D-L3): an initiative is ready for a person to confirm, or has
+    # regressed after a ladder check failed post-confirmation. Both are high:
+    # each needs a human decision.
+    INITIATIVE_READY_TO_CONFIRM: ("initiative_ready_to_confirm", "high"),
+    INITIATIVE_REGRESSED: ("initiative_regressed", "high"),
 }
 
 _AUTO_RESOLVE_EVENTS = (INITIATIVE_APPROVED, INITIATIVE_REJECTED, INITIATIVE_WITHDRAWN)
@@ -584,7 +592,8 @@ class NotificationEngine:
         subject = event.get("subject")
         # Dedupe on WHAT happened, not which cycle saw it: subject is
         # deliberately excluded so repeat signals collapse inside the window.
-        if kind in ("approval_required", "unassigned_work"):
+        if kind in ("approval_required", "unassigned_work",
+                    "initiative_ready_to_confirm", "initiative_regressed"):
             # One open notification per item, whichever cycle or screen raised it.
             dedupe_key = f"{kind}:{subject or ''}"
         else:
@@ -658,6 +667,10 @@ class NotificationEngine:
         if etype == WORK_UNASSIGNED:
             title = payload.get("title")
             return f"{event.get('subject')}{f' {title}' if title else ''} is unassigned"
+        if etype == INITIATIVE_READY_TO_CONFIRM:
+            return f"Ready to confirm: {event.get('subject')}"
+        if etype == INITIATIVE_REGRESSED:
+            return f"Regressed: {event.get('subject')}"
         return etype
 
     @staticmethod
@@ -689,6 +702,20 @@ class NotificationEngine:
                     project_id, kinds=("unassigned_work",),
                     dedupe_key=f"unassigned_work:{ref}", note=None,
                     note_template="assigned: {ref}", note_ref=ref)
+            return
+        if etype == INITIATIVE_COMPLETED:
+            # A confirmed initiative resolves both of its D-L3 notifications:
+            # the "ready to confirm" prompt and any "regressed" notice (a fresh
+            # confirmation re-opens neither).
+            if ref and project_id:
+                self._auto_resolve_state(
+                    project_id, kinds=("initiative_ready_to_confirm",),
+                    dedupe_key=f"initiative_ready_to_confirm:{ref}",
+                    note="confirmed delivered", note_ref=ref)
+                self._auto_resolve_state(
+                    project_id, kinds=("initiative_regressed",),
+                    dedupe_key=f"initiative_regressed:{ref}",
+                    note="confirmed delivered", note_ref=ref)
             return
         if etype == HEALTH_CHANGED:
             if (event.get("payload") or {}).get("to") == "healthy":

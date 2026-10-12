@@ -345,12 +345,25 @@ def test_plugin_approve_and_reject_use_real_upstream_contract(client):
     assert approve_response.status_code == 200, approve_response.text
     assert approve_response.json()["status"] == "executing"
 
+    # D-L3: /complete now goes through the ladder rule. With no reached
+    # milestone it is refused (409); build a reached ladder via the app's own
+    # services, then /complete (a person confirms) succeeds and schedules the
+    # observation.
+    from .r2_helpers import make_ready
+
+    refused = client.post(
+        f"/api/plugins/hermes-project-stewardship/initiatives/{approved['ref']}/complete",
+        json={"verified": True, "regressed": False},
+    )
+    assert refused.status_code == 409, refused.text
+    make_ready(plugin_api._app, project_id, approved["ref"])
+
     completed = client.post(
         f"/api/plugins/hermes-project-stewardship/initiatives/{approved['ref']}/complete",
         json={"verified": True, "regressed": False},
     )
     assert completed.status_code == 200, completed.text
-    assert completed.json()["engine_status"] == "completed"
+    assert completed.json()["status"] == "completed"
     observations = client.get(
         f"/api/plugins/hermes-project-stewardship/projects/{project_id}/observations"
     )

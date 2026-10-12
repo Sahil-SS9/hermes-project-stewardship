@@ -29,6 +29,9 @@ INITIATIVE_WITHDRAWN = "initiative.withdrawn"
 INITIATIVE_STARTED = "initiative.started"
 INITIATIVE_COMPLETED = "initiative.completed"
 INITIATIVE_REGRESSED = "initiative.regressed"
+# Batch L (D-L3): an executing initiative whose every milestone is reached is
+# ready for a person to confirm as delivered.
+INITIATIVE_READY_TO_CONFIRM = "initiative.ready_to_confirm"
 PROJECT_CRITICAL = "project.critical"
 MUTATIONS_BLOCKED = "cycle.mutations_blocked"
 # Assignment of work (Sahil 04/10, demo feedback b): Hermes never dispatches

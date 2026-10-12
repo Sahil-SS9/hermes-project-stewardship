@@ -267,7 +267,77 @@ class ReconcileService:
                     ref,
                 ),
             )
+        # D-L3: after the cycle has evaluated this project's checks, a completed
+        # initiative whose ladder check now fails is marked regressed. Only
+        # completed initiatives are considered, and only when a check actually
+        # failed — a still-passing ladder is left alone.
+        self._regress_completed_if_checks_failed(current["project_id"])
+        self._raise_ready_to_confirm(current["project_id"])
         return self.observation(ref)
+
+    def _raise_ready_to_confirm(self, project_id: str) -> None:
+        """Emit initiative.ready_to_confirm for executing initiatives whose every
+        milestone is reached, so a person is prompted to confirm delivery.
+
+        The event dedupes to one open notification per initiative; confirmation
+        auto-resolves it. Best-effort: a sweep failure never breaks observation.
+        """
+        try:
+            from ..events.bus import EventBus
+            from ..kanban import ReferenceKanbanAdapter
+            from ..persistence.canonical_work_service import CanonicalWorkService
+            from ..persistence.roadmap_service import RoadmapService
+
+            service = self._service
+            if service is None:
+                return
+            adapter = ReferenceKanbanAdapter(self._store)
+            work = CanonicalWorkService(self._store, adapter)
+            roadmap = RoadmapService(self._store, service, work)
+            bus = EventBus(self._store)
+            for ini in service.initiatives(project_id):
+                if ini["status"] != "executing":
+                    continue
+                state = roadmap.initiative_state(project_id, ini["ref"])
+                if state["ready_to_confirm"]:
+                    bus.emit("initiative.ready_to_confirm",
+                             project_id=project_id, subject=ini["ref"],
+                             payload={"title": ini.get("title")})
+        except Exception:  # noqa: BLE001 - the sweep is best-effort by design
+            pass
+
+    def _regress_completed_if_checks_failed(self, project_id: str) -> None:
+        """Mark completed initiatives regressed when a ladder check now fails.
+
+        Built lazily so ReconcileService keeps its existing constructor. Any
+        failure here is swallowed: observation has already recorded its result,
+        and a regression sweep must never break the observation run.
+        """
+        try:
+            from ..kanban import ReferenceKanbanAdapter
+            from ..persistence.canonical_work_service import CanonicalWorkService
+            from ..persistence.ladder_service import LadderService
+            from ..persistence.roadmap_service import RoadmapService
+
+            service = self._service
+            if service is None:
+                return
+            adapter = ReferenceKanbanAdapter(self._store)
+            work = CanonicalWorkService(self._store, adapter)
+            roadmap = RoadmapService(self._store, service, work)
+            ladder = LadderService(self._store, service, work, roadmap)
+            completed = [
+                row["ref"]
+                for row in self._conn.execute(
+                    "SELECT ref FROM project_initiatives"
+                    " WHERE project_id=? AND status='completed'", (project_id,))
+            ]
+            for initiative_ref in completed:
+                ladder.regress_completed_if_failed(
+                    project_id, initiative_ref,
+                    actor="system", interface="observation")
+        except Exception:  # noqa: BLE001 - the sweep is best-effort by design
+            pass
 
     def observation(self, ref: str) -> Dict[str, Any]:
         row = self._conn.execute(

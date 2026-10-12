@@ -449,6 +449,49 @@ function PlaceDialog({ kind, itemId, projectId, projectLabel, onClose, onDone })
 // initialScope: 'all' (the signed default) or one project id ("View in
 // Roadmap", or the global picker while this tab is open). onOpen({ project,
 // entryView, workRef }) asks the shell to open the item's own project screen.
+function ConfirmDeliveredDialog({ projectId, ref, title, onClose, onDone }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  useDialogFocusManager('[data-rm-confirm-dialog] .dy-rm-modal')
+  const submit = async () => {
+    setBusy(true); setError(null)
+    try {
+      await api(
+        `/projects/${encodeURIComponent(projectId)}/initiatives/${encodeURIComponent(ref)}/confirm-delivered`,
+        { method: 'POST', body: {} })
+      emitToast('success', `“${title}” confirmed as delivered.`)
+      onDone()
+    } catch (failure) {
+      // A 409 (a milestone is not reached) shows its message in plain words.
+      setError(String(failure?.message ?? failure))
+      setBusy(false)
+    }
+  }
+  return jsx('div', {
+    className: 'dy-rm-modal-backdrop', 'data-rm-confirm-dialog': true,
+    onKeyDown: (event) => { if (event.key === 'Escape') { event.stopPropagation(); onClose() } },
+    children: jsxs('section', { className: 'dy-rm-modal', role: 'dialog', 'aria-modal': true, 'aria-label': 'Confirm as delivered', children: [
+      jsxs('header', { className: 'dy-rm-modal-head', children: [
+        jsxs('div', { children: [
+          jsx('p', { className: 'dockyard-meta', children: 'Confirm' }),
+          jsx('h3', { children: 'Confirm as delivered' }),
+          jsx('p', { children: `Project ${projectId}` }),
+        ] }),
+        jsx(Button, { onClick: onClose, ariaLabel: 'Close confirm dialog', children: '×' }),
+      ] }),
+      jsxs('div', { className: 'dy-rm-modal-body', 'data-rm-confirm-body': true, children: [
+        jsx('p', { className: 'dy-rm-confirm', children: `Confirm “${title}” as delivered? Every milestone is reached.` }),
+        jsx('p', { className: 'dy-rm-confirm', children: 'This records the delivery under your name and an audit entry.' }),
+        jsx('p', { className: 'dy-rm-modal-error', role: 'alert', children: error }),
+      ] }),
+      jsxs('div', { className: 'dy-rm-modal-actions', children: [
+        jsx(Button, { disabled: busy, onClick: onClose, children: 'Cancel' }),
+        jsx(Button, { variant: 'primary', disabled: busy, onClick: submit, children: busy ? 'Confirming…' : 'Confirm as delivered' }),
+      ] }),
+    ] }),
+  })
+}
+
 export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
   // The scope is the switcher's; a new scope re-mounts the view (shell key).
   const [scope] = useState(initialScope)
@@ -461,6 +504,7 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
   const [selection, setSelection] = useState(null)
   const [focusNode, setFocusNode] = useState(null)
   const [placeDialog, setPlaceDialog] = useState(null)
+  const [confirmDialog, setConfirmDialog] = useState(null)
   const [contract, setContract] = useState(null)
   const [refreshTick, setRefreshTick] = useState(0)
   const loadSerial = useRef(0)
@@ -601,6 +645,14 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
           readyToConfirm ? chip('Ready to confirm', 'ready') : null,
           initiative.attention ? chip('Attention', 'attention') : null,
         ] }),
+        actions: (readyToConfirm && canWrite) ? jsx(Button, {
+          small: true, action: 'roadmap-confirm-delivered',
+          onClick: (event) => {
+            event.stopPropagation()
+            setConfirmDialog({ projectId: pid, ref, title: initiative.title })
+          },
+          children: 'Confirm as delivered',
+        }) : null,
         onToggle: () => toggle(initiativeNode),
         onOpen: () => { openNode(initiativeNode); setSelection({ type: 'initiative', id: ref, projectId: pid, node: initiativeNode }) },
       }, initiativeNode))
@@ -791,6 +843,11 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
       ...placeDialog,
       onClose: () => setPlaceDialog(null),
       onDone: () => { setPlaceDialog(null); void load() },
+    }) : null,
+    confirmDialog ? jsx(ConfirmDeliveredDialog, {
+      ...confirmDialog,
+      onClose: () => setConfirmDialog(null),
+      onDone: () => { setConfirmDialog(null); void load() },
     }) : null,
   ]})
 }

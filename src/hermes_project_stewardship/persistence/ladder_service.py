@@ -408,10 +408,14 @@ class LadderService:
         return {"id": row_id, "dismissed": True}
 
     def confirm_delivered(self, project_id: str, ref: str, *, actor: str,
-                          interface: str = "service") -> Dict[str, Any]:
+                          interface: str = "service",
+                          after_confirm=None) -> Dict[str, Any]:
         self._known_project(project_id)
         self._require_features(project_id, "initiatives")
         initiative = self.roadmap.initiative_state(project_id, ref)
+        # Already confirmed: repeating is harmless, the recorded result stands.
+        if initiative["governance"] == "completed":
+            return self.svc.initiative_by_ref(ref)
         if not initiative["ready_to_confirm"]:
             raise RoadmapConflict(
                 "initiative is not ready to confirm; every milestone must be reached")
@@ -428,6 +432,18 @@ class LadderService:
                 raise RoadmapConflict("initiative state changed before confirmation")
             self._audit(cx, actor=actor, interface=interface,
                         action="initiative.completed", subject=ref, detail=outcome)
+        # Notify: the "ready to confirm" prompt and any "regressed" notice for
+        # this initiative resolve when it is confirmed (handled by the
+        # notification runner on the completed event).
+        bus = getattr(self.svc, "events", None)
+        if bus is not None:
+            bus.emit("initiative.completed", project_id=project_id, subject=ref,
+                     payload={"confirmed_by": actor})
+        # A confirmed initiative is still observed (the outcome is measured
+        # after delivery). The caller supplies the integration hook; the ladder
+        # itself stays free of host/integration wiring.
+        if after_confirm is not None:
+            after_confirm(ref)
         return self.svc.initiative_by_ref(ref)
 
     def regress_completed_if_failed(self, project_id: str, ref: str, *,
@@ -455,4 +471,9 @@ class LadderService:
                             action="initiative.regressed", subject=ref,
                             detail={"project_id": project_id,
                                     "reason": "ladder check failed after confirmation"})
+        if changed.rowcount:
+            bus = getattr(self.svc, "events", None)
+            if bus is not None:
+                bus.emit("initiative.regressed", project_id=project_id, subject=ref,
+                         payload={"reason": "ladder check failed after confirmation"})
         return bool(changed.rowcount)

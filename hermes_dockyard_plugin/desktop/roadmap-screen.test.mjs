@@ -327,3 +327,88 @@ test('Roadmap: dark theme recolours the toolbar, tree, chips and drawer', { time
     await browser.close()
   }
 })
+
+// ---- Batch L required journeys (fix 7) ------------------------------------- //
+// The confirm-as-delivered flow, driven through the real control in the Roadmap.
+
+test('Roadmap journey (a): a reached initiative confirms as delivered and shows Completed', { timeout: 180000 }, async () => {
+  const browser = await chromium.launch({ headless: true })
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  try {
+    await openRoadmap(page)
+    await projectRow(page, 'payments-relaunch').click()
+    // The fully-reached initiative shows "Ready to confirm" with the action.
+    const ready = page.locator('[data-rm-node^="initiative:"]').filter({ hasText: 'Confirm me when ready' })
+    await ready.waitFor()
+    assert.match(await ready.innerText(), /Ready to confirm/)
+    await ready.getByRole('button', { name: 'Confirm as delivered' }).click()
+    const dialog = page.locator('[data-rm-confirm-dialog]')
+    await dialog.waitFor()
+    assert.match(await dialog.innerText(), /Confirm me when ready/)
+    await dialog.getByRole('button', { name: 'Confirm as delivered' }).click()
+    // After reload the initiative reads Completed (the confirmation persisted).
+    await page.reload()
+    await openRoadmap(page)
+    await projectRow(page, 'payments-relaunch').click()
+    const done = page.locator('[data-rm-node^="initiative:"]').filter({ hasText: 'Confirm me when ready' })
+    await done.waitFor()
+    assert.match(await done.innerText(), /completed/i)
+    // No "Ready to confirm" chip remains on the completed initiative.
+    assert.equal(await done.getByText('Ready to confirm').count(), 0)
+  } finally {
+    await browser.close()
+  }
+})
+
+test('Roadmap journey (b): confirming is refused while a milestone is not reached', { timeout: 180000 }, async () => {
+  const browser = await chromium.launch({ headless: true })
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  try {
+    await openRoadmap(page)
+    await projectRow(page, 'payments-relaunch').click()
+    // "Ship saved views" has a milestone whose goal has no done task, so it is
+    // NOT ready: the Roadmap offers no Confirm action on it at all.
+    const notReady = page.locator('[data-rm-node^="initiative:"]').filter({ hasText: 'Ship saved views' })
+    await notReady.waitFor()
+    assert.equal(await notReady.getByRole('button', { name: 'Confirm as delivered' }).count(), 0,
+      'a not-reached initiative has no Confirm action')
+    // Driving the API directly shows the refusal message in plain words.
+    const refused = await page.evaluate(async () => {
+      const rows = [...document.querySelectorAll('[data-rm-node^="initiative:"]')]
+      const row = rows.find((r) => r.textContent.includes('Ship saved views'))
+      const ref = row?.getAttribute('data-rm-node').replace('initiative:', '')
+      const res = await fetch(`/plugins/hermes-project-stewardship/projects/payments-relaunch/initiatives/${ref}/confirm-delivered`,
+        { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+      return { status: res.status, body: await res.text() }
+    })
+    assert.equal(refused.status, 409)
+    assert.match(refused.body, /every milestone must be reached/i)
+  } finally {
+    await browser.close()
+  }
+})
+
+test('Roadmap journey (c): a Needs-placing item is placed by hand and gone', { timeout: 180000 }, async () => {
+  const browser = await chromium.launch({ headless: true })
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  try {
+    // Needs-placing is driven by the not-placed groups: placing the unlinked
+    // objective under a milestone removes it from "Not placed yet".
+    await openRoadmap(page)
+    await projectRow(page, 'payments-relaunch').click()
+    const item = page.locator('[data-rm-node^="not-placed-objectives:payments-relaunch:"]').first()
+    await item.waitFor()
+    await item.getByRole('button', { name: 'Place…' }).click()
+    const dialog = page.locator('[data-rm-place-dialog]')
+    await dialog.locator('select#dy-rm-place-choice').waitFor()
+    await dialog.locator('select#dy-rm-place-choice').selectOption({ index: 1 })
+    await dialog.getByRole('button', { name: 'Continue' }).click()
+    await dialog.locator('[data-rm-place-confirm]').waitFor()
+    await dialog.locator('.dy-rm-modal-actions').getByRole('button', { name: 'Place' }).click()
+    // Placed: the item is gone from the "Not placed yet" group.
+    await page
+      .waitForFunction(() => !document.querySelector('[data-rm-node^="not-placed-objectives:payments-relaunch:"]'))
+  } finally {
+    await browser.close()
+  }
+})

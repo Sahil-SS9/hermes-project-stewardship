@@ -118,6 +118,22 @@ class World:
     def confirm(self, pid, ref):
         return self.ladder.confirm_delivered(pid, ref, actor="owner")
 
+    def ready_initiative(self, pid, title="Ready", *, status="executing"):
+        """An executing initiative whose single milestone is fully reached.
+
+        Builds milestone <- objective(passed check) <- goal <- one done task,
+        so the initiative is `ready_to_confirm`. Returns the initiative ref.
+        """
+        ref = self.initiative(pid, title, status=status)
+        mid = self.milestone(pid, "Release")
+        self.place_milestone(pid, mid, ref)
+        oid = self.objective(pid, "Obj", state="passed")
+        self.place_objective(pid, oid, mid)
+        gid = self.goal(pid, "Goal")
+        self.place_goal(pid, gid, oid)
+        self.place_task(pid, self.item(pid, "Task", status="done"), gid)
+        return ref
+
     # -- read-model navigation ---------------------------------------
     def outline(self, pid: str):
         data = self.roadmap.roadmap(pid)
@@ -131,3 +147,38 @@ def find(rows, **match):
         if all(row.get(k) == v for k, v in match.items()):
             return row
     raise AssertionError(f"no row matching {match!r} in {rows!r}")
+
+
+def make_ready(app, project_id, ref):
+    """Give an executing initiative a fully-reached ladder, using the APP's own
+    services (so the in-memory kanban adapter the routes use sees the work).
+
+    Builds milestone <- objective(passed check) <- goal <- one done task, so
+    the initiative becomes `ready_to_confirm`. Required because a fresh
+    ReferenceKanbanAdapter keeps work items in memory only — a second instance
+    would not see them, so the routes' read of the ladder must go through the
+    app's own CanonicalWorkService/LadderService.
+    """
+    from hermes_project_stewardship.dockyard import Actor, ActorKind
+    from hermes_project_stewardship.persistence.dockyard_service import DockyardService
+
+    svc = app.state.svc
+    work = app.state.canonical_work_service
+    ladder = app.state.ladder
+    dy = DockyardService(work.store, canonical_work=work)
+    human = Actor(id="test-user", display_name="test-user", kind=ActorKind.HUMAN)
+    mid = dy.milestone_create(project_id, "Release", actor=human)
+    ladder.set_milestone_initiative(project_id, mid, ref, actor="test-user", interface="test")
+    oid = int(svc.add_objective(project_id, name="Obj", evaluator_type="manual",
+                                target=">=1", actor="test-user",
+                                interface="test")["id"])
+    svc.record_assessment(project_id, oid, passed=True, evidence=["t:1"],
+                          actor="test-user", interface="dockyard:human",
+                          trusted_principal="test-user")
+    ladder.set_objective_milestone(project_id, oid, mid, actor="test-user", interface="test")
+    gid = svc.create_goal(project_id, title="Goal", objective_ids=[oid],
+                          actor="test-user", interface="test")["goal_id"]
+    ladder.set_goal_objective(project_id, gid, oid, actor="test-user", interface="test")
+    task = work.create_item(project_id, "task", "Task", actor=human)
+    work.transition(project_id, task["ref"], "done", actor=human)
+    ladder.set_task_goal(project_id, task["ref"], gid, actor="test-user", interface="test")

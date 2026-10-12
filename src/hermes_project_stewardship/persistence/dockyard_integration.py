@@ -133,15 +133,16 @@ class DockyardIntegration:
     def complete_from_board(self, ref: str, *, outcome: Dict[str, Any],
                             regressed: bool = False,
                             actor: Optional[Actor] = None) -> Dict[str, Any]:
-        """Finish execution, sync canonical work and schedule observation."""
+        """Board-done no longer completes an initiative (D-L3).
+
+        Delivery is confirmed by a person through LadderService.confirm_delivered,
+        and only when every milestone is reached. This entry point still syncs
+        the bound canonical work and schedules observation, but it leaves the
+        initiative `executing` — it does not set `completed` or `regressed`.
+        """
         ini = self.svc.initiative_by_ref(ref)
-        if ini["status"] not in {"completed", "regressed"}:
-            self.bridge.complete_from_board(
-                ref,
-                outcome=outcome,
-                regressed=regressed,
-            )
-            ini = self.svc.initiative_by_ref(ref)
+        # Deliberately NOT calling bridge.complete_from_board: that is what used
+        # to flip the initiative to completed behind the rule.
 
         final_status = (WorkItemStatus.DONE if not regressed
                         else WorkItemStatus.BLOCKED)

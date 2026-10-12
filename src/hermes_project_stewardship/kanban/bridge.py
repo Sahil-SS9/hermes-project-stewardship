@@ -458,6 +458,13 @@ class KanbanBridge:
         regressed: bool = False,
         board_slug: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """Board-done no longer completes the initiative (D-L3).
+
+        A person confirms delivery through LadderService.confirm_delivered, and
+        only when every milestone is reached. This still does the best-effort
+        board cleanup (moving the initiative's cards to done), but it leaves the
+        initiative `executing` — it does not record `completed`/`regressed`.
+        """
         ini = self.svc.initiative_by_ref(ref)
         slug = board_slug or ini.get("board_slug")
         if slug and isinstance(self.adapter, ReferenceKanbanAdapter):
@@ -467,5 +474,8 @@ class KanbanBridge:
                     if c["metadata"].get("initiative_ref") == ref:
                         self.adapter.move_card(str(c["board_id"]), str(c["id"]), "done")
             except Exception:
-                pass  # board cleanup is best-effort; outcome recording is not
-        return self.svc.complete_initiative(ref, outcome=outcome, regressed=regressed)
+                pass  # board cleanup is best-effort; it never completes the initiative
+        # Deliberately NOT calling svc.complete_initiative: that flipped the
+        # initiative to completed behind the D-L3 rule. The initiative stays
+        # `executing` until a person confirms it.
+        return ini

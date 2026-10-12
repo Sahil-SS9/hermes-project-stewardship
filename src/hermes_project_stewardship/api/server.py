@@ -431,6 +431,13 @@ class CompleteRequest(BaseModel):
     actor_kind: str = "human"
 
 
+def _post_confirm(integration, ref: str) -> None:
+    """After a person confirms delivery, sync canonical work and schedule the
+    post-delivery observation. complete_from_board no longer completes the
+    initiative (D-L3); here it only does the work-sync + observation scheduling."""
+    integration.complete_from_board(ref, outcome={}, regressed=False)
+
+
 class ReconcileRequest(BaseModel):
     actor: str = "stewardship-api"
     interface: str = "api"
@@ -1853,18 +1860,23 @@ def create_app(
             raise HTTPException(409, str(e))
 
     @router.post("/initiatives/{ref}/complete")
-    def complete(ref: str, body: CompleteRequest):
+    def complete(ref: str, body: CompleteRequest, request: Request):
+        # D-L3: a person confirms an initiative as delivered, and only when
+        # every milestone is reached. The old board-driven completion is gone;
+        # this route now goes through the ladder rule. It refuses (403) without
+        # a trusted caller and (409) naming confirm-delivered unless the
+        # initiative is ready, so no path completes behind the rule. The legacy
+        # engine_status/observation_status contract is preserved by merging the
+        # post-confirm work-sync result into the response.
+        principal = _decision_actor(request)
+        ini = svc.initiative_by_ref(ref)
         try:
-            return integration.complete_from_board(
-                ref,
-                outcome=body.outcome,
-                regressed=body.regressed,
-                actor=Actor(
-                    id=_principal_id(body.actor_id),
-                    display_name=_principal_id(body.actor_id),
-                    kind=ActorKind.HUMAN if current_principal() else ActorKind(body.actor_kind),
-                ),
-            )
+            confirmed = _ladder.confirm_delivered(
+                ini["project_id"], ref, actor=principal, interface="rpc",
+                after_confirm=lambda r: _post_confirm(integration, r))
+            return {**confirmed,
+                    "engine_status": confirmed.get("status"),
+                    "observation_status": "pending"}
         except (ServiceError, IntegrationError) as exc:
             raise HTTPException(409, str(exc)) from None
 
@@ -3612,10 +3624,15 @@ def create_app(
     from .roadmap_routes import install as _install_roadmap_routes
 
     _roadmap = RoadmapService(store, svc, work)
+    _ladder = LadderService(store, svc, work, _roadmap)
+    app.state.ladder = _ladder
     _install_roadmap_routes(
-        router, _roadmap,
-        LadderService(store, svc, work, _roadmap),
-        authority=_membership_authority)
+        router, _roadmap, _ladder,
+        authority=_membership_authority,
+        # After a person confirms delivery, sync canonical work and schedule
+        # the post-delivery observation (complete_from_board no longer
+        # completes; it only does the work-sync + observation scheduling).
+        on_confirmed=lambda ref: _post_confirm(integration, ref))
     # --- end Batch R2/L
 
     # --- Project memory and chat links (checks round 1; see api/memory_routes.py)

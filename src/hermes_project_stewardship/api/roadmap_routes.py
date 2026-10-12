@@ -100,8 +100,15 @@ def _refuse(exc: Exception) -> HTTPException:
 
 
 def install(router: APIRouter, roadmap: RoadmapService, ladder: LadderService, *,
-            authority: Callable[[str], str]) -> None:
-    """Register every Roadmap and ladder route on ``router``."""
+            authority: Callable[[str], str],
+            on_confirmed: Optional[Callable[[str], None]] = None) -> None:
+    """Register every Roadmap and ladder route on ``router``.
+
+    ``on_confirmed`` runs after an initiative is confirmed as delivered, so the
+    caller can sync canonical work and schedule the post-delivery observation.
+    It defaults to a no-op (the ladder itself stays free of host wiring).
+    """
+    _schedule_post_confirm = on_confirmed or (lambda ref: None)
 
     def _run(call: Callable[[], Dict[str, Any]]) -> Dict[str, Any]:
         # FeatureDisabledError is deliberately NOT caught: the app-level handler
@@ -185,7 +192,8 @@ def install(router: APIRouter, roadmap: RoadmapService, ladder: LadderService, *
     def confirm_delivered(project_id: str, ref: str, body: _Empty):
         principal = authority(WRITE_CAPABILITY)
         return _run(lambda: ladder.confirm_delivered(
-            project_id, ref, actor=principal, interface="rpc"))
+            project_id, ref, actor=principal, interface="rpc",
+            after_confirm=lambda r: _schedule_post_confirm(r)))
 
     @router.get("/projects/{project_id}/roadmap/unplaced")
     def list_unplaced(project_id: str):

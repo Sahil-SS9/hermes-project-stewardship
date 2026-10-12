@@ -507,3 +507,42 @@ def test_a_task_tagged_with_an_initiative_but_under_no_goal_is_not_placed(w):
     entry = find(w.outline(pid)["initiatives"], ref=ref)
     assert [t["ref"] for t in entry["not_placed"]["tasks"]] == [task]
     assert [t["ref"] for t in w.outline(pid)["not_placed"]["tasks"]] == []
+
+
+def test_a_disabled_objective_neither_blocks_nor_counts_toward_milestone_reached(w):
+    """Fix 8: a disabled objective is not listed, so it can neither block nor
+    count toward its milestone being reached."""
+    pid = "alpha"
+    ref = w.initiative(pid, "Ship", status="executing")
+    mid = w.milestone(pid, "Release")
+    w.place_milestone(pid, mid, ref)
+    live = w.objective(pid, "Live", state="passed")
+    w.place_objective(pid, live, mid)
+    gone = w.objective(pid, "Gone", state="failed")  # would block if counted
+    w.place_objective(pid, gone, mid)
+    w.svc.archive_objective(pid, gone, actor="owner", interface="test")
+    ms = find(w.outline(pid)["milestones"], id=mid)
+    # The disabled objective is not listed, so it neither blocks nor counts:
+    # the milestone is reached on the live objective alone.
+    assert gone not in [o["id"] for o in ms["objectives"]]
+    assert ms["state"] == "reached"
+    assert find(w.outline(pid)["initiatives"], ref=ref)["ready_to_confirm"] is True
+
+
+def test_an_archived_goal_neither_blocks_nor_counts_toward_its_objective(w):
+    """Fix 8: an archived goal is hidden, so it can neither block nor count
+    toward its objective being met."""
+    pid = "alpha"
+    oid = w.objective(pid, "Obj", state="passed")
+    live = w.goal(pid, "Live")
+    w.place_goal(pid, live, oid)
+    w.place_task(pid, w.item(pid, "done item", status="done"), live)
+    gone = w.goal(pid, "Gone")
+    w.place_goal(pid, gone, oid)
+    w.place_task(pid, w.item(pid, "blocked item", status="backlog"), gone)
+    w.svc.archive_goal(pid, gone, actor="owner", interface="test")
+    obj = find(w.outline(pid)["objectives"], id=oid)
+    # The archived goal is hidden, so its backlog task neither blocks nor counts:
+    # the objective is met on the live (done) goal alone.
+    assert gone not in [g["id"] for g in obj["goals"]]
+    assert obj["state"] == "met"

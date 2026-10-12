@@ -74,7 +74,10 @@ def test_complete_from_board_syncs_twin_and_reputation(
         ini["ref"], outcome={"verified": True}, regressed=False,
         actor=human)
 
-    assert out["engine_status"] == "completed"
+    # D-L3: board-done syncs the work and schedules observation but leaves the
+    # initiative executing — a person confirms delivery, and only when every
+    # milestone is reached.
+    assert out["engine_status"] == "executing"
     assert out["work_item_status"] == "done"
 
     rep = dy.bot_reputation("coder-bot")  # bot untouched: platform event only
