@@ -183,10 +183,15 @@ export function planActions(projectId) {
     archiveGoal: (id) => api(`/projects/${p}/goals/${enc(id)}/archive`, { method: 'POST', quiet, body: {} }),
     restoreGoal: (id) => api(`/projects/${p}/goals/${enc(id)}/restore`, { method: 'POST', quiet, body: {} }),
     deleteGoal: (id) => api(`/projects/${p}/goals/${enc(id)}`, { method: 'DELETE', quiet, body: {} }),
-    linkMilestone: (ref, milestoneId, relationship) => api(`/projects/${p}/initiatives/${enc(ref)}/milestones`, { method: 'POST', quiet, body: { milestone_id: Number(milestoneId), relationship } }),
-    unlinkMilestone: (ref, milestoneId) => api(`/projects/${p}/initiatives/${enc(ref)}/milestones/${Number(milestoneId)}`, { method: 'DELETE', quiet, body: {} }),
-    linkObjective: (ref, objectiveId, relationship) => api(`/projects/${p}/objectives/${Number(objectiveId)}/initiatives`, { method: 'POST', quiet, body: { initiative_ref: ref, relationship } }),
-    unlinkObjective: (ref, objectiveId) => api(`/projects/${p}/objectives/${Number(objectiveId)}/initiatives/${enc(ref)}`, { method: 'DELETE', quiet, body: {} }),
+    // Batch L: the 0.4.0 link endpoints are retired (410). Placement is a PUT
+    // of one parent on the child; a null parent unplaces it.
+    linkMilestone: (ref, milestoneId) => api(`/projects/${p}/milestones/${Number(milestoneId)}/initiative`, { method: 'PUT', quiet, body: { parent_id: ref } }),
+    unlinkMilestone: (ref, milestoneId) => api(`/projects/${p}/milestones/${Number(milestoneId)}/initiative`, { method: 'PUT', quiet, body: { parent_id: null } }),
+    linkObjective: (ref, objectiveId) => api(`/projects/${p}/objectives/${Number(objectiveId)}/milestone`, { method: 'PUT', quiet, body: { parent_id: Number(ref) } }),
+    unlinkObjective: (ref, objectiveId) => api(`/projects/${p}/objectives/${Number(objectiveId)}/milestone`, { method: 'PUT', quiet, body: { parent_id: null } }),
+    // A goal has one objective parent (v42): place it, or unplace it.
+    linkGoal: (goalId, objectiveId) => api(`/projects/${p}/goals/${enc(goalId)}/objective`, { method: 'PUT', quiet, body: { parent_id: Number(objectiveId) } }),
+    unlinkGoal: (goalId) => api(`/projects/${p}/goals/${enc(goalId)}/objective`, { method: 'PUT', quiet, body: { parent_id: null } }),
     saveMission: (text) => api(`/projects/${p}/settings`, { method: 'PATCH', quiet, body: { mission: text.trim() } }),
     archiveMission: () => api(`/projects/${p}/mission/archive`, { method: 'POST', quiet, body: {} }),
     removeMission: () => api(`/projects/${p}/mission`, { method: 'DELETE', quiet, body: {} }),

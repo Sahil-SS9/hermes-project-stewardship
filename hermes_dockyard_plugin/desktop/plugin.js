@@ -21358,10 +21358,15 @@ function planActions(projectId) {
     archiveGoal: (id) => api(`/projects/${p}/goals/${enc(id)}/archive`, { method: "POST", quiet, body: {} }),
     restoreGoal: (id) => api(`/projects/${p}/goals/${enc(id)}/restore`, { method: "POST", quiet, body: {} }),
     deleteGoal: (id) => api(`/projects/${p}/goals/${enc(id)}`, { method: "DELETE", quiet, body: {} }),
-    linkMilestone: (ref, milestoneId, relationship) => api(`/projects/${p}/initiatives/${enc(ref)}/milestones`, { method: "POST", quiet, body: { milestone_id: Number(milestoneId), relationship } }),
-    unlinkMilestone: (ref, milestoneId) => api(`/projects/${p}/initiatives/${enc(ref)}/milestones/${Number(milestoneId)}`, { method: "DELETE", quiet, body: {} }),
-    linkObjective: (ref, objectiveId, relationship) => api(`/projects/${p}/objectives/${Number(objectiveId)}/initiatives`, { method: "POST", quiet, body: { initiative_ref: ref, relationship } }),
-    unlinkObjective: (ref, objectiveId) => api(`/projects/${p}/objectives/${Number(objectiveId)}/initiatives/${enc(ref)}`, { method: "DELETE", quiet, body: {} }),
+    // Batch L: the 0.4.0 link endpoints are retired (410). Placement is a PUT
+    // of one parent on the child; a null parent unplaces it.
+    linkMilestone: (ref, milestoneId) => api(`/projects/${p}/milestones/${Number(milestoneId)}/initiative`, { method: "PUT", quiet, body: { parent_id: ref } }),
+    unlinkMilestone: (ref, milestoneId) => api(`/projects/${p}/milestones/${Number(milestoneId)}/initiative`, { method: "PUT", quiet, body: { parent_id: null } }),
+    linkObjective: (ref, objectiveId) => api(`/projects/${p}/objectives/${Number(objectiveId)}/milestone`, { method: "PUT", quiet, body: { parent_id: Number(ref) } }),
+    unlinkObjective: (ref, objectiveId) => api(`/projects/${p}/objectives/${Number(objectiveId)}/milestone`, { method: "PUT", quiet, body: { parent_id: null } }),
+    // A goal has one objective parent (v42): place it, or unplace it.
+    linkGoal: (goalId, objectiveId) => api(`/projects/${p}/goals/${enc(goalId)}/objective`, { method: "PUT", quiet, body: { parent_id: Number(objectiveId) } }),
+    unlinkGoal: (goalId) => api(`/projects/${p}/goals/${enc(goalId)}/objective`, { method: "PUT", quiet, body: { parent_id: null } }),
     saveMission: (text2) => api(`/projects/${p}/settings`, { method: "PATCH", quiet, body: { mission: text2.trim() } }),
     archiveMission: () => api(`/projects/${p}/mission/archive`, { method: "POST", quiet, body: {} }),
     removeMission: () => api(`/projects/${p}/mission`, { method: "DELETE", quiet, body: {} }),
@@ -21623,26 +21628,19 @@ function ItemForm({ kind, mode = "create", item, plan, actions, linkTo, onClose,
   });
 }
 function LinkDialog({ from, target, plan, actions, onClose, onDone, onCreateNew }) {
-  const goalLink = from.kind === "goal" || target === "goal";
-  const hasGoal = (objectiveId) => plan.goals.some((goal) => goal.objectiveIds.includes(objectiveId));
-  const options = from.kind === "goal" ? plan.objectives.filter((row) => !row.archived && !hasGoal(row.id)) : target === "goal" ? hasGoal(from.id) ? [] : plan.goals.filter((row) => !row.archived) : from.kind === "initiative" ? listOf(plan, target).filter((row) => !row.archived && !from[`${target}s`].some((link) => link.id === row.id)) : plan.initiatives.filter((row) => row.status !== "rejected" && !from.initiatives.some((link) => link.ref === row.ref));
-  const relationships = goalLink ? [] : RELATIONSHIPS[from.kind === "initiative" ? target : from.kind];
+  const options = from.kind === "goal" ? plan.objectives.filter((row) => !row.archived) : from.kind === "objective" ? plan.milestones.filter((row) => !row.archived) : from.kind === "milestone" ? plan.initiatives.filter((row) => row.status !== "rejected") : plan.milestones.filter((row) => !row.archived);
   const [choice, setChoice] = useState("");
-  const [relationship, setRelationship] = useState(relationships[0] ?? "");
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
-  const chosen = options.find((row) => String(row.id) === choice);
+  const chosen = options.find((row) => String(row.id ?? row.ref) === choice);
   const submit = async () => {
     setBusy(true);
     setFailure(null);
     try {
-      if (from.kind === "goal") await actions.updateGoal(from.id, { objective_ids: [...from.objectiveIds, chosen.id] });
-      else if (target === "goal") await actions.updateGoal(chosen.id, { objective_ids: [...chosen.objectiveIds, from.id] });
-      else {
-        const [ref, other, kind] = from.kind === "initiative" ? [from.ref, chosen.id, target] : [chosen.ref, from.id, from.kind];
-        await (kind === "milestone" ? actions.linkMilestone(ref, other, relationship) : actions.linkObjective(ref, other, relationship));
-      }
-      emitToast("success", `Linked \u201C${from.title}\u201D and \u201C${chosen.title}\u201D.`);
+      if (from.kind === "goal") await actions.linkGoal(from.id, chosen.id);
+      else if (from.kind === "objective") await actions.linkObjective(chosen.id, from.id);
+      else if (from.kind === "milestone") await actions.linkMilestone(chosen.ref, from.id);
+      emitToast("success", `Placed \u201C${from.title}\u201D under \u201C${chosen.title}\u201D.`);
       onDone();
     } catch (error) {
       setFailure(errorText(error));
@@ -21650,23 +21648,23 @@ function LinkDialog({ from, target, plan, actions, onClose, onDone, onCreateNew 
     }
   };
   const noun = KIND_LABEL[target].toLowerCase();
+  const parentNoun = from.kind === "goal" ? "objective" : from.kind === "objective" ? "milestone" : from.kind === "milestone" ? "initiative" : "milestone";
   return jsx(PlanDialog, {
     dialogKey: `link-${from.kind}-${target}`,
     eyebrow: `${KIND_LABEL[from.kind]} \xB7 ${from.title}`,
-    title: target === "initiative" ? "Link to an initiative" : `Link a ${noun}`,
+    title: `Place under a ${parentNoun}`,
     busy,
     onClose,
     actions: [
       onCreateNew ? jsx(Button, { action: `plan-link-new-${target}`, disabled: busy, onClick: onCreateNew, children: `New ${noun}\u2026` }, "new") : null,
       jsx(Button, { onClick: onClose, disabled: busy, children: "Cancel" }, "cancel"),
-      jsx(Button, { variant: "primary", action: "plan-link-confirm", disabled: busy || !chosen, onClick: submit, children: busy ? "Linking\u2026" : "Link" }, "link")
+      jsx(Button, { variant: "primary", action: "plan-link-confirm", disabled: busy || !chosen, onClick: submit, children: busy ? "Placing\u2026" : "Place" }, "link")
     ],
     children: jsxs("div", { className: "dy-plan-form", children: [
-      options.length === 0 ? jsx("p", { className: "dy-plan-note", children: goalLink ? "Nothing to link: each objective can measure one goal only, and every objective here already has its goal." : `Nothing to link: every ${noun} in this project is already linked here${onCreateNew ? `. Create a new ${noun} instead` : ""}.` }) : jsx(Field, { id: "dy-plan-link-choice", label: KIND_LABEL[target], required: true, children: jsxs("select", { id: "dy-plan-link-choice", "data-plan-link-choice": true, value: choice, onChange: (event) => setChoice(event.target.value), children: [
+      options.length === 0 ? jsx("p", { className: "dy-plan-note", children: `Nothing to place it under: this project has no ${parentNoun} yet${onCreateNew ? `. Create a new ${noun} instead` : ""}.` }) : jsx(Field, { id: "dy-plan-link-choice", label: KIND_LABEL[target], required: true, children: jsxs("select", { id: "dy-plan-link-choice", "data-plan-link-choice": true, value: choice, onChange: (event) => setChoice(event.target.value), children: [
         jsx("option", { value: "", children: "Choose\u2026" }),
-        ...options.map((row) => jsx("option", { value: String(row.id), children: row.title }, row.id))
+        ...options.map((row) => jsx("option", { value: String(row.id ?? row.ref), children: row.title }, row.id ?? row.ref))
       ] }) }),
-      relationships.length && options.length ? jsx(Field, { id: "dy-plan-link-relationship", label: "Relationship", required: true, children: jsx("select", { id: "dy-plan-link-relationship", value: relationship, onChange: (event) => setRelationship(event.target.value), children: relationships.map((value) => jsx("option", { value, children: REL_LABEL[value] }, value)) }) }) : null,
       failure ? jsx("p", { className: "dockyard-inline-error", role: "alert", children: failure }) : null
     ] })
   });
