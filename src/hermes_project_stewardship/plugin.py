@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 from .bot_context import project_memory_hook
-from .persistence.service import StewardshipService
+from .cycles.engine import CycleRefused
+from .persistence.service import ServiceError, StewardshipService
 from .persistence.store import Store
 from .runtime import bot_db_path, mark_hermes_host, open_store
 
@@ -108,7 +109,13 @@ _TOOL_REQUIRED = {
 
 def _tool_handler(fn):
     def handle(args=None, **_kwargs):
-        return json.dumps(fn(**dict(args or {})), sort_keys=True, default=str)
+        # A refusal (paused, frozen, budget, duplicate, unknown project) is an
+        # answer the agent must read, not a tool crash.
+        try:
+            result = fn(**dict(args or {}))
+        except (CycleRefused, ServiceError) as refusal:
+            return json.dumps({"refused": str(refusal)})
+        return json.dumps(result, sort_keys=True, default=str)
 
     return handle
 
