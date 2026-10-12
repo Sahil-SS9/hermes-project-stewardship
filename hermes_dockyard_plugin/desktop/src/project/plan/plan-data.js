@@ -84,10 +84,18 @@ function buildPlan({ projectId, roadmap, initiatives, objectives, goals, milesto
   }
   const milestoneLinks = linksTo('milestones')
   const objectiveLinks = linksTo('objectives')
+  // v42 (Batch L): one parent per level. The roadmap is the source of truth.
+  const milestoneOfObjective = new Map((project?.objectives ?? []).map((row) => [row.id, row.milestone_id ?? null]))
+  const initiativeOfMilestone = new Map((project?.milestones ?? []).map((row) => [row.id, row.initiative_ref ?? null]))
+  const objectivesOfInitiative = new Map((project?.initiatives ?? []).map((row) => [
+    row.ref,
+    (row.milestones ?? []).flatMap((milestone) => (milestone.objectives ?? []).map((o) => ({ id: o.id, title: o.name })),
+  )]))
   const goalRows = (goals?.goals ?? []).map((goal) => ({
     kind: 'goal', id: goal.goal_id, title: goal.title, description: goal.description ?? '',
     position: goal.position ?? 0, archived: Boolean(goal.archived_at),
     objectiveIds: (goal.objective_ids ?? []).map(Number),
+    objectiveId: goalRead.get(goal.goal_id)?.objective_id ?? (goal.objective_ids ?? [])[0] ?? null,
     state: goalRead.get(goal.goal_id)?.state ?? 'unknown',
     objectivesPassed: goalRead.get(goal.goal_id)?.objectives_passed ?? null,
   })).sort((a, b) => a.position - b.position)
@@ -108,6 +116,7 @@ function buildPlan({ projectId, roadmap, initiatives, objectives, goals, milesto
       // The backend record, for the evidence history and the human assessment
       // form (the same panel the old Objectives tab showed).
       record: row,
+      milestoneId: milestoneOfObjective.get(row.id) ?? null,
       initiatives: objectiveLinks.get(row.id) ?? [],
       goals: goalRows.filter((goal) => goal.objectiveIds.includes(row.id)).map((goal) => ({ id: goal.id, title: goal.title })),
     })),
@@ -115,6 +124,7 @@ function buildPlan({ projectId, roadmap, initiatives, objectives, goals, milesto
       kind: 'milestone', id: row.id, title: row.name, name: row.name, due: row.due ?? null,
       closed: Boolean(row.closed), archived: Boolean(row.archived_at),
       done: row.done ?? 0, total: row.total ?? 0, itemRefs: row.item_refs ?? [],
+      initiativeRef: initiativeOfMilestone.get(row.id) ?? null,
       initiatives: milestoneLinks.get(row.id) ?? [],
     })),
     initiatives: (initiatives?.initiatives ?? []).map((row) => {
@@ -125,8 +135,8 @@ function buildPlan({ projectId, roadmap, initiatives, objectives, goals, milesto
         // The backend record, handed unchanged to the approval panel: the
         // Inbox gives it the same record, so a review shows the same facts.
         record: row,
-        milestones: (link?.milestones ?? []).map((m) => ({ id: m.id, title: m.name, relationship: m.relationship })),
-        objectives: (link?.objectives ?? []).map((o) => ({ id: o.id, title: o.name, relationship: o.relationship })),
+        milestones: (link?.milestones ?? []).map((m) => ({ id: m.id, title: m.name, state: m.state })),
+        objectives: objectivesOfInitiative.get(row.ref) ?? [],
         delivery: link?.delivery ?? null,
       }
     }),
@@ -187,11 +197,15 @@ export function planActions(projectId) {
     // of one parent on the child; a null parent unplaces it.
     linkMilestone: (ref, milestoneId) => api(`/projects/${p}/milestones/${Number(milestoneId)}/initiative`, { method: 'PUT', quiet, body: { parent_id: ref } }),
     unlinkMilestone: (ref, milestoneId) => api(`/projects/${p}/milestones/${Number(milestoneId)}/initiative`, { method: 'PUT', quiet, body: { parent_id: null } }),
+    // v42 unplacing helpers (names say what they do): a null parent unplaces.
+    unplaceMilestone: (milestoneId) => api(`/projects/${p}/milestones/${Number(milestoneId)}/initiative`, { method: 'PUT', quiet, body: { parent_id: null } }),
+    unplaceObjective: (objectiveId) => api(`/projects/${p}/objectives/${Number(objectiveId)}/milestone`, { method: 'PUT', quiet, body: { parent_id: null } }),
     linkObjective: (ref, objectiveId) => api(`/projects/${p}/objectives/${Number(objectiveId)}/milestone`, { method: 'PUT', quiet, body: { parent_id: Number(ref) } }),
     unlinkObjective: (ref, objectiveId) => api(`/projects/${p}/objectives/${Number(objectiveId)}/milestone`, { method: 'PUT', quiet, body: { parent_id: null } }),
     // A goal has one objective parent (v42): place it, or unplace it.
     linkGoal: (goalId, objectiveId) => api(`/projects/${p}/goals/${enc(goalId)}/objective`, { method: 'PUT', quiet, body: { parent_id: Number(objectiveId) } }),
     unlinkGoal: (goalId) => api(`/projects/${p}/goals/${enc(goalId)}/objective`, { method: 'PUT', quiet, body: { parent_id: null } }),
+    unplaceGoal: (goalId) => api(`/projects/${p}/goals/${enc(goalId)}/objective`, { method: 'PUT', quiet, body: { parent_id: null } }),
     saveMission: (text) => api(`/projects/${p}/settings`, { method: 'PATCH', quiet, body: { mission: text.trim() } }),
     archiveMission: () => api(`/projects/${p}/mission/archive`, { method: 'POST', quiet, body: {} }),
     removeMission: () => api(`/projects/${p}/mission`, { method: 'DELETE', quiet, body: {} }),

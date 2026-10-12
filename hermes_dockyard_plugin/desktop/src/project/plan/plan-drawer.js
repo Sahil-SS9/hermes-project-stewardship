@@ -20,7 +20,6 @@ import { BUCKETS } from '../../lib/plan-vocab.js'
 import { COMPLETABLE_STATUSES } from '../../lib/plan-vocab.js'
 import { KIND_LABEL } from '../../lib/plan-vocab.js'
 import { OUTCOME_LABEL } from '../../lib/plan-vocab.js'
-import { REL_LABEL } from '../../lib/plan-vocab.js'
 import { WITHDRAWABLE_STATUSES } from '../../lib/plan-vocab.js'
 import { forecastLine } from '../../lib/plan-vocab.js'
 import { riskLine } from '../../lib/plan-vocab.js'
@@ -164,11 +163,6 @@ export function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
     setBusy(true)
     try { await work(); emitToast('success', message); onChanged() } catch (error) { emitToast('danger', errorText(error)) } finally { setBusy(false) }
   }
-  const initiativeRows = (links, other) => links.map((link) => jsx(LinkRow, {
-    kind: 'initiative', title: link.title, meta: REL_LABEL[link.relationship], onOpen: open('initiative', link.ref), unlinkLabel: `Unlink from ${link.title}`,
-    onUnlink: unlink(`Unlink this ${other}?`, `“${item.title}” stays in the project; it is no longer linked to “${link.title}”.`,
-      () => item.kind === 'milestone' ? actions.unlinkMilestone(link.ref, item.id) : actions.unlinkObjective(link.ref, item.id)),
-  }, link.ref))
   const status = statusOf(item)
   const tags = [jsx(StatusTag, { tone: status.tone, label: status.label }, 'status')]
   let body
@@ -192,16 +186,18 @@ export function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
       jsx(Section, { title: 'Milestones', readOnly, action: linkButton('milestone'), children: jsx(Links, { empty: 'No milestones linked yet.', rows: item.milestones.map((m) => {
         const row = plan.milestones.find((x) => x.id === m.id)
         return jsx(LinkRow, { kind: 'milestone', title: m.title, onOpen: open('milestone', m.id), unlinkLabel: `Unlink ${m.title}`,
-          meta: [REL_LABEL[m.relationship], row?.due && `due ${row.due}`, row && `${row.done}/${row.total} done`, row?.closed && 'closed'].filter(Boolean).join(' · '),
+          meta: [row?.due && `due ${row.due}`, row && `${row.done}/${row.total} done`, row?.closed && 'closed'].filter(Boolean).join(' · '),
           onUnlink: unlink('Unlink this milestone?', `“${m.title}” stays in the project; it is no longer linked to “${item.title}”.`, () => actions.unlinkMilestone(item.ref, m.id)) }, m.id)
       }) }) }, 'milestones'),
-      jsx(Section, { title: 'Objectives', readOnly, action: linkButton('objective'), children: jsx(Links, {
-        empty: 'No objectives linked yet. Work finishing does not prove the outcome; link an objective that measures it.',
+      // v42: an objective sits under a milestone (not under an initiative), so
+      // this list is read-only here — place/unplace an objective from its own
+      // drawer, or from the Roadmap.
+      jsx(Section, { title: 'Objectives (via its milestones)', children: jsx(Links, {
+        empty: 'No objectives yet. An objective measures a goal and sits under a milestone.',
         rows: item.objectives.map((o) => {
           const row = plan.objectives.find((x) => x.id === o.id)
-          return jsx(LinkRow, { kind: 'objective', title: o.title, onOpen: open('objective', o.id), unlinkLabel: `Unlink ${o.title}`,
-            meta: [REL_LABEL[o.relationship], row && OUTCOME_LABEL[row.outcome]].filter(Boolean).join(' · '),
-            onUnlink: unlink('Unlink this objective?', `“${o.title}” stays in the project; it no longer measures “${item.title}”.`, () => actions.unlinkObjective(item.ref, o.id)) }, o.id)
+          return jsx(LinkRow, { kind: 'objective', title: o.title, onOpen: open('objective', o.id),
+            meta: row && OUTCOME_LABEL[row.outcome] }, o.id)
         }),
       }) }, 'objectives'),
       jsx(Section, { title: 'Delivery', children: !item.delivery || item.delivery.state === 'no_linked_work'
@@ -226,7 +222,16 @@ export function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
   } else if (item.kind === 'milestone') {
     body = [
       jsx(Facts, { rows: [['Due', item.due ?? 'No due date'], ['Progress', `${number(item.done)} of ${number(item.total)} work items done`]] }, 'facts'),
-      jsx(Section, { title: 'Initiatives', readOnly, action: linkButton('initiative'), children: jsx(Links, { empty: 'Not linked to an initiative yet.', rows: initiativeRows(item.initiatives, 'milestone') }) }, 'initiatives'),
+      // v42 (R2 fix 5): a milestone's parent is an INITIATIVE (one only).
+      jsx(Section, { title: 'Initiative it is placed under', readOnly, action: linkButton('initiative'), children: jsx(Links, {
+        empty: 'Not placed under an initiative yet.',
+        rows: (() => {
+          const parent = plan.initiatives.find((x) => x.ref === item.initiativeRef)
+          return parent ? [jsx(LinkRow, { kind: 'initiative', title: parent.title, onOpen: open('initiative', parent.ref), unlinkLabel: `Unplace from ${parent.title}`,
+            onUnlink: unlink('Unplace this milestone?', `“${item.title}” stays in the project; it is no longer under “${parent.title}”.`,
+              () => actions.unplaceMilestone(item.id), 'Unplace') }, parent.ref)] : []
+        })(),
+      }) }, 'initiative'),
       jsx(MilestoneWork, { milestone: item, plan, actions, onChanged, readOnly }, 'work'),
     ]
     footer = item.archived ? [
@@ -273,7 +278,17 @@ export function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
           onUnlink: unlink('Remove from this goal?', `“${item.title}” no longer measures the goal “${goal.title}”.`,
             () => actions.updateGoal(goal.id, { objective_ids: goalRow.objectiveIds.filter((id) => id !== item.id) }), 'Remove') }, goal.id)] : [],
       }) }, 'goal'),
-      jsx(Section, { title: 'Initiatives it measures', readOnly, action: linkButton('initiative'), children: jsx(Links, { empty: 'Not linked to an initiative yet.', rows: initiativeRows(item.initiatives, 'objective') }) }, 'initiatives'),
+      // v42 (R2 fix 5): an objective's parent is a MILESTONE (one only).
+      jsx(Section, { title: 'Milestone it is placed under', readOnly, action: linkButton('milestone'), children: jsx(Links, {
+        empty: 'Not placed under a milestone yet.',
+        rows: (() => {
+          const parent = plan.milestones.find((x) => x.id === item.milestoneId)
+          return parent ? [jsx(LinkRow, { kind: 'milestone', title: parent.title, onOpen: open('milestone', parent.id), unlinkLabel: `Unplace from ${parent.title}`,
+            meta: parent.due ? `due ${parent.due}` : undefined,
+            onUnlink: unlink('Unplace this objective?', `“${item.title}” stays in the project; it is no longer under “${parent.title}”.`,
+              () => actions.unplaceObjective(item.id), 'Unplace') }, parent.id)] : []
+        })(),
+      }) }, 'milestone'),
     ]
     footer = item.archived ? [jsx(Button, { variant: 'danger', action: 'plan-delete-objective', onClick: () => ui.remove(item), children: 'Delete for good…' }, 'delete')] : [
       jsx(Button, { variant: 'primary', action: 'plan-edit', onClick: () => ui.edit(item), children: 'Edit' }, 'edit'),
@@ -290,16 +305,16 @@ export function PlanDrawer({ item, plan, actions, ui, onClose, onChanged }) {
     }
     body = [
       jsx(Facts, { rows: [['Description', item.description || '—'], ['Order', item.archived ? '—' : `${index + 1} of ${active.length}`]] }, 'facts'),
-      jsx(Section, { title: 'Objectives that measure it', readOnly, action: linkButton('objective', '+ Add'), children: jsx(Links, {
-        empty: 'No objectives yet. A goal is met only when its objectives pass.',
-        rows: item.objectiveIds.map((id) => {
-          const row = plan.objectives.find((x) => x.id === id)
-          const title = row?.title ?? `Objective ${id}`
-          return jsx(LinkRow, { kind: 'objective', title, meta: row && OUTCOME_LABEL[row.outcome], onOpen: open('objective', id), unlinkLabel: `Remove ${title} from this goal`,
-            onUnlink: unlink('Remove from this goal?', `“${title}” no longer measures “${item.title}”.`,
-              () => actions.updateGoal(item.id, { objective_ids: item.objectiveIds.filter((x) => x !== id) }), 'Remove') }, id)
-        }),
-      }) }, 'objectives'),
+      // v42: a goal's parent is an OBJECTIVE (one only).
+      jsx(Section, { title: 'Objective it is placed under', readOnly, action: item.objectiveId ? null : linkButton('objective', '+ Add'), children: jsx(Links, {
+        empty: 'Not placed under an objective yet.',
+        rows: (() => {
+          const row = plan.objectives.find((x) => x.id === item.objectiveId)
+          return row ? [jsx(LinkRow, { kind: 'objective', title: row.title, meta: OUTCOME_LABEL[row.outcome], onOpen: open('objective', row.id), unlinkLabel: `Unplace from ${row.title}`,
+            onUnlink: unlink('Unplace this goal?', `“${item.title}” stays in the project; it is no longer under “${row.title}”.`,
+              () => actions.unplaceGoal(item.id), 'Unplace') }, row.id)] : []
+        })(),
+      }) }, 'objective'),
     ]
     footer = item.archived ? [
       jsx(Button, { action: 'plan-restore-goal', onClick: () => ui.restore(item), children: 'Restore' }, 'restore'),

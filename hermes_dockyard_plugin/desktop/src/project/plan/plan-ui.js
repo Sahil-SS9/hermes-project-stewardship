@@ -117,8 +117,7 @@ async function save(kind, mode, form, item, actions, linkTo) {
   if (kind === 'milestone') {
     if (mode === 'create') {
       const created = await actions.createMilestone(form)
-      if (linkTo) await actions.linkMilestone(linkTo.ref, created?.id, linkTo.relationship)
-      return `Created milestone “${name}”${linkTo ? ' and linked it' : ''}.`
+      return `Created milestone “${name}”. Place it under an initiative from its drawer.`
     }
     if (name !== item.name) await actions.renameMilestone(item.name, name)
     if ((form.due || null) !== (item.due || null) || form.closed !== item.closed) await actions.updateMilestone(name, { due: form.due || null, closed: form.closed })
@@ -127,8 +126,7 @@ async function save(kind, mode, form, item, actions, linkTo) {
   if (kind === 'objective') {
     if (mode === 'edit') { await actions.updateObjective(item.id, form); return `Saved objective “${name}”.` }
     const created = await actions.createObjective(form)
-    if (linkTo) await actions.linkObjective(linkTo.ref, created?.id, linkTo.relationship)
-    return `Created objective “${name}”${linkTo ? ' and linked it' : ''}.`
+    return `Created objective “${name}”. Place it under a milestone from its drawer.`
   }
   if (mode === 'create') { await actions.createGoal(form); return `Created goal “${name}”.` }
   await actions.updateGoal(item.id, { title: name, description: form.description.trim(), objective_ids: form.objectiveIds })
@@ -210,7 +208,7 @@ export function ItemForm({ kind, mode = 'create', item, plan, actions, linkTo, o
     ? 'A new initiative waits for approval before work starts. Reviewers see why it matters and its risk.'
     : 'Changes were requested. Update the proposal and resubmit it for approval. The title stays as proposed.'
   return jsx(PlanDialog, {
-    dialogKey: `${mode}-${kind}`, eyebrow: linkTo ? `Will be linked to ${linkTo.title}` : plan.label, title, busy, onClose,
+    dialogKey: `${mode}-${kind}`, eyebrow: plan.label, title, busy, onClose,
     actions: [
       jsx(Button, { onClick: onClose, disabled: busy, children: 'Cancel' }, 'cancel'),
       jsx(Button, { variant: 'primary', action: `plan-${mode}-${kind}`, disabled: busy, onClick: submit, children: busy ? `${verb}…` : verb }, 'submit'),

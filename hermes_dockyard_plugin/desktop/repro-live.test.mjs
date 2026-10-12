@@ -1262,7 +1262,8 @@ async function testMissionObjectiveManagementAndDestructiveGates() {
   await runtime.click(`${row('goal', 'GOAL-DEMO1')} .dy-plan-row-open`, 40);
   assert.match(doc.querySelector('[data-plan-drawer="goal"]').textContent, /Checkout reliability/, 'linked objective was not rendered on its goal');
   await runtime.click(`${row('goal', 'GOAL-DEMO2')} .dy-plan-row-open`, 40);
-  assert.match(doc.querySelector('[data-plan-drawer="goal"]').textContent, /No objectives yet/, 'nullable objective relationship was not visible');
+  assert.match(doc.querySelector('[data-plan-drawer="goal"]').textContent, /Not placed under an objective yet/,
+    'a goal with no objective must say so honestly (v42: one objective parent)');
   assert(doc.querySelector('[data-plan-mission]'), 'mission strip is missing');
   assert.equal(doc.querySelectorAll('[data-plan-row="objective"]').length, 1, 'only the active objective shows by default');
   await runtime.click('[data-plan-show-archived]', 40);
