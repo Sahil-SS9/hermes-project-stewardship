@@ -184,8 +184,12 @@ function stopPopupPoller() {
   window.__dockyardPopupPoller = undefined
 }
 
-window.addEventListener('pagehide', stopPopupPoller)
-window.addEventListener('pageshow', () => startPopupPoller())
+// The committed bundle must evaluate bare (loader contract): no window at
+// module scope, so the listeners only arm when a real surface exists.
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', stopPopupPoller)
+  window.addEventListener('pageshow', () => startPopupPoller())
+}
 
 const __plugin = {
   id: 'hermes-project-stewardship',
