@@ -11,7 +11,6 @@ breaking pathlib itself, so they are guarded for a real Windows CI lane.
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -72,14 +71,9 @@ def test_permitted_env_extra_reaches_child(tmp_path):
     assert "delivered" in result.stdout
 
 
-def test_timeout_returns_timed_out_result_not_exception(tmp_path, monkeypatch):
-    def slow_run(*args, **kwargs):
-        raise subprocess.TimeoutExpired(
-            cmd=args[0], timeout=0.01, output=b"partial", stderr=b"")
-
-    monkeypatch.setattr(subprocess, "run", slow_run)
+def test_timeout_returns_timed_out_result_not_exception(tmp_path):
     result = run_allowlisted(
-        ["python3", "-c", "import time; time.sleep(5)"],
+        ["python3", "-c", "import sys, time; print('partial', flush=True); time.sleep(30)"],
         cwd=tmp_path,
         allowlist=frozenset({"python3"}),
         timeout_seconds=1,
@@ -116,6 +110,63 @@ def test_output_truncation_flag_and_cap(tmp_path):
     assert result.ok is True
     assert len(result.stdout) <= MAX_OUTPUT_BYTES
     assert result.truncated is True
+
+
+@pytest.mark.parametrize("stream", ["stdout", "stderr"])
+def test_output_flood_is_killed_not_buffered(tmp_path, stream):
+    """A command that never stops writing is killed once a stream passes
+    MAX_CAPTURE_BYTES, long before its timeout, and only that much is read."""
+    import time
+
+    from hermes_project_stewardship.security.allowlist import MAX_CAPTURE_BYTES
+
+    started = time.monotonic()
+    result = run_allowlisted(
+        ["python3", "-c", f"import sys\nwhile True: sys.{stream}.write('x' * 65536)"],
+        cwd=tmp_path,
+        allowlist=frozenset({"python3"}),
+        timeout_seconds=50,
+    )
+    assert time.monotonic() - started < 30
+    assert result.output_too_large is True and result.truncated is True
+    assert result.ok is False and result.timed_out is False
+    assert len(getattr(result, stream)) <= MAX_OUTPUT_BYTES < MAX_CAPTURE_BYTES
+
+
+def _timed(command, tmp_path, timeout_seconds=2):
+    import time
+
+    started = time.monotonic()
+    result = run_allowlisted(command, cwd=tmp_path, allowlist=frozenset({"python3"}),
+                             timeout_seconds=timeout_seconds)
+    return result, time.monotonic() - started
+
+
+@pytest.mark.skipif(os.name == "nt", reason="process groups are POSIX")
+def test_grandchild_holding_stdout_is_killed_at_the_deadline(tmp_path):
+    """The child exits at once but leaves a grandchild with its stdout open:
+    the read must not wait for that pipe past the deadline, and the kill
+    must reach the grandchild through the process group."""
+    marker = tmp_path / "grandchild-survived"
+    grandchild = f"import time, pathlib; time.sleep(6); pathlib.Path({str(marker)!r}).touch()"
+    result, elapsed = _timed(
+        ["python3", "-c", f"import subprocess, sys; subprocess.Popen([sys.executable, '-c', {grandchild!r}]);"
+                          " print('started', flush=True)"], tmp_path)
+    assert result.timed_out is True and result.ok is False
+    assert "started" in result.stdout
+    assert elapsed < 2 + 3
+    import time
+
+    time.sleep(6)
+    assert not marker.exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="closing the standard streams is POSIX here")
+def test_command_that_closes_its_output_is_still_bound_by_the_deadline(tmp_path):
+    result, elapsed = _timed(
+        ["python3", "-c", "import os, time; os.close(1); os.close(2); time.sleep(30)"], tmp_path)
+    assert result.timed_out is True and result.exit_code is None
+    assert elapsed < 2 + 3
 
 
 def test_nonzero_exit_reports_not_ok(tmp_path):
