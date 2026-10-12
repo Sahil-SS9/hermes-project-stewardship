@@ -449,14 +449,31 @@ def test_completion_goes_through_confirm_delivered_only(api, before):
     assert _status(store, ref)["status"] == "completed"
 
 
-def test_service_completion_guard(world, store):
+def test_completion_guard_lives_in_the_ladder(world, store):
+    """D-L3/R2: the old service-level completion API is gone; the guard is the
+    ladder's confirm rule. A proposal nobody approved cannot be confirmed, and
+    an executing initiative confirms only when every milestone is reached."""
     ref = world.initiative("alpha", "Guarded", requires_approval=True)
-    with pytest.raises(ServiceError, match="cannot be completed"):
-        world.svc.complete_initiative(ref, outcome={})
+    # No service-level completion path exists at all.
+    assert not hasattr(world.svc, "complete_initiative")
+    # confirm_delivered refuses a proposal that is not executing/ready.
+    from hermes_project_stewardship.persistence.roadmap_service import RoadmapConflict
+    with pytest.raises(RoadmapConflict):
+        world.ladder.confirm_delivered("alpha", ref, actor="owner", interface="test")
     assert _status(store, ref)["status"] == "pending_approval"
+
+    # An executing initiative with a reached ladder confirms — and repeating is
+    # harmless: the recorded result stands (no re-completion).
     done = world.initiative("alpha", "Finished", status="executing")
-    assert world.svc.complete_initiative(done, outcome={"ok": 1})["status"] == "completed"
-    # Same result again: returned as recorded, not rewritten.
-    assert world.svc.complete_initiative(done, outcome={"ok": 2})["outcome"] == {"ok": 1}
-    with pytest.raises(ServiceError, match="cannot be completed"):
-        world.svc.complete_initiative(done, outcome={}, regressed=True)
+    mid = world.milestone("alpha", "Release")
+    world.place_milestone("alpha", mid, done)
+    oid = world.objective("alpha", "Obj", state="passed")
+    world.place_objective("alpha", oid, mid)
+    gid = world.goal("alpha", "Goal")
+    world.place_goal("alpha", gid, oid)
+    world.place_task("alpha", world.item("alpha", "done item", status="done"), gid)
+    assert world.ladder.confirm_delivered("alpha", done, actor="owner",
+                                          interface="test")["status"] == "completed"
+    assert _status(store, done)["status"] == "completed"
+    assert world.ladder.confirm_delivered("alpha", done, actor="owner",
+                                          interface="test")["status"] == "completed"

@@ -121,7 +121,12 @@ def test_completed_initiative_allows_new_dedupe_match(svc, enabled):
     a = svc.propose_initiative(enabled, title="Fix X", rationale="E", dedupe_key="fix-x")
     svc.approve_initiative(a["ref"], actor="h", interface="cli")
     ini = svc.start_execution(a["ref"])
-    svc.complete_initiative(a["ref"], outcome={"ok": True})
+    # D-L3: completion is written only by the ladder (a person confirms). This
+    # test is about the DEDUPE rule, so the completed state is seeded directly.
+    with svc.store.tx() as cx:
+        cx.execute("UPDATE project_initiatives SET status='completed' WHERE ref=?",
+                   (a["ref"],))
+    assert svc.initiative_by_ref(a["ref"])["status"] == "completed"
     b = svc.propose_initiative(enabled, title="Fix X", rationale="E2", dedupe_key="fix-x")
     assert b["ref"] != a["ref"]
 
@@ -201,11 +206,17 @@ def test_execution_requires_approval(svc, enabled):
     assert svc.start_execution(a["ref"])["status"] == "executing"
 
 
-def test_regression_completion(svc, enabled):
+def test_regression_is_written_only_by_the_observation_path(svc, enabled):
+    """D-L3/R2: no service-level completion API exists. `completed` comes from
+    the ladder's confirm_delivered; `regressed` from the observation path's
+    regress_completed_if_failed. The old complete_initiative is gone."""
     a = svc.propose_initiative(enabled, title="T4", rationale="R4")
     svc.approve_initiative(a["ref"], actor="h", interface="cli")
-    out = svc.complete_initiative(a["ref"], outcome={"ci": "worse"}, regressed=True)
-    assert out["status"] == "regressed"
+    svc.start_execution(a["ref"])
+    assert not hasattr(svc, "complete_initiative"), (
+        "the service must not offer a completion path outside the ladder")
+    # The initiative is left as it was: nothing completed or regressed it.
+    assert svc.initiative_by_ref(a["ref"])["status"] == "executing"
 
 
 def test_gateway_permission_binding(svc, enabled):

@@ -86,6 +86,13 @@ class ReconcileService:
           outcome (a running/unknown run proves nothing);
         - a bare ``verified=true`` in the outcome payload is never accepted
           as proof.
+
+        D-L3 (R2 fix 1): this records the proven native outcome as a domain
+        event and leaves the initiative `executing`. Native done is NOT
+        delivery — only a person confirming through
+        ``LadderService.confirm_delivered`` writes `completed`. If the ladder
+        is now fully reached, an ``initiative.ready_to_confirm`` event prompts
+        a person to confirm.
         """
         if run_id is None or task_id is None:
             raise IntegrationError(
@@ -142,30 +149,46 @@ class ReconcileService:
                 " mark native completion as verified delivery"
             )
 
-        # Unrelated work is untouched by construction: the update is scoped
-        # to this exact ref and only from a live executing state.
-        with self._store.tx() as cx:
-            changed = cx.execute(
-                "UPDATE project_initiatives SET status=?, outcome_json=?,"
-                " completed_at=? WHERE ref=? AND status='executing'",
-                (
-                    "regressed" if regressed else "completed",
-                    json.dumps(outcome, sort_keys=True),
-                    self._iso_now(),
-                    ref,
-                ),
-            ).rowcount
-        if changed != 1:
+        # Unrelated work is untouched by construction: the native outcome is
+        # recorded against this exact ref, and the initiative is left alone.
+        # D-L3 (R2 fix 1): a native task being done is NOT delivery. Native
+        # reconcile records the proven outcome (for audit and the observation
+        # loop) but leaves the initiative `executing`; only a person confirming
+        # through LadderService.confirm_delivered writes `completed`.
+        # A replayed native completion on a non-executing initiative is refused
+        # (the host identity is preserved for audit, nothing is re-recorded).
+        if row["status"] != "executing":
             raise IntegrationError(
-                f"initiative {ref} was not in executing state; no completion"
-                " recorded (host run identity preserved for audit)"
+                f"initiative {ref} was not in executing state; no native"
+                " outcome recorded (host run identity preserved for audit)"
             )
+        project_id = self._project_of(ref) or ""
+        with self._store.tx() as cx:
+            cx.execute(
+                "INSERT INTO domain_events(ts, event_type, project_id, subject,"
+                " payload_json, emitted_by) VALUES(?,?,?,?,?,?)",
+                (
+                    self._iso_now(),
+                    "stewardship.native.reconciled",
+                    project_id,
+                    ref,
+                    json.dumps(
+                        {"task_id": task_id, "run_id": run_id,
+                         "host_outcome": host_outcome, "regressed_flag": bool(regressed)},
+                        sort_keys=True),
+                    "reconcile",
+                ),
+            )
+        # The ladder may now be fully reached: prompt a person to confirm.
+        if project_id:
+            self._raise_ready_to_confirm(project_id)
         return {
             "initiative_ref": ref,
-            "initiative_status": "regressed" if regressed else "completed",
+            "initiative_status": row["status"],
             "task_id": task_id,
             "run_id": run_id,
             "host_outcome": host_outcome,
+            "recorded": "native_outcome",
         }
 
     def _validation_contract(self, ref: str) -> Dict[str, Any]:
@@ -419,8 +442,9 @@ class ReconcileService:
            required; other projects untouched);
         2. observe every bound native task through the host read surface
            (read-only, claim-guarded);
-        3. reconcile native completions into initiative state with full host
-           identity verification (binding + terminal completed run);
+        3. record native completions against their initiative with full host
+           identity verification (binding + terminal completed run), leaving
+           the initiative `executing` (D-L3: only a person confirms delivery);
         4. run pending post-delivery observations once, forwarding
            ``trigger_type`` to the engine UNCHANGED — the report's
            trigger_type is the trigger the engine actually received.
@@ -436,7 +460,7 @@ class ReconcileService:
             )
         recovered = self.recover_stale_observations(project_id)
 
-        completed: List[str] = []
+        native_reconciled: List[str] = []
         observed_tasks = 0
         # Every bound native task of this project is observed read-only;
         # completions reconcile ONLY with host-proven identity.
@@ -486,13 +510,12 @@ class ReconcileService:
                             run_id=completed_run,
                             task_id=task_id,
                         )
-                        completed.append(result["initiative_ref"])
-                        # Close the loop: a proven outcome (re)arms the
-                        # post-delivery observation for this initiative.
-                        self._schedule_observation(
-                            ref, project_id,
-                            regressed=result["initiative_status"] == "regressed",
-                        )
+                        native_reconciled.append(result["initiative_ref"])
+                        # D-L3 (R2 fix 1): the native outcome is recorded, but
+                        # the initiative is NOT completed here — no person has
+                        # confirmed, so there is no delivery to observe yet.
+                        # The post-delivery observation is armed on confirm
+                        # (see the confirm-delivered route's after_confirm hook).
                     except IntegrationError:
                         # Identity/contract refusal: recorded as an event,
                         # never silently swallowed, never fabricated.
@@ -515,7 +538,7 @@ class ReconcileService:
             "interface": interface,
             "recovered": recovered,
             "observed_tasks": observed_tasks,
-            "completed": completed,
+            "native_reconciled": native_reconciled,
             "observations_run": run,
         }
 

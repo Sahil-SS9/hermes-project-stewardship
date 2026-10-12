@@ -43,8 +43,10 @@ memory or conversation; canonical state lives in the stewardship store.
    risk, dedupe_key (`<objective>:<root-cause-slug>`).
 4. If proposals were refused (dedupe/cap/suppression) — accept it silently;
    refusals are the anti-busywork system working.
-5. After execution completes elsewhere, evaluate outcome honestly:
-   `complete_initiative(ref, regressed=…)` — regressions are recorded as
+5. After execution completes elsewhere, delivery is confirmed by a PERSON:
+   `confirm-delivered` (only when every milestone is reached). Native
+   completion evidence is recorded by reconcile, never treated as delivery.
+   Regressions after confirmation are recorded by the observation path as
    regressions, never massaged into completions.
 
 ## Retrospective

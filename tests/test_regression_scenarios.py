@@ -119,13 +119,32 @@ def test_gateway_approval_permission_and_idempotence(engine, enabled, svc):
 # --------------------------------------------------------------------- #
 
 def test_scenario_5_regressed_initiative_flags_health_path(engine, enabled, svc, clock):
-    ini = svc.propose_initiative(enabled, title="Speed up CI", rationale="CI slow",
-                                 dedupe_key="ci-speed")
-    svc.approve_initiative(ini["ref"], actor="h", interface="cli")
-    out = svc.complete_initiative(ini["ref"], outcome={"ci_pass_rate": 0.91},
-                                  regressed=True)
+    """D-L3/R2: 'technically complete but regressed' now runs the real path.
+
+    A person confirms delivery (the ladder must be reached first), then a
+    ladder check fails and the observation path marks the initiative
+    `regressed` — with an `initiative.regressed` audit entry.
+    """
+    from .r2_helpers import ladder_for, reach_ladder
+
+    ref = svc.propose_initiative(enabled, title="Speed up CI", rationale="CI slow",
+                                 dedupe_key="ci-speed")["ref"]
+    svc.approve_initiative(ref, actor="h", interface="cli")
+    svc.start_execution(ref)
+    ladder, work = ladder_for(svc.store, svc)
+    _mid, _oid, gid, _task = reach_ladder(enabled, ref, ladder, work, svc)
+    ladder.confirm_delivered(enabled, ref, actor="h", interface="cli")
+    assert svc.initiative_by_ref(ref)["status"] == "completed"
+
+    # A goal check fails after confirmation: the observation path regresses it.
+    ladder.set_goal_check(enabled, gid, {"evaluator_type": "manual", "target": ">=1"},
+                          actor="h", interface="cli")
+    ladder.record_goal_assessment(enabled, gid, passed=False, evidence=["t:2"],
+                                  trusted_principal="h", interface="desktop")
+    assert ladder.regress_completed_if_failed(enabled, ref) is True
+    out = svc.initiative_by_ref(ref)
     assert out["status"] == "regressed"
-    actions = [r["action"] for r in svc.store.audit_tail(10)]
+    actions = [r["action"] for r in svc.store.audit_tail(20)]
     assert "initiative.regressed" in actions
 
 

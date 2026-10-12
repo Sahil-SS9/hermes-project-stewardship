@@ -3364,41 +3364,13 @@ class StewardshipService:
         self.store.audit(actor="system", interface="kanban_bridge", action="initiative.execution_started", subject=ref)
         return self.initiative_by_ref(ref)
 
-    def complete_initiative(
-        self,
-        ref: str,
-        *,
-        outcome: Dict[str, Any],
-        regressed: bool = False,
-    ) -> Dict[str, Any]:
-        """Record delivery: approved or in progress -> completed/regressed.
-
-        Nothing else can be completed: not a proposal nobody approved, not a
-        withdrawn or rejected one. Repeating the same completion returns the
-        recorded result unchanged; switching a finished initiative between
-        completed and regressed is refused.
-        """
-        new_status = InitiativeStatus.REGRESSED.value if regressed else InitiativeStatus.COMPLETED.value
-        with self.store.tx() as cx:
-            res = cx.execute(
-                "UPDATE project_initiatives SET status=?, outcome_json=?, completed_at=?"
-                " WHERE ref=? AND status IN ('approved','executing')",
-                (new_status, self.store._j(outcome), iso(self._clock()), ref),
-            )
-        if res.rowcount != 1:
-            current = self.initiative_by_ref(ref)
-            if current["status"] == new_status:
-                return current
-            raise ServiceError(
-                f"initiative {ref} cannot be completed from status={current['status']}")
-        self.store.audit(
-            actor="system",
-            interface="outcome_evaluator",
-            action="initiative.completed" if not regressed else "initiative.regressed",
-            subject=ref,
-            detail=outcome,
-        )
-        return self.initiative_by_ref(ref)
+    # NOTE (Batch L, D-L3): there is deliberately no service-level completion
+    # API. `completed` and `regressed` are written only by LadderService:
+    # `confirm_delivered` (a person, every milestone reached) writes
+    # `completed`, and `regress_completed_if_failed` (the observation path)
+    # writes `regressed`. The old `complete_initiative` was removed in 0.5.0
+    # because it let anything complete an initiative with no person and no
+    # ladder check.
 
     def bind_board(self, ref: str, board_slug: str) -> Dict[str, Any]:
         with self.store.tx() as cx:

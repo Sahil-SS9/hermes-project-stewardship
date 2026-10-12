@@ -159,26 +159,48 @@ def make_ready(app, project_id, ref):
     would not see them, so the routes' read of the ladder must go through the
     app's own CanonicalWorkService/LadderService.
     """
+    return reach_ladder(project_id, ref, app.state.ladder,
+                        app.state.canonical_work_service, app.state.svc)
+
+
+def ladder_for(store, svc, adapter=None):
+    """A LadderService and CanonicalWorkService sharing ONE in-memory adapter.
+
+    Tests that build a ladder must create the work items through the same
+    CanonicalWorkService the ladder reads: the reference adapter keeps items in
+    memory, so a second instance would not see them.
+    """
+    from hermes_project_stewardship.kanban import ReferenceKanbanAdapter
+    from hermes_project_stewardship.persistence.canonical_work_service import (
+        CanonicalWorkService,
+    )
+    from hermes_project_stewardship.persistence.ladder_service import LadderService
+    from hermes_project_stewardship.persistence.roadmap_service import RoadmapService
+
+    adapter = adapter or ReferenceKanbanAdapter(store)
+    work = CanonicalWorkService(store, adapter)
+    return LadderService(store, svc, work, RoadmapService(store, svc, work)), work
+
+
+def reach_ladder(project_id, ref, ladder, work, svc, *, actor="test-user"):
+    """Build a fully-reached ladder: milestone <- objective(passed) <- goal <-
+    one done task. Returns (milestone_id, objective_id, goal_id, task_ref)."""
     from hermes_project_stewardship.dockyard import Actor, ActorKind
     from hermes_project_stewardship.persistence.dockyard_service import DockyardService
 
-    svc = app.state.svc
-    work = app.state.canonical_work_service
-    ladder = app.state.ladder
+    human = Actor(id=actor, display_name=actor, kind=ActorKind.HUMAN)
     dy = DockyardService(work.store, canonical_work=work)
-    human = Actor(id="test-user", display_name="test-user", kind=ActorKind.HUMAN)
     mid = dy.milestone_create(project_id, "Release", actor=human)
-    ladder.set_milestone_initiative(project_id, mid, ref, actor="test-user", interface="test")
+    ladder.set_milestone_initiative(project_id, mid, ref, actor=actor, interface="test")
     oid = int(svc.add_objective(project_id, name="Obj", evaluator_type="manual",
-                                target=">=1", actor="test-user",
-                                interface="test")["id"])
-    svc.record_assessment(project_id, oid, passed=True, evidence=["t:1"],
-                          actor="test-user", interface="dockyard:human",
-                          trusted_principal="test-user")
-    ladder.set_objective_milestone(project_id, oid, mid, actor="test-user", interface="test")
+                                target=">=1", actor=actor, interface="test")["id"])
+    svc.record_assessment(project_id, oid, passed=True, evidence=["t:1"], actor=actor,
+                          interface="dockyard:human", trusted_principal=actor)
+    ladder.set_objective_milestone(project_id, oid, mid, actor=actor, interface="test")
     gid = svc.create_goal(project_id, title="Goal", objective_ids=[oid],
-                          actor="test-user", interface="test")["goal_id"]
-    ladder.set_goal_objective(project_id, gid, oid, actor="test-user", interface="test")
+                          actor=actor, interface="test")["goal_id"]
+    ladder.set_goal_objective(project_id, gid, oid, actor=actor, interface="test")
     task = work.create_item(project_id, "task", "Task", actor=human)
     work.transition(project_id, task["ref"], "done", actor=human)
-    ladder.set_task_goal(project_id, task["ref"], gid, actor="test-user", interface="test")
+    ladder.set_task_goal(project_id, task["ref"], gid, actor=actor, interface="test")
+    return mid, oid, gid, task["ref"]

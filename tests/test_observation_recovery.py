@@ -368,9 +368,14 @@ def test_completion_without_validation_contract_refused(store):
         )
 
 
-def test_completion_with_valid_identity_reconciles(store):
+def test_native_completion_is_recorded_but_leaves_initiative_executing(store):
+    """D-L3 (R2 fix 1): a native-done task is NOT delivery.
+
+    The proven native outcome is recorded as an event, but the initiative
+    stays `executing` until a person confirms through confirm_delivered.
+    """
     host = FakeObservationHost()
-    seed_initiative(store)
+    seed_initiative(store, status="executing")
     seed_observation(store)
     seed_binding(store, "demo", "t1", "ini-1")
     host.tasks["t1"] = {"id": "t1", "status": "done"}
@@ -380,12 +385,22 @@ def test_completion_with_valid_identity_reconciles(store):
         ref="ini-1", outcome={"summary": "suite green", "verified": True},
         run_id=7, task_id="t1",
     )
-    assert result["initiative_status"] == "completed"
+    # No completion behind the rule: the initiative is left executing.
+    assert result["initiative_status"] == "executing"
+    assert result["recorded"] == "native_outcome"
     row = store._conn.execute(
         "SELECT status, completed_at FROM project_initiatives WHERE ref='ini-1'"
     ).fetchone()
-    assert row["status"] == "completed"
-    assert row["completed_at"] is not None
+    assert row["status"] == "executing"
+    assert row["completed_at"] is None
+    # The native outcome is recorded for audit, with its host evidence.
+    events = [dict(r) for r in store._conn.execute(
+        "SELECT event_type, subject, payload_json FROM domain_events"
+        " WHERE event_type='stewardship.native.reconciled'")]
+    assert len(events) == 1 and events[0]["subject"] == "ini-1"
+    payload = json.loads(events[0]["payload_json"])
+    assert payload["task_id"] == "t1" and payload["run_id"] == 7
+    assert payload["host_outcome"] == "completed"
 
 
 def test_unrelated_work_not_marked_done(store):
@@ -406,9 +421,12 @@ def test_unrelated_work_not_marked_done(store):
     assert b_status == "executing"
 
 
-def test_native_blocked_outcome_blocks_initiative(store):
+def test_native_blocked_outcome_is_recorded_and_leaves_initiative_executing(store):
+    """A blocked native run is recorded, not applied: the initiative stays
+    executing. Regression after completion is the observation path's job
+    (regress_completed_if_failed), not a native reconcile's."""
     host = FakeObservationHost()
-    seed_initiative(store)
+    seed_initiative(store, status="executing")
     seed_binding(store, "demo", "t1", "ini-1")
     host.tasks["t1"] = {"id": "t1", "status": "blocked"}
     host.runs["t1"] = [{"id": 3, "outcome": "blocked", "status": "blocked"}]
@@ -420,8 +438,13 @@ def test_native_blocked_outcome_blocks_initiative(store):
     row = store._conn.execute(
         "SELECT status FROM project_initiatives WHERE ref='ini-1'"
     ).fetchone()
-    assert row["status"] == "regressed"
-    assert result["initiative_status"] == "regressed"
+    assert row["status"] == "executing"
+    assert result["initiative_status"] == "executing"
+    events = [dict(r) for r in store._conn.execute(
+        "SELECT payload_json FROM domain_events"
+        " WHERE event_type='stewardship.native.reconciled'")]
+    assert len(events) == 1
+    assert json.loads(events[0]["payload_json"])["host_outcome"] == "blocked"
 
 
 def test_host_blocked_outcome_cannot_complete_initiative(store):
@@ -790,9 +813,10 @@ def test_completion_with_wrong_project_task_refused(store):
 
 
 def test_completion_with_owned_completed_run_still_accepted(store):
-    """The happy path survives: bound task, completed run, valid contract."""
+    """The happy path survives: bound task, completed run, valid contract —
+    but the outcome is recorded without completing the initiative (D-L3)."""
     host = FakeObservationHost()
-    seed_initiative(store, ref="ini-a")
+    seed_initiative(store, ref="ini-a", status="executing")
     seed_binding(store, "demo", "t-owned", "ini-a")
     host.tasks["t-owned"] = {"id": "t-owned", "status": "done"}
     host.runs["t-owned"] = [{"id": 13, "outcome": "completed", "status": "done"}]
@@ -800,7 +824,8 @@ def test_completion_with_owned_completed_run_still_accepted(store):
     result = reconciler.complete_from_native(
         ref="ini-a", outcome={"summary": "done"}, run_id=13, task_id="t-owned",
     )
-    assert result["initiative_status"] == "completed"
+    assert result["initiative_status"] == "executing"
+    assert result["recorded"] == "native_outcome"
 
 
 def test_completion_requires_binding_when_store_tracks_it(store):
@@ -950,11 +975,12 @@ def test_failed_observation_trigger_is_retryable(store):
 # --------------------------------------------------------------------------- #
 
 
-def test_reconcile_observes_native_tasks_and_completes_initiatives(store):
+def test_reconcile_observes_native_tasks_and_records_outcomes(store):
     """The promised loop: reconcile() must drive the real chain — observe
-    bound native tasks, require host identity, and complete the matching
-    initiative when the host proves completion — not just re-run old
-    observation triggers."""
+    bound native tasks, require host identity, and record the matching
+    initiative's proven native outcome — not just re-run old observation
+    triggers. D-L3 (R2 fix 1): recording is not completing; the initiative
+    stays executing until a person confirms."""
     seed_initiative(store, ref="ini-conn", status="executing")
     seed_binding(store, "demo", "t-conn", "ini-conn")
 
@@ -982,14 +1008,19 @@ def test_reconcile_observes_native_tasks_and_completes_initiatives(store):
         " WHERE event_type='stewardship.native.task_observed'"
     ).fetchone()["n"]
     assert observed >= 1
-    # ...the initiative was completed from HOST evidence (not just the
-    # outcome payload)...
+    # ...the initiative's proven native outcome was recorded from HOST
+    # evidence (not just the outcome payload), but it is NOT completed: no
+    # person confirmed, so it stays executing...
     row = store._conn.execute(
         "SELECT status FROM project_initiatives WHERE ref='ini-conn'"
     ).fetchone()
-    assert row["status"] == "completed"
+    assert row["status"] == "executing"
+    recorded = [dict(r) for r in store._conn.execute(
+        "SELECT event_type, subject FROM domain_events"
+        " WHERE event_type='stewardship.native.reconciled'")]
+    assert [r["subject"] for r in recorded] == ["ini-conn"]
     # ...and the report says so honestly.
-    assert report["completed"] == ["ini-conn"]
+    assert report["native_reconciled"] == ["ini-conn"]
 
 
 def test_reconcile_reports_cron_trigger_and_engine_receives_cron(store):
@@ -1002,6 +1033,11 @@ def test_reconcile_reports_cron_trigger_and_engine_receives_cron(store):
     host.events["t-t"] = [{"kind": "completed", "payload": {}, "run_id": 2}]
     host.runs["t-t"] = [{"id": 2, "outcome": "completed", "status": "done"}]
 
+    # The trigger-agreement contract is proven on a project that has a pending
+    # post-delivery observation: the engine must receive exactly the report's
+    # trigger type. (Native reconcile no longer arms one itself — that happens
+    # on confirm — so seed a pending observation to drive the engine.)
+    seed_observation(store, ref="ini-t")
     engine = StubEngine("healthy")
     reconciler = make_service(store, host, engine=engine)
     report = reconciler.reconcile("demo", actor="cron",
@@ -1028,7 +1064,8 @@ def test_repeated_reconcile_observes_later_completion(store):
     """Review blocker: reconciliation is REPEATED by design. Pass 1 observes
     a running task; pass 2 (after the native task completes) must observe the
     completion — not crash on an empty claim-suppressed record, and not stay
-    silently stuck in executing.
+    silently stuck. D-L3 (R2 fix 1): the completion is RECORDED (event), and
+    the initiative stays executing until a person confirms.
 
     Deduplication must distinguish a NEW task outcome from a replay of the
     SAME observation: the claim must key on the observed state, so a state
@@ -1042,7 +1079,7 @@ def test_repeated_reconcile_observes_later_completion(store):
     reconciler = make_service(store, host)
     first = reconciler.reconcile("demo", actor="test", interface="api")
     assert first["observed_tasks"] == 1
-    assert first["completed"] == []
+    assert first["native_reconciled"] == []
 
     # Native work finishes between the two passes.
     host.tasks["task-a"] = {"id": "task-a", "status": "done"}
@@ -1050,17 +1087,18 @@ def test_repeated_reconcile_observes_later_completion(store):
     host.runs["task-a"] = [{"id": 1, "outcome": "completed", "status": "done"}]
 
     second = reconciler.reconcile("demo", actor="test", interface="api")
-    assert second["completed"] == ["ini-1"], (
-        f"second pass must observe the completion, got {second}"
+    assert second["native_reconciled"] == ["ini-1"], (
+        f"second pass must record the completion, got {second}"
     )
     status = store._conn.execute(
         "SELECT status FROM project_initiatives WHERE ref='ini-1'"
     ).fetchone()["status"]
-    assert status == "completed"
+    # Recorded, not completed: only a person confirms delivery.
+    assert status == "executing"
 
     # Pass 3 replays the SAME state: deduped (no crash, no duplicate work).
     third = reconciler.reconcile("demo", actor="test", interface="api")
-    assert third["completed"] == []
+    assert third["native_reconciled"] == []
 
 
 def test_same_state_replay_stays_deduped(store):
@@ -1144,3 +1182,73 @@ def test_observation_regresses_a_confirmed_initiative_when_a_check_fails(store):
     assert "initiative.regressed" in events
     audited = [r for r in store.audit_tail(200) if r["action"] == "initiative.regressed"]
     assert audited and audited[0]["subject"] == ref
+
+
+def test_reconcile_with_reconciliation_on_never_completes_an_initiative(store):
+    """R2 fix 1 (the blocker): with the `reconciliation` feature ON, a bound
+    native task done with a completed run is recorded — the initiative stays
+    executing. Completion then succeeds ONLY through confirm-delivered (a
+    person, and only when every milestone is reached)."""
+    from hermes_project_stewardship.events.bus import EventBus
+    from hermes_project_stewardship.persistence.service import StewardshipService
+
+    svc = StewardshipService(store)
+    svc.enable("demo", mission="m", lead_profile="lead", autonomy_level=2)
+    svc.update_features("demo", {"reconciliation": True}, actor="t", interface="t")
+    svc.attach_event_bus(EventBus(store))
+    ref = svc.propose_initiative(
+        "demo", title="Native work", rationale="value",
+        validation_contract={"steps": ["run the suite"], "tests": "suite"},
+    )["ref"]
+    svc.approve_initiative(ref, actor="sahil", interface="test")
+    svc.start_execution(ref)
+
+    # A bound native task that is done with a completed run.
+    seed_binding(store, "demo", "t-native", ref)
+    host = FakeObservationHost()
+    host.tasks["t-native"] = {"id": "t-native", "status": "done"}
+    host.events["t-native"] = [{"kind": "completed", "payload": {}, "run_id": 5}]
+    host.runs["t-native"] = [{"id": 5, "outcome": "completed", "status": "done"}]
+
+    reconciler = make_service(store, host, service=svc)
+    report = reconciler.reconcile("demo", actor="cron", interface="native-cron",
+                                  trigger_type="cron")
+    # Recorded, not completed: no person, no ladder check.
+    assert report["native_reconciled"] == [ref]
+    assert svc.initiative_by_ref(ref)["status"] == "executing"
+
+    # confirm-delivered refuses while no milestone is reached.
+    from hermes_project_stewardship.persistence.ladder_service import LadderService
+    from hermes_project_stewardship.persistence.roadmap_service import RoadmapService
+    from hermes_project_stewardship.kanban import ReferenceKanbanAdapter
+    from hermes_project_stewardship.persistence.canonical_work_service import (
+        CanonicalWorkService,
+    )
+    work = CanonicalWorkService(store, ReferenceKanbanAdapter(store))
+    ladder = LadderService(store, svc, work, RoadmapService(store, svc, work))
+    from hermes_project_stewardship.persistence.roadmap_service import RoadmapConflict
+    with pytest.raises(RoadmapConflict):
+        ladder.confirm_delivered("demo", ref, actor="sahil", interface="test")
+    assert svc.initiative_by_ref(ref)["status"] == "executing"
+
+    # Build a reached ladder, then confirm. Everything is built through the
+    # same CanonicalWorkService the ladder reads (one adapter instance).
+    from .r2_helpers import HUMAN
+    from hermes_project_stewardship.persistence.dockyard_service import DockyardService
+    dy = DockyardService(store, canonical_work=work)
+    mid = dy.milestone_create("demo", "Release", actor=HUMAN)
+    ladder.set_milestone_initiative("demo", mid, ref, actor="sahil", interface="test")
+    oid = int(svc.add_objective("demo", name="Obj", evaluator_type="manual",
+                                target=">=1", actor="sahil", interface="test")["id"])
+    svc.record_assessment("demo", oid, passed=True, evidence=["t:1"], actor="sahil",
+                          interface="dockyard:human", trusted_principal="sahil")
+    ladder.set_objective_milestone("demo", oid, mid, actor="sahil", interface="test")
+    gid = svc.create_goal("demo", title="Goal", objective_ids=[oid],
+                          actor="sahil", interface="test")["goal_id"]
+    ladder.set_goal_objective("demo", gid, oid, actor="sahil", interface="test")
+    task = work.create_item("demo", "task", "Task", actor=HUMAN)
+    work.transition("demo", task["ref"], "done", actor=HUMAN)
+    ladder.set_task_goal("demo", task["ref"], gid, actor="sahil", interface="test")
+    # Only now, through a person, does the initiative complete.
+    ladder.confirm_delivered("demo", ref, actor="sahil", interface="test")
+    assert svc.initiative_by_ref(ref)["status"] == "completed"
