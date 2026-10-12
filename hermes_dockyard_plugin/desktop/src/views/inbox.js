@@ -108,16 +108,6 @@ export function InboxView({ view, onRefresh, focusRef = null, onOpenProject }) {
     if (items.some((item) => item.ref === focusRef)) setSelectedRef(focusRef)
   }, [focusRef, items])
   useEffect(() => {
-    const handle = (event) => {
-      const link = event.detail
-      if (typeof link !== 'string' || !link.startsWith('s6:initiative/')) return
-      const ref = link.slice('s6:initiative/'.length)
-      if (items.some((item) => item.ref === ref)) setSelectedRef(ref)
-    }
-    window.addEventListener('dockyard:test:deeplink', handle)
-    return () => window.removeEventListener('dockyard:test:deeplink', handle)
-  }, [items])
-  useEffect(() => {
     const close = (event) => {
       if (event.key !== 'Escape' || !selectedRef) return
       const ref = selectedRef

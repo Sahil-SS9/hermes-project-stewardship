@@ -200,7 +200,7 @@ export function BacklogBoard(ctx) {
       jsx('button', { type: 'button', 'data-transfer-retry': operation.op_id, onClick: () => retryTransfer(operation.op_id), children: 'Retry remaining items' }),
     ] }, operation.op_id)),
     entries.length > 0 ? jsxs('section', { className: 'dockyard-backlog-list', 'data-backlog-table': true, children: [
-      !window.__V4_DISABLE?.has('cmdbar') ? jsxs('div', { className: 'dockyard-cmdbar', 'data-column-filters': true, children: [
+      jsxs('div', { className: 'dockyard-cmdbar', 'data-column-filters': true, children: [
         jsxs('label', { className: 'cm-search', children: [
           jsx(Icon, { name: 'search' }, 'v4-search'),
           jsx('input', { type: 'search', 'data-cm-search': true, 'aria-label': 'Search backlog', placeholder: 'Search backlog', value: search, onInput: (event) => setSearch(event.target.value) }),
@@ -276,8 +276,8 @@ export function BacklogBoard(ctx) {
           sortKey !== 'rank' ? `sorted by ${sortLabels[sortKey]}` : '',
           groupBy !== 'none' ? `grouped by ${GROUP_LABELS[groupBy]}` : '',
         ].filter(Boolean).join(' · '), children: treeRows.length === entries.length ? `${number(entries.length)} items` : `${number(treeRows.length)} of ${number(entries.length)}` }),
-      ] }) : null,
-      !window.__V4_DISABLE?.has('head') ? jsxs('div', { className: 'tree-head', children: [
+      ] }),
+      jsxs('div', { className: 'tree-head', children: [
         jsx('span', { className: 'th-gutter' }),
         sortHeader('rank', 'Rank', 'th-rank'),
         sortHeader('type', 'Type', 'th-type'),
@@ -288,12 +288,12 @@ export function BacklogBoard(ctx) {
         sortHeader('age', 'Age', 'th-age'),
         jsx('span', { className: 'th-reason', children: 'Priority reason' }),
         jsx('span', { className: 'th-act', 'aria-label': 'Actions' }),
-      ] }) : null,
-      !window.__V4_DISABLE?.has('head') && treeRows.length === 0 ? jsxs('div', { className: 'tree-group-head', 'data-no-matches': true, children: [
+      ] }),
+      treeRows.length === 0 ? jsxs('div', { className: 'tree-group-head', 'data-no-matches': true, children: [
         jsx('span', { children: hasFilters ? 'No items match the current search and filters.' : 'No backlog items to show.' }),
         hasFilters ? jsx('button', { type: 'button', className: 'cm-chip', onClick: resetFilters, children: 'Clear filters' }) : null,
       ] }) : null,
-      ...(window.__V4_DISABLE?.has('rows') ? [] : groups.flatMap(([label, rows], gi) => [
+      ...groups.flatMap(([label, rows], gi) => [
         label !== null ? jsxs('div', { className: 'tree-group-head', children: [
           jsx('span', { children: label }),
           jsx('span', { className: 'grp-count', children: `· ${rows.length}` }),
@@ -442,8 +442,8 @@ export function BacklogBoard(ctx) {
             ],
           }, ref)
         }),
-      ])),
-      !window.__V4_DISABLE?.has('popover') && bulkSelected.length ? jsxs('div', { className: 'sel-pop', 'data-selection-popover': true, onClick: (event) => event.stopPropagation(), children: [
+      ]),
+      bulkSelected.length ? jsxs('div', { className: 'sel-pop', 'data-selection-popover': true, onClick: (event) => event.stopPropagation(), children: [
         jsx('span', { className: 'sel-count', children: `${bulkSelected.length} selected` }),
         jsx('span', { className: 'sel-sep' }),
         jsxs('select', { 'data-pop-target': true, 'aria-label': 'Bulk target', defaultValue: '', children: [
@@ -471,9 +471,9 @@ export function BacklogBoard(ctx) {
       ] }) : null,
     ] }) : (q ? jsx(EmptyState, { title: 'No matches', description: `Nothing in the backlog matches “${search}”. Clear the filter to see all items.`, icon: 'project', children: jsx(Button, { small: true, onClick: () => setSearch(''), children: 'Clear filter' }) }) : jsx(EmptyState, { title: 'No ranked backlog items', description: 'Work items appear here after they are added to the project backlog.', icon: 'project' })),
     detailItem ? jsx(WorkItemDetail, { item: detailItem, projectId: project.id, profiles: view.profiles ?? [], initiatives: view.initiatives ?? [], onClose: () => setDetailItem(null), onRefresh }) : null,
-    !window.__V4_DISABLE?.has('wizard') ? jsx(BacklogImportWizard, {
+    jsx(BacklogImportWizard, {
       project, importOpen, importStep, importText, importMode, importRows, importValid, importError, importBusy, importResult, importSelected, importWarningsOnly, importColumnMetadata, setImportMode, setImportText, setImportRows, setImportValid, setImportError, setImportBusy, setImportStep, setImportSelected, closeImport, parseImport, runImport, api,
-    }) : null,
+    }),
     jsx(BacklogReasonModal, { pendingMove, reason, setReason, error, saving, pendingParentItem, pendingParentRef, pendingParentChoices, pendingParentChanged, saveParent, saveMove, setPendingMove, typeLabel }),
     jsxs('section', {
       className: 'dockyard-modal-layer',

@@ -14,7 +14,7 @@ export function BacklogImportWizard(props) {
     setImportRows, setImportValid, setImportError, setImportBusy, setImportStep,
     setImportSelected, closeImport, parseImport, runImport, api,
   } = props
-  return !window.__V4_DISABLE?.has('wizard') ? jsxs('section', { className: 'dockyard-modal-layer', 'data-bulk-import-layer': true, hidden: !importOpen, children: [
+  return jsxs('section', { className: 'dockyard-modal-layer', 'data-bulk-import-layer': true, hidden: !importOpen, children: [
       jsxs('div', { className: 'dockyard-modal dockyard-onboarding', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'dockyard-import-title', children: [
         jsxs('header', { className: 'dockyard-onboarding-head', children: [
           jsxs('div', { children: [
@@ -205,5 +205,5 @@ importStep === 2 ? (importValid ? jsx(Button, { action: 'confirm-bulk-import', v
           ] }),
         ] }),
       ] }),
-    ] }) : null
+    ] })
 }

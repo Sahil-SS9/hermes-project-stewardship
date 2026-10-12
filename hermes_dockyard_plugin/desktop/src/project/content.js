@@ -130,7 +130,7 @@ export function ProjectContentPanel({ project, content, onRefresh }) {
         : previewState === 'ready' && selected?.preview_kind === 'image' && selected.data_base64
           ? jsx('img', { 'data-content-preview': true, 'data-preview-kind': 'image', className: 'dockyard-content-image', alt: selected.filename, src: `data:${selected.media_type};base64,${selected.data_base64}` })
         : previewState === 'ready' && selected?.preview_kind === 'pdf' && mediaUrl
-          ? jsx('iframe', { 'data-content-preview': true, 'data-preview-kind': 'pdf', className: 'dockyard-content-pdf', title: `PDF preview: ${selected.filename}`, src: mediaUrl })
+          ? jsx('iframe', { 'data-content-preview': true, 'data-preview-kind': 'pdf', className: 'dockyard-content-pdf', title: `PDF preview: ${selected.filename}`, src: mediaUrl, sandbox: 'allow-same-origin' })
         : previewState === 'ready' && selected?.preview_kind === 'video' && mediaUrl
           ? jsx('video', { 'data-content-preview': true, 'data-preview-kind': 'video', className: 'dockyard-content-video', controls: true, preload: 'metadata', 'aria-label': `Video: ${selected.filename}`, src: mediaUrl })
         : previewState === 'ready'

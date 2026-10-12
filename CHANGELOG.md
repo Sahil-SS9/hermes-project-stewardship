@@ -6,6 +6,39 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [0.5.1] - 2026-10-12
 
+### Fixed
+
+The security and correctness fixes from the catalog review
+(hermes-agent PR #136752), completed and verified:
+
+- The Kanban host no longer writes process-global `HERMES_KANBAN_HOME`:
+  it scopes only through the context-local Hermes-home override and takes its
+  board root from Hermes core (`kanban_db.kanban_home()`), so core's own
+  Kanban reads/writes and every other thread keep the shared board.
+  `stewardctl --hermes-home` sets `HERMES_HOME` for its own process and
+  restores it.
+- Desktop "Match Hermes" reads the mode through the plugin SDK's `useTheme()`
+  (rendered surface first, resolved mode second), never the app's markup.
+  Outside Hermes the system setting decides.
+- Guarded Kanban transfers assign through core's `assign_task`, so the
+  `assigned` event the respawn guard reads exists and the failure streak
+  resets.
+- "Evaluate now" applies the same command-evaluator autonomy gate as the
+  cycle: below the `run_command_evaluator` level, a check command is not run
+  and the attempt is recorded as refused.
+- Agent workflow revisions check added steps' assignees against project and
+  bound-team membership before auto-applying (unknown profiles are refused),
+  and the recorded proposer is the authenticated principal, not the request
+  body.
+- Desktop: the popup poller's interval is cleared on `pagehide` and re-armed
+  on `pageshow`; PDF previews render in a `sandbox="allow-same-origin"`
+  frame.
+
+### Removed
+
+- The `__V4_DISABLE` view gating and the `dockyard:test:deeplink` test-only
+  event listener.
+
 ### Added
 - **Objective descriptions from the CLI.** `stewardctl objective add
   --description` sets an objective's description, and the new `stewardctl
@@ -47,7 +80,6 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   Exit-code objectives (such as `>=1`) still measure 0 and fail as before.
 
   (by @appletechie)
-
 ## [0.5.0] - 2026-10-12
 
 The delivery model becomes a strict ladder: **Task -> Goal -> Objective ->

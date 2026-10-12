@@ -151,13 +151,27 @@ test('deep link s6:initiative/<ref> selects that row via focusRef', { timeout: 3
   await page.locator('[data-inbox-row]').first().waitFor()
   const ref = await page.locator('[data-inbox-row]').first().getAttribute('data-inbox-ref')
   assert.ok(ref, 'the row exposes its ref')
-  // The shell contract: selecting with focusRef (deep link) highlights the row.
-  await page.evaluate((target) => {
-    window.dispatchEvent(new CustomEvent('dockyard:test:deeplink', { detail: `s6:initiative/${target}` }))
-  }, ref)
-  await page.locator('[data-inbox-row][aria-selected="true"]').waitFor()
+  // The real deep-link surface: the command palette opens s6:initiative/<ref>
+  // (catalog review, PR #136752 — the synthetic test event is gone).
+  await page.keyboard.press('Control+k')
+  const search = page.locator('input[aria-label="Search projects, work and initiatives"]')
+  await search.fill(ref)
+  await page.locator('#dockyard-search-results button').first().click()
+  await page.locator('[data-inbox-screen="true"]').waitFor()
+  await page.locator(`[data-inbox-row][aria-selected="true"]`).waitFor()
   const selected = await page.locator('[data-inbox-row][aria-selected="true"]').getAttribute('data-inbox-ref')
   assert.equal(selected, ref, 'the deep-linked row is the selected row')
+  // The old test-only event must do nothing: the production listener is gone.
+  // A second row's ref: the old hook would have moved the selection to it.
+  const other = await page.locator('[data-inbox-row]').nth(1).getAttribute('data-inbox-ref')
+  assert.ok(other && other !== ref, 'a second row exists with a different ref')
+  await page.evaluate((target) => {
+    window.dispatchEvent(new CustomEvent('dockyard:test:deeplink', { detail: `s6:initiative/${target}` }))
+  }, other)
+  await page.waitForTimeout(300)
+  const still = await page.locator('[data-inbox-row][aria-selected="true"]').getAttribute('data-inbox-ref')
+  assert.equal(still, ref, 'a synthetic deeplink event no longer moves the selection')
+
 })
 
 test('390px: the detail opens full width with Back, and nothing scrolls sideways', { timeout: 300000 }, async () => {

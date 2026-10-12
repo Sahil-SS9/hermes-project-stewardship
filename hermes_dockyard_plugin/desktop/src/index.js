@@ -174,6 +174,19 @@ function startPopupPoller(ctxRest) {
   window.setTimeout(tick, 1500)
 }
 
+// The interval is the plugin's own timer: clear it when the surface unloads
+// (pagehide) and re-arm when the surface returns (pageshow); the guard inside
+// startPopupPoller keeps a fresh load from stacking a second timer
+// (catalog review, PR #136752).
+function stopPopupPoller() {
+  if (!window.__dockyardPopupPoller) return
+  clearInterval(window.__dockyardPopupPoller)
+  window.__dockyardPopupPoller = undefined
+}
+
+window.addEventListener('pagehide', stopPopupPoller)
+window.addEventListener('pageshow', () => startPopupPoller())
+
 const __plugin = {
   id: 'hermes-project-stewardship',
   name: 'Hermes Project Stewardship',

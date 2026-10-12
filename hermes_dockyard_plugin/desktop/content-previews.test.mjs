@@ -80,3 +80,30 @@ test('Content shows images, PDFs and videos from their stored bytes; videos may 
     await browser.close()
   }
 })
+test('the PDF preview is sandboxed (catalog review, PR #136752)', { timeout: 120000 }, async () => {
+  assert.ok(BASE, 'Run via run-browser-suite.mjs')
+  const browser = await chromium.launch({ headless: true })
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+    page.setDefaultTimeout(10000)
+    await page.goto(BASE, { waitUntil: 'networkidle' })
+    await page.getByRole('button', { name: 'Project context', exact: true }).click()
+    await page.getByRole('combobox', { name: 'Find project' }).fill(PROJECT)
+    await page.getByRole('listbox', { name: 'Projects' }).getByRole('option', { name: PROJECT, exact: true }).click()
+    await page.locator('[data-tab="project"]').click()
+    await page.locator('[data-project-view="content"]').click()
+    const name = `sandbox-check-${Date.now().toString(36)}.pdf`
+    await page.locator('[data-content-file]').setInputFiles({ name, mimeType: 'application/pdf', buffer: PDF })
+    await page.locator('[data-action="upload-project-content"]').click()
+    const item = page.locator('[data-project-content-item]').filter({ hasText: name }).first()
+    await item.waitFor()
+    await item.click()
+    const frame = page.locator('[data-content-preview][data-preview-kind="pdf"]')
+    await frame.waitFor()
+    const sandbox = await frame.getAttribute('sandbox')
+    assert.ok(sandbox && sandbox.includes('allow-same-origin'), `blob PDFs render inside the plugin origin (${sandbox})`)
+    assert.ok(!sandbox.includes('allow-scripts'), 'PDF previews run no scripts')
+  } finally {
+    await browser.close()
+  }
+})
