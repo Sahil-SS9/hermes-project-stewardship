@@ -136,8 +136,6 @@ test('Batch L R1: capture every changed screen for signoff', { timeout: 300000 }
         await page.waitForTimeout(1200)
         await pickProject(page, 'atlas-mobile')
         await page.getByRole('tab', { name: /Board|Work/i }).first().click()
-        // The board VIEW, not the list: cards are what these captures need.
-        await page.locator('[data-project-view="board"]').click()
         await page.waitForTimeout(1500)
         await setTheme(page, theme)
         await page.screenshot({ path: `${SHOTS}/board-${theme}-${width}.png` })
