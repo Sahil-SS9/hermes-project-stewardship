@@ -271,6 +271,7 @@ class CanvasPlanDocumentRequest(BaseModel):
 class CanvasPlanBacklogRequest(BaseModel):
     step_orders: List[int]
     actor: str = "system"
+    goal_id: Optional[Any] = None
 
 
 class CanvasPlanStepsRequest(BaseModel):
@@ -1633,7 +1634,10 @@ def create_app(
         try:
             return PlanDocumentService(store).create_backlog_items(
                 project_id, plan_id, step_orders=body.step_orders,
-                actor=_principal_id(body.actor), work=work)
+                actor=_principal_id(body.actor), work=work,
+                goal_id=body.goal_id,
+                place_task_goal=lambda pid, ref, gid, actor: _ladder.set_task_goal(
+                    pid, ref, gid, actor=actor, interface="plan"))
         except PlanConflictError as exc:
             raise HTTPException(409, str(exc)) from exc
         except CanvasConflictError as exc:

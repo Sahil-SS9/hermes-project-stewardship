@@ -29,6 +29,11 @@ export function WorkItemDetail({ item, projectId, profiles, initiatives = [], on
   // refreshed record, not the stale inbox list item, so consecutive edits and
   // re-edits both reach the backend.
   const [baseline, setBaseline] = useState(null)
+  // Batch L: the goal this task works towards (one parent), read from the
+  // roadmap ladder and edited via PUT tasks/{ref}/goal.
+  const [goals, setGoals] = useState([])
+  const [currentGoal, setCurrentGoal] = useState(null)
+  const [goalDraft, setGoalDraft] = useState(null)
   const rebaseFromDetail = (result) => {
     if (!result) return null
     const current = result.work_item ?? {}
@@ -132,6 +137,17 @@ export function WorkItemDetail({ item, projectId, profiles, initiatives = [], on
     if (!item) return undefined
     const guard = { current: { alive: true, ref: item.ref } }
     loadDetail(item.ref, guard)
+    // The project's goals (for the picker) and this task's current goal.
+    api(`/roadmap?project_id=${encodeURIComponent(projectId || item.project_id)}`)
+      .then((result) => {
+        if (!guard.current.alive) return
+        const project = (result?.projects ?? [])[0] ?? {}
+        setGoals(project.goals ?? [])
+        const owner = (project.goals ?? []).find((goal) =>
+          (goal.tasks ?? []).some((task) => task.ref === item.ref))
+        setCurrentGoal(owner ? String(owner.id) : '')
+      })
+      .catch(() => { if (guard.current.alive) { setGoals([]); setCurrentGoal('') } })
     return () => {
       // Any response arriving after this cleanup is obsolete: the drawer now
       // shows a different item (effect re-ran) or is unmounted.
@@ -188,6 +204,16 @@ export function WorkItemDetail({ item, projectId, profiles, initiatives = [], on
           method: 'POST',
           body: { status: draft.status },
         })
+      }
+      // Batch L: a goal change is a ladder placement (one parent), not a field
+      // patch. null unplaces the task ("Not placed yet").
+      if (goalDraft !== null && goalDraft !== (currentGoal ?? '')) {
+        await api(`/projects/${encodeURIComponent(projectIdResolved)}/tasks/${encodeURIComponent(item.ref)}/goal`, {
+          method: 'PUT',
+          body: { parent_id: goalDraft === '' ? null : goalDraft },
+        })
+        setCurrentGoal(goalDraft)
+        setGoalDraft(null)
       }
       // Rebase onto canonical state so the NEXT edit diffs against reality
       // (round-4 Residual B): a second edit back to the original must send
@@ -304,6 +330,10 @@ export function WorkItemDetail({ item, projectId, profiles, initiatives = [], on
               jsx('option', { value: '', children: 'No initiative' }, 'none'),
               ...initiatives.map((initiative) => jsx('option', { value: initiative.ref, children: `${initiative.ref} / ${initiative.title}` }, initiative.ref)),
               draft?.initiative_ref && !initiatives.some((initiative) => initiative.ref === draft.initiative_ref) ? jsx('option', { value: draft.initiative_ref, children: `${draft.initiative_ref} (current)` }, 'current-initiative') : null,
+            ] })] }),
+            jsxs('label', { className: 'dockyard-field', children: [jsx('span', { className: 'field-optional-hint', children: 'Goal' }), jsx('select', { 'aria-label': 'Goal', value: goalDraft ?? currentGoal ?? '', disabled: busy, onChange: (event) => setGoalDraft(event.target.value), children: [
+              jsx('option', { value: '', children: 'Not placed yet' }, 'none'),
+              ...goals.map((goal) => jsx('option', { value: String(goal.id), children: goal.title }, String(goal.id))),
             ] })] }),
             jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Evidence refs (optional)' }), jsx('input', { 'aria-label': 'Evidence refs', placeholder: 'Comma-separated refs', value: draft?.evidence_refs ?? '', onChange: (event) => setDraft({ ...draft, evidence_refs: event.target.value }) })] }),
             jsxs('label', { className: 'dockyard-field', children: [jsx('span', { children: 'Labels (optional)' }), jsx('input', { 'aria-label': 'Labels', placeholder: 'Comma-separated labels', value: draft?.labels ?? '', onChange: (event) => setDraft({ ...draft, labels: event.target.value }) })] }),

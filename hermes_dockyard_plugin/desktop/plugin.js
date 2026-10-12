@@ -7735,6 +7735,9 @@ function WorkItemDetail({ item, projectId, profiles, initiatives = [], onClose, 
   const [parentReason, setParentReason] = useState("");
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [baseline, setBaseline] = useState(null);
+  const [goals, setGoals] = useState([]);
+  const [currentGoal, setCurrentGoal] = useState(null);
+  const [goalDraft, setGoalDraft] = useState(null);
   const rebaseFromDetail = (result) => {
     if (!result) return null;
     const current = result.work_item ?? {};
@@ -7843,6 +7846,18 @@ function WorkItemDetail({ item, projectId, profiles, initiatives = [], onClose, 
     if (!item) return void 0;
     const guard = { current: { alive: true, ref: item.ref } };
     loadDetail(item.ref, guard);
+    api(`/roadmap?project_id=${encodeURIComponent(projectId || item.project_id)}`).then((result) => {
+      if (!guard.current.alive) return;
+      const project = (result?.projects ?? [])[0] ?? {};
+      setGoals(project.goals ?? []);
+      const owner = (project.goals ?? []).find((goal) => (goal.tasks ?? []).some((task2) => task2.ref === item.ref));
+      setCurrentGoal(owner ? String(owner.id) : "");
+    }).catch(() => {
+      if (guard.current.alive) {
+        setGoals([]);
+        setCurrentGoal("");
+      }
+    });
     return () => {
       guard.current.alive = false;
     };
@@ -7898,6 +7913,14 @@ function WorkItemDetail({ item, projectId, profiles, initiatives = [], onClose, 
           method: "POST",
           body: { status: draft.status }
         });
+      }
+      if (goalDraft !== null && goalDraft !== (currentGoal ?? "")) {
+        await api(`/projects/${encodeURIComponent(projectIdResolved)}/tasks/${encodeURIComponent(item.ref)}/goal`, {
+          method: "PUT",
+          body: { parent_id: goalDraft === "" ? null : goalDraft }
+        });
+        setCurrentGoal(goalDraft);
+        setGoalDraft(null);
       }
       await loadDetail(item.ref);
       setParentReason("");
@@ -8036,6 +8059,10 @@ function WorkItemDetail({ item, projectId, profiles, initiatives = [], onClose, 
               jsx("option", { value: "", children: "No initiative" }, "none"),
               ...initiatives.map((initiative) => jsx("option", { value: initiative.ref, children: `${initiative.ref} / ${initiative.title}` }, initiative.ref)),
               draft?.initiative_ref && !initiatives.some((initiative) => initiative.ref === draft.initiative_ref) ? jsx("option", { value: draft.initiative_ref, children: `${draft.initiative_ref} (current)` }, "current-initiative") : null
+            ] })] }),
+            jsxs("label", { className: "dockyard-field", children: [jsx("span", { className: "field-optional-hint", children: "Goal" }), jsx("select", { "aria-label": "Goal", value: goalDraft ?? currentGoal ?? "", disabled: busy, onChange: (event) => setGoalDraft(event.target.value), children: [
+              jsx("option", { value: "", children: "Not placed yet" }, "none"),
+              ...goals.map((goal) => jsx("option", { value: String(goal.id), children: goal.title }, String(goal.id)))
             ] })] }),
             jsxs("label", { className: "dockyard-field", children: [jsx("span", { children: "Evidence refs (optional)" }), jsx("input", { "aria-label": "Evidence refs", placeholder: "Comma-separated refs", value: draft?.evidence_refs ?? "", onChange: (event) => setDraft({ ...draft, evidence_refs: event.target.value }) })] }),
             jsxs("label", { className: "dockyard-field", children: [jsx("span", { children: "Labels (optional)" }), jsx("input", { "aria-label": "Labels", placeholder: "Comma-separated labels", value: draft?.labels ?? "", onChange: (event) => setDraft({ ...draft, labels: event.target.value }) })] }),
@@ -11187,6 +11214,8 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
   const [planPanel, setPlanPanel] = useState(null);
   const [planBusy, setPlanBusy] = useState(false);
   const [backlogConfirm, setBacklogConfirm] = useState(null);
+  const [backlogGoal, setBacklogGoal] = useState("");
+  const [backlogGoals, setBacklogGoals] = useState([]);
   const [boards, setBoards] = useState([]);
   const [boardListOpen, setBoardListOpen] = useState(true);
   const [boardBusy, setBoardBusy] = useState(false);
@@ -12374,11 +12403,12 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
     const at = boardRef.current;
     setPlanBusy(true);
     try {
-      const result = await api(`/projects/${encoded}/plans/${encodeURIComponent(planPanel.plan_id)}/backlog`, { method: "POST", body: { step_orders: backlogConfirm } });
+      const result = await api(`/projects/${encoded}/plans/${encodeURIComponent(planPanel.plan_id)}/backlog`, { method: "POST", body: { step_orders: backlogConfirm, goal_id: backlogGoal === "" ? null : backlogGoal } });
       if (boardRef.current !== at) return;
       setPlanPanel((current) => ({ ...current ?? {}, backlog_created: result.backlog_created ?? [] }));
       setNotice({ tone: "ok", text: `${number((result.created ?? []).length)} backlog item(s) created: ${(result.created ?? []).map((row) => row.ref).join(", ")}.` });
       setBacklogConfirm(null);
+      setBacklogGoal("");
       onRefresh?.();
     } catch (failure) {
       if (boardRef.current === at) setNotice({ tone: "danger", text: `Backlog creation failed: ${failureText2(failure)}` });
@@ -12386,6 +12416,18 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       if (boardRef.current === at) setPlanBusy(false);
     }
   };
+  useEffect(() => {
+    if (!backlogConfirm?.length) return void 0;
+    let alive = true;
+    api(`/roadmap?project_id=${encoded}`).then((result) => {
+      if (alive) setBacklogGoals((result?.projects ?? [])[0]?.goals ?? []);
+    }).catch(() => {
+      if (alive) setBacklogGoals([]);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [backlogConfirm?.length, encoded]);
   const renderConnectors = () => {
     const byId = new Map(objects.map((item) => [item.id, item]));
     const laid = layoutConnectors(objects.map((item) => ({ ...item, ...canvasRect(item) })), connectors, (meaning) => CANVAS_MEANING_LABELS[meaning] ?? meaning, CANVAS_WORLD);
@@ -12557,8 +12599,15 @@ function PlanningCanvasPanel({ project, canvas: initialCanvas, content = [], onR
       ] }),
       backlogConfirm?.length ? jsxs("div", { className: "dy-pc-proposal", "data-canvas-backlog-confirm": true, children: [
         jsx("small", { children: `Create ${number(backlogConfirm.length)} backlog item(s)? One confirm per batch, nothing auto-runs.` }),
+        jsxs("label", { className: "dockyard-field", children: [jsx("span", { className: "field-optional-hint", children: "Goal (optional)" }), jsx("select", { "aria-label": "Goal", value: backlogGoal, onChange: (event) => setBacklogGoal(event.target.value), children: [
+          jsx("option", { value: "", children: "Not placed yet" }, "none"),
+          ...backlogGoals.map((goal) => jsx("option", { value: String(goal.id), children: goal.title }, String(goal.id)))
+        ] })] }),
         jsx(Button, { small: true, variant: "primary", action: "confirm-backlog-from-plan", disabled: planBusy, onClick: createBacklogItems, children: "Confirm create" }),
-        jsx(Button, { small: true, action: "cancel-backlog-from-plan", disabled: planBusy, onClick: () => setBacklogConfirm(null), children: "Cancel" })
+        jsx(Button, { small: true, action: "cancel-backlog-from-plan", disabled: planBusy, onClick: () => {
+          setBacklogConfirm(null);
+          setBacklogGoal("");
+        }, children: "Cancel" })
       ] }) : null
     ] }, "plan") : null
   ];
@@ -24595,8 +24644,7 @@ function AppSettingsView({ view, selectedProject, appearance, onAppearance, onOp
   ] });
 }
 
-// hermes_dockyard_plugin/desktop/src/views/roadmap.js
-var CONTRACT_STATUS = { active: "Active", paused: "Paused", done: "Done", cleared: "Cleared" };
+// hermes_dockyard_plugin/desktop/src/views/roadmap-dialogs.js
 var PLACE_KIND = {
   milestone: {
     title: "Place a milestone under an initiative",
@@ -24623,6 +24671,153 @@ var PLACE_KIND = {
     candidates: (project) => (project.goals ?? []).map((row) => ({ id: row.id, label: row.title }))
   }
 };
+function PlaceDialog({ kind, itemId, projectId, projectLabel, onClose, onDone }) {
+  const spec = PLACE_KIND[kind];
+  const [candidates, setCandidates] = useState(null);
+  const [parent, setParent] = useState("");
+  const [step, setStep] = useState("choose");
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useDialogFocusManager(`[data-rm-place-dialog][data-rm-step="${step}"] .dy-rm-modal`);
+  useEffect(() => {
+    let current = true;
+    loadRoadmapData(projectId).then((result) => {
+      if (!current) return;
+      const project = result.projects?.[0];
+      setCandidates(project ? spec.candidates(project) : []);
+    }).catch((failure) => {
+      if (current) setError(String(failure?.message ?? failure));
+    });
+    return () => {
+      current = false;
+    };
+  }, []);
+  const parentLabel = candidates?.find((row) => row.id === parent)?.label ?? "";
+  const ready = Boolean(candidates && parent);
+  const submit = async (nextParent) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(spec.path(projectId, itemId), { method: "PUT", body: { parent_id: nextParent } });
+      emitToast("success", nextParent === null ? `Removed the parent of \u201C${itemId}\u201D. It is now not placed yet.` : `Placed \u201C${itemId}\u201D under \u201C${parentLabel}\u201D.`);
+      onDone();
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+      setBusy(false);
+    }
+  };
+  const field = (id, label, value, onChange, options) => jsxs("label", { htmlFor: id, children: [
+    label,
+    jsx("select", { id, value, onChange: (event) => onChange(event.target.value), children: options })
+  ] });
+  const choose = jsxs("div", { className: "dy-rm-modal-body", children: [
+    candidates === null && !error ? jsx("p", { role: "status", children: "Loading choices\u2026" }) : null,
+    candidates && candidates.length === 0 ? jsx("p", { children: `Nothing to place it under: this project has no candidates yet. Create one on the project screen first.` }) : null,
+    candidates && candidates.length > 0 ? field(
+      "dy-rm-place-choice",
+      spec.itemLabel === "Milestone" ? "Initiative" : spec.itemLabel === "Objective" ? "Milestone" : spec.itemLabel === "Goal" ? "Objective" : "Goal",
+      parent,
+      setParent,
+      [
+        jsx("option", { value: "", children: "Choose\u2026" }, ""),
+        ...candidates.map((row) => jsx("option", { value: row.id, children: row.label }, row.id))
+      ]
+    ) : null,
+    jsx("p", { className: "dy-rm-modal-error", role: "alert", children: error })
+  ] });
+  const confirm = jsxs("div", { className: "dy-rm-modal-body", "data-rm-place-confirm": true, children: [
+    jsx("p", { className: "dy-rm-confirm", children: `Place the ${spec.itemLabel.toLowerCase()} \u201C${itemId}\u201D under \u201C${parentLabel}\u201D?` }),
+    jsx("p", { className: "dy-rm-confirm", children: "This records one placement and an audit entry under your name." }),
+    jsx("p", { className: "dy-rm-modal-error", role: "alert", children: error })
+  ] });
+  return jsx("div", {
+    className: "dy-rm-modal-backdrop",
+    "data-rm-place-dialog": true,
+    "data-rm-step": step,
+    onKeyDown: (event) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onClose();
+      }
+    },
+    children: jsxs("section", { className: "dy-rm-modal", role: "dialog", "aria-modal": true, "aria-label": spec.title, children: [
+      jsxs("header", { className: "dy-rm-modal-head", children: [
+        jsxs("div", { children: [
+          jsx("p", { className: "dockyard-meta", children: "Place" }),
+          jsx("h3", { children: spec.title }),
+          jsx("p", { children: `Project ${projectLabel}` })
+        ] }),
+        jsx(Button, { onClick: onClose, ariaLabel: "Close place dialog", children: "\xD7" })
+      ] }),
+      step === "choose" ? choose : confirm,
+      step === "choose" ? jsxs("div", { className: "dy-rm-modal-actions", children: [
+        jsx(Button, { onClick: onClose, children: "Cancel" }),
+        jsx(Button, { variant: "primary", disabled: !ready, onClick: () => {
+          setError(null);
+          setStep("confirm");
+        }, children: "Continue" })
+      ] }) : jsxs("div", { className: "dy-rm-modal-actions", children: [
+        jsx(Button, { disabled: busy, onClick: () => {
+          setError(null);
+          setStep("choose");
+        }, children: "Back" }),
+        jsx(Button, { variant: "primary", disabled: busy, onClick: () => submit(parent), children: busy ? "Placing\u2026" : "Place" })
+      ] })
+    ] })
+  });
+}
+function ConfirmDeliveredDialog({ projectId, ref, title, onClose, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  useDialogFocusManager("[data-rm-confirm-dialog] .dy-rm-modal");
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(
+        `/projects/${encodeURIComponent(projectId)}/initiatives/${encodeURIComponent(ref)}/confirm-delivered`,
+        { method: "POST", body: {} }
+      );
+      emitToast("success", `\u201C${title}\u201D confirmed as delivered.`);
+      onDone();
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+      setBusy(false);
+    }
+  };
+  return jsx("div", {
+    className: "dy-rm-modal-backdrop",
+    "data-rm-confirm-dialog": true,
+    onKeyDown: (event) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onClose();
+      }
+    },
+    children: jsxs("section", { className: "dy-rm-modal", role: "dialog", "aria-modal": true, "aria-label": "Confirm as delivered", children: [
+      jsxs("header", { className: "dy-rm-modal-head", children: [
+        jsxs("div", { children: [
+          jsx("p", { className: "dockyard-meta", children: "Confirm" }),
+          jsx("h3", { children: "Confirm as delivered" }),
+          jsx("p", { children: `Project ${projectId}` })
+        ] }),
+        jsx(Button, { onClick: onClose, ariaLabel: "Close confirm dialog", children: "\xD7" })
+      ] }),
+      jsxs("div", { className: "dy-rm-modal-body", "data-rm-confirm-body": true, children: [
+        jsx("p", { className: "dy-rm-confirm", children: `Confirm \u201C${title}\u201D as delivered? Every milestone is reached.` }),
+        jsx("p", { className: "dy-rm-confirm", children: "This records the delivery under your name and an audit entry." }),
+        jsx("p", { className: "dy-rm-modal-error", role: "alert", children: error })
+      ] }),
+      jsxs("div", { className: "dy-rm-modal-actions", children: [
+        jsx(Button, { disabled: busy, onClick: onClose, children: "Cancel" }),
+        jsx(Button, { variant: "primary", disabled: busy, onClick: submit, children: busy ? "Confirming\u2026" : "Confirm as delivered" })
+      ] })
+    ] })
+  });
+}
+
+// hermes_dockyard_plugin/desktop/src/views/roadmap.js
+var CONTRACT_STATUS = { active: "Active", paused: "Paused", done: "Done", cleared: "Cleared" };
 var STATE_LABEL = {
   not_started: "Not started",
   in_progress: "In progress",
@@ -24923,150 +25118,6 @@ function Drawer({ type, body, onClose, onOpen }) {
       ] })
     ] })
   ] });
-}
-function PlaceDialog({ kind, itemId, projectId, projectLabel, onClose, onDone }) {
-  const spec = PLACE_KIND[kind];
-  const [candidates, setCandidates] = useState(null);
-  const [parent, setParent] = useState("");
-  const [step, setStep] = useState("choose");
-  const [error, setError] = useState(null);
-  const [busy, setBusy] = useState(false);
-  useDialogFocusManager(`[data-rm-place-dialog][data-rm-step="${step}"] .dy-rm-modal`);
-  useEffect(() => {
-    let current = true;
-    loadRoadmapData(projectId).then((result) => {
-      if (!current) return;
-      const project = result.projects?.[0];
-      setCandidates(project ? spec.candidates(project) : []);
-    }).catch((failure) => {
-      if (current) setError(String(failure?.message ?? failure));
-    });
-    return () => {
-      current = false;
-    };
-  }, []);
-  const parentLabel = candidates?.find((row) => row.id === parent)?.label ?? "";
-  const ready = Boolean(candidates && parent);
-  const submit = async (nextParent) => {
-    setBusy(true);
-    setError(null);
-    try {
-      await api(spec.path(projectId, itemId), { method: "PUT", body: { parent_id: nextParent } });
-      emitToast("success", nextParent === null ? `Removed the parent of \u201C${itemId}\u201D. It is now not placed yet.` : `Placed \u201C${itemId}\u201D under \u201C${parentLabel}\u201D.`);
-      onDone();
-    } catch (failure) {
-      setError(String(failure?.message ?? failure));
-      setBusy(false);
-    }
-  };
-  const field = (id, label, value, onChange, options) => jsxs("label", { htmlFor: id, children: [
-    label,
-    jsx("select", { id, value, onChange: (event) => onChange(event.target.value), children: options })
-  ] });
-  const choose = jsxs("div", { className: "dy-rm-modal-body", children: [
-    candidates === null && !error ? jsx("p", { role: "status", children: "Loading choices\u2026" }) : null,
-    candidates && candidates.length === 0 ? jsx("p", { children: `Nothing to place it under: this project has no candidates yet. Create one on the project screen first.` }) : null,
-    candidates && candidates.length > 0 ? field(
-      "dy-rm-place-choice",
-      spec.itemLabel === "Milestone" ? "Initiative" : spec.itemLabel === "Objective" ? "Milestone" : spec.itemLabel === "Goal" ? "Objective" : "Goal",
-      parent,
-      setParent,
-      [
-        jsx("option", { value: "", children: "Choose\u2026" }, ""),
-        ...candidates.map((row) => jsx("option", { value: row.id, children: row.label }, row.id))
-      ]
-    ) : null,
-    jsx("p", { className: "dy-rm-modal-error", role: "alert", children: error })
-  ] });
-  const confirm = jsxs("div", { className: "dy-rm-modal-body", "data-rm-place-confirm": true, children: [
-    jsx("p", { className: "dy-rm-confirm", children: `Place the ${spec.itemLabel.toLowerCase()} \u201C${itemId}\u201D under \u201C${parentLabel}\u201D?` }),
-    jsx("p", { className: "dy-rm-confirm", children: "This records one placement and an audit entry under your name." }),
-    jsx("p", { className: "dy-rm-modal-error", role: "alert", children: error })
-  ] });
-  return jsx("div", {
-    className: "dy-rm-modal-backdrop",
-    "data-rm-place-dialog": true,
-    "data-rm-step": step,
-    onKeyDown: (event) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        onClose();
-      }
-    },
-    children: jsxs("section", { className: "dy-rm-modal", role: "dialog", "aria-modal": true, "aria-label": spec.title, children: [
-      jsxs("header", { className: "dy-rm-modal-head", children: [
-        jsxs("div", { children: [
-          jsx("p", { className: "dockyard-meta", children: "Place" }),
-          jsx("h3", { children: spec.title }),
-          jsx("p", { children: `Project ${projectLabel}` })
-        ] }),
-        jsx(Button, { onClick: onClose, ariaLabel: "Close place dialog", children: "\xD7" })
-      ] }),
-      step === "choose" ? choose : confirm,
-      step === "choose" ? jsxs("div", { className: "dy-rm-modal-actions", children: [
-        jsx(Button, { onClick: onClose, children: "Cancel" }),
-        jsx(Button, { variant: "primary", disabled: !ready, onClick: () => {
-          setError(null);
-          setStep("confirm");
-        }, children: "Continue" })
-      ] }) : jsxs("div", { className: "dy-rm-modal-actions", children: [
-        jsx(Button, { disabled: busy, onClick: () => {
-          setError(null);
-          setStep("choose");
-        }, children: "Back" }),
-        jsx(Button, { variant: "primary", disabled: busy, onClick: () => submit(parent), children: busy ? "Placing\u2026" : "Place" })
-      ] })
-    ] })
-  });
-}
-function ConfirmDeliveredDialog({ projectId, ref, title, onClose, onDone }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  useDialogFocusManager("[data-rm-confirm-dialog] .dy-rm-modal");
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await api(
-        `/projects/${encodeURIComponent(projectId)}/initiatives/${encodeURIComponent(ref)}/confirm-delivered`,
-        { method: "POST", body: {} }
-      );
-      emitToast("success", `\u201C${title}\u201D confirmed as delivered.`);
-      onDone();
-    } catch (failure) {
-      setError(String(failure?.message ?? failure));
-      setBusy(false);
-    }
-  };
-  return jsx("div", {
-    className: "dy-rm-modal-backdrop",
-    "data-rm-confirm-dialog": true,
-    onKeyDown: (event) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        onClose();
-      }
-    },
-    children: jsxs("section", { className: "dy-rm-modal", role: "dialog", "aria-modal": true, "aria-label": "Confirm as delivered", children: [
-      jsxs("header", { className: "dy-rm-modal-head", children: [
-        jsxs("div", { children: [
-          jsx("p", { className: "dockyard-meta", children: "Confirm" }),
-          jsx("h3", { children: "Confirm as delivered" }),
-          jsx("p", { children: `Project ${projectId}` })
-        ] }),
-        jsx(Button, { onClick: onClose, ariaLabel: "Close confirm dialog", children: "\xD7" })
-      ] }),
-      jsxs("div", { className: "dy-rm-modal-body", "data-rm-confirm-body": true, children: [
-        jsx("p", { className: "dy-rm-confirm", children: `Confirm \u201C${title}\u201D as delivered? Every milestone is reached.` }),
-        jsx("p", { className: "dy-rm-confirm", children: "This records the delivery under your name and an audit entry." }),
-        jsx("p", { className: "dy-rm-modal-error", role: "alert", children: error })
-      ] }),
-      jsxs("div", { className: "dy-rm-modal-actions", children: [
-        jsx(Button, { disabled: busy, onClick: onClose, children: "Cancel" }),
-        jsx(Button, { variant: "primary", disabled: busy, onClick: submit, children: busy ? "Confirming\u2026" : "Confirm as delivered" })
-      ] })
-    ] })
-  });
 }
 function RoadmapView({ initialScope = "all", onOpen, onRefresh }) {
   const [scope] = useState(initialScope);

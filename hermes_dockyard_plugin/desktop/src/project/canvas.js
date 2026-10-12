@@ -187,6 +187,9 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
   const [planPanel, setPlanPanel] = useState(null)
   const [planBusy, setPlanBusy] = useState(false)
   const [backlogConfirm, setBacklogConfirm] = useState(null)
+  // Batch L: optionally place the created backlog tasks under one goal.
+  const [backlogGoal, setBacklogGoal] = useState('')
+  const [backlogGoals, setBacklogGoals] = useState([])
   const [boards, setBoards] = useState([])
   const [boardListOpen, setBoardListOpen] = useState(true)
   const [boardBusy, setBoardBusy] = useState(false)
@@ -1243,16 +1246,26 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
     const at = boardRef.current
     setPlanBusy(true)
     try {
-      const result = await api(`/projects/${encoded}/plans/${encodeURIComponent(planPanel.plan_id)}/backlog`, { method: 'POST', body: { step_orders: backlogConfirm } })
+      const result = await api(`/projects/${encoded}/plans/${encodeURIComponent(planPanel.plan_id)}/backlog`, { method: 'POST', body: { step_orders: backlogConfirm, goal_id: backlogGoal === '' ? null : backlogGoal } })
       if (boardRef.current !== at) return
       setPlanPanel((current) => ({ ...(current ?? {}), backlog_created: result.backlog_created ?? [] }))
       setNotice({ tone: 'ok', text: `${number((result.created ?? []).length)} backlog item(s) created: ${(result.created ?? []).map((row) => row.ref).join(', ')}.` })
       setBacklogConfirm(null)
+      setBacklogGoal('')
       onRefresh?.()
     } catch (failure) {
       if (boardRef.current === at) setNotice({ tone: 'danger', text: `Backlog creation failed: ${failureText(failure)}` })
     } finally { if (boardRef.current === at) setPlanBusy(false) }
   }
+  // Batch L: load the project's goals for the optional backlog goal picker.
+  useEffect(() => {
+    if (!backlogConfirm?.length) return undefined
+    let alive = true
+    api(`/roadmap?project_id=${encoded}`)
+      .then((result) => { if (alive) setBacklogGoals((result?.projects ?? [])[0]?.goals ?? []) })
+      .catch(() => { if (alive) setBacklogGoals([]) })
+    return () => { alive = false }
+  }, [backlogConfirm?.length, encoded])
   const renderConnectors = () => {
     const byId = new Map(objects.map((item) => [item.id, item]))
     const laid = layoutConnectors(objects.map((item) => ({ ...item, ...canvasRect(item) })), connectors, (meaning) => CANVAS_MEANING_LABELS[meaning] ?? meaning, CANVAS_WORLD)
@@ -1427,8 +1440,12 @@ export function PlanningCanvasPanel({ project, canvas: initialCanvas, content = 
       ]}),
       backlogConfirm?.length ? jsxs('div', { className: 'dy-pc-proposal', 'data-canvas-backlog-confirm': true, children: [
         jsx('small', { children: `Create ${number(backlogConfirm.length)} backlog item(s)? One confirm per batch, nothing auto-runs.` }),
+        jsxs('label', { className: 'dockyard-field', children: [jsx('span', { className: 'field-optional-hint', children: 'Goal (optional)' }), jsx('select', { 'aria-label': 'Goal', value: backlogGoal, onChange: (event) => setBacklogGoal(event.target.value), children: [
+          jsx('option', { value: '', children: 'Not placed yet' }, 'none'),
+          ...backlogGoals.map((goal) => jsx('option', { value: String(goal.id), children: goal.title }, String(goal.id))),
+        ] })] }),
         jsx(Button, { small: true, variant: 'primary', action: 'confirm-backlog-from-plan', disabled: planBusy, onClick: createBacklogItems, children: 'Confirm create' }),
-        jsx(Button, { small: true, action: 'cancel-backlog-from-plan', disabled: planBusy, onClick: () => setBacklogConfirm(null), children: 'Cancel' }),
+        jsx(Button, { small: true, action: 'cancel-backlog-from-plan', disabled: planBusy, onClick: () => { setBacklogConfirm(null); setBacklogGoal('') }, children: 'Cancel' }),
       ]}) : null,
     ]}, 'plan') : null,
   ]

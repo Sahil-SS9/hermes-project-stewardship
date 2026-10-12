@@ -407,11 +407,17 @@ class PlanDocumentService:
         return "\n".join(lines)
 
     # -------------------------------------------------- backlog creation --
-    def create_backlog_items(self, project_id: str, plan_id: str, *, step_orders: list[int], actor: str, work=None) -> dict[str, Any]:
+    def create_backlog_items(self, project_id: str, plan_id: str, *, step_orders: list[int], actor: str, work=None, goal_id=None, place_task_goal=None) -> dict[str, Any]:
         """Explicit, batch-confirmed creation of backlog items from APPROVED
         plan steps, through the canonical work service (never direct DB
         writes to work tables). ``work`` is the CanonicalWorkService the
         route already holds; it is injected, never constructed ad hoc.
+
+        ``goal_id`` (Batch L, optional) places every created task under one
+        goal in the same project. ``place_task_goal`` is the route's ladder
+        callback ``(project_id, ref, goal_id, actor)``; it validates the goal
+        (same project, exists) and audits each placement, so a bad goal_id
+        refuses the batch before any work item is created.
         """
         plan = self.get_plan(project_id, plan_id)
         if plan.get("status") != "documented":
@@ -430,6 +436,9 @@ class PlanDocumentService:
         repeated = sorted(set(step_orders) & already)
         if repeated:
             raise PlanConflictError(f"backlog items already created for step(s): {repeated}")
+        placing = goal_id is not None and goal_id != ""
+        if placing and place_task_goal is None:
+            raise ValueError("placing created tasks under a goal requires the ladder callback")
         created = []
         for order in sorted(set(step_orders)):
             step = steps_by_order[order]
@@ -442,7 +451,10 @@ class PlanDocumentService:
                 actor=actor_object,
                 body=f"From plan {plan_id} step {order} (board objects: {', '.join(step.get('source_object_ids') or [])})",
             )
-            created.append({"order": order, "ref": record.get("ref") or record.get("id")})
+            ref = record.get("ref") or record.get("id")
+            if placing:
+                place_task_goal(project_id, ref, goal_id, actor)
+            created.append({"order": order, "ref": ref})
         # Remember what this plan created so a repeat confirm cannot duplicate
         # work items. Stored inside plan_json: no schema change.
         row = self._conn().execute(
