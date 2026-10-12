@@ -44,8 +44,49 @@ class PluginState:
 
 
 def tool_steward_status(project_id: str) -> dict:
+    """Settings, health and the delivery-ladder summary for one project.
+
+    The ladder block reports derived states only (computed at read time from
+    stored links, task statuses and check results). No percentages, no blended
+    scores, no forecasts: unknown is reported as unknown.
+    """
     svc = PluginState.services()
-    return {"settings": svc.settings(project_id), "health": svc.latest_health(project_id)}
+    out = {"settings": svc.settings(project_id), "health": svc.latest_health(project_id)}
+    try:
+        from .kanban import ReferenceKanbanAdapter
+        from .persistence.canonical_work_service import CanonicalWorkService
+        from .persistence.ladder_service import LadderService
+        from .persistence.roadmap_service import RoadmapService
+
+        store = PluginState._store
+        if store is None:
+            out["ladder"] = {"state": "unavailable"}
+            return out
+        work = CanonicalWorkService(store, ReferenceKanbanAdapter(store))
+        roadmap = RoadmapService(store, svc, work)
+        ladder = LadderService(store, svc, work, roadmap)
+        project = roadmap.roadmap(project_id)["projects"][0]
+        out["ladder"] = {
+            "work_host": project["work_host"],
+            "goals": {s: sum(1 for g in project["goals"] if g["state"] == s)
+                      for s in ("not_started", "in_progress", "met", "at_risk", "unknown")},
+            "objectives": {s: sum(1 for o in project["objectives"] if o["state"] == s)
+                           for s in ("not_started", "in_progress", "met", "at_risk", "unknown")},
+            "milestones": {
+                "reached": sum(1 for m in project["milestones"] if m["state"] == "reached"),
+                "not_reached": sum(1 for m in project["milestones"]
+                                   if m["state"] == "not_reached"),
+                "overdue": sum(1 for m in project["milestones"] if m["overdue"]),
+            },
+            "ready_to_confirm": [i["ref"] for i in project["initiatives"]
+                                 if i["ready_to_confirm"]],
+            "not_placed": {kind: len(rows)
+                           for kind, rows in project["not_placed"].items()},
+            "needs_placing": len(project["needs_placing"]),
+        }
+    except Exception:  # noqa: BLE001 - status must never fail on an optional block
+        out["ladder"] = {"state": "unavailable"}
+    return out
 
 
 def tool_steward_run_cycle(project_id: str, idempotency_key: Optional[str] = None) -> dict:

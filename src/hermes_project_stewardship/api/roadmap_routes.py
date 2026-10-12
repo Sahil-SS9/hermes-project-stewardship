@@ -1,24 +1,29 @@
-"""Roadmap routes (Batch R2), installed onto the stewardship router.
+"""Roadmap routes (Batch R2 read model; Batch L delivery ladder).
 
 Kept in their own module so ``api/server.py`` only carries one import and one
 call: the shared file stays easy to merge.
 
-Authority: link and contract writes use the SAME capability as the goal edit
-routes (``project_archive``). Goal edits and milestone archive/restore both use
-it today, so a link edit is the same class of structural change. Reads need no
-capability, like every other GET. The outline read also reports ``can_write``
-(would a write by this caller pass that check?) so the Desktop hides Link…
-instead of offering an action the server will refuse. It is a display hint
-only: every write is still checked on its own.
+Authority: every ladder write uses the SAME capability as the goal edit routes
+(``project_archive``). Goal edits and milestone archive/restore both use it
+today, so a placement edit is the same class of structural change. Reads need
+no capability, like every other GET. The outline read also reports ``can_write``
+so the Desktop hides an action the server would refuse; it is a display hint
+only, and every write is still checked on its own.
+
+The 0.4.0 link endpoints (initiative<->milestone, objective<->initiative) answer
+**410 Gone** and name the replacement endpoint, because the model they served
+(one relationship between two objects) no longer exists: v42 is a strict
+one-parent ladder, so a placement is a PUT of a single parent on the child.
 """
 
 from __future__ import annotations
 
 from typing import Any, Callable, Dict, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 
+from ..persistence.ladder_service import LadderService
 from ..persistence.roadmap_service import (
     RoadmapConflict,
     RoadmapInvalid,
@@ -28,20 +33,53 @@ from ..persistence.roadmap_service import (
 
 WRITE_CAPABILITY = "project_archive"
 
+# Where each retired 0.4.0 endpoint now lives (410 bodies name these).
+_REPLACEMENTS = {
+    "link_milestone": "PUT /projects/{project_id}/milestones/{milestone_id}/initiative",
+    "unlink_milestone": "PUT /projects/{project_id}/milestones/{milestone_id}/initiative",
+    "link_objective": "PUT /projects/{project_id}/objectives/{objective_id}/milestone",
+    "unlink_objective": "PUT /projects/{project_id}/objectives/{objective_id}/milestone",
+}
+
 
 class _Strict(BaseModel):
     # A payload can never name its own actor: unknown fields are refused (422).
     model_config = ConfigDict(extra="forbid")
 
 
-class MilestoneLinkRequest(_Strict):
-    milestone_id: int
-    relationship: str = "delivers"
+class ParentRequest(_Strict):
+    """The new parent, or null to unplace the item ("Not placed yet")."""
+
+    parent_id: Optional[Any] = None
 
 
-class ObjectiveLinkRequest(_Strict):
-    initiative_ref: str
-    relationship: str = "supports"
+class GoalCheckRequest(_Strict):
+    evaluator_type: str
+    target: str
+    command: Optional[Any] = None
+    integration: Optional[str] = None
+    window: Optional[str] = None
+
+
+class GoalAssessmentRequest(_Strict):
+    passed: bool
+    evidence: list[str]
+    detail: str = ""
+    expires_at: Optional[str] = None
+
+
+class _Any(BaseModel):
+    """A retired endpoint's body: accepted and ignored, then answered 410.
+
+    Validation must not reject the caller first, or a 0.4.0 client gets a
+    confusing 422 instead of the "this endpoint is gone" answer it needs.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+
+class _Empty(_Strict):
+    """A confirmation/dismissal carries no payload; only the path names the item."""
 
 
 class GoalContractRequest(_Strict):
@@ -61,9 +99,9 @@ def _refuse(exc: Exception) -> HTTPException:
     return HTTPException(409, str(exc))
 
 
-def install(router: APIRouter, roadmap: RoadmapService, *,
+def install(router: APIRouter, roadmap: RoadmapService, ladder: LadderService, *,
             authority: Callable[[str], str]) -> None:
-    """Register every Roadmap route on ``router``."""
+    """Register every Roadmap and ladder route on ``router``."""
 
     def _run(call: Callable[[], Dict[str, Any]]) -> Dict[str, Any]:
         # FeatureDisabledError is deliberately NOT caught: the app-level handler
@@ -72,6 +110,16 @@ def install(router: APIRouter, roadmap: RoadmapService, *,
             return call()
         except (RoadmapNotFound, RoadmapConflict, RoadmapInvalid) as exc:
             raise _refuse(exc) from None
+
+    def _gone(which: str) -> HTTPException:
+        # The app-level handler rewrites the body into the shared
+        # {error:{code,message}} envelope, so the replacement must travel in the
+        # message itself: a 0.4.0 client has to be told where the endpoint went.
+        return HTTPException(
+            status.HTTP_410_GONE,
+            "the 0.4.0 objective/milestone link endpoints were removed in 0.5.0; "
+            f"the ladder places one parent on the child: use {_REPLACEMENTS[which]}",
+        )
 
     @router.get("/roadmap")
     def roadmap_outline(project_id: Optional[str] = None):
@@ -87,31 +135,88 @@ def install(router: APIRouter, roadmap: RoadmapService, *,
     def roadmap_milestone_items(project_id: str, milestone_id: int):
         return _run(lambda: roadmap.milestone_items(project_id, milestone_id))
 
+    # ---- retired 0.4.0 link endpoints: 410 Gone, naming the replacement ---- //
+
     @router.post("/projects/{project_id}/initiatives/{ref}/milestones")
-    def link_milestone(project_id: str, ref: str, body: MilestoneLinkRequest):
-        principal = authority(WRITE_CAPABILITY)
-        return _run(lambda: roadmap.link_initiative_milestone(
-            project_id, ref, body.milestone_id, body.relationship,
-            actor=principal, interface="rpc"))
+    def link_milestone(project_id: str, ref: str, body: _Any):
+        raise _gone("link_milestone")
 
     @router.delete("/projects/{project_id}/initiatives/{ref}/milestones/{milestone_id}")
     def unlink_milestone(project_id: str, ref: str, milestone_id: int):
-        principal = authority(WRITE_CAPABILITY)
-        return _run(lambda: roadmap.unlink_initiative_milestone(
-            project_id, ref, milestone_id, actor=principal, interface="rpc"))
+        raise _gone("unlink_milestone")
 
     @router.post("/projects/{project_id}/objectives/{objective_id}/initiatives")
-    def link_objective(project_id: str, objective_id: int, body: ObjectiveLinkRequest):
-        principal = authority(WRITE_CAPABILITY)
-        return _run(lambda: roadmap.link_objective_initiative(
-            project_id, objective_id, body.initiative_ref, body.relationship,
-            actor=principal, interface="rpc"))
+    def link_objective(project_id: str, objective_id: int, body: _Any):
+        raise _gone("link_objective")
 
     @router.delete("/projects/{project_id}/objectives/{objective_id}/initiatives/{ref}")
     def unlink_objective(project_id: str, objective_id: int, ref: str):
+        raise _gone("unlink_objective")
+
+    # ---- v42 ladder: one parent per level ---------------------------------- //
+
+    @router.put("/projects/{project_id}/tasks/{item_ref}/goal")
+    def place_task(project_id: str, item_ref: str, body: ParentRequest):
         principal = authority(WRITE_CAPABILITY)
-        return _run(lambda: roadmap.unlink_objective_initiative(
-            project_id, objective_id, ref, actor=principal, interface="rpc"))
+        return _run(lambda: ladder.set_task_goal(
+            project_id, item_ref, body.parent_id, actor=principal, interface="rpc"))
+
+    @router.put("/projects/{project_id}/goals/{goal_id}/objective")
+    def place_goal(project_id: str, goal_id: str, body: ParentRequest):
+        principal = authority(WRITE_CAPABILITY)
+        return _run(lambda: ladder.set_goal_objective(
+            project_id, goal_id, body.parent_id, actor=principal, interface="rpc"))
+
+    @router.put("/projects/{project_id}/objectives/{objective_id}/milestone")
+    def place_objective(project_id: str, objective_id: int, body: ParentRequest):
+        principal = authority(WRITE_CAPABILITY)
+        return _run(lambda: ladder.set_objective_milestone(
+            project_id, objective_id, body.parent_id, actor=principal,
+            interface="rpc"))
+
+    @router.put("/projects/{project_id}/milestones/{milestone_id}/initiative")
+    def place_milestone(project_id: str, milestone_id: int, body: ParentRequest):
+        principal = authority(WRITE_CAPABILITY)
+        return _run(lambda: ladder.set_milestone_initiative(
+            project_id, milestone_id, body.parent_id, actor=principal,
+            interface="rpc"))
+
+    @router.post("/projects/{project_id}/initiatives/{ref}/confirm-delivered")
+    def confirm_delivered(project_id: str, ref: str, body: _Empty):
+        principal = authority(WRITE_CAPABILITY)
+        return _run(lambda: ladder.confirm_delivered(
+            project_id, ref, actor=principal, interface="rpc"))
+
+    @router.get("/projects/{project_id}/roadmap/unplaced")
+    def list_unplaced(project_id: str):
+        return _run(lambda: {"unplaced": ladder.list_unplaced(project_id)})
+
+    @router.post("/projects/{project_id}/roadmap/unplaced/{row_id}/dismiss")
+    def dismiss_unplaced(project_id: str, row_id: int, body: _Empty):
+        principal = authority(WRITE_CAPABILITY)
+        return _run(lambda: ladder.dismiss_unplaced(
+            project_id, row_id, actor=principal, interface="rpc"))
+
+    @router.get("/projects/{project_id}/goals/{goal_id}/check")
+    def goal_check(project_id: str, goal_id: str):
+        return _run(lambda: ladder.goal_check(project_id, goal_id))
+
+    @router.put("/projects/{project_id}/goals/{goal_id}/check")
+    def set_goal_check(project_id: str, goal_id: str, body: GoalCheckRequest):
+        principal = authority(WRITE_CAPABILITY)
+        return _run(lambda: ladder.set_goal_check(
+            project_id, goal_id, body.model_dump(exclude_unset=True),
+            actor=principal, interface="rpc"))
+
+    @router.post("/projects/{project_id}/goals/{goal_id}/assessment")
+    def record_assessment(project_id: str, goal_id: str, body: GoalAssessmentRequest):
+        # The body cannot name its own actor: the server binds the verified
+        # principal, exactly like the objective assessment routes.
+        principal = authority(WRITE_CAPABILITY)
+        return _run(lambda: ladder.record_goal_assessment(
+            project_id, goal_id, passed=body.passed, evidence=body.evidence,
+            detail=body.detail, expires_at=body.expires_at,
+            trusted_principal=principal, interface="rpc"))
 
     @router.get("/projects/{project_id}/goals/{goal_id}/contract")
     def goal_contract(project_id: str, goal_id: str):

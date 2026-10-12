@@ -138,6 +138,26 @@ def build_parser() -> argparse.ArgumentParser:
     ol.add_argument("project_id")
     ol.add_argument("--json", action="store_true")
 
+    # Batch L: the delivery ladder (v42). `place` sets the single parent of an
+    # item at one level; `unplaced` lists what the 0.4.0 upgrade could not place
+    # and `confirm` is the human delivery decision on an initiative.
+    rm = sub.add_parser("roadmap", help="delivery ladder (task-goal-objective-milestone-initiative)")
+    rmsub = rm.add_subparsers(dest="action", required=True)
+    ru = rmsub.add_parser("unplaced", help="list items the upgrade could not place")
+    ru.add_argument("project_id")
+    ru.add_argument("--json", action="store_true")
+    rp = rmsub.add_parser("place", help="set an item's single parent at the next level up")
+    rp.add_argument("project_id")
+    rp.add_argument("kind", choices=["task", "goal", "objective", "milestone"])
+    rp.add_argument("item_id", help="task ref, goal id, objective id or milestone id")
+    rp.add_argument("--parent", default=None,
+                    help="parent id/ref; omit or pass '' to unplace the item")
+    rp.add_argument("--actor", default="cli-user")
+    rc = rmsub.add_parser("confirm", help="confirm an initiative as delivered")
+    rc.add_argument("project_id")
+    rc.add_argument("ref")
+    rc.add_argument("--actor", default="cli-user")
+
     health = sub.add_parser("health", help="latest health snapshot")
     health.add_argument("project_id")
     health.add_argument("--json", action="store_true")
@@ -305,6 +325,76 @@ def _transfer_host(hermes_home: Optional[str]):
     if not hasattr(host, "list_work"):
         return None, "host adapter does not implement the transfer contract"
     return host, None
+
+
+def _roadmap_group(args, svc: StewardshipService, store: Store) -> int:
+    """Batch L: the delivery ladder CLI (unplaced / place / confirm).
+
+    Exit codes follow the file's contract: 0 ok, 1 refused (a ladder rule said
+    no), 2 error. A placement the ladder refuses is a refusal, never a crash.
+    """
+    from ..persistence.ladder_service import LadderService
+    from ..persistence.roadmap_service import RoadmapService
+    from ..persistence.roadmap_service import (
+        RoadmapConflict,
+        RoadmapInvalid,
+        RoadmapNotFound,
+    )
+    from ..kanban import ReferenceKanbanAdapter
+    from ..persistence.canonical_work_service import CanonicalWorkService
+
+    adapter = ReferenceKanbanAdapter(store)
+    work = CanonicalWorkService(store, adapter)
+    roadmap = RoadmapService(store, svc, work)
+    ladder = LadderService(store, svc, work, roadmap)
+
+    try:
+        if args.action == "unplaced":
+            rows = ladder.list_unplaced(args.project_id)
+            if args.json:
+                print(json.dumps({"unplaced": rows}, sort_keys=True))
+            elif not rows:
+                print(f"nothing needs placing in {args.project_id}")
+            else:
+                print(render_table(
+                    ["id", "kind", "item", "reason"],
+                    [[r["id"], r["kind"], r["item_id"], r["reason"]] for r in rows]))
+            return EXIT_OK
+
+        if args.action == "place":
+            # An explicit empty --parent means "unplace"; an omitted flag is None.
+            raw = args.parent
+            parent = None if raw in (None, "") else raw
+            if args.kind in ("objective", "milestone"):
+                # These levels address their parent by integer id.
+                parent = None if parent is None else int(parent)
+            calls = {
+                "task": ladder.set_task_goal,
+                "goal": ladder.set_goal_objective,
+                "objective": ladder.set_objective_milestone,
+                "milestone": ladder.set_milestone_initiative,
+            }
+            out = calls[args.kind](
+                args.project_id, args.item_id, parent,
+                actor=args.actor, interface="cli")
+            print(f"{out['kind']} {out['item_id']} -> "
+                  f"{out['parent_id'] if out['parent_id'] is not None else 'not placed yet'}")
+            return EXIT_OK
+
+        if args.action == "confirm":
+            out = ladder.confirm_delivered(
+                args.project_id, args.ref, actor=args.actor, interface="cli")
+            print(f"{args.ref} confirmed delivered (status {out['status']})")
+            return EXIT_OK
+    except RoadmapNotFound as exc:
+        print(friendly_error(str(exc)), file=sys.stderr)
+        return EXIT_ERROR
+    except (RoadmapConflict, RoadmapInvalid) as exc:
+        # A ladder rule refused the write: exit 1, exactly like every other
+        # refusal in this CLI, so scripts can tell "no" from "broken".
+        print(friendly_error(str(exc)), file=sys.stderr)
+        return EXIT_REFUSED
+    return EXIT_ERROR
 
 
 def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) -> int:
@@ -514,6 +604,9 @@ def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) 
             print(f"removed {args.content_id} (removal_state="
                   f"{result['removal_state']})")
             return EXIT_OK
+
+    if g == "roadmap":
+        return _roadmap_group(args, svc, store)
 
     if g == "objective":
         if args.action == "add":

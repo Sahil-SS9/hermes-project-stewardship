@@ -35,6 +35,17 @@ class LadderService:
         if row["archived_at"] is not None:
             raise RoadmapConflict("project is archived; restore it before editing the ladder")
 
+    def _require_features(self, project_id: str, *names: str) -> None:
+        """A placement is refused while a feature it touches is switched off.
+
+        The 0.4.0 link routes carried the same gates, so a project with
+        milestones off could not be wired into an initiative through the old
+        endpoint either. The gate stays: turning a feature off must keep the
+        ladder consistent with the rest of the product.
+        """
+        for name in names:
+            self.svc.require_feature(project_id, name)
+
     def _audit(self, cx, *, actor: str, interface: str, action: str,
                subject: str, detail: Dict[str, Any]) -> None:
         cx.execute(
@@ -98,6 +109,7 @@ class LadderService:
                            parent_id: Optional[int], *, actor: str,
                            interface: str = "service") -> Dict[str, Any]:
         self._known_project(project_id)
+        self._require_features(project_id, "initiatives")
         child = self.store._conn.execute(
             "SELECT project_id,archived_at,objective_id FROM project_goals WHERE goal_id=?",
             (goal_id,),
@@ -124,6 +136,7 @@ class LadderService:
                                 parent_id: Optional[int], *, actor: str,
                                 interface: str = "service") -> Dict[str, Any]:
         self._known_project(project_id)
+        self._require_features(project_id, "milestones")
         child = self.store._conn.execute(
             "SELECT project_id,enabled,milestone_id FROM project_objectives WHERE id=?",
             (objective_id,),
@@ -151,6 +164,7 @@ class LadderService:
                                  parent_id: Optional[str], *, actor: str,
                                  interface: str = "service") -> Dict[str, Any]:
         self._known_project(project_id)
+        self._require_features(project_id, "initiatives", "milestones")
         child = self.store._conn.execute(
             "SELECT project_id,archived_at,initiative_ref FROM dockyard_milestones WHERE id=?",
             (milestone_id,),
@@ -396,6 +410,7 @@ class LadderService:
     def confirm_delivered(self, project_id: str, ref: str, *, actor: str,
                           interface: str = "service") -> Dict[str, Any]:
         self._known_project(project_id)
+        self._require_features(project_id, "initiatives")
         initiative = self.roadmap.initiative_state(project_id, ref)
         if not initiative["ready_to_confirm"]:
             raise RoadmapConflict(

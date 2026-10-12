@@ -389,6 +389,10 @@ class RoadmapService:
         raise RoadmapNotFound(f"no such initiative '{ref}'")
 
     def milestone_items(self, project_id: str, milestone_id: int) -> Dict[str, Any]:
+        # The read is gated exactly as the 0.4.0 route was: a project with
+        # milestones switched off does not expose milestone detail at all.
+        self._known_project(project_id)
+        self.svc.require_feature(project_id, "milestones")
         project = self._project(project_id)
         milestone = next((m for m in project["milestones"] if m["id"] == milestone_id), None)
         if milestone is None:

@@ -3606,13 +3606,17 @@ def create_app(
             "next": "Review the objective results; onboarding enables no automation.",
         }
 
-    # --- Batch R2: Roadmap routes (one contiguous block; see api/roadmap_routes.py)
+    # --- Batch R2/L: Roadmap routes (one contiguous block; see api/roadmap_routes.py)
+    from ..persistence.ladder_service import LadderService
     from ..persistence.roadmap_service import RoadmapService
     from .roadmap_routes import install as _install_roadmap_routes
 
+    _roadmap = RoadmapService(store, svc, work)
     _install_roadmap_routes(
-        router, RoadmapService(store, svc, work), authority=_membership_authority)
-    # --- end Batch R2
+        router, _roadmap,
+        LadderService(store, svc, work, _roadmap),
+        authority=_membership_authority)
+    # --- end Batch R2/L
 
     # --- Project memory and chat links (checks round 1; see api/memory_routes.py)
     from ..persistence.chat_links import ChatLinkService

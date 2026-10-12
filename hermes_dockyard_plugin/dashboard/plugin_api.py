@@ -2024,12 +2024,140 @@ async def roadmap_milestone_items(project_id: str, milestone_id: int) -> dict:
     )
 
 
+# ---- the delivery ladder (v42): one parent per level ------------------------- //
+# The 0.4.0 link routes below were removed in 0.5.0 and now answer 410 Gone
+# from the backend; the proxy keeps them so a cached Desktop build gets the
+# same "gone, use X" answer instead of a bare 404.
+
+class RoadmapParentBody(BaseModel):
+    """The new parent, or null to unplace the item ("Not placed yet").
+
+    extra="forbid" like every other body here: a payload can never name its own
+    actor, and an unknown field is refused rather than forwarded.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    parent_id: str | int | None = None
+
+
+class RoadmapGoalCheckBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    evaluator_type: str
+    target: str
+    command: list[str] | None = None
+    integration: str | None = None
+    window: str | None = None
+
+
+class RoadmapGoalAssessmentBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    passed: bool
+    evidence: list[str]
+    detail: str = ""
+    expires_at: str | None = None
+
+
+@plugin_api.put("/projects/{project_id}/tasks/{item_ref}/goal")
+async def roadmap_place_task(project_id: str, item_ref: str, body: RoadmapParentBody) -> dict:
+    return await _proxy(
+        "PUT",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/tasks/{quote(item_ref, safe='')}/goal",
+        body.model_dump(),
+    )
+
+
+@plugin_api.put("/projects/{project_id}/goals/{goal_id}/objective")
+async def roadmap_place_goal(project_id: str, goal_id: str, body: RoadmapParentBody) -> dict:
+    return await _proxy(
+        "PUT",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/goals/{quote(goal_id, safe='')}/objective",
+        body.model_dump(),
+    )
+
+
+@plugin_api.put("/projects/{project_id}/objectives/{objective_id}/milestone")
+async def roadmap_place_objective(project_id: str, objective_id: int,
+                                  body: RoadmapParentBody) -> dict:
+    return await _proxy(
+        "PUT",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/objectives/{objective_id}/milestone",
+        body.model_dump(),
+    )
+
+
+@plugin_api.put("/projects/{project_id}/milestones/{milestone_id}/initiative")
+async def roadmap_place_milestone(project_id: str, milestone_id: int,
+                                  body: RoadmapParentBody) -> dict:
+    return await _proxy(
+        "PUT",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/milestones/{milestone_id}/initiative",
+        body.model_dump(),
+    )
+
+
+@plugin_api.post("/projects/{project_id}/initiatives/{ref}/confirm-delivered")
+async def roadmap_confirm_delivered(project_id: str, ref: str) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/initiatives/{quote(ref, safe='')}"
+        "/confirm-delivered",
+        {},
+    )
+
+
+@plugin_api.get("/projects/{project_id}/roadmap/unplaced")
+async def roadmap_unplaced(project_id: str) -> dict:
+    return await _proxy(
+        "GET",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/roadmap/unplaced",
+    )
+
+
+@plugin_api.post("/projects/{project_id}/roadmap/unplaced/{row_id}/dismiss")
+async def roadmap_dismiss_unplaced(project_id: str, row_id: int) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/roadmap/unplaced/{row_id}/dismiss",
+        {},
+    )
+
+
+@plugin_api.get("/projects/{project_id}/goals/{goal_id}/check")
+async def roadmap_goal_check(project_id: str, goal_id: str) -> dict:
+    return await _proxy(
+        "GET",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/goals/{quote(goal_id, safe='')}/check",
+    )
+
+
+@plugin_api.put("/projects/{project_id}/goals/{goal_id}/check")
+async def roadmap_set_goal_check(project_id: str, goal_id: str,
+                                 body: RoadmapGoalCheckBody) -> dict:
+    return await _proxy(
+        "PUT",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/goals/{quote(goal_id, safe='')}/check",
+        body.model_dump(),
+    )
+
+
+@plugin_api.post("/projects/{project_id}/goals/{goal_id}/assessment")
+async def roadmap_record_goal_assessment(project_id: str, goal_id: str,
+                                         body: RoadmapGoalAssessmentBody) -> dict:
+    return await _proxy(
+        "POST",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/goals/{quote(goal_id, safe='')}/assessment",
+        body.model_dump(),
+    )
+
+
+# ---- retired 0.4.0 link endpoints: forwarded so the 410 reaches the client --- //
+
 @plugin_api.post("/projects/{project_id}/initiatives/{ref}/milestones")
-async def roadmap_link_milestone(project_id: str, ref: str, body: RoadmapMilestoneLinkBody) -> dict:
+async def roadmap_link_milestone(project_id: str, ref: str, body: dict) -> dict:
     return await _proxy(
         "POST",
         f"/stewardship/v1/projects/{quote(project_id, safe='')}/initiatives/{quote(ref, safe='')}/milestones",
-        body.model_dump(),
+        body,
     )
 
 
@@ -2043,11 +2171,11 @@ async def roadmap_unlink_milestone(project_id: str, ref: str, milestone_id: int)
 
 
 @plugin_api.post("/projects/{project_id}/objectives/{objective_id}/initiatives")
-async def roadmap_link_objective(project_id: str, objective_id: int, body: RoadmapObjectiveLinkBody) -> dict:
+async def roadmap_link_objective(project_id: str, objective_id: int, body: dict) -> dict:
     return await _proxy(
         "POST",
         f"/stewardship/v1/projects/{quote(project_id, safe='')}/objectives/{objective_id}/initiatives",
-        body.model_dump(),
+        body,
     )
 
 
