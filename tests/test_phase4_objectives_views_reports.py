@@ -50,8 +50,16 @@ def _repo(tmp_path, name="repo"):
     return path
 
 
+def _allow_commands(svc, pid):
+    # Command evaluators need the run_command_evaluator capability (level 3),
+    # for "Evaluate now" exactly as for the cycle (catalog review, PR #136752).
+    svc.enable(pid, mission="keep CI green and deps fresh", lead_profile="lead",
+               member_profiles=["coder", "qa"], autonomy_level=3)
+
+
 def _command_objective(svc, pid, *, name="ci-green", command=("echo", "1"),
                        target=">=1", repo=None):
+    _allow_commands(svc, pid)
     if repo is not None:
         svc.update_settings(pid, verification_policy={"repo_path": str(repo)})
     return svc.add_objective(
@@ -77,6 +85,28 @@ def _evaluations(store, pid, objective_id):
 # ------------------------------------------------------------------ #
 # Evaluate now — command semantics                                    #
 # ------------------------------------------------------------------ #
+
+def test_evaluate_now_never_runs_a_command_below_the_command_autonomy_level(svc, enabled, tmp_path):
+    repo = _repo(tmp_path)
+    marker = repo / "ran.txt"
+    obj = _command_objective(
+        svc, enabled, repo=repo,
+        command=("python3", "-c", "open('ran.txt','w').write('1'); print(1)"))
+    # Back to observe-and-propose (level 2): the cycle would not run it, so
+    # a person clicking "Evaluate now" must not run it either.
+    svc.enable(enabled, mission="keep CI green and deps fresh", lead_profile="lead",
+               member_profiles=["coder", "qa"], autonomy_level=2)
+    res = svc.evaluate_objective_now(enabled, obj["id"], actor="sahil")
+    assert not marker.exists(), "the command ran on a project below level 3"
+    assert res["result"]["passed"] is False
+    assert res["result"]["state"] != "passed"
+    assert res["result"]["detail"].startswith("not run: ")
+    assert res["result"]["detail"] == (
+        "not run: running a check command needs autonomy level 3; this project is at level 2")
+    # The attempt stays visible and never counts as a pass.
+    rows = _evaluations(svc.store, enabled, obj["id"])
+    assert len(rows) == 1 and rows[0]["passed"] == 0
+
 
 def test_evaluate_now_command_runs_records_and_updates_evidence(svc, enabled, tmp_path):
     obj = _command_objective(svc, enabled, repo=_repo(tmp_path))
@@ -142,6 +172,7 @@ def test_evaluate_now_blocked_command_is_unknown_and_visible(svc, enabled, tmp_p
 
 
 def test_evaluate_now_missing_project_path_fails_closed(svc, enabled):
+    _allow_commands(svc, enabled)
     obj = svc.add_objective(enabled, name="no-repo", evaluator_type="command",
                             target=">=1", severity="medium",
                             command=["echo", "1"])
@@ -238,7 +269,7 @@ def test_evaluate_endpoint_denies_missing_and_agent_principals(tmp_path):
 def test_evaluate_endpoint_human_readback_through_api(tmp_path):
     store, service, adapter, app, client, headers = make_service_client(tmp_path)
     pid = "phase4-eval"
-    service.enable(pid, mission="m", lead_profile="lead")
+    service.enable(pid, mission="m", lead_profile="lead", autonomy_level=3)
     repo = _repo(tmp_path, "api-repo")
     service.update_settings(pid, verification_policy={"repo_path": str(repo)})
     created = service.add_objective(

@@ -197,6 +197,26 @@ class AutonomyPolicy:
         base = DEFAULT_RUNTIME_BASE if runtime_base is None else runtime_base
         return self.permits("run_command_evaluator", base)
 
+    @classmethod
+    def evaluator_allowlist(cls, settings: Dict[str, Any]) -> FrozenSet[str]:
+        """Executables command evaluators may run for this project now.
+
+        The one gate for every path that runs a command evaluator (the cycle
+        and "Evaluate now"). Autonomy is checked first: below the
+        ``run_command_evaluator`` level the answer is the empty allowlist,
+        which ``run_allowlisted`` already refuses for every executable, so an
+        observe-only project never runs a subprocess.
+        """
+        from ..security.allowlist import DEFAULT_ALLOWLIST
+
+        if not cls.from_settings(settings).command_evaluator_allowed().allowed:
+            return frozenset()
+        policies = settings.get("policies", {}) or {}
+        configured = (policies.get("verification", {}) or {}).get("command_allowlist")
+        if configured is None:
+            return DEFAULT_ALLOWLIST
+        return frozenset(configured)
+
     def can_create_initiative(self, runtime_base: FrozenSet[str]) -> bool:
         return self.permits("create_initiative", runtime_base).allowed
 

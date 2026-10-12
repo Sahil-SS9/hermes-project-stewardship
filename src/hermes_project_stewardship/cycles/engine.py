@@ -443,17 +443,8 @@ class CycleEngine:
         it, so the gate needs no new failure path downstream.
         """
         from ..domain.policy import AutonomyPolicy
-        from ..security.allowlist import DEFAULT_ALLOWLIST
 
-        decision = AutonomyPolicy.from_settings(settings).command_evaluator_allowed()
-        if not decision.allowed:
-            return frozenset()
-
-        policies = settings.get("policies", {}) or {}
-        configured = (policies.get("verification", {}) or {}).get("command_allowlist")
-        if configured is None:
-            return DEFAULT_ALLOWLIST
-        return frozenset(configured)
+        return AutonomyPolicy.evaluator_allowlist(settings)
 
     @staticmethod
     def _score(results: List[Dict[str, Any]]) -> float:

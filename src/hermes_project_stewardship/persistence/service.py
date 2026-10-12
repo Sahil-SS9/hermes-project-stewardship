@@ -1693,13 +1693,16 @@ class StewardshipService:
         policies = settings.get("policies", {}) or {}
         verification = policies.get("verification", {}) or {}
         repo_path = verification.get("repo_path")
-        command_allowlist = verification.get("command_allowlist")
-        from ..security.allowlist import DEFAULT_ALLOWLIST
+        from ..domain.policy import AutonomyPolicy
 
+        # Same gate as the cycle (catalog review, PR #136752): below the
+        # run_command_evaluator autonomy level no command runs, so an
+        # observe-only project stays observe-only when a person clicks.
+        autonomy = AutonomyPolicy.from_settings(settings)
+        command_gate = autonomy.command_evaluator_allowed()
         ctx = EvaluationContext(
             project_path=Path(repo_path) if repo_path else None,
-            allowlist=(DEFAULT_ALLOWLIST if command_allowlist is None
-                       else frozenset(command_allowlist)),
+            allowlist=AutonomyPolicy.evaluator_allowlist(settings),
             clock=self._clock,
         )
         objective = _Objective(**obj)
@@ -1748,6 +1751,11 @@ class StewardshipService:
                 "state": res.state,
                 "detail": res.detail,
             }
+        if obj["evaluator_type"] == "command" and not command_gate.allowed:
+            res_dict["detail"] = (
+                "not run: running a check command needs autonomy level 3; "
+                f"this project is at level {autonomy.level}"
+            )
         # Sample persistence: command evaluations always record the attempt
         # (blocked/failed attempts stay visible but never count as passes).
         # Integration evaluations record only when real evidence was fetched;
