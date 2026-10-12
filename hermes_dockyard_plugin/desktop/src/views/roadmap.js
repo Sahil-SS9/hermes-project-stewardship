@@ -204,20 +204,36 @@ function MilestoneItemsRow({ node, projectId, milestoneId, tabStop, onFocusRow, 
 // Batch L (R2 fix 2): a person sets or clears a goal's check right here, via
 // GET/PUT /projects/{pid}/goals/{gid}/check. The goal's derived state follows.
 function GoalCheckEditor({ projectId, goal, onChanged }) {
-  const check = goal.check ?? {}
-  const hasCheck = Boolean(check.state) && check.state !== 'no_check'
+  // The roadmap's per-goal check is the DERIVED evidence state; the check's own
+  // endpoint carries what was configured (evaluator type and target), so the
+  // editor reads that for the detail it shows.
+  const evidence = goal.check ?? {}
+  const [detail, setDetail] = useState(null)
   const [open, setOpen] = useState(false)
-  const [evaluator, setEvaluator] = useState(check.evaluator_type ?? 'manual')
-  const [target, setTarget] = useState(check.target ?? '')
+  const [evaluator, setEvaluator] = useState('manual')
+  const [target, setTarget] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const url = `/projects/${encodeURIComponent(projectId)}/goals/${encodeURIComponent(goal.id)}/check`
+  const load = async () => {
+    try {
+      const result = await api(url)
+      const check = result?.check ?? null
+      setDetail(check)
+      setEvaluator(check?.evaluator_type ?? 'manual')
+      setTarget(check?.target ?? '')
+    } catch { setDetail(null) }
+  }
+  useEffect(() => { void load() }, [projectId, goal.id])
+  const hasCheck = Boolean(detail) || (Boolean(evidence.state) && evidence.state !== 'no_check')
+  const state = STATE_LABEL[evidence.state] ?? words(evidence.state)
   const run = async (body, message) => {
     setBusy(true); setError(null)
     try {
       await api(url, { method: 'PUT', body })
       emitToast('success', message)
       setOpen(false)
+      await load()
       onChanged?.()
     } catch (failure) {
       setError(String(failure?.message ?? failure))
@@ -226,9 +242,9 @@ function GoalCheckEditor({ projectId, goal, onChanged }) {
     }
   }
   return jsxs('div', { className: 'dy-rm-check-editor', 'data-rm-goal-check': goal.id, children: [
-    jsxs('p', { children: ['Check: ', jsx('strong', { 'data-rm-check-state': true, children: hasCheck
-      ? `${check.evaluator_type ?? 'check'} · ${check.target ?? ''} · ${STATE_LABEL[check.state] ?? words(check.state)}`
-      : 'none' })] }),
+    jsxs('p', { children: ['Check: ', jsx('strong', { 'data-rm-check-state': true, children: detail
+      ? `${detail.evaluator_type} · ${detail.target} · ${state}`
+      : hasCheck ? state : 'none' })] }),
     open
       ? jsxs('div', { className: 'dy-rm-check-form', children: [
           jsxs('label', { children: ['Type ', jsx('select', { 'data-rm-check-evaluator': true, value: evaluator, onChange: (event) => setEvaluator(event.target.value), children: ['manual', 'command', 'integration'].map((value) => jsx('option', { value, children: value }, value)) })] }),

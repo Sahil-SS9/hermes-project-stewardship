@@ -427,6 +427,9 @@ test('Roadmap: a person sets a goal check through the rendered control, and clea
     }
     await openGoal()
     const editor = page.locator('[data-rm-goal-check]')
+    // The editor reads the check's own endpoint, so wait for the detail to land.
+    const settled = (pattern) => page.waitForFunction(([p]) => new RegExp(p).test(document.querySelector('[data-rm-check-state]')?.textContent ?? ''), [pattern])
+    await settled('none')
     assert.match(await editor.locator('[data-rm-check-state]').innerText(), /none/)
     await editor.getByRole('button', { name: 'Set check' }).click()
     await editor.locator('[data-rm-check-target]').fill('>=1')
@@ -435,6 +438,7 @@ test('Roadmap: a person sets a goal check through the rendered control, and clea
     // (an unassessed manual check is honestly unknown, never met).
     await page.waitForTimeout(600)
     await openGoal()
+    await settled('>=1')
     assert.match(await editor.locator('[data-rm-check-state]').innerText(), />=1/)
     assert.match(await editor.locator('[data-rm-check-state]').innerText(), /unknown/i)
     // Clearing it through the same control removes the check (state restored).
@@ -442,6 +446,7 @@ test('Roadmap: a person sets a goal check through the rendered control, and clea
     await editor.getByRole('button', { name: 'Clear check' }).click()
     await page.waitForTimeout(600)
     await openGoal()
+    await settled('none')
     assert.match(await editor.locator('[data-rm-check-state]').innerText(), /none/)
   } finally {
     await browser.close()
