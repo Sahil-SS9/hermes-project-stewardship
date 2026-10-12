@@ -63,3 +63,24 @@ def test_manual_without_status_is_unknown_fail():
     m = obj(evaluator_type="manual", command=None)
     r = DEFAULT_EVALUATOR.evaluate(m, EvaluationContext())
     assert not r.passed and "no manual status" in r.detail
+
+
+def test_failed_count_without_a_measure_is_unknown_not_zero(tmp_path: Path):
+    """A count objective whose command crashes before printing a number must
+    not read as "0 found" and meet a "<=0" target."""
+    ctx = EvaluationContext(project_path=tmp_path, allowlist={PY})
+    r = DEFAULT_EVALUATOR.evaluate(
+        obj(command=[PY, "-c", "raise SystemExit('source unreachable')"], target="<=0"), ctx
+    )
+    assert r.measured is None
+    assert r.state == "unknown"
+    assert not r.passed and not r.target_met
+    assert "no_measure" in r.detail and "source unreachable" in r.detail
+
+
+def test_failed_count_with_a_measure_keeps_it(tmp_path: Path):
+    ctx = EvaluationContext(project_path=tmp_path, allowlist={PY})
+    r = DEFAULT_EVALUATOR.evaluate(
+        obj(command=[PY, "-c", "print(3); raise SystemExit(1)"], target="<=0"), ctx
+    )
+    assert r.measured == 3.0 and r.state == "failed" and "no_measure" not in r.detail
