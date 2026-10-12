@@ -6,6 +6,13 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **Longer command-objective details.** A failed command objective keeps the
+  first 200 characters of its stderr as its detail; a project can raise that
+  to at most 4000 with `verification.objective_detail_chars` (or
+  `stewardctl project enable --objective-detail-chars`); a value outside
+  1..4000 is refused when saved. The default is unchanged.
+
 ### Fixed
 - **A crashed counter no longer reads as "0 found".** A command objective
   that exits non-zero without printing a number used to measure 0, which met

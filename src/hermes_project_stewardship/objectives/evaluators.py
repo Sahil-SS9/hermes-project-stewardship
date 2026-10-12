@@ -25,6 +25,29 @@ from ..security.allowlist import CommandNotPermitted, run_allowlisted
 
 _TARGET_RE = re.compile(r"^(>=|<=|>|<|==|!=)\s*(-?\d+(?:\.\d+)?)$")
 
+DEFAULT_DETAIL_CHARS = 200
+MAX_DETAIL_CHARS = 4000
+
+
+def check_detail_chars(verification_policy) -> None:
+    """Refuse an ``objective_detail_chars`` setting outside 1..MAX_DETAIL_CHARS."""
+    value = (verification_policy or {}).get("objective_detail_chars", DEFAULT_DETAIL_CHARS)
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= MAX_DETAIL_CHARS:
+        raise ValueError(f"objective_detail_chars must be an integer from 1 to {MAX_DETAIL_CHARS}")
+
+
+def detail_chars_from(verification_policy) -> int:
+    """stderr characters a failed command objective keeps as its detail.
+
+    Read from the project's ``verification.objective_detail_chars``, which
+    check_detail_chars validates when it is saved; a value stored some other
+    way still falls back to the default or is clamped to 1..MAX_DETAIL_CHARS.
+    """
+    value = (verification_policy or {}).get("objective_detail_chars", DEFAULT_DETAIL_CHARS)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return DEFAULT_DETAIL_CHARS
+    return max(1, min(value, MAX_DETAIL_CHARS))
+
 
 @dataclass
 class EvaluationContext:
@@ -32,6 +55,7 @@ class EvaluationContext:
     allowlist: FrozenSet[str] = frozenset()
     timeout_seconds: int = 60
     github_evidence: Optional[dict] = None
+    detail_chars: int = DEFAULT_DETAIL_CHARS
     clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)
 
 
@@ -193,7 +217,7 @@ class ObjectiveEvaluator:
             f"exit={result.exit_code}"
             + (" timed_out" if result.timed_out else "")
             + (" no_measure" if measured is None and not result.timed_out else "")
-            + (f" stderr_head={result.stderr[:200]}" if result.stderr and not result.ok else "")
+            + (f" stderr_head={result.stderr[:ctx.detail_chars]}" if result.stderr and not result.ok else "")
         )
         return ObjectiveResult(
             objective_id=objective.id or -1,

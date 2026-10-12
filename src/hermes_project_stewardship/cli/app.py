@@ -58,6 +58,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--repo", dest="repo_path", default=None,
         help="repo root used by verification collectors",
     )
+    en.add_argument(
+        "--objective-detail-chars", type=int, default=None,
+        help="stderr characters a failed command objective keeps as its detail (default 200, at most 4000)",
+    )
     dis = psub.add_parser("disable")
     dis.add_argument("project_id")
     for act in ("pause", "resume", "freeze"):
@@ -329,6 +333,8 @@ def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) 
             vp = {}
             if getattr(args, "repo_path", None):
                 vp["repo_path"] = args.repo_path
+            if args.objective_detail_chars is not None:
+                vp["objective_detail_chars"] = args.objective_detail_chars
             s = svc.enable(
                 args.project_id,
                 mission=args.mission,

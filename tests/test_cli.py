@@ -33,6 +33,16 @@ def test_cli_json_output_parses(db, capsys):
     assert cycle["health"]["state"] in {"healthy", "watch", "degraded", "critical", "unknown"}
 
 
+def test_cli_enable_sets_the_objective_detail_cap(db, capsys):
+    assert main(["--db", str(db), "project", "enable", "pd", "--repo", "/srv/pd",
+                 "--objective-detail-chars", "1500"]) == EXIT_OK
+    capsys.readouterr()
+    main(["--db", str(db), "project", "status", "pd", "--json"])
+    verification = json.loads(capsys.readouterr().out)["settings"]["policies"]["verification"]
+    assert verification == {"repo_path": "/srv/pd", "objective_detail_chars": 1500}
+    assert main(["--db", str(db), "project", "enable", "pd", "--objective-detail-chars", "5000"]) == EXIT_ERROR
+
+
 def test_cli_unknown_project_exit_code(db):
     rc = main(["--db", str(db), "health", "ghost"])
     assert rc == EXIT_ERROR
