@@ -327,3 +327,46 @@ def test_update_task_validates_before_any_write(native_host):
         row = kb.get_task(conn, task["id"])
         assert row.title == "Original"  # no partial write
         assert len(kb.list_events(conn, task["id"])) == before_events
+
+
+def _events(host, task_id, kind):
+    with host._kanban() as (_kb, conn, _):
+        return [row[0] for row in conn.execute(
+            "SELECT payload FROM task_events WHERE task_id=? AND kind=? ORDER BY id", (task_id, kind))]
+
+
+def _guard(record, assignee):
+    return {"expect_assignee": assignee, "eligible_statuses": [record["status"]],
+            "claim_lock_absent": True, "expected_revision": record["revision"]}
+
+
+def test_guarded_transfer_assigns_through_core_and_records_the_assigned_event(native_host):
+    # Catalog review (PR #136752): core's assign_task records the `assigned`
+    # event and resets the failure streak; the plugin no longer writes the row.
+    task = native_host.create_task(title="Move me", assignee="alice", initial_status="ready")
+    record = native_host.get_task(task["id"])["task"]
+    with native_host._kanban() as (_kb, conn, _):
+        conn.execute("UPDATE tasks SET consecutive_failures=3, last_failure_error='x' WHERE id=?", (task["id"],))
+        conn.commit()
+    before = len(_events(native_host, task["id"], "assigned"))
+    result = native_host.assign_task_if_unchanged(task["id"], "alice", "bob", _guard(record, "alice"))
+    assert result["assignee"] == "bob"
+    payloads = _events(native_host, task["id"], "assigned")
+    assert len(payloads) == before + 1 and '"bob"' in payloads[-1]
+    with native_host._kanban() as (_kb, conn, _):
+        row = conn.execute("SELECT consecutive_failures, last_failure_error FROM tasks WHERE id=?", (task["id"],)).fetchone()
+    assert tuple(row) == (0, None)
+
+
+def test_guarded_transfer_refuses_without_writing_when_a_guard_fails(native_host):
+    task = native_host.create_task(title="Stay put", assignee="alice", initial_status="ready")
+    record = native_host.get_task(task["id"])["task"]
+    before = len(_events(native_host, task["id"], "assigned"))
+    stale = dict(_guard(record, "alice"), expected_revision=int(record["revision"]) + 1)
+    for guard, code in ((_guard(record, "carol"), "assignee_changed"), (stale, "revision_changed"),
+                        (dict(_guard(record, "alice"), eligible_statuses=["review"]), "claimed_or_running")):
+        with pytest.raises(HostError) as caught:
+            native_host.assign_task_if_unchanged(task["id"], "alice", "bob", guard)
+        assert caught.value.message == code
+    assert native_host.get_task(task["id"])["task"]["assignee"] == "alice"
+    assert len(_events(native_host, task["id"], "assigned")) == before
