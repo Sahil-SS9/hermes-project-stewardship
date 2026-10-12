@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Longer command-objective details.** A failed command objective keeps the
+  first 200 characters of its stderr as its detail; a project can raise that
+  to at most 4000 with `verification.objective_detail_chars` (or
+  `stewardctl project enable --objective-detail-chars`); a value outside
+  1..4000 is refused when saved. The default is unchanged.
+
 ## [0.5.2] - 2026-10-13
 
 ### Fixed

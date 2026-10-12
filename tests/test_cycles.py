@@ -116,6 +116,21 @@ def test_crashed_count_objective_is_unknown_not_healthy(engine, enabled, svc, tm
     assert r["initiatives"] == []
 
 
+def test_cycle_uses_the_project_objective_detail_cap(engine, enabled, svc, tmp_path):
+    import json
+
+    svc.enable(enabled, lead_profile="lead", autonomy_level=3)
+    repo = make_repo(tmp_path / "r")
+    svc.store._conn.execute(
+        "UPDATE project_stewardship SET verification_policy_json=? WHERE project_id=?",
+        (json.dumps({"repo_path": repo.as_posix(), "objective_detail_chars": 600}), enabled),
+    )
+    svc.add_objective(enabled, name="ci", evaluator_type="command", target=">=1",
+                      command=["python3", "-c", "import sys; sys.stderr.write('e' * 900); sys.exit(1)"])
+    [objective] = engine.run_cycle(enabled)["objectives"]
+    assert objective["detail"].endswith("stderr_head=" + "e" * 600)
+
+
 def test_unknown_state_blocks_mutations(engine, enabled, svc, tmp_path):
     """Fail-closed: missing declared file → Unknown → no proposals even if
     the proposer tries."""
