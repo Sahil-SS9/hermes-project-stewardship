@@ -412,23 +412,33 @@ test('Roadmap journey (c): a Needs-placing item is placed by hand and gone', { t
 
 // Batch L R2 fix 2: the goal-check editor, driven through the real control.
 test('Roadmap: a person sets a goal check through the rendered control, and clears it', { timeout: 180000 }, async () => {
+  // A goal of its own, so the test never depends on which tree row comes first.
+  const API = process.env.STEWARD_API_URL
+  const TOKEN = { 'x-hermes-session-token': 'demo-session-token' }
+  const call = async (path, init = {}) => {
+    const r = await fetch(API + path, { method: init.method || 'GET', headers: { ...TOKEN, 'content-type': 'application/json' }, body: init.body === undefined ? undefined : JSON.stringify(init.body) })
+    const text = await r.text()
+    if (!r.ok) throw new Error(`${init.method || 'GET'} ${path} -> ${r.status} ${text.slice(0, 160)}`)
+    return text ? JSON.parse(text) : {}
+  }
+  const goal = await call('/projects/payments-relaunch/goals', { method: 'POST', body: { title: 'Editor goal', objective_ids: [] } })
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  page.setDefaultTimeout(12000)
   try {
+    const node = `not-placed-goals:payments-relaunch:${goal.goal_id}`
     const openGoal = async () => {
       await openRoadmap(page)
       await projectRow(page, 'payments-relaunch').click()
-      await page.locator('[data-rm-node^="initiative:"]').filter({ hasText: 'Confirm me when ready' }).first().click()
-      await page.locator('[data-rm-node^="milestone:"]').first().waitFor()
-      await page.locator('[data-rm-node^="milestone:"]').first().click()
-      await page.locator('[data-rm-node^="objective:"]').first().click()
-      await page.locator('[data-rm-node^="goal:"]').first().click()
+      const row = page.locator(`[data-rm-node="${node}"]`)
+      await row.waitFor()
+      await row.click()
       await page.locator('[data-rm-goal-check]').waitFor()
     }
+    // The editor reads the check's own endpoint: wait for the detail to land.
+    const settled = (pattern) => page.waitForFunction((p) => new RegExp(p).test(document.querySelector('[data-rm-check-state]')?.textContent ?? ''), pattern)
     await openGoal()
     const editor = page.locator('[data-rm-goal-check]')
-    // The editor reads the check's own endpoint, so wait for the detail to land.
-    const settled = (pattern) => page.waitForFunction(([p]) => new RegExp(p).test(document.querySelector('[data-rm-check-state]')?.textContent ?? ''), [pattern])
     await settled('none')
     assert.match(await editor.locator('[data-rm-check-state]').innerText(), /none/)
     await editor.getByRole('button', { name: 'Set check' }).click()
@@ -441,6 +451,8 @@ test('Roadmap: a person sets a goal check through the rendered control, and clea
     await settled('>=1')
     assert.match(await editor.locator('[data-rm-check-state]').innerText(), />=1/)
     assert.match(await editor.locator('[data-rm-check-state]').innerText(), /unknown/i)
+    const stored = await call(`/projects/payments-relaunch/goals/${goal.goal_id}/check`)
+    assert.equal(stored.check.target, '>=1')
     // Clearing it through the same control removes the check (state restored).
     await editor.getByRole('button', { name: 'Edit check' }).click()
     await editor.getByRole('button', { name: 'Clear check' }).click()
@@ -448,6 +460,7 @@ test('Roadmap: a person sets a goal check through the rendered control, and clea
     await openGoal()
     await settled('none')
     assert.match(await editor.locator('[data-rm-check-state]').innerText(), /none/)
+    assert.equal((await call(`/projects/payments-relaunch/goals/${goal.goal_id}/check`)).check, null)
   } finally {
     await browser.close()
   }
