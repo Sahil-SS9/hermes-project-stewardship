@@ -33,34 +33,14 @@ import { number } from '../lib/ui.js'
 import { plural } from '../lib/ui.js'
 import { useDialogFocusManager } from '../lib/ui.js'
 import { loadRoadmapData } from '../data/loaders.js'
-import { ConfirmDeliveredDialog, PlaceDialog } from './roadmap-dialogs.js'
+import { ConfirmDeliveredDialog, PlaceDialog, WaiveDialog } from './roadmap-dialogs.js'
 import { BUCKETS } from '../lib/plan-vocab.js'
 import { ICON } from '../lib/plan-vocab.js'
+import {
+  STATE_LABEL, chip, goalStateWords, milestoneStateWords, objectiveStateWords, waivedChip, words,
+} from './roadmap-words.js'
 
 const CONTRACT_STATUS = { active: 'Active', paused: 'Paused', done: 'Done', cleared: 'Cleared' }
-
-// Derived states, exactly as the backend computes them. Unknown is unknown:
-// never rendered as met, and never as zero.
-const STATE_LABEL = {
-  not_started: 'Not started', in_progress: 'In progress', met: 'Met',
-  at_risk: 'At risk', unknown: 'Unknown', reached: 'Reached', not_reached: 'Not reached',
-}
-const milestoneStateWords = (row) => (
-  `${STATE_LABEL[row.state] ?? words(row.state)}${row.overdue ? ' · overdue' : ''}${row.closed ? ' · closed' : ''}`)
-const objectiveStateWords = (row) => {
-  const check = row.check?.state
-  const checkText = check && check !== 'no_check' ? ` · check ${STATE_LABEL[check] ?? words(check)}` : ''
-  return `${STATE_LABEL[row.state] ?? words(row.state)}${checkText}`
-}
-const goalStateWords = (row) => {
-  const check = row.check?.state
-  const checkText = check && check !== 'no_check' ? ` · check ${STATE_LABEL[check] ?? words(check)}` : ''
-  const tasks = row.task_count ? ` · ${row.task_count} ${row.task_count === 1 ? 'task' : 'tasks'}` : ' · no tasks'
-  return `${STATE_LABEL[row.state] ?? words(row.state)}${tasks}${checkText}`
-}
-
-const words = (value) => String(value ?? '').replace(/_/g, ' ')
-const chip = (text, tone = '') => jsx('span', { className: `dy-rm-chip${tone ? ` ${tone}` : ''}`, children: text })
 
 // W3C APG tree pattern with one roving tab stop (the row holding tabIndex 0).
 // Down/Up move between visible rows; Right opens a closed node or moves to the
@@ -403,6 +383,7 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
   const [focusNode, setFocusNode] = useState(null)
   const [placeDialog, setPlaceDialog] = useState(null)
   const [confirmDialog, setConfirmDialog] = useState(null)
+  const [waiveDialog, setWaiveDialog] = useState(null)
   const [contract, setContract] = useState(null)
   const [refreshTick, setRefreshTick] = useState(0)
   const loadSerial = useRef(0)
@@ -419,6 +400,38 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
     } finally {
       if (serial === loadSerial.current) setLoading(false)
     }
+  }
+
+  // v43: the requirement controls. Waiving asks why (the reason is shown on
+  // the item); restoring puts the item back in the chain, no words needed.
+  const restoreRequirement = async (projectId, kind, itemId, itemLabel) => {
+    try {
+      await api(
+        `/projects/${encodeURIComponent(projectId)}/waivers/${encodeURIComponent(kind)}/${encodeURIComponent(itemId)}`,
+        { method: 'DELETE' })
+      emitToast('success', `“${itemLabel}” is back in the chain.`)
+      void load()
+    } catch (failure) {
+      emitToast('error', String(failure?.message ?? failure))
+    }
+  }
+  const waiverAction = (projectId, kind, row, itemId, itemLabel) => {
+    if (!canWrite) return null
+    if (row.waived) {
+      return jsx(Button, {
+        small: true, action: 'roadmap-restore-requirement',
+        onClick: (event) => { event.stopPropagation(); void restoreRequirement(projectId, kind, itemId, itemLabel) },
+        children: 'Restore requirement',
+      })
+    }
+    return jsx(Button, {
+      small: true, action: 'roadmap-waive',
+      onClick: (event) => {
+        event.stopPropagation()
+        setWaiveDialog({ projectId, kind, itemId: String(itemId), itemLabel })
+      },
+      children: 'No longer required',
+    })
   }
   useEffect(() => { void load() }, [scope])
   // The goal contract loads for the goal in the drawer, from that goal's project.
@@ -567,7 +580,9 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
           chips: jsxs(Fragment, { children: [
             deliveryChips(milestone.delivery),
             milestone.overdue ? chip('Overdue', 'overdue') : null,
+            waivedChip(milestone),
           ] }),
+          actions: waiverAction(pid, 'milestone', milestone, milestone.id, milestone.name),
           onToggle: () => toggle(milestoneNode),
           onOpen: () => { openNode(milestoneNode); setSelection({ type: 'milestone', id: milestone.id, via: ref, projectId: pid, node: milestoneNode }) },
         }, milestoneNode))
@@ -585,7 +600,11 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
               label: objective.name,
               detail: objectiveStateWords(objective),
               expandable: (objective.goals ?? []).length > 0, open: objectiveOpen,
-              chips: jsx('span', { className: 'dy-rm-chips', children: chip(STATE_LABEL[objective.state] ?? words(objective.state), objective.state === 'met' ? 'passed' : objective.state === 'at_risk' ? 'failed' : '') }),
+              chips: jsxs('span', { className: 'dy-rm-chips', children: [
+                chip(STATE_LABEL[objective.state] ?? words(objective.state), objective.state === 'met' ? 'passed' : objective.state === 'at_risk' ? 'failed' : ''),
+                waivedChip(objective),
+              ] }),
+              actions: waiverAction(pid, 'objective', objective, objective.id, objective.name),
               onToggle: () => toggle(objectiveNode),
               onOpen: () => { openNode(objectiveNode); setSelection({ type: 'objective', id: objective.id, via: ref, projectId: pid, node: objectiveNode }) },
             }, objectiveNode))
@@ -598,7 +617,11 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
                 label: goal.title,
                 detail: goalStateWords(goal),
                 expandable: (goal.tasks ?? []).length > 0, open: goalOpen,
-                chips: jsx('span', { className: 'dy-rm-chips', children: chip(STATE_LABEL[goal.state] ?? words(goal.state), goal.state === 'met' ? 'passed' : goal.state === 'at_risk' ? 'failed' : '') }),
+                chips: jsxs('span', { className: 'dy-rm-chips', children: [
+                  chip(STATE_LABEL[goal.state] ?? words(goal.state), goal.state === 'met' ? 'passed' : goal.state === 'at_risk' ? 'failed' : ''),
+                  waivedChip(goal),
+                ] }),
+                actions: waiverAction(pid, 'goal', goal, goal.id, goal.title),
                 onToggle: () => toggle(goalNode),
                 onOpen: () => { openNode(goalNode); setSelection({ type: 'goal', id: goal.id, projectId: pid, node: goalNode }) },
               }, goalNode))
@@ -610,7 +633,8 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
                   label: task.title,
                   detail: words(task.bucket),
                   expandable: false, open: false,
-                  chips: null,
+                  chips: waivedChip(task),
+                  actions: waiverAction(pid, 'task', task, task.ref, task.title),
                   onToggle: () => {},
                   onOpen: () => onOpen({ project: pid, entryView: 'board', workRef: task.ref }),
                 }, taskNode))
@@ -746,6 +770,11 @@ export function RoadmapView({ initialScope = 'all', onOpen, onRefresh }) {
       ...confirmDialog,
       onClose: () => setConfirmDialog(null),
       onDone: () => { setConfirmDialog(null); void load() },
+    }) : null,
+    waiveDialog ? jsx(WaiveDialog, {
+      ...waiveDialog,
+      onClose: () => setWaiveDialog(null),
+      onDone: () => { setWaiveDialog(null); void load() },
     }) : null,
   ]})
 }

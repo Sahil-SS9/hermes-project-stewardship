@@ -24888,9 +24888,69 @@ function ConfirmDeliveredDialog({ projectId, ref, title, onClose, onDone }) {
     ] })
   });
 }
+function WaiveDialog({ kind, itemId, itemLabel, projectId, onClose, onDone }) {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  useDialogFocusManager("[data-rm-waive-dialog] .dy-rm-modal");
+  const ready = reason.trim().length >= 4;
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(
+        `/projects/${encodeURIComponent(projectId)}/waivers/${encodeURIComponent(kind)}/${encodeURIComponent(itemId)}`,
+        { method: "PUT", body: { reason: reason.trim() } }
+      );
+      emitToast("success", `\u201C${itemLabel}\u201D is marked no longer required.`);
+      onDone();
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+      setBusy(false);
+    }
+  };
+  return jsx("div", {
+    className: "dy-rm-modal-backdrop",
+    "data-rm-waive-dialog": true,
+    onKeyDown: (event) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onClose();
+      }
+    },
+    children: jsxs("section", { className: "dy-rm-modal", role: "dialog", "aria-modal": true, "aria-label": "Mark as no longer required", children: [
+      jsxs("header", { className: "dy-rm-modal-head", children: [
+        jsxs("div", { children: [
+          jsx("p", { className: "dockyard-meta", children: "No longer required" }),
+          jsx("h3", { children: "Mark as no longer required" }),
+          jsx("p", { children: `Project ${projectId}` })
+        ] }),
+        jsx(Button, { onClick: onClose, ariaLabel: "Close waiver dialog", children: "\xD7" })
+      ] }),
+      jsxs("div", { className: "dy-rm-modal-body", "data-rm-waive-body": true, children: [
+        jsx("p", { className: "dy-rm-confirm", children: `\u201C${itemLabel}\u201D stops blocking the work above it, and counts as settled. Its history stays.` }),
+        jsxs("label", { className: "dockyard-field dockyard-field-wide field-required", children: [
+          jsx("span", { children: "Why is it no longer required?" }),
+          jsx("textarea", {
+            rows: 3,
+            "data-rm-waive-reason": true,
+            value: reason,
+            onInput: (event) => setReason(event.target.value),
+            onChange: (event) => setReason(event.target.value),
+            placeholder: "e.g. delivered under the old plan; not required for this initiative"
+          })
+        ] }),
+        jsx("p", { className: "dy-rm-modal-error", role: "alert", children: error })
+      ] }),
+      jsxs("div", { className: "dy-rm-modal-actions", children: [
+        jsx(Button, { disabled: busy, onClick: onClose, children: "Cancel" }),
+        jsx(Button, { variant: "primary", disabled: busy || !ready, onClick: submit, children: busy ? "Marking\u2026" : "Mark as no longer required" })
+      ] })
+    ] })
+  });
+}
 
-// hermes_dockyard_plugin/desktop/src/views/roadmap.js
-var CONTRACT_STATUS = { active: "Active", paused: "Paused", done: "Done", cleared: "Cleared" };
+// hermes_dockyard_plugin/desktop/src/views/roadmap-words.js
 var STATE_LABEL = {
   not_started: "Not started",
   in_progress: "In progress",
@@ -24898,8 +24958,12 @@ var STATE_LABEL = {
   at_risk: "At risk",
   unknown: "Unknown",
   reached: "Reached",
-  not_reached: "Not reached"
+  not_reached: "Not reached",
+  waived: "No longer required"
 };
+var words = (value) => String(value ?? "").replace(/_/g, " ");
+var chip = (text2, tone = "") => jsx("span", { className: `dy-rm-chip${tone ? ` ${tone}` : ""}`, children: text2 });
+var waivedChip = (row) => row.waived ? chip(`No longer required \u2014 ${row.waived.reason}`, "waived") : null;
 var milestoneStateWords = (row) => `${STATE_LABEL[row.state] ?? words(row.state)}${row.overdue ? " \xB7 overdue" : ""}${row.closed ? " \xB7 closed" : ""}`;
 var objectiveStateWords = (row) => {
   const check = row.check?.state;
@@ -24912,8 +24976,9 @@ var goalStateWords = (row) => {
   const tasks = row.task_count ? ` \xB7 ${row.task_count} ${row.task_count === 1 ? "task" : "tasks"}` : " \xB7 no tasks";
   return `${STATE_LABEL[row.state] ?? words(row.state)}${tasks}${checkText}`;
 };
-var words = (value) => String(value ?? "").replace(/_/g, " ");
-var chip = (text2, tone = "") => jsx("span", { className: `dy-rm-chip${tone ? ` ${tone}` : ""}`, children: text2 });
+
+// hermes_dockyard_plugin/desktop/src/views/roadmap.js
+var CONTRACT_STATUS = { active: "Active", paused: "Paused", done: "Done", cleared: "Cleared" };
 function treeKeydown(event) {
   const rows = [...event.currentTarget.querySelectorAll("[data-rm-row]")];
   const row = document.activeElement?.closest?.("[data-rm-row]");
@@ -25258,6 +25323,7 @@ function RoadmapView({ initialScope = "all", onOpen, onRefresh }) {
   const [focusNode, setFocusNode] = useState(null);
   const [placeDialog, setPlaceDialog] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
+  const [waiveDialog, setWaiveDialog] = useState(null);
   const [contract, setContract] = useState(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const loadSerial = useRef(0);
@@ -25275,6 +25341,41 @@ function RoadmapView({ initialScope = "all", onOpen, onRefresh }) {
     } finally {
       if (serial === loadSerial.current) setLoading(false);
     }
+  };
+  const restoreRequirement = async (projectId, kind, itemId, itemLabel) => {
+    try {
+      await api(
+        `/projects/${encodeURIComponent(projectId)}/waivers/${encodeURIComponent(kind)}/${encodeURIComponent(itemId)}`,
+        { method: "DELETE" }
+      );
+      emitToast("success", `\u201C${itemLabel}\u201D is back in the chain.`);
+      void load();
+    } catch (failure) {
+      emitToast("error", String(failure?.message ?? failure));
+    }
+  };
+  const waiverAction = (projectId, kind, row, itemId, itemLabel) => {
+    if (!canWrite) return null;
+    if (row.waived) {
+      return jsx(Button, {
+        small: true,
+        action: "roadmap-restore-requirement",
+        onClick: (event) => {
+          event.stopPropagation();
+          void restoreRequirement(projectId, kind, itemId, itemLabel);
+        },
+        children: "Restore requirement"
+      });
+    }
+    return jsx(Button, {
+      small: true,
+      action: "roadmap-waive",
+      onClick: (event) => {
+        event.stopPropagation();
+        setWaiveDialog({ projectId, kind, itemId: String(itemId), itemLabel });
+      },
+      children: "No longer required"
+    });
   };
   useEffect(() => {
     void load();
@@ -25444,8 +25545,10 @@ function RoadmapView({ initialScope = "all", onOpen, onRefresh }) {
           open: milestoneOpen,
           chips: jsxs(Fragment, { children: [
             deliveryChips(milestone.delivery),
-            milestone.overdue ? chip("Overdue", "overdue") : null
+            milestone.overdue ? chip("Overdue", "overdue") : null,
+            waivedChip(milestone)
           ] }),
+          actions: waiverAction(pid, "milestone", milestone, milestone.id, milestone.name),
           onToggle: () => toggle(milestoneNode),
           onOpen: () => {
             openNode(milestoneNode);
@@ -25474,7 +25577,11 @@ function RoadmapView({ initialScope = "all", onOpen, onRefresh }) {
               detail: objectiveStateWords(objective),
               expandable: (objective.goals ?? []).length > 0,
               open: objectiveOpen,
-              chips: jsx("span", { className: "dy-rm-chips", children: chip(STATE_LABEL[objective.state] ?? words(objective.state), objective.state === "met" ? "passed" : objective.state === "at_risk" ? "failed" : "") }),
+              chips: jsxs("span", { className: "dy-rm-chips", children: [
+                chip(STATE_LABEL[objective.state] ?? words(objective.state), objective.state === "met" ? "passed" : objective.state === "at_risk" ? "failed" : ""),
+                waivedChip(objective)
+              ] }),
+              actions: waiverAction(pid, "objective", objective, objective.id, objective.name),
               onToggle: () => toggle(objectiveNode),
               onOpen: () => {
                 openNode(objectiveNode);
@@ -25494,7 +25601,11 @@ function RoadmapView({ initialScope = "all", onOpen, onRefresh }) {
                 detail: goalStateWords(goal),
                 expandable: (goal.tasks ?? []).length > 0,
                 open: goalOpen,
-                chips: jsx("span", { className: "dy-rm-chips", children: chip(STATE_LABEL[goal.state] ?? words(goal.state), goal.state === "met" ? "passed" : goal.state === "at_risk" ? "failed" : "") }),
+                chips: jsxs("span", { className: "dy-rm-chips", children: [
+                  chip(STATE_LABEL[goal.state] ?? words(goal.state), goal.state === "met" ? "passed" : goal.state === "at_risk" ? "failed" : ""),
+                  waivedChip(goal)
+                ] }),
+                actions: waiverAction(pid, "goal", goal, goal.id, goal.title),
                 onToggle: () => toggle(goalNode),
                 onOpen: () => {
                   openNode(goalNode);
@@ -25513,7 +25624,8 @@ function RoadmapView({ initialScope = "all", onOpen, onRefresh }) {
                   detail: words(task2.bucket),
                   expandable: false,
                   open: false,
-                  chips: null,
+                  chips: waivedChip(task2),
+                  actions: waiverAction(pid, "task", task2, task2.ref, task2.title),
                   onToggle: () => {
                   },
                   onOpen: () => onOpen({ project: pid, entryView: "board", workRef: task2.ref })
@@ -25669,6 +25781,14 @@ function RoadmapView({ initialScope = "all", onOpen, onRefresh }) {
       onClose: () => setConfirmDialog(null),
       onDone: () => {
         setConfirmDialog(null);
+        void load();
+      }
+    }) : null,
+    waiveDialog ? jsx(WaiveDialog, {
+      ...waiveDialog,
+      onClose: () => setWaiveDialog(null),
+      onDone: () => {
+        setWaiveDialog(null);
         void load();
       }
     }) : null

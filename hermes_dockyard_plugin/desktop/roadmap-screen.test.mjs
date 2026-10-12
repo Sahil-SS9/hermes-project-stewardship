@@ -549,3 +549,50 @@ test('Roadmap: a person sets a goal check through the rendered control, and clea
     await browser.close()
   }
 })
+
+test('Roadmap: mark a step no longer required through the row, then restore it', { timeout: 180000 }, async () => {
+  // v43: the deadlock this closes — a blocked chain becomes deliverable
+  // without faking a completion, and the decision is reversible.
+  const browser = await chromium.launch({ headless: true })
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  const errors = []
+  page.on('pageerror', (error) => errors.push(String(error)))
+  try {
+    await openRoadmap(page, { pickAll: false })
+    await projectRow(page, 'waivers-demo').click()
+    const initiative = page.locator('[data-rm-node^="initiative:"]', { hasText: 'Waive me to deliver' })
+    await initiative.waitFor()
+    // Not ready to start with: nothing on the row offers a confirmation.
+    assert.equal(await initiative.locator('[data-action="roadmap-confirm-delivered"]').count(), 0)
+    await initiative.click()
+    const milestone = page.locator('[data-rm-node^="milestone:"]', { hasText: 'Waivable milestone' })
+    await milestone.click()
+    const objective = page.locator('[data-rm-node^="objective:"]', { hasText: 'Waivable objective' })
+    await objective.locator('[data-action="roadmap-waive"]').click()
+
+    // The dialog asks WHY, and refuses to submit without a reason.
+    const dialog = page.locator('[data-rm-waive-dialog]')
+    await dialog.waitFor()
+    const submit = dialog.getByRole('button', { name: 'Mark as no longer required' })
+    assert.equal(await submit.isDisabled(), true, 'no reason, no waiver')
+    await dialog.locator('[data-rm-waive-reason]').fill('delivered under the old plan; out of scope now')
+    await submit.click()
+    await dialog.waitFor({ state: 'detached' })
+
+    // The item stays, marked with the reason, and the chain is now deliverable.
+    const marked = page.locator('[data-rm-node^="objective:"]')
+      .filter({ hasText: 'No longer required — delivered under the old plan; out of scope now' })
+    await marked.waitFor()
+    await page.locator('[data-rm-node^="initiative:"]', { hasText: 'Waive me to deliver' })
+      .getByText('Ready to confirm').waitFor()
+
+    // Restore puts it back in the chain: the mark goes and the block returns.
+    await objective.locator('[data-action="roadmap-restore-requirement"]').click()
+    await marked.waitFor({ state: 'detached' })
+    await page.locator('[data-rm-node^="initiative:"]', { hasText: 'Waive me to deliver' })
+      .getByText('Ready to confirm').waitFor({ state: 'detached' })
+    assert.deepEqual(errors, [])
+  } finally {
+    await browser.close()
+  }
+})

@@ -94,6 +94,39 @@ def seed_roadmap_fixtures(service, adapter, roadmap, ladder=None) -> None:
     ladder.set_task_goal(pid, ready_task["ref"], ready_gid,
                          actor="fixture", interface="fixture")
 
+    # v43 waivers: a chain that is blocked until a person says a step is no
+    # longer required, so a browser test can waive and restore it by hand.
+    # It lives in its OWN project: adding cards to payments-relaunch's board
+    # displaces the legacy drag suites that drive it with exact coordinates.
+    wpid = "waivers-demo"
+    service.enable(wpid, mission="Show waivers working", lead_profile="fixture-lead",
+                   member_profiles=["worker", "reviewer"], autonomy_level=2,
+                   verification_policy={"max_open_initiatives": 50})
+    waive_ref = service.propose_initiative(
+        wpid, title="Waive me to deliver", rationale="One step is out of scope")["ref"]
+    try:
+        service.approve_initiative(waive_ref, actor="fixture", interface="fixture")
+        service.start_execution(waive_ref)
+    except Exception:
+        pass
+    waive_mid = dy.milestone_create(wpid, "Waivable milestone", due="2099-03-01", actor=HUMAN)
+    ladder.set_milestone_initiative(wpid, waive_mid, waive_ref,
+                                    actor="fixture", interface="fixture")
+    waive_oid = int(service.add_objective(
+        wpid, name="Waivable objective", evaluator_type="manual", target=">=1",
+        actor="fixture", interface="fixture")["id"])
+    ladder.set_objective_milestone(wpid, waive_oid, waive_mid,
+                                   actor="fixture", interface="fixture")
+    waive_gid = service.create_goal(
+        wpid, title="Waivable goal", objective_ids=[waive_oid],
+        actor="fixture", interface="fixture")["goal_id"]
+    ladder.set_goal_objective(wpid, waive_gid, waive_oid, actor="fixture", interface="fixture")
+    waive_task = adapter.create_work(
+        wpid, kind="task", title="Waivable task", body="fixture",
+        assignee="worker", created_by="fixture")
+    ladder.set_task_goal(wpid, waive_task["ref"], waive_gid,
+                         actor="fixture", interface="fixture")
+
     # Batch L R2 fix 7: both ladder notifications, so the Notifications screen
     # shows the new kinds with their plain words in the signoff screenshots.
     from hermes_project_stewardship.events.bus import EventBus

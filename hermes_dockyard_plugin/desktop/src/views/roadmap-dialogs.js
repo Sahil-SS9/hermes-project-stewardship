@@ -172,3 +172,57 @@ export function ConfirmDeliveredDialog({ projectId, ref, title, onClose, onDone 
     ] }),
   })
 }
+
+// v43 waiver: a person takes an item out of the requirement without deleting
+// it or faking a completion. The reason is required and is shown on the item.
+export function WaiveDialog({ kind, itemId, itemLabel, projectId, onClose, onDone }) {
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  useDialogFocusManager('[data-rm-waive-dialog] .dy-rm-modal')
+  const ready = reason.trim().length >= 4
+  const submit = async () => {
+    setBusy(true); setError(null)
+    try {
+      await api(
+        `/projects/${encodeURIComponent(projectId)}/waivers/${encodeURIComponent(kind)}/${encodeURIComponent(itemId)}`,
+        { method: 'PUT', body: { reason: reason.trim() } })
+      emitToast('success', `“${itemLabel}” is marked no longer required.`)
+      onDone()
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+      setBusy(false)
+    }
+  }
+  return jsx('div', {
+    className: 'dy-rm-modal-backdrop', 'data-rm-waive-dialog': true,
+    onKeyDown: (event) => { if (event.key === 'Escape') { event.stopPropagation(); onClose() } },
+    children: jsxs('section', { className: 'dy-rm-modal', role: 'dialog', 'aria-modal': true, 'aria-label': 'Mark as no longer required', children: [
+      jsxs('header', { className: 'dy-rm-modal-head', children: [
+        jsxs('div', { children: [
+          jsx('p', { className: 'dockyard-meta', children: 'No longer required' }),
+          jsx('h3', { children: 'Mark as no longer required' }),
+          jsx('p', { children: `Project ${projectId}` }),
+        ] }),
+        jsx(Button, { onClick: onClose, ariaLabel: 'Close waiver dialog', children: '×' }),
+      ] }),
+      jsxs('div', { className: 'dy-rm-modal-body', 'data-rm-waive-body': true, children: [
+        jsx('p', { className: 'dy-rm-confirm', children: `“${itemLabel}” stops blocking the work above it, and counts as settled. Its history stays.` }),
+        jsxs('label', { className: 'dockyard-field dockyard-field-wide field-required', children: [
+          jsx('span', { children: 'Why is it no longer required?' }),
+          jsx('textarea', {
+            rows: 3, 'data-rm-waive-reason': true, value: reason,
+            onInput: (event) => setReason(event.target.value),
+            onChange: (event) => setReason(event.target.value),
+            placeholder: 'e.g. delivered under the old plan; not required for this initiative',
+          }),
+        ] }),
+        jsx('p', { className: 'dy-rm-modal-error', role: 'alert', children: error }),
+      ] }),
+      jsxs('div', { className: 'dy-rm-modal-actions', children: [
+        jsx(Button, { disabled: busy, onClick: onClose, children: 'Cancel' }),
+        jsx(Button, { variant: 'primary', disabled: busy || !ready, onClick: submit, children: busy ? 'Marking…' : 'Mark as no longer required' }),
+      ] }),
+    ] }),
+  })
+}
