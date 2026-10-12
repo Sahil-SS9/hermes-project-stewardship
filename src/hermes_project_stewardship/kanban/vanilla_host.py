@@ -55,10 +55,24 @@ class ProjectKanbanHost:
 
     def __init__(self, *, hermes_home: str | Path, board: str = "default", **_kwargs) -> None:
         self.hermes_home = Path(hermes_home)
-        self.kanban_home = Path(os.environ.get("HERMES_KANBAN_HOME", self.hermes_home))
+        self.kanban_home = self._shared_kanban_home()
         self.board = (board or "default").strip()
         # Grouping parents live beside the boards, never as Hermes links (owner decision 4 = B).
         self._work_parents = WorkParents(self.kanban_home / "dockyard" / "work-parents.db")
+
+    def _shared_kanban_home(self) -> Path:
+        """The board root core itself uses: never the plugin's own guess.
+
+        Core resolves HERMES_KANBAN_HOME (tests and pinned deployments) and
+        otherwise the shared Hermes root, so a profile process stays on the
+        shared board. Without a runtime the adapter fails closed later; the
+        fallback here only names a path.
+        """
+        try:
+            from hermes_cli import kanban_db
+        except ImportError:
+            return Path(os.environ.get("HERMES_KANBAN_HOME") or self.hermes_home)
+        return Path(kanban_db.kanban_home())
 
     @staticmethod
     def _modules():
@@ -68,20 +82,16 @@ class ProjectKanbanHost:
 
     @contextmanager
     def _scope(self, board: str | None = None) -> Iterator[str]:
+        # Context-local only: os.environ is shared by every thread in the
+        # Hermes process, so it is never written here (catalog review).
         hermes_constants, kanban_db, _ = self._modules()
         selected = (board or self.board or "default").strip()
         token = hermes_constants.set_hermes_home_override(self.hermes_home)
-        previous_kanban_home = os.environ.get("HERMES_KANBAN_HOME")
-        os.environ["HERMES_KANBAN_HOME"] = str(self.kanban_home)
         try:
             with kanban_db.scoped_current_board(selected):
                 yield selected
         finally:
             hermes_constants.reset_hermes_home_override(token)
-            if previous_kanban_home is None:
-                os.environ.pop("HERMES_KANBAN_HOME", None)
-            else:
-                os.environ["HERMES_KANBAN_HOME"] = previous_kanban_home
 
     def capabilities(self) -> dict[str, Any]:
         return {"contract_version": CONTRACT_VERSION, "methods": sorted(_METHODS)}

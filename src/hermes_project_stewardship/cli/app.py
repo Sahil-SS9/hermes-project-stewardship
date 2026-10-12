@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sqlite3
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from typing import List, Optional
 
@@ -263,7 +265,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     engine.attach_events(bus)
 
     try:
-        return _dispatch(args, svc, engine, store)
+        with _command_hermes_home(getattr(args, "hermes_home", None)):
+            return _dispatch(args, svc, engine, store)
     except CycleRefused as e:
         print(friendly_error(str(e)), file=sys.stderr)
         return EXIT_REFUSED
@@ -272,6 +275,29 @@ def main(argv: Optional[List[str]] = None) -> int:
         return EXIT_ERROR
     finally:
         store.close()
+
+
+@contextmanager
+def _command_hermes_home(hermes_home: Optional[str]):
+    """Run one stewardctl command as the Hermes home it names.
+
+    The CLI is its own process, so `--hermes-home` sets HERMES_HOME for the
+    command (core then resolves the shared Kanban root from it, exactly as the
+    workflow timer does) and restores it after. The in-Hermes plugin never
+    writes process environment; only this command-line entry point does.
+    """
+    if not hermes_home:
+        yield
+        return
+    previous = os.environ.get("HERMES_HOME")
+    os.environ["HERMES_HOME"] = str(hermes_home)
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("HERMES_HOME", None)
+        else:
+            os.environ["HERMES_HOME"] = previous
 
 
 def _vanilla_adapter(hermes_home: str):
