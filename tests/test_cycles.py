@@ -98,6 +98,24 @@ def test_objective_failure_drives_proposals(engine, enabled, svc, tmp_path):
     assert r["mutation_blocked_reason"] is None
 
 
+def test_crashed_count_objective_is_unknown_not_healthy(engine, enabled, svc, tmp_path):
+    """A "<=0" count objective whose command fails without printing a number
+    measured nothing: the cycle is unknown and proposes nothing, instead of
+    reading the crash as a count of 0."""
+    svc.enable(enabled, lead_profile="lead", autonomy_level=3)
+    wire_repo(svc, enabled, make_repo(tmp_path / "r"))
+    svc.add_objective(enabled, name="drift", evaluator_type="command",
+                      target="<=0", severity="medium",
+                      command=["python3", "-c", "raise SystemExit('git failed')"])
+    engine.proposal_fn = lambda *a: [{"title": "Should never be created", "rationale": "x"}]
+    r = engine.run_cycle(enabled)
+    [objective] = r["objectives"]
+    assert objective["measured"] is None and objective["state"] == "unknown"
+    assert objective["target_met"] is False
+    assert r["health"]["state"] == "unknown"
+    assert r["initiatives"] == []
+
+
 def test_unknown_state_blocks_mutations(engine, enabled, svc, tmp_path):
     """Fail-closed: missing declared file → Unknown → no proposals even if
     the proposer tries."""

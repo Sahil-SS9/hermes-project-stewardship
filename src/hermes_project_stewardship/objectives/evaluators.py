@@ -4,7 +4,9 @@ Targets use a small, strict comparison grammar:
     ">=0.99", "<=5", ">90", "<10", "==1", "!=0"
 The measured value is:
 - command evaluator: exit code 0 => 1.0 else 0.0 (unless the command's stdout
-  ends with a single float on the last line — then that float is the measure);
+  ends with a single float on the last line — then that float is the measure).
+  A non-zero exit with no printed number is unknown (None) instead of 0.0 when
+  0.0 would meet the target: a crashed counter must never read as "0 found";
 - manual evaluator: the recorded status passed with evidence.
 
 Command evaluators ALWAYS run through security.allowlist.run_allowlisted.
@@ -184,12 +186,13 @@ class ObjectiveEvaluator:
                 target_met=False,
                 detail=f"blocked: {e}",
             )
-        measured = self._measure(result)
+        measured = self._measure(result, objective.target)
         target_met = _compare(measured, objective.target) if measured is not None else False
         passed = result.ok and (target_met if measured is not None else True)
         detail = (
             f"exit={result.exit_code}"
             + (" timed_out" if result.timed_out else "")
+            + (" no_measure" if measured is None and not result.timed_out else "")
             + (f" stderr_head={result.stderr[:200]}" if result.stderr and not result.ok else "")
         )
         return ObjectiveResult(
@@ -202,7 +205,7 @@ class ObjectiveEvaluator:
         )
 
     @staticmethod
-    def _measure(result) -> Optional[float]:
+    def _measure(result, target: str) -> Optional[float]:
         """Exit-code-first semantics with optional numeric stdout override."""
         if result.timed_out:
             return None
@@ -211,7 +214,13 @@ class ObjectiveEvaluator:
             m = re.fullmatch(r"-?\d+(?:\.\d+)?", lines[-1])
             if m:
                 return float(m.group(0))
-        return 1.0 if result.ok else 0.0
+        if result.ok:
+            return 1.0
+        # A failed command that printed no number measured nothing. Reading it
+        # as 0.0 is safe only when 0.0 fails the target (exit-code objectives
+        # such as ">=1"); for a count target such as "<=0" it would read as
+        # "nothing found", so the measure is unknown instead.
+        return None if _compare(0.0, target) else 0.0
 
 
 DEFAULT_EVALUATOR = ObjectiveEvaluator()
