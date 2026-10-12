@@ -394,8 +394,13 @@ test('Roadmap journey (a): from NOT ready, the UI drives task done + check → r
     await editor.locator('[data-rm-check-target]').fill('>=1')
     await editor.getByRole('button', { name: 'Save check' }).click()
     await page.waitForTimeout(600)
-    // 3. Record the passing assessment (no UI control exists for a goal check).
+    // 3. Record the passing assessments. A goal check has no UI control (the
+    // API carries it); the OBJECTIVE's manual assessment DOES have one (the
+    // Vision objective drawer's evidence panel) but this journey drives the
+    // goal level, so both are recorded through the API and said so here.
     await proxyCall(`/projects/atlas-mobile/goals/${goal.id}/assessment`, {
+      method: 'POST', body: { passed: true, evidence: ['journey:1'] } })
+    await proxyCall(`/projects/atlas-mobile/objectives/${objective.id}/assessment`, {
       method: 'POST', body: { passed: true, evidence: ['journey:1'] } })
     // 4. The chain rolls up: goal met -> objective met -> milestone reached.
     await openRoadmap(page)

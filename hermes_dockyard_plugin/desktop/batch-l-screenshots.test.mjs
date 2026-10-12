@@ -19,6 +19,17 @@ mkdirSync(SHOTS, { recursive: true })
 
 const SIZES = [[1440, 900], [1024, 768], [390, 780]]
 
+const proxyCall = async (path, init = {}) => {
+  const r = await fetch(process.env.STEWARD_API_URL + path, {
+    method: init.method || 'GET',
+    headers: { 'x-hermes-session-token': 'demo-session-token', 'content-type': 'application/json' },
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+  })
+  const text = await r.text()
+  if (!r.ok) throw new Error(`${init.method || 'GET'} ${path} -> ${r.status} ${text.slice(0, 140)}`)
+  return text ? JSON.parse(text) : {}
+}
+
 async function setTheme(page, theme) {
   await page.evaluate((t) => {
     const root = document.querySelector('.dockyard-root')
@@ -89,6 +100,23 @@ test('Batch L R1: capture every changed screen for signoff', { timeout: 300000 }
           await page.locator('[data-rm-confirm-dialog]').waitFor({ timeout: 3000 }).catch(() => {})
           await setTheme(page, theme)
           await page.screenshot({ path: `${SHOTS}/roadmap-confirm-${theme}-${width}.png` })
+          // At 1440 also capture the 409 refusal in plain words: the ladder
+          // becomes not-reached behind the open dialog, then Confirm is pressed.
+          if (width === 1440) {
+            try {
+              const rm = await proxyCall('/roadmap?project_id=payments-relaunch')
+              const proj = rm.projects[0]
+              const ini = proj.initiatives.find((i) => i.title === 'Confirm me when ready')
+              const ms = proj.milestones.find((m) => m.initiative_ref === ini.ref)
+              const obj = proj.objectives.find((o) => o.milestone_id === ms.id)
+              await proxyCall(`/projects/payments-relaunch/objectives/${obj.id}/assessment`, { method: 'POST', body: { passed: false, evidence: ['shot:stale'] } })
+              await page.locator('[data-rm-confirm-dialog]').getByRole('button', { name: 'Confirm as delivered' }).click()
+              await page.waitForFunction(() => /not ready to confirm|every milestone must be reached/i.test(document.querySelector('[data-rm-confirm-dialog]')?.textContent ?? ''), null, { timeout: 8000 })
+              await setTheme(page, theme)
+              await page.screenshot({ path: `${SHOTS}/roadmap-refusal-${theme}-${width}.png` })
+              await proxyCall(`/projects/payments-relaunch/objectives/${obj.id}/assessment`, { method: 'POST', body: { passed: true, evidence: ['shot:restore'] } })
+            } catch { /* the refusal shot is best-effort; the run continues */ }
+          }
           await page.keyboard.press('Escape')
         }
 
@@ -98,11 +126,46 @@ test('Batch L R1: capture every changed screen for signoff', { timeout: 300000 }
         await setTheme(page, theme)
         await page.screenshot({ path: `${SHOTS}/board-${theme}-${width}.png` })
 
+        // Work-item detail with the Goal picker (R2 fix 3/7).
+        const firstCard = page.locator('[data-work-card]').first()
+        if (await firstCard.count()) {
+          await firstCard.locator('[data-card-toggle]').click()
+          await firstCard.getByRole('button', { name: 'Open full details' }).click().catch(() => {})
+          await page.locator('[data-work-item-detail]').waitFor({ timeout: 5000 }).catch(() => {})
+          await setTheme(page, theme)
+          await page.screenshot({ path: `${SHOTS}/work-item-${theme}-${width}.png` })
+          await page.keyboard.press('Escape')
+          await page.waitForTimeout(400)
+        }
+
         // Approval Inbox: the ready-to-confirm section.
         await page.getByRole('tab', { name: /Inbox|Approval/i }).first().click()
         await page.waitForTimeout(1500)
         await setTheme(page, theme)
         await page.screenshot({ path: `${SHOTS}/inbox-${theme}-${width}.png` })
+
+        // Notifications: both new ladder kinds with their plain words.
+        await page.getByRole('tab', { name: /Notif/i }).first().click().catch(() => {})
+        await page.waitForTimeout(1500)
+        await setTheme(page, theme)
+        await page.screenshot({ path: `${SHOTS}/notifications-${theme}-${width}.png` })
+
+        // Vision: the goal drawer with the check editor and its pickers.
+        await page.getByRole('tab', { name: /Board|Work/i }).first().click()
+        await page.waitForTimeout(800)
+        const vCard = page.locator('[data-work-card]').filter({ hasText: 'Build setup screens' }).first()
+        if (await vCard.count()) {
+          await vCard.locator('[data-card-toggle]').click()
+          await vCard.getByRole('button', { name: /^Milestone:/ }).first().click().catch(() => {})
+          await page.locator('[data-plan-screen]').waitFor({ timeout: 6000 }).catch(() => {})
+          const goalRow = page.locator('[data-plan-row="goal"]').first()
+          if (await goalRow.count()) {
+            await goalRow.locator('.dy-plan-row-open').click()
+            await page.locator('[data-plan-drawer="goal"]').waitFor({ timeout: 5000 }).catch(() => {})
+          }
+          await setTheme(page, theme)
+          await page.screenshot({ path: `${SHOTS}/vision-goal-${theme}-${width}.png` })
+        }
 
         // Guards: subtext meets WCAG AA, and "Place…" is not clipped at 1440.
         await page.getByRole('tab', { name: 'Roadmap' }).click()

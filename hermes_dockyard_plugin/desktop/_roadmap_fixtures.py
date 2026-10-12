@@ -93,3 +93,18 @@ def seed_roadmap_fixtures(service, adapter, roadmap, ladder=None) -> None:
     adapter.transition_work(pid, "task", ready_task["ref"], "done")
     ladder.set_task_goal(pid, ready_task["ref"], ready_gid,
                          actor="fixture", interface="fixture")
+
+    # Batch L R2 fix 7: both ladder notifications, so the Notifications screen
+    # shows the new kinds with their plain words in the signoff screenshots.
+    from hermes_project_stewardship.events.bus import EventBus
+    from hermes_project_stewardship.events.notifications import NotificationEngine
+
+    notif = NotificationEngine(store, service)
+    notif.attach(EventBus(store))
+    notif.process_event({
+        "event_type": "initiative.ready_to_confirm", "project_id": pid,
+        "subject": ready_ref, "payload": {"title": "Confirm me when ready"}})
+    notif.process_event({
+        "event_type": "initiative.regressed", "project_id": pid,
+        "subject": "INIT-REGRESSED-DEMO",
+        "payload": {"reason": "ladder check failed after confirmation"}})
