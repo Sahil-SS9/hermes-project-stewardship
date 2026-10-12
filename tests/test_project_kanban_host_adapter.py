@@ -774,6 +774,11 @@ def test_list_work_links_still_maps_host_failures_to_the_stable_codes():
 # ---- Implement card can carry an owner the host will run (appletechie) ----.
 
 
+def _assign_client(tmp_path: Path, host: FakeProjectKanbanHost):
+    """The PR's name for the same fixture shape."""
+    return _approval_client(tmp_path, host)
+
+
 def _approval_client(tmp_path: Path, host: FakeProjectKanbanHost):
     from fastapi.testclient import TestClient
 
