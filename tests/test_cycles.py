@@ -131,6 +131,21 @@ def test_cycle_uses_the_project_objective_detail_cap(engine, enabled, svc, tmp_p
     assert objective["detail"].endswith("stderr_head=" + "e" * 600)
 
 
+def test_flooding_objective_is_killed_and_the_cycle_goes_on(engine, enabled, svc, tmp_path):
+    svc.enable(enabled, lead_profile="lead", autonomy_level=3)
+    wire_repo(svc, enabled, make_repo(tmp_path / "r"))
+    svc.add_objective(enabled, name="flood", evaluator_type="command", target=">=1",
+                      command=["python3", "-c", "import sys\nwhile True: sys.stdout.write('9' * 65536)"])
+    svc.add_objective(enabled, name="fine", evaluator_type="command", target=">=1",
+                      command=["python3", "-c", "print(1)"])
+    r = engine.run_cycle(enabled)
+    flood, fine = r["objectives"]
+    assert flood["passed"] is False and flood["measured"] is None
+    assert "output_too_large" in flood["detail"]
+    assert fine["passed"] is True and fine["measured"] == 1.0
+    assert r["health"]["state"] == "unknown"
+
+
 def test_unknown_state_blocks_mutations(engine, enabled, svc, tmp_path):
     """Fail-closed: missing declared file → Unknown → no proposals even if
     the proposer tries."""

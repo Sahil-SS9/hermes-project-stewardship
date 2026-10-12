@@ -19,6 +19,14 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   a `<=0` target. It now measures nothing (`unknown`, detail `no_measure`), so
   the cycle fails closed instead of reporting a count it never took.
   Exit-code objectives (such as `>=1`) still measure 0 and fail as before.
+- **Objective commands are bounded in memory and time.** They were read with
+  `capture_output`, so one printing without end filled memory until the
+  timeout, and only the direct child was killed. A command now runs in its own
+  session under one deadline (60 s by default) and its output is read as it
+  is written. Past 1 MiB on either stream, or at the deadline, its whole
+  process group is killed, including a grandchild that kept a pipe open. A
+  flood records `output_too_large` with an unknown measure, like a timeout;
+  other objectives in the cycle still run.
 
 ## [0.4.0] - 2026-10-11
 

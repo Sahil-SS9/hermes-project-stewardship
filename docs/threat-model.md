@@ -47,7 +47,12 @@ Objective evaluators run commands in project context. Controls:
 - bare executable names only; absolute/relative paths are rejected;
 - resolution uses the same fixed trusted PATH passed to the child;
 - per-project executable allowlist;
-- hard timeout + 64 KiB output caps;
+- hard timeout + 64 KiB output caps. The command runs in its own session
+  under one monotonic deadline; both pipes are read without blocking past it,
+  and a command that passes 1 MiB on either stream is killed
+  (`output_too_large`). A timeout or flood kills the whole process group
+  (SIGTERM, then SIGKILL after 1 s), so a grandchild holding a pipe open
+  cannot outlive the deadline;
 - refusal recorded as failed objective, not an exception path.
 
 Note honestly: a malicious repo can still contain a Makefile that does
