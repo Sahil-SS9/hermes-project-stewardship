@@ -631,7 +631,7 @@ class DockyardStore:
         """
         with self.store.tx() as cx:
             row = cx.execute(
-                "SELECT id, archived_at FROM dockyard_milestones"
+                "SELECT id, archived_at, initiative_ref FROM dockyard_milestones"
                 " WHERE project_id=? AND name=?", (project_id, name),
             ).fetchone()
             if row is None:
@@ -644,9 +644,14 @@ class DockyardStore:
                 " ORDER BY item_ref", (row["id"],),
             ).fetchall()]
             initiatives = [str(r["initiative_ref"]) for r in cx.execute(
-                "SELECT initiative_ref FROM initiative_milestones WHERE milestone_id=?"
-                " ORDER BY initiative_ref", (row["id"],),
+                "SELECT initiative_ref FROM initiative_milestones WHERE milestone_id=?",
+                (row["id"],),
             ).fetchall()]
+            # v42 places a milestone under ONE initiative via its own column, so
+            # the audit must name that parent too: the legacy table is history
+            # and is empty for anything placed since 0.5.0.
+            if row["initiative_ref"] and row["initiative_ref"] not in initiatives:
+                initiatives.append(str(row["initiative_ref"]))
             cx.execute("DELETE FROM dockyard_milestones WHERE id=?", (row["id"],))
         return {"items": items, "initiatives": initiatives}
 

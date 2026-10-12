@@ -399,7 +399,13 @@ class RoadmapService:
             raise RoadmapNotFound(f"no such milestone '{milestone_id}'")
         items = [task for objective in milestone["objectives"]
                  for goal in objective["goals"] for task in goal["tasks"]]
-        return {"state": "ok" if project["work_host"] == "ok" else "unavailable",
+        delivery = milestone["delivery"]
+        unavailable = project["work_host"] != "ok"
+        return {"state": "ok" if not unavailable else "unavailable",
+                # The reason must travel: "unlinked" (Hermes has no such project)
+                # and "unavailable" (the host did not answer) are different
+                # answers, and the Roadmap must never claim one for the other.
+                "reason": delivery.get("reason") if unavailable else None,
                 "milestone": {k: milestone[k] for k in
                               ("id", "name", "due", "closed", "state")},
-                "items": items, "delivery": milestone["delivery"]}
+                "items": items, "delivery": delivery}

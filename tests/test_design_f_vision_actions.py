@@ -219,17 +219,21 @@ def test_an_active_goal_cannot_be_deleted(world, store):
 
 
 def test_deleting_an_archived_goal_frees_its_objectives_and_keeps_them(world, store):
+    """Was: an archived goal held its objective (one goal per objective).
+
+    v42 drops that rule: a goal has exactly one objective and re-pointing it is
+    a normal placement, so there is no "linked to another goal" conflict to
+    raise. What must still hold is the substance of the old test — deleting the
+    goal frees its objective and keeps the objective itself.
+    """
     oid = world.objective("alpha", "Speed")
     gid = world.goal("alpha", "Faster", [oid])
     world.svc.archive_goal("alpha", gid, actor="owner", interface="test")
-    # Today an archived goal still holds its objective: one goal per objective.
-    with pytest.raises(ServiceError, match="linked to another goal"):
-        world.goal("alpha", "Replacement", [oid])
 
     out = world.svc.delete_goal("alpha", gid, actor="owner", interface="test")
 
     assert out == {"goal_id": gid, "deleted": True, "objective_ids": [oid]}
-    for table in ("project_goals", "project_objective_goals", "project_goal_contracts"):
+    for table in ("project_goals", "project_goal_contracts"):
         assert store._conn.execute(
             f"SELECT COUNT(*) FROM {table} WHERE goal_id=?", (gid,)).fetchone()[0] == 0, table
     assert [o.id for o in world.svc.objectives("alpha")] == [oid], "the objective itself stays"
@@ -289,7 +293,7 @@ def test_an_active_milestone_cannot_be_deleted(world, store):
 def test_deleting_an_archived_milestone_drops_its_links_and_frees_its_name(world, store):
     mid = world.milestone("alpha", "Beta launch")
     ref = world.initiative("alpha", "Ship beta")
-    world.link_milestone("alpha", ref, mid)
+    world.place_milestone("alpha", mid, ref)
     item = world.item("alpha", "Write docs", milestone="Beta launch")
     world.dy.milestone_archive("alpha", "Beta launch", actor=HUMAN)
 
@@ -298,7 +302,6 @@ def test_deleting_an_archived_milestone_drops_its_links_and_frees_its_name(world
     assert out == {"name": "Beta launch", "deleted": True, "items": [item], "initiatives": [ref]}
     assert store._conn.execute("SELECT COUNT(*) FROM dockyard_milestones").fetchone()[0] == 0
     assert store._conn.execute("SELECT COUNT(*) FROM dockyard_milestone_items").fetchone()[0] == 0
-    assert store._conn.execute("SELECT COUNT(*) FROM initiative_milestones").fetchone()[0] == 0
     # The work item and the initiative stay; only the grouping goes.
     assert world.work.get("alpha", item)["ref"] == item
     assert world.svc.initiative_by_ref(ref)["status"] == "approved"

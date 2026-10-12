@@ -222,7 +222,7 @@ def _history_then_unlinked(store, clock):
     assert started.status_code == 200, started.text
     initiative = world.initiative(GHOST, "Ship")
     milestone = world.milestone(GHOST, "Pilot")
-    world.link_milestone(GHOST, initiative, milestone)
+    world.place_milestone(GHOST, milestone, initiative)
     world.item(GHOST, "pilot item", milestone="Pilot")
     adapter.missing.add(GHOST)
     return world, client, milestone
