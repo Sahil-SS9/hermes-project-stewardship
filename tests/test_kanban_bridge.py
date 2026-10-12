@@ -122,6 +122,64 @@ def test_bind_falls_back_to_ops_when_host_silent(svc, enabled, approved):
     assert out["board_slug"] == f"{approved['project_id']}-ops"
 
 
+@pytest.fixture()
+def approved_plain(svc, enabled):
+    """An approved initiative without its own steps: the project decides."""
+    ini = svc.propose_initiative(
+        enabled, title="Fix flaky CI", rationale="3 flakes in 30d window",
+        expected_outcome="CI pass rate >= 0.99")
+    svc.approve_initiative(ini["ref"], actor="human", interface="cli")
+    return svc.initiative_by_ref(ini["ref"])
+
+
+def _bound_titles(svc, ref):
+    fake = FakeHostAdapter()
+    KanbanBridge(svc, fake).bind(ref)
+    return [card["title"] for card in fake.cards]
+
+
+def test_bind_default_validation_steps_are_unchanged(svc, enabled, approved_plain):
+    assert _bound_titles(svc, approved_plain["ref"]) == [
+        "Implement: Fix flaky CI",
+        "Validate: project test suite",
+        "Outcome check: CI pass rate >= 0.99",
+    ]
+
+
+def test_bind_with_no_validation_steps_creates_only_the_implement_card(
+    svc, enabled, approved_plain
+):
+    """Production: the Validate card often cannot run on the host (wrong Node
+    version), and it was created unassigned. A project can switch it off."""
+    svc.update_settings(enabled, verification_policy={"validation_steps": []})
+    assert _bound_titles(svc, approved_plain["ref"]) == ["Implement: Fix flaky CI"]
+
+
+def test_bind_uses_the_projects_validation_steps(svc, enabled, approved_plain):
+    svc.update_settings(
+        enabled, verification_policy={"validation_steps": ["Validate: npm test on Node 22"]})
+    assert _bound_titles(svc, approved_plain["ref"]) == [
+        "Implement: Fix flaky CI",
+        "Validate: npm test on Node 22",
+    ]
+    svc.update_settings(enabled, verification_policy={"validation_steps": None})
+    assert svc.settings(enabled)["policies"]["verification"]["validation_steps"] is None
+
+
+def test_initiative_steps_still_win_over_project_validation_steps(
+    svc, enabled, approved
+):
+    svc.update_settings(enabled, verification_policy={"validation_steps": []})
+    assert _bound_titles(svc, approved["ref"]) == ["Patch test timeout", "Re-run suite twice"]
+
+
+@pytest.mark.parametrize("bad", ["npm test", [""], ["ok", 3], ["x" * 121], ["s"] * 11])
+def test_invalid_validation_steps_are_refused(svc, enabled, bad):
+    with pytest.raises(ServiceError, match="validation_steps"):
+        svc.update_settings(enabled, verification_policy={"validation_steps": bad})
+    assert "validation_steps" not in svc.settings(enabled)["policies"]["verification"]
+
+
 def test_reference_adapter_bound_board_slug(store):
     adapter = ReferenceKanbanAdapter(store)
     assert adapter.bound_board_slug("p") is None  # nothing bound yet

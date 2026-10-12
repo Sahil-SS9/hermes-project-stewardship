@@ -63,6 +63,17 @@ def build_parser() -> argparse.ArgumentParser:
     for act in ("pause", "resume", "freeze"):
         s = psub.add_parser(act)
         s.add_argument("project_id")
+    vs = psub.add_parser(
+        "validation-steps",
+        help="cards created after Implement when an initiative is bound (prints them)")
+    vs.add_argument("project_id")
+    vs_set = vs.add_mutually_exclusive_group()
+    vs_set.add_argument("--step", dest="steps", action="append",
+                        help="set the steps, in order (repeat for several)")
+    vs_set.add_argument("--none", action="store_true",
+                        help="create only the Implement card")
+    vs_set.add_argument("--default", action="store_true",
+                        help="back to the default Validate and Outcome check cards")
     st = psub.add_parser("status")
     st.add_argument("project_id")
     st.add_argument("--json", action="store_true")
@@ -347,6 +358,19 @@ def _dispatch(args, svc: StewardshipService, engine: CycleEngine, store: Store) 
             fn = {"pause": svc.pause, "resume": svc.resume, "freeze": svc.freeze}[args.action]
             s = fn(args.project_id)
             print(f"{args.project_id}: phase={s['phase']}")
+            return EXIT_OK
+        if args.action == "validation-steps":
+            if args.steps or args.none or args.default:
+                svc.update_settings(
+                    args.project_id,
+                    verification_policy={
+                        "validation_steps": None if args.default else (args.steps or [])},
+                    actor="cli-user", interface="cli")
+            s = svc.settings(args.project_id)
+            print(json.dumps({
+                "project_id": s["project_id"],
+                "validation_steps": s["policies"]["verification"].get("validation_steps"),
+            }))
             return EXIT_OK
         if args.action == "status":
             s = svc.settings(args.project_id)

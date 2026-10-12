@@ -415,11 +415,16 @@ class KanbanBridge:
 
         card_ids: List[str] = []
         validation = ini.get("validation_contract") or {}
-        steps = validation.get("steps") or [
-            f"Implement: {ini['title']}",
-            f"Validate: {validation.get('tests') or 'project test suite'}",
-            f"Outcome check: {ini.get('expected_outcome') or 'objective restored'}",
-        ]
+        # The project's validation steps follow Implement; unset keeps the
+        # default pair, an empty list leaves Implement on its own.
+        after = self.svc.settings(project_id, include_disabled=True)[
+            "policies"]["verification"].get("validation_steps")
+        if after is None:
+            after = [
+                f"Validate: {validation.get('tests') or 'project test suite'}",
+                f"Outcome check: {ini.get('expected_outcome') or 'objective restored'}",
+            ]
+        steps = validation.get("steps") or [f"Implement: {ini['title']}", *after]
         n = max(len(steps), 1)
         for i, step in enumerate(steps):
             idx = min(i * len(self.WORKFLOW_COLUMNS) // n, len(self.WORKFLOW_COLUMNS) - 1)

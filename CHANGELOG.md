@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Per-project validation steps.** `verification_policy.validation_steps`
+  (project settings) lists the cards created after Implement when an
+  initiative is bound. Unset keeps the Validate and Outcome check cards; an
+  empty list creates the Implement card only. An initiative's own
+  `validation_contract.steps` still win. Set it through
+  `PATCH /projects/{id}/settings` or
+  `stewardctl project validation-steps <project> [--step S ... | --none | --default]`.
+  No schema change.
+
 ## [0.4.0] - 2026-10-11
 
 The Project Stewardship Desktop app becomes the main surface, and every part

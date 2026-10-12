@@ -170,3 +170,30 @@ def test_regression_blocks_canonical_work_and_schedules_one_observation(store, e
         (ref,),
     ).fetchone()["n"]
     assert rows == 1
+
+
+def test_settings_api_validation_steps_shape_the_bound_cards(store, enabled):
+    adapter = CanonicalBridgeAdapter(store)
+    client = TestClient(create_app(store, auth_token="test-token", auth_principal="test-user", auth_principal_is_human=True, kanban_adapter=adapter), headers={"Authorization": "Bearer test-token"})
+    patched = client.patch(
+        f"/stewardship/v1/projects/{enabled}/settings",
+        json={"verification_policy": {"validation_steps": []}},
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["policies"]["verification"]["validation_steps"] == []
+    refused = client.patch(
+        f"/stewardship/v1/projects/{enabled}/settings",
+        json={"verification_policy": {"validation_steps": "npm test"}},
+    )
+    assert refused.status_code == 409
+    ref = client.post(
+        f"/stewardship/v1/projects/{enabled}/initiatives",
+        json={"title": "Ship it", "rationale": "objective: ship", "risk": "low"},
+    ).json()["ref"]
+
+    approved = client.post(f"/stewardship/v1/initiatives/{ref}/approve", json={})
+
+    assert approved.status_code == 200, approved.text
+    assert len(approved.json()["work_item_refs"]) == 1
+    titles = [item["title"] for item in adapter.list_work(enabled)]
+    assert titles == ["Implement: Ship it"]
