@@ -6636,9 +6636,19 @@ async function loadInboxData() {
   projectInitiatives.flat().forEach((initiative) => {
     detailByRef[initiative.ref] = initiative;
   });
+  const readyToConfirm = await Promise.all(projectIds.map(async (projectId) => {
+    try {
+      const roadmap = await api(`/roadmap?project_id=${encodeURIComponent(projectId)}`);
+      const project = (roadmap?.projects ?? [])[0];
+      return (project?.initiatives ?? []).filter((row) => row.ready_to_confirm).map((row) => ({ project: projectId, ref: row.ref, title: row.title }));
+    } catch {
+      return [];
+    }
+  }));
   return {
     ...inbox,
-    items: (inbox.items ?? []).map((item) => ({ ...item, detail: detailByRef[item.ref] ?? null }))
+    items: (inbox.items ?? []).map((item) => ({ ...item, detail: detailByRef[item.ref] ?? null })),
+    readyToConfirm: readyToConfirm.flat()
   };
 }
 
@@ -23872,6 +23882,29 @@ function AttentionDetail({ item, onBack, onOpenProject }) {
     jsx(Button, { variant: "primary", onClick: () => onOpenProject?.(copy.deeplink), children: `Open ${copy.project || "project"}` })
   ] });
 }
+function ReadyToConfirm({ rows, onDone }) {
+  const [busy, setBusy] = useState(null);
+  const confirm = async (row) => {
+    setBusy(row.ref);
+    try {
+      await api(`/projects/${encodeURIComponent(row.project)}/initiatives/${encodeURIComponent(row.ref)}/confirm-delivered`, { method: "POST", body: {} });
+      emitToast("success", `\u201C${row.title}\u201D confirmed as delivered.`);
+      onDone?.();
+    } catch (failure) {
+      emitToast("danger", String(failure?.message ?? failure));
+    } finally {
+      setBusy(null);
+    }
+  };
+  if (!rows?.length) return null;
+  return jsxs("section", { className: "dockyard-inbox-ready", "data-inbox-ready-confirm": true, children: [
+    jsx("h3", { children: `Ready to confirm \xB7 ${number(rows.length)}` }),
+    jsx("ul", { children: rows.map((row) => jsxs("li", { children: [
+      jsxs("span", { children: [row.title, jsx("small", { children: ` \xB7 ${row.project}` })] }),
+      jsx(Button, { small: true, variant: "primary", action: "inbox-confirm-delivered", disabled: busy === row.ref, onClick: () => confirm(row), children: busy === row.ref ? "Confirming\u2026" : "Confirm as delivered" })
+    ] }, `${row.project}/${row.ref}`)) })
+  ] });
+}
 function InboxView({ view, onRefresh, focusRef = null, onOpenProject }) {
   const [items, setItems] = useState(() => sortApprovals(view.items ?? []));
   const [tab, setTab] = useState("all");
@@ -23963,6 +23996,7 @@ function InboxView({ view, onRefresh, focusRef = null, onOpenProject }) {
       }, key))
     }),
     jsxs("section", { className: "dockyard-inbox-layout", children: [
+      jsx(ReadyToConfirm, { rows: view.readyToConfirm ?? [], onDone: onRefresh }),
       narrow && selected ? null : jsx("div", { className: "dockyard-inbox-list", "aria-label": "Pending approvals and project attention", children: visible.length ? visible.map((item) => jsx(InboxRow, { item, selected: item.ref === selectedRef, onSelect: selectRow, onOpenProject }, item.ref)) : jsx("p", { className: "dockyard-inbox-empty", children: `No ${TAB_LABELS[tab].toLowerCase()} items.` }) }),
       selected ? isAttention(selected) ? jsx(AttentionDetail, { item: selected, onBack: narrow ? closePanel : null, onOpenProject }) : jsx(ApprovalDetail, { item: selected, onResolved: resolved, onBack: narrow ? closePanel : null }) : narrow ? null : jsx("p", { className: "dockyard-inbox-empty", children: "Select a row to review its full decision context." })
     ] })

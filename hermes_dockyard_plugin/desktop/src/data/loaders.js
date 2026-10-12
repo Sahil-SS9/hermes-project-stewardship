@@ -232,8 +232,23 @@ export async function loadInboxData() {
   }))
   const detailByRef = {}
   projectInitiatives.flat().forEach((initiative) => { detailByRef[initiative.ref] = initiative })
+  // Batch L: initiatives ready for a person to confirm as delivered, read from
+  // each project's roadmap ladder. The Approval Inbox lists these with the same
+  // Confirm action the Roadmap offers.
+  const readyToConfirm = await Promise.all(projectIds.map(async (projectId) => {
+    try {
+      const roadmap = await api(`/roadmap?project_id=${encodeURIComponent(projectId)}`)
+      const project = (roadmap?.projects ?? [])[0]
+      return (project?.initiatives ?? [])
+        .filter((row) => row.ready_to_confirm)
+        .map((row) => ({ project: projectId, ref: row.ref, title: row.title }))
+    } catch {
+      return []
+    }
+  }))
   return {
     ...inbox,
     items: (inbox.items ?? []).map((item) => ({ ...item, detail: detailByRef[item.ref] ?? null })),
+    readyToConfirm: readyToConfirm.flat(),
   }
 }

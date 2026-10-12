@@ -1,6 +1,8 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 import { sortApprovals } from '../data/loaders.js'
+import { api } from '../runtime/context.js'
+import { emitToast } from '../runtime/context.js'
 import { useEffect, useRef, useState } from '../runtime/react.js'
 import { jsx, jsxs } from '../runtime/react.js'
 import { Button, EmptyState, PageHead, number, plural } from '../lib/ui.js'
@@ -59,6 +61,33 @@ function AttentionDetail({ item, onBack, onOpenProject }) {
     jsx('p', { children: copy.description }),
     jsx(Button, { variant: 'primary', onClick: () => onOpenProject?.(copy.deeplink), children: `Open ${copy.project || 'project'}` }),
   ]})
+}
+
+// Batch L: initiatives whose every milestone is reached, waiting for a person
+// to confirm as delivered. The same action the Roadmap offers, in the inbox
+// where decisions live.
+function ReadyToConfirm({ rows, onDone }) {
+  const [busy, setBusy] = useState(null)
+  const confirm = async (row) => {
+    setBusy(row.ref)
+    try {
+      await api(`/projects/${encodeURIComponent(row.project)}/initiatives/${encodeURIComponent(row.ref)}/confirm-delivered`, { method: 'POST', body: {} })
+      emitToast('success', `“${row.title}” confirmed as delivered.`)
+      onDone?.()
+    } catch (failure) {
+      emitToast('danger', String(failure?.message ?? failure))
+    } finally {
+      setBusy(null)
+    }
+  }
+  if (!rows?.length) return null
+  return jsxs('section', { className: 'dockyard-inbox-ready', 'data-inbox-ready-confirm': true, children: [
+    jsx('h3', { children: `Ready to confirm · ${number(rows.length)}` }),
+    jsx('ul', { children: rows.map((row) => jsxs('li', { children: [
+      jsxs('span', { children: [row.title, jsx('small', { children: ` · ${row.project}` })] }),
+      jsx(Button, { small: true, variant: 'primary', action: 'inbox-confirm-delivered', disabled: busy === row.ref, onClick: () => confirm(row), children: busy === row.ref ? 'Confirming…' : 'Confirm as delivered' }),
+    ] }, `${row.project}/${row.ref}`)) }),
+  ] })
 }
 
 export function InboxView({ view, onRefresh, focusRef = null, onOpenProject }) {
@@ -148,6 +177,7 @@ export function InboxView({ view, onRefresh, focusRef = null, onOpenProject }) {
       }, key)),
     }),
     jsxs('section', { className: 'dockyard-inbox-layout', children: [
+      jsx(ReadyToConfirm, { rows: view.readyToConfirm ?? [], onDone: onRefresh }),
       narrow && selected ? null : jsx('div', { className: 'dockyard-inbox-list', 'aria-label': 'Pending approvals and project attention', children: visible.length
         ? visible.map((item) => jsx(InboxRow, { item, selected: item.ref === selectedRef, onSelect: selectRow, onOpenProject }, item.ref))
         : jsx('p', { className: 'dockyard-inbox-empty', children: `No ${TAB_LABELS[tab].toLowerCase()} items.` }) }),
