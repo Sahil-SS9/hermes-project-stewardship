@@ -380,6 +380,51 @@ def test_vanilla_host_narrows_profiles_by_the_dispatchers_allowlist(
     allowlist["value"] = None  # no kanban.dispatch_profiles: every profile runs
     assert [p["name"] for p in host.list_dispatchable_profiles()] == ["default", "coder", "idle"]
 (by @appletechie)
+- **Agent tools answer refusals instead of failing.** `steward_run_cycle`,
+  `steward_status` and `steward_propose_initiative` return
+  `{"refused": "<reason>"}` when the project is paused or frozen, the cycle
+  budget is spent, another cycle is running, the project is unknown or a
+  proposal is a duplicate. They used to raise, which Hermes reports as a tool
+  error the agent cannot tell apart from a crash.
+
+4. A tool that cannot act answers `{"refused": "<reason>"}` instead of
+   failing. If proposals were refused (dedupe/cap/suppression) — accept it
+   silently; refusals are the anti-busywork system working. A refused cycle
+   (paused, frozen, budget, another cycle running) is reported in one line.
+from .cycles.engine import CycleRefused
+from .persistence.service import ServiceError, StewardshipService
+        # A refusal (paused, frozen, budget, duplicate, unknown project) is an
+        # answer the agent must read, not a tool crash.
+        try:
+            result = fn(**dict(args or {}))
+        except (CycleRefused, ServiceError) as refusal:
+            return json.dumps({"refused": str(refusal)})
+        return json.dumps(result, sort_keys=True, default=str)
+def test_tool_refusals_are_results_not_errors(store, svc, enabled, monkeypatch):
+    import json
+
+    monkeypatch.setattr("hermes_project_stewardship.runtime._HOST_REGISTERED", False)
+    plugin.PluginState.reset()
+    plugin.PluginState.db_path = store.db_path
+    rt = FakeRuntime()
+    plugin.register(rt)
+
+    args = {"project_id": enabled, "title": "T", "rationale": "R", "dedupe_key": "same"}
+    assert "ref" in json.loads(rt.tools["steward_propose_initiative"](args))
+    assert set(json.loads(rt.tools["steward_propose_initiative"](args))) == {"refused"}
+    refused = json.loads(rt.tools["steward_status"]({"project_id": "ghost"}))
+    assert set(refused) == {"refused"} and "ghost" in refused["refused"]
+    svc.freeze(enabled)
+    assert json.loads(rt.tools["steward_run_cycle"]({"project_id": enabled})) == {
+        "refused": "project is frozen"}
+
+- **Agent tool answers frame untrusted text as data.** Tool answers carry
+  objective details, command output, evidence and titles the code did not
+  write. Every string in an answer now has ANSI escapes, control characters
+  and bidi overrides stripped and is cut to 4000 characters, and the answer
+  carries `untrusted_evidence: true` and a fixed `untrusted_note`; the tool
+  descriptions say the same. Stored data is unchanged.
+(by @appletechie)
 
 ## [0.5.0] - 2026-10-12
 

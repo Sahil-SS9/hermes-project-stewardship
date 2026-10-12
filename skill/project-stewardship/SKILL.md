@@ -41,8 +41,10 @@ memory or conversation; canonical state lives in the stewardship store.
 3. For each failed high-severity objective, propose AT MOST one initiative
    per root cause. Include: title, evidence citation, expected outcome,
    risk, dedupe_key (`<objective>:<root-cause-slug>`).
-4. If proposals were refused (dedupe/cap/suppression) — accept it silently;
-   refusals are the anti-busywork system working.
+4. A tool that cannot act answers `{"refused": "<reason>"}` instead of
+   failing. If proposals were refused (dedupe/cap/suppression) — accept it
+   silently; refusals are the anti-busywork system working. A refused cycle
+   (paused, frozen, budget, another cycle running) is reported in one line.
 5. After execution completes elsewhere, delivery is confirmed by a PERSON:
    `confirm-delivered` (only when every milestone is reached). Native
    completion evidence is recorded by reconcile, never treated as delivery.

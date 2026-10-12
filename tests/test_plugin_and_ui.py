@@ -62,6 +62,25 @@ def test_plugin_tools_roundtrip(store, svc, enabled):
     assert initiative["status"] == "pending_approval"
 
 
+def test_tool_refusals_are_results_not_errors(store, svc, enabled, monkeypatch):
+    import json
+
+    monkeypatch.setattr("hermes_project_stewardship.runtime._HOST_REGISTERED", False)
+    plugin.PluginState.reset()
+    plugin.PluginState.db_path = store.db_path
+    rt = FakeRuntime()
+    plugin.register(rt)
+
+    args = {"project_id": enabled, "title": "T", "rationale": "R", "dedupe_key": "same"}
+    assert "ref" in json.loads(rt.tools["steward_propose_initiative"](args))
+    assert set(json.loads(rt.tools["steward_propose_initiative"](args))) == {"refused"}
+    refused = json.loads(rt.tools["steward_status"]({"project_id": "ghost"}))
+    assert set(refused) == {"refused"} and "ghost" in refused["refused"]
+    svc.freeze(enabled)
+    assert json.loads(rt.tools["steward_run_cycle"]({"project_id": enabled})) == {
+        "refused": "project is frozen"}
+
+
 def test_ui_pick_numbered_fallback(monkeypatch, capsys):
     monkeypatch.setattr("sys.stdin", type("FakeIn", (), {"isatty": lambda s: False})())
     opts = [{"ref": "INIT-A-0001", "title": "A", "risk": "low"},
