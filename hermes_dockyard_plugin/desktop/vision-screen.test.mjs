@@ -56,6 +56,7 @@ from hermes_project_stewardship.kanban import ReferenceKanbanAdapter
 from hermes_project_stewardship.kanban.bridge import KanbanBridge
 from hermes_project_stewardship.persistence.canonical_work_service import CanonicalWorkService
 from hermes_project_stewardship.persistence.dockyard_service import DockyardService
+from hermes_project_stewardship.persistence.ladder_service import LadderService
 from hermes_project_stewardship.persistence.roadmap_service import RoadmapService
 from hermes_project_stewardship.persistence.service import StewardshipService
 store = plugin_api._store
@@ -74,7 +75,8 @@ dy = DockyardService(store, canonical_work=work)
 mid = dy.milestone_create(pid, 'Beta', due='2026-12-01', actor=owner)
 item = work.create_item(pid, 'task', 'Write the beta notes', actor=owner)['ref']
 dy.milestone_attach(pid, 'Beta', item, actor=owner)
-RoadmapService(store, svc, work).link_initiative_milestone(pid, running, mid, 'delivers', actor='owner')
+LadderService(store, svc, work, RoadmapService(store, svc, work)).set_milestone_initiative(
+    pid, mid, running, actor='owner', interface='test')
 oid = int(svc.add_objective(pid, name='Checkout time', evaluator_type='manual', target='>=1',
                             actor='owner', interface='test')['id'])
 svc.create_goal(pid, title='Faster checkout', objective_ids=[oid], actor='owner', interface='test')

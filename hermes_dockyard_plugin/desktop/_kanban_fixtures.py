@@ -18,6 +18,7 @@ def seed_kanban_fixtures(service, adapter, roadmap, *, owner: str) -> None:
     from hermes_project_stewardship.dockyard import Actor, ActorKind
     from hermes_project_stewardship.persistence.canonical_work_service import CanonicalWorkService
     from hermes_project_stewardship.persistence.dockyard_service import DockyardService
+    from hermes_project_stewardship.persistence.ladder_service import LadderService
 
     human = Actor(id="fixture", display_name="fixture", kind=ActorKind.HUMAN)
     ada = Actor(id="ada-lovelace", display_name="ada-lovelace", kind=ActorKind.HUMAN)
@@ -26,6 +27,7 @@ def seed_kanban_fixtures(service, adapter, roadmap, *, owner: str) -> None:
     store = service.store
     work = CanonicalWorkService(store, adapter)
     dy = DockyardService(store, canonical_work=work)
+    ladder = LadderService(store, service, work, roadmap)
 
     service.update_features(pid, {"initiatives": True, "milestones": True}, actor="fixture", interface="fixture")
 
@@ -63,9 +65,13 @@ def seed_kanban_fixtures(service, adapter, roadmap, *, owner: str) -> None:
     objective_id = int(service.add_objective(
         pid, name="Setup under two minutes", evaluator_type="manual", target=">=1",
         actor="fixture", interface="fixture")["id"])
-    roadmap.link_objective_initiative(pid, objective_id, ref, "supports", actor="fixture", interface="fixture")
+    # v42 ladder: an objective has one milestone parent, placed with the ladder.
+    beta_milestone = dy.milestone_create(pid, "Beta launch", due="2099-03-01", actor=human)
+    ladder.set_objective_milestone(
+        pid, objective_id, beta_milestone, actor="fixture", interface="fixture")
+    ladder.set_milestone_initiative(
+        pid, beta_milestone, ref, actor="fixture", interface="fixture")
 
-    dy.milestone_create(pid, "Beta launch", due="2099-03-01", actor=human)
     dy.milestone_attach(pid, "Beta launch", screens, actor=human)
     dy.milestone_attach(pid, "Beta launch", analytics, actor=human)
 

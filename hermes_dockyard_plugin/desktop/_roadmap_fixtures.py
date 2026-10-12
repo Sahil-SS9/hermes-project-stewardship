@@ -7,12 +7,19 @@ per owner.
 """
 
 
-def seed_roadmap_fixtures(service, adapter, roadmap) -> None:
+def seed_roadmap_fixtures(service, adapter, roadmap, ladder=None) -> None:
     from hermes_project_stewardship.dockyard import Actor, ActorKind
     from hermes_project_stewardship.persistence.dockyard_service import DockyardService
+    from hermes_project_stewardship.persistence.ladder_service import LadderService
 
     HUMAN = Actor(id="fixture", display_name="fixture", kind=ActorKind.HUMAN)
     store = service.store  # noqa: F841 — kept for parity with disposable-backend locals
+    if ladder is None:
+        from hermes_project_stewardship.persistence.canonical_work_service import (
+            CanonicalWorkService,
+        )
+        ladder = LadderService(
+            store, service, CanonicalWorkService(store, adapter), roadmap)
     # payments-relaunch: the fully linked story.
     pid = "payments-relaunch"
     service.update_features(pid, {"initiatives": True, "milestones": True}, actor="fixture", interface="fixture")
@@ -34,14 +41,15 @@ def seed_roadmap_fixtures(service, adapter, roadmap) -> None:
     adapter.transition_work("atlas-mobile", "task", work["ref"], "in_progress")
     dy.milestone_create("atlas-mobile", "Demo milestone", due="2099-02-01", actor=HUMAN)
     dy.milestone_attach("atlas-mobile", "Demo milestone", work["ref"], actor=HUMAN)
-    roadmap.link_initiative_milestone(pid, ref, mid, "delivers", actor="fixture", interface="fixture")
+    # v42 ladder: one parent per level, placed with the ladder service.
+    ladder.set_milestone_initiative(pid, mid, ref, actor="fixture", interface="fixture")
     objective_id = int(service.add_objective(
         pid, name="Review cycle under two days", evaluator_type="manual", target=">=1",
         actor="fixture", interface="fixture")["id"])
     service.record_assessment(
         pid, objective_id, passed=True, evidence=["fixture:1"], actor="fixture",
         interface="dockyard:human", trusted_principal="fixture")
-    roadmap.link_objective_initiative(pid, objective_id, ref, "supports", actor="fixture", interface="fixture")
+    ladder.set_objective_milestone(pid, objective_id, mid, actor="fixture", interface="fixture")
     goal = service.create_goal(pid, title="Reviewers trust the queue", objective_ids=[objective_id],
                                actor="fixture", interface="fixture")
     roadmap.update_goal_contract(
@@ -49,7 +57,7 @@ def seed_roadmap_fixtures(service, adapter, roadmap) -> None:
         {"verification": "suite green", "constraints": "no downtime"},
         actor="fixture", interface="fixture")
     # A second, deliberately unlinked objective + milestone: drives the
-    # "Not linked yet" groups and the Link… flow in the browser tests.
+    # "Not placed yet" groups and the placement flows in the browser tests.
     service.add_objective(
         pid, name="Unlinked objective for linking", evaluator_type="manual", target=">=1",
         actor="fixture", interface="fixture")
