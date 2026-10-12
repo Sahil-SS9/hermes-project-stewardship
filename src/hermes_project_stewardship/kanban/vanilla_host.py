@@ -95,6 +95,23 @@ class ProjectKanbanHost:
                     profiles.append({"name": path.name, "is_default": False})
         return profiles
 
+    def list_dispatchable_profiles(self) -> list[dict[str, Any]]:
+        """The profiles Hermes' Kanban dispatcher claims cards for.
+
+        ``kanban.dispatch_profiles`` narrows the existing profiles when set,
+        resolved by the dispatcher's own reader; a Hermes without that
+        setting dispatches for every profile.
+        """
+        profiles = self.list_profiles()
+        try:
+            from hermes_cli.kanban_db_dispatch import _dispatch_profile_allowlist
+            from hermes_cli.profiles import normalize_profile_name
+        except ImportError:
+            return profiles
+        with self._scope():
+            allowed = _dispatch_profile_allowlist(normalize_profile_name)
+        return profiles if allowed is None else [p for p in profiles if p["name"] in allowed]
+
     def list_existing_projects(self) -> dict[str, Any]:
         """Phase 7 preflight (P7.1): what the host ALREADY owns.
 

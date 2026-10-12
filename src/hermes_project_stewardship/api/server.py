@@ -371,6 +371,8 @@ class ApprovalAction(BaseModel):
     expected_fingerprint: Optional[str] = None
     note: str = ""
     reason: str = ""
+    # Approve only: the profile that owns the Implement card.
+    assignee: Optional[str] = None
 
 
 class RequestChangesAction(BaseModel):
@@ -423,6 +425,7 @@ class GatewayCommandBody(BaseModel):
 
 class BindBoardRequest(BaseModel):
     board_slug: Optional[str] = None
+    assignee: Optional[str] = None
     actor_id: str = "stewardship-api"
 
 
@@ -1789,6 +1792,7 @@ def create_app(
                 ),
                 expected_fingerprint=body.expected_fingerprint,
                 note=body.note,
+                assignee=body.assignee,
             )
         except (IntegrationError, ServiceError) as exc:
             raise HTTPException(409, str(exc)) from None
@@ -1861,7 +1865,8 @@ def create_app(
     def bind_board(ref: str, body: BindBoardRequest):
         try:
             return integration.bind(
-                ref, board_slug=body.board_slug, actor=_actor(body.actor_id, "human"))
+                ref, board_slug=body.board_slug, assignee=body.assignee,
+                actor=_actor(body.actor_id, "human"))
         except (IntegrationError, ServiceError) as e:
             raise HTTPException(409, str(e))
 

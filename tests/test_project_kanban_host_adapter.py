@@ -770,7 +770,8 @@ def test_list_work_links_still_maps_host_failures_to_the_stable_codes():
     assert exc.value.code == "task_not_found"
 
 
-# ---- approval binds the project's own board, or is not committed -----------
+# ---- approval binds the project's own board, or is not committed; the ------
+# ---- Implement card can carry an owner the host will run (appletechie) ----.
 
 
 def _approval_client(tmp_path: Path, host: FakeProjectKanbanHost):
@@ -854,3 +855,92 @@ def test_bind_board_route_refuses_a_board_the_project_is_not_bound_to(tmp_path: 
     assert response.status_code == 409, response.text
     assert svc.initiative_by_ref(ref)["status"] == "approved"
     assert svc.initiative_by_ref(ref)["board_slug"] is None
+
+
+class TeamHost(FakeProjectKanbanHost):
+    def list_profiles(self):
+        return [{"name": "default", "is_default": True},
+                {"name": "coder", "is_default": False},
+                {"name": "idle", "is_default": False}]
+
+
+def test_approval_assigns_only_the_implement_card(tmp_path: Path):
+    """Bound cards were always unassigned, and governance forbids unassigned
+    cards; the fleet assigned the Implement card by hand afterwards."""
+    host = TeamHost()
+    client, svc, ref = _assign_client(tmp_path, host)
+
+    response = client.post(f"/stewardship/v1/initiatives/{ref}/approve",
+                           json={"assignee": "coder"})
+
+    assert response.status_code == 200, response.text
+    assert [call["assignee"] for call in host.create_calls] == ["coder", None, None]
+    assert host.create_calls[0]["title"].startswith("Implement:")
+
+
+def test_an_unknown_assignee_is_refused_before_the_approval(tmp_path: Path):
+    host = TeamHost()
+    client, svc, ref = _assign_client(tmp_path, host)
+
+    response = client.post(f"/stewardship/v1/initiatives/{ref}/approve",
+                           json={"assignee": "ghost"})
+
+    assert response.status_code == 409, response.text
+    assert "ghost" in response.text
+    assert svc.initiative_by_ref(ref)["status"] == "pending_approval"
+    assert host.create_calls == []
+
+
+def test_assignee_must_be_dispatchable_when_the_host_says(tmp_path: Path):
+    class DispatchHost(TeamHost):
+        def list_dispatchable_profiles(self):
+            return [{"name": "coder"}]
+
+    host = DispatchHost()
+    client, svc, ref = _assign_client(tmp_path, host)
+    svc.approve_initiative(ref, actor="owner", interface="cli")
+
+    refused = client.post(f"/stewardship/v1/initiatives/{ref}/bind-board",
+                          json={"assignee": "idle"})
+    assert refused.status_code == 409, refused.text
+    assert host.create_calls == []
+
+    bound = client.post(f"/stewardship/v1/initiatives/{ref}/bind-board",
+                        json={"assignee": "coder"})
+    assert bound.status_code == 200, bound.text
+    assert host.create_calls[0]["assignee"] == "coder"
+
+
+def test_vanilla_host_narrows_profiles_by_the_dispatchers_allowlist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+):
+    import contextlib
+    import types
+
+    from hermes_project_stewardship.kanban.vanilla_host import ProjectKanbanHost
+
+    for name in ("coder", "idle"):
+        (tmp_path / "profiles" / name).mkdir(parents=True)
+    allowlist: dict = {"value": frozenset({"coder"})}
+    constants = types.ModuleType("hermes_constants")
+    setattr(constants, "set_hermes_home_override", lambda home: None)
+    setattr(constants, "reset_hermes_home_override", lambda token: None)
+    kanban_db = types.ModuleType("hermes_cli.kanban_db")
+    setattr(kanban_db, "scoped_current_board", lambda board: contextlib.nullcontext())
+    dispatch = types.ModuleType("hermes_cli.kanban_db_dispatch")
+    setattr(dispatch, "_dispatch_profile_allowlist", lambda normalize: allowlist["value"])
+    profiles = types.ModuleType("hermes_cli.profiles")
+    setattr(profiles, "normalize_profile_name", str.lower)
+    cli = types.ModuleType("hermes_cli")
+    for attr, module in (("kanban_db", kanban_db), ("projects_db", types.ModuleType("p"))):
+        setattr(cli, attr, module)
+    for name, module in (("hermes_constants", constants), ("hermes_cli", cli),
+                         ("hermes_cli.kanban_db", kanban_db),
+                         ("hermes_cli.kanban_db_dispatch", dispatch),
+                         ("hermes_cli.profiles", profiles)):
+        monkeypatch.setitem(sys.modules, name, module)
+    host = ProjectKanbanHost(hermes_home=tmp_path)
+
+    assert [p["name"] for p in host.list_dispatchable_profiles()] == ["coder"]
+    allowlist["value"] = None  # no kanban.dispatch_profiles: every profile runs
+    assert [p["name"] for p in host.list_dispatchable_profiles()] == ["default", "coder", "idle"]

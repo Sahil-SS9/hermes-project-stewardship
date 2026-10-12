@@ -69,9 +69,17 @@ class DockyardIntegration:
 
     def approve(self, ref: str, *, actor: Actor,
                 expected_fingerprint: Optional[str] = None,
-                note: str = "") -> Dict[str, Any]:
-        """Human approval, then promotion + execution start."""
+                note: str = "",
+                assignee: Optional[str] = None) -> Dict[str, Any]:
+        """Human approval, then promotion + execution start.
+
+        ``assignee`` owns the Implement card; it is checked before approving.
+        """
         ini = self.svc.initiative_by_ref(ref)
+        try:
+            self.bridge.check_assignee(assignee)
+        except ServiceError as e:
+            raise IntegrationError(str(e)) from e
         if ini["status"] == "pending_approval":
             # Resolve and verify the board first: an approval that cannot be
             # bound is refused while still pending, never committed unbound.
@@ -93,16 +101,17 @@ class DockyardIntegration:
         if ini["status"] in {"executing", "completed", "regressed"}:
             return self._existing_execution(ini)
         out = {"initiative_ref": ref, "status": ini["status"]}
-        out.update(self._after_approval(ini, actor, promote=True))
+        out.update(self._after_approval(ini, actor, promote=True, assignee=assignee))
         return out
 
     def _after_approval(self, ini: Dict[str, Any], actor: Actor,
-                        promote: bool) -> Dict[str, Any]:
+                        promote: bool,
+                        assignee: Optional[str] = None) -> Dict[str, Any]:
         out: Dict[str, Any] = {}
         if promote and self.canonical_work is None:
             item = self.dy.promote_initiative(ini, actor=actor)
             out["work_item"] = item.ref
-        bound = self.bind(ini["ref"], actor=actor)
+        bound = self.bind(ini["ref"], actor=actor, assignee=assignee)
         if self.canonical_work is not None:
             out["work_item_refs"] = list(bound.get("card_ids") or [])
         out["board_slug"] = bound.get("board_slug")
@@ -112,12 +121,14 @@ class DockyardIntegration:
         return out
 
     def bind(self, ref: str, *, actor: Actor,
-             board_slug: Optional[str] = None) -> Dict[str, Any]:
+             board_slug: Optional[str] = None,
+             assignee: Optional[str] = None) -> Dict[str, Any]:
         """Bind an approved initiative to its project's board, then record
         the canonical work binding of every card so reconciliation sees them."""
         ini = self.svc.initiative_by_ref(ref)
         slug, _ = self._resolve_board(ini["project_id"], board_slug)
-        bound = self.bridge.bind(ref, board_slug=slug, start_execution=True)
+        bound = self.bridge.bind(ref, board_slug=slug, start_execution=True,
+                                 assignee=assignee)
         if self.canonical_work is not None:
             for item_id in bound.get("card_ids") or []:
                 self.canonical_work.metadata.bind_work(
