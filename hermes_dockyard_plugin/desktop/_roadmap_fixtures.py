@@ -101,10 +101,15 @@ def seed_roadmap_fixtures(service, adapter, roadmap, ladder=None) -> None:
 
     notif = NotificationEngine(store, service)
     notif.attach(EventBus(store))
-    notif.process_event({
-        "event_type": "initiative.ready_to_confirm", "project_id": pid,
-        "subject": ready_ref, "payload": {"title": "Confirm me when ready"}})
-    notif.process_event({
-        "event_type": "initiative.regressed", "project_id": pid,
-        "subject": "INIT-REGRESSED-DEMO",
-        "payload": {"reason": "ladder check failed after confirmation"}})
+    # Both are left OPEN (each keeps its ladder meaning) but marked SEEN, so the
+    # Notifications badge is unchanged for tests that count unseen items.
+    for event in (
+        {"event_type": "initiative.ready_to_confirm", "project_id": pid,
+         "subject": ready_ref, "payload": {"title": "Confirm me when ready"}},
+        {"event_type": "initiative.regressed", "project_id": pid,
+         "subject": "INIT-REGRESSED-DEMO",
+         "payload": {"reason": "ladder check failed after confirmation"}},
+    ):
+        nid = notif.process_event(event)
+        if nid is not None:
+            notif.ack(nid)

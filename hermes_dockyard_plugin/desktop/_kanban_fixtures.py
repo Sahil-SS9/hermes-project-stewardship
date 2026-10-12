@@ -59,6 +59,13 @@ def seed_kanban_fixtures(service, adapter, roadmap, *, owner: str) -> None:
         service.approve_initiative(ref, actor="fixture", interface="fixture")
     except Exception:
         pass  # already approved or governance differs; the link rules still hold
+    try:
+        # The fixture's initiative is LIVE: execution started, so the board and
+        # the Roadmap show a real in-flight initiative (R2: journey (a) drives it
+        # from not-ready to delivered).
+        service.start_execution(ref)
+    except Exception:
+        pass  # already executing
     work.update_item(pid, screens, actor=human, initiative_ref=ref)
     work.update_item(pid, analytics, actor=human, initiative_ref=ref)
 
