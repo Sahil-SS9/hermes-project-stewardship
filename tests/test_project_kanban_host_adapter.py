@@ -768,3 +768,63 @@ def test_list_work_links_still_maps_host_failures_to_the_stable_codes():
     with pytest.raises(_adapter_error_type()) as exc:
         adapter.list_work_links("project-1", "t_x")
     assert exc.value.code == "task_not_found"
+
+
+# ---- which Hermes home the factory serves: the root, unless told otherwise --
+
+
+def _factory_on_fake_hermes(monkeypatch: pytest.MonkeyPatch, active_home: Path):
+    """The factory against a stand-in Hermes whose active home is ``active_home``."""
+    import types
+
+    from hermes_project_stewardship.kanban.host_adapter import (
+        create_project_kanban_adapter,
+    )
+
+    class HomeHost(FakeProjectKanbanHost):
+        def __init__(self, *, hermes_home, board="default", **_kwargs):
+            super().__init__()
+            self.hermes_home = Path(hermes_home)
+
+        def list_existing_projects(self):
+            return {"projects": [], "profiles": self.list_profiles()}
+
+        def capabilities(self):
+            methods = _REQUIRED | {"list_existing_projects"}
+            return {"contract_version": 2, "methods": sorted(methods)}
+
+    constants = types.ModuleType("hermes_constants")
+    setattr(constants, "get_hermes_home", lambda: active_home)
+    host_module = types.ModuleType("hermes_cli.project_kanban_host")
+    setattr(host_module, "ProjectKanbanHost", HomeHost)
+    monkeypatch.setitem(sys.modules, "hermes_constants", constants)
+    monkeypatch.setitem(sys.modules, "hermes_cli", types.ModuleType("hermes_cli"))
+    monkeypatch.setitem(sys.modules, "hermes_cli.kanban_db", types.ModuleType("hermes_cli.kanban_db"))
+    monkeypatch.setitem(sys.modules, "hermes_cli.project_kanban_host", host_module)
+    monkeypatch.delenv("STEWARD_KANBAN_HOME", raising=False)
+    return create_project_kanban_adapter
+
+
+def test_factory_serves_the_hermes_root_from_a_profile_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+):
+    """A dashboard opened inside a profile saw that profile's (empty) projects
+    and profiles, not the root's where the boards live; the fleet rebound the
+    adapter by hand. The default is now the root, as for the database."""
+    factory = _factory_on_fake_hermes(monkeypatch, tmp_path / "root" / "profiles" / "techie")
+
+    adapter = factory()
+
+    assert adapter.host.hermes_home == tmp_path / "root"
+    assert adapter.host_provenance["resolved_home"] == str(tmp_path / "root")
+
+
+def test_factory_keeps_a_root_home_and_honours_overrides(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+):
+    factory = _factory_on_fake_hermes(monkeypatch, tmp_path / "root")
+    assert factory().host.hermes_home == tmp_path / "root"
+
+    monkeypatch.setenv("STEWARD_KANBAN_HOME", str(tmp_path / "elsewhere"))
+    assert factory().host.hermes_home == tmp_path / "elsewhere"
+    assert factory(hermes_home=tmp_path / "explicit").host.hermes_home == tmp_path / "explicit"

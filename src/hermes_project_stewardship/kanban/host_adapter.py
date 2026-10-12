@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 from importlib import import_module
 import json
+import os
 from pathlib import Path
 import sys
 from typing import Any, Mapping, Optional
@@ -867,6 +868,9 @@ def create_project_kanban_adapter(
 ) -> ProjectKanbanHostAdapter:
     """Compose Project Stewardship against the active Hermes host implementation.
 
+    The Hermes home served is ``hermes_home`` when given, else
+    ``STEWARD_KANBAN_HOME``, else the Hermes root above the active profile.
+
     P1.3 selection order: the plugin's own vanilla host is the canonical
     implementation and always satisfies the contract. A host-tree module
     (``hermes_cli.project_kanban_host``) is used only when it provably
@@ -897,18 +901,6 @@ def create_project_kanban_adapter(
                     fork_type, "__module__", "hermes_cli.project_kanban_host")
                 host_type = vanilla_type
     if host_type is None:
-        try:
-            constants_module = import_module("hermes_constants")
-        except Exception:
-            raise KanbanAdapterError(
-                "host_contract_unavailable",
-                "canonical project and Kanban host is unavailable",
-            ) from None
-        resolved_home = (
-            Path(hermes_home)
-            if hermes_home is not None
-            else Path(constants_module.get_hermes_home())
-        )
         host_type = vanilla_type  # constructor below fails closed without runtime
     try:
         constants_module = import_module("hermes_constants")
@@ -917,11 +909,17 @@ def create_project_kanban_adapter(
             "host_contract_unavailable",
             "canonical project and Kanban host is unavailable",
         ) from None
-    resolved_home = (
-        Path(hermes_home)
-        if hermes_home is not None
-        else Path(constants_module.get_hermes_home())
-    )
+    # Projects, profiles and boards are shared from the Hermes root, so a
+    # profile-scoped process (a dashboard opened inside a profile) serves the
+    # root unless told otherwise, matching where the database is found.
+    if hermes_home is not None:
+        resolved_home = Path(hermes_home)
+    elif os.environ.get("STEWARD_KANBAN_HOME"):
+        resolved_home = Path(os.environ["STEWARD_KANBAN_HOME"]).expanduser()
+    else:
+        from ..runtime import hermes_root
+
+        resolved_home = hermes_root(Path(constants_module.get_hermes_home()))
     host = host_type(hermes_home=resolved_home, board=board or "default")
     adapter = ProjectKanbanHostAdapter(host)
     # P1.7: record the actually imported host so unsupported trees are

@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **A profile-scoped dashboard sees the root's projects.** The Kanban host
+  adapter now serves the Hermes root above the active profile
+  (`<root>/profiles/<name>` -> `<root>`, as the database lookup already
+  does) instead of the profile's own home, where it found no projects and
+  only the default profile. `STEWARD_KANBAN_HOME` or an explicit
+  `hermes_home` still choose another home.
+
 ## [0.4.0] - 2026-10-11
 
 The Project Stewardship Desktop app becomes the main surface, and every part

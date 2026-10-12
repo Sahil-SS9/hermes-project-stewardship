@@ -12,6 +12,14 @@ Selection precedence:
 4. `$HERMES_HOME/plugin-data/hermes-dockyard/dockyard.db`.
    Without `HERMES_HOME`, the profile root is `~/.hermes`.
 
+The Kanban host adapter (native projects, profiles and boards) serves, in
+order: an explicit `hermes_home` given to `create_project_kanban_adapter`;
+`STEWARD_KANBAN_HOME`; else the Hermes root above the active profile
+(`<root>/profiles/<name>` -> `<root>`), the same root the bots' database lookup
+uses. A dashboard opened inside a profile therefore sees the root's projects and
+profiles, not the profile's own. Set `STEWARD_KANBAN_HOME=$HERMES_HOME` to keep a profile's
+own projects instead.
+
 Use the same selection across processes. An already-running plugin retains its
 open store until its normal lifecycle ends; setting an environment variable does
 not silently switch a running service's database. No restart is performed by the

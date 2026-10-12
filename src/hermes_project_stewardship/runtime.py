@@ -43,15 +43,19 @@ def _profile_db_path() -> Path:
     return home / "plugin-data" / "hermes-dockyard" / "dockyard.db"
 
 
-def _root_db_path() -> Path:
-    """The root profile's database: ``<root>/profiles/<name>`` -> ``<root>``.
+def hermes_root(home: Path) -> Path:
+    """The Hermes root above a profile home: ``<root>/profiles/<name>`` -> ``<root>``.
 
     Mirrors Hermes' own ``get_default_hermes_root()`` for the standard and Docker
     layouts, without importing Hermes (the dashboard loads this module too).
     """
+    return home.parent.parent if home.parent.name == "profiles" else home
+
+
+def _root_db_path() -> Path:
+    """The root profile's database."""
     home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes").expanduser().resolve()
-    root = home.parent.parent if home.parent.name == "profiles" else home
-    return root / "plugin-data" / "hermes-dockyard" / "dockyard.db"
+    return hermes_root(home) / "plugin-data" / "hermes-dockyard" / "dockyard.db"
 
 
 def locate_shared_db() -> Path | None:
