@@ -2041,9 +2041,12 @@ class RoadmapParentBody(BaseModel):
 
 
 class RoadmapGoalCheckBody(BaseModel):
+    # A person clearing the check sends {"clear": true}; otherwise the check
+    # fields are the ones being set. Unknown fields are still refused.
     model_config = ConfigDict(extra="forbid")
-    evaluator_type: str
-    target: str
+    clear: bool | None = None
+    evaluator_type: str | None = None
+    target: str | None = None
     command: list[str] | None = None
     integration: str | None = None
     window: str | None = None
@@ -2133,10 +2136,12 @@ async def roadmap_goal_check(project_id: str, goal_id: str) -> dict:
 @plugin_api.put("/projects/{project_id}/goals/{goal_id}/check")
 async def roadmap_set_goal_check(project_id: str, goal_id: str,
                                  body: RoadmapGoalCheckBody) -> dict:
+    # exclude_unset: only the fields the caller actually sent travel, so the
+    # proxy never invents nulls the backend would have to validate.
     return await _proxy(
         "PUT",
         f"/stewardship/v1/projects/{quote(project_id, safe='')}/goals/{quote(goal_id, safe='')}/check",
-        body.model_dump(),
+        body.model_dump(exclude_unset=True),
     )
 
 
