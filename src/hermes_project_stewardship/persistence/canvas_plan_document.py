@@ -428,6 +428,22 @@ class PlanDocumentService:
             raise ValueError("backlog creation requires the canonical work service")
         if not step_orders:
             raise ValueError("select at least one step to create backlog items from")
+        # Validate an optional goal BEFORE anything else: a cross-project or
+        # unknown goal must refuse the batch, not leave orphaned work items.
+        placing = goal_id is not None and goal_id != ""
+        if placing and place_task_goal is None:
+            raise ValueError("placing created tasks under a goal requires the ladder callback")
+        if placing:
+            goal = self._conn().execute(
+                "SELECT project_id, archived_at FROM project_goals WHERE goal_id=?",
+                (goal_id,),
+            ).fetchone()
+            if goal is None:
+                raise ValueError(f"unknown goal '{goal_id}'")
+            if goal["project_id"] != project_id:
+                raise ValueError("cross-project goal refused")
+            if goal["archived_at"] is not None:
+                raise ValueError("goal is archived; restore it before placing work under it")
         steps_by_order = {step["order"]: step for step in plan["steps"]}
         unknown = [order for order in step_orders if order not in steps_by_order]
         if unknown:
@@ -436,9 +452,6 @@ class PlanDocumentService:
         repeated = sorted(set(step_orders) & already)
         if repeated:
             raise PlanConflictError(f"backlog items already created for step(s): {repeated}")
-        placing = goal_id is not None and goal_id != ""
-        if placing and place_task_goal is None:
-            raise ValueError("placing created tasks under a goal requires the ladder callback")
         created = []
         for order in sorted(set(step_orders)):
             step = steps_by_order[order]

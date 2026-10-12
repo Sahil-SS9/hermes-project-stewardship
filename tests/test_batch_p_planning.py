@@ -295,6 +295,57 @@ def test_backlog_creation_is_explicit_and_uses_canonical_endpoints(tmp_path):
     assert any(item["title"] == created[0]["ref"] or item["ref"] == created[0]["ref"] for item in readback["work_items"])
 
 
+def test_backlog_items_can_be_placed_under_a_goal_with_audit(store, svc, enabled):
+    """R2 fix 4: create_backlog_items takes an optional goal_id. Every created
+    task lands under that goal (one audited placement each), and a goal from
+    another project is refused BEFORE anything is created."""
+    from .r2_helpers import ladder_for
+
+    _seed_canvas(store, enabled)
+    technical = _approve_technical_plan(store, enabled)
+    service = PlanDocumentService(store)
+    plan = service.synthesise_plan(enabled, proposal_id=technical["proposal_id"], actor="sahil")
+    doc = service.build_implementation_document(enabled, plan["plan_id"])
+    service.save_implementation_document(enabled, plan["plan_id"], doc, actor="sahil")
+    ladder, work = ladder_for(store, svc)
+    orders = [step["order"] for step in plan["steps"]]
+    assert orders, "the plan has steps to place"
+
+    def place(pid, ref, goal, actor):
+        return ladder.set_task_goal(pid, ref, goal, actor=actor, interface="plan")
+
+    gid = svc.create_goal(enabled, title="Placed goal", objective_ids=[],
+                          actor="sahil", interface="test")["goal_id"]
+    out = service.create_backlog_items(
+        enabled, plan["plan_id"], step_orders=orders[:1], actor="sahil",
+        work=work, goal_id=gid, place_task_goal=place)
+    refs = [row["ref"] for row in out["created"]]
+    assert len(refs) == 1
+    placed = store._conn.execute(
+        "SELECT item_ref FROM goal_tasks WHERE goal_id=?", (gid,)).fetchall()
+    assert sorted(row["item_ref"] for row in placed) == sorted(refs)
+    audited = [r for r in store.audit_tail(50) if r["action"] == "roadmap.parent.set"
+               and r["detail"].get("parent_id") == gid]
+    assert len(audited) == 1, "each placement is audited with both ends"
+
+    # A goal from ANOTHER project is refused before anything is created.
+    svc.enable("p8", mission="m", lead_profile="l", autonomy_level=2)
+    foreign = svc.create_goal("p8", title="Foreign goal", objective_ids=[],
+                              actor="sahil", interface="test")["goal_id"]
+    before = store._conn.execute(
+        "SELECT COUNT(*) AS n FROM goal_tasks WHERE goal_id=?", (foreign,)).fetchone()["n"]
+    with pytest.raises(ValueError, match="cross-project"):
+        service.create_backlog_items(
+            enabled, plan["plan_id"], step_orders=orders[:1], actor="sahil",
+            work=work, goal_id=foreign, place_task_goal=place)
+    after = store._conn.execute(
+        "SELECT COUNT(*) AS n FROM goal_tasks WHERE goal_id=?", (foreign,)).fetchone()["n"]
+    assert before == after == 0
+    # Nothing extra was created by the refusal (the plan still remembers one).
+    readback = service.get_plan(enabled, plan["plan_id"])
+    assert [row["order"] for row in readback.get("backlog_created") or []] == orders[:1]
+
+
 def test_saving_the_document_twice_does_not_duplicate_content(store, svc, enabled):
     # Kensei review: a second click on "Save doc to Content" uploaded a second
     # identical Markdown file. Saving is idempotent per plan.
