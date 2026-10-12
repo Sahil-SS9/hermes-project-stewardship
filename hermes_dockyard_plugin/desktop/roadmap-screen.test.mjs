@@ -331,53 +331,132 @@ test('Roadmap: dark theme recolours the toolbar, tree, chips and drawer', { time
 // ---- Batch L required journeys (fix 7) ------------------------------------- //
 // The confirm-as-delivered flow, driven through the real control in the Roadmap.
 
-test('Roadmap journey (a): a reached initiative confirms as delivered and shows Completed', { timeout: 180000 }, async () => {
+// Shared helpers for the R2 journeys: the suite hands the proxy base in
+// STEWARD_API_URL, and the demo session token is the suite's own.
+const proxyCall = async (path, init = {}) => {
+  const r = await fetch(process.env.STEWARD_API_URL + path, {
+    method: init.method || 'GET',
+    headers: { 'x-hermes-session-token': 'demo-session-token', 'content-type': 'application/json' },
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+  })
+  const text = await r.text()
+  if (!r.ok) throw new Error(`${init.method || 'GET'} ${path} -> ${r.status} ${text.slice(0, 160)}`)
+  return text ? JSON.parse(text) : {}
+}
+async function goToBoard(page, project) {
+  await page.getByRole('button', { name: 'Project context', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Find project' }).fill(project)
+  await page.getByRole('listbox', { name: 'Projects' }).getByRole('option', { name: project, exact: true }).click()
+  await page.locator('[data-tab="project"]').click()
+  await page.locator('[data-project-view="board"]').click()
+  await page.locator('[data-kanban-screen]').waitFor()
+}
+
+test('Roadmap journey (a): from NOT ready, the UI drives task done + check → ready → confirm → Completed', { timeout: 240000 }, async () => {
+  // R2 fix 5a. The fixture (atlas-mobile) has an executing initiative whose goal
+  // holds 'Build setup screens' still in progress, so it is NOT ready when the
+  // screen loads. A person: marks the task done on the board, sets the goal's
+  // check in the Roadmap; the assessment is recorded through the API (there is
+  // no UI control for a goal assessment) — then goal met -> objective met ->
+  // milestone reached -> Ready to confirm -> confirm -> Completed after a reload.
+  const roadmap = await proxyCall('/roadmap?project_id=atlas-mobile')
+  const project = roadmap.projects[0]
+  const initiative = project.initiatives.find((i) => i.title === 'Make setup effortless')
+  const milestone = project.milestones.find((m) => m.initiative_ref === initiative.ref)
+  const objective = project.objectives.find((o) => o.milestone_id === milestone.id)
+  const goal = project.goals.find((g) => g.objective_id === objective.id)
+  const task = (goal.tasks ?? []).find((t) => t.title === 'Build setup screens')
+  assert.ok(task, 'the fixture task is under the goal')
+
   const browser = await chromium.launch({ headless: true })
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+  page.setDefaultTimeout(12000)
   try {
+    // 1. Mark the last task done through the board's Move control.
+    await page.goto(BASE, { waitUntil: 'networkidle' })
+    await goToBoard(page, 'atlas-mobile')
+    // The Move control lives on the expanded card.
+    const card = page.locator('[data-work-card]').filter({ has: page.locator('.dy-kb-title').getByText('Build setup screens', { exact: true }) })
+    await card.locator('[data-card-toggle]').click()
+    await page.locator(`[data-card-move="${task.ref}"]`).waitFor()
+    await page.locator(`[data-card-move="${task.ref}"]`).selectOption('done')
+    await page.waitForTimeout(600)
+    // 2. Set the goal's check through the rendered control in the Roadmap.
     await openRoadmap(page)
-    await projectRow(page, 'payments-relaunch').click()
-    // The fully-reached initiative shows "Ready to confirm" with the action.
-    const ready = page.locator('[data-rm-node^="initiative:"]').filter({ hasText: 'Confirm me when ready' })
+    await projectRow(page, 'atlas-mobile').click()
+    await page.locator('[data-rm-node^="initiative:"]').filter({ hasText: 'Make setup effortless' }).first().click()
+    await page.locator('[data-rm-node^="milestone:"]').first().click()
+    await page.locator('[data-rm-node^="objective:"]').first().click()
+    await page.locator('[data-rm-node^="goal:"]').first().click()
+    const editor = page.locator('[data-rm-goal-check]')
+    await editor.waitFor()
+    await editor.getByRole('button', { name: 'Set check' }).click()
+    await editor.locator('[data-rm-check-target]').fill('>=1')
+    await editor.getByRole('button', { name: 'Save check' }).click()
+    await page.waitForTimeout(600)
+    // 3. Record the passing assessment (no UI control exists for a goal check).
+    await proxyCall(`/projects/atlas-mobile/goals/${goal.id}/assessment`, {
+      method: 'POST', body: { passed: true, evidence: ['journey:1'] } })
+    // 4. The chain rolls up: goal met -> objective met -> milestone reached.
+    await openRoadmap(page)
+    await projectRow(page, 'atlas-mobile').click()
+    const ready = page.locator('[data-rm-node^="initiative:"]').filter({ hasText: 'Make setup effortless' }).first()
     await ready.waitFor()
     assert.match(await ready.innerText(), /Ready to confirm/)
     await ready.getByRole('button', { name: 'Confirm as delivered' }).click()
     const dialog = page.locator('[data-rm-confirm-dialog]')
     await dialog.waitFor()
-    assert.match(await dialog.innerText(), /Confirm me when ready/)
     await dialog.getByRole('button', { name: 'Confirm as delivered' }).click()
-    // After reload the initiative is confirmed: no "Ready to confirm" chip and
-    // no Confirm action remain (the delivery chip reflects the done work).
-    await page.reload()
+    // 5. Completed after a reload, with the ready state gone.
+    await page.reload({ waitUntil: 'networkidle' })
     await openRoadmap(page)
-    await projectRow(page, 'payments-relaunch').click()
-    const done = page.locator('[data-rm-node^="initiative:"]').filter({ hasText: 'Confirm me when ready' })
+    await projectRow(page, 'atlas-mobile').click()
+    const done = page.locator('[data-rm-node^="initiative:"]').filter({ hasText: 'Make setup effortless' }).first()
     await done.waitFor()
-    assert.equal(await done.getByText('Ready to confirm').count(), 0, 'ready chip clears on confirm')
-    assert.equal(await done.getByRole('button', { name: 'Confirm as delivered' }).count(), 0, 'confirm action clears')
-    assert.match(await done.innerText(), /Complete/)
+    assert.equal(await done.getByRole('button', { name: 'Confirm as delivered' }).count(), 0, 'no confirm action after delivery')
+    assert.equal(await done.getByText('Ready to confirm').count(), 0, 'the ready chip clears')
+    const after = await proxyCall('/roadmap?project_id=atlas-mobile')
+    assert.equal(after.projects[0].initiatives.find((i) => i.title === 'Make setup effortless').governance, 'completed')
   } finally {
     await browser.close()
   }
 })
 
-test('Roadmap journey (b): confirming is refused while a milestone is not reached', { timeout: 180000 }, async () => {
+test('Roadmap journey (b): a stale state shows the 409 refusal in plain words and stays executing', { timeout: 240000 }, async () => {
+  // R2 fix 5b. The initiative is READY when the screen loads; a milestone
+  // becomes not-reached through the BACKEND; Confirm is pressed and the 409
+  // message appears in plain words while the initiative stays executing.
+  const roadmap = await proxyCall('/roadmap?project_id=payments-relaunch')
+  const project = roadmap.projects[0]
+  const initiative = project.initiatives.find((i) => i.title === 'Confirm me when ready')
+  const milestone = project.milestones.find((m) => m.initiative_ref === initiative.ref)
+  const objective = project.objectives.find((o) => o.milestone_id === milestone.id)
+
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  page.setDefaultTimeout(12000)
   try {
     await openRoadmap(page)
     await projectRow(page, 'payments-relaunch').click()
-    // "Ship saved views" has a milestone whose goal has no done task, so it is
-    // NOT ready: the Roadmap offers no "Confirm as delivered" action on it at
-    // all, and it carries no "Ready to confirm" chip. (The backend refuses the
-    // API call 409 unless every milestone is reached — covered by the ladder
-    // tests; the screen simply never offers the action when it would refuse.)
-    const notReady = page.locator('[data-rm-node^="initiative:"]').filter({ hasText: 'Ship saved views' }).first()
-    await notReady.waitFor()
-    assert.equal(await notReady.getByRole('button', { name: 'Confirm as delivered' }).count(), 0,
-      'a not-reached initiative has no Confirm action')
-    assert.equal(await notReady.getByText('Ready to confirm').count(), 0,
-      'a not-reached initiative is not marked ready')
+    const row = page.locator('[data-rm-node^="initiative:"]').filter({ hasText: 'Confirm me when ready' }).first()
+    await row.waitFor()
+    assert.match(await row.innerText(), /Ready to confirm/, 'ready when the screen loads')
+    await row.getByRole('button', { name: 'Confirm as delivered' }).click()
+    const dialog = page.locator('[data-rm-confirm-dialog]')
+    await dialog.waitFor()
+    // The state changes behind the screen: the objective fails its assessment.
+    await proxyCall(`/projects/payments-relaunch/objectives/${objective.id}/assessment`, {
+      method: 'POST', body: { passed: false, evidence: ['journey:stale'] } })
+    // Press Confirm: the refusal is shown in plain words.
+    await dialog.getByRole('button', { name: 'Confirm as delivered' }).click()
+    await page.waitForFunction(() => /not ready to confirm|every milestone must be reached/i.test(document.querySelector('[data-rm-confirm-dialog]')?.textContent ?? ''))
+    const shown = await dialog.innerText()
+    assert.match(shown, /not ready to confirm|every milestone must be reached/i, 'the refusal is shown in plain words')
+    const after = await proxyCall('/roadmap?project_id=payments-relaunch')
+    assert.equal(after.projects[0].initiatives.find((i) => i.title === 'Confirm me when ready').governance, 'executing', 'still executing after the refusal')
+    // Restore the fixture: the assessment passes again.
+    await proxyCall(`/projects/payments-relaunch/objectives/${objective.id}/assessment`, {
+      method: 'POST', body: { passed: true, evidence: ['journey:restore'] } })
   } finally {
     await browser.close()
   }
