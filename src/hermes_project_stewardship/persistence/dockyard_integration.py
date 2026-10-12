@@ -64,9 +64,17 @@ class DockyardIntegration:
 
     def approve(self, ref: str, *, actor: Actor,
                 expected_fingerprint: Optional[str] = None,
-                note: str = "") -> Dict[str, Any]:
-        """Human approval, then promotion + execution start."""
+                note: str = "",
+                assignee: Optional[str] = None) -> Dict[str, Any]:
+        """Human approval, then promotion + execution start.
+
+        ``assignee`` owns the Implement card; it is checked before approving.
+        """
         ini = self.svc.initiative_by_ref(ref)
+        try:
+            self.bridge.check_assignee(assignee)
+        except ServiceError as e:
+            raise IntegrationError(str(e)) from e
         if ini["status"] == "pending_approval":
             try:
                 ini = self.svc.approve_initiative(
@@ -85,16 +93,17 @@ class DockyardIntegration:
         if ini["status"] in {"executing", "completed", "regressed"}:
             return self._existing_execution(ini)
         out = {"initiative_ref": ref, "status": ini["status"]}
-        out.update(self._after_approval(ini, actor, promote=True))
+        out.update(self._after_approval(ini, actor, promote=True, assignee=assignee))
         return out
 
     def _after_approval(self, ini: Dict[str, Any], actor: Actor,
-                        promote: bool) -> Dict[str, Any]:
+                        promote: bool,
+                        assignee: Optional[str] = None) -> Dict[str, Any]:
         out: Dict[str, Any] = {}
         if promote and self.canonical_work is None:
             item = self.dy.promote_initiative(ini, actor=actor)
             out["work_item"] = item.ref
-        bound = self.bridge.bind(ini["ref"], start_execution=True)
+        bound = self.bridge.bind(ini["ref"], start_execution=True, assignee=assignee)
         if self.canonical_work is not None:
             for item_id in bound.get("card_ids") or []:
                 self.canonical_work.metadata.bind_work(

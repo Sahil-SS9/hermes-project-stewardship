@@ -31,6 +31,7 @@ class BoardCard:
     description: str
     column: str = "todo"
     metadata: Dict[str, Any] = field(default_factory=dict)
+    assignee: Optional[str] = None
 
 
 class KanbanAdapter(ABC):
@@ -59,6 +60,10 @@ class KanbanAdapter(ABC):
 
     def list_profiles(self) -> List[Dict[str, Any]]:
         raise NotImplementedError("profile listing is not supported")
+
+    def assignable_profiles(self) -> List[str]:
+        """Profiles a card may be assigned to; by default every listed profile."""
+        return [str(profile["name"]) for profile in self.list_profiles()]
 
     def list_existing_projects(self) -> Dict[str, Any]:
         raise NotImplementedError("project discovery is not supported")
@@ -140,7 +145,8 @@ class ReferenceKanbanAdapter(KanbanAdapter):
                 " column_name, metadata_json, created_at) VALUES(?,?,?,?,?,?)",
                 (
                     int(board_id), card.title, card.description, card.column,
-                    json.dumps(card.metadata), iso(self.store._clock()),
+                    json.dumps({**card.metadata, **({"assignee": card.assignee} if card.assignee else {})}),
+                    iso(self.store._clock()),
                 ),
             )
         return str(cur.lastrowid)
@@ -400,10 +406,13 @@ class KanbanBridge:
         *,
         board_slug: Optional[str] = None,
         start_execution: bool = True,
+        assignee: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """``assignee`` owns the first (Implement) card; the others stay unassigned."""
         ini = self.svc.initiative_by_ref(ref)
         if ini["status"] != "approved":
             raise ServiceError(f"initiative {ref} is not approved (status={ini['status']})")
+        self.check_assignee(assignee)
 
         project_id = ini["project_id"]
         slug = (
@@ -433,6 +442,7 @@ class KanbanBridge:
                                     f"evidence-backed by cycle {ini.get('source_cycle_id')}",
                         column=column,
                         metadata={"initiative_ref": ref, "step": i + 1},
+                        assignee=assignee if i == 0 else None,
                     ),
                 )
             )
@@ -449,6 +459,22 @@ class KanbanBridge:
         )
         return {"ref": ref, "board_slug": slug, "board_id": board_id,
                 "card_ids": card_ids}
+
+    def check_assignee(self, assignee: Optional[str]) -> None:
+        """Refuse an assignee the host would not run; fail closed if it cannot say."""
+        if assignee is None:
+            return
+        try:
+            allowed = self.adapter.assignable_profiles()
+        except NotImplementedError:
+            raise ServiceError(
+                "the Kanban host cannot list its profiles, so cards cannot be assigned"
+            ) from None
+        if assignee not in allowed:
+            raise ServiceError(
+                f"{assignee!r} is not a profile the Kanban host runs work for"
+                f" (assignable: {', '.join(sorted(allowed)) or 'none'})"
+            )
 
     def complete_from_board(
         self,

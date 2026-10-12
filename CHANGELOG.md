@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Assign the Implement card when binding.** `POST /initiatives/{ref}/approve`
+  and `POST /initiatives/{ref}/bind-board` take an optional `assignee`. It
+  must be a profile the Kanban host runs work for: the dispatcher's
+  `kanban.dispatch_profiles` on the vanilla host, else any existing
+  profile. An unknown assignee is refused before the approval is recorded.
+  The Validate and Outcome check cards stay unassigned.
+
 ## [0.4.0] - 2026-10-11
 
 The Project Stewardship Desktop app becomes the main surface, and every part

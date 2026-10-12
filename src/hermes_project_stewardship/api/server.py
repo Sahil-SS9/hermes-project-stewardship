@@ -370,6 +370,8 @@ class ApprovalAction(BaseModel):
     expected_fingerprint: Optional[str] = None
     note: str = ""
     reason: str = ""
+    # Approve only: the profile that owns the Implement card.
+    assignee: Optional[str] = None
 
 
 class RequestChangesAction(BaseModel):
@@ -422,6 +424,7 @@ class GatewayCommandBody(BaseModel):
 
 class BindBoardRequest(BaseModel):
     board_slug: Optional[str] = None
+    assignee: Optional[str] = None
 
 
 class CompleteRequest(BaseModel):
@@ -1777,6 +1780,7 @@ def create_app(
                 ),
                 expected_fingerprint=body.expected_fingerprint,
                 note=body.note,
+                assignee=body.assignee,
             )
         except (IntegrationError, ServiceError) as exc:
             raise HTTPException(409, str(exc)) from None
@@ -1848,7 +1852,7 @@ def create_app(
     @router.post("/initiatives/{ref}/bind-board")
     def bind_board(ref: str, body: BindBoardRequest):
         try:
-            return bridge.bind(ref, board_slug=body.board_slug)
+            return bridge.bind(ref, board_slug=body.board_slug, assignee=body.assignee)
         except ServiceError as e:
             raise HTTPException(409, str(e))
 

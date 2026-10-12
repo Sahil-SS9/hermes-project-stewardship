@@ -207,6 +207,15 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
         except Exception as exc:
             raise self._mapped_error(exc) from None
 
+    def assignable_profiles(self) -> list[str]:
+        """The profiles the host's dispatcher runs when it can say, else every profile."""
+        lister = getattr(self.host, "list_dispatchable_profiles", None)
+        try:
+            rows = lister() if callable(lister) else self.host.list_profiles()
+            return [str(profile["name"]) for profile in rows]
+        except Exception as exc:
+            raise self._mapped_error(exc) from None
+
     def list_existing_projects(self) -> dict[str, Any]:
         try:
             return dict(self.host.list_existing_projects())
@@ -708,6 +717,7 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
             task = self.host.create_task(
                 title=card.title,
                 body=card.description,
+                assignee=card.assignee,
                 created_by="dockyard",
                 project_id=project_id,
                 task_kind="task",
