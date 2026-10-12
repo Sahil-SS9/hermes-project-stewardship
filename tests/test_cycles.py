@@ -98,6 +98,54 @@ def test_objective_failure_drives_proposals(engine, enabled, svc, tmp_path):
     assert r["mutation_blocked_reason"] is None
 
 
+def test_crashed_count_objective_is_unknown_not_healthy(engine, enabled, svc, tmp_path):
+    """A "<=0" count objective whose command fails without printing a number
+    measured nothing: the cycle is unknown and proposes nothing, instead of
+    reading the crash as a count of 0."""
+    svc.enable(enabled, lead_profile="lead", autonomy_level=3)
+    wire_repo(svc, enabled, make_repo(tmp_path / "r"))
+    svc.add_objective(enabled, name="drift", evaluator_type="command",
+                      target="<=0", severity="medium",
+                      command=["python3", "-c", "raise SystemExit('git failed')"])
+    engine.proposal_fn = lambda *a: [{"title": "Should never be created", "rationale": "x"}]
+    r = engine.run_cycle(enabled)
+    [objective] = r["objectives"]
+    assert objective["measured"] is None and objective["state"] == "unknown"
+    assert objective["target_met"] is False
+    assert r["health"]["state"] == "unknown"
+    assert r["initiatives"] == []
+
+
+def test_cycle_uses_the_project_objective_detail_cap(engine, enabled, svc, tmp_path):
+    import json
+
+    svc.enable(enabled, lead_profile="lead", autonomy_level=3)
+    repo = make_repo(tmp_path / "r")
+    svc.store._conn.execute(
+        "UPDATE project_stewardship SET verification_policy_json=? WHERE project_id=?",
+        (json.dumps({"repo_path": repo.as_posix(), "objective_detail_chars": 600}), enabled),
+    )
+    svc.add_objective(enabled, name="ci", evaluator_type="command", target=">=1",
+                      command=["python3", "-c", "import sys; sys.stderr.write('e' * 900); sys.exit(1)"])
+    [objective] = engine.run_cycle(enabled)["objectives"]
+    assert objective["detail"].endswith("stderr_head=" + "e" * 600)
+
+
+def test_flooding_objective_is_killed_and_the_cycle_goes_on(engine, enabled, svc, tmp_path):
+    svc.enable(enabled, lead_profile="lead", autonomy_level=3)
+    wire_repo(svc, enabled, make_repo(tmp_path / "r"))
+    svc.add_objective(enabled, name="flood", evaluator_type="command", target=">=1",
+                      command=["python3", "-c", "import sys\nwhile True: sys.stdout.write('9' * 65536)"])
+    svc.add_objective(enabled, name="fine", evaluator_type="command", target=">=1",
+                      command=["python3", "-c", "print(1)"])
+    r = engine.run_cycle(enabled)
+    flood, fine = r["objectives"]
+    assert flood["passed"] is False and flood["measured"] is None
+    assert "output_too_large" in flood["detail"]
+    assert fine["passed"] is True and fine["measured"] == 1.0
+    assert r["health"]["state"] == "unknown"
+
+
 def test_unknown_state_blocks_mutations(engine, enabled, svc, tmp_path):
     """Fail-closed: missing declared file → Unknown → no proposals even if
     the proposer tries."""

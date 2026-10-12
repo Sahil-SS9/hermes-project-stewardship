@@ -63,3 +63,56 @@ def test_manual_without_status_is_unknown_fail():
     m = obj(evaluator_type="manual", command=None)
     r = DEFAULT_EVALUATOR.evaluate(m, EvaluationContext())
     assert not r.passed and "no manual status" in r.detail
+
+
+def test_failed_count_without_a_measure_is_unknown_not_zero(tmp_path: Path):
+    """A count objective whose command crashes before printing a number must
+    not read as "0 found" and meet a "<=0" target."""
+    ctx = EvaluationContext(project_path=tmp_path, allowlist={PY})
+    r = DEFAULT_EVALUATOR.evaluate(
+        obj(command=[PY, "-c", "raise SystemExit('source unreachable')"], target="<=0"), ctx
+    )
+    assert r.measured is None
+    assert r.state == "unknown"
+    assert not r.passed and not r.target_met
+    assert "no_measure" in r.detail and "source unreachable" in r.detail
+
+
+def test_failed_count_with_a_measure_keeps_it(tmp_path: Path):
+    ctx = EvaluationContext(project_path=tmp_path, allowlist={PY})
+    r = DEFAULT_EVALUATOR.evaluate(
+        obj(command=[PY, "-c", "print(3); raise SystemExit(1)"], target="<=0"), ctx
+    )
+    assert r.measured == 3.0 and r.state == "failed" and "no_measure" not in r.detail
+
+
+def test_stderr_detail_cap_defaults_to_200_and_is_configurable(tmp_path: Path):
+    from hermes_project_stewardship.objectives.evaluators import detail_chars_from
+
+    noisy = obj(command=[PY, "-c", "import sys; sys.stderr.write('x' * 5000); raise SystemExit(1)"])
+    default = DEFAULT_EVALUATOR.evaluate(noisy, EvaluationContext(project_path=tmp_path, allowlist={PY}))
+    assert default.detail.endswith("stderr_head=" + "x" * 200)
+    wide = DEFAULT_EVALUATOR.evaluate(
+        noisy, EvaluationContext(project_path=tmp_path, allowlist={PY}, detail_chars=1000)
+    )
+    assert wide.detail.endswith("stderr_head=" + "x" * 1000)
+
+    assert detail_chars_from(None) == 200
+    assert detail_chars_from({}) == 200
+    assert detail_chars_from({"objective_detail_chars": 1000}) == 1000
+    assert detail_chars_from({"objective_detail_chars": 10**6}) == 4000
+    assert detail_chars_from({"objective_detail_chars": 0}) == 1
+    assert detail_chars_from({"objective_detail_chars": "1000"}) == 200
+    assert detail_chars_from({"objective_detail_chars": True}) == 200
+
+
+@pytest.mark.parametrize("value", [0, 4001, 10**6, "1000", True, None])
+def test_detail_cap_outside_1_to_4000_is_refused_when_saved(svc, enabled, value):
+    from hermes_project_stewardship.persistence.service import ServiceError
+
+    with pytest.raises(ServiceError, match="objective_detail_chars must be an integer from 1 to 4000"):
+        svc.update_settings(enabled, verification_policy={"objective_detail_chars": value})
+    with pytest.raises(ServiceError, match="objective_detail_chars"):
+        svc.enable("other", verification_policy={"objective_detail_chars": value})
+    svc.update_settings(enabled, verification_policy={"objective_detail_chars": 4000})
+    assert svc.settings(enabled)["policies"]["verification"]["objective_detail_chars"] == 4000

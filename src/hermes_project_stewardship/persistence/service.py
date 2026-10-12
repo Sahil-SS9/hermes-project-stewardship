@@ -141,6 +141,7 @@ class StewardshipService:
         actor: str = "system",
         interface: str = "service",
     ) -> Dict[str, Any]:
+        self._check_verification_policy(verification_policy)
         now = iso(self._clock())
         # PM-0102 (fix 1, atomic seeding): the project row is inserted with
         # EMPTY projection fields; normalised membership is seeded and the
@@ -359,6 +360,15 @@ class StewardshipService:
         if not row["enabled"]:
             raise ServiceError(f"stewardship is disabled for project '{project_id}'")
         return row
+
+    @staticmethod
+    def _check_verification_policy(policy: Optional[Dict[str, Any]]) -> None:
+        from ..objectives.evaluators import check_detail_chars
+
+        try:
+            check_detail_chars(policy if isinstance(policy, dict) else None)
+        except ValueError as error:
+            raise ServiceError(str(error)) from None
 
     def _require_known(self, project_id: str) -> sqlite3.Row:
         """Require a configured project without requiring it to be enabled."""
@@ -662,6 +672,7 @@ class StewardshipService:
             changed.append(f"{name}_policy")
 
         merge_policy("autonomy", autonomy_policy)
+        self._check_verification_policy(verification_policy)
         merge_policy("verification", verification_policy)
         merge_policy("release", release_policy)
         if notification_policy is not None:
@@ -1654,7 +1665,7 @@ class StewardshipService:
         evaluating one records no new manual evidence by itself.
         """
         from ..domain.models import Objective as _Objective
-        from ..objectives.evaluators import DEFAULT_EVALUATOR, EvaluationContext
+        from ..objectives.evaluators import DEFAULT_EVALUATOR, EvaluationContext, detail_chars_from
 
         self._require_known(project_id)
         row = self._objective_row(project_id, objective_id)
@@ -1689,6 +1700,7 @@ class StewardshipService:
             allowlist=(DEFAULT_ALLOWLIST if command_allowlist is None
                        else frozenset(command_allowlist)),
             clock=self._clock,
+            detail_chars=detail_chars_from(verification),
         )
         objective = _Objective(**obj)
         if obj["evaluator_type"] == "manual" and objective.id is not None:

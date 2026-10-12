@@ -4,6 +4,30 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Longer command-objective details.** A failed command objective keeps the
+  first 200 characters of its stderr as its detail; a project can raise that
+  to at most 4000 with `verification.objective_detail_chars` (or
+  `stewardctl project enable --objective-detail-chars`); a value outside
+  1..4000 is refused when saved. The default is unchanged.
+
+### Fixed
+- **A crashed counter no longer reads as "0 found".** A command objective
+  that exits non-zero without printing a number used to measure 0, which met
+  a `<=0` target. It now measures nothing (`unknown`, detail `no_measure`), so
+  the cycle fails closed instead of reporting a count it never took.
+  Exit-code objectives (such as `>=1`) still measure 0 and fail as before.
+- **Objective commands are bounded in memory and time.** They were read with
+  `capture_output`, so one printing without end filled memory until the
+  timeout, and only the direct child was killed. A command now runs in its own
+  session under one deadline (60 s by default) and its output is read as it
+  is written. Past 1 MiB on either stream, or at the deadline, its whole
+  process group is killed, including a grandchild that kept a pipe open. A
+  flood records `output_too_large` with an unknown measure, like a timeout;
+  other objectives in the cycle still run.
+
 ## [0.4.0] - 2026-10-11
 
 The Project Stewardship Desktop app becomes the main surface, and every part
