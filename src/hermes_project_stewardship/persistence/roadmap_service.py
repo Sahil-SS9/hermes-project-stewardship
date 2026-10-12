@@ -241,6 +241,10 @@ class RoadmapService:
         settings = self.svc.settings(project_id, include_disabled=True)
         work, unreadable = self._load_work(project_id)
         work = work if work is None else dict(work)
+        # A switched-off level is hidden everywhere, never deleted: the data
+        # comes back exactly when the feature is switched on again.
+        want_initiatives = bool(settings["features"].get("initiatives", True))
+        want_milestones = bool(settings["features"].get("milestones", True))
 
         task_links: Dict[str, List[str]] = {}
         linked_refs = set()
@@ -302,10 +306,10 @@ class RoadmapService:
         milestones_by_initiative: Dict[str, List[Dict[str, Any]]] = {}
         flat_milestones: List[Dict[str, Any]] = []
         today = self._clock().date()
-        for row in cx.execute(
+        milestone_rows = cx.execute(
             "SELECT * FROM dockyard_milestones WHERE project_id=? AND archived_at IS NULL ORDER BY id",
-            (project_id,),
-        ):
+            (project_id,)).fetchall() if want_milestones else []
+        for row in milestone_rows:
             children = objectives_by_milestone.get(int(row["id"]), [])
             state = milestone_state([child["state"] for child in children])
             try:
@@ -323,9 +327,14 @@ class RoadmapService:
             if row["initiative_ref"]:
                 milestones_by_initiative.setdefault(row["initiative_ref"], []).append(entry)
 
+        initiatives_by_ref = {}
+        if want_initiatives:
+            initiatives_by_ref = {i["ref"]: i for i in self.svc.initiatives(project_id)}
+
         initiative_rows = []
-        initiative_refs = set()
-        for ini in self.svc.initiatives(project_id):
+        project_reasons: set = set()
+        initiative_refs: set = set()
+        for ini in initiatives_by_ref.values():
             ref = ini["ref"]
             initiative_refs.add(ref)
             children = milestones_by_initiative.get(ref, [])
@@ -341,11 +350,38 @@ class RoadmapService:
             refs = [task["ref"] for ms in children for obj in ms["objectives"]
                     for goal in obj["goals"] for task in goal["tasks"]]
             refs.extend(item["ref"] for item in loose)
+            delivery = self._delivery(refs, work, unreadable=unreadable)
+
+            # Attention: the 0.4.0 read model raised these codes per initiative
+            # and the project roll-up used them; L4's notifications read them.
+            # Re-expressed for the ladder, and nothing is invented.
+            reasons: List[str] = []
+            if ini["status"] == "pending_approval":
+                reasons.append("pending_approval")
+            if not children:
+                reasons.append("no_milestone_link")
+            for child in children:
+                if child["overdue"]:
+                    reasons.append("milestone_overdue")
+            if delivery.get("state") == "ok" and delivery.get("blocked", 0) > 0:
+                reasons.append("blocked_items")
+            objective_states = [obj["state"] for ms in children for obj in ms["objectives"]]
+            if not objective_states:
+                reasons.append("no_objective_link")
+            for code, state in (("objective_at_risk", "at_risk"),
+                                ("objective_unknown", "unknown")):
+                if state in objective_states:
+                    reasons.append(code)
+            reasons = list(dict.fromkeys(reasons))
+            project_reasons.update(reasons)
+
             initiative_rows.append({
                 "ref": ref, "title": ini["title"], "governance": ini["status"],
+                "approval_state": ini.get("approval_state"),
                 "state": "ready_to_confirm" if ready else ini["status"],
                 "ready_to_confirm": ready, "milestones": children,
-                "delivery": self._delivery(refs, work, unreadable=unreadable),
+                "attention": bool(reasons), "attention_reasons": reasons,
+                "delivery": delivery,
                 "not_placed": {"tasks": loose},
             })
 
@@ -379,6 +415,8 @@ class RoadmapService:
                 "tasks": unplaced_tasks,
             },
             "needs_placing": needs_rows,
+            "attention": bool(project_reasons),
+            "attention_reasons": sorted(project_reasons),
         }
 
     def initiative_state(self, project_id: str, ref: str) -> Dict[str, Any]:
@@ -399,6 +437,18 @@ class RoadmapService:
             raise RoadmapNotFound(f"no such milestone '{milestone_id}'")
         items = [task for objective in milestone["objectives"]
                  for goal in objective["goals"] for task in goal["tasks"]]
+        # Blockers are best effort and never invented: an unreadable dependency
+        # list leaves the field null rather than reading as "nothing blocks this".
+        if project["work_host"] == "ok":
+            for task in items:
+                blockers: Optional[List[str]] = []
+                try:
+                    detail = self.work.detail(project_id, task["ref"]) or {}
+                    blockers = [dep["ref"] for dep in (detail.get("dependencies") or [])
+                                if dep.get("status") != "done"]
+                except Exception:  # noqa: BLE001 - blocker detail is best effort
+                    blockers = None
+                task["blockers"] = blockers
         delivery = milestone["delivery"]
         unavailable = project["work_host"] != "ok"
         return {"state": "ok" if not unavailable else "unavailable",
