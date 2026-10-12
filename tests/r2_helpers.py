@@ -30,6 +30,11 @@ class World:
         self.dy = DockyardService(store, canonical_work=self.work)
         self.roadmap = RoadmapService(
             store, self.svc, self.work, clock=clock)
+        # v42 ladder: the one-parent placement writes, goal checks, needs-placing
+        # queue and human delivery confirmation (Batch L).
+        from hermes_project_stewardship.persistence.ladder_service import LadderService
+        self.ladder = LadderService(
+            store, self.svc, self.work, self.roadmap, clock=clock)
 
     # -- projects -----------------------------------------------------
     def project(self, pid: str) -> str:
@@ -92,14 +97,26 @@ class World:
             pid, title=title, objective_ids=list(objective_ids),
             actor="owner", interface="test")["goal_id"]
 
-    # -- links --------------------------------------------------------
-    def link_milestone(self, pid, ref, milestone_id, relationship="delivers"):
-        return self.roadmap.link_initiative_milestone(
-            pid, ref, milestone_id, relationship, actor="owner")
+    # -- links (v42 delivery ladder: one parent per level) -------------------
+    # The 0.4.0 link tables (initiative_milestones, project_objective_deliveries,
+    # project_objective_goals) are history only. Placement is one set-parent call
+    # per level; a parent_id of None unplaces the item.
+    def place_task(self, pid, item_ref, goal_id):
+        return self.ladder.set_task_goal(pid, item_ref, goal_id, actor="owner")
 
-    def link_objective(self, pid, objective_id, ref, relationship="supports"):
-        return self.roadmap.link_objective_initiative(
-            pid, objective_id, ref, relationship, actor="owner")
+    def place_goal(self, pid, goal_id, objective_id):
+        return self.ladder.set_goal_objective(pid, goal_id, objective_id, actor="owner")
+
+    def place_objective(self, pid, objective_id, milestone_id):
+        return self.ladder.set_objective_milestone(
+            pid, objective_id, milestone_id, actor="owner")
+
+    def place_milestone(self, pid, milestone_id, initiative_ref):
+        return self.ladder.set_milestone_initiative(
+            pid, milestone_id, initiative_ref, actor="owner")
+
+    def confirm(self, pid, ref):
+        return self.ladder.confirm_delivered(pid, ref, actor="owner")
 
     # -- read-model navigation ---------------------------------------
     def outline(self, pid: str):

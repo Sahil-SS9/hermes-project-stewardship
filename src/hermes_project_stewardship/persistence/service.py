@@ -1005,14 +1005,7 @@ class StewardshipService:
         return row
 
     def _goal_dict(self, row: sqlite3.Row) -> Dict[str, Any]:
-        objective_ids = [
-            int(link["objective_id"])
-            for link in self.store._conn.execute(
-                "SELECT objective_id FROM project_objective_goals WHERE goal_id=?"
-                " ORDER BY objective_id",
-                (row["goal_id"],),
-            ).fetchall()
-        ]
+        objective_id = row["objective_id"]
         return {
             "goal_id": row["goal_id"],
             "project_id": row["project_id"],
@@ -1022,7 +1015,10 @@ class StewardshipService:
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
             "archived_at": row["archived_at"],
-            "objective_ids": objective_ids,
+            "objective_id": objective_id,
+            # Transitional response alias for 0.4 Desktop callers. It is
+            # derived from the v42 parent column; the old link table is never read.
+            "objective_ids": [] if objective_id is None else [int(objective_id)],
         }
 
     @staticmethod
@@ -1038,38 +1034,33 @@ class StewardshipService:
         return clean_title, clean_description, int(position)
 
     @staticmethod
-    def _replace_goal_links_in_tx(
+    def _goal_parent_in_tx(
         cx: sqlite3.Connection,
         project_id: str,
-        goal_id: str,
         objective_ids: Sequence[int],
-    ) -> None:
+    ) -> Optional[int]:
+        """Validate the transitional create/update input against the v42 parent.
+
+        ``objective_ids`` remains accepted until the API phase so 0.4 clients get
+        a deterministic conflict rather than a server error. The v42 model only
+        stores zero or one parent and never writes the legacy link table.
+        """
         requested = list(dict.fromkeys(int(value) for value in objective_ids))
-        if requested:
-            placeholders = ",".join("?" for _ in requested)
-            rows = cx.execute(
-                f"SELECT id FROM project_objectives WHERE project_id=? AND id IN ({placeholders})",
-                (project_id, *requested),
-            ).fetchall()
-            found = {int(row["id"]) for row in rows}
-            missing = sorted(set(requested) - found)
-            if missing:
-                raise ServiceError(f"unknown project objective ids: {missing}")
-            conflicts = cx.execute(
-                f"SELECT objective_id, goal_id FROM project_objective_goals "
-                f"WHERE objective_id IN ({placeholders}) AND goal_id != ?",
-                (*requested, goal_id),
-            ).fetchall()
-            if conflicts:
-                raise ServiceError(
-                    f"objective {conflicts[0]['objective_id']} is linked to another goal"
-                )
-        cx.execute("DELETE FROM project_objective_goals WHERE goal_id=?", (goal_id,))
-        for objective_id in requested:
-            cx.execute(
-                "INSERT INTO project_objective_goals(objective_id, goal_id) VALUES(?,?)",
-                (objective_id, goal_id),
-            )
+        if len(requested) > 1:
+            raise ServiceError("a goal can have at most one objective parent")
+        if not requested:
+            return None
+        row = cx.execute(
+            "SELECT project_id,enabled FROM project_objectives WHERE id=?",
+            (requested[0],),
+        ).fetchone()
+        if row is None:
+            raise ServiceError(f"unknown project objective ids: {requested}")
+        if row["project_id"] != project_id:
+            raise ServiceError("cross-project objective parent refused")
+        if not row["enabled"]:
+            raise ServiceError("objective parent is archived")
+        return requested[0]
 
     def create_goal(
         self,
@@ -1096,22 +1087,25 @@ class StewardshipService:
         now = iso(self._clock())
         goal_id = f"GOAL-{uuid.uuid4().hex[:16].upper()}"
         with self.store.tx() as cx:
+            objective_id = self._goal_parent_in_tx(cx, project_id, objective_ids)
             cx.execute(
                 "INSERT INTO project_goals(goal_id, project_id, title, description,"
-                " position, created_at, updated_at) VALUES(?,?,?,?,?,?,?)",
-                (goal_id, project_id, clean_title, clean_description, clean_position, now, now),
+                " position, created_at, updated_at, objective_id) VALUES(?,?,?,?,?,?,?,?)",
+                (goal_id, project_id, clean_title, clean_description, clean_position,
+                 now, now, objective_id),
             )
-            self._replace_goal_links_in_tx(cx, project_id, goal_id, objective_ids)
             # R2: every active goal carries a contract row from birth.
             cx.execute(
                 "INSERT INTO project_goal_contracts(goal_id, outcome, status, updated_at)"
                 " VALUES(?,?,'active',?)",
                 (goal_id, clean_title, now),
             )
-        self.store.audit(
-            actor=actor, interface=interface, action="goal.created", subject=goal_id,
-            detail={"project_id": project_id, "objective_ids": list(objective_ids)},
-        )
+            cx.execute(
+                "INSERT INTO stewardship_audit_log(ts,actor,interface,action,subject,detail_json)"
+                " VALUES(?,?,?,?,?,?)",
+                (now, actor, interface, "goal.created", goal_id,
+                 self.store._j({"project_id": project_id, "objective_id": objective_id})),
+            )
         return self._goal_dict(self._goal_row(project_id, goal_id))
 
     def update_goal(
@@ -1132,17 +1126,24 @@ class StewardshipService:
             existing["description"] if description is None else description,
             existing["position"] if position is None else position,
         )
+        now = iso(self._clock())
         with self.store.tx() as cx:
-            cx.execute(
-                "UPDATE project_goals SET title=?, description=?, position=?, updated_at=?"
-                " WHERE project_id=? AND goal_id=?",
-                (clean_title, clean_description, clean_position, iso(self._clock()), project_id, goal_id),
-            )
+            objective_id = existing["objective_id"]
             if objective_ids is not None:
-                self._replace_goal_links_in_tx(cx, project_id, goal_id, objective_ids)
-        self.store.audit(
-            actor=actor, interface=interface, action="goal.updated", subject=goal_id,
-        )
+                objective_id = self._goal_parent_in_tx(cx, project_id, objective_ids)
+            cx.execute(
+                "UPDATE project_goals SET title=?, description=?, position=?,"
+                " objective_id=?, updated_at=? WHERE project_id=? AND goal_id=?",
+                (clean_title, clean_description, clean_position, objective_id,
+                 now, project_id, goal_id),
+            )
+            cx.execute(
+                "INSERT INTO stewardship_audit_log(ts,actor,interface,action,subject,detail_json)"
+                " VALUES(?,?,?,?,?,?)",
+                (now, actor, interface, "goal.updated", goal_id,
+                 self.store._j({"project_id": project_id,
+                                "objective_id": objective_id})),
+            )
         return self._goal_dict(self._goal_row(project_id, goal_id))
 
     def goals(self, project_id: str, *, include_archived: bool = False) -> List[Dict[str, Any]]:
