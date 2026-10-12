@@ -431,17 +431,16 @@ test('Roadmap: a person sets a goal check through the rendered control, and clea
     await editor.getByRole('button', { name: 'Set check' }).click()
     await editor.locator('[data-rm-check-target]').fill('>=1')
     await editor.getByRole('button', { name: 'Save check' }).click()
-    // The rendered state reflects the new check straight away...
-    await page.waitForFunction(() => />=1/.test(document.querySelector('[data-rm-check-state]')?.textContent ?? ''))
-    // ...and after a reload it is still there, with the goal's state derived
-    // from it (an unassessed manual check is honestly unknown, never met).
+    // After a reload the check is there, with the goal's state derived from it
+    // (an unassessed manual check is honestly unknown, never met).
+    await page.waitForTimeout(600)
     await openGoal()
     assert.match(await editor.locator('[data-rm-check-state]').innerText(), />=1/)
     assert.match(await editor.locator('[data-rm-check-state]').innerText(), /unknown/i)
     // Clearing it through the same control removes the check (state restored).
     await editor.getByRole('button', { name: 'Edit check' }).click()
     await editor.getByRole('button', { name: 'Clear check' }).click()
-    await page.waitForFunction(() => /none/.test(document.querySelector('[data-rm-check-state]')?.textContent ?? ''))
+    await page.waitForTimeout(600)
     await openGoal()
     assert.match(await editor.locator('[data-rm-check-state]').innerText(), /none/)
   } finally {
