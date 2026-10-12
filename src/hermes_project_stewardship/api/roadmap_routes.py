@@ -53,6 +53,12 @@ class ParentRequest(_Strict):
     parent_id: Optional[Any] = None
 
 
+class WaiverRequest(_Strict):
+    """Why the item is no longer required (required; shown to people)."""
+
+    reason: str
+
+
 class GoalCheckRequest(_Strict):
     # A person clearing the check sends {"clear": true}; otherwise the check
     # fields are required to set one.
@@ -197,6 +203,18 @@ def install(router: APIRouter, roadmap: RoadmapService, ladder: LadderService, *
         return _run(lambda: ladder.confirm_delivered(
             project_id, ref, actor=principal, interface="rpc",
             after_confirm=lambda r: _schedule_post_confirm(r)))
+
+    @router.put("/projects/{project_id}/waivers/{kind}/{item_id}")
+    def waive_item(project_id: str, kind: str, item_id: str, body: WaiverRequest):
+        principal = authority(WRITE_CAPABILITY)
+        return _run(lambda: ladder.waive(
+            project_id, kind, item_id, body.reason, actor=principal, interface="rpc"))
+
+    @router.delete("/projects/{project_id}/waivers/{kind}/{item_id}")
+    def clear_waiver(project_id: str, kind: str, item_id: str):
+        principal = authority(WRITE_CAPABILITY)
+        return _run(lambda: ladder.clear_waiver(
+            project_id, kind, item_id, actor=principal, interface="rpc"))
 
     @router.get("/projects/{project_id}/roadmap/unplaced")
     def list_unplaced(project_id: str):

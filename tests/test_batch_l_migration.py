@@ -22,7 +22,11 @@ from hermes_project_stewardship.persistence import migrations, store as store_mo
 from hermes_project_stewardship.persistence.store import NewerSchemaError, Store
 
 L_NAME = "delivery ladder: one-parent chain task-goal-objective-milestone-initiative"
-NEW_TABLES = ("goal_tasks", "goal_checks", "goal_check_evaluations", "roadmap_unplaced")
+WAIVER_NAME = "ladder waivers: a person marks an item no longer required"
+NEW_TABLES = (
+    "goal_tasks", "goal_checks", "goal_check_evaluations", "roadmap_unplaced",
+    "ladder_waivers",
+)
 NEW_INDEXES = (
     "idx_project_goals_objective",
     "idx_project_objectives_milestone",
@@ -44,6 +48,17 @@ def _l():
     matches = [m for m in migrations.MIGRATIONS if m.name == L_NAME]
     assert len(matches) == 1, "exactly one Batch L migration must exist"
     return matches[0]
+
+
+def _lane(name):
+    """The Batch L migration with this name (looked up by NAME, never version)."""
+    matches = [m for m in migrations.MIGRATIONS if m.name == name]
+    assert len(matches) == 1, f"exactly one migration named {name!r}"
+    return matches[0]
+
+
+def _latest():
+    return [m for m in migrations.MIGRATIONS if m.version > 41][-1]
 
 
 def _store_without_l(path, monkeypatch):
@@ -152,7 +167,10 @@ def _seed_legacy(cx):
 def test_migration_is_registered_exactly_once_and_is_latest():
     versions = [m.version for m in migrations.MIGRATIONS if m.name == L_NAME]
     assert versions == [42]
-    assert migrations.SCHEMA_VERSION == 42
+    # A waiver lane follows it; both must be the newest and registered once.
+    waivers = [m.version for m in migrations.MIGRATIONS if m.name == WAIVER_NAME]
+    assert waivers == [43]
+    assert migrations.SCHEMA_VERSION == 43
     assert migrations.SCHEMA_VERSION == max(m.version for m in migrations.MIGRATIONS)
 
 
@@ -432,20 +450,23 @@ def test_downgrade_restores_v41_content_byte_for_byte(tmp_path, monkeypatch):
     _seed_legacy(pre._conn)
     before = _content_snapshot(pre._conn)
     pre.close()
-    lane = _l()
-    store = Store(tmp_path / "pre.db")   # upgrades to v42
+    lanes = [m for m in migrations.MIGRATIONS if m.version > 41]
+    top = _latest()
+    store = Store(tmp_path / "pre.db")   # upgrades to the latest
     try:
-        assert store.schema_version == 42
+        assert store.schema_version == top.version
     finally:
         store.close()
     # Downgrade back to v41 content: drop the new columns/tables via the
-    # downgrade SQL, then compare every old-table row.
+    # downgrade SQL in reverse order, then compare every old-table row.
     store = Store(tmp_path / "pre.db")
     try:
-        store._conn.executescript(lane.downgrade_sql)
+        for lane in reversed(lanes):
+            store._conn.executescript(lane.downgrade_sql)
         # A direct migration downgrade must also move the ledger back to v41;
         # Store's forward migrator normally owns ledger writes.
-        store._conn.execute("DELETE FROM schema_migrations WHERE version=42")
+        store._conn.execute(
+            f"DELETE FROM schema_migrations WHERE version>{41}")
         after = _content_snapshot(store._conn, exclude=set(NEW_TABLES))
         # Old link tables + all pre-existing tables are unchanged.
         assert after == before
@@ -456,39 +477,42 @@ def test_downgrade_restores_v41_content_byte_for_byte(tmp_path, monkeypatch):
         store.close()
 
 
-def test_v41_v42_v41_v42_roundtrip_is_lossless(tmp_path, monkeypatch):
+def test_v41_to_latest_back_to_v41_and_again_is_lossless(tmp_path, monkeypatch):
     pre = _store_without_l(tmp_path / "pre.db", monkeypatch)
     _seed_legacy(pre._conn)
-    v42_snapshot_after_first = None
+    top_snapshot_after_first = None
     pre.close()
-    lane = _l()
+    lanes = [m for m in migrations.MIGRATIONS if m.version > 41]
+    top = _latest()
 
-    store = Store(tmp_path / "pre.db")  # v41 -> v42
+    store = Store(tmp_path / "pre.db")  # v41 -> latest
     try:
-        assert store.schema_version == 42
-        v42_snapshot_after_first = _content_snapshot(store._conn)
+        assert store.schema_version == top.version
+        top_snapshot_after_first = _content_snapshot(store._conn)
     finally:
         store.close()
 
     store = Store(tmp_path / "pre.db")
-    store._conn.executescript(lane.downgrade_sql)  # v42 -> v41
+    for lane in reversed(lanes):
+        store._conn.executescript(lane.downgrade_sql)  # latest -> v41
     # Mirror the migration runner's ledger transition for this direct SQL proof.
-    store._conn.execute("DELETE FROM schema_migrations WHERE version=42")
+    store._conn.execute(f"DELETE FROM schema_migrations WHERE version>{41}")
     store.close()
 
-    store = Store(tmp_path / "pre.db")  # v41 -> v42 again
+    store = Store(tmp_path / "pre.db")  # v41 -> latest again
     try:
-        assert store.schema_version == 42
-        assert _content_snapshot(store._conn) == v42_snapshot_after_first
+        assert store.schema_version == top.version
+        assert _content_snapshot(store._conn) == top_snapshot_after_first
     finally:
         store.close()
 
 
-def test_v040_code_refuses_a_v42_database(tmp_path, monkeypatch):
-    """0.4.0 (SCHEMA_VERSION 41) refuses a v42 DB with NewerSchemaError."""
-    store = Store(tmp_path / "v42.db")   # builds at v42
+def test_v040_code_refuses_a_latest_database(tmp_path, monkeypatch):
+    """0.4.0 (SCHEMA_VERSION 41) refuses a newer DB with NewerSchemaError."""
+    top = _latest()
+    store = Store(tmp_path / "v42.db")   # builds at the latest
     try:
-        assert store.schema_version == 42
+        assert store.schema_version == top.version
     finally:
         store.close()
     # Simulate the 0.4.0 binary: its MIGRATIONS top out at 41.

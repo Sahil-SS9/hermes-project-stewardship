@@ -105,6 +105,93 @@ class LadderService:
         return {"project_id": project_id, "kind": "task", "item_id": item_ref,
                 "parent_id": parent_id}
 
+    # -- waivers: a person takes an item out of the requirement -------------
+    #
+    # A waiver is not a deletion and not a completion: the item keeps its
+    # history, stays on the roadmap marked "no longer required", and stops
+    # blocking its parent, which counts it as satisfied. Clearing it puts the
+    # item back exactly as it was.
+
+    WAIVABLE = ("task", "goal", "objective", "milestone")
+
+    def _waiver_target(self, project_id: str, kind: str, item_id: str) -> None:
+        """The item must exist, in this project, at that level."""
+        if kind not in self.WAIVABLE:
+            raise RoadmapConflict(f"'{kind}' cannot be marked no longer required")
+        cx = self.store._conn
+        if kind == "task":
+            try:
+                item = self.work.get(project_id, item_id)
+            except Exception as exc:  # a host failure cannot authorise a write
+                raise RoadmapConflict("task host is unavailable; waiver refused") from exc
+            if item is None:
+                raise RoadmapNotFound(f"no such task '{item_id}' in project '{project_id}'")
+            return
+        table, column = {
+            "goal": ("project_goals", "goal_id"),
+            "objective": ("project_objectives", "id"),
+            "milestone": ("dockyard_milestones", "id"),
+        }[kind]
+        value = item_id
+        if kind != "goal":
+            try:
+                value = int(item_id)
+            except (TypeError, ValueError):
+                raise RoadmapNotFound(f"no such {kind} '{item_id}'") from None
+        row = cx.execute(
+            f"SELECT project_id FROM {table} WHERE {column}=?", (value,)
+        ).fetchone()
+        if row is None:
+            raise RoadmapNotFound(f"no such {kind} '{item_id}'")
+        if row["project_id"] != project_id:
+            raise RoadmapConflict("cross-project waiver refused")
+
+    def waive(self, project_id: str, kind: str, item_id: str, reason: str, *,
+              actor: str, interface: str = "service") -> Dict[str, Any]:
+        self._known_project(project_id)
+        self._waiver_target(project_id, kind, item_id)
+        text = (reason or "").strip()
+        if len(text) < 4:
+            raise RoadmapConflict("a reason is required to mark an item no longer required")
+        now = iso(self._clock())
+        with self.store.tx() as cx:
+            cx.execute(
+                "INSERT INTO ladder_waivers(project_id,kind,item_id,reason,waived_by,"
+                "waived_at,cleared_by,cleared_at) VALUES(?,?,?,?,?,?,NULL,NULL)"
+                " ON CONFLICT(project_id,kind,item_id) DO UPDATE SET"
+                " reason=excluded.reason, waived_by=excluded.waived_by,"
+                " waived_at=excluded.waived_at, cleared_by=NULL, cleared_at=NULL",
+                (project_id, kind, str(item_id), text, actor, now),
+            )
+            self._audit(
+                cx, actor=actor, interface=interface, action="ladder.waived",
+                subject=str(item_id),
+                detail={"project_id": project_id, "kind": kind,
+                        "item_id": str(item_id), "reason": text},
+            )
+        return {"project_id": project_id, "kind": kind, "item_id": str(item_id),
+                "waived": True, "reason": text}
+
+    def clear_waiver(self, project_id: str, kind: str, item_id: str, *,
+                     actor: str, interface: str = "service") -> Dict[str, Any]:
+        self._known_project(project_id)
+        now = iso(self._clock())
+        with self.store.tx() as cx:
+            removed = cx.execute(
+                "UPDATE ladder_waivers SET cleared_by=?,cleared_at=?"
+                " WHERE project_id=? AND kind=? AND item_id=? AND cleared_at IS NULL",
+                (actor, now, project_id, kind, str(item_id)),
+            ).rowcount
+            if not removed:
+                raise RoadmapNotFound("that item is not marked no longer required")
+            self._audit(
+                cx, actor=actor, interface=interface, action="ladder.waiver.cleared",
+                subject=str(item_id),
+                detail={"project_id": project_id, "kind": kind, "item_id": str(item_id)},
+            )
+        return {"project_id": project_id, "kind": kind, "item_id": str(item_id),
+                "waived": False}
+
     def set_goal_objective(self, project_id: str, goal_id: str,
                            parent_id: Optional[int], *, actor: str,
                            interface: str = "service") -> Dict[str, Any]:

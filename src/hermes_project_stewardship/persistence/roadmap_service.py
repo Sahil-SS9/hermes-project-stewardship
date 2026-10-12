@@ -10,7 +10,13 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from ..kanban.host_adapter import MISSING_LINK_CODES, KanbanAdapterError
-from .ladder_state import goal_state, initiative_ready, milestone_state, objective_state
+from .ladder_state import (
+    WAIVED,
+    goal_state,
+    initiative_ready,
+    milestone_state,
+    objective_state,
+)
 from .service import ServiceError, StewardshipService
 from .store import Store, iso
 
@@ -241,6 +247,19 @@ class RoadmapService:
         settings = self.svc.settings(project_id, include_disabled=True)
         work, unreadable = self._load_work(project_id)
         work = work if work is None else dict(work)
+        # A waived item ("no longer required") stays visible but stops blocking
+        # its parent, which counts it as satisfied. See ladder_waivers (v43).
+        waivers: Dict[str, Dict[str, Any]] = {}
+        for row in cx.execute(
+            "SELECT kind,item_id,reason,waived_by,waived_at FROM ladder_waivers"
+            " WHERE project_id=? AND cleared_at IS NULL",
+            (project_id,),
+        ):
+            waivers.setdefault(str(row["kind"]), {})[str(row["item_id"])] = {
+                "reason": row["reason"], "by": row["waived_by"], "at": row["waived_at"]}
+
+        def _waived(kind: str, item_id: Any) -> Optional[Dict[str, Any]]:
+            return waivers.get(kind, {}).get(str(item_id))
         # A switched-off level is hidden everywhere, never deleted: the data
         # comes back exactly when the feature is switched on again.
         want_initiatives = bool(settings["features"].get("initiatives", True))
@@ -271,14 +290,24 @@ class RoadmapService:
                 for ref in refs:
                     item = work.get(ref)
                     bucket = bucket_for(item["status"]) if item is not None else "unknown"
-                    buckets.append(bucket)
+                    task_waived = _waived("task", ref)
+                    # A waived task is out of the requirement: it counts as
+                    # satisfied in the fold (WAIVED) and still shows, marked.
+                    buckets.append(WAIVED if task_waived is not None else bucket)
                     tasks.append({"ref": ref, "title": (item or {}).get("title") or ref,
-                                  "status": (item or {}).get("status"), "bucket": bucket})
+                                  "status": (item or {}).get("status"), "bucket": bucket,
+                                  "waived": task_waived})
             check = self._goal_check(gid)
-            state = goal_state(buckets, None if check["state"] == "no_check" else check["state"])
+            goal_waived = _waived("goal", gid)
+            state = goal_state(
+                buckets,
+                None if check["state"] == "no_check" else check["state"],
+                waived=goal_waived is not None,
+            )
             entry = {"id": gid, "title": row["title"], "description": row["description"],
                      "state": state, "check": check, "tasks": tasks,
                      "task_count": len(refs), "objective_id": row["objective_id"],
+                     "waived": goal_waived,
                      "delivery": self._delivery(refs, work, unreadable=unreadable)}
             flat_goals.append(entry)
             if row["objective_id"] is not None:
@@ -293,12 +322,15 @@ class RoadmapService:
             raw = dict(row)
             children = goals_by_objective.get(int(row["id"]), [])
             check = self._objective_check(project_id, raw)
+            objective_waived = _waived("objective", int(row["id"]))
             state = objective_state(
                 [child["state"] for child in children],
                 None if check["state"] == "not_applicable" else check["state"],
+                waived=objective_waived is not None,
             )
             entry = {"id": int(row["id"]), "name": row["name"], "state": state,
-                     "check": check, "goals": children, "milestone_id": row["milestone_id"]}
+                     "check": check, "goals": children, "milestone_id": row["milestone_id"],
+                     "waived": objective_waived}
             flat_objectives.append(entry)
             if row["milestone_id"] is not None:
                 objectives_by_milestone.setdefault(int(row["milestone_id"]), []).append(entry)
@@ -311,7 +343,11 @@ class RoadmapService:
             (project_id,)).fetchall() if want_milestones else []
         for row in milestone_rows:
             children = objectives_by_milestone.get(int(row["id"]), [])
-            state = milestone_state([child["state"] for child in children])
+            milestone_waived = _waived("milestone", int(row["id"]))
+            state = milestone_state(
+                [child["state"] for child in children],
+                waived=milestone_waived is not None,
+            )
             try:
                 overdue = bool(row["due"] and not row["closed_at"]
                                and date.fromisoformat(str(row["due"])[:10]) < today)
@@ -322,6 +358,7 @@ class RoadmapService:
             entry = {"id": int(row["id"]), "name": row["name"], "state": state,
                      "due": row["due"], "overdue": overdue, "closed": bool(row["closed_at"]),
                      "initiative_ref": row["initiative_ref"], "objectives": children,
+                     "waived": milestone_waived,
                      "delivery": self._delivery(refs, work, unreadable=unreadable)}
             flat_milestones.append(entry)
             if row["initiative_ref"]:

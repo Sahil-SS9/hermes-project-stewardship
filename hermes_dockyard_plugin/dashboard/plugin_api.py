@@ -2040,6 +2040,12 @@ class RoadmapParentBody(BaseModel):
     parent_id: str | int | None = None
 
 
+class RoadmapWaiverBody(BaseModel):
+    """Why the item is no longer required."""
+
+    reason: str
+
+
 class RoadmapGoalCheckBody(BaseModel):
     # A person clearing the check sends {"clear": true}; otherwise the check
     # fields are the ones being set. Unknown fields are still refused.
@@ -2122,6 +2128,24 @@ async def roadmap_dismiss_unplaced(project_id: str, row_id: int) -> dict:
         "POST",
         f"/stewardship/v1/projects/{quote(project_id, safe='')}/roadmap/unplaced/{row_id}/dismiss",
         {},
+    )
+
+
+@plugin_api.put("/projects/{project_id}/waivers/{kind}/{item_id}")
+async def roadmap_waive_item(project_id: str, kind: str, item_id: str,
+                             body: RoadmapWaiverBody) -> dict:
+    return await _proxy(
+        "PUT",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/waivers/{quote(kind, safe='')}/{quote(item_id, safe='')}",
+        {"reason": body.reason},
+    )
+
+
+@plugin_api.delete("/projects/{project_id}/waivers/{kind}/{item_id}")
+async def roadmap_clear_waiver(project_id: str, kind: str, item_id: str) -> dict:
+    return await _proxy(
+        "DELETE",
+        f"/stewardship/v1/projects/{quote(project_id, safe='')}/waivers/{quote(kind, safe='')}/{quote(item_id, safe='')}",
     )
 
 

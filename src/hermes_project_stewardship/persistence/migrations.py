@@ -15,8 +15,8 @@ from typing import List
 # Never edit a released migration (v1-v17 shipped in v0.3.0); fix forward
 # with a new version instead. Batch R2 owns v35. Batch E owns v36. Checks
 # round 1: project memory v38, chat links v39, Discord alerts v40. Archive
-# follow-up (11/10): v41. Batch L (delivery ladder): v42.
-SCHEMA_VERSION = 42
+# follow-up (11/10): v41. Batch L (delivery ladder): v42; waivers: v43.
+SCHEMA_VERSION = 43
 
 
 @dataclass(frozen=True)
@@ -2061,5 +2061,37 @@ MIGRATIONS.append(Migration(
         ALTER TABLE dockyard_milestones DROP COLUMN initiative_ref;
         ALTER TABLE project_objectives DROP COLUMN milestone_id;
         ALTER TABLE project_goals DROP COLUMN objective_id;
+        """,
+))
+
+
+# v43 (Batch L, owner decision 12/10/2026: waivers — "no longer required").
+# A person may remove a child from a requirement without deleting it: the child
+# keeps its history, stays visible on the roadmap, and stops blocking its
+# parent, which counts it as satisfied. One live waiver per item per project;
+# clearing a waiver restores the item to the chain exactly as it was. The
+# reason is required and the action is audited, so a waived branch always names
+# the person and their words.
+MIGRATIONS.append(Migration(
+    version=43,
+    name="ladder waivers: a person marks an item no longer required",
+    upgrade_sql="""
+        CREATE TABLE IF NOT EXISTS ladder_waivers (
+            project_id TEXT NOT NULL,
+            kind       TEXT NOT NULL CHECK (kind IN ('task','goal','objective','milestone')),
+            item_id    TEXT NOT NULL,
+            reason     TEXT NOT NULL,
+            waived_by  TEXT NOT NULL,
+            waived_at  TEXT NOT NULL,
+            cleared_by TEXT,
+            cleared_at TEXT,
+            PRIMARY KEY (project_id, kind, item_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_ladder_waivers_live
+            ON ladder_waivers(project_id, kind) WHERE cleared_at IS NULL;
+        """,
+    downgrade_sql="""
+        DROP INDEX IF EXISTS idx_ladder_waivers_live;
+        DROP TABLE IF EXISTS ladder_waivers;
         """,
 ))
