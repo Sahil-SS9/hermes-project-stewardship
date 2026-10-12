@@ -36,6 +36,12 @@ A Builder-level steward reads issues/PRs. An attacker embeds:
    and structurally cannot authorise mutations.
 4. **Level gate** — levels ≥ 3 require explicit `untrusted_content_ack` +
    `runtime_allowlist_confirmed`; shipped disabled by default.
+5. **Framed tool answers** — every agent tool answer, refusals included,
+   passes through `frame_untrusted()`: each string has ANSI escapes, control
+   characters and bidi overrides stripped and is cut to 4000 characters, and
+   the answer carries `untrusted_evidence: true` plus a fixed
+   `untrusted_note` saying its strings are data, not instructions. The tool
+   descriptions say the same.
 
 Residual risk: scanner evasion. Accepted because defence-in-depth (1)+(3)+(4)
 do not depend on detection quality.
