@@ -202,17 +202,34 @@ def test_place_and_unplace_a_milestone_roundtrip_and_status_codes(env):
     assert gone.status_code == 200 and gone.json()["parent_id"] is None
     row = c.get(f"{V1}/roadmap", params={"project_id": "alpha"}).json()["projects"][0]
     assert [m["id"] for m in row["not_placed"]["milestones"]] == [mid]
+    # A closed initiative is refused as a parent (choose an active one).
+    dead = world.initiative("alpha", "Dead", status="rejected")
+    assert c.put(url, json={"parent_id": dead}).status_code == 409
+    # Re-placing under the live initiative works and is audited under the caller.
+    assert c.put(url, json={"parent_id": ini}).json()["parent_id"] == ini
+    placed_rows = _audit(store, "roadmap.parent.set")
+    assert placed_rows and placed_rows[0]["actor"] == "sahil"
 
 
 def test_place_and_unplace_an_objective_roundtrip_and_status_codes(env):
     """Was test_objective_link_roundtrip_and_refusals."""
-    c, world, _ = env
+    c, world, store = env
     _ini, mid, oid, _gid = _seed(world)
     url = f"{V1}/projects/alpha/objectives/{oid}/milestone"
     assert c.put(url, json={"parent_id": mid}).json()["parent_id"] == mid
     assert c.put(url, json={"parent_id": 9999}).status_code == 404
     assert c.delete(url).status_code == 405      # unplacing is a PUT with null
     assert c.put(url, json={"parent_id": None}).json()["parent_id"] is None
+    # A cross-project milestone parent is refused; an unknown objective is 404.
+    beta_ms = world.milestone("beta", "Elsewhere")
+    assert c.put(url, json={"parent_id": beta_ms}).status_code in (404, 409)
+    assert c.put(f"{V1}/projects/alpha/objectives/9999/milestone",
+                 json={"parent_id": mid}).status_code == 404
+    # After the roundtrip the stored parent is null and one audit trail exists.
+    assert store._conn.execute(
+        "SELECT milestone_id FROM project_objectives WHERE id=?", (oid,)
+    ).fetchone()[0] is None
+    assert store.audit_tail(200)
 
 
 def test_placement_refusals_cross_project_unknown_and_archived(env):
@@ -252,6 +269,15 @@ def test_feature_off_refuses_placement_routes_with_the_existing_error(env):
     gid = world.goal("alpha", "Another")
     assert c.put(f"{V1}/projects/alpha/goals/{gid}/objective",
                  json={"parent_id": oid}).status_code == 200
+    # Turning initiatives off refuses the goal placement too (it touches
+    # initiatives), and the milestone route is still refused.
+    world.svc.update_features("alpha", {"initiatives": False}, actor="o", interface="t")
+    assert c.put(f"{V1}/projects/alpha/goals/{gid}/objective",
+                 json={"parent_id": None}).json()["error"]["fields"]["feature"] == "initiatives"
+    # Nothing was placed while a feature was off.
+    assert store._conn.execute(
+        "SELECT initiative_ref FROM dockyard_milestones WHERE id=?", (mid,)
+    ).fetchone()[0] is None
 
 
 def test_a_payload_actor_is_never_accepted_or_trusted(env):
@@ -311,6 +337,14 @@ def test_writes_are_refused_like_the_goal_routes(store, clock, kind):
     assert store._conn.execute(
         "SELECT verification FROM project_goal_contracts WHERE goal_id=?", (gid,)
     ).fetchone()[0] == ""
+    # Not one of the refused writes left a placement behind, at any level.
+    assert store._conn.execute(
+        "SELECT milestone_id FROM project_objectives WHERE id=?", (oid,)
+    ).fetchone()[0] is None
+    assert store._conn.execute(
+        "SELECT objective_id FROM project_goals WHERE goal_id=?", (gid,)
+    ).fetchone()[0] is None
+    assert store._conn.execute("SELECT COUNT(*) FROM goal_tasks").fetchone()[0] == 0
 
 
 def test_reads_do_not_need_a_capability(store, clock):
@@ -434,6 +468,16 @@ def test_every_ladder_route_works_through_the_proxy(proxy):
                  json={"parent_id": None}).status_code == 200
     assert c.put(f"/api/projects/alpha/milestones/{mid}/initiative",
                  json={"parent_id": None}).status_code == 200
+    # The unplaced list is reachable through the proxy and starts empty.
+    unplaced = c.get(f"/api/projects/alpha/roadmap/unplaced")
+    assert unplaced.status_code == 200 and unplaced.json()["unplaced"] == []
+    # A goal check round-trips through the proxy, and the assessment binds the
+    # server's principal (never a caller-supplied actor).
+    assert c.put(f"/api/projects/alpha/goals/{gid}/check",
+                 json={"evaluator_type": "manual", "target": ">=1"}).status_code == 200
+    assessed = c.post(f"/api/projects/alpha/goals/{gid}/assessment",
+                       json={"passed": True, "evidence": ["ticket:1"]})
+    assert assessed.status_code == 200 and assessed.json()["evidence"]["state"] == "passed"
 
 
 def test_proxy_forwards_refusals_unchanged_and_blocks_cross_project(proxy):
@@ -447,6 +491,10 @@ def test_proxy_forwards_refusals_unchanged_and_blocks_cross_project(proxy):
     world.svc.update_features("alpha", {"milestones": False}, actor="o", interface="t")
     off = c.put(f"/api/projects/alpha/milestones/{mid}/initiative", json={"parent_id": ini})
     assert off.status_code == 409
+    # The cross-project / feature-off placements wrote nothing.
+    assert store._conn.execute(
+        "SELECT initiative_ref FROM dockyard_milestones WHERE id=?", (mid,)
+    ).fetchone()[0] is None
 
 
 def test_proxy_never_lets_the_caller_name_the_actor(proxy):

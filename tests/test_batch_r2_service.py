@@ -58,10 +58,15 @@ def test_place_milestone_roundtrip_and_returns_the_placement(world, store):
     assert placed["kind"] == "milestone" and placed["item_id"] == str(mid)
     assert placed["parent_id"] == ini
     assert _parent(store, "dockyard_milestones", "initiative_ref", "id", mid) == ini
+    # The old 0.4.0 link table is never written by a v42 placement.
+    assert _count(store, "initiative_milestones") == 0
     # Unplacing is a placement of null: the milestone becomes "Not placed yet".
     removed = world.place_milestone("alpha", mid, None)
     assert removed["parent_id"] is None
     assert _parent(store, "dockyard_milestones", "initiative_ref", "id", mid) is None
+    # Re-placing is idempotent in effect: one parent, audited each time.
+    world.place_milestone("alpha", mid, ini)
+    assert len(_audit(store, "roadmap.parent.set")) == 3
 
 
 def test_milestone_placement_cross_project_is_refused(world, store):
@@ -114,6 +119,13 @@ def test_milestone_placement_to_archived_target_is_refused(world, store):
     with pytest.raises(RoadmapConflict, match="archived"):
         world.place_objective("alpha", oid, archived)
     assert _parent(store, "project_objectives", "milestone_id", "id", oid) is None
+    # An archived goal is likewise refused as a task's parent.
+    gid = world.goal("alpha", "Archived goal")
+    world.svc.archive_goal("alpha", gid, actor="owner", interface="test")
+    task = world.item("alpha", "Work")
+    with pytest.raises(RoadmapConflict, match="archived"):
+        world.place_task("alpha", task, gid)
+    assert _count(store, "goal_tasks") == 0
 
 
 def test_a_closed_initiative_is_refused_as_a_parent(world, store):
@@ -157,6 +169,9 @@ def test_objective_placement_cross_project_unknown_and_archived(world, store):
     world.svc.archive_objective("alpha", oid, actor="owner", interface="test")
     with pytest.raises(RoadmapConflict):
         world.place_goal("alpha", world.goal("alpha", "G"), oid)
+    # None of the refusals wrote a parent or an audit entry.
+    assert _parent(store, "project_objectives", "milestone_id", "id", beta_obj) is None
+    assert _audit(store, "roadmap.parent.set") == []
 
 
 def test_a_task_has_exactly_one_goal(world, store):

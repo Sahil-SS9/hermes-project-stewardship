@@ -139,6 +139,10 @@ def test_no_linked_work_has_no_counts_and_no_percentage(world):
     row = find(world.outline("alpha")["initiatives"], ref=ini)
     assert row["delivery"] == {"state": "no_linked_work"}
     assert find(row["milestones"], id=mid)["delivery"] == {"state": "no_linked_work"}
+    # No work and no objectives: the milestone is not reached and the initiative
+    # is not ready to confirm — an empty ladder is never "done".
+    assert find(row["milestones"], id=mid)["state"] == "not_reached"
+    assert row["ready_to_confirm"] is False
 
 
 def test_not_placed_groups_list_orphans_and_hide_archived(world):
@@ -174,6 +178,11 @@ def test_nothing_is_ever_inferred_from_titles_or_shared_work(world):
     assert len(p["not_placed"]["objectives"]) == 1
     # the shared item is still the initiative's work, just not under any goal
     assert [t["ref"] for t in row["not_placed"]["tasks"]] == [ref]
+    # Nothing was linked just because the titles matched: the milestone and the
+    # objective both carry no parent, and the item is under no goal.
+    assert p["not_placed"]["milestones"][0]["initiative_ref"] is None
+    assert p["not_placed"]["objectives"][0]["milestone_id"] is None
+    assert p["not_placed"]["goals"] == []
 
 
 def test_work_bound_to_an_initiative_but_under_no_goal_gets_its_own_group(world):
@@ -184,7 +193,14 @@ def test_work_bound_to_an_initiative_but_under_no_goal_gets_its_own_group(world)
     assert row["not_placed"]["tasks"][0]["bucket"] == "building"
     # initiative totals are the de-duplicated union of the ladder and the loose work
     assert row["delivery"]["total"] == 2
-    assert {gid, oid, mid} <= {gid, oid, mid}
+    # The loose task is the initiative's work but under no goal, so the goal's
+    # own task list does not include it.
+    assert loose not in [t["ref"] for t in find(world.outline("alpha")["goals"], id=gid)["tasks"]]
+    # It is also not under any milestone's objective chain: it is genuinely
+    # unplaced, listed only in the initiative's own "not placed" group.
+    all_tasks = [t["ref"] for ms in find(world.outline("alpha")["initiatives"], ref=ini)["milestones"]
+                 for obj in ms["objectives"] for g in obj["goals"] for t in g["tasks"]]
+    assert loose not in all_tasks
 
 
 def test_host_failure_gives_unavailable_never_zeros(store, clock):
@@ -199,7 +215,19 @@ def test_host_failure_gives_unavailable_never_zeros(store, clock):
     w.project("beta")
     ini = w.initiative("alpha", "Ship", status="executing")
     mid = w.milestone("alpha", "Pilot")
+    oid = w.objective("alpha", "Obj")
+    goal = w.goal("alpha", "Goal")
     w.place_milestone("alpha", mid, ini)
+    w.place_objective("alpha", oid, mid)
+    w.place_goal("alpha", goal, oid)
+    # A task already placed under the goal (written directly, since the flaky
+    # host is down for alpha): with the host down its status is unknown, so the
+    # goal is unknown — never a false "not started" and never a false "met".
+    ref = w.item("beta", "borrow")  # create in beta where the host is up
+    with w.store.tx() as cx:
+        cx.execute(
+            "INSERT INTO goal_tasks(item_ref,project_id,goal_id,created_at)"
+            " VALUES(?,?,?,?)", (ref, "alpha", goal, "2026-01-01"))
     beta_ini = w.initiative("beta", "Fine")
     projects = {p["id"]: p for p in w.roadmap.roadmap()["projects"]}
     a = projects["alpha"]
@@ -208,6 +236,10 @@ def test_host_failure_gives_unavailable_never_zeros(store, clock):
     assert row["delivery"] == {"state": "unavailable", "reason": "host_unavailable"}
     assert find(row["milestones"], id=mid)["delivery"] == {
         "state": "unavailable", "reason": "host_unavailable"}
+    # The goal's task list is unknown (host down), never a false zero or met.
+    goal_row = find(a["goals"], id=goal)
+    assert goal_row["state"] == "unknown" and goal_row["task_count"] == 1
+    assert goal_row["delivery"] == {"state": "unavailable", "reason": "host_unavailable"}
     # one failing project must not take the others down
     assert projects["beta"]["work_host"] == "ok"
     assert find(projects["beta"]["initiatives"], ref=beta_ini)["delivery"] == {
@@ -230,11 +262,20 @@ def test_objective_outcome_states_pass_through(world, state, expected):
 
 
 def test_disabled_objective_is_not_applicable(world):
-    """Was test_archived_objective_is_unavailable_not_applicable."""
-    oid = world.objective("alpha", "Obj", state="passed")
-    world.svc.archive_objective("alpha", oid, actor="owner", interface="test")
+    """Was test_archived_objective_is_unavailable_not_applicable (and absorbs
+    test_disabled_objectives_do_not_count_toward_a_goal).
+
+    v42 lists only enabled objectives, so a disabled one is not shown at all and
+    cannot inflate or deflate any roll-up.
+    """
+    live = world.objective("alpha", "Live", state="passed")
+    gone = world.objective("alpha", "Gone", state="failed")
+    world.svc.archive_objective("alpha", gone, actor="owner", interface="test")
+    objectives = world.outline("alpha")["objectives"]
     # A disabled objective is not listed at all, so nothing is misreported.
-    assert [o["id"] for o in world.outline("alpha")["objectives"]] == []
+    assert [o["id"] for o in objectives] == [live]
+    # It is absent from the objective list entirely, so it never counts.
+    assert gone not in [o["id"] for o in objectives]
 
 
 def test_evaluator_error_becomes_unknown_not_a_crash(world, monkeypatch):
@@ -266,12 +307,34 @@ def test_goal_states_follow_the_ladder(world):
     building = world.goal("alpha", "Still working")
     world.place_task("alpha", world.item("alpha", "working item", status="in_progress"), building)
     bare = world.goal("alpha", "No tasks")
+    # A goal with a check that has never been evaluated is unknown, not met.
+    unchecked = world.goal("alpha", "Unassessed")
+    world.ladder.set_goal_check("alpha", unchecked, {"evaluator_type": "manual", "target": ">=1"},
+                                actor="owner")
     goals = {g["id"]: g for g in world.outline("alpha")["goals"]}
     assert goals[met]["state"] == "met" and goals[met]["task_count"] == 1
     assert goals[risk]["state"] == "at_risk"
     assert goals[building]["state"] == "in_progress"
     # An empty parent is never met.
     assert goals[bare]["state"] == "not_started" and goals[bare]["task_count"] == 0
+    # An unassessed check is honestly unknown, never optimistically met.
+    assert goals[unchecked]["state"] == "unknown"
+    assert goals[unchecked]["check"]["state"] == "unknown"
+    # A goal with tasks all done but NO check is met (the check is optional).
+    assert goals[met]["check"]["state"] == "no_check"
+    # A goal with tasks done AND a passing check is met; a failing check is
+    # at_risk even when every task is done.
+    passed = world.goal("alpha", "Checked and green")
+    world.place_task("alpha", world.item("alpha", "checked done", status="done"), passed)
+    world.ladder.set_goal_check("alpha", passed, {"evaluator_type": "manual", "target": ">=1"},
+                                actor="owner")
+    world.ladder.record_goal_assessment(
+        "alpha", passed, passed=True, evidence=["t:2"],
+        trusted_principal="owner", interface="desktop")
+    goals = {g["id"]: g for g in world.outline("alpha")["goals"]}
+    assert goals[passed]["state"] == "met" and goals[passed]["check"]["state"] == "passed"
+    # Every goal here is unplaced (no objective parent), which is allowed.
+    assert all(g["objective_id"] is None for g in goals.values())
 
 
 def test_an_unplaced_goal_has_no_objective(world):
@@ -296,16 +359,35 @@ def test_a_milestone_has_exactly_one_initiative(world):
     assert find(p["initiatives"], ref=one)["milestones"] == []
     assert [m["id"] for m in find(p["initiatives"], ref=two)["milestones"]] == [mid]
     assert p["not_placed"]["milestones"] == []
+    # The stored parent is exactly the second initiative, and only one row.
+    assert world.store._conn.execute(
+        "SELECT initiative_ref FROM dockyard_milestones WHERE id=?", (mid,)
+    ).fetchone()[0] == two
+    # A third initiative taking it moves it again; the first two keep none.
+    three = world.initiative("alpha", "Three", status="executing")
+    world.place_milestone("alpha", mid, three)
+    p = world.outline("alpha")
+    assert find(p["initiatives"], ref=two)["milestones"] == []
+    assert [m["id"] for m in find(p["initiatives"], ref=three)["milestones"]] == [mid]
+    # Unplacing leaves it "Not placed yet" under every initiative.
+    world.place_milestone("alpha", mid, None)
+    p = world.outline("alpha")
+    assert [m["id"] for m in p["not_placed"]["milestones"]] == [mid]
+    assert all(i["milestones"] == [] for i in p["initiatives"])
 
 
 def test_an_objective_has_exactly_one_milestone(world):
     """Was test_an_objective_serving_two_initiatives_is_rendered_under_each."""
-    mid = world.milestone("alpha", "Pilot")
+    m1 = world.milestone("alpha", "Pilot")
+    m2 = world.milestone("alpha", "Second")
     oid = world.objective("alpha", "Shared obj", state="passed")
-    world.place_objective("alpha", oid, mid)
+    world.place_objective("alpha", oid, m1)
+    world.place_objective("alpha", oid, m2)
     p = world.outline("alpha")
-    assert find(p["objectives"], id=oid)["milestone_id"] == mid
-    assert [o["id"] for o in find(p["milestones"], id=mid)["objectives"]] == [oid]
+    assert find(p["objectives"], id=oid)["milestone_id"] == m2
+    assert [o["id"] for o in find(p["milestones"], id=m2)["objectives"]] == [oid]
+    # The first milestone no longer claims it.
+    assert find(p["milestones"], id=m1)["objectives"] == []
 
 
 def test_archived_milestones_are_hidden(world):
@@ -351,6 +433,20 @@ def test_attention_reasons_are_raised_for_each_documented_condition(world):
     world.place_milestone("alpha", mid, overdue)
     assert "milestone_overdue" in _reasons(world, overdue)
 
+    # An initiative with no milestone and no objective is flagged for both, so
+    # an empty ladder is never silently "fine".
+    bare = world.initiative("alpha", "Bare", status="executing")
+    reasons = _reasons(world, bare)
+    assert "no_milestone_link" in reasons and "no_objective_link" in reasons
+    # A milestone whose objective is at risk / unknown surfaces that too.
+    risky = world.initiative("alpha", "Risky", status="executing")
+    rmid = world.milestone("alpha", "Risky ms")
+    world.place_milestone("alpha", rmid, risky)
+    world.ladder.set_goal_check("alpha", world.goal("alpha", "G"), None, actor="owner")
+    roid = world.objective("alpha", "Unassessed")  # manual, never assessed -> unknown
+    world.place_objective("alpha", roid, rmid)
+    assert "objective_unknown" in _reasons(world, risky)
+
 
 def test_a_healthy_initiative_raises_no_attention(world):
     ini, mid, oid, gid, _ = _chain(world, "alpha")
@@ -368,6 +464,8 @@ def test_closed_or_future_milestones_are_not_overdue(world):
     world.place_milestone("alpha", future, ini)
     rows = {m["id"]: m for m in find(world.outline("alpha")["initiatives"], ref=ini)["milestones"]}
     assert rows[future]["overdue"] is False and rows[future]["closed"] is False
+    # A closed milestone is never overdue even though its due date has passed.
+    assert rows[closed]["overdue"] is False and rows[closed]["closed"] is True
     assert "milestone_overdue" not in _reasons(world, ini)
 
 
@@ -389,11 +487,15 @@ def test_project_attention_follows_unplaced_objectives(world):
 
 def test_initiatives_off_shows_the_off_state_and_nothing_under_it(world):
     ini, mid, _o, _g, _t = _chain(world, "alpha")
-    world.milestone("alpha", "Orphan")
+    orphan = world.milestone("alpha", "Orphan")
     world.svc.update_features("alpha", {"initiatives": False}, actor="owner", interface="test")
     p = world.outline("alpha")
     assert p["features"]["initiatives"] is False
     assert p["initiatives"] == []
+    # The placed milestone is under the (now hidden) initiative, so it is not
+    # reachable through the tree; the unplaced "Orphan" is still listed because
+    # it belongs to the project, not to an initiative.
+    assert [m["id"] for m in p["not_placed"]["milestones"]] == [orphan]
     # toggling hid data, never deleted it
     world.svc.update_features("alpha", {"initiatives": True}, actor="owner", interface="test")
     assert find(world.outline("alpha")["initiatives"], ref=ini)["milestones"][0]["id"] == mid
@@ -405,13 +507,18 @@ def test_milestones_off_hides_milestones_and_their_children(world):
     v42 hides a switched-off level rather than relabelling its work, so the
     objective of a hidden milestone is hidden with it; nothing is deleted.
     """
-    ini, mid, _o, _g, _t = _chain(world, "alpha")
+    ini, mid, oid, _g, _t = _chain(world, "alpha")
     world.milestone("alpha", "Orphan")
     world.svc.update_features("alpha", {"milestones": False}, actor="owner", interface="test")
     p = world.outline("alpha")
     assert p["features"] == {"initiatives": True, "milestones": False}
     assert p["milestones"] == [] and p["not_placed"]["milestones"] == []
     assert find(p["initiatives"], ref=ini)["milestones"] == []
+    # The hidden milestone is gone from the tree, so its objective is not
+    # reachable under any milestone, and the initiative is not "ready to
+    # confirm" just because its milestone vanished from view.
+    assert all(m["objectives"] == [] for m in p["milestones"])
+    assert find(p["initiatives"], ref=ini)["ready_to_confirm"] is False
     # toggling back restores exactly what was hidden
     world.svc.update_features("alpha", {"milestones": True}, actor="owner", interface="test")
     assert [m["id"] for m in find(world.outline("alpha")["initiatives"], ref=ini)["milestones"]] == [mid]
@@ -490,6 +597,12 @@ def test_milestone_items_refusals(world):
     world.svc.update_features("alpha", {"milestones": False}, actor="owner", interface="test")
     with pytest.raises(FeatureDisabledError):
         world.roadmap.milestone_items("alpha", mid)
+    # A valid, in-project, feature-on milestone reads fine (the refusals above
+    # are about the wrong project / unknown id / switched-off feature, not the
+    # happy path).
+    world.svc.update_features("alpha", {"milestones": True}, actor="owner", interface="test")
+    ok = world.roadmap.milestone_items("alpha", mid)
+    assert ok["state"] == "ok" and ok["milestone"]["id"] == mid
 
 
 def test_milestone_items_host_failure_is_unavailable_not_empty(store, clock):
