@@ -48,7 +48,7 @@ import { hiddenNotifications } from '../data/scope.js'
 import { DEFAULT_FONT } from '../styles/themes.js'
 import { DEFAULT_THEME } from '../styles/themes.js'
 import { fontById } from '../styles/themes.js'
-import { hostIsDark } from '../styles/themes.js'
+import { useHostDark } from '../runtime/host-theme.js'
 import { themeById } from '../styles/themes.js'
 import { themeMode } from '../styles/themes.js'
 // Sahil 04/10 (demo feedback d): screens that work on one project ask for one
@@ -72,7 +72,8 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   // in the backend (/settings/appearance). Match Hermes follows Hermes
   // Desktop's own light/dark mode live (until now nothing set dark mode).
   const [appearance, setAppearance] = useState({ theme: DEFAULT_THEME, font: DEFAULT_FONT })
-  const [hostDark, setHostDark] = useState(() => hostIsDark())
+  // Read through the plugin SDK's useTheme(), never the app's markup.
+  const hostDark = useHostDark()
   // Asked for once, right after the first data load starts: the dashboard
   // stays the first request (same rule as the remembered project below).
   const appearanceAsked = useRef(false)
@@ -84,14 +85,6 @@ export function DashboardPage({ inboxCss = '' } = {}) {
       () => {}, // unavailable: the defaults stand
     )
   }
-  useEffect(() => {
-    const read = () => setHostDark(hostIsDark())
-    const watcher = typeof MutationObserver === 'function' ? new MutationObserver(read) : null
-    watcher?.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-hermes-mode'] })
-    const media = window.matchMedia?.('(prefers-color-scheme: dark)')
-    media?.addEventListener?.('change', read)
-    return () => { watcher?.disconnect(); media?.removeEventListener?.('change', read) }
-  }, [])
   const appearanceRef = useRef(appearance)
   appearanceRef.current = appearance
   const changeAppearance = async (patch) => {

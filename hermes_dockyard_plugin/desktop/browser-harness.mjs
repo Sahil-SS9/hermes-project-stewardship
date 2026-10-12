@@ -22,6 +22,16 @@ export function buildBundle(realBackend = false) {
   const entry = path.join(outDir, 'entry.jsx');
   const bundle = path.join(outDir, 'bundle.js');
   fs.writeFileSync(sdk, [
+    // useTheme(): the SDK hook Desktop v0.21.6+ exports. A test drives the
+    // fake Desktop's painted mode with window.__setHostTheme({ renderedMode });
+    // until it does, the hook reports nothing and the plugin falls back to the
+    // system setting (as on a host without the hook).
+    "import { useSyncExternalStore } from 'react';",
+    'const themeListeners = new Set();',
+    'window.__setHostTheme = (value) => { window.__hostTheme = value; themeListeners.forEach((listener) => listener()); };',
+    'export function useTheme() {',
+    '  return useSyncExternalStore((listener) => { themeListeners.add(listener); return () => themeListeners.delete(listener); }, () => window.__hostTheme ?? null);',
+    '}',
     'export const host = {',
     '  navigate() {},',
     "  notify(item) { (window.__hostNotifyCalls ??= []).push(item); if (typeof window.__hostNotifyWaitResolve === 'function') { window.__hostNotifyWaitResolve(item); window.__hostNotifyWaitResolve = undefined; } },",

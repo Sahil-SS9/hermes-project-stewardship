@@ -2290,13 +2290,6 @@ function themeMode(themeId, hostDark) {
   const theme = themeById(themeId);
   return theme.mode === "auto" ? hostDark ? "dark" : "light" : theme.mode;
 }
-function hostIsDark() {
-  const html = document.documentElement;
-  const mode = html.dataset.hermesMode;
-  if (mode === "dark" || mode === "light") return mode === "dark";
-  if (html.classList.contains("dark")) return true;
-  return Boolean(window.matchMedia?.("(prefers-color-scheme: dark)").matches);
-}
 var VARS = [
   ["bg", "--dy-bg"],
   ["surface", "--dy-surface"],
@@ -25840,6 +25833,30 @@ function hiddenNotifications(view, projectId) {
   return (view.notifications ?? []).filter((note) => ownerOf(note) !== projectId).length;
 }
 
+// hermes_dockyard_plugin/desktop/src/runtime/host-theme.js
+import * as sdk from "@hermes/plugin-sdk";
+var noHostTheme = () => null;
+var useSdkTheme = typeof sdk.useTheme === "function" ? sdk.useTheme : noHostTheme;
+var systemQuery = () => window.matchMedia?.("(prefers-color-scheme: dark)");
+function systemIsDark() {
+  return Boolean(systemQuery()?.matches);
+}
+function hostThemeMode(value) {
+  const mode = value?.renderedMode ?? value?.resolvedMode;
+  return mode === "dark" || mode === "light" ? mode : null;
+}
+function useHostDark() {
+  const hostMode = hostThemeMode(useSdkTheme());
+  const [systemDark, setSystemDark] = useState(systemIsDark);
+  useEffect(() => {
+    const media = systemQuery();
+    const read = () => setSystemDark(systemIsDark());
+    media?.addEventListener?.("change", read);
+    return () => media?.removeEventListener?.("change", read);
+  }, []);
+  return hostMode ? hostMode === "dark" : systemDark;
+}
+
 // hermes_dockyard_plugin/desktop/src/shell/dashboard-page.js
 var ONE_PROJECT_TABS = Object.freeze({ project: "Projects", backlog: "Backlog" });
 function DashboardPage({ inboxCss = "" } = {}) {
@@ -25854,7 +25871,7 @@ function DashboardPage({ inboxCss = "" } = {}) {
     loadArchivedProjects().then((rows) => setArchivedCount(rows.length), () => setArchivedCount(0));
   };
   const [appearance, setAppearance] = useState({ theme: DEFAULT_THEME, font: DEFAULT_FONT });
-  const [hostDark, setHostDark] = useState(() => hostIsDark());
+  const hostDark = useHostDark();
   const appearanceAsked = useRef(false);
   const askAppearance = () => {
     if (appearanceAsked.current) return;
@@ -25868,17 +25885,6 @@ function DashboardPage({ inboxCss = "" } = {}) {
       // unavailable: the defaults stand
     );
   };
-  useEffect(() => {
-    const read = () => setHostDark(hostIsDark());
-    const watcher = typeof MutationObserver === "function" ? new MutationObserver(read) : null;
-    watcher?.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-hermes-mode"] });
-    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
-    media?.addEventListener?.("change", read);
-    return () => {
-      watcher?.disconnect();
-      media?.removeEventListener?.("change", read);
-    };
-  }, []);
   const appearanceRef = useRef(appearance);
   appearanceRef.current = appearance;
   const changeAppearance = async (patch) => {
