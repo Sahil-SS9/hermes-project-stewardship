@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Approving an initiative no longer leaves it approved but unbound.** The
+  board is resolved and checked on the Kanban host before the approval is
+  recorded; a project with no usable board is refused with a 409 that names
+  the board, and the initiative stays pending. On the canonical Hermes host
+  the bridge no longer falls back to a `<project>-ops` board the host does
+  not have (other adapters keep that convention).
+- **`POST /initiatives/{ref}/bind-board` records canonical work bindings**
+  for the cards it creates, like approval does, so the work-items view and
+  reconciliation see them. A board the project is not bound to is a 409.
+
 ## [0.4.0] - 2026-10-11
 
 The Project Stewardship Desktop app becomes the main surface, and every part

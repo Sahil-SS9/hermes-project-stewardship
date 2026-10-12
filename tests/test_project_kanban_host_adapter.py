@@ -768,3 +768,89 @@ def test_list_work_links_still_maps_host_failures_to_the_stable_codes():
     with pytest.raises(_adapter_error_type()) as exc:
         adapter.list_work_links("project-1", "t_x")
     assert exc.value.code == "task_not_found"
+
+
+# ---- approval binds the project's own board, or is not committed -----------
+
+
+def _approval_client(tmp_path: Path, host: FakeProjectKanbanHost):
+    from fastapi.testclient import TestClient
+
+    from hermes_project_stewardship.api.server import create_app
+    from hermes_project_stewardship.persistence.store import Store
+
+    app = create_app(
+        Store(tmp_path / "dockyard.sqlite"),
+        kanban_adapter=_adapter_type()(host),
+        auth_token="test-token",
+        auth_principal="owner",
+        auth_principal_is_human=True,
+    )
+    svc = app.state.svc
+    svc.enable("project-1", mission="keep it green", lead_profile="lead",
+               member_profiles=[], autonomy_level=2)
+    ref = svc.propose_initiative(
+        "project-1", title="Fix flaky CI", rationale="3 flakes in 30d")["ref"]
+    client = TestClient(app, headers={"Authorization": "Bearer test-token"})
+    return client, svc, ref
+
+
+@pytest.mark.parametrize("board_slug", ["", "ghost"])
+def test_approval_is_not_committed_when_the_project_board_cannot_be_bound(
+    tmp_path: Path, board_slug: str,
+):
+    """Production 0.3/0.4: approving committed first, then binding fell back to
+    "<project>-ops" (no such board) and left the initiative approved but
+    unbound. The board is now resolved and verified before the approval."""
+    host = FakeProjectKanbanHost()
+    host.projects["project-1"]["board_slug"] = board_slug
+    client, svc, ref = _approval_client(tmp_path, host)
+
+    response = client.post(f"/stewardship/v1/initiatives/{ref}/approve", json={})
+
+    assert response.status_code == 409, response.text
+    assert "board" in response.text
+    assert "project-1-ops" not in response.text
+    assert svc.initiative_by_ref(ref)["status"] == "pending_approval"
+    assert svc.initiative_by_ref(ref)["board_slug"] is None
+    assert host.create_calls == []
+
+
+def test_approval_binds_the_hosts_board_and_records_canonical_bindings(tmp_path: Path):
+    client, svc, ref = _approval_client(tmp_path, FakeProjectKanbanHost())
+
+    response = client.post(f"/stewardship/v1/initiatives/{ref}/approve", json={})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["board_slug"] == "alpha"
+    assert svc.initiative_by_ref(ref)["status"] == "executing"
+    work = client.get("/stewardship/v1/projects/project-1/work-items").json()["work_items"]
+    assert sorted(item["ref"] for item in work if item["initiative_ref"] == ref) == sorted(
+        response.json()["work_item_refs"])
+
+
+def test_bind_board_route_records_canonical_bindings(tmp_path: Path):
+    """The bind-board route created cards without canonical work bindings, so
+    reconciliation and the work-items view could not see them."""
+    client, svc, ref = _approval_client(tmp_path, FakeProjectKanbanHost())
+    svc.approve_initiative(ref, actor="owner", interface="cli")
+
+    response = client.post(f"/stewardship/v1/initiatives/{ref}/bind-board", json={})
+
+    assert response.status_code == 200, response.text
+    card_ids = response.json()["card_ids"]
+    assert card_ids
+    work = client.get("/stewardship/v1/projects/project-1/work-items").json()["work_items"]
+    assert sorted(item["ref"] for item in work if item["initiative_ref"] == ref) == sorted(card_ids)
+
+
+def test_bind_board_route_refuses_a_board_the_project_is_not_bound_to(tmp_path: Path):
+    client, svc, ref = _approval_client(tmp_path, FakeProjectKanbanHost())
+    svc.approve_initiative(ref, actor="owner", interface="cli")
+
+    response = client.post(f"/stewardship/v1/initiatives/{ref}/bind-board",
+                           json={"board_slug": "someone-elses"})
+
+    assert response.status_code == 409, response.text
+    assert svc.initiative_by_ref(ref)["status"] == "approved"
+    assert svc.initiative_by_ref(ref)["board_slug"] is None

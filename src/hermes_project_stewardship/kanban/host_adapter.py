@@ -160,6 +160,7 @@ class ProjectKanbanHostAdapter(KanbanAdapter):
     """
 
     contract_version = 2
+    requires_bound_board = True
 
     def __init__(self, host: Any) -> None:
         self.host = host

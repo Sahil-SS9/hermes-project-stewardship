@@ -36,6 +36,10 @@ class BoardCard:
 class KanbanAdapter(ABC):
     """Host-side board operations the bridge requires."""
 
+    # A host whose projects carry their own board binding sets this, so the
+    # bridge never guesses a "<project>-ops" board the host does not have.
+    requires_bound_board = False
+
     @abstractmethod
     def ensure_board(self, project_id: str, slug: str) -> str:
         """Return an existing or newly-created board id for slug."""
@@ -43,8 +47,9 @@ class KanbanAdapter(ABC):
     def bound_board_slug(self, project_id: str) -> Optional[str]:
         """Return the board slug the host actually bound this project to.
 
-        Optional: adapters that cannot answer return None, and callers fall
-        back to their own convention. Onboarding may provision a board slug
+        Optional: adapters that cannot answer return None, and the bridge
+        falls back to "<project>-ops" unless ``requires_bound_board`` is set.
+        Onboarding may provision a board slug
         other than the "<project>-ops" default, so binding an approved
         initiative must ask the host instead of guessing.
         """
@@ -394,6 +399,24 @@ class KanbanBridge:
         self.svc = service
         self.adapter = adapter
 
+    def resolve_board(
+        self, project_id: str, board_slug: Optional[str] = None
+    ) -> tuple[str, str]:
+        """The board ``project_id`` binds to, verified on the host: (slug, board id).
+
+        Callers resolve before committing anything (an approval, cards), so a
+        project without a usable board is refused while it is still unchanged.
+        """
+        slug = board_slug or self.adapter.bound_board_slug(project_id)
+        if not slug:
+            if self.adapter.requires_bound_board:
+                raise ServiceError(
+                    f"project {project_id} has no board bound on the Kanban host;"
+                    " bind it to an existing board first"
+                )
+            slug = f"{project_id}-ops"
+        return slug, self.adapter.ensure_board(project_id, slug)
+
     def bind(
         self,
         ref: str,
@@ -406,12 +429,7 @@ class KanbanBridge:
             raise ServiceError(f"initiative {ref} is not approved (status={ini['status']})")
 
         project_id = ini["project_id"]
-        slug = (
-            board_slug
-            or self.adapter.bound_board_slug(project_id)
-            or f"{project_id}-ops"
-        )
-        board_id = self.adapter.ensure_board(project_id, slug)
+        slug, board_id = self.resolve_board(project_id, board_slug)
 
         card_ids: List[str] = []
         validation = ini.get("validation_contract") or {}

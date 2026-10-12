@@ -422,6 +422,7 @@ class GatewayCommandBody(BaseModel):
 
 class BindBoardRequest(BaseModel):
     board_slug: Optional[str] = None
+    actor_id: str = "stewardship-api"
 
 
 class CompleteRequest(BaseModel):
@@ -1848,8 +1849,9 @@ def create_app(
     @router.post("/initiatives/{ref}/bind-board")
     def bind_board(ref: str, body: BindBoardRequest):
         try:
-            return bridge.bind(ref, board_slug=body.board_slug)
-        except ServiceError as e:
+            return integration.bind(
+                ref, board_slug=body.board_slug, actor=_actor(body.actor_id, "human"))
+        except (IntegrationError, ServiceError) as e:
             raise HTTPException(409, str(e))
 
     @router.post("/initiatives/{ref}/complete")

@@ -122,6 +122,18 @@ def test_bind_falls_back_to_ops_when_host_silent(svc, enabled, approved):
     assert out["board_slug"] == f"{approved['project_id']}-ops"
 
 
+def test_bind_never_guesses_a_board_for_hosts_that_bind_projects(svc, enabled, approved):
+    """A host that binds each project to a board (the canonical Hermes host)
+    gets no "<project>-ops" guess: an unbound project is refused."""
+    fake = FakeHostAdapter()
+    fake.requires_bound_board = True
+    bridge = KanbanBridge(svc, fake)
+    with pytest.raises(ServiceError, match="no board bound"):
+        bridge.bind(approved["ref"])
+    assert fake.boards == {} and fake.cards == []
+    assert ini_status(svc, approved["ref"]) == "approved"
+
+
 def test_reference_adapter_bound_board_slug(store):
     adapter = ReferenceKanbanAdapter(store)
     assert adapter.bound_board_slug("p") is None  # nothing bound yet
