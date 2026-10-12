@@ -1,7 +1,7 @@
 {
   "name": "hermes-project-stewardship",
   "label": "Hermes Project Stewardship",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Project Stewardship: PM core + bot fleet oversight for Hermes (work items, inbox, dashboard, notifications, onboarding).",
   "entry": "dist/index.js",
   "css": "dist/style.css",
