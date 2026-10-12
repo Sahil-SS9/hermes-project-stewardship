@@ -143,3 +143,85 @@ def test_critical_alert_created_and_routed(engine, enabled, svc, tmp_path):
     engine.run_cycle(enabled)
     rows = notif.unacked(enabled)
     assert any(n["kind"] == "alert" and n["severity"] == "critical" for n in rows)
+
+
+# ---- Batch L R2 fix 6: the two ladder notifications ----------------------- //
+
+def _open_count(store, kind, subject):
+    return store._conn.execute(
+        "SELECT COUNT(*) AS n FROM notifications WHERE kind=? AND dedupe_key=?",
+        (kind, f"{kind}:{subject}"),
+    ).fetchone()["n"]
+
+
+def _resolved_at(store, kind, subject):
+    row = store._conn.execute(
+        "SELECT resolved_at FROM notifications WHERE kind=? AND dedupe_key=?",
+        (kind, f"{kind}:{subject}"),
+    ).fetchone()
+    return row["resolved_at"] if row else None
+
+
+def test_ready_to_confirm_is_raised_once_and_resolves_on_confirm(svc, enabled):
+    from hermes_project_stewardship.events import (
+        INITIATIVE_COMPLETED, INITIATIVE_READY_TO_CONFIRM,
+    )
+
+    notif = NotificationEngine(svc.store, svc)
+    notif.attach(EventBus(svc.store))
+    ref = "INIT-READY-0001"
+    event = {"event_type": INITIATIVE_READY_TO_CONFIRM, "project_id": enabled,
+             "subject": ref, "payload": {"title": "Ship the ladder"}}
+    assert notif.process_event(event) is not None
+    # A second observation pass raises nothing new (one open notification).
+    assert notif.process_event(event) is None
+    assert _open_count(svc.store, "initiative_ready_to_confirm", ref) == 1
+    assert _resolved_at(svc.store, "initiative_ready_to_confirm", ref) is None
+    # Confirming resolves the prompt (resolution runs through the combined
+    # entry point: INITIATIVE_COMPLETED records nothing, it only resolves).
+    notif.process_event_and_resolve({"event_type": INITIATIVE_COMPLETED,
+                                     "project_id": enabled, "subject": ref,
+                                     "payload": {}})
+    assert _resolved_at(svc.store, "initiative_ready_to_confirm", ref) is not None
+
+
+def test_regressed_is_raised_once_and_resolves_on_reconfirm(svc, enabled):
+    from hermes_project_stewardship.events import (
+        INITIATIVE_COMPLETED, INITIATIVE_REGRESSED,
+    )
+
+    notif = NotificationEngine(svc.store, svc)
+    notif.attach(EventBus(svc.store))
+    ref = "INIT-REGRESSED-0001"
+    event = {"event_type": INITIATIVE_REGRESSED, "project_id": enabled,
+             "subject": ref, "payload": {"reason": "ladder check failed"}}
+    assert notif.process_event(event) is not None
+    assert notif.process_event(event) is None
+    assert _open_count(svc.store, "initiative_regressed", ref) == 1
+    assert _resolved_at(svc.store, "initiative_regressed", ref) is None
+    # Re-confirming after the fix resolves the notice.
+    notif.process_event_and_resolve({"event_type": INITIATIVE_COMPLETED,
+                                     "project_id": enabled, "subject": ref,
+                                     "payload": {}})
+    assert _resolved_at(svc.store, "initiative_regressed", ref) is not None
+
+
+def test_ready_and_regressed_notifications_are_project_scoped(svc, enabled, clock):
+    """A prompt for one initiative never resolves another project's notice."""
+    from hermes_project_stewardship.events import (
+        INITIATIVE_COMPLETED, INITIATIVE_READY_TO_CONFIRM,
+    )
+
+    svc.enable("other", mission="m", lead_profile="l", autonomy_level=2)
+    notif = NotificationEngine(svc.store, svc)
+    notif.attach(EventBus(svc.store))
+    mine, theirs = "INIT-A", "INIT-B"
+    notif.process_event({"event_type": INITIATIVE_READY_TO_CONFIRM,
+                         "project_id": enabled, "subject": mine, "payload": {}})
+    notif.process_event({"event_type": INITIATIVE_READY_TO_CONFIRM,
+                         "project_id": "other", "subject": theirs, "payload": {}})
+    notif.process_event_and_resolve({"event_type": INITIATIVE_COMPLETED,
+                                     "project_id": enabled, "subject": mine,
+                                     "payload": {}})
+    assert _resolved_at(svc.store, "initiative_ready_to_confirm", mine) is not None
+    assert _resolved_at(svc.store, "initiative_ready_to_confirm", theirs) is None
