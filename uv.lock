@@ -464,7 +464,7 @@ wheels = [
 
 [[package]]
 name = "hermes-project-stewardship"
-version = "0.5.0"
+version = "0.5.1"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
