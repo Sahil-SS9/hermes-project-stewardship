@@ -4,12 +4,12 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.1] - 2026-10-12
+## [0.5.2] - 2026-10-13
 
 ### Fixed
 
 The security and correctness fixes from the catalog review
-(hermes-agent PR #136752), completed and verified:
+(hermes-agent PR #136752), completed and verified on the ladder codebase:
 
 - The Kanban host no longer writes process-global `HERMES_KANBAN_HOME`:
   it scopes only through the context-local Hermes-home override and takes its
@@ -38,6 +38,8 @@ The security and correctness fixes from the catalog review
 
 - The `__V4_DISABLE` view gating and the `dockyard:test:deeplink` test-only
   event listener.
+
+## [0.5.1] - 2026-10-12
 
 ### Added
 - **Objective descriptions from the CLI.** `stewardctl objective add

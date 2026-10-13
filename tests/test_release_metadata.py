@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_active_release_metadata_is_coherent(tmp_path):
-    version = "0.5.1"
+    version = "0.5.2"
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     assert project["project"]["version"] == version
     assert __version__ == version
