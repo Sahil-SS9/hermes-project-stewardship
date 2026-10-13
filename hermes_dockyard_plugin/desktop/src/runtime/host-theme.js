@@ -36,3 +36,9 @@ export function useHostDark() {
   }, [])
   return hostMode ? hostMode === 'dark' : systemDark
 }
+
+// True inside a Hermes Desktop whose SDK reports its theme (v0.21.6+): the
+// --dt-*/--theme-* palette Match Hermes takes is then in scope.
+export function useHostIsDesktop() {
+  return hostThemeMode(useSdkTheme()) !== null
+}

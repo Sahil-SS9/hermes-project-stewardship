@@ -67,3 +67,72 @@ test('Match Hermes follows useTheme(), ignores the app markup, and falls back to
     await api('/settings/appearance', 'PUT', before).catch(() => {})
   }
 })
+
+// Desktop's "mono" dark palette: neutral greys and a near-white primary.
+const paintDesktopMono = (page) => page.evaluate(() => {
+  const html = document.documentElement.style
+  html.setProperty('--dt-background', 'rgb(10, 10, 10)')
+  html.setProperty('--dt-card', 'rgb(23, 23, 23)')
+  html.setProperty('--dt-border', 'rgb(38, 38, 38)')
+  html.setProperty('--dt-primary', 'rgb(250, 250, 250)')
+  html.setProperty('--dt-primary-foreground', 'rgb(23, 23, 23)')
+  html.setProperty('--dt-accent', 'rgb(38, 38, 38)')
+  html.setProperty('--dt-ring', 'rgb(115, 115, 115)')
+  html.setProperty('--theme-foreground', 'rgb(250, 250, 250)')
+})
+
+// Inside Hermes Desktop, Match Hermes takes Desktop's palette (its --dt-* and
+// --theme-* properties), not only its mode; status colours stay the app's.
+// Outside Desktop the app's own tokens stand.
+test('Match Hermes inside Hermes Desktop takes the Desktop palette', { timeout: 120000 }, async () => {
+  assert.ok(BASE && API, 'Run via run-browser-suite.mjs')
+  const before = await api('/settings/appearance')
+  await api('/settings/appearance', 'PUT', { ...before, theme: 'auto' })
+  const browser = await chromium.launch({ headless: true })
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, colorScheme: 'dark' })
+    page.setDefaultTimeout(10000)
+    const errors = []
+    page.on('pageerror', (error) => errors.push(String(error)))
+    await page.goto(BASE, { waitUntil: 'networkidle' })
+    const root = page.locator('.dockyard-root').first()
+    await root.waitFor()
+    await paintDesktopMono(page)
+    const token = (name) => root.evaluate((el, n) => getComputedStyle(el).getPropertyValue(n).trim(), name)
+    const own = { action: await token('--dy-action'), danger: await token('--dy-danger') }
+
+    // No SDK theme: not Desktop, so the app's own tokens stand.
+    assert.equal(await root.getAttribute('data-dy-host'), null)
+    assert.notEqual(own.action, 'rgb(250, 250, 250)')
+
+    await page.evaluate(() => window.__setHostTheme({ resolvedMode: 'dark', renderedMode: 'dark' }))
+    await waitForMode(page, 'dark', 'a dark painted surface shows dark')
+    assert.equal(await root.getAttribute('data-dy-host'), 'hermes-desktop')
+    const bg = await root.evaluate((el) => getComputedStyle(el).backgroundColor)
+    assert.equal(bg, 'rgb(10, 10, 10)', 'the page is Desktop\'s background')
+    const button = await root.evaluate((el) => {
+      const probe = el.appendChild(document.createElement('div'))
+      probe.style.background = 'var(--dy-action)'
+      probe.style.color = 'var(--dy-on-action)'
+      const { backgroundColor, color } = getComputedStyle(probe)
+      probe.remove()
+      return { backgroundColor, color }
+    })
+    assert.deepEqual(button, { backgroundColor: 'rgb(250, 250, 250)', color: 'rgb(23, 23, 23)' }, 'primary actions are Desktop\'s primary')
+    assert.equal(await token('--dy-danger'), own.danger, 'status colours stay the app\'s')
+
+    // A chosen theme other than Match Hermes keeps its own palette in Desktop.
+    await api('/settings/appearance', 'PUT', { ...before, theme: 'cobalt' })
+    await page.reload({ waitUntil: 'networkidle' })
+    await page.locator('.dockyard-root[data-dy-theme="cobalt"]').first().waitFor()
+    await paintDesktopMono(page)
+    await page.evaluate(() => window.__setHostTheme({ resolvedMode: 'dark', renderedMode: 'dark' }))
+    await page.locator('.dockyard-root[data-dy-host="hermes-desktop"]').first().waitFor()
+    assert.notEqual(await token('--dy-bg'), 'rgb(10, 10, 10)', 'a chosen theme keeps its own palette')
+    assert.equal(await token('--dt-background'), 'rgb(10, 10, 10)', 'the Desktop palette is still in scope')
+    assert.deepEqual(errors, [])
+  } finally {
+    await browser.close()
+    await api('/settings/appearance', 'PUT', before).catch(() => {})
+  }
+})
