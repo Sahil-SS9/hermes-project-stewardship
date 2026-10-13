@@ -8235,7 +8235,7 @@ function BacklogImportWizard(props) {
     runImport,
     api: api2
   } = props;
-  return !window.__V4_DISABLE?.has("wizard") ? jsxs("section", { className: "dockyard-modal-layer", "data-bulk-import-layer": true, hidden: !importOpen, children: [
+  return jsxs("section", { className: "dockyard-modal-layer", "data-bulk-import-layer": true, hidden: !importOpen, children: [
     jsxs("div", { className: "dockyard-modal dockyard-onboarding", role: "dialog", "aria-modal": true, "aria-labelledby": "dockyard-import-title", children: [
       jsxs("header", { className: "dockyard-onboarding-head", children: [
         jsxs("div", { children: [
@@ -8452,7 +8452,7 @@ function BacklogImportWizard(props) {
         ] })
       ] })
     ] })
-  ] }) : null;
+  ] });
 }
 
 // hermes_dockyard_plugin/desktop/src/views/backlog-model.js
@@ -8721,7 +8721,7 @@ function BacklogBoard(ctx) {
       jsx("button", { type: "button", "data-transfer-retry": operation.op_id, onClick: () => retryTransfer(operation.op_id), children: "Retry remaining items" })
     ] }, operation.op_id)),
     entries.length > 0 ? jsxs("section", { className: "dockyard-backlog-list", "data-backlog-table": true, children: [
-      !window.__V4_DISABLE?.has("cmdbar") ? jsxs("div", { className: "dockyard-cmdbar", "data-column-filters": true, children: [
+      jsxs("div", { className: "dockyard-cmdbar", "data-column-filters": true, children: [
         jsxs("label", { className: "cm-search", children: [
           jsx(Icon, { name: "search" }, "v4-search"),
           jsx("input", { type: "search", "data-cm-search": true, "aria-label": "Search backlog", placeholder: "Search backlog", value: search, onInput: (event) => setSearch(event.target.value) })
@@ -8854,8 +8854,8 @@ function BacklogBoard(ctx) {
           sortKey !== "rank" ? `sorted by ${sortLabels[sortKey]}` : "",
           groupBy !== "none" ? `grouped by ${GROUP_LABELS[groupBy]}` : ""
         ].filter(Boolean).join(" \xB7 "), children: treeRows.length === entries.length ? `${number(entries.length)} items` : `${number(treeRows.length)} of ${number(entries.length)}` })
-      ] }) : null,
-      !window.__V4_DISABLE?.has("head") ? jsxs("div", { className: "tree-head", children: [
+      ] }),
+      jsxs("div", { className: "tree-head", children: [
         jsx("span", { className: "th-gutter" }),
         sortHeader("rank", "Rank", "th-rank"),
         sortHeader("type", "Type", "th-type"),
@@ -8866,12 +8866,12 @@ function BacklogBoard(ctx) {
         sortHeader("age", "Age", "th-age"),
         jsx("span", { className: "th-reason", children: "Priority reason" }),
         jsx("span", { className: "th-act", "aria-label": "Actions" })
-      ] }) : null,
-      !window.__V4_DISABLE?.has("head") && treeRows.length === 0 ? jsxs("div", { className: "tree-group-head", "data-no-matches": true, children: [
+      ] }),
+      treeRows.length === 0 ? jsxs("div", { className: "tree-group-head", "data-no-matches": true, children: [
         jsx("span", { children: hasFilters ? "No items match the current search and filters." : "No backlog items to show." }),
         hasFilters ? jsx("button", { type: "button", className: "cm-chip", onClick: resetFilters, children: "Clear filters" }) : null
       ] }) : null,
-      ...window.__V4_DISABLE?.has("rows") ? [] : groups.flatMap(([label, rows], gi) => [
+      ...groups.flatMap(([label, rows], gi) => [
         label !== null ? jsxs("div", { className: "tree-group-head", children: [
           jsx("span", { children: label }),
           jsx("span", { className: "grp-count", children: `\xB7 ${rows.length}` })
@@ -9098,7 +9098,7 @@ function BacklogBoard(ctx) {
           }, ref);
         })
       ]),
-      !window.__V4_DISABLE?.has("popover") && bulkSelected.length ? jsxs("div", { className: "sel-pop", "data-selection-popover": true, onClick: (event) => event.stopPropagation(), children: [
+      bulkSelected.length ? jsxs("div", { className: "sel-pop", "data-selection-popover": true, onClick: (event) => event.stopPropagation(), children: [
         jsx("span", { className: "sel-count", children: `${bulkSelected.length} selected` }),
         jsx("span", { className: "sel-sep" }),
         jsxs("select", { "data-pop-target": true, "aria-label": "Bulk target", defaultValue: "", children: [
@@ -9134,7 +9134,7 @@ function BacklogBoard(ctx) {
       ] }) : null
     ] }) : q ? jsx(EmptyState, { title: "No matches", description: `Nothing in the backlog matches \u201C${search}\u201D. Clear the filter to see all items.`, icon: "project", children: jsx(Button, { small: true, onClick: () => setSearch(""), children: "Clear filter" }) }) : jsx(EmptyState, { title: "No ranked backlog items", description: "Work items appear here after they are added to the project backlog.", icon: "project" }),
     detailItem ? jsx(WorkItemDetail, { item: detailItem, projectId: project.id, profiles: view.profiles ?? [], initiatives: view.initiatives ?? [], onClose: () => setDetailItem(null), onRefresh }) : null,
-    !window.__V4_DISABLE?.has("wizard") ? jsx(BacklogImportWizard, {
+    jsx(BacklogImportWizard, {
       project,
       importOpen,
       importStep,
@@ -9160,7 +9160,7 @@ function BacklogBoard(ctx) {
       parseImport,
       runImport,
       api
-    }) : null,
+    }),
     jsx(BacklogReasonModal, { pendingMove, reason, setReason, error, saving, pendingParentItem, pendingParentRef, pendingParentChoices, pendingParentChanged, saveParent, saveMove, setPendingMove, typeLabel: typeLabel2 }),
     jsxs("section", {
       className: "dockyard-modal-layer",
@@ -19330,7 +19330,7 @@ function ProjectContentPanel({ project, content, onRefresh }) {
       jsx("span", { className: "dockyard-card-label", children: "PREVIEW" }),
       selected ? jsx("h2", { children: selected.filename }) : jsx("h2", { children: "Select a document" }),
       previewState === "loading" ? jsx("p", { children: "Loading preview..." }) : null,
-      previewState === "ready" && selected?.preview_kind === "text" ? jsx("pre", { "data-content-preview": true, className: "dockyard-content-preview", children: selected.text || "This text file is empty." }) : previewState === "ready" && selected?.preview_kind === "image" && selected.data_base64 ? jsx("img", { "data-content-preview": true, "data-preview-kind": "image", className: "dockyard-content-image", alt: selected.filename, src: `data:${selected.media_type};base64,${selected.data_base64}` }) : previewState === "ready" && selected?.preview_kind === "pdf" && mediaUrl ? jsx("iframe", { "data-content-preview": true, "data-preview-kind": "pdf", className: "dockyard-content-pdf", title: `PDF preview: ${selected.filename}`, src: mediaUrl }) : previewState === "ready" && selected?.preview_kind === "video" && mediaUrl ? jsx("video", { "data-content-preview": true, "data-preview-kind": "video", className: "dockyard-content-video", controls: true, preload: "metadata", "aria-label": `Video: ${selected.filename}`, src: mediaUrl }) : previewState === "ready" ? jsx("div", { "data-content-preview": true, className: "dockyard-report-placeholder", children: `Preview is not available for ${mediaTypeLabel(selected?.media_type)}. File metadata remains visible.` }) : previewState === "idle" ? jsx("p", { className: "dockyard-meta", children: "Text, Markdown, images, PDFs and videos show here." }) : null,
+      previewState === "ready" && selected?.preview_kind === "text" ? jsx("pre", { "data-content-preview": true, className: "dockyard-content-preview", children: selected.text || "This text file is empty." }) : previewState === "ready" && selected?.preview_kind === "image" && selected.data_base64 ? jsx("img", { "data-content-preview": true, "data-preview-kind": "image", className: "dockyard-content-image", alt: selected.filename, src: `data:${selected.media_type};base64,${selected.data_base64}` }) : previewState === "ready" && selected?.preview_kind === "pdf" && mediaUrl ? jsx("iframe", { "data-content-preview": true, "data-preview-kind": "pdf", className: "dockyard-content-pdf", title: `PDF preview: ${selected.filename}`, src: mediaUrl, sandbox: "allow-same-origin" }) : previewState === "ready" && selected?.preview_kind === "video" && mediaUrl ? jsx("video", { "data-content-preview": true, "data-preview-kind": "video", className: "dockyard-content-video", controls: true, preload: "metadata", "aria-label": `Video: ${selected.filename}`, src: mediaUrl }) : previewState === "ready" ? jsx("div", { "data-content-preview": true, className: "dockyard-report-placeholder", children: `Preview is not available for ${mediaTypeLabel(selected?.media_type)}. File metadata remains visible.` }) : previewState === "idle" ? jsx("p", { className: "dockyard-meta", children: "Text, Markdown, images, PDFs and videos show here." }) : null,
       selected ? jsxs("div", { className: "dockyard-form-actions", children: [
         selected.archived_at ? jsx(Button, { action: "restore-project-content", disabled: actionBusy, onClick: () => setContentAction("restore"), children: "Restore" }) : jsx(Button, { action: "archive-project-content", disabled: actionBusy, onClick: () => setContentAction("archive"), children: "Archive" }),
         jsx(Button, { action: "remove-project-content", variant: "danger", disabled: actionBusy, onClick: () => setContentAction("remove"), children: "Remove file" })
@@ -23958,16 +23958,6 @@ function InboxView({ view, onRefresh, focusRef = null, onOpenProject }) {
     if (items.some((item) => item.ref === focusRef)) setSelectedRef(focusRef);
   }, [focusRef, items]);
   useEffect(() => {
-    const handle = (event) => {
-      const link = event.detail;
-      if (typeof link !== "string" || !link.startsWith("s6:initiative/")) return;
-      const ref = link.slice("s6:initiative/".length);
-      if (items.some((item) => item.ref === ref)) setSelectedRef(ref);
-    };
-    window.addEventListener("dockyard:test:deeplink", handle);
-    return () => window.removeEventListener("dockyard:test:deeplink", handle);
-  }, [items]);
-  useEffect(() => {
     const close = (event) => {
       if (event.key !== "Escape" || !selectedRef) return;
       const ref = selectedRef;
@@ -26396,6 +26386,15 @@ function startPopupPoller(ctxRest) {
   const interval = Number(window.__dockyardPopupIntervalMs) > 0 ? Number(window.__dockyardPopupIntervalMs) : POPUP_INTERVAL_MS;
   window.__dockyardPopupPoller = setInterval(tick, interval);
   window.setTimeout(tick, 1500);
+}
+function stopPopupPoller() {
+  if (!window.__dockyardPopupPoller) return;
+  clearInterval(window.__dockyardPopupPoller);
+  window.__dockyardPopupPoller = void 0;
+}
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", stopPopupPoller);
+  window.addEventListener("pageshow", () => startPopupPoller());
 }
 var __plugin = {
   id: "hermes-project-stewardship",
