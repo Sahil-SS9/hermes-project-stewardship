@@ -15,7 +15,9 @@ not emit it.
 
 The build intentionally bundles the maintained source modules. The sibling
 runtime modules used by the source tree remain build inputs; the committed
-`plugin.js` is the only shipped Desktop artifact. `views/backlog.js` remains
+`plugin.js` is the only shipped Desktop artifact. The build also writes an
+identical copy to the repository's top-level `desktop/plugin.js`, the file
+Hermes Desktop installs from Git; it is a real file, not a symlink. `views/backlog.js` remains
 larger than the general size target because its table row and dialog trees
 are one stateful view; the model, bulk-import, wizard, and reason-modal seams are
 split into the documented siblings.

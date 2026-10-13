@@ -14,6 +14,10 @@ const DESKTOP = dirname(fileURLToPath(import.meta.url));
 const REPO = join(DESKTOP, '..', '..');
 const SRC = join(DESKTOP, 'src');
 const OUT = join(DESKTOP, 'plugin.js');
+// The copy Hermes Desktop installs from Git (the repo's top-level desktop/).
+// A real file, not a symlink: Desktop copies desktop/ out of a temporary
+// clone, so a link into the rest of the checkout dangles once it is gone.
+const PUBLISHED = join(REPO, 'desktop', 'plugin.js');
 const ENTRY = join(SRC, 'index.js');
 const require = createRequire(join(DESKTOP, '..', 'dashboard', 'package.json'));
 const { build } = require('esbuild');
@@ -43,6 +47,7 @@ const result = await build({
 
 if (result.errors.length) throw new Error(`esbuild reported ${result.errors.length} error(s)`);
 const bytes = readFileSync(OUT);
+writeFileSync(PUBLISHED, bytes);
 const hash = createHash('sha256').update(bytes).digest('hex');
 const relative = OUT.slice(DESKTOP.length + 1);
 console.log(`${relative}: ${bytes.length} bytes sha256=${hash}`);
