@@ -932,6 +932,7 @@ def test_vanilla_host_narrows_profiles_by_the_dispatchers_allowlist(
     setattr(constants, "reset_hermes_home_override", lambda token: None)
     kanban_db = types.ModuleType("hermes_cli.kanban_db")
     setattr(kanban_db, "scoped_current_board", lambda board: contextlib.nullcontext())
+    setattr(kanban_db, "kanban_home", lambda: tmp_path / ".hermes")
     dispatch = types.ModuleType("hermes_cli.kanban_db_dispatch")
     setattr(dispatch, "_dispatch_profile_allowlist", lambda normalize: allowlist["value"])
     profiles = types.ModuleType("hermes_cli.profiles")
