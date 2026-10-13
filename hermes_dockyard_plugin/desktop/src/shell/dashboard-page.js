@@ -49,6 +49,7 @@ import { DEFAULT_FONT } from '../styles/themes.js'
 import { DEFAULT_THEME } from '../styles/themes.js'
 import { fontById } from '../styles/themes.js'
 import { useHostDark } from '../runtime/host-theme.js'
+import { useHostIsDesktop } from '../runtime/host-theme.js'
 import { themeById } from '../styles/themes.js'
 import { themeMode } from '../styles/themes.js'
 // Sahil 04/10 (demo feedback d): screens that work on one project ask for one
@@ -74,6 +75,7 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   const [appearance, setAppearance] = useState({ theme: DEFAULT_THEME, font: DEFAULT_FONT })
   // Read through the plugin SDK's useTheme(), never the app's markup.
   const hostDark = useHostDark()
+  const hostDesktop = useHostIsDesktop()
   // Asked for once, right after the first data load starts: the dashboard
   // stays the first request (same rule as the remembered project below).
   const appearanceAsked = useRef(false)
@@ -538,6 +540,7 @@ export function DashboardPage({ inboxCss = '' } = {}) {
     className: 'dockyard-root',
     'data-theme': themeMode(theme.id, hostDark),
     'data-dy-theme': theme.id,
+    'data-dy-host': hostDesktop ? 'hermes-desktop' : undefined,
     'data-dy-art': theme.art ? 'true' : undefined,
     'data-dy-font': appearance.font !== DEFAULT_FONT ? appearance.font : undefined,
     children: [
