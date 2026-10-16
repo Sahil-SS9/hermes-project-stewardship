@@ -31,6 +31,7 @@ from ..domain.constants import (
     ProjectPhase,
 )
 from ..domain.models import Objective
+from .anchored import AnchoredDirectory, is_link, open_anchored
 from .file_identity import sqlite_file_identity
 from .store import Store, iso
 
@@ -1946,7 +1947,7 @@ class StewardshipService:
         try:
             if raw_root.exists() or raw_root.is_symlink():
                 root_info = os.lstat(raw_root)
-                if stat.S_ISLNK(root_info.st_mode):
+                if is_link(root_info):
                     raise ServiceError("project content root cannot be a symlink")
                 if not stat.S_ISDIR(root_info.st_mode):
                     raise ServiceError("project content root is not a directory")
@@ -2218,7 +2219,7 @@ class StewardshipService:
                     info = None
                     break
                 raise ServiceError("project content file is unavailable") from exc
-            if stat.S_ISLNK(info.st_mode):
+            if is_link(info):
                 raise ServiceError("project content path contains a symlink")
         try:
             candidate = (root / relative).resolve(strict=info is not None)
@@ -2255,8 +2256,8 @@ class StewardshipService:
         if len(raw) != int(row["size_bytes"]) or hashlib.sha256(raw).hexdigest() != row["sha256"]:
             raise ServiceError("project content failed its integrity check; removal refused")
 
-    def _open_managed_content_parent(self, row: sqlite3.Row) -> tuple[int, str]:
-        """Open the managed parent without following mutable pathnames."""
+    def _open_managed_content_parent(self, row: sqlite3.Row) -> tuple[AnchoredDirectory, str]:
+        """Anchor the managed parent without following mutable pathnames."""
         root = self._content_root()
         relative = Path(str(row["stored_path"] or ""))
         if (
@@ -2264,19 +2265,7 @@ class StewardshipService:
             or any(part in {"", ".", ".."} for part in relative.parts)
         ):
             raise ServiceError("project content does not have a managed relative path")
-        directory_flags = (
-            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
-        )
-        directory_fd = os.open(root, directory_flags)
-        try:
-            for part in relative.parts[:-1]:
-                next_fd = os.open(part, directory_flags, dir_fd=directory_fd)
-                os.close(directory_fd)
-                directory_fd = next_fd
-            return directory_fd, relative.name
-        except BaseException:
-            os.close(directory_fd)
-            raise
+        return open_anchored(root, relative.parts[:-1]), relative.name
 
     def _verify_open_content_file(self, row: sqlite3.Row, file_fd: int) -> None:
         opened = os.fstat(file_fd)
@@ -2290,19 +2279,18 @@ class StewardshipService:
         if len(raw) != int(row["size_bytes"]) or hashlib.sha256(raw).hexdigest() != row["sha256"]:
             raise ServiceError("project content failed its integrity check; removal refused")
 
-    def _open_managed_content_file(self, row: sqlite3.Row) -> tuple[int, str, int]:
-        """Open the managed parent and file without following mutable pathnames."""
-        directory_fd, filename = self._open_managed_content_parent(row)
+    def _open_managed_content_file(self, row: sqlite3.Row) -> tuple[AnchoredDirectory, str, int]:
+        """Anchor the managed parent and open the file without following mutable pathnames."""
+        parent, filename = self._open_managed_content_parent(row)
         file_fd: int | None = None
         try:
-            file_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-            file_fd = os.open(filename, file_flags, dir_fd=directory_fd)
+            file_fd = parent.open(filename, os.O_RDONLY)
             self._verify_open_content_file(row, file_fd)
-            return directory_fd, filename, file_fd
+            return parent, filename, file_fd
         except BaseException:
             if file_fd is not None:
                 os.close(file_fd)
-            os.close(directory_fd)
+            parent.close()
             raise
 
     def _insert_content_removal_audit(
@@ -2339,16 +2327,12 @@ class StewardshipService:
         )
         tombstone = f".{content_id}.removing"
         if info is None:
-            parent_fd, _ = self._open_managed_content_parent(row)
+            parent, _ = self._open_managed_content_parent(row)
             tombstone_fd: int | None = None
             final_fd: int | None = None
             try:
                 try:
-                    tombstone_fd = os.open(
-                        tombstone,
-                        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
-                        dir_fd=parent_fd,
-                    )
+                    tombstone_fd = parent.open(tombstone, os.O_RDONLY)
                 except FileNotFoundError:
                     tombstone_fd = None
                 if tombstone_fd is None:
@@ -2412,23 +2396,17 @@ class StewardshipService:
                         raise ServiceError(
                             f"project content removal blocked by dependencies: {refs}"
                         )
-                    current = os.stat(
-                        tombstone, dir_fd=parent_fd, follow_symlinks=False
-                    )
+                    current = parent.stat(tombstone)
                     opened = os.fstat(tombstone_fd)
                     if (
-                        stat.S_ISLNK(current.st_mode)
+                        is_link(current)
                         or int(current.st_dev) != int(opened.st_dev)
                         or int(current.st_ino) != int(opened.st_ino)
                     ):
                         raise ServiceError(
                             "quarantined content identity changed; removal refused"
                         )
-                    final_fd = os.open(
-                        tombstone,
-                        os.O_RDWR | getattr(os, "O_NOFOLLOW", 0),
-                        dir_fd=parent_fd,
-                    )
+                    final_fd = parent.open(tombstone, os.O_RDWR)
                     self._verify_open_content_file(row, final_fd)
                     try:
                         os.ftruncate(final_fd, 0)
@@ -2464,7 +2442,7 @@ class StewardshipService:
                     os.close(final_fd)
                 if tombstone_fd is not None:
                     os.close(tombstone_fd)
-                os.close(parent_fd)
+                parent.close()
             return self._content_metadata(self._project_content_row(project_id, content_id))
 
         self._verify_managed_content_identity(row, candidate, info)
@@ -2478,7 +2456,7 @@ class StewardshipService:
                 " WHERE project_id=? AND content_id=? AND removal_state IN ('active','pending')",
                 (actor, project_id, content_id),
             )
-        parent_fd, filename, file_fd = self._open_managed_content_file(row)
+        parent, filename, file_fd = self._open_managed_content_file(row)
         try:
             with self.store.tx() as cx:
                 dependencies = self.project_content_dependencies(project_id, content_id)
@@ -2486,37 +2464,25 @@ class StewardshipService:
                     refs = ", ".join(f"{item['kind']}:{item['ref']}" for item in dependencies)
                     raise ServiceError(f"project content removal blocked by dependencies: {refs}")
                 try:
-                    current = os.stat(filename, dir_fd=parent_fd, follow_symlinks=False)
+                    current = parent.stat(filename)
                     opened = os.fstat(file_fd)
                     if (
-                        stat.S_ISLNK(current.st_mode)
+                        is_link(current)
                         or int(current.st_dev) != int(opened.st_dev)
                         or int(current.st_ino) != int(opened.st_ino)
                     ):
                         raise ServiceError("project content file identity changed before removal")
-                    os.rename(
-                        filename,
-                        tombstone,
-                        src_dir_fd=parent_fd,
-                        dst_dir_fd=parent_fd,
-                    )
-                    quarantined = os.stat(
-                        tombstone, dir_fd=parent_fd, follow_symlinks=False
-                    )
+                    parent.rename(filename, tombstone)
+                    quarantined = parent.stat(tombstone)
                     if (
-                        stat.S_ISLNK(quarantined.st_mode)
+                        is_link(quarantined)
                         or int(quarantined.st_dev) != int(opened.st_dev)
                         or int(quarantined.st_ino) != int(opened.st_ino)
                     ):
                         try:
-                            os.stat(filename, dir_fd=parent_fd, follow_symlinks=False)
+                            parent.stat(filename)
                         except FileNotFoundError:
-                            os.rename(
-                                tombstone,
-                                filename,
-                                src_dir_fd=parent_fd,
-                                dst_dir_fd=parent_fd,
-                            )
+                            parent.rename(tombstone, filename)
                         raise ServiceError(
                             "project content file identity changed during quarantine; removal refused"
                         )
@@ -2531,11 +2497,7 @@ class StewardshipService:
                     " WHERE project_id=? AND content_id=? AND removal_state='pending'",
                     (project_id, content_id),
                 )
-            tombstone_fd = os.open(
-                tombstone,
-                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
-                dir_fd=parent_fd,
-            )
+            tombstone_fd = parent.open(tombstone, os.O_RDONLY)
             final_fd: int | None = None
             try:
                 self._verify_open_content_file(row, tombstone_fd)
@@ -2548,23 +2510,17 @@ class StewardshipService:
                         raise ServiceError(
                             f"project content removal blocked by dependencies: {refs}"
                         )
-                    current = os.stat(
-                        tombstone, dir_fd=parent_fd, follow_symlinks=False
-                    )
+                    current = parent.stat(tombstone)
                     opened = os.fstat(tombstone_fd)
                     if (
-                        stat.S_ISLNK(current.st_mode)
+                        is_link(current)
                         or int(current.st_dev) != int(opened.st_dev)
                         or int(current.st_ino) != int(opened.st_ino)
                     ):
                         raise ServiceError(
                             "quarantined content identity changed; removal refused"
                         )
-                    final_fd = os.open(
-                        tombstone,
-                        os.O_RDWR | getattr(os, "O_NOFOLLOW", 0),
-                        dir_fd=parent_fd,
-                    )
+                    final_fd = parent.open(tombstone, os.O_RDWR)
                     self._verify_open_content_file(row, final_fd)
                     try:
                         os.ftruncate(final_fd, 0)
@@ -2595,7 +2551,7 @@ class StewardshipService:
                 os.close(tombstone_fd)
         finally:
             os.close(file_fd)
-            os.close(parent_fd)
+            parent.close()
         return self._content_metadata(self._project_content_row(project_id, content_id))
 
     def project_content_image(self, project_id: str, content_id: str) -> Dict[str, Any]:

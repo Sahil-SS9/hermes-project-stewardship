@@ -56,6 +56,15 @@ def _managed_path(store: Store, content_id: str) -> Path:
     return store.db_path.parent / "project-content" / row["stored_path"]
 
 
+def _anchored_stat_of(name: str, target, kwargs) -> bool:
+    """Is this the removal's own stat of ``name`` inside its anchored parent?
+    POSIX asks relative to the parent's descriptor; Windows, which has no
+    directory descriptors, asks by full path under the pinned parent."""
+    if os.name == "nt":
+        return Path(target).name == name and kwargs.get("follow_symlinks") is False
+    return target == name and kwargs.get("dir_fd") is not None
+
+
 def test_goal_lifecycle_order_and_nullable_objective_links_preserve_unlinked(phase5):
     """Goal lifecycle: create, list order, edit, reorder, archive, restore.
 
@@ -430,17 +439,47 @@ def test_managed_file_removal_is_anchored_against_root_and_parent_swaps(phase5, 
     def swap_after_anchored_stat(target, *args, **kwargs):
         nonlocal swapped
         result = real_stat(target, *args, **kwargs)
-        if target == path.name and kwargs.get("dir_fd") is not None and not swapped:
+        if _anchored_stat_of(path.name, target, kwargs) and not swapped:
             swapped = True
-            path.parent.rename(held)
-            path.parent.symlink_to(outside, target_is_directory=True)
+            if os.name == "nt":
+                # Windows pins every directory from the root down while it
+                # removes, so the parent cannot even be moved aside.
+                with pytest.raises(PermissionError):
+                    path.parent.rename(held)
+            else:
+                path.parent.rename(held)
+                path.parent.symlink_to(outside, target_is_directory=True)
         return result
 
     monkeypatch.setattr(os, "stat", swap_after_anchored_stat)
     result = service.remove_project_content("demo", uploaded["content_id"], actor="sahil")
+    assert swapped
     assert result["removal_state"] == "file_removed"
     assert victim.read_bytes() == b"unrelated"
-    assert not (held / path.name).exists()
+    erased_in = path.parent if os.name == "nt" else held
+    assert not (erased_in / path.name).exists()
+    assert (erased_in / f".{uploaded['content_id']}.removing").read_bytes() == b""
+
+
+@pytest.mark.skipif(os.name != "nt", reason="junctions are a Windows reparse point")
+def test_managed_file_removal_refuses_a_junction_root_on_windows(phase5, tmp_path):
+    """A junction is not a symlink to os.lstat, yet it redirects like one:
+    a content root swapped for a junction is refused, the file left alone."""
+    import _winapi
+
+    store, service, _, _, _ = phase5
+    uploaded = service.upload_project_content(
+        "demo", filename="junction.md", media_type="text/markdown",
+        content=b"managed", actor="sahil",
+    )
+    path = _managed_path(store, uploaded["content_id"])
+    root = store.db_path.parent / "project-content"
+    external_root = tmp_path / "external-root"
+    root.rename(external_root)
+    _winapi.CreateJunction(str(external_root), str(root))
+    with pytest.raises(ServiceError, match="root cannot be a symlink"):
+        service.remove_project_content("demo", uploaded["content_id"], actor="sahil")
+    assert (external_root / path.relative_to(root)).read_bytes() == b"managed"
 
 
 def test_managed_file_basename_swap_is_quarantined_without_deleting_replacement(
@@ -461,7 +500,7 @@ def test_managed_file_basename_swap_is_quarantined_without_deleting_replacement(
     def swap_after_final_stat(target, *args, **kwargs):
         nonlocal swapped
         result = real_stat(target, *args, **kwargs)
-        if target == path.name and kwargs.get("dir_fd") is not None and not swapped:
+        if _anchored_stat_of(path.name, target, kwargs) and not swapped:
             swapped = True
             path.rename(held)
             os.replace(external, path)
@@ -536,7 +575,7 @@ def test_quarantine_stat_boundary_swap_is_refused(
     def swap_after_final_quarantine_stat(target, *args, **kwargs):
         nonlocal seen
         result = real_stat(target, *args, **kwargs)
-        if target == tombstone.name and kwargs.get("dir_fd") is not None:
+        if _anchored_stat_of(tombstone.name, target, kwargs):
             seen += 1
             trigger = 1 if recovery else 2
             if seen == trigger:
