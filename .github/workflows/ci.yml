@@ -11,7 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python: ["3.10", "3.11", "3.12"]
+        # 3.10 is the declared floor; 3.14 is the interpreter Hermes ships.
+        python: ["3.10", "3.11", "3.12", "3.14"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -21,11 +22,9 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - name: Install reproducibly
         run: uv sync --locked --extra dev --extra plugin --python "${{ matrix.python }}"
-      # NOTE: GitHub Actions is rate-limited for this account and CI cannot run
-      # there for now. scripts/local-ci.sh mirrors this exact gate sequence
-      # locally; its output is the authoritative CI evidence until Actions is
-      # restored. The gate is pinned to the measured suite value (87) and must
-      # be re-raised deliberately, not by silent drift.
+      # scripts/local-ci.sh runs this same gate sequence locally; gate values
+      # match this file, so change both together. The coverage gate is pinned to
+      # the measured suite value (87) and is raised deliberately, never by drift.
       - name: Run tests with coverage gate
         run: uv run --locked --extra dev --extra plugin pytest --cov=hermes_project_stewardship --cov-report=term --cov-fail-under=87
       - name: Lint production source
@@ -64,6 +63,14 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: hermes_dockyard_plugin/dashboard/package-lock.json
+      # The dashboard contract tests start the real Python backend from the
+      # repo's .venv, so this job needs the same locked environment.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@v6
+      - name: Install the Python backend the dashboard tests start
+        run: uv sync --locked --extra dev --extra plugin --python "3.14"
       - name: Install dashboard dependencies
         working-directory: hermes_dockyard_plugin/dashboard
         run: npm ci
@@ -87,3 +94,6 @@ jobs:
         env:
           DOCKYARD_CAPTURE_SCREENSHOTS: "0"
         run: node --experimental-vm-modules --test repro-live.test.mjs milestone-chain.test.mjs
+      - name: Check the Desktop bundle (rebuilds identically, loads bare, SDK-only surface)
+        working-directory: hermes_dockyard_plugin/desktop
+        run: node --test drift.test.mjs loader-contract.test.mjs prohibited-api.test.mjs

@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # scripts/local-ci.sh — local CI mirror for Project Stewardship.
 #
-# Why this exists: GitHub Actions is rate-limited for this account; the repo's
-# gate sequence cannot run there for now. This script mirrors the ci.yml gate
-# sequence exactly so CI evidence stays truthful while Actions is unavailable.
-# The NOTE block in .github/workflows/ci.yml points here as the authoritative
-# evidence source. Gate values match ci.yml; change both together or neither.
+# Why this exists: the same gate sequence as .github/workflows/ci.yml, runnable
+# offline on one machine, with every log kept as evidence. GitHub Actions runs
+# the full OS/Python matrix; this script is the fast local mirror of one cell.
+# Gate values match ci.yml; change both together or neither.
 #
 # Usage:
 #   scripts/local-ci.sh                 # all Python gates
@@ -122,7 +121,9 @@ if [ "$WITH_NODE" -eq 1 ]; then
     popd >/dev/null
     pushd hermes_dockyard_plugin/desktop >/dev/null
     run_gate "desktop-harness" "node --test" \
-        env DOCKYARD_CAPTURE_SCREENSHOTS=0 node --experimental-vm-modules --test repro-live.test.mjs
+        env DOCKYARD_CAPTURE_SCREENSHOTS=0 node --experimental-vm-modules --test repro-live.test.mjs milestone-chain.test.mjs
+    run_gate "desktop-bundle" "drift+loader+surface" \
+        node --test drift.test.mjs loader-contract.test.mjs prohibited-api.test.mjs
     popd >/dev/null
   else
     fail "node-gates" "npm not found; skipping requested JS gates"
