@@ -95,9 +95,27 @@ class ProjectKanbanHost:
     def capabilities(self) -> dict[str, Any]:
         return {"contract_version": CONTRACT_VERSION, "methods": sorted(_METHODS)}
 
+    def _hermes_root(self) -> Path:
+        """The Hermes root that holds every profile's directory.
+
+        Profile names are root-level, so they are listed from here. Projects
+        stay with the profile this host serves (core keeps projects.db per
+        profile), so the scoped project calls keep using hermes_home. Newer
+        cores resolve the root of an explicit home themselves; older ones take
+        no argument, so core's rule is applied here instead:
+        <root>/profiles/<name> -> <root>; any other home is its own root.
+        """
+        try:
+            import hermes_constants
+
+            return Path(hermes_constants.get_default_hermes_root(home=self.hermes_home))
+        except (ImportError, AttributeError, TypeError):
+            home = self.hermes_home
+            return home.parent.parent if home.parent.name == "profiles" else home
+
     def list_profiles(self) -> list[dict[str, Any]]:
         profiles = [{"name": "default", "is_default": True}]
-        root = self.hermes_home / "profiles"
+        root = self._hermes_root() / "profiles"
         if root.is_dir():
             for path in sorted(root.iterdir(), key=lambda p: p.name.casefold()):
                 if path.is_dir() and _PROFILE_RE.fullmatch(path.name):
