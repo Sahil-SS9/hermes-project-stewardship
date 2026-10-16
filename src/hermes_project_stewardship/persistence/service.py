@@ -31,6 +31,7 @@ from ..domain.constants import (
     ProjectPhase,
 )
 from ..domain.models import Objective
+from .file_identity import sqlite_file_identity
 from .store import Store, iso
 
 logger = logging.getLogger(__name__)
@@ -2042,7 +2043,7 @@ class StewardshipService:
             stored_path = str(final_path.relative_to(root))
             uploaded_at = iso(self._clock())
             digest = hashlib.sha256(content).hexdigest()
-            identity = os.stat(final_path, follow_symlinks=False)
+            identity = sqlite_file_identity(os.stat(final_path, follow_symlinks=False))
             try:
                 with self.store.tx() as cx:
                     cx.execute(
@@ -2060,8 +2061,8 @@ class StewardshipService:
                             digest,
                             actor,
                             uploaded_at,
-                            int(identity.st_dev),
-                            int(identity.st_ino),
+                            identity[0],
+                            identity[1],
                         ),
                     )
             except BaseException:
@@ -2222,7 +2223,7 @@ class StewardshipService:
         if row["file_dev"] is None or row["file_ino"] is None:
             raise ServiceError("project content file identity is unavailable; removal refused")
         expected_identity = (int(row["file_dev"]), int(row["file_ino"]))
-        if (int(info.st_dev), int(info.st_ino)) != expected_identity:
+        if sqlite_file_identity(info) != expected_identity:
             raise ServiceError("project content file identity changed; removal refused")
         if int(info.st_size) != int(row["size_bytes"]):
             raise ServiceError("project content file identity changed; removal refused")
@@ -2233,7 +2234,7 @@ class StewardshipService:
             raise ServiceError("project content file could not be opened safely") from exc
         try:
             opened = os.fstat(descriptor)
-            if (int(opened.st_dev), int(opened.st_ino)) != expected_identity:
+            if sqlite_file_identity(opened) != expected_identity:
                 raise ServiceError("project content file identity changed during verification")
             with os.fdopen(descriptor, "rb", closefd=False) as handle:
                 raw = handle.read(_content_limit(row["media_type"]) + 1)
@@ -2270,7 +2271,7 @@ class StewardshipService:
         if not stat.S_ISREG(opened.st_mode):
             raise ServiceError("project content path is not a managed regular file")
         expected = (int(row["file_dev"]), int(row["file_ino"]))
-        if (int(opened.st_dev), int(opened.st_ino)) != expected:
+        if sqlite_file_identity(opened) != expected:
             raise ServiceError("project content file identity changed before removal")
         with os.fdopen(file_fd, "rb", closefd=False) as handle:
             raw = handle.read(_content_limit(row["media_type"]) + 1)
@@ -2344,9 +2345,7 @@ class StewardshipService:
                     )
                 tombstone_info = os.fstat(tombstone_fd)
                 expected_identity = (int(row["file_dev"]), int(row["file_ino"]))
-                actual_identity = (
-                    int(tombstone_info.st_dev), int(tombstone_info.st_ino)
-                )
+                actual_identity = sqlite_file_identity(tombstone_info)
                 if (
                     row["removal_state"] == "quarantined"
                     and actual_identity == expected_identity
