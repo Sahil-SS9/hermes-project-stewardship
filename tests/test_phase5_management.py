@@ -643,11 +643,15 @@ def test_final_removal_is_bound_to_verified_descriptor(
     def verify_then_replace(row, descriptor):
         nonlocal seen
         verify(row, descriptor)
+        # Is this descriptor the file currently named `tombstone`? Compared by
+        # identity (dev, inode), which every platform reports; /proc/self/fd
+        # exists only on Linux and silently skipped the swap on macOS.
         try:
-            target = os.readlink(f"/proc/self/fd/{descriptor}")
-        except OSError:
+            named = os.stat(tombstone, follow_symlinks=False)
+        except FileNotFoundError:
             return
-        if target == str(tombstone):
+        opened = os.fstat(descriptor)
+        if (opened.st_dev, opened.st_ino) == (named.st_dev, named.st_ino):
             seen += 1
             if seen == 2:
                 tombstone.rename(held)
