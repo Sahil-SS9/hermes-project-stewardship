@@ -131,7 +131,14 @@ def test_cycle_uses_the_project_objective_detail_cap(engine, enabled, svc, tmp_p
     assert objective["detail"].endswith("stderr_head=" + "e" * 600)
 
 
-def test_flooding_objective_is_killed_and_the_cycle_goes_on(engine, enabled, svc, tmp_path):
+def test_flooding_objective_times_out_and_the_cycle_goes_on(engine, enabled, svc, tmp_path, monkeypatch):
+    """A check that never stops writing is bound by its deadline like any
+    other: its measure is unknown, and the cycle's other checks still run."""
+    from hermes_project_stewardship.objectives import evaluators
+
+    real = evaluators.run_allowlisted
+    monkeypatch.setattr(evaluators, "run_allowlisted",
+                        lambda command, **kw: real(command, **{**kw, "timeout_seconds": 2}))
     svc.enable(enabled, lead_profile="lead", autonomy_level=3)
     wire_repo(svc, enabled, make_repo(tmp_path / "r"))
     svc.add_objective(enabled, name="flood", evaluator_type="command", target=">=1",
@@ -141,9 +148,22 @@ def test_flooding_objective_is_killed_and_the_cycle_goes_on(engine, enabled, svc
     r = engine.run_cycle(enabled)
     flood, fine = r["objectives"]
     assert flood["passed"] is False and flood["measured"] is None
-    assert "output_too_large" in flood["detail"]
+    assert "timed_out" in flood["detail"]
     assert fine["passed"] is True and fine["measured"] == 1.0
     assert r["health"]["state"] == "unknown"
+
+
+def test_verbose_objective_is_measured_from_its_last_line(engine, enabled, svc, tmp_path):
+    """A check that prints far more than the kept window and then its count
+    (`pytest -q`, a linter summary) is measured from that final line."""
+    svc.enable(enabled, lead_profile="lead", autonomy_level=3)
+    wire_repo(svc, enabled, make_repo(tmp_path / "r"))
+    svc.add_objective(enabled, name="verbose", evaluator_type="command", target=">=5",
+                      command=["python3", "-c", "print('noise\\n' * 300000, end=''); print(7)"])
+    r = engine.run_cycle(enabled)
+    (verbose,) = r["objectives"]
+    assert verbose["measured"] == 7.0
+    assert verbose["passed"] is True
 
 
 def test_unknown_state_blocks_mutations(engine, enabled, svc, tmp_path):

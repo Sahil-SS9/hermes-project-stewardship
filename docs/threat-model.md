@@ -53,12 +53,17 @@ Objective evaluators run commands in project context. Controls:
 - bare executable names only; absolute/relative paths are rejected;
 - resolution uses the same fixed trusted PATH passed to the child;
 - per-project executable allowlist;
-- hard timeout + 64 KiB output caps. The command runs in its own session
-  under one monotonic deadline; both pipes are read without blocking past it,
-  and a command that passes 1 MiB on either stream is killed
-  (`output_too_large`). A timeout or flood kills the whole process group
-  (SIGTERM, then SIGKILL after 1 s), so a grandchild holding a pipe open
-  cannot outlive the deadline;
+- hard timeout + bounded output. Each command runs under one monotonic
+  deadline (60 s by default), and the deadline is the only reason it is
+  stopped; a command is never killed for writing a lot. Both pipes are read
+  as the command writes, and only the head and tail of each stream are kept
+  (64 KiB), so a flood cannot grow memory and the last line, an objective's
+  measure, survives. At the deadline, or when the caller is interrupted or
+  fails mid-run, the command and everything it started are stopped: on POSIX
+  it runs in its own session and its process group is stopped (SIGTERM, then
+  SIGKILL after 1 s); on Windows its process tree is (`taskkill /T /F`). A
+  grandchild holding a pipe open cannot outlive the deadline. The command's
+  stdin is empty, never the steward's own;
 - refusal recorded as failed objective, not an exception path.
 
 Note honestly: a malicious repo can still contain a Makefile that does

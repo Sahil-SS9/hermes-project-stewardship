@@ -104,7 +104,7 @@ Read [SECURITY.md](SECURITY.md) and the [threat model](docs/threat-model.md) bef
 ### What it touches
 
 - **Your bots' context:** a `pre_llm_call` hook adds a project's saved rules, decisions and facts to a turn, only for a bot assigned to that project.
-- **Shell commands:** objective checks run allowlisted programs only, and only at autonomy level 3 or higher. GitHub objectives call your own `gh api` against github.com.
+- **Shell commands:** objective checks run allowlisted programs only, and only at autonomy level 3 or higher. Each check has 60 seconds; then it, and anything it started, is stopped. Only the start and end of its output are kept (64 KiB per stream), and it gets no input. GitHub objectives call your own `gh api` against github.com.
 - **Discord:** off by default. When you switch alerts on, the plugin only prepares the text; your Hermes Discord bot posts it, from a cron job you create.
 - **Data:** its own SQLite database, plus Hermes's projects and Kanban through the host adapter.
 - **Background work:** no threads or daemons of its own. Workflow runs move on by themselves only if you schedule `stewardctl workflows tick` (for example as a Hermes cron job).

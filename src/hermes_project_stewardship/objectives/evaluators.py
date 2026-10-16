@@ -216,8 +216,7 @@ class ObjectiveEvaluator:
         detail = (
             f"exit={result.exit_code}"
             + (" timed_out" if result.timed_out else "")
-            + (" output_too_large" if result.output_too_large else "")
-            + (" no_measure" if measured is None and not (result.timed_out or result.output_too_large) else "")
+            + (" no_measure" if measured is None and not result.timed_out else "")
             + (f" stderr_head={result.stderr[:ctx.detail_chars]}" if result.stderr and not result.ok else "")
         )
         return ObjectiveResult(
@@ -232,7 +231,7 @@ class ObjectiveEvaluator:
     @staticmethod
     def _measure(result, target: str) -> Optional[float]:
         """Exit-code-first semantics with optional numeric stdout override."""
-        if result.timed_out or result.output_too_large:
+        if result.timed_out:
             return None
         lines = [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
         if lines:

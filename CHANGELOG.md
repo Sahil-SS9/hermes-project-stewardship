@@ -16,12 +16,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ### Security
 - **Objective commands are bounded in memory and time.** They were read with
   `capture_output`, so one printing without end filled memory until the
-  timeout, and only the direct child was killed. A command now runs in its own
-  session under one deadline (60 s by default) and its output is read as it
-  is written. Past 1 MiB on either stream, or at the deadline, its whole
-  process group is killed, including a grandchild that kept a pipe open. A
-  flood records `output_too_large` with an unknown measure, like a timeout;
-  other objectives in the cycle still run.
+  timeout, and only the direct child was killed. A command now runs under one
+  deadline (60 s by default), the only reason it is stopped, and its output is
+  read as it is written: only the start and end of each stream are kept
+  (64 KiB per stream), so a flood keeps memory flat, a verbose but healthy run
+  still passes, and a count on its last line is still measured. At the
+  deadline, or if the steward is interrupted mid-run, the command and
+  everything it started are stopped (its process group on Linux and macOS,
+  `taskkill /T` on Windows), including a grandchild that kept a pipe open.
+  Commands get an empty stdin, and each run records how long it took.
 
 ## [0.5.2] - 2026-10-13
 
