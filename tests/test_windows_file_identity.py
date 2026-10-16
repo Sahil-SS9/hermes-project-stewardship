@@ -14,6 +14,7 @@ os.stat/os.lstat/os.fstat result the same way, so a file keeps one consistent
 from __future__ import annotations
 
 import os
+import pathlib
 from pathlib import Path
 
 import pytest
@@ -56,7 +57,14 @@ def windows_identities(request, monkeypatch):
         return stat_with_windows_identity
 
     for name in ("stat", "lstat", "fstat"):
-        monkeypatch.setattr(os, name, wrap(getattr(os, name)))
+        wrapped = wrap(getattr(os, name))
+        monkeypatch.setattr(os, name, wrapped)
+        # Python 3.10's pathlib keeps its own reference to os.stat/os.lstat
+        # (Path.stat goes through _NormalAccessor), so widen it there too;
+        # 3.11+ calls os.stat directly.
+        accessor = getattr(pathlib, "_NormalAccessor", None)
+        if accessor is not None and hasattr(accessor, name):
+            monkeypatch.setattr(accessor, name, staticmethod(wrapped))
     return request.param
 
 
