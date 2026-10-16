@@ -103,8 +103,6 @@ def test_pick_initiative_degrades_to_numbered_list_without_tty(
 
 
 def _fake_tty_stdin(keys):
-    import itertools
-
     class FakeStdin:
         def isatty(self):
             return True
@@ -120,8 +118,9 @@ def _fake_tty_stdin(keys):
 
 def test_pick_initiative_interactive_arrow_selection(monkeypatch, capsys):
     """Full TTY path: escape sequence moves down, Enter selects, redraw runs."""
-    import termios
-    import tty
+    termios = pytest.importorskip(
+        "termios", reason="arrow-key picking drives a POSIX terminal; Windows types a number")
+    tty = pytest.importorskip("tty")
 
     options = [
         {"ref": "PM-A", "title": "Alpha", "risk": "low"},
@@ -142,8 +141,9 @@ def test_pick_initiative_interactive_arrow_selection(monkeypatch, capsys):
 
 
 def test_pick_initiative_interactive_quit_returns_none(monkeypatch):
-    import termios
-    import tty
+    termios = pytest.importorskip(
+        "termios", reason="arrow-key picking drives a POSIX terminal; Windows types a number")
+    tty = pytest.importorskip("tty")
 
     options = [{"ref": "PM-C", "title": "Gamma", "risk": "high"}]
     keys = iter(["q"])
@@ -154,3 +154,42 @@ def test_pick_initiative_interactive_quit_returns_none(monkeypatch):
     monkeypatch.setattr(tty, "setraw", lambda fd: None)
 
     assert ui.pick_initiative(options, "Pick:") is None
+
+
+# --- Windows (no termios): the user types a number --------------------------
+# Python on Windows has no termios, so raw arrow-key reading is unavailable;
+# the picker numbers the choices and reads one line instead. Replayed on any
+# OS by making `import termios` fail, exactly as it does on Windows.
+
+def _windows_console(monkeypatch, answers):
+    monkeypatch.setitem(__import__("sys").modules, "termios", None)
+    monkeypatch.setattr(ui.sys, "stdin", _fake_tty_stdin(iter(())))
+    replies = iter(answers)
+
+    def fake_input(prompt=""):
+        print(prompt, end="")
+        reply = next(replies)
+        if isinstance(reply, BaseException):
+            raise reply
+        return reply
+
+    monkeypatch.setattr("builtins.input", fake_input)
+
+
+_TWO = [
+    {"ref": "PM-A", "title": "Alpha", "risk": "low"},
+    {"ref": "PM-B", "title": "Beta", "risk": "medium"},
+]
+
+
+def test_pick_initiative_on_windows_reads_the_chosen_number(monkeypatch, capsys):
+    _windows_console(monkeypatch, ["2"])
+    assert ui.pick_initiative(_TWO, "Pick:") == "PM-B"
+    out = capsys.readouterr().out
+    assert "Pick:" in out and "1. PM-A" in out and "2. PM-B" in out
+
+
+@pytest.mark.parametrize("answer", ["", "0", "3", "two", EOFError(), KeyboardInterrupt()])
+def test_pick_initiative_on_windows_cancels_on_anything_else(monkeypatch, answer):
+    _windows_console(monkeypatch, [answer])
+    assert ui.pick_initiative(_TWO, "Pick:") is None
