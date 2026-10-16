@@ -847,7 +847,7 @@ def test_bot_session_transcripts_are_profile_scoped(client, tmp_path, monkeypatc
 
 def test_manifest_declares_required_fields():
     import json
-    manifest = json.loads((PLUGIN_DIR / "manifest.json").read_text())
+    manifest = json.loads((PLUGIN_DIR / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["name"] == "hermes-project-stewardship"
     assert manifest["entry"].startswith("dist/")
     assert manifest["css"].startswith("dist/")

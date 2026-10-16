@@ -143,6 +143,6 @@ def test_stewardctl_db_repair_cli(snapshot_copy, tmp_path):
          "--backup-dir", str(tmp_path / "backup"), "--report", str(report_path)],
         env=env, capture_output=True, text=True, timeout=180)
     assert result.returncode == 0, result.stderr[-2000:]
-    report = json.loads(report_path.read_text())
+    report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["ok"] is True
     assert {t: n for t, n in report["target_rows"].items() if n} == EXPECTED_ROWS

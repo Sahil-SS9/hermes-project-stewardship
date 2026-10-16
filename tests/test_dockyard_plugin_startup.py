@@ -87,8 +87,12 @@ def _run_plugin_import(legacy_rows: bool) -> dict:
         # by test_dockyard_plugin_backend before importing its plugin_api).
         env.pop("DOCKYARD_PLUGIN_DB", None)
         env.pop("STEWARD_DB_PATH", None)
+        # The harness embeds the legacy database's bytes, far past Windows'
+        # 32,767-character command line: run it from a file, not `-c`.
+        script = Path(tmp) / "harness.py"
+        script.write_text(harness, encoding="utf-8")
         proc = subprocess.run(
-            [sys.executable, "-c", harness],
+            [sys.executable, str(script)],
             env=env, capture_output=True, text=True, timeout=120,
         )
         assert proc.returncode == 0, (

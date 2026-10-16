@@ -116,7 +116,7 @@ def _archive_with_one_content(tmp_path: Path) -> tuple[Store, Path, Path, dict]:
     archive = tmp_path / "export"
     export_store(store, archive)
     manifest_path = archive / "manifest.json"
-    manifest = json.loads(manifest_path.read_text())
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     return store, archive, manifest_path, manifest
 
 

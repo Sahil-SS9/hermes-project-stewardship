@@ -106,9 +106,10 @@ def test_missing_binary_fails_closed_without_crash(tmp_path):
 
 def test_output_truncation_flag_and_cap(tmp_path):
     exe = "python3"  # /usr/bin/python3 — the only interpreter on the trusted PATH
-    big = "x" * (MAX_OUTPUT_BYTES + 10)
+    # The child builds the oversized line itself: a 64 KiB literal in argv
+    # exceeds Windows' 32,767-character command-line limit.
     result = run_allowlisted(
-        [exe, "-c", f"print('{big}')"],
+        [exe, "-c", f"print('x' * {MAX_OUTPUT_BYTES + 10})"],
         cwd=tmp_path,
         allowlist=frozenset({exe}),
     )

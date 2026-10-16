@@ -205,5 +205,5 @@ def test_api_opens_a_link(store):
 
 
 def test_proxy_carries_chat_links():
-    text = (Path(__file__).parents[1] / "hermes_dockyard_plugin/dashboard/plugin_api.py").read_text()
+    text = (Path(__file__).parents[1] / "hermes_dockyard_plugin/dashboard/plugin_api.py").read_text(encoding="utf-8")
     assert '@plugin_api.post("/projects/{project_id}/chat-links")' in text

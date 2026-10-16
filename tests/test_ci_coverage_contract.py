@@ -26,7 +26,7 @@ print(json.dumps(sorted(cov.get_data().measured_files())))
                             env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
                             capture_output=True, text=True, timeout=20)
     assert result.returncode == 0, result.stderr
-    measured = json.loads(result.stdout)
+    measured = [Path(p).as_posix() for p in json.loads(result.stdout)]
     assert measured, "The control must actually collect package execution"
     assert not any(p.endswith("/kanban/vanilla_host.py") for p in measured), measured
     assert any(p.endswith("/kanban/host_adapter.py") for p in measured), measured
