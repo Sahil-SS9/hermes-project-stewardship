@@ -119,6 +119,16 @@ export const CONTRAST_PAIRS = Object.freeze([
   { theme: 'dark', label: 'control boundary on page', foreground: DARK_TOKENS.controlBorder, background: DARK_TOKENS.bg, minimum: 3 },
   { theme: 'dark', label: 'control boundary on surface', foreground: DARK_TOKENS.controlBorder, background: DARK_TOKENS.surface, minimum: 3 },
   { theme: 'dark', label: 'focus indicator', foreground: DARK_TOKENS.focus, background: DARK_TOKENS.bg, minimum: 3 },
+  // Match Hermes inside Desktop keeps these status colours on Desktop's own
+  // background. Desktop's light editor backgrounds sit between #e5e5e5 and
+  // white, its dark ones between black and #2e3440: both ends must read.
+  ...['success', 'warning', 'danger', 'info'].flatMap((status) => [
+    ['light', LIGHT_TOKENS, '#ffffff'], ['light', LIGHT_TOKENS, '#e5e5e5'],
+    ['dark', DARK_TOKENS, '#000000'], ['dark', DARK_TOKENS, '#2e3440'],
+  ].map(([theme, tokens, background]) => ({
+    theme, label: `${status} on a Desktop background (${background})`,
+    foreground: tokens[status], background, minimum: 4.5,
+  }))),
 ])
 
 export const DOCKYARD_TEST = Object.freeze({

@@ -171,7 +171,22 @@ var CONTRAST_PAIRS = Object.freeze([
   { theme: "dark", label: "disabled control", foreground: DARK_TOKENS.disabledText, background: DARK_TOKENS.disabledBg, minimum: 4.5 },
   { theme: "dark", label: "control boundary on page", foreground: DARK_TOKENS.controlBorder, background: DARK_TOKENS.bg, minimum: 3 },
   { theme: "dark", label: "control boundary on surface", foreground: DARK_TOKENS.controlBorder, background: DARK_TOKENS.surface, minimum: 3 },
-  { theme: "dark", label: "focus indicator", foreground: DARK_TOKENS.focus, background: DARK_TOKENS.bg, minimum: 3 }
+  { theme: "dark", label: "focus indicator", foreground: DARK_TOKENS.focus, background: DARK_TOKENS.bg, minimum: 3 },
+  // Match Hermes inside Desktop keeps these status colours on Desktop's own
+  // background. Desktop's light editor backgrounds sit between #e5e5e5 and
+  // white, its dark ones between black and #2e3440: both ends must read.
+  ...["success", "warning", "danger", "info"].flatMap((status) => [
+    ["light", LIGHT_TOKENS, "#ffffff"],
+    ["light", LIGHT_TOKENS, "#e5e5e5"],
+    ["dark", DARK_TOKENS, "#000000"],
+    ["dark", DARK_TOKENS, "#2e3440"]
+  ].map(([theme, tokens, background]) => ({
+    theme,
+    label: `${status} on a Desktop background (${background})`,
+    foreground: tokens[status],
+    background,
+    minimum: 4.5
+  })))
 ]);
 var DOCKYARD_TEST = Object.freeze({
   palettes: { light: LIGHT_TOKENS, dark: DARK_TOKENS },
@@ -2336,31 +2351,41 @@ var FONT_FACES = [
   ["Dockyard Space Mono", THEME_FONTS["space-mono"][0], "400"],
   ["Dockyard Space Mono", THEME_FONTS["space-mono"][1], "700"]
 ].map(([family, url, weight]) => `@font-face { font-family: "${family}"; src: url("${url}") format("woff2"); font-weight: ${weight}; font-style: normal; font-display: swap; }`);
-var desktopMix = (pct) => `color-mix(in srgb, var(--theme-foreground) ${pct}%, var(--dt-background))`;
-var DESKTOP_AUTO_CSS = `.dockyard-root[data-dy-theme="auto"][data-dy-host="hermes-desktop"][data-theme] {
-  --dy-bg: var(--dt-background);
-  --dy-surface: var(--dt-card);
-  --dy-surface-subtle: ${desktopMix(7)};
-  --dy-surface-strong: ${desktopMix(11)};
-  --dy-text: var(--theme-foreground);
-  --dy-text-2: ${desktopMix(80)};
-  --dy-text-3: ${desktopMix(68)};
-  --dy-border: var(--dt-border);
-  --dy-control-border: ${desktopMix(42)};
-  --dy-action: var(--dt-primary);
-  --dy-action-hover: color-mix(in srgb, var(--dt-primary) 90%, var(--dt-background));
-  --dy-on-action: var(--dt-primary-foreground);
-  --dy-accent-text: var(--theme-foreground);
-  --dy-accent-soft: var(--dt-accent);
-  --dy-accent-border: ${desktopMix(36)};
-  --dy-neutral: ${desktopMix(80)};
-  --dy-neutral-bg: ${desktopMix(10)};
-  --dy-focus: var(--dt-ring);
-  --dy-disabled-text: ${desktopMix(68)};
-  --dy-disabled-bg: ${desktopMix(11)};
+var desktopAutoRule = (mode, own) => {
+  const ui = (name, fallback) => `var(--ui-${name}, ${fallback})`;
+  const tint = (colour, pct) => `color-mix(in srgb, ${colour} ${pct}%, var(--dy-host-surface))`;
+  return `.dockyard-root[data-dy-theme="auto"][data-dy-host="hermes-desktop"][data-theme="${mode}"] {
+  --dy-host-text: ${ui("text-primary", own.text)};
+  --dy-host-surface: ${ui("bg-editor", own.surface)};
+  --dy-host-accent: ${ui("accent", own.action)};
+  --dy-bg: transparent;
+  --dy-surface: var(--dy-host-surface);
+  --dy-surface-subtle: ${tint("var(--dy-host-text)", 5)};
+  --dy-surface-strong: ${tint("var(--dy-host-text)", 9)};
+  --dy-text: var(--dy-host-text);
+  --dy-text-2: ${ui("text-secondary", own.textSecondary)};
+  --dy-text-3: ${ui("text-tertiary", own.textTertiary)};
+  --dy-border: ${ui("stroke-secondary", own.border)};
+  --dy-control-border: ${ui("stroke-primary", own.controlBorder)};
+  --dy-action: var(--dy-host-action, ${own.action});
+  --dy-action-hover: var(--dy-host-action, ${own.actionHover});
+  --dy-on-action: var(--dy-host-on-action, ${own.onAction});
+  --dy-accent-text: var(--dy-host-text);
+  --dy-accent-soft: ${tint("var(--dy-host-accent)", 14)};
+  --dy-accent-border: ${tint("var(--dy-host-accent)", 45)};
+  --dy-neutral: ${ui("text-secondary", own.neutral)};
+  --dy-neutral-bg: ${tint("var(--dy-host-text)", 8)};
+  --dy-focus: ${ui("accent", own.focus)};
+  --dy-disabled-text: ${ui("text-tertiary", own.disabledText)};
+  --dy-disabled-bg: ${tint("var(--dy-host-text)", 8)};
   color: var(--dy-text);
-  background: var(--dy-bg);
+  background: transparent;
 }`;
+};
+var DESKTOP_AUTO_CSS = [
+  desktopAutoRule("light", LIGHT_TOKENS),
+  desktopAutoRule("dark", DARK_TOKENS)
+].join("\n");
 var THEME_CSS = `
 /* Names some rules used without a definition (accent, accent bg, secondary
    text): they now follow the active theme instead of fixed light colours. */
@@ -25875,6 +25900,57 @@ function useHostDark() {
 function useHostIsDesktop() {
   return hostThemeMode(useSdkTheme()) !== null;
 }
+function parseComputedColour(value) {
+  const text2 = String(value || "").trim();
+  let match = text2.match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.]+%?))?\s*\)$/);
+  if (match) {
+    if (match[4] !== void 0 && parseFloat(match[4]) === 0) return null;
+    return [match[1], match[2], match[3]].map(Number);
+  }
+  match = text2.match(/^color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+%?))?\s*\)$/);
+  if (match) {
+    if (match[4] !== void 0 && parseFloat(match[4]) === 0) return null;
+    return [match[1], match[2], match[3]].map((channel) => Number(channel) * 255);
+  }
+  return null;
+}
+function luminance([red, green, blue]) {
+  const linear = (channel) => {
+    const value = channel / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue);
+}
+function inkFor(rgb) {
+  const lum = luminance(rgb);
+  return (lum + 0.05) / 0.05 >= 1.05 / (lum + 0.05) ? "#000000" : "#ffffff";
+}
+function useHostAccent(root, active) {
+  const hostTheme = useSdkTheme();
+  const [accent, setAccent] = useState(null);
+  useEffect(() => {
+    if (!active || !root) {
+      setAccent(null);
+      return void 0;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      if (!getComputedStyle(root).getPropertyValue("--ui-accent").trim()) {
+        setAccent(null);
+        return;
+      }
+      const probe = document.createElement("span");
+      probe.style.color = "var(--ui-accent)";
+      root.appendChild(probe);
+      const resolved = getComputedStyle(probe).color;
+      probe.remove();
+      const rgb = parseComputedColour(resolved);
+      const next = rgb ? { fill: resolved, ink: inkFor(rgb) } : null;
+      setAccent((previous) => previous && next && previous.fill === next.fill && previous.ink === next.ink ? previous : next);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [active, hostTheme, root]);
+  return accent;
+}
 
 // hermes_dockyard_plugin/desktop/src/shell/dashboard-page.js
 var ONE_PROJECT_TABS = Object.freeze({ project: "Projects", backlog: "Backlog" });
@@ -25892,6 +25968,8 @@ function DashboardPage({ inboxCss = "" } = {}) {
   const [appearance, setAppearance] = useState({ theme: DEFAULT_THEME, font: DEFAULT_FONT });
   const hostDark = useHostDark();
   const hostDesktop = useHostIsDesktop();
+  const [rootElement, setRootElement] = useState(null);
+  const hostAccent = useHostAccent(rootElement, hostDesktop && appearance.theme === "auto");
   const appearanceAsked = useRef(false);
   const askAppearance = () => {
     if (appearanceAsked.current) return;
@@ -26308,12 +26386,14 @@ function DashboardPage({ inboxCss = "" } = {}) {
   }
   const theme = themeById(appearance.theme);
   return jsxs("div", {
+    ref: setRootElement,
     className: "dockyard-root",
     "data-theme": themeMode(theme.id, hostDark),
     "data-dy-theme": theme.id,
     "data-dy-host": hostDesktop ? "hermes-desktop" : void 0,
     "data-dy-art": theme.art ? "true" : void 0,
     "data-dy-font": appearance.font !== DEFAULT_FONT ? appearance.font : void 0,
+    style: hostAccent ? { "--dy-host-action": hostAccent.fill, "--dy-host-on-action": hostAccent.ink } : void 0,
     children: [
       jsxs("div", { className: "dockyard-shell", children: [
         jsx(ConsoleBar, {

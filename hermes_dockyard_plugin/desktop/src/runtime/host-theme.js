@@ -38,7 +38,75 @@ export function useHostDark() {
 }
 
 // True inside a Hermes Desktop whose SDK reports its theme (v0.21.6+): the
-// --dt-*/--theme-* palette Match Hermes takes is then in scope.
+// documented --ui-* theme variables Match Hermes styles with are then in scope.
 export function useHostIsDesktop() {
   return hostThemeMode(useSdkTheme()) !== null
+}
+
+// [r, g, b] (0-255) from a computed colour: 'rgb(...)'/'rgba(...)', or the
+// 'color(srgb r g b)' form Chromium uses for color-mix() results. null when
+// the value is anything else, or fully transparent.
+export function parseComputedColour(value) {
+  const text = String(value || '').trim()
+  let match = text.match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.]+%?))?\s*\)$/)
+  if (match) {
+    if (match[4] !== undefined && parseFloat(match[4]) === 0) return null
+    return [match[1], match[2], match[3]].map(Number)
+  }
+  match = text.match(/^color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+%?))?\s*\)$/)
+  if (match) {
+    if (match[4] !== undefined && parseFloat(match[4]) === 0) return null
+    return [match[1], match[2], match[3]].map((channel) => Number(channel) * 255)
+  }
+  return null
+}
+
+function luminance([red, green, blue]) {
+  const linear = (channel) => {
+    const value = channel / 255
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+  }
+  return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue)
+}
+
+// Black or white, whichever reads better on `rgb`. The better of the two always
+// clears 4.5:1 (WCAG AA), whatever accent a Desktop theme chooses.
+export function inkFor(rgb) {
+  const lum = luminance(rgb)
+  return (lum + 0.05) / 0.05 >= 1.05 / (lum + 0.05) ? '#000000' : '#ffffff'
+}
+
+// Inside Desktop's Match Hermes, primary buttons take Desktop's accent. The SDK
+// documents --ui-accent as a stroke/accent colour, not a fill with readable
+// text, so the text colour is computed: resolve the accent the SDK docs' way
+// (getComputedStyle on a theme variable) and pick black or white. Read one frame
+// after a theme change so Desktop has already rewritten its variables. null when
+// Desktop defines no accent; the buttons then keep the app's checked colours.
+export function useHostAccent(root, active) {
+  const hostTheme = useSdkTheme()
+  const [accent, setAccent] = useState(null)
+  useEffect(() => {
+    if (!active || !root) {
+      setAccent(null)
+      return undefined
+    }
+    const frame = window.requestAnimationFrame(() => {
+      if (!getComputedStyle(root).getPropertyValue('--ui-accent').trim()) {
+        setAccent(null)
+        return
+      }
+      const probe = document.createElement('span')
+      probe.style.color = 'var(--ui-accent)'
+      root.appendChild(probe)
+      const resolved = getComputedStyle(probe).color
+      probe.remove()
+      const rgb = parseComputedColour(resolved)
+      const next = rgb ? { fill: resolved, ink: inkFor(rgb) } : null
+      setAccent((previous) => (
+        previous && next && previous.fill === next.fill && previous.ink === next.ink ? previous : next
+      ))
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [active, hostTheme, root])
+  return accent
 }
