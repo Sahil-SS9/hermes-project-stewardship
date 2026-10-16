@@ -307,9 +307,17 @@ def test_bug6_quiet_hours_use_local_zone():
     assert in_quiet_hours(policy, local) is True
 
 
-def test_bug6_engine_default_zone_injectable(tmp_path):
+def test_bug6_engine_default_zone_injectable(tmp_path, monkeypatch):
     """The engine accepts an injectable tz and defaults to the machine zone;
-    the effective-settings response names the zone."""
+    the effective-settings response names the zone.
+
+    The machine zone is pinned to Europe/London here: the 22:30 hold below is
+    UK local time, and CI runners (UTC) must reach the same verdict as a UK
+    machine. Which zone the machine reports is _machine_zone's own contract,
+    covered by its tests; this one proves the engine DEFAULTS to it."""
+    import hermes_project_stewardship.events.notifications as notifications
+
+    monkeypatch.setattr(notifications, "_machine_zone", lambda: "Europe/London")
     c = None
     store = Store(tmp_path / "tz.db", clock=pinned("2026-07-15T21:30:00+00:00"))
     app = create_app(store, kanban_adapter=ReferenceKanbanAdapter(store))
@@ -323,7 +331,8 @@ def test_bug6_engine_default_zone_injectable(tmp_path):
         assert r.status_code == 200
         eff = c.get(f"{V}/settings/notifications/effective",
                     params={"project_id": "pg1"}).json()["effective"]
-        assert eff.get("timezone"), "effective settings must name the time zone"
+        assert eff.get("timezone") == "Europe/London", \
+            "effective settings must name the machine's time zone"
         ne = app.state.notification_engine
         ne.create("pg1", severity="high", kind="alert", title="a", dedupe_key="g")
         kinds = [p["kind"] for p in
