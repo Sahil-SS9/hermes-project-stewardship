@@ -110,3 +110,17 @@ def test_cli_hermes_home_is_scoped_to_the_command_and_restored(tmp_path: Path, m
     assert app.main(["--db", str(db), "workflows", "tick", "--hermes-home", str(tmp_path / "h")]) == 0
     assert seen["home"] == str(tmp_path / "h")
     assert os.environ["HERMES_HOME"] == "/original/home"
+
+
+def test_conftest_pops_the_dispatcher_worker_env_before_any_host_is_built():
+    """Regression (testboards cleanup, 15/10/2026): the dispatcher hands every
+    worker a board handoff in the environment (HERMES_KANBAN_DB pins the live
+    board DB, honoured FIRST by kanban_db_path; HERMES_KANBAN_TASK pins the
+    live write-guard). A worker running pytest inherits them, so tests/conftest
+    must pop the whole injection family BEFORE any host is constructed."""
+    for name in ("HERMES_KANBAN_BOARD", "HERMES_KANBAN_DB", "HERMES_KANBAN_TASK",
+                 "HERMES_KANBAN_WORKSPACES_ROOT", "HERMES_TENANT"):
+        assert name not in os.environ, (
+            f"{name} leaked from the launching shell into the pytest process; "
+            "tests/conftest.py must pop the dispatcher injection family at import"
+        )

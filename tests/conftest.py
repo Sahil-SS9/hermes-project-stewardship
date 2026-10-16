@@ -49,6 +49,15 @@ os.environ["HPS_TEST_STATE_ROOT"] = str(_TEST_ROOT)
 os.environ["HERMES_HOME"] = str(_TEST_ROOT / "hermes-home")
 os.environ["HERMES_KANBAN_HOME"] = str(_TEST_ROOT / "hermes-home")
 os.environ.pop("HERMES_KANBAN_BOARD", None)
+# The dispatcher injects a full board handoff into every worker shell, and a
+# worker running pytest inherits it: ``HERMES_KANBAN_DB`` pins the live ops DB
+# path and kanban_db_path() honours it FIRST, ``HERMES_KANBAN_TASK`` points the
+# shared-board write guard at a live task, and a profile ``HERMES_HOME`` makes
+# get_default_hermes_root() resolve the live shared root. Pop the whole family
+# (the same tuple the real-host fixtures delenv) before any host is built.
+for _injected in ("HERMES_KANBAN_BOARD", "HERMES_KANBAN_DB", "HERMES_KANBAN_TASK",
+                  "HERMES_KANBAN_WORKSPACES_ROOT", "HERMES_TENANT"):
+    os.environ.pop(_injected, None)
 os.environ["STEWARD_DB_PATH"] = str(_TEST_ROOT / "dockyard.db")
 os.environ["DOCKYARD_PLUGIN_DB"] = str(_TEST_ROOT / "dockyard.db")
 

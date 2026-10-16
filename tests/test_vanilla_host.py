@@ -370,3 +370,44 @@ def test_guarded_transfer_refuses_without_writing_when_a_guard_fails(native_host
         assert caught.value.message == code
     assert native_host.get_task(task["id"])["task"]["assignee"] == "alice"
     assert len(_events(native_host, task["id"], "assigned")) == before
+
+
+def _live_boards_listing() -> list[str]:
+    # Read-only snapshot of the operator's shared boards root: the same
+    # listing the testboards cleanup (15/10/2026) used to prove the leak.
+    live_boards = Path.home() / ".hermes" / "kanban" / "boards"
+    if not live_boards.is_dir():
+        return []
+    return sorted(p.name for p in live_boards.iterdir())
+
+
+def test_provisioning_from_an_isolated_home_never_escapes_the_test_home(
+    tmp_path: Path, monkeypatch
+):
+    """Regression (testboards cleanup, 15/10/2026): provisioning from an
+    isolated test home must create the board inside the pinned test home and
+    never under the operator's shared boards dir. The cleanup found the live
+    `alpha`/`demo` boards were pytest-born from unpinned test hosts."""
+    require_native()
+    live_before = _live_boards_listing()
+
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "native-root"))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    host = ProjectKanbanHost(hermes_home=tmp_path / "hermes")
+
+    # Even with the shared-root runtime importable, the per-test pin decides
+    # the kanban home; the hermes_home ctor arg alone must never anchor it.
+    assert host.kanban_home == tmp_path / "native-root"
+
+    host.provision_project(
+        name="Isolated", slug="isolated", description="never escapes",
+        repo_path=str(repo), lead_profile="default",
+        idempotency_key="isolated-1", board_slug="isolated",
+    )
+
+    board_dir = Path(tmp_path / "native-root") / "kanban" / "boards" / "isolated"
+    assert board_dir.is_dir(), "the created board must live inside the test home"
+
+    assert _live_boards_listing() == live_before, \
+        "provisioning leaked into the operator boards dir"
