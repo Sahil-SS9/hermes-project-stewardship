@@ -1,0 +1,22 @@
+# Every text file checks out with LF line endings on every platform, Windows
+# included. Tests pin byte-exact hashes of fixtures, rebuild the committed
+# Desktop bundle and compare it byte for byte, and read source files; a CRLF
+# conversion on checkout (Git for Windows' default) breaks all three.
+* text=auto eol=lf
+
+# Binary assets are never converted (git already detects these; explicit for clarity).
+*.png binary
+*.avif binary
+*.gif binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.mp4 binary
+*.webm binary
+*.woff binary
+*.woff2 binary
+*.db binary
+*.sqlite binary
+*.zip binary
