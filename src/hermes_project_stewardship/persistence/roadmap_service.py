@@ -6,7 +6,7 @@ preserved for downgrade history but are never read or written here.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from ..kanban.host_adapter import MISSING_LINK_CODES, KanbanAdapterError
