@@ -177,7 +177,14 @@ def test_output_flood_is_drained_until_the_deadline_not_killed_for_volume(tmp_pa
 def test_output_flood_keeps_the_runner_memory_flat(tmp_path):
     """Draining a flood for the whole deadline must not buffer it: 0.5.2 grew
     by about 4 GB per second here. The runner runs in a fresh interpreter (with
-    its address space capped where the platform allows) and reports its peak."""
+    its address space capped where the platform allows) and reports how much
+    its own peak memory grew while it drained the flood.
+
+    Growth, not the absolute peak: an interpreter's size depends on the Python
+    version and on coverage, and on Linux ``ru_maxrss`` also carries the
+    parent's peak across fork and exec (a full pytest run with coverage read
+    as 205 MB here). ``VmHWM`` is the peak of the process's own image, so it is
+    used where the platform has it."""
     pytest.importorskip("resource")
     import hermes_project_stewardship
 
@@ -189,11 +196,22 @@ def test_output_flood_keeps_the_runner_memory_flat(tmp_path):
         "    resource.setrlimit(resource.RLIMIT_AS, (1 << 30, resource.RLIM_INFINITY))\n"
         "except (ValueError, OSError):\n"
         "    pass  # macOS does not enforce an address-space cap\n"
+        "def peak_kib():\n"
+        "    try:\n"
+        "        with open('/proc/self/status') as status:\n"
+        "            for line in status:\n"
+        "                if line.startswith('VmHWM:'):\n"
+        "                    return int(line.split()[1])\n"
+        "    except OSError:\n"
+        "        pass  # no procfs (macOS): the rusage peak, in bytes there\n"
+        "    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss\n"
+        "    return peak // 1024 if sys.platform == 'darwin' else peak\n"
         "from hermes_project_stewardship.security.allowlist import run_allowlisted\n"
+        "before = peak_kib()\n"
         "flood = \"import sys\\nwhile True: sys.stdout.write('x' * 65536)\"\n"
         "run_allowlisted(['python3', '-c', flood], cwd=Path(sys.argv[1]),\n"
         "                allowlist=frozenset({'python3'}), timeout_seconds=2)\n"
-        "print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)\n"
+        "print(before, peak_kib())\n"
     )
     done = subprocess.run(
         [sys.executable, "-c", probe, str(tmp_path)],
@@ -201,9 +219,9 @@ def test_output_flood_keeps_the_runner_memory_flat(tmp_path):
         env={**os.environ, "PYTHONPATH": package_root},
     )
     assert done.returncode == 0, done.stderr[-2000:]
-    peak = int(done.stdout.split()[-1])
-    peak_mb = peak / (1024 * 1024) if sys.platform == "darwin" else peak / 1024
-    assert peak_mb < 200, f"runner peak RSS {peak_mb:.0f} MB while draining a flood"
+    before, after = (int(value) for value in done.stdout.split()[-2:])
+    growth_mb = (after - before) / 1024
+    assert growth_mb < 32, f"runner peak grew by {growth_mb:.0f} MB while draining a flood"
 
 
 def test_command_never_reads_the_callers_stdin(tmp_path):
