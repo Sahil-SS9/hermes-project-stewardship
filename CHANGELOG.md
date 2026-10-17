@@ -4,14 +4,56 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.3] - 2026-10-17
+
+Windows support, fixes for the latest issues and pull requests, and
+objective commands that run the way Hermes's own commands do.
 
 ### Added
+- **Windows.** The plugin runs on Windows, and CI now runs the full suite on
+  Linux, macOS and Windows for Python 3.10, 3.11, 3.12 and 3.14. For Windows:
+  - removing uploaded content works. Removal holds every folder from the
+    content root down while it works, so none can be swapped underneath
+    it, and refuses a symlink or junction on the way (it used directory
+    descriptors, which Windows does not have);
+  - uploads and restores no longer fail with an overflow: file identities
+    are stored in a form SQLite can hold (NTFS and ReFS identities are wider
+    than its integers). Linux and macOS values are unchanged, so there is
+    no migration;
+  - quiet hours and alert timing use a real time zone: `tzlocal` names the
+    machine's zone and `tzdata` supplies the zone database Windows lacks;
+  - `stewardctl`'s initiative picker asks for a number (the arrow-key
+    picker needs a terminal library Windows does not have);
+  - every text file checks out with LF line endings, so the Desktop bundle
+    and the pinned fixtures match on a Windows checkout.
 - **Longer command-objective details.** A failed command objective keeps the
   first 200 characters of its stderr as its detail; a project can raise that
   to at most 4000 with `verification.objective_detail_chars` (or
   `stewardctl project enable --objective-detail-chars`); a value outside
   1..4000 is refused when saved. The default is unchanged.
+
+### Fixed
+- **Install from Git installs the Desktop app** (#23, #25).
+  `desktop/plugin.js` was a symlink into the build folder. Desktop copies a
+  plugin out of a temporary clone and then deletes the clone, so the
+  installed app pointed at nothing and was removed again; a Windows
+  checkout got a small text file instead. It is now a real file, kept
+  identical to the build by a test.
+- **"Match Hermes" takes Hermes Desktop's theme, not only light or dark**
+  (#22, #24). Inside Desktop the app uses the theme variables the Desktop
+  plugin docs define (`--ui-*`) for text, lines, surfaces and the accent,
+  each falling back to the app's own light or dark colour, and leaves the
+  background to Desktop. Status colours stay the app's own and are checked
+  for contrast across Desktop's light and dark range; button text on the
+  accent is black or white, whichever reads.
+- **Inside a named profile every profile is listed** (#18). The Kanban
+  host read profile names from the profile's own folder and saw only
+  "default", so team pickers and card assignment were wrong and choosing
+  another profile as project lead was refused. Profile names now come from
+  the Hermes root; projects stay per profile, as in Hermes.
+- **The test suite never reaches the machine's live Kanban boards.** Run
+  inside a Hermes worker, pytest inherited the dispatcher's board settings
+  and could create boards in the live Kanban home.
 
 ### Security
 - **Objective commands are bounded in memory and time.** They were read with
@@ -25,6 +67,10 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   everything it started are stopped (its process group on Linux and macOS,
   `taskkill /T` on Windows), including a grandchild that kept a pipe open.
   Commands get an empty stdin, and each run records how long it took.
+
+Thanks to Andrew Peltekci (@appletechie) for the reports and pull requests
+behind the Desktop install, Match Hermes, command-runner and profile-listing
+changes (#18, #19, #22-#25).
 
 ## [0.5.2] - 2026-10-13
 
@@ -104,6 +150,7 @@ The security and correctness fixes from the catalog review
   Exit-code objectives (such as `>=1`) still measure 0 and fail as before.
 
   (by @appletechie)
+
 ## [0.5.0] - 2026-10-12
 
 The delivery model becomes a strict ladder: **Task -> Goal -> Objective ->
