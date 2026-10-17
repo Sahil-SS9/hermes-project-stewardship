@@ -136,7 +136,10 @@ _Reader = Tuple[threading.Thread, IO[bytes]]
 
 def _drain_posix(proc: subprocess.Popen, sinks: Sequence[_HeadTail], deadline: float) -> bool:
     """Read both pipes into their windows until both reach EOF, or the
-    deadline passes (True). A read never blocks past the deadline."""
+    deadline passes (True). A read never blocks past the deadline. POSIX
+    only: Windows cannot select() on pipes (see _start_readers)."""
+    if _IS_WINDOWS:
+        raise NotImplementedError("Windows drains pipes with reader threads")
     selector = selectors.DefaultSelector()
     with selector:
         for stream, sink in zip((proc.stdout, proc.stderr), sinks):
@@ -198,7 +201,10 @@ def _join_until(readers: Sequence[_Reader], deadline: float) -> bool:
 
 def _group_gone(proc: subprocess.Popen, pgid: int, timeout: float) -> bool:
     """Wait until the process group is gone, reaping the leader as it exits
-    (a dead but unreaped leader keeps ``killpg(pgid, 0)`` succeeding)."""
+    (a dead but unreaped leader keeps ``killpg(pgid, 0)`` succeeding). POSIX
+    only: Windows has no process groups to wait on (see _kill)."""
+    if _IS_WINDOWS:
+        raise NotImplementedError("Windows stops the tree with taskkill")
     deadline = time.monotonic() + timeout
     while True:
         proc.poll()
