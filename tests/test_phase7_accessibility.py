@@ -14,7 +14,7 @@ PLUGIN = WT / "hermes_dockyard_plugin/desktop/plugin.js"
 
 
 def _text() -> str:
-    return PLUGIN.read_text()
+    return PLUGIN.read_text(encoding="utf-8")
 
 
 def test_keyboard_order_focus_trap_and_return():

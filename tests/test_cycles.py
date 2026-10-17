@@ -116,6 +116,56 @@ def test_crashed_count_objective_is_unknown_not_healthy(engine, enabled, svc, tm
     assert r["initiatives"] == []
 
 
+def test_cycle_uses_the_project_objective_detail_cap(engine, enabled, svc, tmp_path):
+    import json
+
+    svc.enable(enabled, lead_profile="lead", autonomy_level=3)
+    repo = make_repo(tmp_path / "r")
+    svc.store._conn.execute(
+        "UPDATE project_stewardship SET verification_policy_json=? WHERE project_id=?",
+        (json.dumps({"repo_path": repo.as_posix(), "objective_detail_chars": 600}), enabled),
+    )
+    svc.add_objective(enabled, name="ci", evaluator_type="command", target=">=1",
+                      command=["python3", "-c", "import sys; sys.stderr.write('e' * 900); sys.exit(1)"])
+    [objective] = engine.run_cycle(enabled)["objectives"]
+    assert objective["detail"].endswith("stderr_head=" + "e" * 600)
+
+
+def test_flooding_objective_times_out_and_the_cycle_goes_on(engine, enabled, svc, tmp_path, monkeypatch):
+    """A check that never stops writing is bound by its deadline like any
+    other: its measure is unknown, and the cycle's other checks still run."""
+    from hermes_project_stewardship.objectives import evaluators
+
+    real = evaluators.run_allowlisted
+    monkeypatch.setattr(evaluators, "run_allowlisted",
+                        lambda command, **kw: real(command, **{**kw, "timeout_seconds": 2}))
+    svc.enable(enabled, lead_profile="lead", autonomy_level=3)
+    wire_repo(svc, enabled, make_repo(tmp_path / "r"))
+    svc.add_objective(enabled, name="flood", evaluator_type="command", target=">=1",
+                      command=["python3", "-c", "import sys\nwhile True: sys.stdout.write('9' * 65536)"])
+    svc.add_objective(enabled, name="fine", evaluator_type="command", target=">=1",
+                      command=["python3", "-c", "print(1)"])
+    r = engine.run_cycle(enabled)
+    flood, fine = r["objectives"]
+    assert flood["passed"] is False and flood["measured"] is None
+    assert "timed_out" in flood["detail"]
+    assert fine["passed"] is True and fine["measured"] == 1.0
+    assert r["health"]["state"] == "unknown"
+
+
+def test_verbose_objective_is_measured_from_its_last_line(engine, enabled, svc, tmp_path):
+    """A check that prints far more than the kept window and then its count
+    (`pytest -q`, a linter summary) is measured from that final line."""
+    svc.enable(enabled, lead_profile="lead", autonomy_level=3)
+    wire_repo(svc, enabled, make_repo(tmp_path / "r"))
+    svc.add_objective(enabled, name="verbose", evaluator_type="command", target=">=5",
+                      command=["python3", "-c", "print('noise\\n' * 300000, end=''); print(7)"])
+    r = engine.run_cycle(enabled)
+    (verbose,) = r["objectives"]
+    assert verbose["measured"] == 7.0
+    assert verbose["passed"] is True
+
+
 def test_unknown_state_blocks_mutations(engine, enabled, svc, tmp_path):
     """Fail-closed: missing declared file → Unknown → no proposals even if
     the proposer tries."""

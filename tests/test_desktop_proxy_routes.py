@@ -71,7 +71,7 @@ def _desktop_calls():
     """(method, path, where) for every api(...) call whose path is a string literal."""
     calls, dynamic = [], []
     for source in sorted(DESKTOP_SRC.rglob("*.js")):
-        text = source.read_text()
+        text = source.read_text(encoding="utf-8")
         for match in re.finditer(r"\bapi\(\s*", text):
             where = f"{source.relative_to(DESKTOP_SRC)}:{text.count(chr(10), 0, match.start()) + 1}"
             begin = match.end()
@@ -95,7 +95,7 @@ def _call_segments(path: str):
 
 
 def _proxy_routes():
-    text = PROXY.read_text()
+    text = PROXY.read_text(encoding="utf-8")
     routes = []
     for match in re.finditer(r'@plugin_api\.(get|post|put|patch|delete)\(\s*"([^"]+)"', text):
         routes.append((match.group(1).upper(), match.group(2).strip("/").split("/")))

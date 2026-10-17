@@ -1,5 +1,5 @@
 name: hermes-project-stewardship
-version: 0.5.2
+version: 0.5.3
 description: Durable project ownership for Hermes agent fleets.
 author: Sahil Saghir
 license: Apache-2.0
@@ -14,3 +14,5 @@ provides_hooks:
 python_dependencies:
   - fastapi>=0.104,<1
   - httpx2>=2.7,<3
+  - tzlocal>=5.0,<6
+  - tzdata>=2024.1,<2030; sys_platform == 'win32'

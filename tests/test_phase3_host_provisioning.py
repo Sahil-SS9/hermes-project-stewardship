@@ -202,7 +202,7 @@ def test_vanilla_partial_failure_writes_no_metadata_then_same_key_retry_converge
     import json
 
     journal = json.loads(
-        (home / "dockyard" / "provisioning-journal.json").read_text()
+        (home / "dockyard" / "provisioning-journal.json").read_text(encoding="utf-8")
     )
     assert journal["alpha"]["project_id"] == partial["id"]
     with pytest.raises(HostError) as missing_board:

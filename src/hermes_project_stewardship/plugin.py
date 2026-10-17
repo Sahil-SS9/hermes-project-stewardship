@@ -57,7 +57,6 @@ def tool_steward_status(project_id: str) -> dict:
     try:
         from .kanban import ReferenceKanbanAdapter
         from .persistence.canonical_work_service import CanonicalWorkService
-        from .persistence.ladder_service import LadderService
         from .persistence.roadmap_service import RoadmapService
 
         store = PluginState._store
@@ -66,7 +65,6 @@ def tool_steward_status(project_id: str) -> dict:
             return out
         work = CanonicalWorkService(store, ReferenceKanbanAdapter(store))
         roadmap = RoadmapService(store, svc, work)
-        ladder = LadderService(store, svc, work, roadmap)
         project = roadmap.roadmap(project_id)["projects"][0]
         out["ladder"] = {
             "work_host": project["work_host"],

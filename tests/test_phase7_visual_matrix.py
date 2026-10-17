@@ -27,7 +27,7 @@ PLUGIN = WT / "hermes_dockyard_plugin/desktop/plugin.js"
 
 
 def _text() -> str:
-    return PLUGIN.read_text()
+    return PLUGIN.read_text(encoding="utf-8")
 
 
 def test_desktop_tokens_match_approved_contract():
@@ -127,6 +127,6 @@ def test_prototype_matrix_remains_authority_until_integration():
     # Route-matrix authority file exists at base and is internally consistent.
     import json
 
-    matrix = json.loads((WT / "docs/plans/evidence/project-management-route-matrix.json").read_text())
+    matrix = json.loads((WT / "docs/plans/evidence/project-management-route-matrix.json").read_text(encoding="utf-8"))
     assert matrix["summary"]["unresolved_count"] == 0
     # Lane report (not this test) carries manual visual-diff review.

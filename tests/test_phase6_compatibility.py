@@ -198,14 +198,19 @@ def test_pm0606_shipped_manifest_is_v1_supported_shape():
 # ------------------------------------------------------------------ #
 
 
-def test_pm0606_default_only_home_lists_single_default_profile(tmp_path):
+def test_pm0606_default_only_home_lists_single_default_profile(tmp_path, monkeypatch):
+    # Test isolation (t_255d14b1): the host opens its work-parents store inside
+    # the kanban home; pin the root before constructing the host so nothing is
+    # ever created under the operator's shared boards root.
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "hermes-home"))
     host = ProjectKanbanHost(hermes_home=tmp_path / "home")
     profiles = host.list_profiles()
     assert [p["name"] for p in profiles] == ["default"]
     assert profiles[0]["is_default"] is True
 
 
-def test_pm0606_multiple_profiles_and_stale_profile_directory(tmp_path):
+def test_pm0606_multiple_profiles_and_stale_profile_directory(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "hermes-home"))
     home = tmp_path / "home"
     for slug in ("alpha", "beta"):
         (home / "profiles" / slug).mkdir(parents=True)
@@ -216,10 +221,14 @@ def test_pm0606_multiple_profiles_and_stale_profile_directory(tmp_path):
     assert names == ["default", "alpha", "beta"]
 
 
-def test_pm0606_stale_profile_is_reported_unavailable_not_crashing(tmp_path):
+def test_pm0606_stale_profile_is_reported_unavailable_not_crashing(
+    tmp_path, monkeypatch
+):
     """A stale profile directory must surface as a non-selectable profile,
     and membership reads must not lie about availability (PM-0606 matrix
     cell: stale profiles)."""
+    # Test isolation (t_255d14b1): pin the kanban root before host construction.
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "hermes-home"))
     from hermes_project_stewardship.persistence.membership import MembershipService
     from hermes_project_stewardship.persistence.service import StewardshipService
     from hermes_project_stewardship.persistence.store import Store

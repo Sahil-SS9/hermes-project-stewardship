@@ -54,10 +54,15 @@ def host(tmp_path, monkeypatch):
 # P7.1 — discovery                                                    #
 # ------------------------------------------------------------------ #
 
-def test_discover_lists_existing_projects_and_boards_before_provision():
+def test_discover_lists_existing_projects_and_boards_before_provision(
+    tmp_path, monkeypatch
+):
     """P7.1: discovery reflects what the host ALREADY has — before any
     provisioning, after provisioning it lists the provisioned project."""
     require_native()
+    # Test isolation (t_255d14b1): pin the kanban root BEFORE constructing the
+    # host so provisioning never resolves the operator's shared boards dir.
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "native-root"))
     home = Path(tempfile.mkdtemp())
     (home / "alpha").mkdir()
     host = ProjectKanbanHost(hermes_home=home)
@@ -81,11 +86,16 @@ def test_discover_lists_existing_projects_and_boards_before_provision():
 # P7.2 — host validate as preflight                                   #
 # ------------------------------------------------------------------ #
 
-def test_preflight_uses_host_validate_and_surfaces_conflicts_early(tmp_path):
+def test_preflight_uses_host_validate_and_surfaces_conflicts_early(
+    tmp_path, monkeypatch
+):
     """P7.2: validate_project is the preflight; an invalid repo path or an
     unknown profile is rejected BEFORE provisioning, and a duplicate slug
     conflict is reported without creating anything."""
     require_native()
+    # Test isolation (t_255d14b1): this test's provisioning created the leaked
+    # live 'alpha' board; pin the kanban root BEFORE constructing the host.
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "native-root"))
     home = tmp_path / "hermes"
     repo = tmp_path / "alpha"
     repo.mkdir()

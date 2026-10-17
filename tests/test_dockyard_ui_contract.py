@@ -17,7 +17,7 @@ BASELINE = Path(__file__).resolve().parents[1] / "design" / "dockyard-mockups-v4
 @pytest.fixture(scope="module")
 def html() -> str:
     assert BASELINE.exists(), "approved baseline missing"
-    return BASELINE.read_text()
+    return BASELINE.read_text(encoding="utf-8")
 
 
 def test_baseline_is_self_contained(html):

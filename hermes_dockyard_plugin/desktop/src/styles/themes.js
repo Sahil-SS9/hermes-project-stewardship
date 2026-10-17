@@ -8,6 +8,8 @@
 // assets/themes/README.md. The choice lives in the backend (/settings/appearance).
 import { THEME_ART } from './theme-assets.js'
 import { THEME_FONTS } from './theme-assets.js'
+import { LIGHT_TOKENS } from './tokens.js'
+import { DARK_TOKENS } from './tokens.js'
 
 export const DEFAULT_THEME = 'auto'
 export const DEFAULT_FONT = 'system'
@@ -85,6 +87,57 @@ const FONT_FACES = [
   ['Dockyard Space Mono', THEME_FONTS['space-mono'][1], '700'],
 ].map(([family, url, weight]) => `@font-face { font-family: "${family}"; src: url("${url}") format("woff2"); font-weight: ${weight}; font-style: normal; font-display: swap; }`)
 
+// Match Hermes inside Hermes Desktop (data-dy-host, set from the SDK's
+// useTheme(): see runtime/host-theme.js) styles with Desktop's documented theme
+// variables, as the Desktop plugin SDK asks: "Style with theme variables, never
+// hardcoded colors. Panes already sit on the app's editor background — leave
+// the background alone and use vars for everything else" (--ui-text-*,
+// --ui-stroke-*, --ui-accent). So the page background is left to Desktop, and
+// every other mapping falls back to this app's own light or dark value: a
+// Desktop that renames a variable shows the app's colours, never an unset one.
+// --ui-accent is a stroke/accent colour, not a text colour, so links keep
+// Desktop's primary text, and primary buttons take the accent only with the
+// black-or-white text runtime/host-theme.js computes for it (inline
+// --dy-host-action / --dy-host-on-action); without it they keep the app's.
+// Status colours stay the app's (CONTRAST_PAIRS checks them across Desktop's
+// background range). Desktop rewrites its variables on every theme or mode
+// change, so the app follows without a re-render.
+const desktopAutoRule = (mode, own) => {
+  const ui = (name, fallback) => `var(--ui-${name}, ${fallback})`
+  const tint = (colour, pct) => `color-mix(in srgb, ${colour} ${pct}%, var(--dy-host-surface))`
+  return `.dockyard-root[data-dy-theme="auto"][data-dy-host="hermes-desktop"][data-theme="${mode}"] {
+  --dy-host-text: ${ui('text-primary', own.text)};
+  --dy-host-surface: ${ui('bg-editor', own.surface)};
+  --dy-host-accent: ${ui('accent', own.action)};
+  --dy-bg: transparent;
+  --dy-surface: var(--dy-host-surface);
+  --dy-surface-subtle: ${tint('var(--dy-host-text)', 5)};
+  --dy-surface-strong: ${tint('var(--dy-host-text)', 9)};
+  --dy-text: var(--dy-host-text);
+  --dy-text-2: ${ui('text-secondary', own.textSecondary)};
+  --dy-text-3: ${ui('text-tertiary', own.textTertiary)};
+  --dy-border: ${ui('stroke-secondary', own.border)};
+  --dy-control-border: ${ui('stroke-primary', own.controlBorder)};
+  --dy-action: var(--dy-host-action, ${own.action});
+  --dy-action-hover: var(--dy-host-action, ${own.actionHover});
+  --dy-on-action: var(--dy-host-on-action, ${own.onAction});
+  --dy-accent-text: var(--dy-host-text);
+  --dy-accent-soft: ${tint('var(--dy-host-accent)', 14)};
+  --dy-accent-border: ${tint('var(--dy-host-accent)', 45)};
+  --dy-neutral: ${ui('text-secondary', own.neutral)};
+  --dy-neutral-bg: ${tint('var(--dy-host-text)', 8)};
+  --dy-focus: ${ui('accent', own.focus)};
+  --dy-disabled-text: ${ui('text-tertiary', own.disabledText)};
+  --dy-disabled-bg: ${tint('var(--dy-host-text)', 8)};
+  color: var(--dy-text);
+  background: transparent;
+}`
+}
+const DESKTOP_AUTO_CSS = [
+  desktopAutoRule('light', LIGHT_TOKENS),
+  desktopAutoRule('dark', DARK_TOKENS),
+].join('\n')
+
 export const THEME_CSS = `
 /* Names some rules used without a definition (accent, accent bg, secondary
    text): they now follow the active theme instead of fixed light colours. */
@@ -97,6 +150,7 @@ export const THEME_CSS = `
 .dockyard-root a:where(:not([class])) { color: var(--dy-accent-text); }
 ${FONT_FACES.join('\n')}
 ${THEMES.filter((theme) => theme.tokens).map(themeRule).join('\n')}
+${DESKTOP_AUTO_CSS}
 /* Themes with a background: the art shows in the page gutters, the top bar is
    frosted glass, and reading surfaces (cards, panels, tables) stay opaque.
    The glass is a layer behind the bar's content, not the bar itself: a

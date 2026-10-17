@@ -434,23 +434,52 @@ def _parse_hhmm(value: str) -> time:
 
 
 def _machine_zone() -> str:
-    """The machine's IANA zone name; 'UTC' only when nothing else is known."""
+    """The machine's IANA zone name; 'UTC' only when nothing usable is known.
+
+    tzlocal answers on every platform Hermes supports, Windows included (it
+    maps the registry's zone to an IANA key); the /etc/localtime link is the
+    POSIX fallback. Every candidate must load: a Windows display name such as
+    'Coordinated Universal Time' (what time.tzname reports there) once reached
+    ZoneInfo and failed every notification.
+    """
+    for candidate in (_tzlocal_zone(), _localtime_link_zone()):
+        if candidate and _zone_loads(candidate):
+            return candidate
+    return "UTC"
+
+
+def _tzlocal_zone() -> Optional[str]:
+    try:
+        from tzlocal import get_localzone_name
+
+        return get_localzone_name()
+    except Exception:  # unreadable registry / config, or tzlocal unavailable
+        return None
+
+
+def _localtime_link_zone() -> Optional[str]:
     try:
         import os
         from pathlib import Path
 
         link = Path("/etc/localtime")
         if link.is_symlink():
-            target = os.readlink(link)
-            bits = target.split("zoneinfo/")
+            bits = os.readlink(link).split("zoneinfo/")
             if len(bits) > 1 and bits[-1]:
                 return bits[-1]
     except Exception:
         pass
-    import time as _time
+    return None
 
-    name = getattr(_time, "tzname", (None, None))
-    return name[0] if name and name[0] else "UTC"
+
+def _zone_loads(name: str) -> bool:
+    from zoneinfo import ZoneInfo
+
+    try:
+        ZoneInfo(name)
+    except Exception:  # ZoneInfoNotFoundError, or ValueError for a malformed key
+        return False
+    return True
 
 
 def in_quiet_hours(policy: Dict[str, Any], now: datetime) -> bool:

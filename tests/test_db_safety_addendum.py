@@ -382,7 +382,7 @@ def test_fix4a_fixture_is_the_tagged_release():
         cwd=ROOT, capture_output=True, text=True)
     if tagged.returncode != 0:
         pytest.skip("git tag v0.3.0 not available in this checkout")
-    assert FIXTURE.read_text() == tagged.stdout
+    assert FIXTURE.read_text(encoding="utf-8") == tagged.stdout
 
 
 def test_fix4b_v0_3_0_database_upgrades_to_fresh_schema_with_rows(tmp_path):

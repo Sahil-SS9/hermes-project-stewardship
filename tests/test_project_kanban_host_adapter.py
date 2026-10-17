@@ -588,6 +588,7 @@ def test_factory_rejects_hostless_environment_cleanly(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """Without any Hermes host importable, the factory fails closed."""
+    import os
     import subprocess
     import textwrap
 
@@ -608,17 +609,24 @@ def test_factory_rejects_hostless_environment_cleanly(
     )
     # Use the candidate venv (no Hermes host installed) so the child truly
     # lacks any host module; the factory must fail closed, not silently fall back.
-    standalone_python = Path(__file__).resolve().parents[1] / ".venv" / "bin" / "python"
+    venv = Path(__file__).resolve().parents[1] / ".venv"
+    standalone_python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    env = {
+        "PATH": os.defpath,
+        "HOME": str(tmp_path),
+        "HERMES_HOME": str(tmp_path / "empty"),
+        "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src"),
+    }
+    # Windows needs these for any process to start (SYSTEMROOT seeds the
+    # interpreter's random source); none of them can import a Hermes host.
+    for key in ("SYSTEMROOT", "WINDIR", "TEMP", "TMP"):
+        if key in os.environ:
+            env[key] = os.environ[key]
     result = subprocess.run(
         [str(standalone_python), "-c", child],
         capture_output=True, text=True, timeout=60,
         cwd=str(tmp_path),
-        env={
-            "PATH": "/usr/bin:/bin",
-            "HOME": str(tmp_path),
-            "HERMES_HOME": str(tmp_path / "empty"),
-            "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src"),
-        },
+        env=env,
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip().startswith("KanbanAdapterError host_contract_unavailable")

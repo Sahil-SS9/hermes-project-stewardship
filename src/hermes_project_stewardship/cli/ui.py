@@ -14,7 +14,7 @@ import os
 import sys
 from typing import Any, Dict, List, Optional, Sequence
 
-__version__ = "0.5.2"
+__version__ = "0.5.3"
 
 # --------------------------------------------------------------------- #
 # Tokens                                                                #
@@ -138,6 +138,7 @@ def friendly_error(message: str) -> str:
 def pick_initiative(options: List[Dict[str, Any]], prompt: str) -> Optional[str]:
     """Arrow-key picker over pending initiatives; returns chosen ref.
 
+    Windows consoles (no termios) get a numbered list and type the number.
     Non-TTY (pipes, CI): prints a numbered list and returns None — caller
     should tell the user to pass the ref explicitly.
     """
@@ -155,10 +156,10 @@ def pick_initiative(options: List[Dict[str, Any]], prompt: str) -> Optional[str]
     try:
         import termios
         import tty
-    except ImportError:  # pragma: no cover (windows)
-        for n, o in enumerate(options, 1):
-            print(f"  {n}. {o['ref']}  {o['title']}")
-        return None
+    except ImportError:
+        # Windows has no termios, so no raw arrow-key reading: number the
+        # choices and read one line instead.
+        return _pick_by_number(options, prompt)
 
     idx = 0
 
@@ -193,3 +194,18 @@ def pick_initiative(options: List[Dict[str, Any]], prompt: str) -> Optional[str]
                 return None
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+
+def _pick_by_number(options: List[Dict[str, Any]], prompt: str) -> Optional[str]:
+    """Line-based picker for consoles without raw key reading (Windows)."""
+    print(paint(prompt, "bold"))
+    for n, o in enumerate(options, 1):
+        print(f"  {n}. {o['ref']}  {o['title'][:48]} [{o['risk']}]")
+    try:
+        answer = input(f"Number 1-{len(options)} (Enter to cancel): ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return None
+    if answer.isdigit() and 1 <= int(answer) <= len(options):
+        return options[int(answer) - 1]["ref"]
+    return None

@@ -154,9 +154,9 @@ def test_route_parity_static_frontend_shapes_have_backend_routes():
     build + desktop harness under the heavy-gate lock; see lane report.
     """
     wt = Path(__file__).resolve().parents[1]
-    server = (wt / "src/hermes_project_stewardship/api/server.py").read_text()
+    server = (wt / "src/hermes_project_stewardship/api/server.py").read_text(encoding="utf-8")
     matrix_path = wt / "docs/plans/evidence/project-management-route-matrix.json"
-    matrix = json.loads(matrix_path.read_text())
+    matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
     # Critical user journeys must have backend routes (exact, not false-empty).
     required = [
         "/onboard/discover", "/onboard/preflight", "/onboard",

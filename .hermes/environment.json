@@ -8,7 +8,7 @@
   ],
   "build": [
     "node hermes_dockyard_plugin/desktop/build.mjs",
-    "git diff --exit-code -- hermes_dockyard_plugin/desktop/plugin.js"
+    "git diff --exit-code -- hermes_dockyard_plugin/desktop/plugin.js desktop/plugin.js"
   ],
   "test": [
     ".venv/bin/python -m pytest",

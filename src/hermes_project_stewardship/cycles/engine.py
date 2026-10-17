@@ -30,7 +30,7 @@ from ..events.bus import (
     VERIFICATION_FAILED,
     EventBus,
 )
-from ..objectives.evaluators import DEFAULT_EVALUATOR, EvaluationContext
+from ..objectives.evaluators import DEFAULT_EVALUATOR, EvaluationContext, detail_chars_from
 from ..persistence.service import ServiceError, StewardshipService
 from ..verification.engine import VerificationEngine
 
@@ -162,6 +162,7 @@ class CycleEngine:
                 project_path=self._project_path(specs),
                 allowlist=self._allowlist_from(settings),
                 clock=self.svc._clock,
+                detail_chars=detail_chars_from(policies.get("verification")),
             )
             objectives = self.svc.objectives(project_id)
             if any(o.evaluator_type == "integration" and o.integration == "github" for o in objectives):

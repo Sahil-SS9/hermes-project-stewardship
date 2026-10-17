@@ -18,7 +18,7 @@ hermes-project-stewardship/
 ├── skill/project-stewardship/SKILL.md   # steward behaviour layer (never owns state)
 ├── desktop/stewardship-panel/           # React panel scaffold (thin RPC client)
 ├── examples/example_project.py          # full loop walkthrough
-└── .github/workflows/ci.yml            # 3 OS × 3 Python matrix + API-extra job
+└── .github/workflows/ci.yml            # 3 OS × 4 Python matrix + API-extra + frontend/Desktop-bundle jobs
 ```
 
 Milestone mapping (PRD v0.1 §23): A→`domain/`+`persistence/`, B→`verification/`,

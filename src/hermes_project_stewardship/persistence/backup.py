@@ -10,6 +10,7 @@ import sqlite3
 from typing import Any
 from uuid import uuid4
 
+from .file_identity import sqlite_file_identity
 from .store import Store, iso
 
 
@@ -241,10 +242,9 @@ def _restore_content(
             destination = target_root / _safe_relative(str(record["path"]), label="restored content path")
             destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             shutil.copyfile(source, destination)
-            identity = destination.stat()
             connection.execute(
                 "UPDATE project_content SET file_dev=?, file_ino=? WHERE content_id=?",
-                (int(identity.st_dev), int(identity.st_ino), content_id),
+                (*sqlite_file_identity(destination.stat()), content_id),
             )
         connection.commit()
     except Exception:

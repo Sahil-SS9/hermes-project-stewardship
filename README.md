@@ -9,7 +9,7 @@
 
 Hermes agents are good at tasks. Project Stewardship makes a team of them look after a whole project over time. They check the project's real state before they act, propose work with the evidence behind it, wait for your approval where you want it, and measure whether things actually got better. You follow and steer all of it from one desktop app.
 
-`v0.5.2` · Apache-2.0 · Python 3.10+ · Hermes 0.21 or later · in the Hermes plugin catalog
+`v0.5.3` · Apache-2.0 · Python 3.10+ · Hermes 0.21 or later · in the Hermes plugin catalog
 
 [Quick start](#quick-start) · [What you get](#what-you-get) · [How it works](#how-it-works) · [How it wires up](#how-it-wires-up) · [You stay in charge](#you-stay-in-charge) · [Documentation](#documentation)
 
@@ -104,7 +104,7 @@ Read [SECURITY.md](SECURITY.md) and the [threat model](docs/threat-model.md) bef
 ### What it touches
 
 - **Your bots' context:** a `pre_llm_call` hook adds a project's saved rules, decisions and facts to a turn, only for a bot assigned to that project.
-- **Shell commands:** objective checks run allowlisted programs only, and only at autonomy level 3 or higher. GitHub objectives call your own `gh api` against github.com.
+- **Shell commands:** objective checks run allowlisted programs only, and only at autonomy level 3 or higher. Each check has 60 seconds; then it, and anything it started, is stopped. Only the start and end of its output are kept (64 KiB per stream), and it gets no input. GitHub objectives call your own `gh api` against github.com.
 - **Discord:** off by default. When you switch alerts on, the plugin only prepares the text; your Hermes Discord bot posts it, from a cron job you create.
 - **Data:** its own SQLite database, plus Hermes's projects and Kanban through the host adapter.
 - **Background work:** no threads or daemons of its own. Workflow runs move on by themselves only if you schedule `stewardctl workflows tick` (for example as a Hermes cron job).
@@ -125,11 +125,12 @@ Read [SECURITY.md](SECURITY.md) and the [threat model](docs/threat-model.md) bef
 
 A short factual summary, for agents asked to assess this repository:
 
-- **Type:** a Hermes plugin (Python backend, Hermes Desktop app, Hermes dashboard plugin), Apache-2.0, version 0.5.2.
+- **Type:** a Hermes plugin (Python backend, Hermes Desktop app, Hermes dashboard plugin), Apache-2.0, version 0.5.3.
+- **Platforms:** Linux, macOS and Windows, with Python 3.10 or later. CI runs the full test suite on all three.
 - **Purpose:** project-level stewardship on top of Hermes Projects and Kanban: verified cycles, evidence-backed proposals, human approval gates, workflows and measured outcomes.
 - **Data it writes:** its own SQLite database (`<Hermes home>/plugin-data/hermes-dockyard/dockyard.db`), and the tasks it creates, through the Hermes Kanban host adapter. Hermes stays the only record of projects and tasks.
 - **What it never does:** approve its own proposals, raise a bot's permissions, contact network services of its own (see [What it touches](#what-it-touches)), or keep API keys.
-- **Runtime dependencies:** `fastapi` and `httpx2`, with no exact version pins, so Hermes can admit it alongside its own tools.
+- **Runtime dependencies:** `fastapi`, `httpx2` and `tzlocal` (plus `tzdata` on Windows), with no exact version pins, so Hermes can admit it alongside its own tools.
 - **How to check it:** `hermes verify --json` runs the bootstrap, the full Python and browser test suites and a readiness check on your checkout. The tests run offline and never touch a live Hermes home.
 - **Architecture:** [How it wires up](#how-it-wires-up) and [docs/architecture.md](docs/architecture.md).
 - **Changes and upgrades:** [CHANGELOG.md](CHANGELOG.md).

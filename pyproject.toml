@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hermes-project-stewardship"
-version = "0.5.2"
+version = "0.5.3"
 description = "Durable project ownership for Hermes agent fleets: verified cycles, bounded initiatives, explicit autonomy policy."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,7 +22,14 @@ classifiers = [
   "Environment :: Console",
   "Topic :: Software Development :: Build Tools",
 ]
-dependencies = ["fastapi>=0.104,<1", "httpx2>=2.7,<3"]
+dependencies = [
+  "fastapi>=0.104,<1", "httpx2>=2.7,<3",
+  # The notification engine's local zone (quiet hours): tzlocal names the
+  # machine's IANA zone on every platform; Windows ships no system zone
+  # database, so zoneinfo needs tzdata there (Hermes core does the same).
+  "tzlocal>=5.0,<6",
+  "tzdata>=2024.1,<2030; sys_platform == 'win32'",
+]
 
 [project.optional-dependencies]
 desktop-panel = ["fastapi", "uvicorn"]
@@ -31,6 +38,8 @@ dev = [
   "pytest>=7", "pytest-timeout", "pytest-cov",
   "httpx2", "ruff>=0.15.10", "ty>=0.0.21,<0.1", "pip-audit>=2.9",
   "tomli>=2; python_version < '3.11'",
+  # Lets Linux/macOS test runs replay Windows' empty system zone database.
+  "tzdata>=2024.1,<2030",
 ]
 
 [project.entry-points."hermes_agent.plugins"]
