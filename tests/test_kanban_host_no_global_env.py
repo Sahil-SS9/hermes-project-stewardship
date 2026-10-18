@@ -124,3 +124,22 @@ def test_conftest_pops_the_dispatcher_worker_env_before_any_host_is_built():
             f"{name} leaked from the launching shell into the pytest process; "
             "tests/conftest.py must pop the dispatcher injection family at import"
         )
+
+
+def test_core_sees_every_disposable_home_as_its_own_root(tmp_path: Path):
+    """Regression (gate, 17/10/2026): core counts any path under its native
+    home (~/.hermes) as the operator's install, and the Hermes runtime keeps
+    TMPDIR there. A core that resolves explicit homes then mapped each test's
+    Hermes home to the live root, so hosts built on synthetic profiles listed
+    the machine's real ones. tests/conftest.py must move core's native home
+    into the disposable root at import, before any host is built."""
+    hermes_constants = pytest.importorskip("hermes_constants")
+    assert hermes_constants.get_default_hermes_root() == Path(os.environ["HERMES_HOME"]), (
+        "this pytest process resolves a Hermes root outside its disposable state root"
+    )
+    home = tmp_path / "hermes-home"
+    try:
+        root = hermes_constants.get_default_hermes_root(home=home)
+    except TypeError:  # an older core resolves no explicit home; the host applies the rule
+        return
+    assert root == home, f"core put a disposable home under the live root {root}"

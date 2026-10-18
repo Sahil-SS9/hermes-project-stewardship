@@ -51,9 +51,13 @@ objective commands that run the way Hermes's own commands do.
   "default", so team pickers and card assignment were wrong and choosing
   another profile as project lead was refused. Profile names now come from
   the Hermes root; projects stay per profile, as in Hermes.
-- **The test suite never reaches the machine's live Kanban boards.** Run
-  inside a Hermes worker, pytest inherited the dispatcher's board settings
-  and could create boards in the live Kanban home.
+- **The test suite never reaches the machine's live Kanban boards or
+  profiles.** Run inside a Hermes worker, pytest inherited the dispatcher's
+  board settings and could create boards in the live Kanban home. And
+  because a Hermes session keeps its temporary files inside `~/.hermes`,
+  Hermes counted each test's throwaway Hermes folder as part of the
+  machine's real install, so a test could see the machine's real profiles
+  instead of its own.
 
 ### Security
 - **Objective commands are bounded in memory and time.** They were read with

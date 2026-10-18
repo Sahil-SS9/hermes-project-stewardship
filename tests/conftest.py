@@ -62,6 +62,38 @@ os.environ["STEWARD_DB_PATH"] = str(_TEST_ROOT / "dockyard.db")
 os.environ["DOCKYARD_PLUGIN_DB"] = str(_TEST_ROOT / "dockyard.db")
 
 
+def _isolate_cores_native_home() -> None:
+    """Keep every disposable path out of the Hermes home core calls native.
+
+    Core counts any path under its native home (~/.hermes on Linux and macOS)
+    as the operator's own install, and the Hermes runtime keeps its scratch
+    tree there, so TMPDIR, every tmp_path and the state root above can all be
+    inside it. Core then resolved this process's root, and the root of each
+    test's synthetic home, to the live install: hosts built on synthetic
+    profiles listed the machine's real ones (gate, 17/10/2026). Only core's
+    native home moves, as in Hermes' own suite: HOME stays for subprocesses,
+    and a test that points HOME elsewhere keeps the layout it chose.
+    """
+    try:
+        import hermes_constants
+    except ImportError:  # no Hermes core importable: nothing resolves a root
+        return
+    platform_home = getattr(hermes_constants, "_get_platform_default_hermes_home", None)
+    if platform_home is None:  # nothing to move; the contract test still checks the root
+        return
+    live = platform_home()
+    disposable = _TEST_ROOT / "native-home" / live.name
+
+    def disposable_platform_home() -> Path:
+        current = platform_home()
+        return disposable if current == live else current
+
+    hermes_constants._get_platform_default_hermes_home = disposable_platform_home
+
+
+_isolate_cores_native_home()
+
+
 def _path_from_sqlite_database(database: object) -> Path | None:
     if isinstance(database, os.PathLike):
         return Path(database).expanduser()
