@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.3] - 2026-10-17
+## [0.5.3] - 2026-10-19
 
 Windows support, fixes for the latest issues and pull requests, and
 objective commands that are bounded in memory and time.
