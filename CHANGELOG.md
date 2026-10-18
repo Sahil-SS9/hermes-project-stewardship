@@ -7,7 +7,7 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [0.5.3] - 2026-10-17
 
 Windows support, fixes for the latest issues and pull requests, and
-objective commands that run the way Hermes's own commands do.
+objective commands that are bounded in memory and time.
 
 ### Added
 - **Windows.** The plugin runs on Windows, and CI now runs the full suite on
@@ -65,11 +65,18 @@ objective commands that run the way Hermes's own commands do.
   timeout, and only the direct child was killed. A command now runs under one
   deadline (60 s by default), the only reason it is stopped, and its output is
   read as it is written: only the start and end of each stream are kept
-  (64 KiB per stream), so a flood keeps memory flat, a verbose but healthy run
-  still passes, and a count on its last line is still measured. At the
-  deadline, or if the steward is interrupted mid-run, the command and
-  everything it started are stopped (its process group on Linux and macOS,
-  `taskkill /T` on Windows), including a grandchild that kept a pipe open.
+  (64 KiB per stream), so a flood keeps memory flat and a verbose but healthy
+  run still passes. A count on the last line is now measured even after a
+  long output (0.5.2 lost it past the first 64 KiB), so the result of a very
+  chatty count objective can change. At the deadline, or if the steward is
+  interrupted mid-run, the command is stopped with what it started: its
+  process group on Linux and macOS (a second Ctrl-C cuts the grace period
+  short, never the kill), then any process still carrying the run's private
+  environment marker, such as a helper that left the group or outlived its
+  parent; on Windows its process tree, with `taskkill /T` run from System32,
+  never found by search. A grandchild that kept a pipe open is stopped too. A
+  process that replaces its inherited environment and leaves the group, or
+  on Windows one whose parent has already exited, can still outlive it.
   Commands get an empty stdin, and each run records how long it took.
 
 Thanks to Andrew Peltekci (@appletechie) for the reports and pull requests

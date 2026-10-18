@@ -7,9 +7,14 @@ Security properties:
   a scrubbed environment; stdin is empty, never the steward's own;
 - one deadline per command (60 s by default), and the deadline is the only
   reason a command is stopped. At the deadline, or when the caller is
-  interrupted or fails mid-run, the command and everything it started are
-  stopped: on POSIX its own session's process group (SIGTERM, then SIGKILL
-  after a grace period), on Windows its process tree (`taskkill /T /F`);
+  interrupted or fails mid-run, the command and what it started are stopped:
+  on POSIX its own session's process group (SIGTERM, then SIGKILL after a
+  grace period; a second interrupt cuts the grace short, never the kill),
+  then, on Linux and macOS, any process still carrying the run's private
+  environment marker (a helper that left the group or outlived its parent);
+  on Windows its process tree (`taskkill /T /F`, run from System32). A
+  process that replaces its inherited environment and leaves the group, or
+  on Windows one whose parent already exited, can still escape;
 - output is read as it is written and only the head and tail of each stream
   are kept (at most MAX_OUTPUT_BYTES), so however much a command writes its
   memory stays flat, and its last line (an objective's measure) survives;
@@ -18,7 +23,9 @@ Security properties:
 This mirrors Hermes's own local runner, which plugins may not import (its
 module paths are not part of the plugin contract): a 40/60 head/tail window,
 no kill for volume, group TERM then KILL, `taskkill /T /F` on Windows, and
-cleanup on any exception.
+cleanup on any exception. Hermes sweeps escaped descendants it can still
+reach through their parents; the marker also reaches those whose parent has
+already exited.
 
 This is the ONLY sanctioned way stewardship runs commands in a project
 context. See docs/threat-model.md §4.
@@ -26,11 +33,14 @@ context. See docs/threat-model.md §4.
 
 from __future__ import annotations
 
+import ntpath
 import os
+import secrets
 import selectors
 import shutil
 import signal
 import subprocess
+import sys
 import threading
 import time
 from contextlib import suppress
@@ -54,6 +64,12 @@ _IS_WINDOWS = os.name == "nt"
 # subprocess.CREATE_NO_WINDOW, which only Windows builds of Python define: no
 # console window flashes up for a check, or for taskkill.
 _CREATE_NO_WINDOW = 0x08000000
+# Each run puts a private random value under this name in its command's
+# environment. What the command starts inherits it, including a helper that
+# leaves the command's process group (setsid) or outlives its parent, so a
+# stop on Linux and macOS finds those by it. Callers cannot set it.
+_RUN_MARKER = "STEWARD_RUN_MARKER"
+_PS_TIMEOUT_SECONDS = 10
 
 
 class CommandNotPermitted(Exception):
@@ -219,33 +235,58 @@ def _group_gone(proc: subprocess.Popen, pgid: int, timeout: float) -> bool:
         time.sleep(0.05)
 
 
-def _kill(proc: subprocess.Popen) -> None:
-    """Stop the command and everything it started; never raises.
+def _kill(proc: subprocess.Popen, *, marker: Optional[str] = None) -> None:
+    """Stop the command and what it started. OS errors never escape; an
+    interrupt during the stop goes on up only after the kill has been sent.
 
-    Windows: ``taskkill /T /F`` ends the whole tree (``kill()`` ends only the
-    direct child); ``kill()`` is the fallback when taskkill is missing, hangs,
-    or the command outlives it. POSIX: the command leads its own session, so
-    its process group is the tree: SIGTERM, wait for the group to go, then
-    SIGKILL. Only called while the leader is unreaped, so its pid, and the
-    group's id, cannot have been handed to another process.
+    Windows: ``taskkill /T /F`` ends the whole tree (see _stop_tree_windows).
+    POSIX: the command leads its own session, so its process group is the
+    tree (see _stop_group); then any process still carrying the run's
+    ``marker`` (``NAME=value``) is killed too (see _stop_marked).
     """
     if _IS_WINDOWS:
-        try:
-            subprocess.run(
-                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
-                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                timeout=_TASKKILL_TIMEOUT_SECONDS, check=False, creationflags=_CREATE_NO_WINDOW,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            with suppress(OSError):
-                proc.kill()
-            return
-        try:
-            proc.wait(timeout=KILL_GRACE_SECONDS)
-        except subprocess.TimeoutExpired:
-            with suppress(OSError):
-                proc.kill()
+        _stop_tree_windows(proc)
         return
+    try:
+        _stop_group(proc)
+    finally:
+        if marker is not None:
+            _stop_marked(marker)
+
+
+def _stop_tree_windows(proc: subprocess.Popen) -> None:
+    """``taskkill /T /F`` ends the whole tree (``kill()`` ends only the direct
+    child); ``kill()`` is the fallback when taskkill is missing, hangs, or the
+    command outlives it. taskkill runs from the system directory with a
+    minimal environment, never found by search: Windows looks in the
+    application's and the current directory before System32, so a planted
+    taskkill.exe would run instead."""
+    root = os.environ.get("SYSTEMROOT") or os.environ.get("WINDIR") or "C:\\Windows"
+    system32 = ntpath.join(root, "System32")
+    try:
+        subprocess.run(
+            [ntpath.join(system32, "taskkill.exe"), "/PID", str(proc.pid), "/T", "/F"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            env={"SYSTEMROOT": root, "WINDIR": root, "PATH": system32},
+            timeout=_TASKKILL_TIMEOUT_SECONDS, check=False, creationflags=_CREATE_NO_WINDOW,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        with suppress(OSError):
+            proc.kill()
+        return
+    try:
+        proc.wait(timeout=KILL_GRACE_SECONDS)
+    except subprocess.TimeoutExpired:
+        with suppress(OSError):
+            proc.kill()
+
+
+def _stop_group(proc: subprocess.Popen) -> None:
+    """POSIX: SIGTERM the command's process group, wait out the grace, then
+    SIGKILL what is left. Only called while the leader is unreaped, so its
+    pid, and the group's id, cannot have been handed to another process."""
+    if _IS_WINDOWS:
+        raise NotImplementedError("Windows stops the tree with taskkill")
     pgid = proc.pid
     try:
         os.killpg(pgid, signal.SIGTERM)
@@ -257,11 +298,99 @@ def _kill(proc: subprocess.Popen) -> None:
         with suppress(OSError):
             proc.kill()
         return
-    if _group_gone(proc, pgid, KILL_GRACE_SECONDS):
-        return
+    try:
+        if _group_gone(proc, pgid, KILL_GRACE_SECONDS):
+            return
+    except BaseException:
+        # Interrupted again (a second Ctrl-C) or failing while the grace runs:
+        # the grace is cut short, never the kill.
+        with suppress(ProcessLookupError, PermissionError):
+            os.killpg(pgid, signal.SIGKILL)
+        raise
     with suppress(ProcessLookupError, PermissionError):
         os.killpg(pgid, signal.SIGKILL)
     _group_gone(proc, pgid, _STOP_WAIT_SECONDS)
+
+
+def _stop_marked(marker: str) -> None:
+    """POSIX: SIGKILL every process still carrying this run's marker, i.e.
+    what the command started that left its process group (setsid) or
+    outlived its parent. Runs after the group stop. Best effort: Linux reads
+    /proc, macOS asks ps; a process that replaced its environment is not
+    found, and other systems rely on the group stop alone."""
+    if _IS_WINDOWS:
+        raise NotImplementedError("Windows stops the tree with taskkill")
+    needle = marker.encode()
+    for pid in _marked(needle):
+        _kill_marked(pid, needle)
+
+
+def _carries(pid: int, needle: bytes) -> bool:
+    """Linux: whether process ``pid``'s environment holds ``needle`` exactly."""
+    try:
+        with open(f"/proc/{pid}/environ", "rb") as handle:
+            return needle in handle.read().split(b"\0")
+    except OSError:
+        return False  # gone, or not ours to read
+
+
+def _marked(needle: bytes) -> List[int]:
+    """Pids, other than ours, whose environment carries ``needle``."""
+    me = os.getpid()
+    if sys.platform.startswith("linux"):
+        try:
+            names = os.listdir("/proc")
+        except OSError:
+            return []
+        return [int(name) for name in names
+                if name.isdigit() and int(name) != me and _carries(int(name), needle)]
+    if sys.platform == "darwin":
+        # No /proc: ps -E prints each process's launch environment after its
+        # command, as space-separated NAME=value words.
+        try:
+            listing = subprocess.run(
+                ["/bin/ps", "-A", "-E", "-ww", "-o", "pid=", "-o", "command="],
+                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                timeout=_PS_TIMEOUT_SECONDS, check=False,
+            ).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            return []
+        found = []
+        for line in listing.splitlines():
+            pid_text, _, rest = line.strip().partition(b" ")
+            if pid_text.isdigit() and int(pid_text) != me and needle in rest.split():
+                found.append(int(pid_text))
+        return found
+    return []
+
+
+def _kill_marked(pid: int, needle: bytes) -> None:
+    """SIGKILL a marked process. Linux goes through a pidfd and re-checks the
+    marker on the process the fd holds, so a reused pid is never signalled;
+    elsewhere the pid is signalled directly, moments after it was listed."""
+    if _IS_WINDOWS:
+        raise NotImplementedError("Windows stops the tree with taskkill")
+    pidfd_open = getattr(os, "pidfd_open", None)
+    send_signal = getattr(signal, "pidfd_send_signal", None)
+    if pidfd_open is None or send_signal is None:
+        with suppress(OSError):
+            os.kill(pid, signal.SIGKILL)
+        return
+    try:
+        fd = pidfd_open(pid)
+    except ProcessLookupError:
+        return  # already gone
+    except OSError:  # a kernel without pidfds
+        with suppress(OSError):
+            os.kill(pid, signal.SIGKILL)
+        return
+    try:
+        if _carries(pid, needle):
+            send_signal(fd, signal.SIGKILL)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
 
 
 def _release(proc: subprocess.Popen, readers: Sequence[_Reader]) -> None:
@@ -318,13 +447,15 @@ def run_allowlisted(
             if value:
                 env[key] = value
     if env_extra:
-        forbidden = {"PATH", "PYTHONPATH", "LD_PRELOAD", "LD_LIBRARY_PATH"}
+        forbidden = {"PATH", "PYTHONPATH", "LD_PRELOAD", "LD_LIBRARY_PATH", _RUN_MARKER}
         bad = forbidden.intersection(env_extra)
         if bad:
             raise CommandNotPermitted(
                 f"environment override is not permitted for {sorted(bad)}"
             )
         env.update(env_extra)
+    env[_RUN_MARKER] = secrets.token_hex(16)
+    marker = f"{_RUN_MARKER}={env[_RUN_MARKER]}"
     # Resolve only from the same restricted PATH passed to the child. This
     # prevents caller-PATH shadowing and keeps the allowlist tied to trusted bins.
     exe_path = shutil.which(exe, path=env["PATH"])
@@ -375,12 +506,12 @@ def run_allowlisted(
             except subprocess.TimeoutExpired:
                 timed_out = True
         if timed_out:
-            _kill(proc)
+            _kill(proc, marker=marker)
     except BaseException:
         # Ctrl-C or any failure mid-run: its own session kept the terminal's
         # SIGINT from the command, so stop it here before the error goes on.
         if proc.returncode is None:
-            _kill(proc)
+            _kill(proc, marker=marker)
         raise
     finally:
         _release(proc, readers)

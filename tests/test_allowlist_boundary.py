@@ -355,6 +355,81 @@ def test_interrupt_mid_run_stops_the_command_and_its_children(tmp_path):
     assert not grandchild_marker.exists()
 
 
+@pytest.mark.skipif(os.name == "nt", reason="sessions are POSIX; Windows stops the tree with taskkill")
+def test_a_helper_that_leaves_the_process_group_is_stopped_too(tmp_path):
+    """Independent review F1 (18/10/2026): the command starts a helper that
+    calls setsid() (a session and process group of its own) and exits, and
+    the helper keeps the pipes open. The group kill at the deadline cannot
+    reach it; the private marker each run puts in its command's environment,
+    which the helper inherits, does."""
+    marker = tmp_path / "helper-survived"
+    helper = ("import os, pathlib, time; os.setsid(); time.sleep(6); "
+              f"pathlib.Path({str(marker)!r}).touch()")
+    result, elapsed = _timed(
+        ["python3", "-c", f"import subprocess, sys; subprocess.Popen([sys.executable, '-c', {helper!r}]);"
+                          " print('started', flush=True)"], tmp_path)
+    assert result.timed_out is True and result.ok is False
+    assert "started" in result.stdout
+    assert elapsed < 2 + 3
+    time.sleep(6)
+    assert not marker.exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="the marker sweep is POSIX")
+def test_a_stop_spares_processes_that_do_not_carry_this_runs_marker(tmp_path):
+    """The sweep kills only what this run started: a process outside the
+    run keeps running, and so does one carrying another run's marker."""
+    other_run = dict(os.environ, STEWARD_RUN_MARKER="another-run")
+    bystanders = [
+        subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"]),
+        subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], env=other_run),
+    ]
+    try:
+        result, _ = _timed(["python3", "-c", "import time; time.sleep(30)"], tmp_path, timeout_seconds=1)
+        assert result.timed_out is True
+        assert [bystander.poll() for bystander in bystanders] == [None, None]
+    finally:
+        for bystander in bystanders:
+            bystander.kill()
+            bystander.wait()
+
+
+def test_each_run_has_its_own_marker_that_callers_cannot_set(tmp_path):
+    """The marker a stop relies on is private to one run: two runs see
+    different values, the steward's own environment never carries it, and a
+    caller cannot set or replace it."""
+    probe = ["python3", "-c", "import os; print(os.environ.get('STEWARD_RUN_MARKER', ''))"]
+    seen = [run_allowlisted(probe, cwd=tmp_path, allowlist=frozenset({"python3"})).stdout.strip()
+            for _ in range(2)]
+    assert all(len(value) >= 32 for value in seen) and seen[0] != seen[1]
+    assert "STEWARD_RUN_MARKER" not in os.environ
+    with pytest.raises(CommandNotPermitted, match="not permitted"):
+        run_allowlisted(probe, cwd=tmp_path, allowlist=frozenset({"python3"}),
+                        env_extra={"STEWARD_RUN_MARKER": "chosen-by-the-caller"})
+
+
+@pytest.mark.skipif(os.name == "nt", reason="process groups are POSIX")
+def test_a_second_interrupt_during_the_stop_never_skips_the_kill(tmp_path, monkeypatch):
+    """Independent review F2 (18/10/2026): Ctrl-C again while the runner
+    waits out the SIGTERM grace cuts the grace short, never the kill. The
+    command ignores SIGTERM, and every grace wait is interrupted."""
+    from hermes_project_stewardship.security import allowlist
+
+    marker = tmp_path / "survived"
+    child = ("import pathlib, signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+             f"time.sleep(5); pathlib.Path({str(marker)!r}).touch()")
+
+    def interrupted_grace(proc, pgid, timeout):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(allowlist, "_group_gone", interrupted_grace)
+    with pytest.raises(KeyboardInterrupt):
+        run_allowlisted(["python3", "-c", child], cwd=tmp_path,
+                        allowlist=frozenset({"python3"}), timeout_seconds=1)
+    time.sleep(5)
+    assert not marker.exists()
+
+
 class _FakeProc:
     """Stands in for a Popen whose process ignores everything but `kill()`
     when ``stubborn``; signalling its pid for real would reach nothing."""
@@ -386,19 +461,27 @@ def _windows_stop(monkeypatch, proc, run):
     allowlist._kill(proc)  # type: ignore[arg-type]
 
 
-def test_windows_stop_ends_the_whole_tree_with_taskkill(monkeypatch):
+def test_windows_stop_ends_the_whole_tree_with_taskkill_from_system32(monkeypatch):
+    """`taskkill /T /F` ends the tree. It runs from the system directory with
+    a minimal environment, never found by search: Windows looks in the
+    application's and the current directory before System32, so a planted
+    taskkill.exe would run instead (independent review F3, 18/10/2026)."""
     calls = []
 
     def run(argv, **kwargs):
         calls.append((argv, kwargs))
         return subprocess.CompletedProcess(argv, 0)
 
+    monkeypatch.setenv("SYSTEMROOT", "C:\\Windows")
+    monkeypatch.setenv("STEW_STEWARD_ONLY", "not for taskkill")
     proc = _FakeProc()
     _windows_stop(monkeypatch, proc, run)
-    assert [argv for argv, _ in calls] == [["taskkill", "/PID", str(_UNREACHABLE_PID), "/T", "/F"]]
+    assert [argv for argv, _ in calls] == [
+        ["C:\\Windows\\System32\\taskkill.exe", "/PID", str(_UNREACHABLE_PID), "/T", "/F"]]
     kwargs = calls[0][1]
     assert kwargs["creationflags"] == 0x08000000  # CREATE_NO_WINDOW: no console flash
     assert kwargs["stdin"] is subprocess.DEVNULL and kwargs["timeout"] > 0
+    assert kwargs.get("env") is not None and "STEW_STEWARD_ONLY" not in kwargs["env"]
     assert proc.killed is False  # taskkill did it; the fallback stayed unused
 
 

@@ -59,17 +59,26 @@ Objective evaluators run commands in project context. Controls:
   as the command writes, and only the head and tail of each stream are kept
   (64 KiB), so a flood cannot grow memory and the last line, an objective's
   measure, survives. At the deadline, or when the caller is interrupted or
-  fails mid-run, the command and everything it started are stopped: on POSIX
-  it runs in its own session and its process group is stopped (SIGTERM, then
-  SIGKILL after 1 s); on Windows its process tree is (`taskkill /T /F`). A
-  grandchild holding a pipe open cannot outlive the deadline. The command's
-  stdin is empty, never the steward's own;
+  fails mid-run, the command is stopped with what it started. On POSIX it
+  runs in its own session and its process group is stopped (SIGTERM, then
+  SIGKILL after 1 s; a second interrupt cuts the grace short, never the
+  kill). Each run also puts a private random marker in its command's
+  environment, and on Linux and macOS every process still carrying it is
+  then killed: a helper that left the group (setsid) or outlived its parent,
+  as long as it kept the environment it inherited. On Windows its process
+  tree is stopped (`taskkill /T /F`, run from System32 with a minimal
+  environment, never found by search). A grandchild holding a pipe open
+  cannot outlive the deadline. The command's stdin is empty, never the
+  steward's own;
 - refusal recorded as failed objective, not an exception path.
 
 Note honestly: a malicious repo can still contain a Makefile that does
 anything when `make` runs. Mitigation is policy, not code: allowlists are
 per-project config owned by the human; docs recommend narrowing them on
-untrusted repos and keeping autonomy ≤ 2 there.
+untrusted repos and keeping autonomy ≤ 2 there. The stop is not a sandbox
+either: a process that replaces its inherited environment and leaves the
+process group, or on Windows one whose parent has already exited, can
+outlive it.
 
 ## 5. Approval integrity
 
