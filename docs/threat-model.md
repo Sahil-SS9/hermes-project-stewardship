@@ -62,14 +62,17 @@ Objective evaluators run commands in project context. Controls:
   fails mid-run, the command is stopped with what it started. On POSIX it
   runs in its own session and its process group is stopped (SIGTERM, then
   SIGKILL after 1 s; a second interrupt cuts the grace short, never the
-  kill). Each run also puts a private random marker in its command's
+  group kill, while a further interrupt can still cut short the final
+  marker sweep). Each run also puts a private random marker in its command's
   environment, and on Linux and macOS every process still carrying it is
   then killed: a helper that left the group (setsid) or outlived its parent,
   as long as it kept the environment it inherited. On Windows its process
   tree is stopped (`taskkill /T /F`, run from System32 with a minimal
   environment, never found by search). A grandchild holding a pipe open
-  cannot outlive the deadline. The command's stdin is empty, never the
-  steward's own;
+  cannot outlive the deadline. A command that finishes within its deadline is
+  left as it is (detached helpers included); a further interrupt during the
+  final marker sweep can cut that sweep short. The command's stdin is empty,
+  never the steward's own;
 - refusal recorded as failed objective, not an exception path.
 
 Note honestly: a malicious repo can still contain a Makefile that does

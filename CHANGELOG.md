@@ -71,13 +71,16 @@ objective commands that are bounded in memory and time.
   chatty count objective can change. At the deadline, or if the steward is
   interrupted mid-run, the command is stopped with what it started: its
   process group on Linux and macOS (a second Ctrl-C cuts the grace period
-  short, never the kill), then any process still carrying the run's private
-  environment marker, such as a helper that left the group or outlived its
-  parent; on Windows its process tree, with `taskkill /T` run from System32,
-  never found by search. A grandchild that kept a pipe open is stopped too. A
-  process that replaces its inherited environment and leaves the group, or
-  on Windows one whose parent has already exited, can still outlive it.
-  Commands get an empty stdin, and each run records how long it took.
+  short, never the group kill; a further Ctrl-C can still cut short the
+  final sweep of detached helpers), then any process still carrying the
+  run's private environment marker, such as a helper that left the group or
+  outlived its parent; on Windows its process tree, with `taskkill /T` run
+  from System32, never found by search. A check that finishes on its own is
+  left as it is, detached helpers included. A grandchild that kept a pipe
+  open is stopped too. A process that replaces its inherited environment and
+  leaves the group, or on Windows one whose parent has already exited, can
+  still outlive it. Commands get an empty stdin, and each run records how
+  long it took.
 
 Thanks to Andrew Peltekci (@appletechie) for the reports and pull requests
 behind the Desktop install, Match Hermes, command-runner and profile-listing

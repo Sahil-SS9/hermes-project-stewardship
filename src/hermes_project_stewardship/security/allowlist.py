@@ -9,10 +9,12 @@ Security properties:
   reason a command is stopped. At the deadline, or when the caller is
   interrupted or fails mid-run, the command and what it started are stopped:
   on POSIX its own session's process group (SIGTERM, then SIGKILL after a
-  grace period; a second interrupt cuts the grace short, never the kill),
-  then, on Linux and macOS, any process still carrying the run's private
-  environment marker (a helper that left the group or outlived its parent);
-  on Windows its process tree (`taskkill /T /F`, run from System32). A
+  grace period; a second interrupt cuts the SIGTERM grace short, never the
+  group kill — a further interrupt can still cut short the final marker
+  sweep), then, on Linux and macOS, any process still carrying the run's
+  private environment marker (a helper that left the group or outlived its
+  parent); on Windows its process tree (`taskkill /T /F`, run from
+  System32). A command that finishes within its deadline is not swept, and a
   process that replaces its inherited environment and leaves the group, or
   on Windows one whose parent already exited, can still escape;
 - output is read as it is written and only the head and tail of each stream
