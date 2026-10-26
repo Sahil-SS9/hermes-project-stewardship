@@ -98,32 +98,35 @@ def test_env_token_and_default_shared_principal_cannot_mutate(tmp_path, monkeypa
         store.close()
 
 
-def test_plugin_proxy_forwards_authorization_to_backend(tmp_path, monkeypatch):
+def test_plugin_proxy_uses_private_credential_after_host_auth(tmp_path, monkeypatch):
     import asyncio
-    import sys
+    import importlib.util
     from pathlib import Path
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
-    plugin_dir = str(Path(__file__).parents[1] / "hermes_dockyard_plugin/dashboard")
-    sys.path.insert(0, plugin_dir)
+    from .dashboard_host import authenticated_host
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setenv("STEWARD_DB_PATH", str(tmp_path / "plugin.db"))
-    monkeypatch.setenv("STEWARD_RPC_TOKEN", "inner-secret")
-    import plugin_api
-    from hermes_project_stewardship.persistence.service import StewardshipService
-    backend_store = Store(tmp_path / "plugin.db")
-    StewardshipService(backend_store).enable("demo", mission="original")
-    monkeypatch.setattr(plugin_api, "_app", create_app(backend_store, auth_token="inner-secret", auth_principal="human", auth_principal_is_human=True, capabilities={"project_archive"}))
-    previous = plugin_api._client
-    plugin_api._client = plugin_api.httpx.AsyncClient(transport=plugin_api.httpx.ASGITransport(app=plugin_api._app), base_url="http://test")
-    host = FastAPI()
-    host.include_router(plugin_api.plugin_api, prefix="/plugin")
+    monkeypatch.setenv("STEWARD_RPC_TOKEN", "standalone-only")
+    monkeypatch.setenv("STEWARD_RPC_PRINCIPAL", "human")
+    monkeypatch.setenv("STEWARD_RPC_PRINCIPAL_KIND", "human")
+    monkeypatch.setenv("STEWARD_RPC_CAPABILITIES", "project_archive")
+    path = Path(__file__).parents[1] / "hermes_dockyard_plugin/dashboard/plugin_api.py"
+    spec = importlib.util.spec_from_file_location("corrections_proxy", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    StewardshipService(module._store).enable("demo", mission="original")
+    host = authenticated_host(module.router, prefix="/plugin")
     try:
-        with TestClient(host) as client:
-            response = client.post("/plugin/projects/demo/disable", headers={"Authorization": "Bearer inner-secret"})
+        with TestClient(host, cookies={"hermes_session_at": "accepted-cookie"}) as client:
+            response = client.post("/plugin/projects/demo/disable")
             assert response.status_code == 200, response.text
             assert response.json()["enabled"] is False
-            denied = client.post("/plugin/projects/demo/re-enable")
-            assert denied.status_code == 401
+            client.cookies.clear()
+            assert client.post("/plugin/projects/demo/re-enable").status_code == 401
+        with TestClient(module._app) as direct:
+            assert direct.get("/stewardship/v1/notifications",
+                              headers={"Authorization": "Bearer standalone-only"}).status_code == 401
     finally:
-        asyncio.run(plugin_api._client.aclose())
-        plugin_api._client = previous
+        asyncio.run(module._client.aclose())
+        module._store.close()

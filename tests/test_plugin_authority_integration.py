@@ -1,21 +1,9 @@
-"""P1.4/P1.5: trusted-principal propagation through the ACTUAL plugin proxy.
+"""Trusted-principal and capability propagation through the real plugin proxy.
 
-Companion to tests/test_desktop_session_auth.py (which covers the archive
-route under STEWARD_RPC_PRINCIPAL_KIND=human). This module closes two gaps
-that module leaves open:
-
-1. token-present composition: the session token captured by the proxy must
-   BE the bearer that reaches the backend authenticator — a 401 on a wrong
-   token proves the backend validated it (the request body actor field was
-   never consulted), not that the proxy happened to be open.
-2. token-absent composition: with no dashboard session token in the host
-   environment, the proxy forwards no Authorization header; the configured
-   RPC token still gates the backend. The browser cannot self-authorize by
-   inventing headers.
-3. principal attribution: a successful human archive records the configured
-   human principal, never the forged actor_id from the request payload.
-4. cross-project isolation on a state-changing route through the proxy
-   (existing coverage is on a queued-item creation route only).
+The small host double enforces the outer authentication boundary. The proxy
+uses its own process-local backend credential, not a browser credential.
+Principal attribution, permission denials and cross-project isolation still
+exercise the production backend and a real disposable database.
 """
 from __future__ import annotations
 
@@ -23,7 +11,7 @@ import importlib.util
 from pathlib import Path
 
 import pytest
-from fastapi import FastAPI
+from .dashboard_host import authenticated_host
 from fastapi.testclient import TestClient
 
 from hermes_project_stewardship.persistence.service import StewardshipService
@@ -36,12 +24,10 @@ PLUGIN_PATH = (
 
 def _load_proxy(monkeypatch, tmp_path, *, rpc_token, session_token, principal_kind,
                 capabilities="project_archive"):
-    """Host-faithful composition: the production plugin binds the backend RPC
-    token to the SAME value as the dashboard session token
-    (`STEWARD_RPC_TOKEN or HERMES_DASHBOARD_SESSION_TOKEN`), and the browser
-    presents that session token per request. So `session_token` is the value
-    the browser sends; pass the same string as `rpc_token` to model a valid
-    host, or a different one to model a forged session.
+    """Configure host and RPC credentials independently to catch accidental coupling.
+
+    This is a host double, not the actual Hermes authentication middleware.
+    Native-host verification separately exercises the real gate and provider.
     """
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setenv("STEWARD_DB_PATH", str(tmp_path / "db.sqlite"))
@@ -57,8 +43,7 @@ def _load_proxy(monkeypatch, tmp_path, *, rpc_token, session_token, principal_ki
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    app = FastAPI()
-    app.include_router(module.router)
+    app = authenticated_host(module.router, session_token=session_token)
     return module, app
 
 
@@ -72,8 +57,7 @@ def demo(tmp_path):
 
 
 def test_token_present_wrong_session_token_is_401_not_open(tmp_path, monkeypatch, demo):
-    """A wrong session token must fail at the backend authenticator, proving
-    the proxy forwards it as the bearer and nothing in the body is trusted."""
+    """A wrong session token must fail at the host before a backend mutation."""
     module, app = _load_proxy(
         monkeypatch, tmp_path,
         rpc_token="inner-secret", session_token="host-session-token",
@@ -121,14 +105,11 @@ def test_token_present_valid_session_token_archives_with_trusted_principal(
 def test_raw_authorization_header_follows_bearer_contract(
     tmp_path, monkeypatch, demo,
 ):
-    """The capture layer fills Authorization from the session header only when
-    the client sent no Authorization (plugin_api._capture_request). A raw
-    bearer therefore authenticates by POSSESSION of the token: valid token
-    admitted, wrong token 401 even alongside a valid x-hermes-session-token
-    (Authorization takes precedence — it is never silently overridden).
-    In production the browser's session token IS the RPC token
-    (`STEWARD_RPC_TOKEN or HERMES_DASHBOARD_SESSION_TOKEN`), so this is the
-    same credential, not a bypass path."""
+    """The gated host rejects an invalid bearer even with a legacy session header.
+
+    Successful host authentication does not require the browser bearer to
+    equal the private credential used by the embedded backend.
+    """
     module, app = _load_proxy(
         monkeypatch, tmp_path,
         rpc_token="host-session-token", session_token="host-session-token",
@@ -155,12 +136,10 @@ def test_raw_authorization_header_follows_bearer_contract(
     module._store.close()
 
 
-def test_token_absent_host_keeps_backend_gated_by_rpc_token(
+def test_missing_host_credentials_cannot_borrow_backend_credential(
     tmp_path, monkeypatch, demo,
 ):
-    """Without HERMES_DASHBOARD_SESSION_TOKEN the capture layer forwards no
-    credential; the configured RPC token still denies unauthenticated calls
-    and admits nothing — fail-closed on the whole route."""
+    """A private backend credential never authorises an unauthenticated host caller."""
     module, app = _load_proxy(
         monkeypatch, tmp_path,
         rpc_token="inner-secret", session_token=None,
@@ -173,6 +152,7 @@ def test_token_absent_host_keeps_backend_gated_by_rpc_token(
     module._store.close()
 
 
+@pytest.mark.parametrize("credential_mode", ["loopback", "cookie", "native"])
 @pytest.mark.parametrize("principal_kind,capabilities,expected", [
     ("human", "project_archive", 200),
     # An agent-kind principal is not granted the human lifecycle capability:
@@ -180,7 +160,7 @@ def test_token_absent_host_keeps_backend_gated_by_rpc_token(
     ("agent", "", 403),
 ])
 def test_capability_grant_decides_authority_through_proxy(
-    tmp_path, monkeypatch, demo, principal_kind, capabilities, expected,
+    tmp_path, monkeypatch, demo, principal_kind, capabilities, expected, credential_mode,
 ):
     module, app = _load_proxy(
         monkeypatch, tmp_path,
@@ -189,10 +169,14 @@ def test_capability_grant_decides_authority_through_proxy(
     )
     demo(module)
     with TestClient(app) as client:
+        headers = {"x-hermes-session-token": "host-session-token"}
+        if credential_mode == "cookie":
+            client.cookies.set("hermes_session_at", "accepted-cookie")
+            headers = {}
+        elif credential_mode == "native":
+            headers = {"authorization": "Bearer accepted-native"}
         response = client.post(
-            "/projects/demo/archive",
-            headers={"x-hermes-session-token": "host-session-token"},
-            json={"actor": "bot"},
+            "/projects/demo/archive", headers=headers, json={"actor": "bot"},
         )
     assert response.status_code == expected, response.text
     module._store.close()

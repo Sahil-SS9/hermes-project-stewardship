@@ -13,6 +13,11 @@ The running application is authoritative. Use:
 
 - Standalone mode fails closed unless `STEWARD_RPC_TOKEN` is configured.
 - Embedded dashboard mode relies on the Hermes dashboard authentication boundary.
+  The plugin proxy authenticates its process-local ASGI hop with a private
+  credential; it does not forward browser cookies, provider bearers or legacy
+  session headers as backend credentials. No reverse-proxy token injection is
+  needed. The configured RPC principal takes precedence over the Desktop actor;
+  human/capability grants remain explicit. Standalone RPC tokens are unchanged.
 - Authenticated actor identity is bound server-side; body actor fields cannot
   override the configured principal (`STEWARD_RPC_PRINCIPAL`, default `rpc-token`).
 - Mutating routes are rate-limited with a bounded client cache.

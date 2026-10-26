@@ -282,7 +282,7 @@ def test_waiver_routes_work_through_the_dashboard_proxy(tmp_path, monkeypatch):
     world.project("proj")
     c = _chain(world)
     module._app = create_app(
-        store, kanban_adapter=adapter, auth_token="synthetic-desktop-token",
+        store, kanban_adapter=adapter, auth_token=module._rpc_token,
         auth_principal="owner", auth_principal_is_human=True)
     module._client = module.httpx.AsyncClient(
         transport=module.httpx.ASGITransport(app=module._app),

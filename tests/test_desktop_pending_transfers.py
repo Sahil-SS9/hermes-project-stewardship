@@ -2,7 +2,7 @@ import importlib.util
 from pathlib import Path
 
 import pytest
-from fastapi import FastAPI
+from .dashboard_host import authenticated_host
 from fastapi.testclient import TestClient
 from hermes_project_stewardship.persistence.service import StewardshipService
 
@@ -24,8 +24,7 @@ def test_desktop_pending_transfer_auth(tmp_path, monkeypatch, header, grant, exp
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     StewardshipService(module._store).enable('demo', mission='review', lead_profile='lead')
-    app = FastAPI()
-    app.include_router(module.router)
+    app = authenticated_host(module.router, session_token="synthetic-desktop-token")
     headers = {} if header == 'missing' else {'x-hermes-session-token': 'wrong' if header == 'wrong' else 'synthetic-desktop-token'}
     if header == 'bad-bearer':
         headers['authorization'] = 'Bearer deliberately-invalid'

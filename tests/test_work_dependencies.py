@@ -220,7 +220,7 @@ def proxy(tmp_path, monkeypatch):
     w = World(store, FrozenClock(), adapter=adapter)
     w.project("alpha")
     module._app = create_app(
-        store, kanban_adapter=adapter, auth_token=SESSION["x-hermes-session-token"],
+        store, kanban_adapter=adapter, auth_token=module._rpc_token,
         auth_principal="owner", auth_principal_is_human=True)
     module._client = module.httpx.AsyncClient(
         transport=module.httpx.ASGITransport(app=module._app), base_url="http://dockyard.test")

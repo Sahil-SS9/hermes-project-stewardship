@@ -74,8 +74,8 @@ def test_assessment_proxy_preserves_server_authority(client, human):
     service.enable(pid, lead_profile='fixture')
     objective = service.add_objective(pid, name='manual', evaluator_type='manual', target='>=1')
     previous = plugin_api._client
-    application = create_app(plugin_api._store, auth_token='proxy-test', auth_principal='verified-human', auth_principal_is_human=human, kanban_adapter=ReferenceKanbanAdapter(plugin_api._store))
-    transport = plugin_api.httpx.AsyncClient(transport=plugin_api.httpx.ASGITransport(app=application), base_url='http://test', headers={'Authorization': 'Bearer proxy-test'})
+    application = create_app(plugin_api._store, auth_token=plugin_api._rpc_token, auth_principal='verified-human', auth_principal_is_human=human, kanban_adapter=ReferenceKanbanAdapter(plugin_api._store))
+    transport = plugin_api.httpx.AsyncClient(transport=plugin_api.httpx.ASGITransport(app=application), base_url='http://test', headers={"Authorization": f"Bearer {plugin_api._rpc_token}"})
     plugin_api._client = transport
     try:
         path = f'/api/plugins/hermes-project-stewardship/projects/{pid}/objectives/{objective["id"]}/assessment'
@@ -167,6 +167,7 @@ def test_milestone_server_error_branches_are_explicit(client):
 def test_milestone_proxy_propagates_backend_failures(client, monkeypatch, status, payload, expected, code):
     class Response:
         status_code = status
+        headers = {}
         text = str(payload)
         def json(self):
             return payload
@@ -186,6 +187,7 @@ def test_milestone_proxy_propagates_backend_failures(client, monkeypatch, status
 def test_proxy_reports_a_non_json_failure_as_text(client, monkeypatch):
     class Response:
         status_code = 502
+        headers = {}
         text = "upstream exploded"
         def json(self):
             raise ValueError("not json")
@@ -444,7 +446,7 @@ def test_project_archive_restore_roundtrip_through_plugin_proxy(client):
     authenticated_app = create_app(
         plugin_api._store,
         kanban_adapter=ReferenceKanbanAdapter(plugin_api._store),
-        auth_token="phase5-proxy",
+        auth_token=plugin_api._rpc_token,
         auth_principal="verified-human",
         auth_principal_is_human=True,
         capabilities={item.value for item in Capability},
@@ -452,7 +454,7 @@ def test_project_archive_restore_roundtrip_through_plugin_proxy(client):
     transport = plugin_api.httpx.AsyncClient(
         transport=plugin_api.httpx.ASGITransport(app=authenticated_app),
         base_url="http://phase5.test",
-        headers={"Authorization": "Bearer phase5-proxy"},
+        headers={"Authorization": f"Bearer {plugin_api._rpc_token}"},
     )
     plugin_api._client = transport
     try:

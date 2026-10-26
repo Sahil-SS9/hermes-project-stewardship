@@ -38,7 +38,7 @@ def _load_proxy(tmp_path, monkeypatch, *, principal_is_human=True, auth=True):
         "p2", mission="m", lead_profile="lead", member_profiles=["worker"], autonomy_level=2)
     module._app = create_app(
         store, kanban_adapter=adapter,
-        auth_token=TOKEN if auth else None,
+        auth_token=module._rpc_token if auth else None,
         auth_principal="owner" if auth else None,
         auth_principal_is_human=principal_is_human)
     module._client = module.httpx.AsyncClient(

@@ -10,14 +10,14 @@ from __future__ import annotations
 import logging
 import os
 import re
+import secrets
 import sqlite3
-from contextvars import ContextVar
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
 import httpx2 as httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict
 
 logger = logging.getLogger(__name__)
@@ -32,25 +32,9 @@ from hermes_project_stewardship.runtime import (  # noqa: E402
     resolve_db_path,
 )
 
-_REQUEST_AUTHORIZATION: ContextVar[str | None] = ContextVar(
-    "dockyard_plugin_request_authorization", default=None
-)
-
-
-async def _capture_request(request: Request):
-    authorization = request.headers.get("authorization")
-    if authorization is None and os.environ.get("HERMES_DASHBOARD_SESSION_TOKEN"):
-        session_token = request.headers.get("x-hermes-session-token")
-        if session_token:
-            authorization = f"Bearer {session_token}"
-    token = _REQUEST_AUTHORIZATION.set(authorization)
-    try:
-        yield
-    finally:
-        _REQUEST_AUTHORIZATION.reset(token)
-
-
-plugin_api = APIRouter(dependencies=[Depends(_capture_request)])
+# The dashboard host authenticates incoming requests before mounting this
+# router. Browser cookies/native bearers belong to that host, not our backend.
+plugin_api = APIRouter()
 
 # The KenseiAgent host contract mounts the module-level `router` attribute
 # (web_server.py `_mount_plugin_api_routes`); `plugin_api` is the same object
@@ -72,6 +56,7 @@ _DB: Path | None = None
 _store = None
 _app = None
 _dockyard = None
+_ACTOR_ID = os.environ.get("DOCKYARD_ACTOR_ID", "dashboard-user")
 try:
     # Deferred import keeps the guard below in charge of every startup error.
     from hermes_project_stewardship.api.server import create_app
@@ -81,7 +66,9 @@ try:
     if os.name == "posix":
         _DB.chmod(0o600)
     _dockyard = DockyardStore(_store)
-    _rpc_token = os.environ.get("STEWARD_RPC_TOKEN") or os.environ.get("HERMES_DASHBOARD_SESSION_TOKEN")
+    # Private credential for the process-local ASGI hop; never forwarded to
+    # the browser, persisted or used to alter standalone RPC authentication.
+    _rpc_token = secrets.token_urlsafe(32)
     _rpc_capabilities = frozenset(
         value.strip() for value in os.environ.get("STEWARD_RPC_CAPABILITIES", "").split(",")
         if value.strip()
@@ -89,7 +76,7 @@ try:
     _app = create_app(
         _store,
         auth_token=_rpc_token,
-        auth_principal=os.environ.get("STEWARD_RPC_PRINCIPAL", "dashboard-user"),
+        auth_principal=os.environ.get("STEWARD_RPC_PRINCIPAL", _ACTOR_ID),
         auth_principal_is_human=os.environ.get("STEWARD_RPC_PRINCIPAL_KIND") == "human",
         capabilities=_rpc_capabilities,
     )
@@ -106,7 +93,6 @@ except (StateSelectionError, SchemaDriftError, NewerSchemaError) as exc:
 # Hermaguard fixes: EAGER initialisation (no lazy-init race, HG-CRITICAL),
 # explicit timeouts (HG-HIGH), env-configurable base URL (HG-MEDIUM).
 _BASE_URL = os.environ.get("DOCKYARD_PLUGIN_URL", "http://dockyard.local")
-_ACTOR_ID = os.environ.get("DOCKYARD_ACTOR_ID", "dashboard-user")
 _client = httpx.AsyncClient(
     # Degraded startup: no Project Stewardship app exists yet; requests are rejected in
     # _proxy before ever reaching the transport.
@@ -140,9 +126,7 @@ async def _proxy(method: str, path: str, json_body: dict | None = None,
     # vouches for that user (owner decision 03/10/2026, Q2). The backend
     # trusts this only for decisions, and a bearer principal still wins.
     headers = desktop_proxy_headers(_ACTOR_ID)
-    authorization = _REQUEST_AUTHORIZATION.get()
-    if authorization:
-        headers["authorization"] = authorization
+    headers["authorization"] = f"Bearer {_rpc_token}"
     response = await _client.request(
         method, path, json=json_body, params=params, headers=headers
     )
@@ -151,9 +135,14 @@ async def _proxy(method: str, path: str, json_body: dict | None = None,
         detail, code = _upstream_error(response)
         logger.error("Upstream error %s on %s %s",
                      response.status_code, method, path)
+        error_headers = {name: response.headers[name]
+                         for name in ("Retry-After", "WWW-Authenticate")
+                         if name in response.headers}
+        if code:
+            error_headers["X-Dockyard-Error-Code"] = code
         raise HTTPException(
             status_code=response.status_code, detail=detail,
-            headers={"X-Dockyard-Error-Code": code} if code else None)
+            headers=error_headers or None)
     try:
         return response.json()
     except ValueError:
@@ -512,11 +501,6 @@ async def fleet_search(q: str, limit: int = 30) -> dict:
 @plugin_api.get("/inbox")
 async def inbox() -> dict:
     return await _proxy("GET", "/stewardship/v1/inbox")
-
-
-@plugin_api.get("/notifications")
-async def notifications() -> dict:
-    return await _proxy("GET", "/stewardship/v1/notifications")
 
 
 @plugin_api.get("/projects")
@@ -2275,10 +2259,10 @@ async def notification_popups() -> dict:
 
 @plugin_api.post("/notifications/popups/shown")
 async def notification_popups_shown(body: dict) -> dict:
-    ids = body.get("ids")
-    ids = [int(i) for i in ids] if isinstance(ids, list) else []
+    # Preserve types: the backend validates the complete batch before any
+    # update. int(...) here truncated fractions and turned booleans into IDs.
     return await _proxy(
-        "POST", "/stewardship/v1/notifications/popups/shown", {"ids": ids})
+        "POST", "/stewardship/v1/notifications/popups/shown", {"ids": body.get("ids")})
 
 
 @plugin_api.get("/settings/notifications")

@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any, cast, Dict, List, NoReturn, Optional
 
 try:
-    from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
+    from fastapi import APIRouter, FastAPI, HTTPException, Path as PathParam, Query, Request
     from pydantic import BaseModel, ConfigDict, Field, StrictBool
 except ImportError as e:  # pragma: no cover
     raise ImportError(
@@ -2629,7 +2629,7 @@ def create_app(
         kind: Optional[str] = None,
         severity: Optional[str] = None,
         project_id: Optional[str] = None,
-        before_id: Optional[int] = None,
+        before_id: Optional[int] = Query(None, ge=-(2**63), le=2**63 - 1),
         limit: int = Query(100, ge=1, le=500),
     ):
         # Batch E4: filtered, paged feed + counts for the filter chips.
@@ -2645,7 +2645,10 @@ def create_app(
         return out
 
     @router.post("/notifications/{notification_id}/ack")
-    def ack_notification(notification_id: int, body: dict | None = None):
+    def ack_notification(
+        notification_id: int = PathParam(..., ge=-(2**63), le=2**63 - 1),
+        body: dict | None = None,
+    ):
         # Batch E2: one service-side path; records the actor, audited,
         # idempotent (second ack / ack-after-resolve change nothing).
         actor = _principal_id((body or {}).get("actor_id") or "unknown")
@@ -2658,7 +2661,10 @@ def create_app(
     # ------------------- Batch E: resolution + pop-ups + settings ------ #
 
     @router.post("/notifications/{notification_id}/resolve")
-    def resolve_notification(notification_id: int, body: dict | None = None):
+    def resolve_notification(
+        notification_id: int = PathParam(..., ge=-(2**63), le=2**63 - 1),
+        body: dict | None = None,
+    ):
         payload = body or {}
         note = str(payload.get("note") or "")
         if len(note) > 2000:
@@ -2693,7 +2699,7 @@ def create_app(
     def popups_shown(body: dict):
         ids = body.get("ids")
         if not isinstance(ids, list) or not all(
-                isinstance(i, int) for i in ids):
+                type(i) is int and 0 < i <= 2**63 - 1 for i in ids):
             raise HTTPException(422, "ids must be a list of notification ids")
         return {"marked": notification_engine.mark_popups_shown(ids)}
 

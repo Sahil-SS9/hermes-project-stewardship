@@ -144,10 +144,10 @@ def test_desktop_decision_buttons_work_in_the_production_composition(tmp_path, m
                            json={"expected_fingerprint": fingerprint, **extra})
     assert response.status_code == 200, response.text
     receipts = client.get(f"{BASE}/initiatives/{ref}/decision/receipts", headers=headers).json()["receipts"]
-    # With the env token the backend's bearer principal decides; without it,
-    # the proxy's own trusted actor (DOCKYARD_ACTOR_ID) does.
+    # The proxy's configured actor stays stable regardless of whether the host
+    # happens to export a dashboard session token.
     assert [(row["decision"], row["actor"]) for row in receipts] == [
-        (outcome, "dashboard-user" if env_token else "desk-owner")]
+        (outcome, "desk-owner")]
     module._store.close()
 
 
@@ -155,19 +155,20 @@ def test_production_backend_refuses_a_direct_call_that_bypasses_the_proxy(tmp_pa
     module, svc, _client = _load_plugin(tmp_path, monkeypatch, env_token=False)
     ref = _pending(svc, project="p1")
 
+    # Read through the authenticated proxy. Even reads on the private backend
+    # are now gated; a raw caller cannot borrow the proxy's process-local key.
+    fingerprint = _client.get(f"{BASE}/initiatives/{ref}/decision").json()["fingerprint"]
+
     async def direct():
         transport = module.httpx.ASGITransport(app=module._app)
         async with module.httpx.AsyncClient(transport=transport, base_url="http://direct.test") as raw:
-            fingerprint = (await raw.get(f"{V}/initiatives/{ref}/decision")).json()["fingerprint"]
-            refused = await raw.post(f"{V}/initiatives/{ref}/approve",
-                                     json={"expected_fingerprint": fingerprint, "actor": "sahil"})
-            receipts = (await raw.get(f"{V}/initiatives/{ref}/decision/receipts")).json()["receipts"]
-            return refused, receipts
+            return await raw.post(f"{V}/initiatives/{ref}/approve",
+                                  json={"expected_fingerprint": fingerprint, "actor": "sahil"})
 
-    refused, receipts = asyncio.run(direct())
-    assert refused.status_code == 403, refused.text
-    assert refused.json()["error"]["code"] == "trusted_principal_required"
-    assert receipts == []
+    refused = asyncio.run(direct())
+    assert refused.status_code == 401, refused.text
+    assert refused.json()["error"]["code"] == "unauthorized"
+    assert _client.get(f"{BASE}/initiatives/{ref}/decision/receipts").json()["receipts"] == []
     module._store.close()
 
 
@@ -266,5 +267,5 @@ def test_desktop_canvas_buttons_work_in_the_production_composition(tmp_path, mon
                            json={"approve": approve, "project_id": "p1"})
     assert response.status_code == 200, response.text
     assert response.json()["status"] == status
-    assert _proposal_row(module._store, proposal_id) == (status, "dashboard-user" if env_token else "desk-owner")
+    assert _proposal_row(module._store, proposal_id) == (status, "desk-owner")
     module._store.close()

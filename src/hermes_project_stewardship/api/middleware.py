@@ -106,7 +106,7 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         header = request.headers.get("authorization", "")
         ok = header.startswith("Bearer ") and hmac.compare_digest(
-            header[7:].strip(), self._token
+            header[7:].strip().encode("utf-8"), self._token.encode("utf-8")
         )
         if not ok:
             return JSONResponse(

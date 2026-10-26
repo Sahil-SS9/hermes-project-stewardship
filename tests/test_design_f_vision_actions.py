@@ -200,7 +200,8 @@ def test_desktop_withdraw_works_through_the_plugin_proxy(tmp_path, monkeypatch, 
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "cancelled"
     [row] = _audit(module._store, "initiative.withdrawn")
-    assert row["actor"] == ("dashboard-user" if env_token else "desk-owner")
+    # Host token configuration must not change the configured proxy actor.
+    assert row["actor"] == "desk-owner"
     assert row["detail"]["reason"] == "Not now"
     module._store.close()
 
@@ -390,8 +391,8 @@ def test_desktop_deletes_work_through_the_plugin_proxy_when_archive_does(tmp_pat
         milestone = client.delete(f"{BASE}/projects/p1/milestones/M%201")
         assert goal.status_code == 200 and goal.json()["deleted"] is True, goal.text
         assert milestone.status_code == 200 and milestone.json()["deleted"] is True, milestone.text
-        assert [r["actor"] for r in _audit(module._store, "goal.deleted")] == ["dashboard-user"]
-        assert [r["actor"] for r in _audit(module._store, "milestone.deleted")] == ["dashboard-user"]
+        assert [r["actor"] for r in _audit(module._store, "goal.deleted")] == ["desk-owner"]
+        assert [r["actor"] for r in _audit(module._store, "milestone.deleted")] == ["desk-owner"]
     finally:
         module._store.close()
 
