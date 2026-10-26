@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Authenticated Desktop/browser sessions no longer fail the plugin's embedded
+  API bearer check (#27). Hermes authenticates the user; the in-process proxy
+  uses a private backend credential. Standalone RPC authentication and explicit
+  capability grants remain enforced. An explicit RPC principal still wins;
+  otherwise attribution uses the configured Desktop actor consistently.
+- Backlog renders its empty state before accessing a missing project (#28).
+  Switching projects resets project-owned state without changing hook order;
+  refreshing the same project retains its state. Both Desktop bundles are rebuilt.
+- Notification filters and pagination reach the backend instead of being
+  shadowed by a duplicate route. Out-of-range cursors and notification IDs
+  return validation errors rather than database-overflow server errors.
+- Popup IDs are validated without coercion: fractions, booleans, strings and
+  out-of-range integers cannot mark another notification as shown.
+- Malformed non-ASCII bearer tokens return 401 instead of a server error.
+- The proxy preserves `Retry-After` and `WWW-Authenticate` error headers without
+  exposing private backend headers.
+
+Thanks to Holger Marschall (@hmarschall) for reporting #27 and #28 and providing
+reproduction details.
+
 ## [0.5.3] - 2026-10-19
 
 Windows support, fixes for the latest issues and pull requests, and

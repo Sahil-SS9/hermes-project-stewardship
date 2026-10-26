@@ -96,7 +96,7 @@ jobs:
         working-directory: hermes_dockyard_plugin/desktop
         env:
           DOCKYARD_CAPTURE_SCREENSHOTS: "0"
-        run: node --experimental-vm-modules --test repro-live.test.mjs milestone-chain.test.mjs
+        run: node --experimental-vm-modules --test repro-live.test.mjs milestone-chain.test.mjs backlog-empty-state.test.mjs
       - name: Check the Desktop bundle (rebuilds identically, loads bare, SDK-only surface)
         working-directory: hermes_dockyard_plugin/desktop
         run: node --test drift.test.mjs loader-contract.test.mjs prohibited-api.test.mjs

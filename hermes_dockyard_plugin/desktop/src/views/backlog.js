@@ -48,7 +48,14 @@ export {
 // The create form's assignee choice: a bot, or deliberately unassigned (Sahil 04/10).
 const UNASSIGNED = '__unassigned__'
 
-export function BacklogView({ view, onRefresh, preset }) {
+// Keep the hook sequence independent of empty/project transitions, and do not
+// carry drafts, selections or pending moves into a different project.
+export function BacklogView(props) {
+  if (!props.view.project) return jsx(EmptyState, { title: 'No project selected', description: 'Select a project before prioritising its backlog.', icon: 'project' })
+  return jsx(ProjectBacklogView, { ...props }, props.view.project.id)
+}
+
+function ProjectBacklogView({ view, onRefresh, preset }) {
   const [draggedRef, setDraggedRef] = useState(null)
   const [pendingMove, setPendingMove] = useState(null)
   const [reason, setReason] = useState('')
@@ -143,7 +150,6 @@ export function BacklogView({ view, onRefresh, preset }) {
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [createOpen, createSaving])
-  if (!project) return jsx(EmptyState, { title: 'No project selected', description: 'Select a project before prioritising its backlog.', icon: 'project' })
   // Work lives in Hermes: none can be created for an unlinked project.
   const canCreate = project.enabled !== false && project.phase === 'active' && !isUnlinked(project)
   const workByRef = Object.fromEntries((view.workItems ?? []).map((item) => [item.ref, item]))

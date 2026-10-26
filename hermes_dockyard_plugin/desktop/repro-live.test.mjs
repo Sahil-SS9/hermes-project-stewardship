@@ -1043,6 +1043,9 @@ async function testLoadingAndEmptyStates() {
   await empty.mount();
   assert.match(empty.dom.window.document.body.textContent, /No projects under watch/);
   assert(!empty.dom.window.document.body.textContent.includes('hermes dockyard onboard'), 'empty state must not send the owner to the CLI');
+  await empty.click('[data-tab="backlog"]');
+  assert.match(empty.dom.window.document.body.textContent, /No project selected/);
+  assert.equal(empty.dom.window.document.querySelector('[data-state="error"]'), null, 'empty Backlog must not crash');
   await empty.click('[data-tab="inbox"]');
   assert.match(empty.dom.window.document.body.textContent, /No approvals waiting/);
   await empty.click('[data-tab="notifications"]');

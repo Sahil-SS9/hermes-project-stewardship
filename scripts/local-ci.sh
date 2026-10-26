@@ -121,7 +121,7 @@ if [ "$WITH_NODE" -eq 1 ]; then
     popd >/dev/null
     pushd hermes_dockyard_plugin/desktop >/dev/null
     run_gate "desktop-harness" "node --test" \
-        env DOCKYARD_CAPTURE_SCREENSHOTS=0 node --experimental-vm-modules --test repro-live.test.mjs milestone-chain.test.mjs
+        env DOCKYARD_CAPTURE_SCREENSHOTS=0 node --experimental-vm-modules --test repro-live.test.mjs milestone-chain.test.mjs backlog-empty-state.test.mjs
     run_gate "desktop-bundle" "drift+loader+surface" \
         node --test drift.test.mjs loader-contract.test.mjs prohibited-api.test.mjs
     popd >/dev/null

@@ -9283,7 +9283,11 @@ function BacklogBoard(ctx) {
 
 // hermes_dockyard_plugin/desktop/src/views/backlog.js
 var UNASSIGNED = "__unassigned__";
-function BacklogView({ view, onRefresh, preset }) {
+function BacklogView(props) {
+  if (!props.view.project) return jsx(EmptyState, { title: "No project selected", description: "Select a project before prioritising its backlog.", icon: "project" });
+  return jsx(ProjectBacklogView, { ...props }, props.view.project.id);
+}
+function ProjectBacklogView({ view, onRefresh, preset }) {
   const [draggedRef, setDraggedRef] = useState(null);
   const [pendingMove, setPendingMove] = useState(null);
   const [reason, setReason] = useState("");
@@ -9389,7 +9393,6 @@ function BacklogView({ view, onRefresh, preset }) {
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [createOpen, createSaving]);
-  if (!project) return jsx(EmptyState, { title: "No project selected", description: "Select a project before prioritising its backlog.", icon: "project" });
   const canCreate = project.enabled !== false && project.phase === "active" && !isUnlinked(project);
   const workByRef = Object.fromEntries((view.workItems ?? []).map((item) => [item.ref, item]));
   const entries = [...view.backlog ?? []].sort((left, right) => Number(left.rank) - Number(right.rank));
