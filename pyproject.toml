@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hermes-project-stewardship"
-version = "0.5.3"
+version = "0.5.4"
 description = "Durable project ownership for Hermes agent fleets: verified cycles, bounded initiatives, explicit autonomy policy."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -38,6 +38,11 @@ dev = [
   "pytest>=7", "pytest-timeout", "pytest-cov",
   "httpx2", "ruff>=0.15.10", "ty>=0.0.21,<0.1", "pip-audit>=2.9",
   "tomli>=2; python_version < '3.11'",
+  "certifi>=2026.10.19",
+  # The newer locking line is vulnerable before 4.2.1, whose Python floor is
+  # 3.11. Keep the audited, unaffected 3.20.3 line only on Python 3.10.
+  "filelock>=3.20.3,<3.20.4; python_version < '3.11'",
+  "filelock>=4.2.1; python_version >= '3.11'",
   # Lets Linux/macOS test runs replay Windows' empty system zone database.
   "tzdata>=2024.1,<2030",
 ]

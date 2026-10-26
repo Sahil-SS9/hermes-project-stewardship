@@ -14,7 +14,7 @@ import os
 import sys
 from typing import Any, Dict, List, Optional, Sequence
 
-__version__ = "0.5.3"
+__version__ = "0.5.4"
 
 # --------------------------------------------------------------------- #
 # Tokens                                                                #

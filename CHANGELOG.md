@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.4] - 2026-10-26
 
 ### Fixed
 - Authenticated Desktop/browser sessions no longer fail the plugin's embedded
@@ -23,6 +23,12 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - Malformed non-ASCII bearer tokens return 401 instead of a server error.
 - The proxy preserves `Retry-After` and `WWW-Authenticate` error headers without
   exposing private backend headers.
+
+### Security
+- Update the development-tool certificate bundle and exclude the vulnerable
+  locking releases without suppressing dependency-audit findings. Python 3.10
+  uses the unaffected FileLock 3.20.3 line; newer Python versions use 4.2.1 or
+  later. The declared Python support floor stays at 3.10.
 
 Thanks to Holger Marschall (@hmarschall) for reporting #27 and #28 and providing
 reproduction details.

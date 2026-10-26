@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_active_release_metadata_is_coherent(tmp_path):
-    version = "0.5.3"
+    version = "0.5.4"
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     assert project["project"]["version"] == version
     assert __version__ == version
@@ -96,3 +96,27 @@ def test_verify_bootstrap_installs_the_host_side_yaml_libraries():
         if not token.startswith("-") and token != ".venv/bin/python"
     }
     assert {"pyyaml", "ruamel.yaml"} <= installed, installed
+
+
+def test_audit_tool_constraints_are_secure_on_each_supported_python():
+    """Keep 3.10 support without admitting the vulnerable locking releases."""
+    from packaging.markers import default_environment
+    from packaging.requirements import Requirement
+    from packaging.version import Version
+
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    requirements = [Requirement(dep) for dep in project["project"]["optional-dependencies"]["dev"]]
+    for python in ("3.10", "3.11", "3.12", "3.14"):
+        environment = {**default_environment(), "python_version": python,
+                       "python_full_version": python + ".0"}
+        active = [dep for dep in requirements
+                  if dep.marker is None or dep.marker.evaluate(environment)]
+        locking = [dep for dep in active if dep.name == "filelock"]
+        certificates = [dep for dep in active if dep.name == "certifi"]
+        assert len(locking) == len(certificates) == 1, python
+        safe_lock = "3.20.3" if python == "3.10" else "4.2.1"
+        assert Version(safe_lock) in locking[0].specifier, python
+        for vulnerable in ("3.20.2", "3.20.4", "3.32.5", "4.2.0"):
+            assert Version(vulnerable) not in locking[0].specifier, (python, vulnerable)
+        assert Version("2026.10.19") in certificates[0].specifier
+        assert Version("2026.7.22") not in certificates[0].specifier
