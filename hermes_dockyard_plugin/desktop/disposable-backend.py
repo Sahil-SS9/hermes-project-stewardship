@@ -98,7 +98,10 @@ _kanban_fixtures.seed_kanban_fixtures(service, adapter, roadmap, owner=_PRINCIPA
 for _pid in ("legacy-integration",):
     service.disable(_pid, actor="fixture", interface="fixture")
 plugin_api._app = create_app(store, kanban_adapter=adapter,
-    auth_token="demo-session-token", auth_principal=_PRINCIPAL,
+    # The proxy mints its own private credential and injects it itself (the
+    # #27 fix); a replacement backend must accept exactly that credential, or
+    # every proxied call the browser suite makes is refused 401.
+    auth_token=plugin_api._rpc_token, auth_principal=_PRINCIPAL,
     auth_principal_is_human=True, capabilities=frozenset({"workflow_revision_approval", "project_archive"}))
 plugin_api._client = plugin_api.httpx.AsyncClient(
     transport=plugin_api.httpx.ASGITransport(app=plugin_api._app), base_url="http://dockyard.test")
