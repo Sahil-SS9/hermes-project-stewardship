@@ -121,9 +121,20 @@ def make_service(store: Store, host, engine=None, service=None) -> ReconcileServ
 
 
 def wire_repo(svc, pid: str, repo) -> None:
+    """Point a project at a real repo, builder-ready.
+
+    Command execution at level >= 3 needs the docs/threat-model.md §6
+    acknowledgements as well as the level, so a helper that wires a repo for
+    command objectives sets them.
+    """
+    policy = {
+        "repo_path": repo.as_posix(),
+        "untrusted_content_ack": True,
+        "runtime_allowlist_confirmed": True,
+    }
     svc.store._conn.execute(
         "UPDATE project_stewardship SET verification_policy_json=? WHERE project_id=?",
-        (f'{{"repo_path": "{repo.as_posix()}"}}', pid),
+        (json.dumps(policy), pid),
     )
 
 

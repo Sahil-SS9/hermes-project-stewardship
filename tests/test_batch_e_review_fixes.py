@@ -159,6 +159,11 @@ def test_bug1_project_patch_unknown_key_422(env):
 def test_bug2_plugin_tool_proposal_notifies(env):
     c, store = env
     enable(c, "pb")
+    from hermes_project_stewardship.persistence.service import StewardshipService
+    # The tool proposes only on measured ground, so give the project the
+    # health snapshot a cycle would have recorded.
+    StewardshipService(store).record_health_snapshot(
+        "pb", status="healthy", score=0.9, evidence=[], contradictions=[])
     from hermes_project_stewardship.plugin import PluginState, tool_steward_propose_initiative
     try:
         PluginState.reset()

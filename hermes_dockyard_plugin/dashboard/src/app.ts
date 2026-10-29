@@ -8,8 +8,9 @@ import { createApi } from './api';
 import { UNLINKED_DETAIL, UNLINKED_LABEL, UNLINKED_TITLE, hermesRead, isUnlinkedError, unlinkedNextStep } from './unlinked';
 import { renderObjectiveEvidence } from './objective-evidence';
 import { mountWorkflowCanvas, type CanvasRun } from './workflow-canvas';
+import { applyFleetDeepLink } from './deep-link';
 
-interface AppState {
+export interface AppState {
   api: Api;
   tab: 'dashboard' | 'work' | 'delivery' | 'inbox' | 'notifications' | 'workflow' | 'onboard';
   projectId?: string;
@@ -20,7 +21,11 @@ interface AppState {
   pendingWorkRef?: string | null;
   // P6.4: bound deep-link navigation, installed by initApp. Open buttons
   // call this so a link actually navigates (state + tab strip + render).
-  openFleetLink?: (link: string) => void;
+  // ``ownerProjectId`` is the project the clicked row belongs to: a link such
+  // as ``s2:work/<ref>`` names the object but not its project, so from "All
+  // projects" the destination tab had no project to render and fell back to
+  // the chooser.
+  openFleetLink?: (link: string, ownerProjectId?: string) => void;
 }
 
 type FeatureMap = Record<string, boolean>;
@@ -28,66 +33,6 @@ type FeatureMap = Record<string, boolean>;
 // P6.4: exact-context deep links. ``screen:object/id`` opens the screen and,
 // where the screen supports selection, pre-selects the exact object. Bound
 // inside initApp so Open also drives the real render/navigation path.
-interface FleetLink {
-  link: string;
-  s: AppState;
-  tabs: HTMLElement[];
-  go: () => void;
-}
-
-function applyFleetDeepLink(
-  { link, s, tabs, go }: FleetLink,
-): void {
-  const sep = link.indexOf(':');
-  if (sep <= 0) return;
-  const screen = link.slice(0, sep);
-  const rest = link.slice(sep + 1);
-  const slash = rest.indexOf('/');
-  const objectKind = slash >= 0 ? rest.slice(0, slash) : '';
-  const objectId = slash >= 0 ? rest.slice(slash + 1) : rest;
-  const select = (tab: AppState['tab']): void => {
-    s.tab = tab;
-    // keep the tab strip in sync with the programmatic navigation
-    for (const t of tabs) {
-      const active = (t as HTMLElement).dataset.tab === tab;
-      t.classList.toggle('active', active);
-      t.setAttribute('aria-selected', String(active));
-    }
-    go();
-  };
-  if (screen === 's4') {
-    select('inbox');
-    return;
-  }
-  if (screen === 's6' && objectKind === 'initiative') {
-    select('inbox');
-    return;
-  }
-  if (screen === 's2') {
-    if (objectKind === 'work' && objectId) {
-      s.selectedWorkRef = objectId;
-      select('work');
-      return;
-    }
-    if (objectKind === 'project' && objectId) {
-      s.projectId = objectId;
-      select('work');
-      return;
-    }
-    select('work');
-    return;
-  }
-  if (screen === 's1') {
-    if (objectKind === 'project' && objectId) s.projectId = objectId;
-    select('dashboard');
-    return;
-  }
-  if (screen === 's5') {
-    select('workflow');
-    return;
-  }
-  select('dashboard');
-}
 
 export function initApp(
   sdk: HermesPluginSDK,
@@ -218,12 +163,13 @@ export function initApp(
   // P6.4: bound navigation — Open mutates state, syncs the tab strip and
   // drives the real render path (review R3: a bare state mutation never
   // navigates).
-  const navigateDeepLink = (link: string): void => {
+  const navigateDeepLink = (link: string, ownerProjectId?: string): void => {
     applyFleetDeepLink({
       link,
       s: state,
       tabs: tabs as HTMLElement[],
       go: () => void render(main, state),
+      ownerProjectId,
     });
   };
   state.openFleetLink = navigateDeepLink;
@@ -367,8 +313,9 @@ async function renderDashboard(
           open.className = 'dy-btn dy-fleet-open';
           open.textContent = 'Open';
           open.dataset.deepLink = link;
+          if (item.project) open.dataset.deepLinkProject = String(item.project);
           open.addEventListener('click', () => {
-            s.openFleetLink?.(link);
+            s.openFleetLink?.(link, item.project ? String(item.project) : undefined);
           });
           li.appendChild(open);
         }
@@ -1394,8 +1341,12 @@ async function renderNotifications(
       open.className = 'dy-btn dy-note-open';
       open.textContent = 'Open';
       open.dataset.deepLink = n.deep_link;
+      // The notification knows its project; the link does not. Hand it over,
+      // or Open from "All projects" lands on the chooser instead of the task.
+      const owner = n.project ? String(n.project) : undefined;
+      if (owner) open.dataset.deepLinkProject = owner;
       open.addEventListener('click', () => {
-        s.openFleetLink?.(n.deep_link as string);
+        s.openFleetLink?.(n.deep_link as string, owner);
       });
       row.appendChild(open);
     }

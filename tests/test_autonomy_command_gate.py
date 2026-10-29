@@ -35,9 +35,18 @@ from .test_cycles import wire_repo
 COMMAND_LEVEL = int(AutonomyLevel.BUILDER)  # 3
 
 
-def settings_at(level, denied=(), command_allowlist=None):
-    """A minimal ``svc.settings()``-shaped mapping."""
+def settings_at(level, denied=(), command_allowlist=None, acks=True):
+    """A minimal ``svc.settings()``-shaped mapping.
+
+    ``acks`` carries the docs/threat-model.md §6 pair. It defaults to present
+    so each test states one thing: these cases are about the level and the
+    capability, and the acknowledgement cases below set it to False on
+    purpose.
+    """
     verification = {}
+    if acks:
+        verification["untrusted_content_ack"] = True
+        verification["runtime_allowlist_confirmed"] = True
     if command_allowlist is not None:
         verification["command_allowlist"] = list(command_allowlist)
     return {
@@ -123,6 +132,61 @@ def test_runtime_base_can_narrow_but_not_widen():
 
 
 # --------------------------------------------------------------------- #
+# Level >= 3 also needs the threat-model §6 acknowledgements             #
+# --------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize("level", [3, 4, 5])
+def test_builder_levels_without_the_acks_get_no_allowlist(level):
+    """Reaching the level grants the capability; the acks arm it.
+
+    Running a command is builder-tier execution, so an unacknowledged
+    project must get the same empty allowlist as a level-0 one.
+    """
+    assert CycleEngine._allowlist_from(settings_at(level, acks=False)) == frozenset()
+
+
+@pytest.mark.parametrize("level", [3, 4, 5])
+def test_command_gate_refusal_names_both_acknowledgements(level):
+    decision = AutonomyPolicy.from_settings(
+        settings_at(level, acks=False)
+    ).command_evaluator_allowed()
+    assert not decision.allowed
+    assert decision.capability == "run_command_evaluator"
+    assert "untrusted_content_ack" in decision.reason
+    assert "runtime_allowlist_confirmed" in decision.reason
+
+
+@pytest.mark.parametrize(
+    "present",
+    [
+        {"untrusted_content_ack": True},
+        {"runtime_allowlist_confirmed": True},
+    ],
+)
+def test_one_acknowledgement_alone_is_not_enough(present):
+    settings = settings_at(COMMAND_LEVEL, acks=False)
+    settings["policies"]["verification"].update(present)
+    assert not AutonomyPolicy.from_settings(settings).command_evaluator_allowed().allowed
+
+
+def test_configured_allowlist_cannot_replace_the_acknowledgements():
+    """Naming commands must not buy back an ungated capability."""
+    assert CycleEngine._allowlist_from(
+        settings_at(COMMAND_LEVEL, command_allowlist=["pytest"], acks=False)
+    ) == frozenset()
+
+
+def test_command_and_write_gates_agree_on_the_acknowledgements():
+    """One contract, two call sites: both refuse for the same reason."""
+    policy = AutonomyPolicy.from_settings(settings_at(COMMAND_LEVEL, acks=False))
+    command = policy.command_evaluator_allowed()
+    write = policy.builder_gate_open(DEFAULT_RUNTIME_BASE)
+    assert not command.allowed and not write.allowed
+    assert command.reason == write.reason
+
+
+# --------------------------------------------------------------------- #
 # The executor refuses an empty allowlist with a pointed message        #
 # --------------------------------------------------------------------- #
 
@@ -173,7 +237,7 @@ def test_cycle_below_builder_does_not_execute_the_command(svc, engine, tmp_path)
 
 
 def test_cycle_at_builder_level_does_execute_the_command(svc, engine, tmp_path):
-    """The gate must not break the permitted path."""
+    """The gate must not break the permitted path (level AND acks)."""
     pid = "permitted"
     svc.enable(pid, mission="m", lead_profile="lead", autonomy_level=COMMAND_LEVEL)
     wire_repo(svc, pid, make_repo(tmp_path / "repo"))
@@ -183,3 +247,28 @@ def test_cycle_at_builder_level_does_execute_the_command(svc, engine, tmp_path):
     engine.run_cycle(pid)
 
     assert sentinel.exists(), "command evaluator was blocked at its granted level"
+
+
+def test_cycle_at_builder_level_without_acks_does_not_execute_the_command(
+    svc, engine, tmp_path
+):
+    """The reported defect: level 3 ran commands with neither ack set.
+
+    ``builder_gate_open`` already refused this configuration, but nothing
+    consulted it on the command path, so the subprocess ran anyway. The
+    sentinel is the only honest witness: a refused command and a command that
+    ran and failed both report a failed objective.
+    """
+    pid = "unacknowledged"
+    svc.enable(pid, mission="m", lead_profile="lead", autonomy_level=COMMAND_LEVEL)
+    wire_repo(svc, pid, make_repo(tmp_path / "repo"), acks=False)
+    sentinel = tmp_path / "ran.txt"
+    _add_sentinel_objective(svc, pid, sentinel)
+
+    result = engine.run_cycle(pid)
+
+    assert not sentinel.exists(), (
+        "command evaluator ran at level 3 without the threat-model §6 "
+        "acknowledgements"
+    )
+    assert "run_command_evaluator" in result["objectives"][0]["detail"]

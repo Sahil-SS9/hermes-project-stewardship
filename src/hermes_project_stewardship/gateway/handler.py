@@ -109,11 +109,29 @@ class GatewayCommandHandler:
             data={"initiatives": inis[:25]},
         )
 
+    def _owned_initiative(self, req: CommandRequest, ref: str) -> Dict[str, Any]:
+        """Resolve an initiative and prove it belongs to the commanded project.
+
+        Initiative refs are globally unique and resolve without a project, but
+        the caller's approval authority was granted for ``req.project_id``
+        only. Without this check, authority over one project would approve or
+        reject any other project's initiative by quoting its ref. The
+        ownership test runs before any status disclosure so a foreign ref
+        cannot be probed for existence or state either.
+        """
+        ini = self.svc.initiative_by_ref(ref)  # raises if unknown
+        if ini["project_id"] != req.project_id:
+            raise CommandError(
+                f"initiative '{ref}' does not belong to project "
+                f"'{req.project_id}'"
+            )
+        return ini
+
     def _approve(self, req: CommandRequest) -> CommandResponse:
         ref = str(req.args.get("initiative_ref", "")).strip()
         if not ref:
             raise CommandError("approve requires initiative_ref")
-        ini = self.svc.initiative_by_ref(ref)  # raises if unknown
+        ini = self._owned_initiative(req, ref)
         if ini["status"] == "approved":
             return CommandResponse(True, f"{ref} already approved", already_done=True)
         out = self.svc.approve_initiative(ref, actor=f"{req.platform}:{req.sender_id}", interface="gateway")
@@ -123,7 +141,7 @@ class GatewayCommandHandler:
         ref = str(req.args.get("initiative_ref", "")).strip()
         if not ref:
             raise CommandError("reject requires initiative_ref")
-        ini = self.svc.initiative_by_ref(ref)
+        ini = self._owned_initiative(req, ref)
         if ini["status"] == "rejected":
             return CommandResponse(True, f"{ref} already rejected", already_done=True)
         out = self.svc.reject_initiative(

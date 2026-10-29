@@ -4,6 +4,54 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- Gateway approvals and rejections are authorised against the initiative's own
+  project. Authority over one project could previously approve or reject
+  another project's initiative by quoting its reference, because the permission
+  check used the project named in the command while the initiative was resolved
+  by its globally unique ref. Ownership is checked before any status is
+  disclosed, so a foreign reference cannot be probed either. Idempotent replay
+  of a genuine approval is unchanged.
+- Command-type objective evaluators now honour the builder acknowledgements
+  documented in `docs/threat-model.md` §6. At autonomy level 3 or above a
+  configured command ran with neither `untrusted_content_ack` nor
+  `runtime_allowlist_confirmed` set, because `builder_gate_open()` had no
+  caller on the execution path. The level grants the capability and the
+  acknowledgements arm it; the cycle, goal checks and "Evaluate now" all share
+  the one gate.
+
+### Fixed
+- A failed Git check is no longer read as successful verification. An existing
+  directory that is not a repository exits 128, and the empty output became
+  authoritative "clean working tree" and "0 recent commits" evidence that could
+  then authorise proposals. Non-zero exits now fail closed as high-severity
+  contradictions, and evidence from a failed measurement is not marked
+  authoritative. A repository with no commits yet is still reported as zero
+  commits rather than an error.
+- Verification evidence is pinned to the declared repository path. Git walks up
+  from its working directory, so a non-repository directory nested inside
+  another checkout reported that outer repository's status and log as the
+  project's own.
+- The model proposal tool answers to the same gates as the cycle: project
+  phase, the `create_initiative` capability, and verified health. It could
+  previously create a pending proposal on a frozen, level-0 project whose
+  health had never been measured. Phase is enforced in the service, so freeze
+  and pause now hold for every caller.
+- The cycle no longer creates initiatives on projects held below planner
+  autonomy.
+- Delivery confirmations appear in the Approval Inbox for projects with no
+  other inbox item. Readiness was fetched only for projects already present in
+  the inbox, so a project awaiting only a confirmation showed "No approvals
+  waiting"; it is now read once for the whole fleet.
+- Opening a task from a notification carries the notification's own project.
+  From "All projects" the destination had no project to render and showed the
+  project chooser instead of the task.
+
+Thanks to the community reviewer who reported all six issues against 0.5.4 with
+reproduction details.
+
 ## [0.5.4] - 2026-10-26
 
 ### Fixed
