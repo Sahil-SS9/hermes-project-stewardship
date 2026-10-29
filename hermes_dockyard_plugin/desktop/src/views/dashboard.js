@@ -189,7 +189,7 @@ export function FleetActivity({ notifications, onOpen }) {
             jsx('span', { className: 'dockyard-meta', children: `${note.project || 'Fleet'}${note.body ? ` / ${note.body}` : ''}` }),
             jsx('time', { children: formatWhen(note.created_at) }),
             typeof onOpen === 'function' && note.deep_link
-              ? jsx(Button, { action: 'open', small: true, onClick: () => onOpen(note.deep_link), children: 'Open' })
+              ? jsx(Button, { action: 'open', small: true, onClick: () => onOpen(note.deep_link, note), children: 'Open' })
               : null,
           ]}),
         ]}, String(note.id))

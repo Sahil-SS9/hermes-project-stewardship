@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from typing import Any, Dict
 
 import pytest
 
@@ -13,10 +15,21 @@ from hermes_project_stewardship.verification.engine import CollectorSpec
 from .conftest import make_repo
 
 
-def wire_repo(svc, pid: str, repo: Path) -> None:
+def wire_repo(svc, pid: str, repo: Path, *, acks: bool = True) -> None:
+    """Point a project at a real repo, builder-ready by default.
+
+    Command execution at level >= 3 needs the docs/threat-model.md §6
+    acknowledgements as well as the level, so the helper sets them: callers
+    that wire a repo are configuring a project meant to run its checks. Pass
+    ``acks=False`` to build the unacknowledged case on purpose.
+    """
+    policy: Dict[str, Any] = {"repo_path": repo.as_posix()}
+    if acks:
+        policy["untrusted_content_ack"] = True
+        policy["runtime_allowlist_confirmed"] = True
     svc.store._conn.execute(
         "UPDATE project_stewardship SET verification_policy_json=? WHERE project_id=?",
-        (f'{{"repo_path": "{repo.as_posix()}"}}', pid),
+        (json.dumps(policy), pid),
     )
 
 
@@ -123,7 +136,9 @@ def test_cycle_uses_the_project_objective_detail_cap(engine, enabled, svc, tmp_p
     repo = make_repo(tmp_path / "r")
     svc.store._conn.execute(
         "UPDATE project_stewardship SET verification_policy_json=? WHERE project_id=?",
-        (json.dumps({"repo_path": repo.as_posix(), "objective_detail_chars": 600}), enabled),
+        (json.dumps({"repo_path": repo.as_posix(), "objective_detail_chars": 600,
+                     "untrusted_content_ack": True,
+                     "runtime_allowlist_confirmed": True}), enabled),
     )
     svc.add_objective(enabled, name="ci", evaluator_type="command", target=">=1",
                       command=["python3", "-c", "import sys; sys.stderr.write('e' * 900); sys.exit(1)"])

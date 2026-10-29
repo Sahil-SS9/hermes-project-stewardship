@@ -8,7 +8,6 @@ from typing import Any, Dict, Optional, Sequence
 from ..domain.models import Objective
 from ..domain.policy import AutonomyPolicy
 from ..objectives.evaluators import DEFAULT_EVALUATOR, EvaluationContext, parse_target
-from ..security.allowlist import DEFAULT_ALLOWLIST
 from .roadmap_service import RoadmapConflict, RoadmapInvalid, RoadmapNotFound, RoadmapService
 from .service import StewardshipService
 from .store import Store, iso
@@ -431,10 +430,12 @@ class LadderService:
             if not decision.allowed:
                 raise RoadmapConflict(f"command goal check refused: {decision.reason}")
         verification = (settings.get("policies", {}) or {}).get("verification", {}) or {}
-        configured = verification.get("command_allowlist")
         ctx = EvaluationContext(
             project_path=Path(verification["repo_path"]) if verification.get("repo_path") else None,
-            allowlist=DEFAULT_ALLOWLIST if configured is None else frozenset(configured),
+            # One source of truth for what may run: the same gate the cycle and
+            # "Evaluate now" use, so a goal check cannot reconstruct a wider
+            # allowlist than the project's autonomy and acknowledgements permit.
+            allowlist=AutonomyPolicy.evaluator_allowlist(settings),
             clock=self._clock,
         )
         objective = Objective(

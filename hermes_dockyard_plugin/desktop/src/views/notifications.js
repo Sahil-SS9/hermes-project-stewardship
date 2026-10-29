@@ -248,7 +248,7 @@ export function NotificationRow({ note, busy, selected, onSelect, onSeen, onOpen
       }),
       jsxs('div', { className: 'dockyard-notification-action', children: [
         typeof onOpen === 'function' && note.deep_link
-          ? jsx(Button, { action: 'open', small: true, onClick: () => onOpen(note.deep_link), children: 'Open' })
+          ? jsx(Button, { action: 'open', small: true, onClick: () => onOpen(note.deep_link, note), children: 'Open' })
           : null,
         state === 'new'
           ? jsx(Button, { action: 'mark-seen', small: true, disabled: busy, onClick: onSeen, children: busy ? 'Working…' : 'Mark seen' })
@@ -276,7 +276,7 @@ export function NotificationDetail({ note, busy, resolveOpen, onResolveToggle, r
     ]}) : null,
     jsxs('div', { className: 'dy-notif-detail-actions', children: [
       typeof onOpen === 'function' && note.deep_link
-        ? jsx(Button, { action: 'detail-open', small: true, onClick: () => onOpen(note.deep_link), children: 'Open item' })
+        ? jsx(Button, { action: 'detail-open', small: true, onClick: () => onOpen(note.deep_link, note), children: 'Open item' })
         : null,
       state === 'new'
         ? jsx(Button, { action: 'detail-seen', small: true, disabled: busy, onClick: onSeen, children: busy ? 'Working…' : 'Mark seen' })

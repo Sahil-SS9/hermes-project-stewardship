@@ -6472,6 +6472,32 @@ function ProjectChooser({ projects, screen, onPick, onNewProject, onOnboardExist
   ] });
 }
 
+// hermes_dockyard_plugin/desktop/src/data/inbox-load.js
+async function buildInboxData(fetchApi) {
+  const inbox = await fetchApi("/inbox");
+  const projectIds = [...new Set((inbox.items ?? []).map((item) => item.project).filter(Boolean))];
+  const projectInitiatives = await Promise.all(projectIds.map(async (projectId) => {
+    const result = await fetchApi(`/projects/${encodeURIComponent(projectId)}/initiatives`);
+    return result.initiatives ?? [];
+  }));
+  const detailByRef = {};
+  projectInitiatives.flat().forEach((initiative) => {
+    detailByRef[initiative.ref] = initiative;
+  });
+  let readyToConfirm = [];
+  try {
+    const roadmap = await fetchApi("/roadmap");
+    readyToConfirm = (roadmap?.projects ?? []).flatMap((project) => (project?.initiatives ?? []).filter((row) => row.ready_to_confirm).map((row) => ({ project: project.id, ref: row.ref, title: row.title })));
+  } catch {
+    readyToConfirm = [];
+  }
+  return {
+    ...inbox,
+    items: (inbox.items ?? []).map((item) => ({ ...item, detail: detailByRef[item.ref] ?? null })),
+    readyToConfirm
+  };
+}
+
 // hermes_dockyard_plugin/desktop/src/data/loaders.js
 var HEALTH_PRIORITY = Object.freeze({ critical: 0, frozen: 0, attention: 0, degraded: 1, watch: 1, unknown: 2, healthy: 3 });
 var RISK_PRIORITY = Object.freeze({ critical: 0, high: 0, medium: 1, low: 2 });
@@ -6670,30 +6696,7 @@ async function loadTeamsData() {
   };
 }
 async function loadInboxData() {
-  const inbox = await api("/inbox");
-  const projectIds = [...new Set((inbox.items ?? []).map((item) => item.project).filter(Boolean))];
-  const projectInitiatives = await Promise.all(projectIds.map(async (projectId) => {
-    const result = await api(`/projects/${encodeURIComponent(projectId)}/initiatives`);
-    return result.initiatives ?? [];
-  }));
-  const detailByRef = {};
-  projectInitiatives.flat().forEach((initiative) => {
-    detailByRef[initiative.ref] = initiative;
-  });
-  const readyToConfirm = await Promise.all(projectIds.map(async (projectId) => {
-    try {
-      const roadmap = await api(`/roadmap?project_id=${encodeURIComponent(projectId)}`);
-      const project = (roadmap?.projects ?? [])[0];
-      return (project?.initiatives ?? []).filter((row) => row.ready_to_confirm).map((row) => ({ project: projectId, ref: row.ref, title: row.title }));
-    } catch {
-      return [];
-    }
-  }));
-  return {
-    ...inbox,
-    items: (inbox.items ?? []).map((item) => ({ ...item, detail: detailByRef[item.ref] ?? null })),
-    readyToConfirm: readyToConfirm.flat()
-  };
+  return buildInboxData(api);
 }
 
 // hermes_dockyard_plugin/desktop/src/lib/ui.js
@@ -13202,6 +13205,67 @@ var INBOX_CSS = `
   .dockyard-root .dockyard-inbox-panel { max-height: none; }
 }
 `;
+
+// hermes_dockyard_plugin/desktop/src/shell/deep-link.js
+function ownerProjectOf(owner) {
+  if (typeof owner === "string") return owner || null;
+  return owner?.project ?? owner?.project_id ?? null;
+}
+function resolveDeepLink({
+  link,
+  owner = null,
+  projectContext = {},
+  projects = [],
+  selectedProject = null
+} = {}) {
+  if (typeof link !== "string" || !link.includes(":")) return null;
+  const ownerProject = ownerProjectOf(owner);
+  const [screen, rest] = link.split(":", 2);
+  const slash = rest.indexOf("/");
+  const objectKind = slash >= 0 ? rest.slice(0, slash) : "";
+  const objectId = slash >= 0 ? rest.slice(slash + 1) : rest;
+  if (screen === "s4" || screen === "s6" && objectKind === "initiative") {
+    return {
+      tab: "inbox",
+      // The inbox is per-project, so a confirmation or approval opened from
+      // "All projects" has to carry its project too.
+      project: ownerProject ?? void 0,
+      focusRef: objectId || null,
+      notice: objectId ? `Approval inbox: focus ${objectId}` : null
+    };
+  }
+  if (screen === "s2" && objectKind === "work" && objectId) {
+    const scanned = Object.entries(projectContext ?? {}).find(([, context]) => (context?.workItems ?? []).some((item) => item.ref === objectId));
+    const resolved = ownerProject ?? (scanned ? scanned[0] : null);
+    return {
+      tab: "project",
+      project: resolved ?? (selectedProject ?? projects?.[0]?.id ?? null),
+      entryView: "overview",
+      workRef: objectId,
+      notice: resolved ? null : `Work item ${objectId} is not in the current board data.`
+    };
+  }
+  if (screen === "s2" && objectKind === "project" && objectId) {
+    return { tab: "project", project: objectId, entryView: "overview", notice: null };
+  }
+  if (screen === "s3" && objectKind === "unassigned" && objectId) {
+    return {
+      tab: "backlog",
+      project: objectId,
+      notice: null,
+      backlogPreset: { kind: "unassigned", projectId: objectId }
+    };
+  }
+  if (screen === "s1" && objectKind === "project" && objectId) {
+    return { tab: "project", project: objectId, entryView: "overview", notice: null };
+  }
+  if (screen === "s2" || screen === "s1") {
+    if (objectId) return { tab: "project", project: objectId, entryView: "overview" };
+    return { tab: "dashboard" };
+  }
+  if (screen === "s5") return { tab: "teams" };
+  return { tab: "dashboard" };
+}
 
 // hermes_dockyard_plugin/desktop/src/views/dashboard.js
 function DiscoveredProfilePicker({ profiles = [], value = "", onChange, name, label = "Hermes profile", disabled = false }) {
@@ -23937,7 +24001,7 @@ function InboxRow({ item, selected, onSelect, onOpenProject }) {
           onClick: (event) => {
             event.preventDefault();
             event.stopPropagation();
-            onOpenProject?.(item.deep_link);
+            onOpenProject?.(item.deep_link, item);
           },
           children: "Open project"
         })
@@ -23967,7 +24031,7 @@ function AttentionDetail({ item, onBack, onOpenProject }) {
     onBack ? jsx(Button, { variant: "quiet", small: true, onClick: onBack, children: "Back" }) : null,
     jsx("h2", { children: copy.title }),
     jsx("p", { children: copy.description }),
-    jsx(Button, { variant: "primary", onClick: () => onOpenProject?.(copy.deeplink), children: `Open ${copy.project || "project"}` })
+    jsx(Button, { variant: "primary", onClick: () => onOpenProject?.(copy.deeplink, item), children: `Open ${copy.project || "project"}` })
   ] });
 }
 function ReadyToConfirm({ rows, onDone }) {
@@ -24507,7 +24571,7 @@ function NotificationRow({ note, busy, selected, onSelect, onSeen, onOpen }) {
         ] })
       }),
       jsxs("div", { className: "dockyard-notification-action", children: [
-        typeof onOpen === "function" && note.deep_link ? jsx(Button, { action: "open", small: true, onClick: () => onOpen(note.deep_link), children: "Open" }) : null,
+        typeof onOpen === "function" && note.deep_link ? jsx(Button, { action: "open", small: true, onClick: () => onOpen(note.deep_link, note), children: "Open" }) : null,
         state === "new" ? jsx(Button, { action: "mark-seen", small: true, disabled: busy, onClick: onSeen, children: busy ? "Working\u2026" : "Mark seen" }) : null
       ] })
     ]
@@ -24530,7 +24594,7 @@ function NotificationDetail({ note, busy, resolveOpen, onResolveToggle, resolveN
       note.resolution_note ? ` \u2014 \u201C${note.resolution_note}\u201D` : ""
     ] }) : null,
     jsxs("div", { className: "dy-notif-detail-actions", children: [
-      typeof onOpen === "function" && note.deep_link ? jsx(Button, { action: "detail-open", small: true, onClick: () => onOpen(note.deep_link), children: "Open item" }) : null,
+      typeof onOpen === "function" && note.deep_link ? jsx(Button, { action: "detail-open", small: true, onClick: () => onOpen(note.deep_link, note), children: "Open item" }) : null,
       state === "new" ? jsx(Button, { action: "detail-seen", small: true, disabled: busy, onClick: onSeen, children: busy ? "Working\u2026" : "Mark seen" }) : null,
       state !== "resolved" ? jsx(Button, { action: "detail-resolve", small: true, disabled: busy, onClick: onResolveToggle, "aria-expanded": resolveOpen ? "true" : "false", children: "Resolve" }) : null,
       note.kind === "approval_required" && note.ref ? jsx(Button, { action: "detail-approval", small: true, onClick: () => onOpen?.(note.project ? `s4:project/${note.project}` : "s4:approval-inbox"), children: "Review in Approval Inbox" }) : null
@@ -26236,64 +26300,22 @@ function DashboardPage({ inboxCss = "" } = {}) {
   };
   const [deepLinkNotice, setDeepLinkNotice] = useState(null);
   const [inboxFocusRef, setInboxFocusRef] = useState(null);
-  const openDeepLink = (link) => {
-    if (typeof link !== "string" || !link.includes(":")) return;
-    const [screen, rest] = link.split(":", 2);
-    const slash = rest.indexOf("/");
-    const objectKind = slash >= 0 ? rest.slice(0, slash) : "";
-    const objectId = slash >= 0 ? rest.slice(slash + 1) : rest;
-    if (screen === "s4" || screen === "s6" && objectKind === "initiative") {
-      setDeepLinkNotice(objectId ? `Approval inbox: focus ${objectId}` : null);
-      setInboxFocusRef(objectId || null);
-      setTab("inbox");
-      return;
-    }
-    if (screen === "s2" && objectKind === "work" && objectId) {
-      const known = Object.entries(data?.payload?.projectContext ?? {});
-      const ownerProject = known.find(([, context]) => (context.workItems ?? []).some((item) => item.ref === objectId));
-      setDeepLinkNotice(ownerProject ? null : `Work item ${objectId} is not in the current board data.`);
-      setSelectedProject(ownerProject ? ownerProject[0] : selectedProject ?? data?.payload?.projects?.[0]?.id ?? null);
-      setProjectEntryView("overview");
-      setTab("project");
-      setPendingWorkRef(objectId);
-      return;
-    }
-    if (screen === "s2" && objectKind === "project" && objectId) {
-      setDeepLinkNotice(null);
-      setSelectedProject(objectId);
-      setProjectEntryView("overview");
-      setTab("project");
-      return;
-    }
-    if (screen === "s3" && objectKind === "unassigned" && objectId) {
-      setDeepLinkNotice(null);
-      setSelectedProject(objectId);
-      setBacklogPreset({ kind: "unassigned", projectId: objectId, at: Date.now() });
-      setTab("backlog");
-      return;
-    }
-    if (screen === "s1" && objectKind === "project" && objectId) {
-      setDeepLinkNotice(null);
-      setSelectedProject(objectId);
-      setProjectEntryView("overview");
-      setTab("project");
-      return;
-    }
-    if (screen === "s2" || screen === "s1") {
-      if (objectId) {
-        setSelectedProject(objectId);
-        setProjectEntryView("overview");
-        setTab("project");
-        return;
-      }
-      setTab("dashboard");
-      return;
-    }
-    if (screen === "s5") {
-      setTab("teams");
-      return;
-    }
-    setTab("dashboard");
+  const openDeepLink = (link, owner) => {
+    const target = resolveDeepLink({
+      link,
+      owner,
+      projectContext: data?.payload?.projectContext ?? {},
+      projects: data?.payload?.projects ?? [],
+      selectedProject
+    });
+    if (!target) return;
+    if (target.notice !== void 0) setDeepLinkNotice(target.notice);
+    if (target.focusRef !== void 0) setInboxFocusRef(target.focusRef);
+    if (target.project !== void 0) setSelectedProject(target.project);
+    if (target.entryView !== void 0) setProjectEntryView(target.entryView);
+    if (target.workRef !== void 0) setPendingWorkRef(target.workRef);
+    if (target.backlogPreset) setBacklogPreset({ ...target.backlogPreset, at: Date.now() });
+    setTab(target.tab);
   };
   const payload = data?.tab === tab && data.projectId === selectedProject ? data.payload : null;
   const scoped = useMemo(() => {

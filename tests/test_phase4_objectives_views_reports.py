@@ -52,16 +52,26 @@ def _repo(tmp_path, name="repo"):
 
 def _allow_commands(svc, pid):
     # Command evaluators need the run_command_evaluator capability (level 3),
-    # for "Evaluate now" exactly as for the cycle (catalog review, PR #136752).
+    # for "Evaluate now" exactly as for the cycle (catalog review, PR #136752),
+    # plus the docs/threat-model.md §6 acknowledgements that arm builder-tier
+    # execution at that level.
     svc.enable(pid, mission="keep CI green and deps fresh", lead_profile="lead",
                member_profiles=["coder", "qa"], autonomy_level=3)
+    svc.update_settings(pid, verification_policy={
+        "untrusted_content_ack": True,
+        "runtime_allowlist_confirmed": True,
+    })
 
 
 def _command_objective(svc, pid, *, name="ci-green", command=("echo", "1"),
                        target=">=1", repo=None):
     _allow_commands(svc, pid)
     if repo is not None:
-        svc.update_settings(pid, verification_policy={"repo_path": str(repo)})
+        svc.update_settings(pid, verification_policy={
+            "repo_path": str(repo),
+            "untrusted_content_ack": True,
+            "runtime_allowlist_confirmed": True,
+        })
     return svc.add_objective(
         pid, name=name, evaluator_type="command", target=target,
         severity="high", command=list(command),
@@ -271,7 +281,11 @@ def test_evaluate_endpoint_human_readback_through_api(tmp_path):
     pid = "phase4-eval"
     service.enable(pid, mission="m", lead_profile="lead", autonomy_level=3)
     repo = _repo(tmp_path, "api-repo")
-    service.update_settings(pid, verification_policy={"repo_path": str(repo)})
+    service.update_settings(pid, verification_policy={
+        "repo_path": str(repo),
+        "untrusted_content_ack": True,
+        "runtime_allowlist_confirmed": True,
+    })
     created = service.add_objective(
         pid, name="ci-green", evaluator_type="command", target=">=1",
         severity="high", command=["echo", "1"])

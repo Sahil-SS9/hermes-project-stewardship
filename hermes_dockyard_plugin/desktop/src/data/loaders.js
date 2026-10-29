@@ -1,6 +1,7 @@
 // GENERATED-STRUCTURE: hand-edited Desktop module. Edit this file, then run
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 import { api } from '../runtime/context.js'
+import { buildInboxData } from './inbox-load.js'
 import { hermesRead } from './unlinked.js'
 import { isUnlinked } from './unlinked.js'
 export const HEALTH_PRIORITY = Object.freeze({ critical: 0, frozen: 0, attention: 0, degraded: 1, watch: 1, unknown: 2, healthy: 3 })
@@ -224,31 +225,5 @@ export async function loadTeamsData() {
 }
 
 export async function loadInboxData() {
-  const inbox = await api('/inbox')
-  const projectIds = [...new Set((inbox.items ?? []).map((item) => item.project).filter(Boolean))]
-  const projectInitiatives = await Promise.all(projectIds.map(async (projectId) => {
-    const result = await api(`/projects/${encodeURIComponent(projectId)}/initiatives`)
-    return result.initiatives ?? []
-  }))
-  const detailByRef = {}
-  projectInitiatives.flat().forEach((initiative) => { detailByRef[initiative.ref] = initiative })
-  // Batch L: initiatives ready for a person to confirm as delivered, read from
-  // each project's roadmap ladder. The Approval Inbox lists these with the same
-  // Confirm action the Roadmap offers.
-  const readyToConfirm = await Promise.all(projectIds.map(async (projectId) => {
-    try {
-      const roadmap = await api(`/roadmap?project_id=${encodeURIComponent(projectId)}`)
-      const project = (roadmap?.projects ?? [])[0]
-      return (project?.initiatives ?? [])
-        .filter((row) => row.ready_to_confirm)
-        .map((row) => ({ project: projectId, ref: row.ref, title: row.title }))
-    } catch {
-      return []
-    }
-  }))
-  return {
-    ...inbox,
-    items: (inbox.items ?? []).map((item) => ({ ...item, detail: detailByRef[item.ref] ?? null })),
-    readyToConfirm: readyToConfirm.flat(),
-  }
+  return buildInboxData(api)
 }
