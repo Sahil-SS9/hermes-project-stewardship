@@ -159,27 +159,37 @@ class AutonomyPolicy:
             )
         return decision
 
+    def _builder_acks(self) -> PolicyDecision:
+        """The docs/threat-model.md §6 acknowledgement pair, checked once.
+
+        Builder autonomy on repositories that accept untrusted content
+        requires BOTH an explicit acknowledgement that untrusted content may
+        reach the agent AND confirmation that the runtime tool allowlist has
+        been reviewed. Deliberately separate from the level model so it can
+        never be granted implicitly by a level bump.
+        """
+        ack = bool(self.verification_policy.get("untrusted_content_ack", False))
+        allowlist = bool(self.verification_policy.get("runtime_allowlist_confirmed", False))
+        if ack and allowlist:
+            return PolicyDecision(True, "builder acknowledgements present", "builder_ack")
+        return PolicyDecision(
+            False,
+            "level>=3 requires untrusted_content_ack AND "
+            "runtime_allowlist_confirmed in verification policy "
+            "(docs/threat-model.md §6)",
+            "builder_ack",
+        )
+
     def builder_gate_open(self, runtime_base: FrozenSet[str]) -> PolicyDecision:
         """Levels >= 3 additionally require the security allowlist gate.
 
-        See docs/threat-model.md §6: Builder autonomy on repositories that
-        accept untrusted content requires BOTH an explicit acknowledgement
-        that untrusted content may reach the agent AND confirmation that the
-        runtime tool allowlist has been reviewed. Deliberately separate from
-        the level model so it can never be granted implicitly by a level bump.
+        See docs/threat-model.md §6 and :meth:`_builder_acks`.
         """
         if self.level < 3:
             return PolicyDecision(True, "builder gate not applicable below level 3", "write_code")
-        ack = bool(self.verification_policy.get("untrusted_content_ack", False))
-        allowlist = bool(self.verification_policy.get("runtime_allowlist_confirmed", False))
-        if not (ack and allowlist):
-            return PolicyDecision(
-                False,
-                "level>=3 requires untrusted_content_ack AND "
-                "runtime_allowlist_confirmed in verification policy "
-                "(docs/threat-model.md §6)",
-                "write_code",
-            )
+        acks = self._builder_acks()
+        if not acks.allowed:
+            return PolicyDecision(False, acks.reason, "write_code")
         return self.permits("write_code", runtime_base)
 
     def command_evaluator_allowed(
@@ -193,9 +203,22 @@ class AutonomyPolicy:
         still execute shell commands, because the security allowlist constrains
         *which* executables may run but never *whether* running is permitted at
         all.
+
+        Reaching level 3 is not sufficient on its own. Running a command is
+        builder-tier execution, so the same §6 acknowledgements that gate
+        ``write_code`` are required here: the level grants the capability, the
+        acknowledgements arm it. Checking them in the capability gate (rather
+        than only in :meth:`builder_gate_open`) is what keeps every execution
+        path - the cycle, goal checks and "Evaluate now" - behind one contract.
         """
         base = DEFAULT_RUNTIME_BASE if runtime_base is None else runtime_base
-        return self.permits("run_command_evaluator", base)
+        decision = self.permits("run_command_evaluator", base)
+        if not decision.allowed:
+            return decision
+        acks = self._builder_acks()
+        if not acks.allowed:
+            return PolicyDecision(False, acks.reason, "run_command_evaluator")
+        return decision
 
     @classmethod
     def evaluator_allowlist(cls, settings: Dict[str, Any]) -> FrozenSet[str]:

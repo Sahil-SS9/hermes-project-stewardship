@@ -33,7 +33,11 @@ A Builder-level steward reads issues/PRs. An attacker embeds:
    contradictions fail closed (no mutations; health → Unknown/Critical).
 3. **Authority separation** — only deterministic collectors (git, declared
    files) are authoritative evidence; LLM/session/memory content is advisory
-   and structurally cannot authorise mutations.
+   and structurally cannot authorise mutations. A collector that fails is not
+   evidence at all: a non-zero exit is a high-severity contradiction, never
+   silence read as a clean result, and its output is not marked authoritative.
+   Evidence is pinned to the declared path, so a directory nested inside
+   another checkout cannot report that repository's state as this one's.
 4. **Level gate** — levels ≥ 3 require explicit `untrusted_content_ack` +
    `runtime_allowlist_confirmed`; shipped disabled by default.
 5. **Framed tool answers** — every agent tool answer, refusals included,
@@ -86,6 +90,10 @@ outlive it.
 ## 5. Approval integrity
 
 - Gateway approvals check stored per-(project, platform, sender) grants.
+- The grant is checked against the initiative's OWN project, not the project
+  named in the command: initiative refs are globally unique, so authority over
+  one project must not reach another's work. Ownership is verified before any
+  state is disclosed, so a foreign ref cannot be probed for existence either.
 - Every approval records actor + interface in the audit log.
 - Approvals are idempotent per initiative (redelivery-safe).
 - Rejections impose suppression windows — replayed proposals stay dead.
@@ -107,6 +115,13 @@ Enabling Builder+ requires BOTH flags in verification policy:
 The acknowledgement is the operator asserting they understand §3/§4 residual
 risks for THIS repo. The gate lives outside the level ladder so bumping a
 level never silently grants it.
+
+Both builder-tier execution paths consult the same check: writing code
+(`builder_gate_open()`) and running command-type objective evaluators
+(`command_evaluator_allowed()`, which backs the cycle, goal checks and
+"Evaluate now"). Without both flags a level ≥ 3 project gets an empty command
+allowlist, so no command runs — naming commands in `command_allowlist` does
+not buy the capability back.
 
 ## 7. Availability / abuse
 

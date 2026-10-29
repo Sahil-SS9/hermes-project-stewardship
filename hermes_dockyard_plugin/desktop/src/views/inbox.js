@@ -29,7 +29,7 @@ function InboxRow({ item, selected, onSelect, onOpenProject }) {
         jsx('small', { children: summary.meta || 'frozen or disabled project' }),
         jsx('a', {
           href: '#',
-          onClick: (event) => { event.preventDefault(); event.stopPropagation(); onOpenProject?.(item.deep_link) },
+          onClick: (event) => { event.preventDefault(); event.stopPropagation(); onOpenProject?.(item.deep_link, item) },
           children: 'Open project',
         }),
       ],
@@ -59,7 +59,7 @@ function AttentionDetail({ item, onBack, onOpenProject }) {
     onBack ? jsx(Button, { variant: 'quiet', small: true, onClick: onBack, children: 'Back' }) : null,
     jsx('h2', { children: copy.title }),
     jsx('p', { children: copy.description }),
-    jsx(Button, { variant: 'primary', onClick: () => onOpenProject?.(copy.deeplink), children: `Open ${copy.project || 'project'}` }),
+    jsx(Button, { variant: 'primary', onClick: () => onOpenProject?.(copy.deeplink, item), children: `Open ${copy.project || 'project'}` }),
   ]})
 }
 

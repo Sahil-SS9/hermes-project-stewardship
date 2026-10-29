@@ -105,7 +105,37 @@ def tool_steward_propose_initiative(
     risk: str = "medium",
     dedupe_key: Optional[str] = None,
 ) -> dict:
-    return PluginState.services().propose_initiative(
+    """Propose an initiative under the same gates the cycle obeys.
+
+    This is an agent entry point into the same table the cycle writes, so it
+    answers to the same contract: the project's autonomy level must grant
+    ``create_initiative``, and proposals are never made on unverified ground.
+    Phase is enforced in the service for every caller. Without these checks a
+    model could propose work on a project whose health was never measured, or
+    on one deliberately held at observe-only autonomy.
+    """
+    from .domain.constants import HealthState
+    from .domain.policy import DEFAULT_RUNTIME_BASE, AutonomyPolicy
+
+    svc = PluginState.services()
+    settings = svc.settings(project_id)
+    decision = AutonomyPolicy.from_settings(settings).permits(
+        "create_initiative", DEFAULT_RUNTIME_BASE
+    )
+    if not decision.allowed:
+        raise ServiceError(f"cannot create initiatives: {decision.reason}")
+    health = svc.latest_health(project_id)
+    if not health:
+        raise ServiceError(
+            "no health snapshot for this project: run a cycle so the proposal "
+            "rests on verified evidence"
+        )
+    if health.get("status") in (HealthState.UNKNOWN.value, HealthState.CRITICAL.value):
+        raise ServiceError(
+            f"fail-closed: health={health.get('status')}: "
+            "cannot propose work on unverified or critical state"
+        )
+    return svc.propose_initiative(
         project_id,
         title=title,
         rationale=rationale,

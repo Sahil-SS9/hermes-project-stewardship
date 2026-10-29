@@ -2755,6 +2755,8 @@ class StewardshipService:
         """Create a bounded change proposal.
 
         Enforces anti-busywork controls:
+        - project phase must be active (a frozen or paused project accepts no
+          new work, from the cycle, the model tools or any other caller);
         - evidence-bearing rationale required;
         - dedupe against active/recent initiatives by exact key;
         - suppression windows after rejection;
@@ -2765,6 +2767,14 @@ class StewardshipService:
             raise ServiceError("initiative requires a rationale (anti-busywork rule)")
 
         settings = self.settings(project_id)
+        phase = settings.get("phase")
+        if phase != ProjectPhase.ACTIVE.value:
+            # The cycle refuses to mutate a non-active project, so the
+            # proposal seam must refuse too: otherwise freeze/pause is only
+            # enforced on one route into the same table.
+            raise ServiceError(
+                f"project is {phase}: cannot create initiatives until it is active"
+            )
         if requires_approval is None:
             requires_approval = True  # V1 default: everything needs approval
 

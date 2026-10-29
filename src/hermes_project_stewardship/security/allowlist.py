@@ -434,7 +434,8 @@ def run_allowlisted(
         # config when the actual control is the project's autonomy level.
         raise CommandNotPermitted(
             f"no command may run for this project: the allowlist is empty "
-            f"(autonomy level does not permit 'run_command_evaluator', "
+            f"(autonomy level does not permit 'run_command_evaluator', the "
+            f"threat-model §6 builder acknowledgements are missing, "
             f"or the configured command_allowlist is empty); refused '{exe}'"
         )
     if exe not in allowlist:

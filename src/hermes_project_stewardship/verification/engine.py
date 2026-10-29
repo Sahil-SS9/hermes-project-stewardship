@@ -72,6 +72,54 @@ class VerificationEngine:
     # Collectors                                                         #
     # ------------------------------------------------------------------ #
 
+    @staticmethod
+    def _stderr_of(proc: "subprocess.CompletedProcess") -> str:
+        raw = getattr(proc, "stderr", b"") or b""
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8", errors="replace")
+        return " ".join(str(raw).split())[:200]
+
+    def _repo_root_contradiction(
+        self, spec: CollectorSpec, root: Path
+    ) -> Optional[Contradiction]:
+        """Refuse evidence that does not describe the declared path itself.
+
+        git walks UP from its working directory, so a non-repo directory
+        nested inside another checkout answers with the OUTER repository's
+        status and log. That output is about a different tree, so accepting it
+        would attribute someone else's working state to this project. A
+        directory that is no repository at all exits non-zero and is refused
+        by the same check.
+        """
+        proc = self._git(["rev-parse", "--show-toplevel"], root)
+        if proc.returncode != 0:
+            return Contradiction(
+                severity="high",
+                subject=spec.kind,
+                detail=(
+                    "declared repo path is not a git repository "
+                    f"(git exit {proc.returncode}: {self._stderr_of(proc)})"
+                ),
+                evidence_refs=[f"git:{root}"],
+            )
+        top = proc.stdout.decode("utf-8", errors="replace").strip()
+        try:
+            same = top and Path(top).resolve() == Path(root).resolve()
+        except OSError:
+            same = False
+        if not same:
+            return Contradiction(
+                severity="high",
+                subject=spec.kind,
+                detail=(
+                    "declared repo path is not the root of the repository git "
+                    f"resolved ({top or 'unknown'}): evidence would describe "
+                    "a different working tree"
+                ),
+                evidence_refs=[f"git:{root}"],
+            )
+        return None
+
     def _collect_git(self, spec: CollectorSpec) -> tuple[Evidence, List[Contradiction]]:
         root = spec.path
         if not root or not Path(root).exists():
@@ -80,13 +128,50 @@ class VerificationEngine:
                     kind="git_status",
                     source=f"git:{root}",
                     summary="repo path missing",
+                    authoritative=False,
                 ),
                 [Contradiction(Severity.HIGH if hasattr(Severity, 'HIGH') else 'high',
                                subject="git", detail="declared repo path does not exist",
                                evidence_refs=[f"git:{root}"])],
             )
+        # Identity first: prove the path IS the repository this evidence will
+        # claim to describe, before any output is read as canonical state.
+        misattributed = self._repo_root_contradiction(spec, root)
+        if misattributed is not None:
+            return (
+                Evidence(
+                    kind=spec.kind,
+                    source=f"git:{root}",
+                    summary="unverified: declared repo path is not a repository root",
+                    authoritative=False,
+                ),
+                [misattributed],
+            )
         if spec.kind == "git_status":
             proc = self._git(["status", "--porcelain=v1"], root)
+            if proc.returncode != 0:
+                # A failed command measured nothing. Reading empty stdout as a
+                # clean tree would turn an error into authoritative "no changes"
+                # evidence, so the verdict fails closed instead.
+                return (
+                    Evidence(
+                        kind="git_status",
+                        source=f"git:{root}",
+                        summary=f"git status failed (exit {proc.returncode})",
+                        payload_json={"exit_code": proc.returncode,
+                                      "stderr_head": self._stderr_of(proc)},
+                        authoritative=False,
+                    ),
+                    [Contradiction(
+                        severity="high",
+                        subject="git_status",
+                        detail=(
+                            f"git status exited {proc.returncode}: working tree "
+                            f"state is unknown ({self._stderr_of(proc)})"
+                        ),
+                        evidence_refs=[f"git:{root}"],
+                    )],
+                )
             out = proc.stdout.decode("utf-8", errors="replace")
             dirty = bool(out.strip())
             findings = scan_text(out)
@@ -115,6 +200,46 @@ class VerificationEngine:
                 ["log", f"-n{self._max_log}", "--pretty=format:%H %ad %s", "--date=iso"],
                 root,
             )
+            if proc.returncode != 0:
+                # A repository with no commits yet is a known state, not a
+                # failure: `git log` exits 128 there while `git rev-list --all`
+                # succeeds with empty output. Anything else measured nothing,
+                # and "0 recent commits" from a failed command must not look
+                # like a genuinely empty history.
+                probe = self._git(["rev-list", "-n1", "--all"], root)
+                empty_history = (
+                    probe.returncode == 0
+                    and not probe.stdout.decode("utf-8", errors="replace").strip()
+                )
+                if not empty_history:
+                    return (
+                        Evidence(
+                            kind="git_log",
+                            source=f"git:{root}",
+                            summary=f"git log failed (exit {proc.returncode})",
+                            payload_json={"exit_code": proc.returncode,
+                                          "stderr_head": self._stderr_of(proc)},
+                            authoritative=False,
+                        ),
+                        [Contradiction(
+                            severity="high",
+                            subject="git_log",
+                            detail=(
+                                f"git log exited {proc.returncode}: commit history "
+                                f"is unknown ({self._stderr_of(proc)})"
+                            ),
+                            evidence_refs=[f"git:{root}"],
+                        )],
+                    )
+                return (
+                    Evidence(
+                        kind="git_log",
+                        source=f"git:{root}",
+                        summary="0 recent commits",
+                        payload_json={"commits": [], "empty_history": True},
+                    ),
+                    [],
+                )
             out = proc.stdout.decode("utf-8", errors="replace")
             lines = [line for line in out.splitlines() if line.strip()]
             return (
