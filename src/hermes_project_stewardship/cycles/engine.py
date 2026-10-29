@@ -22,6 +22,7 @@ from ..domain.constants import (
     TriggerType,
 )
 from ..domain.health import DEFAULT_HEALTH_MACHINE
+from ..domain.policy import DEFAULT_RUNTIME_BASE, AutonomyPolicy
 from ..events.bus import (
     CYCLE_STARTED,
     HEALTH_CHANGED,
@@ -325,6 +326,20 @@ class CycleEngine:
             mutation_blocked_reason = f"fail-closed: health={state.value}"
         elif not verdict.ok:
             mutation_blocked_reason = "fail-closed: verification failed"
+        elif (
+            self.proposal_fn is not None
+            and failed_objectives
+            and not AutonomyPolicy.from_settings(self.svc.settings(project_id))
+            .permits("create_initiative", DEFAULT_RUNTIME_BASE)
+            .allowed
+        ):
+            # The cycle is the agent acting. Creating initiatives is a level-2
+            # capability, so an observe-only project must not gain it just
+            # because a proposer happens to be wired in. Only reported when a
+            # proposal would otherwise have been attempted.
+            mutation_blocked_reason = (
+                "autonomy level does not permit creating initiatives"
+            )
         elif self.proposal_fn is not None and failed_objectives:
             remaining = self.max_initiatives_per_cycle
             try:

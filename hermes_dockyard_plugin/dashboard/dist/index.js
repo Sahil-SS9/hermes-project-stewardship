@@ -2159,8 +2159,8 @@
     } });
   }
 
-  // src/app.ts
-  function applyFleetDeepLink({ link, s, tabs, go }) {
+  // src/deep-link.ts
+  function applyFleetDeepLink({ link, s, tabs, go, ownerProjectId }) {
     const sep = link.indexOf(":");
     if (sep <= 0) return;
     const screen = link.slice(0, sep);
@@ -2168,6 +2168,9 @@
     const slash = rest.indexOf("/");
     const objectKind = slash >= 0 ? rest.slice(0, slash) : "";
     const objectId = slash >= 0 ? rest.slice(slash + 1) : rest;
+    const ownProject = () => {
+      if (ownerProjectId) s.projectId = ownerProjectId;
+    };
     const select = (tab) => {
       s.tab = tab;
       for (const t of tabs) {
@@ -2178,16 +2181,19 @@
       go();
     };
     if (screen === "s4") {
+      ownProject();
       select("inbox");
       return;
     }
     if (screen === "s6" && objectKind === "initiative") {
+      ownProject();
       select("inbox");
       return;
     }
     if (screen === "s2") {
       if (objectKind === "work" && objectId) {
         s.selectedWorkRef = objectId;
+        ownProject();
         select("work");
         return;
       }
@@ -2201,6 +2207,7 @@
     }
     if (screen === "s1") {
       if (objectKind === "project" && objectId) s.projectId = objectId;
+      else ownProject();
       select("dashboard");
       return;
     }
@@ -2210,6 +2217,8 @@
     }
     select("dashboard");
   }
+
+  // src/app.ts
   function initApp(sdk, root) {
     let deepLinkView = null;
     const hash = typeof window !== "undefined" && window.location ? window.location.hash : "";
@@ -2309,12 +2318,13 @@
         void render(main, state);
       })
     );
-    const navigateDeepLink = (link) => {
+    const navigateDeepLink = (link, ownerProjectId) => {
       applyFleetDeepLink({
         link,
         s: state,
         tabs,
-        go: () => void render(main, state)
+        go: () => void render(main, state),
+        ownerProjectId
       });
     };
     state.openFleetLink = navigateDeepLink;
@@ -2432,8 +2442,9 @@
             open.className = "dy-btn dy-fleet-open";
             open.textContent = "Open";
             open.dataset.deepLink = link;
+            if (item.project) open.dataset.deepLinkProject = String(item.project);
             open.addEventListener("click", () => {
-              s.openFleetLink?.(link);
+              s.openFleetLink?.(link, item.project ? String(item.project) : void 0);
             });
             li.appendChild(open);
           }
@@ -3361,8 +3372,10 @@
         open.className = "dy-btn dy-note-open";
         open.textContent = "Open";
         open.dataset.deepLink = n.deep_link;
+        const owner = n.project ? String(n.project) : void 0;
+        if (owner) open.dataset.deepLinkProject = owner;
         open.addEventListener("click", () => {
-          s.openFleetLink?.(n.deep_link);
+          s.openFleetLink?.(n.deep_link, owner);
         });
         row.appendChild(open);
       }

@@ -14,6 +14,7 @@ import { loadProjectData } from '../data/loaders.js'
 import { loadBacklogData } from '../data/loaders.js'
 import { loadTeamsData } from '../data/loaders.js'
 import { loadInboxData } from '../data/loaders.js'
+import { resolveDeepLink } from './deep-link.js'
 import { loadAppSettingsData } from '../data/loaders.js'
 import { api } from '../runtime/context.js'
 import { sortProjects } from '../data/loaders.js'
@@ -374,67 +375,27 @@ export function DashboardPage({ inboxCss = '' } = {}) {
   // s6:initiative/<ref> / s4 open the approval inbox focused on the ref.
   const [deepLinkNotice, setDeepLinkNotice] = useState(null)
   const [inboxFocusRef, setInboxFocusRef] = useState(null)
-  const openDeepLink = (link) => {
-    if (typeof link !== 'string' || !link.includes(':')) return
-    const [screen, rest] = link.split(':', 2)
-    const slash = rest.indexOf('/')
-    const objectKind = slash >= 0 ? rest.slice(0, slash) : ''
-    const objectId = slash >= 0 ? rest.slice(slash + 1) : rest
-    if (screen === 's4' || (screen === 's6' && objectKind === 'initiative')) {
-      setDeepLinkNotice(objectId ? `Approval inbox: focus ${objectId}` : null)
-      setInboxFocusRef(objectId || null)
-      setTab('inbox')
-      return
-    }
-    if (screen === 's2' && objectKind === 'work' && objectId) {
-      // exact work item: open its project, board view, and the drawer
-      const known = Object.entries(data?.payload?.projectContext ?? {})
-      const ownerProject = known.find(([, context]) =>
-        (context.workItems ?? []).some((item) => item.ref === objectId))
-      setDeepLinkNotice(ownerProject ? null : `Work item ${objectId} is not in the current board data.`)
-      setSelectedProject(ownerProject ? ownerProject[0] : (selectedProject ?? data?.payload?.projects?.[0]?.id ?? null))
-      setProjectEntryView('overview')
-      setTab('project')
-      setPendingWorkRef(objectId)
-      return
-    }
-    if (screen === 's2' && objectKind === 'project' && objectId) {
-      setDeepLinkNotice(null)
-      setSelectedProject(objectId)
-      setProjectEntryView('overview')
-      setTab('project')
-      return
-    }
-    if (screen === 's3' && objectKind === 'unassigned' && objectId) {
-      // The Dashboard's unassigned-work alert: that project's Backlog, showing unassigned work.
-      setDeepLinkNotice(null)
-      setSelectedProject(objectId)
-      setBacklogPreset({ kind: 'unassigned', projectId: objectId, at: Date.now() })
-      setTab('backlog')
-      return
-    }
-    if (screen === 's1' && objectKind === 'project' && objectId) {
-      setDeepLinkNotice(null)
-      setSelectedProject(objectId)
-      setProjectEntryView('overview')
-      setTab('project')
-      return
-    }
-    if (screen === 's2' || screen === 's1') {
-      if (objectId) {
-        setSelectedProject(objectId)
-        setProjectEntryView('overview')
-        setTab('project')
-        return
-      }
-      setTab('dashboard')
-      return
-    }
-    if (screen === 's5') {
-      setTab('teams')
-      return
-    }
-    setTab('dashboard')
+  // Navigation from a notification, inbox row or fleet item. ``owner`` is the
+  // project that row belongs to; the link itself never names one, so without
+  // it an object opened from "All projects" had no project to render against.
+  // The routing decision lives in ./deep-link.js so it can be tested without
+  // a mounted screen; this applies it.
+  const openDeepLink = (link, owner) => {
+    const target = resolveDeepLink({
+      link,
+      owner,
+      projectContext: data?.payload?.projectContext ?? {},
+      projects: data?.payload?.projects ?? [],
+      selectedProject,
+    })
+    if (!target) return
+    if (target.notice !== undefined) setDeepLinkNotice(target.notice)
+    if (target.focusRef !== undefined) setInboxFocusRef(target.focusRef)
+    if (target.project !== undefined) setSelectedProject(target.project)
+    if (target.entryView !== undefined) setProjectEntryView(target.entryView)
+    if (target.workRef !== undefined) setPendingWorkRef(target.workRef)
+    if (target.backlogPreset) setBacklogPreset({ ...target.backlogPreset, at: Date.now() })
+    setTab(target.tab)
   }
 
   const payload = data?.tab === tab && data.projectId === selectedProject ? data.payload : null
