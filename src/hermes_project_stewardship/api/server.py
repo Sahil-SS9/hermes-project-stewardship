@@ -3458,6 +3458,27 @@ def create_app(
             return detail["result"]
 
         reviewed = onboard_preflight(body)["preflight"]
+        # Connect-existing adopts the host's OWN record. The wizard never asks
+        # for a display name, so a title-cased project id ("Accountability App")
+        # can never match a record stored under another name
+        # ("Accountability__App"), and the host adapter rightly refuses to take
+        # over a project whose details differ — the connect path 409s forever.
+        # Only an omitted name/board is adopted; an explicit one must match or
+        # the host still answers with a real conflict.
+        if body.name is None or body.board_slug is None:
+            try:
+                hosted = next(
+                    (p for p in _onboarding_discovery().get("projects", [])
+                     if str(p.get("slug")) == slug),
+                    None,
+                )
+            except Exception:
+                hosted = None
+            if hosted:
+                if body.name is None and hosted.get("name"):
+                    name = str(hosted["name"])
+                if body.board_slug is None and hosted.get("board_slug"):
+                    board_slug = str(hosted["board_slug"])
         current_revision = int(reviewed["membership_revision"])
         legacy_reference_submission = (
             type(adapter).list_existing_projects is KanbanAdapter.list_existing_projects
