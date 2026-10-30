@@ -7006,7 +7006,7 @@ function OnboardingWizard({ onClose, onComplete, intent = "new" }) {
           mission: mission.trim(),
           lead_profile: leadProfile.trim(),
           member_profiles: memberProfiles,
-          idempotency_key: `dockyard-onboard:${projectId.trim()}`,
+          idempotency_key: `dockyard-onboard:${projectId.trim()}:${preflightContract?.token ?? "unreviewed"}`,
           expected_membership_revision: preflightContract?.membership_revision,
           preflight_token: preflightContract?.token
         }
