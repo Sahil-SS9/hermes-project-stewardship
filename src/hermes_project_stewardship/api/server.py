@@ -3631,15 +3631,47 @@ def create_app(
         """P7.6: the onboarding completion action — run the FIRST read-only
         assessment now. Manual trigger, no schedule created, no initiatives
         proposed (the engine's own gates keep mutation off when nothing is
-        proposed). Returns the evidence/result the owner reviews."""
+        proposed). Returns the evidence/result the owner reviews.
+
+        The trigger key is per project, so this runs once. Pressing the button
+        again replays the recorded cycle instead of answering 409 "duplicate
+        trigger", which left the owner staring at an error for the only action
+        the onboarding screen offers.
+        """
+        key = f"dockyard-first-assessment:{project_id}"
         try:
             result = engine.run_cycle(
                 project_id,
                 trigger_type="manual",
-                idempotency_key=f"dockyard-first-assessment:{project_id}",
+                idempotency_key=key,
             )
         except CycleRefused as exc:
-            raise HTTPException(409, str(exc)) from None
+            prior = svc.cycle_by_key(key)
+            if prior is None or prior["state"] != "completed":
+                raise HTTPException(409, str(exc)) from None
+            health = svc.latest_health(project_id)
+            health_state, initiatives = None, 0
+            for part in str(prior["summary"] or "").split(";"):
+                label, _, value = part.strip().partition("=")
+                if label == "health":
+                    health_state = value or None
+                elif label == "initiatives" and value.isdigit():
+                    initiatives = int(value)
+            return {
+                "project": project_id,
+                "assessment": {
+                    "cycle_id": prior["id"],
+                    "verification_ok": None,
+                    "health_state": health_state or (health or {}).get("state"),
+                    "objective_results": [],
+                    "initiatives_created": initiatives,
+                    "summary": prior["summary"],
+                    "replayed": True,
+                },
+                "health_snapshot": health,
+                "schedules_enabled": False,
+                "next": "This project was already assessed; onboarding enables no automation.",
+            }
         except Exception as exc:
             raise HTTPException(503, str(exc)) from None
         health = svc.latest_health(project_id)
