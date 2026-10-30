@@ -290,6 +290,10 @@ def register(runtime: Any) -> dict:
 
     skill_path = Path(__file__).resolve().parents[2] / "skill" / "project-stewardship"
     if skill_path.is_dir():
+        # Hermes core's register_skill() takes the SKILL.md file, not the skill directory;
+        # passing the directory registers fine but every later skill_view() dies on EISDIR.
+        skill_path = skill_path / "SKILL.md"
+    if skill_path.is_file():
         try:
             runtime.register_skill("project-stewardship", skill_path)
         except AttributeError:
