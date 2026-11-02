@@ -48,9 +48,36 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - Opening a task from a notification carries the notification's own project.
   From "All projects" the destination had no project to render and showed the
   project chooser instead of the task.
+- A corrected onboarding review can be committed again (#32). The wizard's
+  idempotency key was fixed per project, so once an attempt failed after the
+  host had recorded it, every corrected retry was refused as a conflict while
+  the review kept passing. The key now carries the reviewed preflight token: an
+  unchanged retry keeps its key (still one project) and any edit mints a new
+  one. When the wizard omits a name or board for a project the host already
+  owns, the host's own record is adopted; an explicit name that disagrees is
+  still a real conflict.
+- The plugin registers its skill by its `SKILL.md` file, not the skill's
+  directory. Passing the directory registered without error, but every later
+  `skill_view()` failed.
+- Connecting an existing project binds a board that was created outside
+  provisioning (for example with `hermes kanban boards create`) to that project.
+  It was left unbound, so the Team tab, work listing and card writes were
+  refused with `project_board_mismatch`. A board already bound to a different
+  project is never touched. This writes the board's `project_id` metadata
+  through Hermes' own kanban module.
+- "Run first read-only assessment" can be pressed again: a completed first
+  assessment is replayed (same cycle, `replayed: true`) instead of answering
+  409 duplicate trigger. A refused trigger with no completed cycle behind it
+  still returns 409.
 
-Thanks to the community reviewer who reported all six issues against 0.5.4 with
-reproduction details.
+### Changed
+- README: "Onboard existing project" lists the projects in the Hermes project
+  registry of the profile the plugin runs in. Hermes keeps one registry per
+  profile, so projects registered under other profiles are not offered (#30).
+
+Thanks to the community reviewer who reported the six issues against 0.5.4 with
+reproduction details, and to @nrmjeremy for #30 and #32 and the onboarding
+fixes in #33.
 
 ## [0.5.4] - 2026-10-26
 

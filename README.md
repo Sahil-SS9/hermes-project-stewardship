@@ -30,6 +30,8 @@ Running Hermes with several profiles? The plugin works per profile, so switch it
 hermes -p <profile> plugins enable hermes-project-stewardship
 ```
 
+"Onboard existing project" lists the projects in the Hermes project registry of the profile the plugin runs in. Hermes keeps one registry per profile, so projects registered under other profiles are not offered. To bring one in, register it in this profile first (`hermes projects create`), then onboard it. The two records are independent: a project registered in two profiles is two records and will not stay in sync.
+
 Upgrading from 0.3.0? Export a backup first and read the [upgrade notes](CHANGELOG.md).
 
 ## What you get
