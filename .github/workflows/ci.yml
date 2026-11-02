@@ -37,7 +37,7 @@ jobs:
           src/hermes_project_stewardship/plugin.py
           src/hermes_project_stewardship/persistence/store.py
       - name: Audit Python dependencies
-        run: uv run --locked --extra dev --extra plugin pip-audit
+        run: uv run --locked --extra dev --extra plugin python scripts/audit_python.py
       - name: Byte-compile check
         run: uv run --locked --extra dev --extra plugin python -m compileall src tests
 

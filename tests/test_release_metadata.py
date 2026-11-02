@@ -99,7 +99,11 @@ def test_verify_bootstrap_installs_the_host_side_yaml_libraries():
 
 
 def test_audit_tool_constraints_are_secure_on_each_supported_python():
-    """Keep 3.10 support without admitting the vulnerable locking releases."""
+    """Keep 3.10 support without admitting any locking release we can avoid.
+
+    Python 3.11+ must take the patched filelock line. Python 3.10 has no patched
+    release at all, so it keeps the 3.20.3 line (fewest advisories) and the two
+    that remain are ignored by scripts/audit_python.py, tested below."""
     from packaging.markers import default_environment
     from packaging.requirements import Requirement
     from packaging.version import Version
@@ -120,3 +124,44 @@ def test_audit_tool_constraints_are_secure_on_each_supported_python():
             assert Version(vulnerable) not in locking[0].specifier, (python, vulnerable)
         assert Version("2026.10.19") in certificates[0].specifier
         assert Version("2026.7.22") not in certificates[0].specifier
+        msgpacks = [dep for dep in active if dep.name == "msgpack"]
+        assert len(msgpacks) == 1, python
+        assert Version("1.2.3") in msgpacks[0].specifier, python
+        assert Version("1.2.2") not in msgpacks[0].specifier, python
+
+
+def _audit_wrapper():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "audit_python", ROOT / "scripts" / "audit_python.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_audit_exception_is_scoped_to_python_310_and_two_filelock_advisories():
+    """The one documented audit exception must stay narrow: exactly the two
+    filelock advisories, only on Python 3.10, with every other advisory still
+    failing the audit on every version."""
+    audit = _audit_wrapper()
+    assert audit.PYTHON_310_ONLY_IGNORES == ("CVE-2026-112909", "CVE-2026-112910")
+    ignored = audit.audit_command((3, 10, 20))
+    assert [ignored[i + 1] for i, a in enumerate(ignored) if a == "--ignore-vuln"] == \
+        list(audit.PYTHON_310_ONLY_IGNORES)
+    for version in ((3, 11, 0), (3, 12, 9), (3, 14, 7)):
+        assert "--ignore-vuln" not in audit.audit_command(version), version
+    assert audit.audit_command((3, 14, 7), extra=("--strict",))[-1] == "--strict"
+
+
+def test_ci_and_local_gate_audit_through_the_single_wrapper():
+    """Both gates call scripts/audit_python.py, so the exception cannot drift
+    between CI and the local mirror (or be widened in only one of them)."""
+    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    local = (ROOT / "scripts" / "local-ci.sh").read_text(encoding="utf-8")
+    assert "scripts/audit_python.py" in workflow
+    assert "scripts/audit_python.py" in local
+    for text in (workflow, local):
+        assert "--ignore-vuln" not in text
+        assert "-m pip_audit" not in text
+        assert "pip-audit\n" not in text.split("Audit Python dependencies", 1)[-1][:120]
