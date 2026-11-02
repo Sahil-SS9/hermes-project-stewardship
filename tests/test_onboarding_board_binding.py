@@ -13,10 +13,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from hermes_cli import kanban_db, projects_db
-from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+import pytest
 
-from hermes_project_stewardship.kanban.vanilla_host import ProjectKanbanHost
+# Needs a real Hermes host (kanban + projects modules). CI installs none, so the
+# file skips there and runs in the native-host lane, like the other host tests.
+hermes_constants = pytest.importorskip("hermes_constants")
+kanban_db = pytest.importorskip("hermes_cli.kanban_db")
+projects_db = pytest.importorskip("hermes_cli.projects_db")
+reset_hermes_home_override = hermes_constants.reset_hermes_home_override
+set_hermes_home_override = hermes_constants.set_hermes_home_override
+
+from hermes_project_stewardship.kanban.vanilla_host import ProjectKanbanHost  # noqa: E402
 
 PROJECT = "accountability-app"
 NAME = "Accountability__App"
