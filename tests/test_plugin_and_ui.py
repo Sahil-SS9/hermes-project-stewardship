@@ -25,7 +25,9 @@ class FakeRuntime:
 
     def register_skill(self, name, path):
         assert name == "project-stewardship"
-        assert path.name == "project-stewardship"
+        # Hermes core wants the SKILL.md file; a directory registers fine but
+        # every later skill_view() fails with EISDIR.
+        assert path.name == "SKILL.md" and path.is_file()
 
     def register_cli_command(self, name, help, setup_fn, handler_fn=None, description=""):
         assert name == "stewardship"
