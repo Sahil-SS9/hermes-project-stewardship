@@ -97,7 +97,7 @@ run_gate "type-check" "critical boundaries" "$PY" -m ty check \
   src/hermes_project_stewardship/api/middleware.py \
   src/hermes_project_stewardship/plugin.py \
   src/hermes_project_stewardship/persistence/store.py
-run_gate "dependency-audit" "pip-audit" "$PY" -m pip_audit
+run_gate "dependency-audit" "pip-audit" "$PY" scripts/audit_python.py
 
 # --- Gate 4: byte-compile (mirrors ci.yml compileall step).
 if [ "$QUICK" -eq 0 ]; then
