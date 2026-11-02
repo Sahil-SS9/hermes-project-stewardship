@@ -3281,8 +3281,7 @@ def create_app(
         governance project id, canonical board, objectives store, automation
         state — so both UIs can preview what onboarding will create."""
         slug = (body.slug or body.project_id).strip()
-        board_slug = (body.board_slug or slug).strip()
-        name = (body.name or body.project_id.replace("-", " ").title()).strip()
+        name, board_slug = _onboarding_adopted_targets(body, slug)
         try:
             validated = adapter.validate_project(
                 name=name,
@@ -3419,12 +3418,42 @@ def create_app(
             },
         }
 
+    def _onboarding_adopted_targets(body: OnboardingRequest, slug: str) -> tuple[str, str]:
+        """The name/board onboarding will actually provision (F5).
+
+        Connect-existing adopts the host's OWN record. The wizard never asks
+        for a display name, so a title-cased project id ("Accountability App")
+        can never match a record stored under another name
+        ("Accountability__App"), and the host adapter rightly refuses to take
+        over a project whose details differ — the connect path 409s forever.
+        Only an omitted name/board is adopted; an explicit one must match or
+        the host still answers with a real conflict. The preflight preview and
+        the provisioning call resolve through this ONE helper, so the wizard's
+        S2 preview can no longer drift from what adoption actually provisions.
+        """
+        name = (body.name or body.project_id.replace("-", " ").title()).strip()
+        board_slug = (body.board_slug or slug).strip()
+        if body.name is None or body.board_slug is None:
+            try:
+                hosted = next(
+                    (p for p in _onboarding_discovery().get("projects", [])
+                     if str(p.get("slug")) == slug),
+                    None,
+                )
+            except Exception:
+                hosted = None
+            if hosted:
+                if body.name is None and hosted.get("name"):
+                    name = str(hosted["name"])
+                if body.board_slug is None and hosted.get("board_slug"):
+                    board_slug = str(hosted["board_slug"])
+        return name, board_slug
+
     @router.post("/onboard")
     def onboard(body: OnboardingRequest):
         """Provision canonical Hermes state before Project Stewardship governance metadata."""
         slug = (body.slug or body.project_id).strip()
-        board_slug = (body.board_slug or slug).strip()
-        name = (body.name or body.project_id.replace("-", " ").title()).strip()
+        name, board_slug = _onboarding_adopted_targets(body, slug)
         key = (
             body.idempotency_key
             or f"dockyard-onboard:{body.project_id}"
@@ -3458,27 +3487,6 @@ def create_app(
             return detail["result"]
 
         reviewed = onboard_preflight(body)["preflight"]
-        # Connect-existing adopts the host's OWN record. The wizard never asks
-        # for a display name, so a title-cased project id ("Accountability App")
-        # can never match a record stored under another name
-        # ("Accountability__App"), and the host adapter rightly refuses to take
-        # over a project whose details differ — the connect path 409s forever.
-        # Only an omitted name/board is adopted; an explicit one must match or
-        # the host still answers with a real conflict.
-        if body.name is None or body.board_slug is None:
-            try:
-                hosted = next(
-                    (p for p in _onboarding_discovery().get("projects", [])
-                     if str(p.get("slug")) == slug),
-                    None,
-                )
-            except Exception:
-                hosted = None
-            if hosted:
-                if body.name is None and hosted.get("name"):
-                    name = str(hosted["name"])
-                if body.board_slug is None and hosted.get("board_slug"):
-                    board_slug = str(hosted["board_slug"])
         current_revision = int(reviewed["membership_revision"])
         legacy_reference_submission = (
             type(adapter).list_existing_projects is KanbanAdapter.list_existing_projects
@@ -3649,7 +3657,7 @@ def create_app(
             # Only a genuine duplicate is a replay. A frozen, paused, budget or
             # mutex refusal must stay a refusal even when an older completed
             # cycle exists for this key.
-            prior = svc.cycle_by_key(key) if isinstance(exc, DuplicateTrigger) else None
+            prior = svc.cycle_for_trigger(key) if isinstance(exc, DuplicateTrigger) else None
             if prior is None or prior["state"] != "completed":
                 raise HTTPException(409, str(exc)) from None
             health = svc.latest_health(project_id)

@@ -98,6 +98,24 @@ class CycleEngine:
         if phase == ProjectPhase.PAUSED.value and trigger_type != TriggerType.MANUAL.value:
             raise CycleRefused("project is paused (only manual cycles allowed)")
 
+        # F8 (v0.5.5 review): the key may already ride a recorded cycle whose
+        # processed_triggers row is gone (first-assessment keys are fixed per
+        # project, and trigger rows prune after 30 days; a FAILED cycle never
+        # marks its trigger at all). Without this check the INSERT below hits
+        # ``UNIQUE constraint failed: project_cycles.idempotency_key`` and the
+        # caller sees a raw sqlite 503 on that key forever. A completed
+        # (or still-running) prior is a genuine duplicate; a failed prior
+        # retries under a derived, free key after the mutex.
+        prior = self.svc.cycle_for_trigger(key)
+        prior_failed = False
+        if prior is not None:
+            if prior["state"] != CycleState.FAILED.value:
+                raise DuplicateTrigger(
+                    f"duplicate trigger {key}: cycle {prior['id']}"
+                    f" was already run (state {prior['state']})"
+                )
+            prior_failed = True
+
         # Budget guard
         window_start = (self._clock() - timedelta(days=1)).isoformat()
         recent = self.svc.cycles_since(project_id, window_start)
@@ -110,6 +128,16 @@ class CycleEngine:
         if not self.store.mutex_acquire(project_id, holder):
             current = self.store.mutex_holder(project_id)
             raise CycleRefused(f"another cycle holds the mutex ({current})")
+
+        if prior_failed:
+            # A failed cycle is not a duplicate trigger: the recorded failure
+            # stays put and the retry runs under a new key. Deterministic
+            # derivation (first free ``#retry-n``) keeps concurrent presses on
+            # the same key on one key while the mutex holds them single-file.
+            attempt = 1
+            while self.svc.cycle_by_key(f"{key}#retry-{attempt}") is not None:
+                attempt += 1
+            key = f"{key}#retry-{attempt}"
 
         cycle_id = -1
         try:

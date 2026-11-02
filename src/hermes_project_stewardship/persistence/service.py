@@ -2749,6 +2749,55 @@ class StewardshipService:
             "completed_at": row["completed_at"],
         }
 
+    def cycle_for_trigger(self, idempotency_key: str) -> Optional[Dict[str, Any]]:
+        """The cycle a trigger key resolves to, retries included (F8).
+
+        A FAILED cycle under a fixed key (e.g. the first-assessment key) is
+        retried under ``<key>#retry-1``, ``#retry-2``, ...: the base row keeps
+        recording the failure while the trigger's latest answer may be a
+        successful retry. Resolution over the key's chain, in order: any
+        COMPLETED cycle wins (a successful retry supersedes earlier
+        failures); otherwise the first failed record; otherwise the first
+        record of any state (a crashed ``running`` cycle); else None.
+        """
+        escaped = (
+            idempotency_key.replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+        rows = self.store._conn.execute(
+            "SELECT * FROM project_cycles WHERE idempotency_key LIKE ? ESCAPE '\\'"
+            " ORDER BY id",
+            (f"{escaped}#retry-%",),
+        ).fetchall()
+        retry_rows = {row["idempotency_key"]: row for row in map(self._cycle_row_dict, rows)}
+        base_row = self.cycle_by_key(idempotency_key)
+        chain: list[Dict[str, Any]] = []
+        if base_row is not None:
+            chain.append(base_row)
+        attempt = 1
+        while True:
+            row = retry_rows.pop(f"{idempotency_key}#retry-{attempt}", None)
+            if row is None:
+                break
+            chain.append(row)
+            attempt += 1
+        for state in ("completed", "failed", None):
+            for record in chain:
+                if state is None or record["state"] == state:
+                    return record
+        return None
+
+    def _cycle_row_dict(self, row: Any) -> Dict[str, Any]:
+        return {
+            "idempotency_key": row["idempotency_key"],
+            "id": row["id"],
+            "state": row["state"],
+            "summary": row["summary"],
+            "started_at": row["started_at"],
+            "completed_at": row["completed_at"],
+        }
+
     # ------------------------------------------------------------------ #
     # Initiatives                                                        #
     # ------------------------------------------------------------------ #
