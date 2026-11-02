@@ -2734,6 +2734,21 @@ class StewardshipService:
         ).fetchone()
         return int(row["n"])
 
+    def cycle_by_key(self, idempotency_key: str) -> Optional[Dict[str, Any]]:
+        """The cycle recorded for a trigger key, or None (idempotent replay)."""
+        row = self.store._conn.execute(
+            "SELECT * FROM project_cycles WHERE idempotency_key=?", (idempotency_key,)
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "id": row["id"],
+            "state": row["state"],
+            "summary": row["summary"],
+            "started_at": row["started_at"],
+            "completed_at": row["completed_at"],
+        }
+
     # ------------------------------------------------------------------ #
     # Initiatives                                                        #
     # ------------------------------------------------------------------ #

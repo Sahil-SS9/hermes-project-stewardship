@@ -295,6 +295,15 @@ class ProjectKanbanHost:
                                 "provisioning_incomplete",
                                 "Previous attempt is incomplete; the canonical board could not be resumed",
                             ) from exc
+                    elif not str(board.get("project_id") or "").strip():
+                        # A board made outside provisioning (`hermes kanban
+                        # boards create`) carries no project binding, and
+                        # ensure_board refuses every later adapter call with
+                        # "project is not bound to the requested canonical
+                        # board". Adopt it for this project; a board already
+                        # bound to a different project is left alone.
+                        board = kanban_db.write_board_metadata(
+                            clean["board_slug"], project_id=str(record.get("id")))
                     if record.get("archived") is True:
                         with projects_db.connect_closing() as conn:
                             projects_db.restore_project(conn, str(record.get("id")))

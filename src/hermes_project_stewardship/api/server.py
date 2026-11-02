@@ -35,7 +35,7 @@ except ImportError as e:  # pragma: no cover
         "pip install 'hermes-project-stewardship[desktop-panel]'"
     ) from e
 
-from ..cycles.engine import CycleEngine, CycleRefused
+from ..cycles.engine import CycleEngine, CycleRefused, DuplicateTrigger
 from ..domain.constants import Capability
 from ..dockyard import Actor, ActorKind
 from ..gateway.handler import CommandRequest, GatewayCommandHandler
@@ -787,7 +787,7 @@ def create_app(
 
     app = FastAPI(
         title="Hermes Project Stewardship RPC",
-        version="0.5.4",
+        version="0.5.5",
         description=(
             "Durable project ownership for Hermes agent fleets. One canonical "
             "backend serving CLI, TUI, Desktop and messaging gateways. "
@@ -3458,6 +3458,27 @@ def create_app(
             return detail["result"]
 
         reviewed = onboard_preflight(body)["preflight"]
+        # Connect-existing adopts the host's OWN record. The wizard never asks
+        # for a display name, so a title-cased project id ("Accountability App")
+        # can never match a record stored under another name
+        # ("Accountability__App"), and the host adapter rightly refuses to take
+        # over a project whose details differ — the connect path 409s forever.
+        # Only an omitted name/board is adopted; an explicit one must match or
+        # the host still answers with a real conflict.
+        if body.name is None or body.board_slug is None:
+            try:
+                hosted = next(
+                    (p for p in _onboarding_discovery().get("projects", [])
+                     if str(p.get("slug")) == slug),
+                    None,
+                )
+            except Exception:
+                hosted = None
+            if hosted:
+                if body.name is None and hosted.get("name"):
+                    name = str(hosted["name"])
+                if body.board_slug is None and hosted.get("board_slug"):
+                    board_slug = str(hosted["board_slug"])
         current_revision = int(reviewed["membership_revision"])
         legacy_reference_submission = (
             type(adapter).list_existing_projects is KanbanAdapter.list_existing_projects
@@ -3610,15 +3631,50 @@ def create_app(
         """P7.6: the onboarding completion action — run the FIRST read-only
         assessment now. Manual trigger, no schedule created, no initiatives
         proposed (the engine's own gates keep mutation off when nothing is
-        proposed). Returns the evidence/result the owner reviews."""
+        proposed). Returns the evidence/result the owner reviews.
+
+        The trigger key is per project, so this runs once. Pressing the button
+        again replays the recorded cycle instead of answering 409 "duplicate
+        trigger", which left the owner staring at an error for the only action
+        the onboarding screen offers.
+        """
+        key = f"dockyard-first-assessment:{project_id}"
         try:
             result = engine.run_cycle(
                 project_id,
                 trigger_type="manual",
-                idempotency_key=f"dockyard-first-assessment:{project_id}",
+                idempotency_key=key,
             )
         except CycleRefused as exc:
-            raise HTTPException(409, str(exc)) from None
+            # Only a genuine duplicate is a replay. A frozen, paused, budget or
+            # mutex refusal must stay a refusal even when an older completed
+            # cycle exists for this key.
+            prior = svc.cycle_by_key(key) if isinstance(exc, DuplicateTrigger) else None
+            if prior is None or prior["state"] != "completed":
+                raise HTTPException(409, str(exc)) from None
+            health = svc.latest_health(project_id)
+            health_state, initiatives = None, 0
+            for part in str(prior["summary"] or "").split(";"):
+                label, _, value = part.strip().partition("=")
+                if label == "health":
+                    health_state = value or None
+                elif label == "initiatives" and value.isdigit():
+                    initiatives = int(value)
+            return {
+                "project": project_id,
+                "assessment": {
+                    "cycle_id": prior["id"],
+                    "verification_ok": None,
+                    "health_state": health_state or (health or {}).get("state"),
+                    "objective_results": [],
+                    "initiatives_created": initiatives,
+                    "summary": prior["summary"],
+                    "replayed": True,
+                },
+                "health_snapshot": health,
+                "schedules_enabled": False,
+                "next": "This project was already assessed; onboarding enables no automation.",
+            }
         except Exception as exc:
             raise HTTPException(503, str(exc)) from None
         health = svc.latest_health(project_id)

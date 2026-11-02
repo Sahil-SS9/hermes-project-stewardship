@@ -295,7 +295,7 @@ function createDeferred() {
   return { promise, resolve, reject };
 }
 
-async function createRuntime({ mode = 'populated', failOnce = false, failMutationPath = null, objectivePayload = null } = {}) {
+async function createRuntime({ mode = 'populated', failOnce = false, failMutationPath = null, objectivePayload = null, preflightTokens = null } = {}) {
   const virtualConsole = new VirtualConsole();
   const jsdomMessages = [];
   virtualConsole.on('jsdomError', (error) => jsdomMessages.push(error.message));
@@ -687,7 +687,12 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
     if (path === '/dashboard') return clone({ ...data.dashboard, projects: data.dashboard.projects.filter((project) => !data.settings[project.id]?.archived_at) });
     if (path === '/portfolio') return clone(data.portfolio ?? POPULATED_PORTFOLIO);
     if (path === '/onboard/discover') return clone(data.DISCOVER);
-    if (method === 'POST' && path === '/onboard/preflight') return clone(data.PREFLIGHT);
+    if (method === 'POST' && path === '/onboard/preflight') {
+      const review = clone(data.PREFLIGHT);
+      // A real review's token is a hash of the payload, so an edit mints a new one.
+      if (preflightTokens?.length) review.preflight.token = preflightTokens.shift();
+      return review;
+    }
     if (method === 'POST' && /^\/projects\/[^/]+\/first-assessment$/.test(path)) {
       data.FIRST_ASSESSMENT_CALLS = (data.FIRST_ASSESSMENT_CALLS ?? 0) + 1;
       return clone(data.FIRST_ASSESSMENT);
@@ -1815,6 +1820,57 @@ async function testSavedViewsScreenAndCreator() {
   await runtime.dispose();
 }
 
+async function testOnboardingKeyFollowsTheReviewedContract() {
+  // Issue #32: the key was fixed per project, so once an attempt died part-way
+  // every corrected retry was refused as a conflict while preflight kept passing.
+  // The key must carry the reviewed contract: an unchanged retry keeps its key
+  // (still one project), and correcting the review mints a new one.
+  const runtime = await createRuntime({
+    failMutationPath: '/onboard',
+    preflightTokens: ['review-token-A', 'review-token-B'],
+  });
+  await runtime.mount();
+  const doc = runtime.dom.window.document;
+  const onboardCalls = () => runtime.calls.filter((call) => call.method === 'POST' && call.path === '/onboard');
+  await runtime.click('[data-action="open-onboarding"]');
+  await runtime.setValue('[data-field="project-id"]', 'checkout-ops');
+  await runtime.setValue('[data-field="repo-path"]', '/srv/repos/checkout');
+  await runtime.click('[data-action="wizard-next"]');
+  await runtime.setValue('[data-field="mission"]', 'First wording of the mission.');
+  await runtime.click('[data-action="wizard-next"]');
+  await runtime.setValue('[data-field="lead-profile"]', 'octacon');
+  await runtime.click('[data-action="wizard-next"]');
+  await runtime.click('[data-action="run-onboarding-preflight"]', 80);
+
+  // The first attempt fails after the host saw it; retrying without any edit
+  // must keep the same key.
+  await runtime.click('[data-action="submit-onboarding"]', 80);
+  await runtime.click('[data-action="submit-onboarding"]', 80);
+  assert.equal(onboardCalls().length, 2, 'both unchanged attempts should have reached the API');
+  assert.equal(onboardCalls()[0].body.idempotency_key, 'dockyard-onboard:checkout-ops:review-token-A');
+  assert.equal(onboardCalls()[1].body.idempotency_key, onboardCalls()[0].body.idempotency_key,
+    'an unchanged retry must keep its key so it stays one idempotent project');
+
+  // Correct the review: go back, edit the mission, review again.
+  await runtime.click('[data-action="wizard-back"]');
+  await runtime.click('[data-action="wizard-back"]');
+  await runtime.setValue('[data-field="mission"]', 'Corrected wording of the mission.');
+  await runtime.click('[data-action="wizard-next"]');
+  await runtime.click('[data-action="wizard-next"]');
+  assert.equal(doc.querySelector('[data-action="submit-onboarding"]').disabled, true,
+    'editing the review must lock the commit gate until it is reviewed again');
+  await runtime.click('[data-action="run-onboarding-preflight"]', 80);
+  await runtime.click('[data-action="submit-onboarding"]', 80);
+  assert.equal(onboardCalls().length, 3);
+  const corrected = onboardCalls()[2].body;
+  assert.equal(corrected.mission, 'Corrected wording of the mission.');
+  assert.equal(corrected.preflight_token, 'review-token-B');
+  assert.equal(corrected.idempotency_key, 'dockyard-onboard:checkout-ops:review-token-B',
+    'a corrected review must mint a new key, or the earlier failed attempt blocks it forever');
+  assert.notEqual(corrected.idempotency_key, onboardCalls()[0].body.idempotency_key);
+  await runtime.dispose();
+}
+
 async function testOnboardingWizardAndToastSurface() {
   const runtime = await createRuntime();
   await runtime.mount();
@@ -1848,7 +1904,7 @@ async function testOnboardingWizardAndToastSurface() {
     mission: 'Reduce payment failures without weakening release gates.',
     lead_profile: 'octacon',
     member_profiles: ['quan'],
-    idempotency_key: 'dockyard-onboard:checkout-ops',
+    idempotency_key: 'dockyard-onboard:checkout-ops:review-token-0',
     expected_membership_revision: 0,
     preflight_token: 'review-token-0',
   }, 'wizard did not submit the complete reviewed onboarding contract');
@@ -2465,6 +2521,7 @@ const tests = [
   ['initiative loop screen', testInitiativeLoopScreen],
   ['saved views screen and creator', testSavedViewsScreenAndCreator],
   ['onboarding wizard and toast surface', testOnboardingWizardAndToastSurface],
+  ['onboarding key follows the reviewed contract', testOnboardingKeyFollowsTheReviewedContract],
   ['approval flow', testApprovalFlow],
   ['notification flow', testNotificationFlow],
   ['keyboard tabs and accessible names', testKeyboardTabsAndNames],

@@ -109,10 +109,13 @@ def tool_steward_propose_initiative(
 
     This is an agent entry point into the same table the cycle writes, so it
     answers to the same contract: the project's autonomy level must grant
-    ``create_initiative``, and proposals are never made on unverified ground.
-    Phase is enforced in the service for every caller. Without these checks a
-    model could propose work on a project whose health was never measured, or
-    on one deliberately held at observe-only autonomy.
+    ``create_initiative``, and the project must have a measured health
+    snapshot that is neither UNKNOWN nor CRITICAL. The snapshot is not
+    age-checked: a cycle needs a fresh verdict of its own, this tool only needs
+    one to have been recorded. Phase is enforced in the service for every
+    caller. Without these checks a model could propose work on a project whose
+    health was never measured, or on one deliberately held at observe-only
+    autonomy.
     """
     from .domain.constants import HealthState
     from .domain.policy import DEFAULT_RUNTIME_BASE, AutonomyPolicy
@@ -128,7 +131,7 @@ def tool_steward_propose_initiative(
     if not health:
         raise ServiceError(
             "no health snapshot for this project: run a cycle so the proposal "
-            "rests on verified evidence"
+            "rests on measured evidence"
         )
     if health.get("status") in (HealthState.UNKNOWN.value, HealthState.CRITICAL.value):
         raise ServiceError(
@@ -320,6 +323,10 @@ def register(runtime: Any) -> dict:
 
     skill_path = Path(__file__).resolve().parents[2] / "skill" / "project-stewardship"
     if skill_path.is_dir():
+        # Hermes core's register_skill() takes the SKILL.md file, not the skill directory;
+        # passing the directory registers fine but every later skill_view() dies on EISDIR.
+        skill_path = skill_path / "SKILL.md"
+    if skill_path.is_file():
         try:
             runtime.register_skill("project-stewardship", skill_path)
         except AttributeError:

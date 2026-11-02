@@ -272,3 +272,38 @@ def test_cycle_at_builder_level_without_acks_does_not_execute_the_command(
         "acknowledgements"
     )
     assert "run_command_evaluator" in result["objectives"][0]["detail"]
+
+
+def _with_ack_values(untrusted, confirmed):
+    settings = settings_at(COMMAND_LEVEL, acks=False)
+    settings["policies"]["verification"]["untrusted_content_ack"] = untrusted
+    settings["policies"]["verification"]["runtime_allowlist_confirmed"] = confirmed
+    return AutonomyPolicy.from_settings(settings)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["false", "False", "no", "0", "yes", "1", "", " ", 1, 0, None, [], ["true"], {"a": 1}],
+)
+def test_acknowledgements_arm_only_on_an_explicit_true(value):
+    """Independent review F1: a bare bool() read the text "false" as armed, so
+    the gate that exists to refuse opened on a wrong-typed value. Anything that
+    is not boolean true (or the text "true") leaves command execution closed."""
+    policy = _with_ack_values(value, value)
+    assert not policy.command_evaluator_allowed().allowed
+    assert not policy.builder_gate_open(DEFAULT_RUNTIME_BASE).allowed
+    gates = policy.describe()["verification_policy_gates"]
+    assert gates == {"untrusted_content_ack": False, "runtime_allowlist_confirmed": False}
+
+
+@pytest.mark.parametrize("value", [True, "true", "TRUE", " true "])
+def test_an_explicit_true_still_arms_both_acknowledgements(value):
+    policy = _with_ack_values(value, value)
+    assert policy.command_evaluator_allowed().allowed
+    assert policy.builder_gate_open(DEFAULT_RUNTIME_BASE).allowed
+
+
+def test_one_missing_or_false_acknowledgement_keeps_the_gate_closed():
+    assert not _with_ack_values(True, "false").command_evaluator_allowed().allowed
+    assert not _with_ack_values("false", True).command_evaluator_allowed().allowed
+    assert not _with_ack_values(True, None).command_evaluator_allowed().allowed

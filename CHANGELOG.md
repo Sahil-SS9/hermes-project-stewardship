@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.5] - 2026-11-02
 
 ### Security
 - Gateway approvals and rejections are authorised against the initiative's own
@@ -12,8 +12,9 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   another project's initiative by quoting its reference, because the permission
   check used the project named in the command while the initiative was resolved
   by its globally unique ref. Ownership is checked before any status is
-  disclosed, so a foreign reference cannot be probed either. Idempotent replay
-  of a genuine approval is unchanged.
+  disclosed, and an unknown reference and another project's reference are
+  refused with the same message, so a foreign reference cannot be probed for
+  existence either. Idempotent replay of a genuine approval is unchanged.
 - Command-type objective evaluators now honour the builder acknowledgements
   documented in `docs/threat-model.md` §6. At autonomy level 3 or above a
   configured command ran with neither `untrusted_content_ack` nor
@@ -21,6 +22,8 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   caller on the execution path. The level grants the capability and the
   acknowledgements arm it; the cycle, goal checks and "Evaluate now" all share
   the one gate.
+  The flags arm the gate only on an explicit `true` (or the text "true"); the
+  text "false", "no" or "0" is not read as set.
 
 ### Fixed
 - A failed Git check is no longer read as successful verification. An existing
@@ -35,9 +38,11 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   another checkout reported that outer repository's status and log as the
   project's own.
 - The model proposal tool answers to the same gates as the cycle: project
-  phase, the `create_initiative` capability, and verified health. It could
-  previously create a pending proposal on a frozen, level-0 project whose
-  health had never been measured. Phase is enforced in the service, so freeze
+  phase, the `create_initiative` capability, and a measured health snapshot
+  that is neither UNKNOWN nor CRITICAL. It could previously create a pending
+  proposal on a frozen, level-0 project whose health had never been measured.
+  The tool does not age-check that snapshot; a cycle still needs a fresh
+  verdict of its own. Phase is enforced in the service, so freeze
   and pause now hold for every caller.
 - The cycle no longer creates initiatives on projects held below planner
   autonomy.
@@ -48,9 +53,45 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - Opening a task from a notification carries the notification's own project.
   From "All projects" the destination had no project to render and showed the
   project chooser instead of the task.
+- A corrected onboarding review can be committed again (#32). The wizard's
+  idempotency key was fixed per project, so once an attempt failed after the
+  host had recorded it, every corrected retry was refused as a conflict while
+  the review kept passing. The key now carries the reviewed preflight token: an
+  unchanged retry keeps its key (still one project) and any edit mints a new
+  one. API callers that omit `idempotency_key` still get the fixed per-project
+  fallback key; send a key that changes with the reviewed contract, as the
+  wizard now does. When the wizard omits a name or board for a project the host already
+  owns, the host's own record is adopted; an explicit name that disagrees is
+  still a real conflict.
+- The plugin registers its skill by its `SKILL.md` file, not the skill's
+  directory. Passing the directory registered without error, but every later
+  `skill_view()` failed.
+- Connecting an existing project binds a board that was created outside
+  provisioning (for example with `hermes kanban boards create`) to that project.
+  It was left unbound, so the Team tab, work listing and card writes were
+  refused with `project_board_mismatch`. A board already bound to a different
+  project is never touched. This writes the board's `project_id` metadata
+  through Hermes' own kanban module.
+- "Run first read-only assessment" can be pressed again: a completed first
+  assessment is replayed (same cycle, `replayed: true`) instead of answering
+  409 duplicate trigger. A refused trigger with no completed cycle behind it
+  still returns 409, and so does any refusal that is not a genuine duplicate
+  (a frozen or paused project, the daily budget, a held mutex).
 
-Thanks to the community reviewer who reported all six issues against 0.5.4 with
-reproduction details.
+### Changed
+- README: "Onboard existing project" lists the projects in the Hermes project
+  registry of the profile the plugin runs in. Hermes keeps one registry per
+  profile, so projects registered under other profiles are not offered (#30).
+- The dependency audit passes again. `msgpack` is raised to 1.2.4 (fixed in
+  1.2.3), and the two `filelock` advisories (CVE-2026-112909, CVE-2026-112910)
+  are ignored on Python 3.10 only, because no fixed release exists for that
+  version (the patched line needs Python 3.11). The exception lives in one file,
+  `scripts/audit_python.py`, which CI and `scripts/local-ci.sh` both call. Both
+  packages are dev tooling and are not part of the installed plugin.
+
+Thanks to the community reviewer who reported the six issues against 0.5.4 with
+reproduction details, and to @nrmjeremy for #30 and #32 and the onboarding
+fixes in #33.
 
 ## [0.5.4] - 2026-10-26
 
