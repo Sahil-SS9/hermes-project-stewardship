@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.5] - 2026-11-02
 
 ### Security
 - Gateway approvals and rejections are authorised against the initiative's own
@@ -82,6 +82,12 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - README: "Onboard existing project" lists the projects in the Hermes project
   registry of the profile the plugin runs in. Hermes keeps one registry per
   profile, so projects registered under other profiles are not offered (#30).
+- The dependency audit passes again. `msgpack` is raised to 1.2.4 (fixed in
+  1.2.3), and the two `filelock` advisories (CVE-2026-112909, CVE-2026-112910)
+  are ignored on Python 3.10 only, because no fixed release exists for that
+  version (the patched line needs Python 3.11). The exception lives in one file,
+  `scripts/audit_python.py`, which CI and `scripts/local-ci.sh` both call. Both
+  packages are dev tooling and are not part of the installed plugin.
 
 Thanks to the community reviewer who reported the six issues against 0.5.4 with
 reproduction details, and to @nrmjeremy for #30 and #32 and the onboarding
