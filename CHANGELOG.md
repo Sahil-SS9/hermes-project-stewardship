@@ -12,8 +12,9 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   another project's initiative by quoting its reference, because the permission
   check used the project named in the command while the initiative was resolved
   by its globally unique ref. Ownership is checked before any status is
-  disclosed, so a foreign reference cannot be probed either. Idempotent replay
-  of a genuine approval is unchanged.
+  disclosed, and an unknown reference and another project's reference are
+  refused with the same message, so a foreign reference cannot be probed for
+  existence either. Idempotent replay of a genuine approval is unchanged.
 - Command-type objective evaluators now honour the builder acknowledgements
   documented in `docs/threat-model.md` §6. At autonomy level 3 or above a
   configured command ran with neither `untrusted_content_ack` nor
@@ -21,6 +22,8 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   caller on the execution path. The level grants the capability and the
   acknowledgements arm it; the cycle, goal checks and "Evaluate now" all share
   the one gate.
+  The flags arm the gate only on an explicit `true` (or the text "true"); the
+  text "false", "no" or "0" is not read as set.
 
 ### Fixed
 - A failed Git check is no longer read as successful verification. An existing
@@ -35,9 +38,11 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   another checkout reported that outer repository's status and log as the
   project's own.
 - The model proposal tool answers to the same gates as the cycle: project
-  phase, the `create_initiative` capability, and verified health. It could
-  previously create a pending proposal on a frozen, level-0 project whose
-  health had never been measured. Phase is enforced in the service, so freeze
+  phase, the `create_initiative` capability, and a measured health snapshot
+  that is neither UNKNOWN nor CRITICAL. It could previously create a pending
+  proposal on a frozen, level-0 project whose health had never been measured.
+  The tool does not age-check that snapshot; a cycle still needs a fresh
+  verdict of its own. Phase is enforced in the service, so freeze
   and pause now hold for every caller.
 - The cycle no longer creates initiatives on projects held below planner
   autonomy.
@@ -53,7 +58,9 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   host had recorded it, every corrected retry was refused as a conflict while
   the review kept passing. The key now carries the reviewed preflight token: an
   unchanged retry keeps its key (still one project) and any edit mints a new
-  one. When the wizard omits a name or board for a project the host already
+  one. API callers that omit `idempotency_key` still get the fixed per-project
+  fallback key; send a key that changes with the reviewed contract, as the
+  wizard now does. When the wizard omits a name or board for a project the host already
   owns, the host's own record is adopted; an explicit name that disagrees is
   still a real conflict.
 - The plugin registers its skill by its `SKILL.md` file, not the skill's
@@ -68,7 +75,8 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - "Run first read-only assessment" can be pressed again: a completed first
   assessment is replayed (same cycle, `replayed: true`) instead of answering
   409 duplicate trigger. A refused trigger with no completed cycle behind it
-  still returns 409.
+  still returns 409, and so does any refusal that is not a genuine duplicate
+  (a frozen or paused project, the daily budget, a held mutex).
 
 ### Changed
 - README: "Onboard existing project" lists the projects in the Hermes project

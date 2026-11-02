@@ -113,3 +113,22 @@ def test_first_assessment_replays_instead_of_409(onboarded):
     assert replay["replayed"] is True
     assert replay["cycle_id"] == cycle_id
     assert second.json()["schedules_enabled"] is False
+
+
+def test_a_non_duplicate_refusal_is_not_disguised_as_a_replay(onboarded):
+    """Independent review F7: once the 30-day trigger prune has removed the
+    processed key, a frozen project's refusal used to be answered with the old
+    completed cycle (200, "already assessed"). Only a genuine duplicate
+    trigger may replay; every other refusal stays a refusal."""
+    client, store = onboarded
+    assert client.post(ASSESS).status_code == 200
+
+    # Age the trigger out, then change the project's phase.
+    with store.tx() as cx:
+        cx.execute("DELETE FROM processed_triggers")
+    assert client.post("/stewardship/v1/projects/accountability-app/freeze").status_code == 200
+
+    refused = client.post(ASSESS)
+    assert refused.status_code == 409, refused.text
+    assert "frozen" in refused.text
+    assert "replayed" not in refused.text

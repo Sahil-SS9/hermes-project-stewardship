@@ -40,6 +40,10 @@ class CycleRefused(Exception):
     """Cycle did not run (mutex/budget/pause). Not an engine failure."""
 
 
+class DuplicateTrigger(CycleRefused):
+    """The trigger key was already processed: the only refusal a replay may answer."""
+
+
 class CycleEngine:
     def __init__(
         self,
@@ -85,7 +89,7 @@ class CycleEngine:
     ) -> Dict[str, Any]:
         key = idempotency_key or f"{project_id}:{trigger_type}:{uuid.uuid4().hex}"
         if self.store.trigger_seen(key):
-            raise CycleRefused(f"duplicate trigger {key}: already processed")
+            raise DuplicateTrigger(f"duplicate trigger {key}: already processed")
 
         settings = self.svc.settings(project_id)  # raises if disabled
         phase = settings["phase"]

@@ -116,15 +116,16 @@ class GatewayCommandHandler:
         the caller's approval authority was granted for ``req.project_id``
         only. Without this check, authority over one project would approve or
         reject any other project's initiative by quoting its ref. The
-        ownership test runs before any status disclosure so a foreign ref
-        cannot be probed for existence or state either.
+        ownership test runs before any status disclosure, and an unknown ref
+        and another project's ref are refused with the same message, so a
+        foreign ref cannot be probed for existence or state either.
         """
-        ini = self.svc.initiative_by_ref(ref)  # raises if unknown
-        if ini["project_id"] != req.project_id:
-            raise CommandError(
-                f"initiative '{ref}' does not belong to project "
-                f"'{req.project_id}'"
-            )
+        try:
+            ini = self.svc.initiative_by_ref(ref)
+        except ServiceError:
+            ini = None
+        if ini is None or ini["project_id"] != req.project_id:
+            raise CommandError(f"no initiative '{ref}' in project '{req.project_id}'")
         return ini
 
     def _approve(self, req: CommandRequest) -> CommandResponse:

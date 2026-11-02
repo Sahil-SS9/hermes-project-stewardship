@@ -75,6 +75,19 @@ class PolicyDecision:
     capability: str
 
 
+def _acknowledged(value: Any) -> bool:
+    """An acknowledgement arms the builder gate only on an explicit true.
+
+    A bare ``bool()`` reads the strings "false", "no" and "0" as armed, so a
+    gate that exists to refuse opened on a wrong-typed value. Only boolean
+    ``True``, or the text "true" in any case (settings written as text), arms
+    it; every other value, including a missing one, leaves the gate closed.
+    """
+    if isinstance(value, bool):
+        return value
+    return isinstance(value, str) and value.strip().lower() == "true"
+
+
 class AutonomyPolicy:
     """Restriction-only autonomy policy for one stewardship project."""
 
@@ -168,8 +181,8 @@ class AutonomyPolicy:
         been reviewed. Deliberately separate from the level model so it can
         never be granted implicitly by a level bump.
         """
-        ack = bool(self.verification_policy.get("untrusted_content_ack", False))
-        allowlist = bool(self.verification_policy.get("runtime_allowlist_confirmed", False))
+        ack = _acknowledged(self.verification_policy.get("untrusted_content_ack"))
+        allowlist = _acknowledged(self.verification_policy.get("runtime_allowlist_confirmed"))
         if ack and allowlist:
             return PolicyDecision(True, "builder acknowledgements present", "builder_ack")
         return PolicyDecision(
@@ -250,11 +263,11 @@ class AutonomyPolicy:
             "denied_capabilities": sorted(self.denied_capabilities),
             "release_policy": dict(self.release_policy),
             "verification_policy_gates": {
-                "untrusted_content_ack": bool(
-                    self.verification_policy.get("untrusted_content_ack", False)
+                "untrusted_content_ack": _acknowledged(
+                    self.verification_policy.get("untrusted_content_ack")
                 ),
-                "runtime_allowlist_confirmed": bool(
-                    self.verification_policy.get("runtime_allowlist_confirmed", False)
+                "runtime_allowlist_confirmed": _acknowledged(
+                    self.verification_policy.get("runtime_allowlist_confirmed")
                 ),
             },
         }

@@ -69,7 +69,7 @@ def test_approval_authority_does_not_cross_projects(two_projects, svc):
     with pytest.raises(CommandError) as excinfo:
         handler.handle(_request("approve", "alpha", victim["ref"]))
 
-    assert "does not belong to project" in str(excinfo.value)
+    assert "no initiative" in str(excinfo.value)
     assert svc.initiative_by_ref(victim["ref"])["status"] == "pending_approval"
 
 
@@ -98,8 +98,24 @@ def test_foreign_ref_is_refused_before_its_status_is_disclosed(two_projects, svc
         handler.handle(_request("approve", "alpha", victim["ref"]))
 
     message = str(excinfo.value)
-    assert "does not belong to project" in message
+    assert "no initiative" in message
     assert "already approved" not in message
+
+
+@pytest.mark.parametrize("command", ["approve", "reject"])
+def test_unknown_and_foreign_refs_are_refused_identically(two_projects, svc, command):
+    """Independent review F2: the refusal text must not tell a caller whether a
+    ref exists in another project. An unknown ref and a real foreign ref differ
+    only in the ref the caller typed themselves."""
+    victim = _initiative(svc, "beta", f"beta probe {command}")
+    handler = GatewayCommandHandler(svc)
+
+    def refusal(ref):
+        with pytest.raises(CommandError) as excinfo:
+            handler.handle(_request(command, "alpha", ref))
+        return str(excinfo.value).replace(ref, "<ref>")
+
+    assert refusal(victim["ref"]) == refusal("INIT-NOPE-0001")
 
 
 def test_own_project_approval_still_works_and_stays_idempotent(two_projects, svc):

@@ -35,7 +35,7 @@ except ImportError as e:  # pragma: no cover
         "pip install 'hermes-project-stewardship[desktop-panel]'"
     ) from e
 
-from ..cycles.engine import CycleEngine, CycleRefused
+from ..cycles.engine import CycleEngine, CycleRefused, DuplicateTrigger
 from ..domain.constants import Capability
 from ..dockyard import Actor, ActorKind
 from ..gateway.handler import CommandRequest, GatewayCommandHandler
@@ -3646,7 +3646,10 @@ def create_app(
                 idempotency_key=key,
             )
         except CycleRefused as exc:
-            prior = svc.cycle_by_key(key)
+            # Only a genuine duplicate is a replay. A frozen, paused, budget or
+            # mutex refusal must stay a refusal even when an older completed
+            # cycle exists for this key.
+            prior = svc.cycle_by_key(key) if isinstance(exc, DuplicateTrigger) else None
             if prior is None or prior["state"] != "completed":
                 raise HTTPException(409, str(exc)) from None
             health = svc.latest_health(project_id)
