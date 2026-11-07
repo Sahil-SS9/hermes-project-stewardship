@@ -345,6 +345,9 @@ export function createApi(sdk: HermesPluginSDK) {
       get<{
         projects: Array<{ id: string; slug: string; name: string; board_slug: string; repo_path: string }>;
         profiles: Array<{ name: string; is_default: boolean }>;
+        // Issue #30: the profile whose registry this is, and other profiles with projects.
+        profile?: string;
+        other_profiles?: Array<{ name: string; project_count: number }>;
       }>('/onboard/discover'),
     preflight: (b: { project_id: string; repo_path: string; mission: string; lead_profile: string }) =>
       post<{

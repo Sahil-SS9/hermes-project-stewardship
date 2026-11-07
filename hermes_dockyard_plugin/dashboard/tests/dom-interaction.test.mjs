@@ -165,3 +165,49 @@ test('workflow tab renders canvas with nodes and edges, then opens gate passport
   }
 });
 
+
+// Issue #30: the dashboard's onboarding view says which other profiles have
+// projects when this profile's registry is empty (shared wording with Desktop).
+function bootOnboard(discover) {
+  const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
+    runScripts: 'outside-only', url: 'https://dashboard.local/',
+  });
+  dom.window.__HERMES_PLUGIN_SDK__ = {
+    sdkVersion: '1.1.0',
+    React: { createElement: (t, p, c) => ({ t, p, c }) },
+    hooks: { useEffect: () => {}, useRef: () => ({ current: null }) },
+    fetchJSON: async (url) => {
+      if (url.endsWith('/onboard/discover')) return discover;
+      if (url.endsWith('/dashboard')) return { projects: [] };
+      return {};
+    },
+  };
+  dom.window.eval(bundle);
+  return dom;
+}
+
+async function onboardHint(discover) {
+  const dom = bootOnboard(discover);
+  try {
+    await new Promise((r) => setTimeout(r, 80));
+    const tab = [...dom.window.document.querySelectorAll('button[data-tab]')].find((t) => t.dataset.tab === 'onboard');
+    assert.ok(tab, 'Onboard tab should exist');
+    tab.click();
+    await new Promise((r) => setTimeout(r, 120));
+    const box = dom.window.document.querySelector('.dy-ob-discover');
+    assert.ok(box && !/Loading/.test(box.textContent), 'discovery should have answered');
+    return box.querySelector('[data-other-profile-projects]')?.textContent ?? null;
+  } finally {
+    dom.window.close();
+  }
+}
+
+test('onboarding names other profiles with projects when this registry is empty (#30)', async () => {
+  const profiles = [{ name: 'default', is_default: true }, { name: 'alpha', is_default: false }];
+  const hint = await onboardHint({ projects: [], profiles, profile: 'default', other_profiles: [{ name: 'alpha', project_count: 2 }] });
+  assert.match(hint ?? '', /The default profile has no Hermes projects yet\. Other profiles have their own: alpha \(2\)\./);
+  assert.match(hint ?? '', /hermes project create <name> <repo path>/);
+  const project = { id: 'p1', slug: 'p1', name: 'P1', board_slug: 'p1', repo_path: '/srv/p1' };
+  assert.equal(await onboardHint({ projects: [project], profiles, profile: 'default', other_profiles: [{ name: 'alpha', project_count: 2 }] }), null);
+  assert.equal(await onboardHint({ projects: [], profiles }), null, 'an older host without other_profiles keeps the plain empty state');
+});

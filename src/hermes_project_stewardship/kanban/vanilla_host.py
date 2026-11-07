@@ -1,13 +1,14 @@
 """Adapter implementing Project Stewardship's host contract on vanilla Hermes APIs."""
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import asdict
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
+import sqlite3
 from typing import Any, Iterator
 
 from .work_parents import WorkParents
@@ -166,7 +167,49 @@ class ProjectKanbanHost:
             }
             for p in rows
         ]
-        return {"projects": projects, "profiles": self.list_profiles()}
+        return {
+            "projects": projects,
+            "profiles": self.list_profiles(),
+            # Issue #30: the profile whose registry this is, and, only when it is
+            # empty, the other profiles that have projects, so the wizard can say
+            # where the user's projects are instead of a bare "none".
+            "profile": self._served_profile(),
+            "other_profiles": [] if projects else self._other_profile_projects(),
+        }
+
+    def _served_profile(self) -> str:
+        home = self.hermes_home.resolve()
+        if home == self._hermes_root().resolve() or home.parent.name != "profiles":
+            return "default"
+        return home.name
+
+    def _other_profile_projects(self) -> list[dict[str, Any]]:
+        """Other profiles on this root whose own project registry has projects.
+
+        Hermes keeps one project registry per profile and onboarding offers only
+        the one of the profile this host serves (see ``list_existing_projects``).
+        Names and counts only, never the projects themselves: they stay with
+        their profile. Read-only and best effort: each registry is opened
+        read-only (never created or migrated) and an unreadable one is skipped.
+        """
+        root = self._hermes_root()
+        served = self.hermes_home.resolve()
+        found: list[dict[str, Any]] = []
+        for profile in self.list_profiles():
+            home = root if profile["is_default"] else root / "profiles" / profile["name"]
+            registry = home / "projects.db"
+            if home.resolve() == served or not registry.is_file():
+                continue
+            try:
+                uri = registry.resolve().as_uri() + "?mode=ro"
+                with closing(sqlite3.connect(uri, uri=True, timeout=2)) as conn:
+                    (count,) = conn.execute(
+                        "SELECT count(*) FROM projects WHERE archived = 0").fetchone()
+            except sqlite3.Error:
+                continue
+            if count:
+                found.append({"name": profile["name"], "project_count": int(count)})
+        return found
 
     def _validate(self, **payload: Any) -> dict[str, Any]:
         _, kanban_db, projects_db = self._modules()

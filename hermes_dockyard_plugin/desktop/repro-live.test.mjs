@@ -295,7 +295,7 @@ function createDeferred() {
   return { promise, resolve, reject };
 }
 
-async function createRuntime({ mode = 'populated', failOnce = false, failMutationPath = null, objectivePayload = null, preflightTokens = null } = {}) {
+async function createRuntime({ mode = 'populated', failOnce = false, failMutationPath = null, objectivePayload = null, preflightTokens = null, discover = null } = {}) {
   const virtualConsole = new VirtualConsole();
   const jsdomMessages = [];
   virtualConsole.on('jsdomError', (error) => jsdomMessages.push(error.message));
@@ -324,6 +324,7 @@ async function createRuntime({ mode = 'populated', failOnce = false, failMutatio
   const data = clone(mode === 'empty' ? EMPTY : POPULATED);
   const archivedPrior = new Map()
   if (objectivePayload) data.objectives['payments-relaunch'] = objectivePayload;
+  if (discover) data.DISCOVER = clone(discover);
   const deferred = mode === 'loading' ? createDeferred() : null;
   let shouldFail = failOnce;
 
@@ -1900,6 +1901,42 @@ async function testOnboardingAcceptsHostAbsoluteRepositoryPaths() {
   await runtime.dispose();
 }
 
+async function testOnboardingEmptyStateNamesOtherProfiles() {
+  // Issue #30: Hermes keeps one project registry per profile and onboarding
+  // lists only the registry of the profile Project Stewardship runs in. An
+  // empty list read as "Hermes has no projects"; when other profiles have
+  // projects, the wizard now says which, and how to register one here.
+  const profiles = POPULATED.DISCOVER.profiles;
+  const hintFor = async (discover) => {
+    const runtime = await createRuntime({ discover });
+    await runtime.mount();
+    await runtime.click('[data-action="open-onboarding"]', 80);
+    const doc = runtime.dom.window.document;
+    const listed = doc.querySelector('[data-discovered-projects]')?.textContent ?? '';
+    const hint = doc.querySelector('[data-other-profile-projects]')?.textContent ?? null;
+    await runtime.dispose();
+    return { listed, hint };
+  };
+  const empty = await hintFor({ projects: [], profiles, profile: 'default',
+    other_profiles: [{ name: 'octacon', project_count: 2 }, { name: 'quan', project_count: 1 }] });
+  assert.match(empty.listed, /none yet/);
+  assert.ok(empty.hint, 'an empty registry must name the profiles that have projects');
+  assert.match(empty.hint, /The default profile has no Hermes projects yet/);
+  assert.match(empty.hint, /octacon \(2\), quan \(1\)/);
+  assert.match(empty.hint, /hermes project create <name> <repo path>/);
+  const named = await hintFor({ projects: [], profiles, profile: 'octacon',
+    other_profiles: [{ name: 'default', project_count: 3 }] });
+  assert.match(named.hint, /The octacon profile has no Hermes projects yet.*default \(3\)/);
+  assert.match(named.hint, /hermes -p octacon project create/);
+  const nothingElsewhere = await hintFor({ projects: [], profiles, profile: 'default', other_profiles: [] });
+  assert.equal(nothingElsewhere.hint, null, 'no other profile has projects: nothing to point at');
+  const populated = await hintFor({ ...POPULATED.DISCOVER, profile: 'default',
+    other_profiles: [{ name: 'octacon', project_count: 2 }] });
+  assert.equal(populated.hint, null, 'the hint is only for an empty registry');
+  const olderHost = await hintFor({ projects: [], profiles });
+  assert.equal(olderHost.hint, null, 'a host that does not report other profiles shows the plain empty state');
+}
+
 async function testOnboardingWizardAndToastSurface() {
   const runtime = await createRuntime();
   await runtime.mount();
@@ -2551,6 +2588,7 @@ const tests = [
   ['saved views screen and creator', testSavedViewsScreenAndCreator],
   ['onboarding wizard and toast surface', testOnboardingWizardAndToastSurface],
   ['onboarding accepts host-absolute repository paths (#37)', testOnboardingAcceptsHostAbsoluteRepositoryPaths],
+  ['onboarding empty state names other profiles with projects (#30)', testOnboardingEmptyStateNamesOtherProfiles],
   ['onboarding key follows the reviewed contract', testOnboardingKeyFollowsTheReviewedContract],
   ['approval flow', testApprovalFlow],
   ['notification flow', testNotificationFlow],

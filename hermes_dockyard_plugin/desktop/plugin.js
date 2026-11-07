@@ -6480,6 +6480,20 @@ function isAbsoluteRepoPath(value) {
   return path.startsWith("/") || WINDOWS_DRIVE_ABSOLUTE.test(path);
 }
 
+// hermes_dockyard_plugin/dashboard/src/onboarding-hint.ts
+var PROFILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+function otherProfilesHint(discovered) {
+  if (!discovered || (discovered.projects ?? []).length > 0) return null;
+  const others = (discovered.other_profiles ?? []).filter(
+    (p) => p && PROFILE_NAME.test(String(p.name)) && Number(p.project_count) > 0
+  );
+  if (others.length === 0) return null;
+  const here = PROFILE_NAME.test(String(discovered.profile ?? "")) ? String(discovered.profile) : "default";
+  const listed = others.map((p) => `${p.name} (${Number(p.project_count)})`).join(", ");
+  const command = here === "default" ? "hermes project create" : `hermes -p ${here} project create`;
+  return `The ${here} profile has no Hermes projects yet. Other profiles have their own: ${listed}. Hermes keeps projects per profile, so those are not offered here. To onboard one, register it in ${here} first (${command} <name> <repo path>), then refresh host discovery.`;
+}
+
 // hermes_dockyard_plugin/desktop/src/data/inbox-load.js
 async function buildInboxData(fetchApi) {
   const inbox = await fetchApi("/inbox");
@@ -7073,6 +7087,7 @@ function OnboardingWizard({ onClose, onComplete, intent = "new" }) {
                 "Host projects: ",
                 (discovered.projects ?? []).length > 0 ? (discovered.projects ?? []).map((project) => project.slug).join(", ") : "none yet \u2014 create-new below"
               ] }),
+              otherProfilesHint(discovered) ? jsx("p", { className: "dockyard-meta", "data-other-profile-projects": true, children: otherProfilesHint(discovered) }) : null,
               jsx("p", { className: "dockyard-meta", "data-profile-guidance": true, children: "Profiles are managed in the Hermes host profile manager." }),
               jsx(Button, { action: "refresh-onboarding-discovery", small: true, onClick: () => setDiscoveryRefresh((value) => value + 1), children: "Refresh host discovery" })
             ] }) : discoverFailed ? jsxs("div", { children: [
