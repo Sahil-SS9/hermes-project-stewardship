@@ -6472,6 +6472,14 @@ function ProjectChooser({ projects, screen, onPick, onNewProject, onOnboardExist
   ] });
 }
 
+// hermes_dockyard_plugin/desktop/src/lib/repo-path.js
+var WINDOWS_DRIVE_ABSOLUTE = /^[A-Za-z]:[\\/]/;
+function isAbsoluteRepoPath(value) {
+  const path = String(value ?? "").trim();
+  if (path.startsWith("//") || path.startsWith("\\\\")) return false;
+  return path.startsWith("/") || WINDOWS_DRIVE_ABSOLUTE.test(path);
+}
+
 // hermes_dockyard_plugin/desktop/src/data/inbox-load.js
 async function buildInboxData(fetchApi) {
   const inbox = await fetchApi("/inbox");
@@ -6963,7 +6971,7 @@ function OnboardingWizard({ onClose, onComplete, intent = "new" }) {
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [onClose, submitting]);
-  const valid = step === 1 ? /^[a-z0-9][a-z0-9-]*$/.test(projectId.trim()) && repoPath.trim().startsWith("/") : step === 2 ? mission.trim().length >= 12 : step === 3 ? leadProfile.trim().length > 0 : true;
+  const valid = step === 1 ? /^[a-z0-9][a-z0-9-]*$/.test(projectId.trim()) && isAbsoluteRepoPath(repoPath) : step === 2 ? mission.trim().length >= 12 : step === 3 ? leadProfile.trim().length > 0 : true;
   const runPreflight = async () => {
     setPreflightBusy(true);
     setPreflightState(null);

@@ -123,7 +123,7 @@ if [ "$WITH_NODE" -eq 1 ]; then
     run_gate "desktop-harness" "node --test" \
         env DOCKYARD_CAPTURE_SCREENSHOTS=0 node --experimental-vm-modules --test repro-live.test.mjs milestone-chain.test.mjs backlog-empty-state.test.mjs
     run_gate "desktop-bundle" "drift+loader+surface" \
-        node --test drift.test.mjs loader-contract.test.mjs prohibited-api.test.mjs
+        node --test drift.test.mjs loader-contract.test.mjs prohibited-api.test.mjs repo-path.test.mjs
     popd >/dev/null
   else
     fail "node-gates" "npm not found; skipping requested JS gates"

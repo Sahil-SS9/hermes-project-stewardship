@@ -2,6 +2,7 @@
 // node hermes_dockyard_plugin/desktop/build.mjs to regenerate plugin.js.
 import { LUCIDE_ICON_NODES } from '../../lucide-icons.js'
 import { ProjectSwitcher } from './project-switcher.js'
+import { isAbsoluteRepoPath } from './repo-path.js'
 import { jsxs } from '../runtime/react.js'
 import { jsx } from '../runtime/react.js'
 import { readableLabel } from '../data/loaders.js'
@@ -304,7 +305,7 @@ export function OnboardingWizard({ onClose, onComplete, intent = 'new' }) {
   }, [onClose, submitting])
 
   const valid = step === 1
-    ? /^[a-z0-9][a-z0-9-]*$/.test(projectId.trim()) && repoPath.trim().startsWith('/')
+    ? /^[a-z0-9][a-z0-9-]*$/.test(projectId.trim()) && isAbsoluteRepoPath(repoPath)
     : step === 2
       ? mission.trim().length >= 12
       : step === 3

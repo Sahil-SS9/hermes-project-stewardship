@@ -1871,6 +1871,35 @@ async function testOnboardingKeyFollowsTheReviewedContract() {
   await runtime.dispose();
 }
 
+async function testOnboardingAcceptsHostAbsoluteRepositoryPaths() {
+  // Issue #37: step 1 only took a path starting with "/", so a Windows
+  // repository (C:\... or C:/...) left Continue disabled although the backend
+  // accepts it. This is only an early gate: the backend stays authoritative
+  // and still requires an existing directory. Drive-relative, rooted-without-
+  // drive, UNC and plain relative paths stay rejected.
+  const runtime = await createRuntime();
+  await runtime.mount();
+  const doc = runtime.dom.window.document;
+  await runtime.click('[data-action="open-onboarding"]');
+  await runtime.setValue('[data-field="project-id"]', 'checkout-ops');
+  const continueEnabled = async (path) => {
+    await runtime.setValue('[data-field="repo-path"]', path);
+    return !doc.querySelector('[data-action="wizard-next"]').disabled;
+  };
+  for (const path of ['C:\\Projects\\xxx', 'C:/Projects/xxx', 'z:\\projects\\xxx', '/srv/projects/xxx', '  D:\\repo  ']) {
+    assert.equal(await continueEnabled(path), true, `${JSON.stringify(path)} should enable Continue`);
+  }
+  for (const path of ['', '   ', 'C:Projects\\xxx', 'C:', 'Projects/xxx', './Projects/xxx', '../Projects/xxx',
+    '\\Projects\\xxx', '\\\\server\\share\\xxx', '//server/share/xxx', '~/projects/xxx']) {
+    assert.equal(await continueEnabled(path), false, `${JSON.stringify(path)} should keep Continue disabled`);
+  }
+  await runtime.setValue('[data-field="repo-path"]', 'C:\\Projects\\xxx');
+  await runtime.click('[data-action="wizard-next"]');
+  assert.equal(doc.querySelector('[data-wizard-step].active')?.getAttribute('data-wizard-step'), '2',
+    'a Windows repository path did not advance the wizard');
+  await runtime.dispose();
+}
+
 async function testOnboardingWizardAndToastSurface() {
   const runtime = await createRuntime();
   await runtime.mount();
@@ -2521,6 +2550,7 @@ const tests = [
   ['initiative loop screen', testInitiativeLoopScreen],
   ['saved views screen and creator', testSavedViewsScreenAndCreator],
   ['onboarding wizard and toast surface', testOnboardingWizardAndToastSurface],
+  ['onboarding accepts host-absolute repository paths (#37)', testOnboardingAcceptsHostAbsoluteRepositoryPaths],
   ['onboarding key follows the reviewed contract', testOnboardingKeyFollowsTheReviewedContract],
   ['approval flow', testApprovalFlow],
   ['notification flow', testNotificationFlow],
