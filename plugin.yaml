@@ -1,5 +1,5 @@
 name: hermes-project-stewardship
-version: 0.5.5
+version: 0.5.6
 description: Durable project ownership for Hermes agent fleets.
 author: Sahil Saghir
 license: Apache-2.0

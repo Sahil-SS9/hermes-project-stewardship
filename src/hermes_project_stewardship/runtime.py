@@ -44,7 +44,7 @@ def _db_in(home: Path) -> Path:
 
 
 def _standalone_home() -> Path:
-    """Without Hermes: ``HERMES_HOME``, else ``~/.hermes`` (the rule up to 0.5.5)."""
+    """Without Hermes: ``HERMES_HOME``, else ``~/.hermes``."""
     return Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes").expanduser().resolve()
 
 

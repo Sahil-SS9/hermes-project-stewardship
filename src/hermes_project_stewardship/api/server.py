@@ -787,7 +787,7 @@ def create_app(
 
     app = FastAPI(
         title="Hermes Project Stewardship RPC",
-        version="0.5.5",
+        version="0.5.6",
         description=(
             "Durable project ownership for Hermes agent fleets. One canonical "
             "backend serving CLI, TUI, Desktop and messaging gateways. "

@@ -4,6 +4,60 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.6] - 2026-11-07
+
+### Fixed
+- Windows: the dashboard backend is installed again where Git keeps symlinks
+  off (#38). The repository shipped `dashboard` as a Git symlink into
+  `hermes_dockyard_plugin/dashboard`; Git for Windows checks a symlink out as a
+  small text file holding its target (`core.symlinks=false`, its default), so
+  Hermes found no `dashboard/manifest.json`, never mounted
+  `/api/plugins/hermes-project-stewardship/`, and onboarding reported "Host
+  discovery failed". The dashboard build now publishes the manifest and the
+  files it names into the top-level `dashboard/` as regular files, like
+  `desktop/plugin.js`, and the tests fail on any tracked symlink or a published
+  file that drifts from its source. If you worked around this by copying the
+  directory by hand, reinstall the plugin with `--force`.
+- Windows: onboarding accepts absolute repository paths such as
+  `C:\Projects\app` and `C:/Projects/app` (#37). The wizard only took paths
+  starting with `/`, so Continue stayed disabled. Relative, drive-relative
+  (`C:app`), driveless (`\app`) and UNC paths are still refused, and the backend
+  still requires an existing directory.
+- Project memory follows the profile of the chat, not the profile Hermes was
+  started in (#36). A Hermes Desktop process that serves several profiles binds
+  each session's profile context-locally and leaves `HERMES_HOME` at the launch
+  profile; Stewardship read `HERMES_HOME`, so a named profile's Desktop chat
+  looked for the launch profile's chat link, left its own link unclaimed and got
+  no project memory. The hook, the profile and root database paths and the
+  dashboard's bot session lookup now use Hermes' own active home and never write
+  the environment. Without Hermes the environment rule is unchanged; a failing
+  Hermes resolver gives no memory rather than a guess.
+- "Onboard existing project" says where your projects are when this profile has
+  none (#30): it names the other profiles on the same Hermes root that have
+  projects (names and counts only, read-only) and the command that registers one
+  in this profile.
+
+### Changed
+- Windows only: with `HERMES_HOME` unset, the default database now lives in
+  Hermes' own home (`%LOCALAPPDATA%\hermes\plugin-data\hermes-dockyard\`)
+  instead of `~\.hermes\plugin-data\hermes-dockyard\`. A populated database at
+  the old place is not moved or replaced: startup stops with the usual "No data
+  was moved" message until you select it with `STEWARD_DB_PATH` or move it.
+  Linux and macOS are unaffected.
+
+### Docs
+- The README named `hermes projects create`; the command is
+  `hermes project create`. It also said to enable the plugin per profile with
+  `hermes -p <profile> plugins enable`; on current Hermes that only finds a
+  plugin installed in that profile, and a second installed copy stops at
+  dependency resolution ("Two workspace members are both named
+  `hermes-project-stewardship`"). The README and the project-memory guide now
+  describe what works.
+
+### Upgrade notes
+- No schema change, and no new tools, hooks or middleware. On Windows, read the
+  database note under Changed if you used the plugin with `HERMES_HOME` unset.
+
 ## [0.5.5] - 2026-11-02
 
 ### Security
