@@ -847,6 +847,29 @@ def test_bot_session_transcripts_are_profile_scoped(client, tmp_path, monkeypatc
     assert "private hidden request" not in hidden.text
 
 
+@pytest.mark.parametrize("hermes_present", [False, True])
+def test_bot_session_store_is_found_under_the_hermes_root(tmp_path, monkeypatch, hermes_present):
+    """Issue #36: a profile's session store sits under the Hermes ROOT. Reading a raw
+    HERMES_HOME that names a profile (or ~/.hermes on Windows) looked in the wrong place."""
+    import types
+
+    root = tmp_path / "hermes"
+    monkeypatch.delenv("DOCKYARD_SESSION_ROOT", raising=False)
+    monkeypatch.setattr(plugin_api._dockyard, "bot_get",
+                        lambda bot_id: types.SimpleNamespace(profile="octacon"))
+    if hermes_present:  # launched in profile 'coder'; Hermes scopes this request to 'lead'
+        monkeypatch.setenv("HERMES_HOME", str(root / "profiles" / "coder"))
+        module = types.ModuleType("hermes_constants")
+        module.get_hermes_home = lambda: root / "profiles" / "lead"
+        monkeypatch.setitem(sys.modules, "hermes_constants", module)
+    else:  # standalone, launched in a named profile
+        monkeypatch.setitem(sys.modules, "hermes_constants", None)
+        monkeypatch.setenv("HERMES_HOME", str(root / "profiles" / "lead"))
+    profile, path = plugin_api._bot_session_source("transcript-bot")
+    assert profile == "octacon"
+    assert path == (root / "profiles" / "octacon" / "state.db").resolve()
+
+
 def test_manifest_declares_required_fields():
     import json
     manifest = json.loads((PLUGIN_DIR / "manifest.json").read_text(encoding="utf-8"))

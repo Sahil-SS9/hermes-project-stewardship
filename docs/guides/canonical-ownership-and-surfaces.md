@@ -42,12 +42,16 @@ Two invariants follow, and both are release-blocking if broken (plan §2):
   core `projects.db`.
 - Database selection precedence is documented in `docs/RUNTIME-STATE.md`:
   explicit `db_path`/`--db`, then `STEWARD_DB_PATH`, then legacy
-  `DOCKYARD_PLUGIN_DB`, then `$HERMES_HOME/plugin-data/hermes-dockyard/dockyard.db`
-  (falling back to `~/.hermes` when `HERMES_HOME` is unset).
+  `DOCKYARD_PLUGIN_DB`, then `<Hermes home>/plugin-data/hermes-dockyard/dockyard.db`,
+  where the Hermes home is Hermes' own active home (the session's profile, else
+  `HERMES_HOME`, else Hermes' platform default).
 - Managed project content lives beside the database at
   `<database parent>/project-content`, created mode 0700
   (`persistence/service.py::_content_root`). It is **not** inside the export
   archive — see `docs/guides/migration-backup-recovery.md`.
+- Per-turn work (the project-memory hook, a bot's store lookup) follows the
+  profile Hermes binds for that turn, so one multiplexed Desktop/TUI process
+  serves each profile from its own home without writing `HERMES_HOME`.
 - One plugin process binds to one active `HERMES_HOME`. Switching homes needs a
   new process or a supported host restart (plan §1.2).
 - Hermes profile identity in this release is the exact profile slug within one

@@ -28,6 +28,7 @@ from hermes_project_stewardship.persistence.schema_guard import SchemaDriftError
 from hermes_project_stewardship.persistence.store import NewerSchemaError  # noqa: E402
 from hermes_project_stewardship.runtime import (  # noqa: E402
     StateSelectionError,
+    hermes_root,
     open_store,
     resolve_db_path,
 )
@@ -316,10 +317,11 @@ def _bot_session_source(bot_id: str) -> tuple[str, Path]:
     if not _PROFILE_NAME.fullmatch(profile):
         raise HTTPException(422, "bot profile name is not safe to resolve")
 
+    # The session stores sit under the Hermes root (default) or its profiles/:
+    # Hermes' own active home decides the root, never a raw HERMES_HOME that may
+    # name a profile, or ~/.hermes on Windows (issue #36).
     root = Path(
-        os.environ.get("DOCKYARD_SESSION_ROOT")
-        or os.environ.get("HERMES_HOME")
-        or str(Path.home() / ".hermes")
+        os.environ.get("DOCKYARD_SESSION_ROOT") or hermes_root()
     ).expanduser().resolve()
     candidate = (
         root / "state.db"
