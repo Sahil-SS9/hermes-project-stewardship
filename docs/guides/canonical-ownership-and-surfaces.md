@@ -42,12 +42,16 @@ Two invariants follow, and both are release-blocking if broken (plan §2):
   core `projects.db`.
 - Database selection precedence is documented in `docs/RUNTIME-STATE.md`:
   explicit `db_path`/`--db`, then `STEWARD_DB_PATH`, then legacy
-  `DOCKYARD_PLUGIN_DB`, then `$HERMES_HOME/plugin-data/hermes-dockyard/dockyard.db`
-  (falling back to `~/.hermes` when `HERMES_HOME` is unset).
+  `DOCKYARD_PLUGIN_DB`, then `<Hermes home>/plugin-data/hermes-dockyard/dockyard.db`,
+  where the Hermes home is Hermes' own active home (the session's profile, else
+  `HERMES_HOME`, else Hermes' platform default).
 - Managed project content lives beside the database at
   `<database parent>/project-content`, created mode 0700
   (`persistence/service.py::_content_root`). It is **not** inside the export
   archive — see `docs/guides/migration-backup-recovery.md`.
+- Per-turn work (the project-memory hook, a bot's store lookup) follows the
+  profile Hermes binds for that turn, so one multiplexed Desktop/TUI process
+  serves each profile from its own home without writing `HERMES_HOME`.
 - One plugin process binds to one active `HERMES_HOME`. Switching homes needs a
   new process or a supported host restart (plan §1.2).
 - Hermes profile identity in this release is the exact profile slug within one
@@ -82,7 +86,7 @@ commit, so it is unverified until Lane A returns it.
 | Surface | What it actually is | Support at this commit |
 |---|---|---|
 | Desktop plugin | `hermes_dockyard_plugin/desktop/plugin.js`, generated from the hand-edited `hermes_dockyard_plugin/desktop/src/` modules by `hermes_dockyard_plugin/desktop/build.mjs`; id `hermes-project-stewardship`, route `/dockyard`, sidebar nav, command-palette entry, tabs for fleet, teams, initiative, views/workflows, inbox, notifications, plus the onboarding wizard | Intended as the **complete** management surface. The committed blob is a single ESM bundle with only the allowlisted SDK/React imports; Desktop-side journey proof against the installed app is a Phase 7 item (PM-0709) and is not claimed here. |
-| Dashboard (Hermes dashboard plugin) | `hermes_dockyard_plugin/dashboard/manifest.json` (name `hermes-project-stewardship`, `api: plugin_api.py`, `entry: dist/index.js`) | A documented subset of the same backend contracts: portfolio/dashboard/inbox/notifications, project/team/work-item views, objectives/evidence, goals, milestones, workflows, content and report routes exposed by `plugin_api.py`; Desktop remains the complete management surface. The dashboard proxy forwards the incoming bearer token and never invents authority. Lifecycle/membership writes require an explicitly configured human principal and capability grant; an empty or shared-token grant remains denied. |
+| Dashboard (Hermes dashboard plugin) | `hermes_dockyard_plugin/dashboard/manifest.json` (name `hermes-project-stewardship`, `api: plugin_api.py`, `entry: dist/index.js`). Hermes reads the top-level `dashboard/`: the dashboard build publishes the manifest and the files it names there as regular files (never a symlink, which Git for Windows checks out as a text file), and `tests/test_published_dashboard.py` fails when that copy drifts from the source | A documented subset of the same backend contracts: portfolio/dashboard/inbox/notifications, project/team/work-item views, objectives/evidence, goals, milestones, workflows, content and report routes exposed by `plugin_api.py`; Desktop remains the complete management surface. The dashboard proxy forwards the incoming bearer token and never invents authority. Lifecycle/membership writes require an explicitly configured human principal and capability grant; an empty or shared-token grant remains denied. |
 | RPC API | FastAPI app, prefix `/stewardship/v1` (`api/server.py`); bearer token when `STEWARD_RPC_TOKEN` is set; `/healthz` open; mutating routes rate-limited | Supported; standalone mode fails closed without a token (`docs/api.md`). |
 | CLI (`stewardctl`) | `cli/app.py`: project lifecycle/status/archive/restore, team member listing, transfer list/retry with explicit Hermes home, content removal with explicit confirmation, objectives, health, initiatives, cycles, audit, export and restore | Supported for these commands. Transfer retry is bound to the supplied Hermes home and canonical project/board adapter; unavailable or incomplete host contracts fail closed. |
 | Hermes CLI namespace | `plugin.py::register` → `register_cli_command(name="stewardship")` | Registration only; it delegates to `stewardctl`. |

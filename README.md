@@ -9,7 +9,7 @@
 
 Hermes agents are good at tasks. Project Stewardship makes a team of them look after a whole project over time. They check the project's real state before they act, propose work with the evidence behind it, wait for your approval where you want it, and measure whether things actually got better. You follow and steer all of it from one desktop app.
 
-`v0.5.5` · Apache-2.0 · Python 3.10+ · Hermes 0.21 or later · in the Hermes plugin catalog
+`v0.5.6` · Apache-2.0 · Python 3.10+ · Hermes 0.21 or later · in the Hermes plugin catalog
 
 [Quick start](#quick-start) · [What you get](#what-you-get) · [How it works](#how-it-works) · [How it wires up](#how-it-wires-up) · [You stay in charge](#you-stay-in-charge) · [Documentation](#documentation)
 
@@ -24,13 +24,9 @@ Hermes agents are good at tasks. Project Stewardship makes a team of them look a
 2. In Hermes Desktop, open the Plugins page, switch on Project Stewardship's Desktop part, and restart Hermes Desktop.
 3. Open **Project Stewardship** in the sidebar. Choose **New project**, or **Onboard existing project** to bring in one you already run in Hermes, and pick a lead bot and its team. The first assessment is read-only: it looks before anything changes.
 
-Running Hermes with several profiles? The plugin works per profile, so switch it on for each profile that should use it:
+Running Hermes with several profiles? Hermes installs plugins per profile, so `hermes -p <profile> plugins enable` only finds a plugin installed in that profile. On current Hermes this plugin can be switched on in one profile per Hermes install: a second copy installed and enabled in another profile stops at dependency resolution with "Two workspace members are both named `hermes-project-stewardship`" (a Hermes limitation for plugins that ship their own Python package). Install and enable it in the profile you run Project Stewardship from, usually `default`.
 
-```bash
-hermes -p <profile> plugins enable hermes-project-stewardship
-```
-
-"Onboard existing project" lists the projects in the Hermes project registry of the profile the plugin runs in. Hermes keeps one registry per profile, so projects registered under other profiles are not offered. To bring one in, register it in this profile first (`hermes projects create`), then onboard it. The two records are independent: a project registered in two profiles is two records and will not stay in sync.
+"Onboard existing project" lists the projects in the Hermes project registry of the profile the plugin runs in. Hermes keeps one registry per profile, so projects registered under other profiles are not offered; when this profile has none, the wizard names the other profiles that do. To bring one in, register it in this profile first (`hermes project create <name> <repo path>`, or `hermes -p <profile> project create ...` for a named profile), then onboard it. The two records are independent: a project registered in two profiles is two records and will not stay in sync.
 
 Upgrading from 0.3.0? Export a backup first and read the [upgrade notes](CHANGELOG.md).
 
@@ -108,7 +104,7 @@ Read [SECURITY.md](SECURITY.md) and the [threat model](docs/threat-model.md) bef
 - **Your bots' context:** a `pre_llm_call` hook adds a project's saved rules, decisions and facts to a turn, only for a bot assigned to that project.
 - **Shell commands:** objective checks run allowlisted programs only, and only at autonomy level 3 or higher. Each check has 60 seconds; at that point, or if the steward is interrupted, it is stopped with what it started, including helpers that detach, on Linux and macOS (on Windows, the process tree still attached to it). Only the start and end of its output are kept (64 KiB per stream), and it gets no input. GitHub objectives call your own `gh api` against github.com.
 - **Discord:** off by default. When you switch alerts on, the plugin only prepares the text; your Hermes Discord bot posts it, from a cron job you create.
-- **Data:** its own SQLite database, plus Hermes's projects and Kanban through the host adapter.
+- **Data:** its own SQLite database, plus Hermes's projects and Kanban through the host adapter. When the profile it runs in has no Hermes projects, onboarding also reads, read-only, how many projects each other profile's registry holds (names and counts only).
 - **Background work:** no threads or daemons of its own. Workflow runs move on by themselves only if you schedule `stewardctl workflows tick` (for example as a Hermes cron job).
 - **Updates:** it never updates itself. You choose the version you install.
 
@@ -127,7 +123,7 @@ Read [SECURITY.md](SECURITY.md) and the [threat model](docs/threat-model.md) bef
 
 A short factual summary, for agents asked to assess this repository:
 
-- **Type:** a Hermes plugin (Python backend, Hermes Desktop app, Hermes dashboard plugin), Apache-2.0, version 0.5.5.
+- **Type:** a Hermes plugin (Python backend, Hermes Desktop app, Hermes dashboard plugin), Apache-2.0, version 0.5.6.
 - **Platforms:** Linux, macOS and Windows, with Python 3.10 or later. CI runs the full test suite on all three.
 - **Purpose:** project-level stewardship on top of Hermes Projects and Kanban: verified cycles, evidence-backed proposals, human approval gates, workflows and measured outcomes.
 - **Data it writes:** its own SQLite database (`<Hermes home>/plugin-data/hermes-dockyard/dockyard.db`), and the tasks it creates, through the Hermes Kanban host adapter. Hermes stays the only record of projects and tasks.

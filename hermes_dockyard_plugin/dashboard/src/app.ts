@@ -9,6 +9,7 @@ import { UNLINKED_DETAIL, UNLINKED_LABEL, UNLINKED_TITLE, hermesRead, isUnlinked
 import { renderObjectiveEvidence } from './objective-evidence';
 import { mountWorkflowCanvas, type CanvasRun } from './workflow-canvas';
 import { applyFleetDeepLink } from './deep-link';
+import { otherProfilesHint } from './onboarding-hint';
 
 export interface AppState {
   api: Api;
@@ -1621,6 +1622,13 @@ function renderOnboard(main: HTMLElement, s: AppState): void {
           : 'No existing host projects; create-new below.',
       );
       discoverBox.appendChild(head);
+      // Issue #30: an empty registry often means the projects live in another profile.
+      const hint = otherProfilesHint(d);
+      if (hint) {
+        const note = textEl('p', 'dy-dim', hint);
+        note.dataset.otherProfileProjects = 'true';
+        discoverBox.appendChild(note);
+      }
       const profiles = (d.profiles ?? []).map((p) => p.name);
       // R4: host-driven profiles ONLY — never merge with invented choices.
       select.replaceChildren();

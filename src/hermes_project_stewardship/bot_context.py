@@ -41,7 +41,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .persistence.memory_service import context_for
 from .persistence.store import iso
-from .runtime import locate_shared_db
+from .runtime import active_hermes_home, hermes_root, locate_shared_db
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +183,13 @@ def _claimed(db: Path, session_id: str) -> Optional[str]:
 
 
 def _own_profile() -> str:
-    home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes").expanduser().resolve()
+    """The profile of this turn: Hermes' active home, never the launch profile (#36).
+
+    A multiplexed Desktop/TUI process serves several profiles; Hermes binds each
+    session's profile context-locally and leaves ``HERMES_HOME`` at the launch
+    profile, so the environment would claim another bot's link.
+    """
+    home = active_hermes_home()
     return home.name if home.parent.name == "profiles" else "default"
 
 
@@ -221,5 +227,4 @@ def _owner_home(db: Path) -> Path:
     """The Hermes home that owns Project Stewardship's database (its projects list sits beside it)."""
     if db.parent.name == "hermes-dockyard" and db.parent.parent.name == "plugin-data":
         return db.parent.parent.parent
-    home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes").expanduser().resolve()
-    return home.parent.parent if home.parent.name == "profiles" else home
+    return hermes_root()

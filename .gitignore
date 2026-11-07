@@ -51,5 +51,10 @@ tests/.tmp-dockyard-plugin/
 !hermes_dockyard_plugin/dashboard/dist/index.js
 !hermes_dockyard_plugin/dashboard/dist/style.css
 hermes_dockyard_plugin/dashboard/dist/build-meta.json
+# The top-level dashboard/ is the copy Hermes installs (issue #38): regular
+# files published by the dashboard build, committed like desktop/plugin.js.
+!dashboard/dist/
+!dashboard/dist/index.js
+!dashboard/dist/style.css
 __pycache__/
 *.pyc

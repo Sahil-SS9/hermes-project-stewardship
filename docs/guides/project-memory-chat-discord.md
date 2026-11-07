@@ -26,12 +26,14 @@ Only the project owner can change the memory: rules become instructions to bots.
 It is added to that turn only and is not saved in the chat. The bot's own memory, and whichever
 memory provider it uses, are not touched.
 
-**Switch it on for each bot.** Hermes plugins are opt-in per profile, so a bot only gets project
-memory if Project Stewardship's Python plugin is enabled in that bot's profile:
-
-```bash
-hermes -p <bot> plugins enable hermes-project-stewardship
-```
+**Which bots get it.** Hermes loads plugins per profile, and on current Hermes this plugin can be
+switched on in one profile per Hermes install: a second copy installed and enabled in another
+profile stops at dependency resolution with "Two workspace members are both named
+`hermes-project-stewardship`" (a Hermes limitation for plugins that ship their own Python
+package). So a bot gets project memory when its turn runs in a Hermes process that has the plugin
+loaded: the profile where it is enabled, including other profiles' chats in a Hermes Desktop
+process that serves several profiles from it. A Kanban worker that runs as its own process under
+another profile does not load the plugin and gets no project memory.
 
 A bot in another profile reads Project Stewardship's data where Project Stewardship runs (normally the root profile).
 Set `STEWARD_DB_PATH` to point bots somewhere else.

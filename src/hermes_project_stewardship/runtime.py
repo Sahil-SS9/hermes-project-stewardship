@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import sys
+from importlib import import_module
 from pathlib import Path
 import sqlite3
 
@@ -38,20 +39,67 @@ def _populated(path: Path) -> bool:
         raise StateSelectionError(f"Cannot safely inspect existing database: {path}") from exc
 
 
-def _profile_db_path() -> Path:
-    home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes").expanduser().resolve()
+def _db_in(home: Path) -> Path:
     return home / "plugin-data" / "hermes-dockyard" / "dockyard.db"
 
 
-def _root_db_path() -> Path:
-    """The root profile's database: ``<root>/profiles/<name>`` -> ``<root>``.
+def _standalone_home() -> Path:
+    """Without Hermes: ``HERMES_HOME``, else ``~/.hermes``."""
+    return Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes").expanduser().resolve()
+
+
+def active_hermes_home() -> Path:
+    """The Hermes home of the turn or request in progress (issue #36).
+
+    Inside Hermes this is Hermes' own answer, ``hermes_constants.get_hermes_home()``:
+    the context-local profile a multiplexed Desktop/TUI process binds for each
+    session, else ``HERMES_HOME``, else the platform default (``%LOCALAPPDATA%\\hermes``
+    on Windows). Hermes deliberately never writes that per-session profile into
+    ``os.environ``, which every profile in the process shares, so reading the
+    environment named the launch profile instead. Nothing here writes it either.
+
+    A failing Hermes resolver raises rather than falling back to the launch
+    profile: a guess could hand one profile's chat link or memory to another.
+    Without Hermes (a standalone ``stewardctl``) the environment rule applies.
+    """
+    try:
+        get_hermes_home = import_module("hermes_constants").get_hermes_home
+    except (ImportError, AttributeError):
+        return _standalone_home()
+    return Path(get_hermes_home()).expanduser().resolve()
+
+
+def hermes_root(home: Path | None = None) -> Path:
+    """The root that holds every profile: ``<root>/profiles/<name>`` -> ``<root>``.
 
     Mirrors Hermes' own ``get_default_hermes_root()`` for the standard and Docker
-    layouts, without importing Hermes (the dashboard loads this module too).
+    layouts; any other home is its own root. Defaults to the active home.
     """
-    home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes").expanduser().resolve()
-    root = home.parent.parent if home.parent.name == "profiles" else home
-    return root / "plugin-data" / "hermes-dockyard" / "dockyard.db"
+    home = active_hermes_home() if home is None else home
+    return home.parent.parent if home.parent.name == "profiles" else home
+
+
+def _profile_db_path() -> Path:
+    return _db_in(active_hermes_home())
+
+
+def _root_db_path() -> Path:
+    """The root profile's database, beside the root's own Hermes data."""
+    return _db_in(hermes_root())
+
+
+def _old_default_store() -> set[Path]:
+    """Where 0.5.5 and earlier put the default store when ``HERMES_HOME`` was unset.
+
+    That was always ``~/.hermes``, also on Windows, where Hermes keeps its data in
+    ``%LOCALAPPDATA%\\hermes``. Hermes' own home is authoritative now; a store left
+    at the old place is reported for an explicit selection, never silently
+    replaced by a new empty one or moved.
+    """
+    if os.environ.get("HERMES_HOME", "").strip():
+        return set()
+    old_home = (Path.home() / ".hermes").expanduser().resolve()
+    return set() if old_home == hermes_root() else {_db_in(old_home)}
 
 
 def locate_shared_db() -> Path | None:
@@ -143,7 +191,7 @@ def resolve_db_path(explicit: Path | str | None = None) -> Path:
         )
     canonical = _profile_db_path()
     home = canonical.parents[2]
-    legacy = {home / "stewardship.db", Path.cwd().resolve() / "stewardship.db"}
+    legacy = {home / "stewardship.db", Path.cwd().resolve() / "stewardship.db", *_old_default_store()}
     conflicts = [path for path in sorted(legacy) if path != canonical and _populated(path)]
     if conflicts:
         locations = ", ".join(str(path) for path in conflicts)

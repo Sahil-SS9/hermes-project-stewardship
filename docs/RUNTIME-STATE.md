@@ -9,8 +9,12 @@ Selection precedence:
 1. Explicit API `db_path`, core `PluginState.db_path` or CLI `--db`.
 2. `STEWARD_DB_PATH`.
 3. Legacy `DOCKYARD_PLUGIN_DB` (still supported by every surface).
-4. `$HERMES_HOME/plugin-data/hermes-dockyard/dockyard.db`.
-   Without `HERMES_HOME`, the profile root is `~/.hermes`.
+4. `<Hermes home>/plugin-data/hermes-dockyard/dockyard.db`, where the Hermes home
+   is Hermes' own answer (`hermes_constants.get_hermes_home()`): the profile a
+   multiplexed Desktop/TUI process binds for the current session, else
+   `HERMES_HOME`, else Hermes' platform default (`~/.hermes`, or
+   `%LOCALAPPDATA%\hermes` on Windows). Stewardship never writes `HERMES_HOME`.
+   Without Hermes (a standalone `stewardctl`) it is `HERMES_HOME`, else `~/.hermes`.
 
 Use the same selection across processes. An already-running plugin retains its
 open store until its normal lifecycle ends; setting an environment variable does
@@ -20,8 +24,10 @@ resolver.
 ## Existing installations
 
 Before opening the default, the resolver inspects the old
-`$HERMES_HOME/stewardship.db` and current-directory `stewardship.db` with read-only
-SQLite connections. A schema-only empty legacy database is not user data. A
+`<Hermes home>/stewardship.db` and current-directory `stewardship.db` with read-only
+SQLite connections. When `HERMES_HOME` is unset and Hermes' home is not `~/.hermes`
+(Windows), it also inspects `~/.hermes/plugin-data/hermes-dockyard/dockyard.db`,
+where 0.5.5 and earlier kept the default database. A schema-only empty legacy database is not user data. A
 populated, unrecognised or unreadable legacy database stops default startup.
 It never copies, renames, overwrites, merges or silently adopts an old database.
 

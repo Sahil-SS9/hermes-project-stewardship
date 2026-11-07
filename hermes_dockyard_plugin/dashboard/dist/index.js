@@ -2218,6 +2218,20 @@
     select("dashboard");
   }
 
+  // src/onboarding-hint.ts
+  var PROFILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+  function otherProfilesHint(discovered) {
+    if (!discovered || (discovered.projects ?? []).length > 0) return null;
+    const others = (discovered.other_profiles ?? []).filter(
+      (p) => p && PROFILE_NAME.test(String(p.name)) && Number(p.project_count) > 0
+    );
+    if (others.length === 0) return null;
+    const here = PROFILE_NAME.test(String(discovered.profile ?? "")) ? String(discovered.profile) : "default";
+    const listed = others.map((p) => `${p.name} (${Number(p.project_count)})`).join(", ");
+    const command = here === "default" ? "hermes project create" : `hermes -p ${here} project create`;
+    return `The ${here} profile has no Hermes projects yet. Other profiles have their own: ${listed}. Hermes keeps projects per profile, so those are not offered here. To onboard one, register it in ${here} first (${command} <name> <repo path>), then refresh host discovery.`;
+  }
+
   // src/app.ts
   function initApp(sdk, root) {
     let deepLinkView = null;
@@ -3609,6 +3623,12 @@
           existing.length > 0 ? `Existing host projects: ${existing.map((p) => p.slug).join(", ")}.` : "No existing host projects; create-new below."
         );
         discoverBox.appendChild(head);
+        const hint = otherProfilesHint(d);
+        if (hint) {
+          const note = textEl("p", "dy-dim", hint);
+          note.dataset.otherProfileProjects = "true";
+          discoverBox.appendChild(note);
+        }
         const profiles = (d.profiles ?? []).map((p) => p.name);
         select.replaceChildren();
         for (const name of profiles) {
