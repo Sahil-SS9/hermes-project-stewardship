@@ -1,6 +1,8 @@
 import { build } from 'esbuild';
-import { writeFileSync, mkdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import {
+  copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync,
+} from 'node:fs';
+import { dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // cor-008: anchor every path to this script's directory so a wrong-cwd
@@ -90,3 +92,29 @@ for (const f of [join(dir, 'dist', 'index.js'), join(dir, 'dist', 'style.css'), 
   if (size === 0) throw new Error(`empty build output: ${f}`);
   console.log(`${f.replace(dir + '/', '').replace(PLUGIN_DIR + '/', '')}: ${size} bytes`);
 }
+
+// ---- the copy Hermes installs (the repo's top-level dashboard/) -------------
+// Hermes reads <plugin>/dashboard/manifest.json and the files it names. That
+// path is a real directory of regular files, never a symlink: Git for Windows
+// checks a symlink out as a text file holding its target (core.symlinks=false),
+// so Hermes found no manifest and never mounted the backend API (issue #38).
+// Exactly the manifest's runtime files are published, byte for byte; the test
+// suite (tests/test_published_dashboard.py) fails when they drift.
+const PUBLISHED = join(PLUGIN_DIR, '..', 'dashboard');
+const manifest = JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8'));
+const runtimeFiles = ['manifest.json', manifest.api, manifest.entry, manifest.css];
+for (const relative of runtimeFiles) {
+  if (typeof relative !== 'string' || !relative || isAbsolute(relative) || relative.split(/[\\/]/).includes('..')) {
+    throw new Error(`manifest names an unsafe runtime file: ${relative}`);
+  }
+}
+if (existsSync(PUBLISHED) && lstatSync(PUBLISHED).isSymbolicLink()) {
+  throw new Error(`${PUBLISHED} is a symlink; replace it with a directory (git pull) and rebuild`);
+}
+rmSync(PUBLISHED, { recursive: true, force: true });
+for (const relative of runtimeFiles) {
+  const target = join(PUBLISHED, relative);
+  mkdirSync(dirname(target), { recursive: true });
+  copyFileSync(join(dir, relative), target);
+}
+console.log(`published ${runtimeFiles.length} runtime files to dashboard/`);
