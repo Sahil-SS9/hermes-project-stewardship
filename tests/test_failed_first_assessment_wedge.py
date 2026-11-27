@@ -149,3 +149,12 @@ def test_a_press_that_loses_the_race_runs_nothing(engine, project, store, clock,
         {"idempotency_key": f"{KEY}#retry-1", "state": "completed"},
     ]
     assert store.mutex_holder(project) is None  # the mutex was handed back
+
+
+def test_only_first_assessment_keys_are_retried(engine, project, store, clock):
+    """Other triggers keep their old behaviour: no derived retry key is made."""
+    other = "webhook:demo-delivery-1"
+    _record_failed_cycle(store, project, other, clock)
+    with pytest.raises(Exception):  # the old behaviour: the key stays taken
+        engine.run_cycle(project, idempotency_key=other)
+    assert _cycle_rows(store) == [{"idempotency_key": other, "state": "failed"}]

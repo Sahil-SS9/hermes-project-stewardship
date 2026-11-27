@@ -40,6 +40,11 @@ class CycleRefused(Exception):
     """Cycle did not run (mutex/budget/pause). Not an engine failure."""
 
 
+# Only these fixed per-project keys are retried after a failed cycle. Every
+# other trigger keeps its old behaviour; widening this is a separate decision.
+RETRYABLE_KEY_PREFIX = "dockyard-first-assessment:"
+
+
 class DuplicateTrigger(CycleRefused):
     """The trigger key was already processed: the only refusal a replay may answer."""
 
@@ -106,7 +111,7 @@ class CycleEngine:
         # caller sees a raw sqlite 503 on that key forever. A completed
         # (or still-running) prior is a genuine duplicate; a failed prior
         # retries under a derived, free key after the mutex.
-        prior = self.svc.cycle_for_trigger(key)
+        prior = self.svc.cycle_for_trigger(key) if key.startswith(RETRYABLE_KEY_PREFIX) else None
         prior_failed = False
         if prior is not None:
             if prior["state"] != CycleState.FAILED.value:
