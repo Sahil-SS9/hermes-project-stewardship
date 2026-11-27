@@ -130,6 +130,16 @@ class CycleEngine:
             raise CycleRefused(f"another cycle holds the mutex ({current})")
 
         if prior_failed:
+            # Another press can finish between the check above and the mutex.
+            # Look again now that this press holds the mutex, so two presses
+            # cannot both run (the second would otherwise start ``#retry-2``).
+            settled = self.svc.cycle_for_trigger(key)
+            if settled is not None and settled["state"] != CycleState.FAILED.value:
+                self.store.mutex_release(project_id, holder)
+                raise DuplicateTrigger(
+                    f"duplicate trigger {key}: cycle {settled['id']}"
+                    f" was already run (state {settled['state']})"
+                )
             # A failed cycle is not a duplicate trigger: the recorded failure
             # stays put and the retry runs under a new key. Deterministic
             # derivation (first free ``#retry-n``) keeps concurrent presses on

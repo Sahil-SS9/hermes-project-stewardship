@@ -2760,24 +2760,13 @@ class StewardshipService:
         failures); otherwise the first failed record; otherwise the first
         record of any state (a crashed ``running`` cycle); else None.
         """
-        escaped = (
-            idempotency_key.replace("\\", "\\\\")
-            .replace("%", "\\%")
-            .replace("_", "\\_")
-        )
-        rows = self.store._conn.execute(
-            "SELECT * FROM project_cycles WHERE idempotency_key LIKE ? ESCAPE '\\'"
-            " ORDER BY id",
-            (f"{escaped}#retry-%",),
-        ).fetchall()
-        retry_rows = {row["idempotency_key"]: row for row in map(self._cycle_row_dict, rows)}
-        base_row = self.cycle_by_key(idempotency_key)
         chain: list[Dict[str, Any]] = []
+        base_row = self.cycle_by_key(idempotency_key)
         if base_row is not None:
             chain.append(base_row)
         attempt = 1
         while True:
-            row = retry_rows.pop(f"{idempotency_key}#retry-{attempt}", None)
+            row = self.cycle_by_key(f"{idempotency_key}#retry-{attempt}")
             if row is None:
                 break
             chain.append(row)
@@ -2787,16 +2776,6 @@ class StewardshipService:
                 if state is None or record["state"] == state:
                     return record
         return None
-
-    def _cycle_row_dict(self, row: Any) -> Dict[str, Any]:
-        return {
-            "idempotency_key": row["idempotency_key"],
-            "id": row["id"],
-            "state": row["state"],
-            "summary": row["summary"],
-            "started_at": row["started_at"],
-            "completed_at": row["completed_at"],
-        }
 
     # ------------------------------------------------------------------ #
     # Initiatives                                                        #
