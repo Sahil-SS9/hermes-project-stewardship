@@ -54,7 +54,7 @@ _SAFE_HOST_MESSAGES = {
     "write_conflict": "canonical work could not be written",
     "write_forbidden": "canonical work write is not permitted",
     "idempotency_conflict": "Idempotency key was already used for different project details",
-    "board_already_claimed": "That board already belongs to another project",
+    "board_already_claimed": "That board already belongs to another project (or to one that no longer exists). Choose a different board.",
     "host_unavailable": "canonical project and Kanban host is unavailable",
 }
 

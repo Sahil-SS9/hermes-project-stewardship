@@ -91,3 +91,63 @@ def test_replaying_your_own_provisioning_is_not_a_takeover(env):
     again = _provision(host, repo, "mine", "mine-board")
     assert again["replayed"] is True
     assert again["board"]["project_id"] == first["project"]["id"]
+
+
+def test_an_archived_project_still_owns_its_board(env):
+    home, repo = env
+    host = ProjectKanbanHost(hermes_home=home)
+    first = _provision(host, repo, "gone", "kept-board")
+    token = set_home(home)
+    try:
+        with projects_db.connect_closing() as conn:
+            projects_db.archive_project(conn, first["project"]["id"])
+    finally:
+        reset_home(token)
+    with pytest.raises(HostError) as err:
+        _provision(host, repo, "newcomer", "kept-board", "k2")
+    assert err.value.code == "board_already_claimed"
+
+
+def test_the_preflight_refuses_a_claimed_board_before_the_last_step(env):
+    home, repo = env
+    kanban_db.create_board("shared", name="Shared", project_id="p_somebody_else")
+    host = ProjectKanbanHost(hermes_home=home)
+    (repo / "newcomer").mkdir()
+    with pytest.raises(HostError) as err:
+        host.validate_project(
+            name="Newcomer", slug="newcomer", description="d",
+            repo_path=str(repo / "newcomer"), board_slug="shared", lead_profile="octacon",
+        )
+    assert err.value.code == "validation_error"
+    assert "board_slug" in err.value.fields
+    # a free board and an existing project's own board still pass the preflight
+    host.validate_project(
+        name="Newcomer", slug="newcomer", description="d",
+        repo_path=str(repo / "newcomer"), board_slug="free-board", lead_profile="octacon",
+    )
+
+
+def test_two_projects_provisioned_at_once_cannot_both_take_one_board(env):
+    import threading
+
+    home, repo = env
+    host = ProjectKanbanHost(hermes_home=home)
+    for trial in range(8):
+        barrier = threading.Barrier(2)
+        results: list[str] = []
+
+        def go(slug: str, trial=trial, barrier=barrier, results=results) -> None:
+            barrier.wait()
+            try:
+                _provision(host, repo, slug, f"race-{trial}", f"key-{slug}")
+                results.append("ok")
+            except HostError as exc:
+                results.append(exc.code)
+
+        threads = [threading.Thread(target=go, args=(f"a{trial}",)),
+                   threading.Thread(target=go, args=(f"b{trial}",))]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert sorted(results) == ["board_already_claimed", "ok"], (trial, results)
