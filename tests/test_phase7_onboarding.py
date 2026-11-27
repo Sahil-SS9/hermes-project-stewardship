@@ -82,6 +82,31 @@ def test_discover_lists_existing_projects_and_boards_before_provision(
     assert all("repo_path" in p for p in after["projects"])
 
 
+def test_discover_reports_an_unbound_board_as_null_not_the_string_none(
+    tmp_path, monkeypatch
+):
+    """P7.1: ``projects.board_slug`` is NULL for a project that never bound a
+    Kanban board. Discovery must report that as ``null``: stringifying it gives
+    the literal "None", which onboarding's host validation then rejects as a
+    non-lowercase board slug (422) and no commit can ever succeed."""
+    require_native()
+    from hermes_cli import projects_db
+
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "native-root"))
+    home = tmp_path / "hermes"
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    host = ProjectKanbanHost(hermes_home=home)
+    with projects_db.connect_closing(home / "projects.db") as conn:
+        projects_db.create_project(
+            conn, name="Unbound", slug="unbound", primary_path=str(repo),
+        )
+    discovered = host.list_existing_projects()
+    assert [(p["slug"], p["board_slug"]) for p in discovered["projects"]] == [
+        ("unbound", None)
+    ]
+
+
 # ------------------------------------------------------------------ #
 # P7.2 — host validate as preflight                                   #
 # ------------------------------------------------------------------ #

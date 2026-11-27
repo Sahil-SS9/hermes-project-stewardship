@@ -168,7 +168,7 @@ class ProjectKanbanHost:
                 "id": str(p.id),
                 "slug": str(p.slug),
                 "name": str(p.name),
-                "board_slug": str(p.board_slug),
+                "board_slug": str(p.board_slug) if p.board_slug else None,
                 "repo_path": str(p.primary_path),
             }
             for p in rows
