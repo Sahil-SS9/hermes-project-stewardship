@@ -731,7 +731,7 @@ def _kanban_error_status(code: str) -> int:
         return 404
     if code == "validation_error":
         return 422
-    if code in {"transition_conflict", "write_conflict", "idempotency_conflict"}:
+    if code in {"transition_conflict", "write_conflict", "idempotency_conflict", "board_already_claimed"}:
         return 409
     return 503
 

@@ -358,6 +358,14 @@ class ProjectKanbanHost:
                         "status": "complete", "replayed": True,
                         "project": record, "board": board,
                     }
+                # A board that already belongs to another project is never
+                # taken over: refuse before anything is created.
+                owner = self._board_owner(conn, kanban_db, projects_db, clean["board_slug"])
+                if owner:
+                    raise HostError(
+                        "board_already_claimed",
+                        "That board already belongs to another project",
+                    )
                 project_id = projects_db.create_project(
                     conn, name=clean["name"], slug=clean["slug"],
                     description=clean["description"], primary_path=clean["repo_path"],
@@ -386,6 +394,22 @@ class ProjectKanbanHost:
                 "status": "complete", "replayed": False,
                 "project": self.get_project(project_id), "board": board,
             }
+
+    @staticmethod
+    def _board_owner(conn, kanban_db, projects_db, board_slug: str) -> str:
+        """Who owns this board, or "" if nobody.
+
+        A board is claimed when its board.json names a project, or when any
+        project (archived ones too) names it as its board.
+        """
+        if kanban_db.board_exists(board_slug):
+            bound = str(kanban_db.read_board_metadata(board_slug).get("project_id") or "").strip()
+            if bound:
+                return bound
+        for project in projects_db.list_projects(conn, include_archived=True):
+            if str(project.board_slug or "") == board_slug:
+                return str(project.id)
+        return ""
 
     def get_project(self, project_id: str) -> dict[str, Any]:
         _, _, projects_db = self._modules()
