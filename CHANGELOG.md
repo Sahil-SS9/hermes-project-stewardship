@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.7] - 2026-11-27
+
+### Fixed
+- A failed first assessment no longer leaves a project stuck. The first
+  assessment used one fixed key, so after a failure every retry hit the same
+  key and the project answered 503 for good. A retry now runs under a fresh
+  key. Only first assessments retry this way; every other trigger behaves as
+  before, and two retries arriving together cannot both run.
+- The onboarding preview shows what will actually be created. When Hermes
+  already hosts the project, the preflight now previews the adopted name and
+  board instead of the ones typed into the form.
+- A new project can no longer take over a board that belongs to another
+  project. A board counts as claimed when its `board.json` names a project, or
+  when any project row (archived ones too) names it as its board. Provisioning
+  refuses with a clear message (HTTP 409), the onboarding preflight says so up
+  front, and two projects submitted at the same moment cannot both claim one
+  board. The shared `default` board is not special-cased.
+
+### Known
+- `desktop/milestone-chain.test.mjs` is a timing-sensitive browser test that
+  fails in roughly 1 run in 10, on `main` as well. It is unrelated to these
+  fixes and is tracked separately.
+
 ## [0.5.6] - 2026-11-07
 
 ### Fixed

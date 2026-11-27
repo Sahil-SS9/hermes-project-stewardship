@@ -132,3 +132,24 @@ def test_a_non_duplicate_refusal_is_not_disguised_as_a_replay(onboarded):
     assert refused.status_code == 409, refused.text
     assert "frozen" in refused.text
     assert "replayed" not in refused.text
+
+
+def test_a_failed_first_assessment_presses_again_instead_of_503(onboarded):
+    """F8: a failed cycle burns the fixed per-project key (its trigger was
+    never marked) and the endpoint used to answer with a raw sqlite
+    ``UNIQUE constraint failed`` 503 forever. A failed record now retries."""
+    client, store = onboarded
+    with store.tx() as cx:
+        cx.execute(
+            "INSERT INTO project_cycles(project_id, trigger_type, trigger_ref,"
+            " idempotency_key, state, started_at)"
+            " VALUES('accountability-app', 'manual', NULL, ?, 'failed', ?)",
+            ("dockyard-first-assessment:accountability-app", "2026-01-01T00:00:00"),
+        )
+
+    first = client.post(ASSESS)
+    assert first.status_code == 200, first.text  # was 503 + raw sqlite text
+    assert "UNIQUE constraint" not in first.text
+    retry = client.post(ASSESS)
+    assert retry.status_code == 200, retry.text
+    assert retry.json()["assessment"]["cycle_id"] == first.json()["assessment"]["cycle_id"]

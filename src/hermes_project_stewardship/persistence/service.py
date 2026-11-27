@@ -2749,6 +2749,34 @@ class StewardshipService:
             "completed_at": row["completed_at"],
         }
 
+    def cycle_for_trigger(self, idempotency_key: str) -> Optional[Dict[str, Any]]:
+        """The cycle a trigger key resolves to, retries included (F8).
+
+        A FAILED cycle under a fixed key (e.g. the first-assessment key) is
+        retried under ``<key>#retry-1``, ``#retry-2``, ...: the base row keeps
+        recording the failure while the trigger's latest answer may be a
+        successful retry. Resolution over the key's chain, in order: any
+        COMPLETED cycle wins (a successful retry supersedes earlier
+        failures); otherwise the first failed record; otherwise the first
+        record of any state (a crashed ``running`` cycle); else None.
+        """
+        chain: list[Dict[str, Any]] = []
+        base_row = self.cycle_by_key(idempotency_key)
+        if base_row is not None:
+            chain.append(base_row)
+        attempt = 1
+        while True:
+            row = self.cycle_by_key(f"{idempotency_key}#retry-{attempt}")
+            if row is None:
+                break
+            chain.append(row)
+            attempt += 1
+        for state in ("completed", "failed", None):
+            for record in chain:
+                if state is None or record["state"] == state:
+                    return record
+        return None
+
     # ------------------------------------------------------------------ #
     # Initiatives                                                        #
     # ------------------------------------------------------------------ #

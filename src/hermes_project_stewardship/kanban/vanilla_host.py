@@ -9,11 +9,17 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import threading
 from typing import Any, Iterator
 
 from .work_parents import WorkParents
 
 CONTRACT_VERSION = 2
+_BOARD_CLAIMED_MESSAGE = (
+    "That board already belongs to another project (or to one that no longer exists). "
+    "Choose a different board."
+)
+_PROVISION_LOCK = threading.Lock()  # one provisioning at a time in this process
 MAX_PAGE_SIZE = 500
 _PROFILE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 _TASK_KINDS = {"task", "bug", "spike", "subtask", "gate", "epic"}
@@ -255,7 +261,18 @@ class ProjectKanbanHost:
 
     def validate_project(self, **payload: Any) -> dict[str, Any]:
         with self._scope():
-            return self._validate(**payload)
+            clean = self._validate(**payload)
+            # Say so now, not at the last wizard step: a NEW project cannot
+            # take a board that already belongs to another project.
+            _, kanban_db, projects_db = self._modules()
+            with projects_db.connect_closing() as conn:
+                is_new = projects_db.get_project(conn, clean["slug"]) is None
+                if is_new and self._board_owner(conn, kanban_db, projects_db, clean["board_slug"]):
+                    raise HostError(
+                        "validation_error", "Project details are invalid",
+                        fields={"board_slug": [_BOARD_CLAIMED_MESSAGE]},
+                    )
+            return clean
 
     def _journal_path(self) -> Path:
         """P7.5 durable provisioning journal (plugin-owned, inside the host's
@@ -279,7 +296,33 @@ class ProjectKanbanHost:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(journal, indent=1, sort_keys=True))
 
+    @contextmanager
+    def _provision_guard(self) -> Iterator[None]:
+        """One provisioning at a time: threads in this process and other
+        processes on the same Hermes home. Without it two projects could pass
+        the board-owner check together and both claim one board."""
+        with _PROVISION_LOCK:
+            handle = None
+            try:
+                import fcntl
+
+                path = self.hermes_home / "dockyard" / "provisioning.lock"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                handle = open(path, "a")  # noqa: SIM115 - closed in finally
+                fcntl.flock(handle, fcntl.LOCK_EX)
+            except ImportError:  # no flock on this platform: the thread lock still holds
+                handle = None
+            try:
+                yield
+            finally:
+                if handle is not None:
+                    handle.close()  # closing releases the flock
+
     def provision_project(self, *, idempotency_key: str, **payload: Any) -> dict[str, Any]:
+        with self._provision_guard():
+            return self._provision_project(idempotency_key=idempotency_key, **payload)
+
+    def _provision_project(self, *, idempotency_key: str, **payload: Any) -> dict[str, Any]:
         """P7.5: restart- and retry-safe provisioning.
 
         Stages: validated → project-created → board-created. A failure after
@@ -358,6 +401,11 @@ class ProjectKanbanHost:
                         "status": "complete", "replayed": True,
                         "project": record, "board": board,
                     }
+                # A board that already belongs to another project is never
+                # taken over: refuse before anything is created.
+                owner = self._board_owner(conn, kanban_db, projects_db, clean["board_slug"])
+                if owner:
+                    raise HostError("board_already_claimed", _BOARD_CLAIMED_MESSAGE)
                 project_id = projects_db.create_project(
                     conn, name=clean["name"], slug=clean["slug"],
                     description=clean["description"], primary_path=clean["repo_path"],
@@ -386,6 +434,22 @@ class ProjectKanbanHost:
                 "status": "complete", "replayed": False,
                 "project": self.get_project(project_id), "board": board,
             }
+
+    @staticmethod
+    def _board_owner(conn, kanban_db, projects_db, board_slug: str) -> str:
+        """Who owns this board, or "" if nobody.
+
+        A board is claimed when its board.json names a project, or when any
+        project (archived ones too) names it as its board.
+        """
+        if kanban_db.board_exists(board_slug):
+            bound = str(kanban_db.read_board_metadata(board_slug).get("project_id") or "").strip()
+            if bound:
+                return bound
+        for project in projects_db.list_projects(conn, include_archived=True):
+            if str(project.board_slug or "").strip().lower() == board_slug:
+                return str(project.id)
+        return ""
 
     def get_project(self, project_id: str) -> dict[str, Any]:
         _, _, projects_db = self._modules()
